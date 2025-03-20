@@ -1,12 +1,11 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useRef, useCallback } from "react"
 import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useMotionValueEvent } from "motion/react"
 import { useMediaQuery } from "../hooks/use-mobile"
 import { PortfolioModal } from "./PortfolioModal"
 import { FadeIn } from "./FadeIn"
+import Image from "next/image"
 
 interface PortfolioItem {
   company: string
@@ -107,9 +106,11 @@ export function PortfolioGrid() {
                 }}
                 className="w-full md:w-1/2 lg:w-2/5 max-w-lg mx-auto order-1 md:order-2"
               >
-                <img
+                <Image
                   src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK+(1).png"
                   alt="434 Media Icon"
+                  width={500}
+                  height={500}
                   className="w-full h-auto object-contain"
                 />
               </motion.div>
@@ -208,7 +209,6 @@ function PortfolioItem({
   onClick: (item: PortfolioItem) => void
 }) {
   const [isHovered, setIsHovered] = useState(false)
-  const isMobile = useMediaQuery("(max-width: 639px)")
 
   return (
     <motion.div
@@ -229,19 +229,20 @@ function PortfolioItem({
     >
       <div className="relative rounded-2xl overflow-hidden shadow-lg transition-shadow duration-300 group-hover:shadow-xl">
         <div className="aspect-[16/9] overflow-hidden bg-neutral-900">
-          <motion.img
-            src={item.photo}
+          <Image
+            src={item.photo || "/placeholder.svg"}
             alt={item.company}
-            loading="lazy"
-            sizes="(max-width: 479px) 92vw, (max-width: 767px) 95vw, (max-width: 991px) 96vw, 93vw"
-            srcSet={`${item.photo}?w=500 500w, ${item.photo}?w=800 800w, ${item.photo}?w=1080 1080w, ${item.photo}?w=1600 1600w, ${item.photo}?w=2000 2000w, ${item.photo}?w=2600 2600w, ${item.photo}?w=3200 3200w`}
+            width={1600}
+            height={900}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             style={{ opacity: isHovered && item.gif ? 0 : 1 }}
           />
           {item.gif && (
-            <motion.img
-              src={item.gif}
+            <Image
+              src={item.gif || "/placeholder.svg"}
               alt={`${item.company} animation`}
+              width={1600}
+              height={900}
               className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 rounded-2xl"
               style={{ opacity: isHovered ? 1 : 0 }}
             />
@@ -275,10 +276,6 @@ function PortfolioItem({
       </div>
     </motion.div>
   )
-}
-
-function ExternalLinkIcon(props: React.SVGProps<SVGSVGElement>) {
-  return <i className="ri-arrow-right-line" aria-hidden="true" />
 }
 
 export const portfolioArray: PortfolioItem[] = [

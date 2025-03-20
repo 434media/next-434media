@@ -27,7 +27,6 @@ interface PortfolioModalProps {
 export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [isVideoLoaded, setIsVideoLoaded] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
 
   useEffect(() => {
@@ -59,11 +58,6 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
       modalRef.current.focus()
     }
   }, [])
-
-  const handleVideoLoad = () => {
-    console.log("Video loaded")
-    setIsVideoLoaded(true)
-  }
 
   const handlePlayClick = () => {
     if (videoRef.current) {

@@ -123,7 +123,7 @@ export function ContactForm({ className = "" }: ContactFormProps) {
             <div className="text-center">
               <i className="ri-check-line mx-auto h-12 w-12 text-emerald-500" />
               <h3 className="mt-2 text-xl font-semibold text-neutral-900">Thanks for Connecting!</h3>
-              <p className="mt-2 text-sm text-neutral-600">We'll be in touch soon.</p>
+              <p className="mt-2 text-sm text-neutral-600">We&apos;ll be in touch soon.</p>
             </div>
           </motion.div>
         ) : (

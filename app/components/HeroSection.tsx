@@ -25,7 +25,6 @@ export function HeroSection() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false)
   const [isIntersecting, setIsIntersecting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [loadAttempts, setLoadAttempts] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   const videoUrl = useMemo(
@@ -44,29 +43,30 @@ export function HeroSection() {
       { threshold: 0.1 },
     )
 
-    if (videoRef.current) {
-      observer.observe(videoRef.current)
+    const currentVideo = videoRef.current
+    if (currentVideo) {
+      observer.observe(currentVideo)
     }
 
     return () => {
-      if (videoRef.current) {
-        observer.unobserve(videoRef.current)
+      if (currentVideo) {
+        observer.unobserve(currentVideo)
       }
     }
   }, [])
 
   useEffect(() => {
-    if (isIntersecting && videoRef.current) {
-      videoRef.current.play().catch((error) => console.error("Error playing video:", error))
-    } else if (!isIntersecting && videoRef.current) {
-      videoRef.current.pause()
+    const currentVideo = videoRef.current
+    if (isIntersecting && currentVideo) {
+      currentVideo.play().catch((error) => console.error("Error playing video:", error))
+    } else if (!isIntersecting && currentVideo) {
+      currentVideo.pause()
     }
   }, [isIntersecting])
 
   const loadVideo = useCallback(() => {
     setIsLoading(true)
     setError(null)
-    setLoadAttempts((prev) => prev + 1)
 
     if (videoRef.current) {
       videoRef.current.load()

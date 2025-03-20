@@ -152,7 +152,7 @@ export function Newsletter() {
             exit={{ opacity: 0, scale: 0.9 }}
             className="mt-6 bg-neutral-800 px-6 py-4 rounded-full text-emerald-500 text-center"
           >
-            Thanks for subscribing! We'll be in touch soon.
+            Thanks for subscribing! We&apos;ll be in touch soon.
           </motion.div>
         )}
       </AnimatePresence>
