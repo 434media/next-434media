@@ -23,9 +23,9 @@ export default function PrivacyPolicyPage() {
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">1. Introduction</h2>
             <p className="text-neutral-700 mb-4">
-              434 Media ("we," "our," or "us") respects your privacy and is committed to protecting your personal
-              information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information
-              when you visit our website or use our services.
+              434 Media (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) respects your privacy and is committed to
+              protecting your personal information. This Privacy Policy explains how we collect, use, disclose, and
+              safeguard your information when you visit our website or use our services.
             </p>
             <p className="text-neutral-700 mb-4">
               Please read this Privacy Policy carefully. By accessing or using our website or services, you acknowledge
@@ -99,15 +99,15 @@ export default function PrivacyPolicyPage() {
               <li>The right to opt-out of marketing communications</li>
             </ul>
             <p className="text-neutral-700 mb-4">
-              To exercise these rights, please contact us using the information provided in the "Contact Us" section
-              below.
+              To exercise these rights, please contact us using the information provided in the &quot;Contact Us&quot;
+              section below.
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">8. Changes to This Privacy Policy</h2>
             <p className="text-neutral-700 mb-4">
               We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new
-              Privacy Policy on this page and updating the "Last Updated" date. You are advised to review this Privacy
-              Policy periodically for any changes.
+              Privacy Policy on this page and updating the &quot;Last Updated&quot; date. You are advised to review this
+              Privacy Policy periodically for any changes.
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">9. Contact Us</h2>

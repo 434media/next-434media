@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 
 interface ScrambleTextProps {
   text: string
@@ -23,7 +22,8 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
   const [isScrambled, setIsScrambled] = useState(scrambleOnMount)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const scramble = () => {
+  // Define scramble function with useCallback to avoid recreating it on every render
+  const scramble = useCallback(() => {
     let index = 0
     const originalText = text
     const characters = "!<>-_\\/[]{}—=+*^?#________"
@@ -46,8 +46,9 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
         setIsScrambled(false)
       }
     }, duration)
-  }
+  }, [text, duration])
 
+  // Effect for initial scramble on mount
   useEffect(() => {
     if (scrambleOnMount) {
       scramble()
@@ -57,7 +58,7 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
         clearInterval(intervalRef.current)
       }
     }
-  }, [])
+  }, [scrambleOnMount, scramble])
 
   const handleMouseEnter = () => {
     if (scrambleOnHover && !isScrambled) {

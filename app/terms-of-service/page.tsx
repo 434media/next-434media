@@ -23,8 +23,9 @@ export default function TermsOfServicePage() {
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">1. Agreement to Terms</h2>
             <p className="text-neutral-700 mb-4">
-              By accessing or using the services provided by 434 Media ("we," "our," or "us"), you agree to be bound by
-              these Terms of Service. If you do not agree to these terms, please do not use our services.
+              By accessing or using the services provided by 434 Media (&quot;we,&quot; &quot;our,&quot; or
+              &quot;us&quot;), you agree to be bound by these Terms of Service. If you do not agree to these terms,
+              please do not use our services.
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">2. Description of Services</h2>
@@ -70,9 +71,9 @@ export default function TermsOfServicePage() {
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">6. Disclaimer of Warranties</h2>
             <p className="text-neutral-700 mb-4">
-              Our website and services are provided on an "as is" and "as available" basis. 434 Media makes no
-              representations or warranties of any kind, express or implied, as to the operation of our website or the
-              information, content, materials, or products included on our website.
+              Our website and services are provided on an &quot;as is&quot; and &quot;as available&quot; basis. 434
+              Media makes no representations or warranties of any kind, express or implied, as to the operation of our
+              website or the information, content, materials, or products included on our website.
             </p>
             <p className="text-neutral-700 mb-4">
               To the full extent permissible by applicable law, 434 Media disclaims all warranties, express or implied,
@@ -88,8 +89,8 @@ export default function TermsOfServicePage() {
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">8. Indemnification</h2>
             <p className="text-neutral-700 mb-4">
               You agree to indemnify, defend, and hold harmless 434 Media, its officers, directors, employees, agents,
-              and third parties, for any losses, costs, liabilities, and expenses (including reasonable attorneys&apos; fees)
-              relating to or arising out of your use of our website or services, your violation of these Terms of
+              and third parties, for any losses, costs, liabilities, and expenses (including reasonable attorneys&apos;
+              fees) relating to or arising out of your use of our website or services, your violation of these Terms of
               Service, or your violation of any rights of another.
             </p>
 
@@ -102,8 +103,9 @@ export default function TermsOfServicePage() {
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">10. Changes to Terms</h2>
             <p className="text-neutral-700 mb-4">
               We reserve the right to modify these Terms of Service at any time. We will notify you of any changes by
-              posting the new Terms of Service on this page and updating the "Last Updated" date. Your continued use of
-              our website or services after any such changes constitutes your acceptance of the new Terms of Service.
+              posting the new Terms of Service on this page and updating the &quot;Last Updated&quot; date. Your
+              continued use of our website or services after any such changes constitutes your acceptance of the new
+              Terms of Service.
             </p>
 
             <h2 className="text-2xl font-semibold text-neutral-900 mt-8 mb-4">11. Contact Information</h2>

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
 // Define the global interface for window.turnstile
@@ -150,32 +150,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     }
   }, [isVisible, hasSubmitted])
 
-  // Validate form data
-  const validateForm = useCallback((data: FormData): boolean => {
-    const errors: Record<string, string> = {}
-
-    if (!data.firstName.trim()) {
-      errors.firstName = "First name is required"
-    }
-
-    if (!data.lastName.trim()) {
-      errors.lastName = "Last name is required"
-    }
-
-    if (!data.company.trim()) {
-      errors.company = "Company is required"
-    }
-
-    if (!data.email.trim()) {
-      errors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-      errors.email = "Please enter a valid email address"
-    }
-
-    setFieldErrors(errors)
-    return Object.keys(errors).length === 0
-  }, [])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -194,8 +168,29 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     }
 
     // Validate form data
-    if (!formValues.firstName || !formValues.lastName || !formValues.company || !formValues.email) {
-      setError("Please fill in all required fields")
+    const errors: Record<string, string> = {}
+
+    if (!formValues.firstName.trim()) {
+      errors.firstName = "First name is required"
+    }
+
+    if (!formValues.lastName.trim()) {
+      errors.lastName = "Last name is required"
+    }
+
+    if (!formValues.company.trim()) {
+      errors.company = "Company is required"
+    }
+
+    if (!formValues.email.trim()) {
+      errors.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) {
+      errors.email = "Please enter a valid email address"
+    }
+
+    setFieldErrors(errors)
+
+    if (Object.keys(errors).length > 0) {
       setIsLoading(false)
       return
     }
@@ -423,7 +418,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                 <div className="mt-4">
                   <div
                     ref={turnstileRef}
-                    data-size="flexible"
+                    data-size="normal"
                     className="w-full flex justify-center items-center min-h-[70px]"
                     aria-label="Security challenge"
                   >

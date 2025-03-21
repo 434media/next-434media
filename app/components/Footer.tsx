@@ -39,14 +39,17 @@ export default function Footer() {
       { threshold: 0.1 },
     )
 
-    if (footerRef.current) {
-      observer.observe(footerRef.current)
+    // Capture the current value of the ref
+    const currentFooterRef = footerRef.current
+
+    if (currentFooterRef) {
+      observer.observe(currentFooterRef)
     }
 
     // Clean up observer on component unmount
     return () => {
-      if (footerRef.current) {
-        observer.unobserve(footerRef.current)
+      if (currentFooterRef) {
+        observer.unobserve(currentFooterRef)
       }
     }
   }, [])
@@ -80,12 +83,7 @@ export default function Footer() {
             >
               <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 mb-8">
                 <h2 id="footer-heading" className="text-white font-menda-black text-3xl sm:text-4xl lg:text-5xl">
-                  <ScrambleText 
-                    text="434 MEDIA" 
-                    className="inline-block cursor-pointer"
-                    scrambleOnMount={false}
-                    scrambleOnHover={true}
-                  />
+                  <ScrambleText text="434 MEDIA" className="inline-block cursor-pointer" />
                 </h2>
 
                 {/* LinkedIn link - smaller and aligned to the right */}
@@ -118,7 +116,7 @@ export default function Footer() {
                       results.
                     </p>
                   </div>
-                    <Newsletter />
+                  <Newsletter />
                 </div>
               </div>
 

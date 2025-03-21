@@ -5,7 +5,6 @@ import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
 // Extend the Window interface to include the turnstile property
-// Using the same interface as in ContactForm.tsx
 declare global {
   interface Window {
     turnstile?: {
@@ -56,10 +55,10 @@ export function Newsletter() {
         if (window.turnstile && turnstileRef.current) {
           const widgetId = window.turnstile.render(turnstileRef.current, {
             sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            callback: (token: string) => {
-              // Token received, no need to do anything here
+            callback: (_token: string) => {
+              // Token received, no action needed here
             },
-            "refresh-expired": "auto", // Added this property to match the interface
+            "refresh-expired": "auto",
           })
           setTurnstileWidget(widgetId)
         }
@@ -222,7 +221,7 @@ export function Newsletter() {
             role="status"
             aria-live="polite"
           >
-            Thanks for subscribing! We&apos;ll be in touch soon.
+            Thanks for subscribing! We'll be in touch soon.
           </motion.div>
         )}
       </AnimatePresence>

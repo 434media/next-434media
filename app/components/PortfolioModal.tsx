@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "motion/react"
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 
 interface PortfolioItem {
   showVideo: boolean
@@ -148,11 +149,13 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                     )}
                   </div>
                 ) : (
-                  <img
+                  <Image
                     src={item.photo || "/placeholder.svg"}
                     alt={item.company}
                     className="w-full h-full object-contain"
-                    loading="eager"
+                    width={1600}
+                    height={900}
+                    priority
                   />
                 )}
               </motion.div>
