@@ -1,11 +1,14 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { useRef, useState, useEffect, useCallback } from "react"
+import { motion, AnimatePresence, useScroll, useTransform } from "motion/react"
 import Image from "next/image"
 import { useMobile } from "../hooks/use-mobile"
 
 function ScrollIndicator() {
+  const { scrollY } = useScroll()
+  const opacity = useTransform(scrollY, [0, 10], [0.6, 0])
+
   return (
     <motion.div
       className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
@@ -37,83 +40,105 @@ export function HeroSection() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const isMobile = useMobile()
   const [isVideoLoaded, setIsVideoLoaded] = useState(false)
+  const [isIntersecting, setIsIntersecting] = useState(true) // Start as true to autoplay when visible
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [playAttempted, setPlayAttempted] = useState(false)
+  const [loadAttempts, setLoadAttempts] = useState(0)
 
   const videoUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434+Media.mp4"
   const posterUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434-poster.png"
 
-  // Handle video loading and playback
+  // Intersection Observer to play/pause video based on visibility
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsIntersecting(entry.isIntersecting)
+      },
+      { threshold: 0.1 },
+    )
 
-    // Function to handle successful loading
-    const handleCanPlay = () => {
-      setIsVideoLoaded(true)
-      setIsLoading(false)
+    const currentVideo = videoRef.current
+    if (currentVideo) {
+      observer.observe(currentVideo)
+    }
 
-      if (!playAttempted) {
-        setPlayAttempted(true)
-
-        // Try to play the video - always muted for mobile compatibility
-        video.muted = true
-
-        const playPromise = video.play()
-        if (playPromise !== undefined) {
-          playPromise.catch((error) => {
-            console.warn("Autoplay was prevented:", error)
-
-            // On mobile, we'll just show the poster image if autoplay fails
-            if (isMobile) {
-              console.log("Mobile device detected, using poster image as fallback")
-              setIsVideoLoaded(false)
-            }
-          })
-        }
+    return () => {
+      if (currentVideo) {
+        observer.unobserve(currentVideo)
       }
     }
+  }, [])
 
-    // Event listeners
-    video.addEventListener("canplay", handleCanPlay)
-    video.addEventListener("canplaythrough", handleCanPlay)
+  // Play/pause video based on visibility
+  useEffect(() => {
+    const currentVideo = videoRef.current
+    if (!currentVideo || !isVideoLoaded) return
 
-    // Basic error handling
-    video.addEventListener("error", (e) => {
-      console.error("Video error:", e)
-      setIsLoading(false)
-      setError("Unable to load the video. Please refresh the page.")
-    })
+    if (isIntersecting) {
+      const playPromise = currentVideo.play()
 
-    // Cleanup
-    return () => {
-      video.removeEventListener("canplay", handleCanPlay)
-      video.removeEventListener("canplaythrough", handleCanPlay)
-      video.removeEventListener("error", () => {})
+      // Handle play promise to avoid uncaught promise errors
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.error("Error playing video:", error)
+          // Don't show error to user for autoplay failures
+          // Most likely due to browser autoplay policy
+        })
+      }
+    } else {
+      currentVideo.pause()
     }
-  }, [isMobile, playAttempted])
+  }, [isIntersecting, isVideoLoaded])
 
-  // Handle manual retry
-  const handleRetry = () => {
+  // Load video with retry mechanism
+  const loadVideo = useCallback(() => {
     setIsLoading(true)
     setError(null)
-    setPlayAttempted(false)
+    setLoadAttempts((prev) => prev + 1)
 
-    const video = videoRef.current
-    if (video) {
-      video.load()
+    if (videoRef.current) {
+      videoRef.current.load()
+    }
+  }, [])
+
+  // Initial video load
+  useEffect(() => {
+    loadVideo()
+  }, [loadVideo])
+
+  // Handle video load success
+  const handleVideoLoad = () => {
+    console.log("Video loaded successfully")
+    setIsVideoLoaded(true)
+    setIsLoading(false)
+    setError(null)
+  }
+
+  // Handle video load error
+  const handleVideoError = () => {
+    console.error("Error loading video")
+    setIsLoading(false)
+
+    if (loadAttempts < 2 && !isMobile) {
+      // Auto-retry up to 2 times for non-mobile
+      setTimeout(loadVideo, 2000)
+    } else if (isMobile) {
+      // On mobile, just show the poster without error message
+      console.log("Mobile device detected, using poster image as fallback")
+      setIsVideoLoaded(false)
+    } else {
+      setError("Failed to load video. Please try again.")
     }
   }
 
-  // For mobile, we'll prioritize showing the poster image if video doesn't play quickly
+  // For mobile, set a timeout to fall back to poster if video doesn't load quickly
   useEffect(() => {
     if (isMobile && isLoading) {
-      // On mobile, set a timeout to stop waiting for video after 3 seconds
       const timeoutId = setTimeout(() => {
         if (isLoading) {
+          console.log("Mobile timeout reached, using poster image as fallback")
           setIsLoading(false)
-          setIsVideoLoaded(false) // Just show the poster
+          setIsVideoLoaded(false)
         }
       }, 3000)
 
@@ -126,10 +151,10 @@ export function HeroSection() {
       <div className="absolute inset-0 bg-neutral-950 flex items-center justify-center">
         {/* Visually hidden text for screen readers and SEO */}
         <div className="sr-only">
-          <h1 id="hero-heading">High-Impact Media & Marketing</h1>
+          <h1 id="hero-heading">Creative Media & Smart Marketing</h1>
           <p>
-            We connect enterprises through ROI-driven brand media strategies that move audiences and deliver measurable
-            results.
+            Connecting enterprises in San Antonio and South Texas by leveraging networks to connect people, places, and
+            things.
           </p>
         </div>
 
@@ -158,11 +183,14 @@ export function HeroSection() {
         {/* Video Background - Full opacity for better showcase */}
         <video
           ref={videoRef}
+          autoPlay
+          loop
           muted
           playsInline
-          loop
           preload="auto"
           poster={posterUrl}
+          onLoadedData={handleVideoLoad}
+          onError={handleVideoError}
           aria-label="434 Media promotional video showcasing creative media and marketing services"
           className={`absolute w-full h-full object-cover transition-opacity duration-500 ${
             isVideoLoaded && !error ? "opacity-100" : "opacity-0"
@@ -172,7 +200,7 @@ export function HeroSection() {
           <p>Your browser does not support HTML5 video.</p>
         </video>
 
-        {/* Loading Spinner - Only show for a limited time on mobile */}
+        {/* Loading Spinner */}
         {isLoading && (
           <div
             className="absolute inset-0 flex items-center justify-center bg-neutral-900/50 z-10"
@@ -184,7 +212,7 @@ export function HeroSection() {
           </div>
         )}
 
-        {/* Error Message */}
+        {/* Error Message - Only show on non-mobile */}
         {error && !isMobile && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-900/80 text-white z-10"
@@ -192,7 +220,7 @@ export function HeroSection() {
           >
             <p className="mb-4">{error}</p>
             <button
-              onClick={handleRetry}
+              onClick={loadVideo}
               className="px-4 py-2 bg-white text-neutral-900 rounded hover:bg-neutral-200 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-900"
             >
               Retry
@@ -212,7 +240,7 @@ export function HeroSection() {
         >
           <a
             href="#portfolio"
-            className="inline-block border border-white/60 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
+            className="inline-block border border-white/10 text-white px-6 sm:px-8 py-2.5 rounded-md text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
             onClick={(e) => {
               e.preventDefault()
               document.querySelector("#portfolio")?.scrollIntoView({ behavior: "smooth" })
@@ -222,7 +250,7 @@ export function HeroSection() {
           </a>
         </motion.div>
 
-        {/* Scroll Indicator - Kept visible */}
+        {/* Scroll Indicator */}
         <ScrollIndicator />
       </div>
     </section>
