@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, type FormEvent } from "react"
+import { useState, useRef, useEffect, type FormEvent } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
 interface ContactFormProps {
@@ -12,6 +12,8 @@ export function ContactForm({ className = "" }: ContactFormProps) {
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null)
 
   const formVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -26,9 +28,35 @@ export function ContactForm({ className = "" }: ContactFormProps) {
   }
 
   const isDevelopment = process.env.NODE_ENV === "development"
-  const turnstileWidget = process.env.NEXT_PUBLIC_TURNSTILE_WIDGET
 
-  // Update the handleSubmit function to use the new API endpoint and send all form fields
+  // Initialize Turnstile
+  useEffect(() => {
+    if (!isDevelopment && !window.turnstile) {
+      const script = document.createElement("script")
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js"
+      script.async = true
+      script.defer = true
+      document.body.appendChild(script)
+
+      script.onload = () => {
+        if (window.turnstile && turnstileRef.current && !turnstileWidget) {
+          const widgetId = window.turnstile.render(turnstileRef.current, {
+            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
+            callback: (token: string) => {
+              console.log("Turnstile token:", token)
+            },
+          })
+          setTurnstileWidget(widgetId)
+        }
+      }
+
+      return () => {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script)
+        }
+      }
+    }
+  }, [isDevelopment, turnstileWidget])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -59,7 +87,7 @@ export function ContactForm({ className = "" }: ContactFormProps) {
           throw new Error("Turnstile is not initialized")
         }
 
-        turnstileResponse = window.turnstile?.getResponse(turnstileWidget)
+        turnstileResponse = window.turnstile.getResponse(turnstileWidget)
         if (!turnstileResponse) {
           throw new Error("Failed to get Turnstile response")
         }
@@ -94,7 +122,7 @@ export function ContactForm({ className = "" }: ContactFormProps) {
 
         if (!isDevelopment && turnstileWidget) {
           if (window.turnstile) {
-            window.turnstile?.reset(turnstileWidget)
+            window.turnstile.reset(turnstileWidget)
           }
         }
       } else {
@@ -209,6 +237,8 @@ export function ContactForm({ className = "" }: ContactFormProps) {
                   ></textarea>
                 </div>
               </div>
+
+              {!isDevelopment && <div ref={turnstileRef} data-size="flexible" className="mt-4" />}
 
               {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
 
