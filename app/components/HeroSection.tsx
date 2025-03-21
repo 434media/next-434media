@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import Image from "next/image"
+import { useMobile } from "../hooks/use-mobile"
 
 function ScrollIndicator() {
   return (
@@ -34,14 +35,16 @@ function ScrollIndicator() {
 
 export function HeroSection() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const isMobile = useMobile()
   const [isVideoLoaded, setIsVideoLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [playAttempted, setPlayAttempted] = useState(false)
 
   const videoUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434+Media.mp4"
   const posterUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434-poster.png"
 
-  // Simple video initialization
+  // Handle video loading and playback
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -51,48 +54,72 @@ export function HeroSection() {
       setIsVideoLoaded(true)
       setIsLoading(false)
 
-      // Try to play the video
-      const playPromise = video.play()
+      if (!playAttempted) {
+        setPlayAttempted(true)
 
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          console.warn("Autoplay was prevented:", error)
-          // Most browsers require user interaction before playing with sound
-          // Try muted autoplay as a fallback
-          video.muted = true
-          video.play().catch((e) => {
-            console.error("Even muted autoplay failed:", e)
-            setError("Video playback was blocked by your browser. Please refresh the page.")
+        // Try to play the video - always muted for mobile compatibility
+        video.muted = true
+
+        const playPromise = video.play()
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            console.warn("Autoplay was prevented:", error)
+
+            // On mobile, we'll just show the poster image if autoplay fails
+            if (isMobile) {
+              console.log("Mobile device detected, using poster image as fallback")
+              setIsVideoLoaded(false)
+            }
           })
-        })
+        }
       }
     }
 
     // Event listeners
     video.addEventListener("canplay", handleCanPlay)
+    video.addEventListener("canplaythrough", handleCanPlay)
 
     // Basic error handling
-    video.addEventListener("error", () => {
+    video.addEventListener("error", (e) => {
+      console.error("Video error:", e)
       setIsLoading(false)
       setError("Unable to load the video. Please refresh the page.")
     })
 
+    // Cleanup
     return () => {
       video.removeEventListener("canplay", handleCanPlay)
+      video.removeEventListener("canplaythrough", handleCanPlay)
       video.removeEventListener("error", () => {})
     }
-  }, [])
+  }, [isMobile, playAttempted])
 
   // Handle manual retry
   const handleRetry = () => {
     setIsLoading(true)
     setError(null)
+    setPlayAttempted(false)
 
     const video = videoRef.current
     if (video) {
       video.load()
     }
   }
+
+  // For mobile, we'll prioritize showing the poster image if video doesn't play quickly
+  useEffect(() => {
+    if (isMobile && isLoading) {
+      // On mobile, set a timeout to stop waiting for video after 3 seconds
+      const timeoutId = setTimeout(() => {
+        if (isLoading) {
+          setIsLoading(false)
+          setIsVideoLoaded(false) // Just show the poster
+        }
+      }, 3000)
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isMobile, isLoading])
 
   return (
     <section className="relative h-screen w-full overflow-hidden bg-neutral-900" aria-labelledby="hero-heading">
@@ -106,7 +133,7 @@ export function HeroSection() {
           </p>
         </div>
 
-        {/* Poster Image (shown until video loads) */}
+        {/* Poster Image (shown until video loads or as fallback) */}
         <AnimatePresence>
           {(!isVideoLoaded || error) && (
             <motion.div
@@ -145,7 +172,7 @@ export function HeroSection() {
           <p>Your browser does not support HTML5 video.</p>
         </video>
 
-        {/* Loading Spinner */}
+        {/* Loading Spinner - Only show for a limited time on mobile */}
         {isLoading && (
           <div
             className="absolute inset-0 flex items-center justify-center bg-neutral-900/50 z-10"
@@ -158,7 +185,7 @@ export function HeroSection() {
         )}
 
         {/* Error Message */}
-        {error && (
+        {error && !isMobile && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-900/80 text-white z-10"
             aria-live="assertive"
@@ -185,7 +212,7 @@ export function HeroSection() {
         >
           <a
             href="#portfolio"
-            className="inline-block border border-white/10 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-md text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
+            className="inline-block border border-white/60 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
             onClick={(e) => {
               e.preventDefault()
               document.querySelector("#portfolio")?.scrollIntoView({ behavior: "smooth" })
