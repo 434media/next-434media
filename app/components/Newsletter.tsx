@@ -55,7 +55,8 @@ export function Newsletter() {
         if (window.turnstile && turnstileRef.current) {
           const widgetId = window.turnstile.render(turnstileRef.current, {
             sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            callback: (_token: string) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            callback: () => {
               // Token received, no action needed here
             },
             "refresh-expired": "auto",
@@ -221,7 +222,7 @@ export function Newsletter() {
             role="status"
             aria-live="polite"
           >
-            Thanks for subscribing! We'll be in touch soon.
+            Thanks for subscribing! We&apos;ll be in touch soon.
           </motion.div>
         )}
       </AnimatePresence>

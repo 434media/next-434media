@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
@@ -28,7 +27,8 @@ interface ContactFormProps {
   isVisible?: boolean
 }
 
-interface FormData {
+// This interface is used for the form data structure
+interface FormValues {
   firstName: string
   lastName: string
   company: string
@@ -158,7 +158,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
 
     // Get form data
     const formData = new FormData(e.target as HTMLFormElement)
-    const formValues = {
+    const formValues: FormValues = {
       firstName: formData.get("firstName") as string,
       lastName: formData.get("lastName") as string,
       company: formData.get("company") as string,
@@ -418,7 +418,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                 <div className="mt-4">
                   <div
                     ref={turnstileRef}
-                    data-size="normal"
+                    data-size="flexible"
                     className="w-full flex justify-center items-center min-h-[70px]"
                     aria-label="Security challenge"
                   >
