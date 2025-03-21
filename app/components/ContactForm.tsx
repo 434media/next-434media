@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, type FormEvent } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
+// Define the global interface for window.turnstile
 declare global {
   interface Window {
     turnstile?: {
@@ -82,8 +83,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
 
     // Small delay to ensure the DOM is ready
     const timeoutId = setTimeout(() => {
-      // Then in the useEffect for initializing Turnstile widget, update the render call:
-      // Replace the turnstile render code with this:
       if (turnstileRef.current) {
         try {
           // Clear any existing content
@@ -92,7 +91,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
           console.log("Rendering Turnstile widget")
           const widgetId = window.turnstile?.render(turnstileRef.current, {
             sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            callback: (token: string) => {
+            callback: (_token: string) => {
               console.log("Turnstile token generated")
             },
             "refresh-expired": "auto",
@@ -112,8 +111,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     return () => {
       clearTimeout(timeoutId)
       // Clean up widget when component unmounts or becomes invisible
-      // And update the turnstile reset and getResponse calls with optional chaining:
-      // In the cleanup function:
       if (turnstileWidget && window.turnstile) {
         try {
           window.turnstile?.reset(turnstileWidget)
@@ -149,7 +146,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     try {
       let turnstileResponse = undefined
 
-      // In the handleSubmit function:
       if (!isDevelopment) {
         if (!window.turnstile) {
           throw new Error("Turnstile is not initialized")
@@ -221,7 +217,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             <div className="text-center">
               <i className="ri-check-line mx-auto h-12 w-12 text-emerald-500" />
               <h3 className="mt-2 text-xl font-semibold text-neutral-900">Thanks for Connecting!</h3>
-              <p className="mt-2 text-sm text-neutral-600">We&apos;ll be in touch soon.</p>
+              <p className="mt-2 text-sm text-neutral-600">We'll be in touch soon.</p>
             </div>
           </motion.div>
         ) : (
@@ -311,6 +307,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               {!isDevelopment && (
                 <div
                   ref={turnstileRef}
+                  data-size="flexible"
                   className="mt-4 min-h-[70px] flex justify-center items-center"
                   aria-label="Security challenge"
                 >
