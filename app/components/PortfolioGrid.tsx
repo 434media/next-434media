@@ -1,11 +1,15 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
-import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useMotionValueEvent } from "motion/react"
+import type React from "react"
+
+import { useState, useRef } from "react"
+import { motion, AnimatePresence, useScroll, useTransform } from "motion/react"
 import { useMediaQuery } from "../hooks/use-mobile"
 import { PortfolioModal } from "./PortfolioModal"
 import { FadeIn } from "./FadeIn"
 import Image from "next/image"
+import { useHorizontalScroll } from "../hooks/use-horizontaal-scroll"
+import { KeyboardNavigation } from "./keyboardNavigation"
 
 interface PortfolioItem {
   company: string
@@ -30,39 +34,25 @@ export function PortfolioGrid() {
   const [active, setActive] = useState<PortfolioItem | null>(null)
   const isMobile = useMediaQuery("(max-width: 639px)")
   const isTablet = useMediaQuery("(min-width: 640px) and (max-width: 1023px)")
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const scrollX = useMotionValue(0)
-  const { scrollXProgress } = useScroll({ container: scrollRef })
-  const { scrollYProgress } = useScroll()
 
-  useMotionValueEvent(scrollXProgress, "change", (latest) => {
-    scrollX.set(latest)
-  })
+  const { scrollYProgress } = useScroll()
+  const { scrollRef, scrollX, canScrollLeft, canScrollRight, scroll } = useHorizontalScroll()
 
   const leftBlurOpacity = useTransform(scrollX, [0, 0.02], [0, 1])
   const rightBlurOpacity = useTransform(scrollX, [0.98, 1], [1, 0])
+  const leftArrowOpacity = useTransform(scrollX, [0, 0.01], [0, 1])
+  const rightArrowOpacity = useTransform(scrollX, [0.99, 1], [1, 0])
 
   const handleItemClick = (item: PortfolioItem) => {
     setActive(item)
   }
-
-  const scroll = useCallback((direction: "left" | "right") => {
-    const container = scrollRef.current
-    if (container) {
-      const scrollAmount = direction === "left" ? -container.offsetWidth : container.offsetWidth
-      container.scrollBy({ left: scrollAmount, behavior: "smooth" })
-    }
-  }, [])
-
-  const leftArrowOpacity = useTransform(scrollXProgress, [0, 0.01], [0, 1])
-  const rightArrowOpacity = useTransform(scrollXProgress, [0.99, 1], [1, 0])
 
   const imageRotation = useTransform(scrollYProgress, [0, 1], [0, 360])
   const imageScale = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1.2, 1])
   const imageBrightness = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1.2, 1])
 
   return (
-    <motion.div className="relative py-6 sm:py-8 lg:py-12 bg-white">
+    <motion.div id="portfolio" className="relative py-6 sm:py-8 lg:py-12 bg-white" aria-label="Portfolio showcase">
       <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Animated Intro Section */}
         <FadeIn>
@@ -78,17 +68,19 @@ export function PortfolioGrid() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                  className="text-neutral-950 font-geist-sans font-bold text-balance text-6xl/[1.1] lg:text-7xl/[1.1] xl:text-9xl/[1.1] tracking-tight leading-none -mt-4 md:mt-0 mb-4 md:mb-6"
+                  className="text-neutral-950 font-geist-sans font-bold text-balance text-5xl/[1.1] sm:text-6xl/[1.1] lg:text-7xl/[1.1] xl:text-8xl/[1.1] tracking-tight leading-none -mt-4 md:mt-0 mb-4 md:mb-6"
+                  id="portfolio-heading"
                 >
-                  Connecting Enterprises
+                  Action Speaks Louder
                 </motion.h2>
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-                  className="text-neutral-700 text-lg sm:text-xl lg:text-2xl tracking-tight text-balance"
+                  className="text-neutral-700 text-base sm:text-lg lg:text-xl max-w-2xl leading-relaxed tracking-tight text-balance"
                 >
-                  Leveraging networks to connect people, places and things through creative media and smart marketing
+                  We specialize in brand storytelling, media strategy, video production, web development, and event
+                  production—all designed to elevate visibility, engagement, and impact.
                 </motion.p>
               </div>
               <motion.div
@@ -105,6 +97,7 @@ export function PortfolioGrid() {
                   filter: `brightness(${imageBrightness})`,
                 }}
                 className="w-full md:w-1/2 lg:w-2/5 max-w-lg mx-auto order-1 md:order-2"
+                aria-hidden="true"
               >
                 <Image
                   src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK+(1).png"
@@ -119,46 +112,62 @@ export function PortfolioGrid() {
         </FadeIn>
 
         {/* Featured Grid - First 6 Items */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
+        <h3 className="sr-only" id="featured-portfolio">
+          Featured Portfolio Items
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8" aria-labelledby="featured-portfolio">
           {portfolioArray.slice(0, 6).map((item, index) => (
             <PortfolioItem key={item.company} item={item} index={index} onClick={handleItemClick} />
           ))}
         </div>
 
         {/* Scrollable Section - Last 4 Items */}
-        <div className="relative mt-12 sm:mt-16 lg:mt-20">
+        <h3 className="sr-only" id="more-portfolio">
+          More Portfolio Items
+        </h3>
+        <div className="relative mt-12 sm:mt-16 lg:mt-20" aria-labelledby="more-portfolio">
           {/* Navigation Arrows */}
-          <AnimatePresence>
+          <div className="flex justify-between items-center">
             <motion.button
               key="left-arrow"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: canScrollLeft ? 1 : 0.3 }}
               exit={{ opacity: 0 }}
               style={{ opacity: leftArrowOpacity }}
               onClick={() => scroll("left")}
-              className="absolute -left-4 sm:-left-6 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow-lg hover:bg-white transition-colors border border-neutral-200"
-              aria-label="Scroll left"
+              className="absolute -left-4 sm:-left-6 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow-lg hover:bg-white transition-colors border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="Scroll left to see more portfolio items"
+              disabled={!canScrollLeft}
             >
               <i className="ri-arrow-left-line text-xl text-neutral-950" />
             </motion.button>
             <motion.button
               key="right-arrow"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: canScrollRight ? 1 : 0.3 }}
               exit={{ opacity: 0 }}
               style={{ opacity: rightArrowOpacity }}
               onClick={() => scroll("right")}
-              className="absolute -right-4 sm:-right-6 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow-lg hover:bg-white transition-colors border border-neutral-200"
-              aria-label="Scroll right"
+              className="absolute -right-4 sm:-right-6 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow-lg hover:bg-white transition-colors border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="Scroll right to see more portfolio items"
+              disabled={!canScrollRight}
             >
               <i className="ri-arrow-right-line text-xl text-neutral-950" />
             </motion.button>
-          </AnimatePresence>
+          </div>
 
           <div
             ref={scrollRef}
             className="flex overflow-x-auto pb-8 gap-4 sm:gap-6 snap-x snap-mandatory scrollbar-hide"
+            role="region"
+            aria-label="Scrollable portfolio items"
+            tabIndex={0}
           >
+            <KeyboardNavigation
+              onArrowLeft={() => canScrollLeft && scroll("left")}
+              onArrowRight={() => canScrollRight && scroll("right")}
+              enabled={true}
+            />
             {portfolioArray.slice(6).map((item, index) => (
               <motion.div
                 key={item.company}
@@ -185,10 +194,12 @@ export function PortfolioGrid() {
           <motion.div
             className="absolute right-0 top-0 bottom-8 w-6 md:w-10 bg-white/5 backdrop-blur-sm pointer-events-none"
             style={{ opacity: rightBlurOpacity }}
+            aria-hidden="true"
           />
           <motion.div
             className="absolute left-0 top-0 bottom-8 w-6 md:w-10 bg-white/5 backdrop-blur-sm pointer-events-none"
             style={{ opacity: leftBlurOpacity }}
+            aria-hidden="true"
           />
         </div>
       </div>
@@ -209,9 +220,19 @@ function PortfolioItem({
   onClick: (item: PortfolioItem) => void
 }) {
   const [isHovered, setIsHovered] = useState(false)
+  const itemRef = useRef<HTMLDivElement>(null)
+
+  // Handle keyboard interaction
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      onClick(item)
+    }
+  }
 
   return (
     <motion.div
+      ref={itemRef}
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-100px" }}
@@ -226,53 +247,52 @@ function PortfolioItem({
       onMouseLeave={() => setIsHovered(false)}
       onFocus={() => setIsHovered(true)}
       onBlur={() => setIsHovered(false)}
+      tabIndex={0}
+      role="button"
+      aria-label={`View details for ${item.company}: ${item.title}`}
+      onKeyDown={handleKeyDown}
     >
       <div className="relative rounded-2xl overflow-hidden shadow-lg transition-shadow duration-300 group-hover:shadow-xl">
         <div className="aspect-[16/9] overflow-hidden bg-neutral-900">
           <Image
             src={item.photo || "/placeholder.svg"}
-            alt={item.company}
+            alt=""
             width={1600}
             height={900}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             style={{ opacity: isHovered && item.gif ? 0 : 1 }}
+            aria-hidden="true"
           />
           {item.gif && (
             <Image
               src={item.gif || "/placeholder.svg"}
-              alt={`${item.company} animation`}
+              alt=""
               width={1600}
               height={900}
               className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 rounded-2xl"
               style={{ opacity: isHovered ? 1 : 0 }}
+              aria-hidden="true"
             />
           )}
         </div>
         {/* Text Overlay */}
-        {item.showVideo && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4 sm:p-6">
-            <h4 className="text-white font-geist-sans font-bold text-lg sm:text-xl lg:text-2xl tracking-tight mb-1 sm:mb-2">
-              {item.company}
-            </h4>
-            <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-2 sm:mb-4 md:max-w-sm">{item.title}</p>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4 sm:p-6">
+          <h4 className="text-white font-geist-sans font-bold text-base sm:text-lg lg:text-xl tracking-tight mb-1 sm:mb-2">
+            {item.company}
+          </h4>
+          <p className="text-white/90 text-xs sm:text-sm lg:text-base mb-2 sm:mb-4 md:max-w-sm leading-snug">
+            {item.title}
+          </p>
+          {item.showVideo && (
             <motion.div
-              className="inline-flex items-center gap-2 text-emerald-400 text-sm sm:text-base font-semibold"
+              className="inline-flex items-center gap-2 text-emerald-400 text-xs sm:text-sm font-medium"
               whileHover={{ x: 5 }}
             >
               See More
               <i className="ri-arrow-right-line" aria-hidden="true" />
             </motion.div>
-          </div>
-        )}
-
-        {!item.showVideo && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4 sm:p-6">
-            <h4 className="text-white font-geist-sans font-bold text-lg sm:text-xl lg:text-2xl tracking-tight mb-1 sm:mb-2">
-              {item.company}
-            </h4>
-            <p className="text-white/90 text-sm sm:text-base lg:text-lg mb-2 sm:mb-4 md:max-w-sm">{item.title}</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </motion.div>
   )

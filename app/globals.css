@@ -4,10 +4,13 @@
   --font-menda-black: var(--font-menda-black);
   --font-geist-sans: var(--font-geist-sans);
   --font-geist-mono: var(--font-geist-mono);
+  --font-ggx88: var(--font-ggx88);
 }
 
 @theme {
   --font-menda-black: "Menda Black", sans-serif;
   --font-geist-sans: "Geist Sans", sans-serif;
   --font-geist-mono: "Geist Mono", monospace;
+  --font-ggx88: "GGX88", sans-serif;
 }
+

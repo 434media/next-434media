@@ -54,8 +54,18 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
   }, [onClose])
 
   useEffect(() => {
+    // Store the previously focused element to restore focus when modal closes
+    const previouslyFocusedElement = document.activeElement as HTMLElement
+
     if (modalRef.current) {
       modalRef.current.focus()
+    }
+
+    return () => {
+      // Restore focus to the previously focused element when modal closes
+      if (previouslyFocusedElement) {
+        previouslyFocusedElement.focus()
+      }
     }
   }, [])
 
@@ -88,11 +98,14 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className="w-full max-w-4xl bg-neutral-900 rounded-xl overflow-hidden shadow-2xl relative"
             onClick={(e) => e.stopPropagation()}
-            tabIndex={-1}
+            tabIndex={0}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
           >
             <button
               onClick={onClose}
-              className="absolute right-4 top-4 p-2 text-white/60 hover:text-white rounded-full bg-black/20 hover:bg-black/40 transition-colors z-10"
+              className="absolute right-4 top-4 p-2 text-white/60 hover:text-white rounded-full bg-black/20 hover:bg-black/40 transition-colors z-10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-900"
               aria-label="Close modal"
             >
               <i className="ri-close-line text-2xl" />
@@ -106,34 +119,41 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                 className="relative aspect-video"
               >
                 {item.showVideo ? (
-                  <video
-                    ref={videoRef}
-                    src={item.video}
-                    poster={item.poster || item.photo}
-                    controls
-                    preload="metadata"
-                    className="w-full h-full object-contain"
-                    aria-label={`Video for ${item.company}`}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                  />
+                  <div className="relative w-full h-full">
+                    <video
+                      ref={videoRef}
+                      src={item.video}
+                      poster={item.poster || item.photo}
+                      controls
+                      preload="metadata"
+                      className="w-full h-full object-contain"
+                      aria-label={`Video for ${item.company}`}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onError={(e) => {
+                        console.error("Error loading video:", e)
+                        setIsPlaying(false)
+                      }}
+                    />
+                    {!isPlaying && (
+                      <button
+                        onClick={handlePlayClick}
+                        className="absolute inset-0 flex items-center justify-center bg-black/50 group"
+                        aria-label="Play video"
+                      >
+                        <div className="bg-white/20 rounded-full p-4 group-hover:bg-white/30 transition-colors">
+                          <i className="ri-play-fill text-4xl text-white" />
+                        </div>
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <img
                     src={item.photo || "/placeholder.svg"}
                     alt={item.company}
                     className="w-full h-full object-contain"
+                    loading="eager"
                   />
-                )}
-                {item.showVideo && !isPlaying && (
-                  <button
-                    onClick={handlePlayClick}
-                    className="absolute inset-0 flex items-center justify-center bg-black/50 group"
-                    aria-label="Play video"
-                  >
-                    <div className="bg-white/20 rounded-full p-4 group-hover:bg-white/30 transition-colors">
-                      <i className="ri-play-fill text-4xl text-white" />
-                    </div>
-                  </button>
                 )}
               </motion.div>
 
@@ -156,7 +176,8 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                         href={item.linkedin}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-white hover:text-blue-400"
+                        className="text-white hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-neutral-900 p-1 rounded-full"
+                        aria-label={`Visit ${item.company}'s LinkedIn profile`}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -174,7 +195,8 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                         href={item.instagram}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-white hover:text-pink-400"
+                        className="text-white hover:text-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 focus:ring-offset-neutral-900 p-1 rounded-full"
+                        aria-label={`Visit ${item.company}'s Instagram profile`}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -192,7 +214,8 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                         href={item.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-white hover:text-emerald-400"
+                        className="text-white hover:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-neutral-900 p-1 rounded-full"
+                        aria-label={`Visit ${item.company}'s website`}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

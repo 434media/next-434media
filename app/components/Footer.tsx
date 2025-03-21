@@ -1,37 +1,64 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { motion } from "motion/react"
+import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "motion/react"
 import { ScrambleText } from "./ScrambleText"
 import { Newsletter } from "./Newsletter"
+import Link from "next/link"
+
+interface FooterLink {
+  label: string
+  href: string
+  external?: boolean
+}
 
 export default function Footer() {
   const [isVisible, setIsVisible] = useState(false)
+  const footerRef = useRef<HTMLElement>(null)
   const currentYear = new Date().getFullYear()
 
+  // Links for the footer navigation - removed team portal as requested
+  const footerLinks: FooterLink[] = [
+    { label: "Privacy Policy", href: "/privacy-policy" },
+    { label: "Terms of Service", href: "/terms-of-service" },
+    { label: "Contact", href: "mailto:build@434media.com" },
+  ]
+
   useEffect(() => {
+    // Use IntersectionObserver to detect when footer is visible
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsVisible(entry.isIntersecting)
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsVisible(true)
+          // Once visible, we can disconnect the observer
+          if (footerRef.current) {
+            observer.unobserve(footerRef.current)
+          }
+        }
       },
       { threshold: 0.1 },
     )
 
-    const footerElement = document.querySelector("footer")
-    if (footerElement) {
-      observer.observe(footerElement)
+    if (footerRef.current) {
+      observer.observe(footerRef.current)
     }
 
+    // Clean up observer on component unmount
     return () => {
-      if (footerElement) {
-        observer.unobserve(footerElement)
+      if (footerRef.current) {
+        observer.unobserve(footerRef.current)
       }
     }
   }, [])
 
   return (
-    <footer className="bg-neutral-950 mt-auto relative overflow-hidden">
-      <div className="absolute inset-0 opacity-5">
+    <footer
+      ref={footerRef}
+      className="bg-neutral-950 mt-auto relative overflow-hidden"
+      aria-labelledby="footer-heading"
+    >
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-5 pointer-events-none" aria-hidden="true">
         <div
           className="absolute inset-0"
           style={{
@@ -41,34 +68,98 @@ export default function Footer() {
           }}
         />
       </div>
+
       <div className="container mx-auto px-4 relative pt-16 sm:pt-24 pb-16 sm:pb-24">
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={isVisible ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <h2 className="text-white mb-8 font-menda-black text-3xl sm:text-4xl lg:text-5xl">
-            <ScrambleText text="434 MEDIA" className="inline-block cursor-pointer" />
-          </h2>
-          <div className="border-t border-white/30 pt-8 sm:pt-16 lg:flex lg:items-center lg:justify-between">
-            <div className="max-w-md">
-              <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Subscribe to our newsletter</h3>
-              <p className="text-base sm:text-lg text-gray-400 mb-6">
-                Stay connected with our latest updates, product releases, and exclusive offers
-              </p>
-            </div>
-            <Newsletter />
-          </div>
-          <div className="mt-12 pt-8 border-t border-white/30">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="text-sm sm:text-base text-neutral-400">
-                  &copy; {currentYear} 434 MEDIA. All rights reserved
+        <AnimatePresence>
+          {isVisible && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 mb-8">
+                <h2 id="footer-heading" className="text-white font-menda-black text-3xl sm:text-4xl lg:text-5xl">
+                  <ScrambleText 
+                    text="434 MEDIA" 
+                    className="inline-block cursor-pointer"
+                    scrambleOnMount={false}
+                    scrambleOnHover={true}
+                  />
+                </h2>
+
+                {/* LinkedIn link - smaller and aligned to the right */}
+                <a
+                  href="https://www.linkedin.com/company/434media"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1"
+                  aria-label="Follow 434 Media on LinkedIn"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                  </svg>
+                </a>
+              </div>
+
+              <div className="border-t border-white/30 pt-8 sm:pt-16">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+                  <div className="max-w-md">
+                    <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Subscribe to our newsletter</h3>
+                    <p className="text-base sm:text-lg text-gray-400">
+                      Get insights on ROI-driven media strategies and creative approaches that deliver measurable
+                      results.
+                    </p>
+                  </div>
+                    <Newsletter />
                 </div>
               </div>
-            </div>
-          </div>
-        </motion.div>
+
+              <div className="mt-12 pt-8 border-t border-white/30">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="text-sm sm:text-base text-neutral-400">
+                    &copy; {currentYear} 434 MEDIA. All rights reserved |{" "}
+                    <a href="mailto:build@434media.com" className="hover:text-emerald-500 transition-colors">
+                      build@434media.com
+                    </a>
+                  </div>
+                  <nav aria-label="Footer navigation">
+                    <ul className="flex flex-wrap justify-center sm:justify-end gap-6">
+                      {footerLinks.map((link) => (
+                        <li key={link.label}>
+                          {link.external ? (
+                            <a
+                              href={link.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm sm:text-base text-neutral-400 hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded"
+                            >
+                              {link.label}
+                            </a>
+                          ) : (
+                            <Link
+                              href={link.href}
+                              className="text-sm sm:text-base text-neutral-400 hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded"
+                            >
+                              {link.label}
+                            </Link>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </footer>
   )
