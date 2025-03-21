@@ -82,8 +82,19 @@ export default function Footer() {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 mb-8">
+                
                 <h2 id="footer-heading" className="text-white font-menda-black text-3xl sm:text-4xl lg:text-5xl">
-                  <ScrambleText text="434 MEDIA" className="inline-block cursor-pointer" />
+                  <Link
+                    href="/"
+                    aria-label="434 Media - Home"
+                  >
+                    <ScrambleText 
+                      text="434 MEDIA" 
+                      className="inline-block cursor-pointer" 
+                      scrambleOnMount={false}
+                      scrambleOnHover={true}
+                    />
+                  </Link>
                 </h2>
 
                 {/* LinkedIn link - smaller and aligned to the right */}

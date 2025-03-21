@@ -203,7 +203,7 @@ export function Newsletter() {
             </div>
 
             {!isDevelopment && (
-              <div ref={turnstileRef} data-size="compact" className="w-full mt-4" aria-label="Security verification" />
+              <div ref={turnstileRef} data-size="flexible" className="w-full mt-4" aria-label="Security verification" />
             )}
 
             {error && (

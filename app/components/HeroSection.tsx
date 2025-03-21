@@ -95,11 +95,17 @@ export function HeroSection() {
   }
 
   return (
-    <section
-      className="relative h-screen w-full overflow-hidden bg-neutral-900"
-      aria-label="434 Media promotional video section"
-    >
+    <section className="relative h-screen w-full overflow-hidden bg-neutral-900" aria-labelledby="hero-heading">
       <div className="absolute inset-0 bg-neutral-950 flex items-center justify-center">
+        {/* Visually hidden text for screen readers and SEO */}
+        <div className="sr-only">
+          <h1 id="hero-heading">High-Impact Media & Marketing</h1>
+          <p>
+            We connect enterprises through ROI-driven brand media strategies that move audiences and deliver measurable
+            results.
+          </p>
+        </div>
+
         {/* Poster Image (shown until video loads) */}
         <AnimatePresence>
           {(!isVideoLoaded || error) && (
@@ -111,7 +117,7 @@ export function HeroSection() {
             >
               <Image
                 src={posterUrl || "/placeholder.svg"}
-                alt="434 Media background"
+                alt="434 Media promotional video showing creative media and marketing services"
                 fill
                 priority
                 sizes="100vw"
@@ -122,7 +128,7 @@ export function HeroSection() {
           )}
         </AnimatePresence>
 
-        {/* Video Background - Simplified */}
+        {/* Video Background - Full opacity for better showcase */}
         <video
           ref={videoRef}
           muted
@@ -130,9 +136,9 @@ export function HeroSection() {
           loop
           preload="auto"
           poster={posterUrl}
-          aria-hidden="true"
+          aria-label="434 Media promotional video showcasing creative media and marketing services"
           className={`absolute w-full h-full object-cover transition-opacity duration-500 ${
-            isVideoLoaded && !error ? "opacity-50" : "opacity-0"
+            isVideoLoaded && !error ? "opacity-100" : "opacity-0"
           }`}
         >
           <source src={videoUrl} type="video/mp4" />
@@ -167,45 +173,29 @@ export function HeroSection() {
           </div>
         )}
 
-        {/* Hero Content */}
-        <div className="relative z-10 text-center max-w-4xl mx-auto px-4">
-          <motion.h1
-            className="text-white text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-ggx88 mb-4 md:mb-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            High-Impact Media & Marketing
-          </motion.h1>
-          <motion.p
-            className="text-white/90 text-base sm:text-lg md:text-xl lg:text-2xl leading-relaxed mb-6 md:mb-8 max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            We connect enterprises through ROI-driven brand media strategies that move audiences and deliver measurable
-            results.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.6 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            <a
-              href="#portfolio"
-              className="inline-block bg-emerald-600 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-base sm:text-lg font-semibold hover:bg-emerald-500 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-900 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-              onClick={(e) => {
-                e.preventDefault()
-                document.querySelector("#portfolio")?.scrollIntoView({ behavior: "smooth" })
-              }}
-            >
-              View Our Work
-            </a>
-          </motion.div>
-        </div>
+        {/* Subtle overlay for better button visibility at the bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-[1]"></div>
 
-        {/* Scroll Indicator */}
+        {/* View Our Work Button - Moved to bottom and redesigned */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-10"
+        >
+          <a
+            href="#portfolio"
+            className="inline-block border border-white/10 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-md text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
+            onClick={(e) => {
+              e.preventDefault()
+              document.querySelector("#portfolio")?.scrollIntoView({ behavior: "smooth" })
+            }}
+          >
+            View Our Work
+          </a>
+        </motion.div>
+
+        {/* Scroll Indicator - Kept visible */}
         <ScrollIndicator />
       </div>
     </section>

@@ -60,24 +60,26 @@ export function PortfolioGrid() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="mb-12 sm:mb-16 lg:mb-20 max-w-7xl mx-auto"
+            className="mb-8 sm:mb-12 lg:mb-16 max-w-7xl mx-auto" // Reduced bottom margin
           >
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 md:gap-12">
-              <div className="flex-1 text-center md:text-left order-2 md:order-1">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8">
+              {" "}
+              {/* Reduced gap */}
+              <div className="flex-1 text-center md:text-left order-2 md:order-1 md:pr-8">
                 <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                  className="text-neutral-950 font-geist-sans font-bold text-balance text-5xl/[1.1] sm:text-6xl/[1.1] lg:text-7xl/[1.1] xl:text-8xl/[1.1] tracking-tight leading-none -mt-4 md:mt-0 mb-4 md:mb-6"
+                  className="text-neutral-950 font-geist-sans font-bold text-balance text-4xl/[1.1] sm:text-5xl/[1.1] lg:text-6xl/[1.1] xl:text-7xl/[1.1] tracking-tight leading-none mb-3 md:mb-4" // Reduced font size and margin
                   id="portfolio-heading"
                 >
-                  Action Speaks Louder
+                  High Impact Media & Marketing
                 </motion.h2>
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-                  className="text-neutral-700 text-base sm:text-lg lg:text-xl max-w-2xl leading-relaxed tracking-tight text-balance"
+                  className="text-neutral-700 text-base sm:text-lg max-w-xl leading-snug tracking-tight text-balance" // Reduced max-width and changed leading
                 >
                   We specialize in brand storytelling, media strategy, video production, web development, and event
                   production—all designed to elevate visibility, engagement, and impact.
@@ -96,14 +98,14 @@ export function PortfolioGrid() {
                   scale: imageScale,
                   filter: `brightness(${imageBrightness})`,
                 }}
-                className="w-full md:w-1/2 lg:w-2/5 max-w-lg mx-auto order-1 md:order-2"
+                className="w-full md:w-1/2 lg:w-1/2 max-w-xl mx-auto order-1 md:order-2 flex items-center justify-center"
                 aria-hidden="true"
               >
                 <Image
                   src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK+(1).png"
                   alt="434 Media Icon"
-                  width={500}
-                  height={500}
+                  width={700}
+                  height={700}
                   className="w-full h-auto object-contain"
                 />
               </motion.div>
@@ -115,7 +117,9 @@ export function PortfolioGrid() {
         <h3 className="sr-only" id="featured-portfolio">
           Featured Portfolio Items
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8" aria-labelledby="featured-portfolio">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" aria-labelledby="featured-portfolio">
+          {" "}
+          {/* Reduced gap */}
           {portfolioArray.slice(0, 6).map((item, index) => (
             <PortfolioItem key={item.company} item={item} index={index} onClick={handleItemClick} />
           ))}
@@ -125,7 +129,9 @@ export function PortfolioGrid() {
         <h3 className="sr-only" id="more-portfolio">
           More Portfolio Items
         </h3>
-        <div className="relative mt-12 sm:mt-16 lg:mt-20" aria-labelledby="more-portfolio">
+        <div className="relative mt-8 sm:mt-12 lg:mt-16" aria-labelledby="more-portfolio">
+          {" "}
+          {/* Reduced margin-top */}
           {/* Navigation Arrows */}
           <div className="flex justify-between items-center">
             <motion.button
@@ -155,7 +161,6 @@ export function PortfolioGrid() {
               <i className="ri-arrow-right-line text-xl text-neutral-950" />
             </motion.button>
           </div>
-
           <div
             ref={scrollRef}
             className="flex overflow-x-auto pb-8 gap-4 sm:gap-6 snap-x snap-mandatory scrollbar-hide"
@@ -189,7 +194,6 @@ export function PortfolioGrid() {
               </motion.div>
             ))}
           </div>
-
           {/* Blur Effect */}
           <motion.div
             className="absolute right-0 top-0 bottom-8 w-6 md:w-10 bg-white/5 backdrop-blur-sm pointer-events-none"

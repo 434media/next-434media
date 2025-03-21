@@ -419,7 +419,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   <div
                     ref={turnstileRef}
                     data-size="flexible"
-                    className="w-full flex justify-center items-center min-h-[70px]"
+                    className="w-full flex justify-center items-center"
                     aria-label="Security challenge"
                   >
                     {!turnstileLoaded && (

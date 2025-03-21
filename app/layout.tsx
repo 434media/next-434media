@@ -89,12 +89,6 @@ export const metadata: Metadata = {
       "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies that move audiences and deliver measurable results.",
     images: [`${siteUrl}/opengraph-image.png`],
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-    minimumScale: 1,
-  },
   robots: {
     index: true,
     follow: true,
@@ -119,6 +113,13 @@ export const metadata: Metadata = {
     // google: "your-google-verification-code",
     // yandex: "your-yandex-verification-code",
   },
+}
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  minimumScale: 1,
 }
 
 export default function RootLayout({
