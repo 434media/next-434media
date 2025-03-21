@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ScrambleText } from "./ScrambleText"
 import { ContactForm } from "./ContactForm"
 
@@ -13,6 +13,8 @@ interface NavMenuProps {
 }
 
 export default function NavMenu({ isOpen, onClose }: NavMenuProps) {
+  const [menuMounted, setMenuMounted] = useState(false)
+
   const renderMenuItems = useCallback(() => {
     const items = [
       "Ask about our services and capabilities",
@@ -44,8 +46,13 @@ export default function NavMenu({ isOpen, onClose }: NavMenuProps) {
     if (isOpen) {
       document.addEventListener("keydown", handleEscape)
       document.body.style.overflow = "hidden"
+      // Set a small delay to ensure the menu is visible in the DOM
+      setTimeout(() => {
+        setMenuMounted(true)
+      }, 100)
     } else {
       document.body.style.overflow = "unset"
+      setMenuMounted(false)
     }
 
     return () => {
@@ -56,9 +63,8 @@ export default function NavMenu({ isOpen, onClose }: NavMenuProps) {
 
   return (
     <AnimatePresence>
-      {isOpen &&
-        (
-          <motion.aside
+      {isOpen && (
+        <motion.aside
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -104,8 +110,8 @@ export default function NavMenu({ isOpen, onClose }: NavMenuProps) {
                         Take the next step
                       </h2>
                       <ul className="space-y-4 text-base text-neutral-600 mb-8">{renderMenuItems()}</ul>
-                      
-                      <ContactForm />
+
+                      <ContactForm isVisible={menuMounted} />
                     </motion.div>
                   </div>
                 </div>
@@ -137,7 +143,7 @@ export default function NavMenu({ isOpen, onClose }: NavMenuProps) {
                     src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
                     alt="434 Media Logo"
                     width={400}
-                    height={400} 
+                    height={400}
                     className="object-contain"
                     priority
                   />
@@ -157,7 +163,7 @@ export default function NavMenu({ isOpen, onClose }: NavMenuProps) {
             />
           </div>
         </motion.aside>
-        )}
+      )}
     </AnimatePresence>
   )
 }

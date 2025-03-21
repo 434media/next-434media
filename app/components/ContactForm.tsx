@@ -3,17 +3,36 @@
 import { useState, useRef, useEffect, type FormEvent } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
-interface ContactFormProps {
-  className?: string
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        element: HTMLElement,
+        options: {
+          sitekey: string
+          callback: (token: string) => void
+          "refresh-expired"?: "auto" | "manual"
+        },
+      ) => string
+      getResponse: (widgetId: string) => string | null
+      reset: (widgetId: string) => void
+    }
+  }
 }
 
-export function ContactForm({ className = "" }: ContactFormProps) {
+interface ContactFormProps {
+  className?: string
+  isVisible?: boolean
+}
+
+export function ContactForm({ className = "", isVisible = true }: ContactFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const turnstileRef = useRef<HTMLDivElement>(null)
   const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null)
+  const [turnstileLoaded, setTurnstileLoaded] = useState(false)
 
   const formVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -29,34 +48,82 @@ export function ContactForm({ className = "" }: ContactFormProps) {
 
   const isDevelopment = process.env.NODE_ENV === "development"
 
-  // Initialize Turnstile
+  // Load Turnstile script
   useEffect(() => {
-    if (!isDevelopment && !window.turnstile) {
-      const script = document.createElement("script")
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js"
-      script.async = true
-      script.defer = true
-      document.body.appendChild(script)
+    if (isDevelopment || turnstileLoaded) return
 
-      script.onload = () => {
-        if (window.turnstile && turnstileRef.current && !turnstileWidget) {
-          const widgetId = window.turnstile.render(turnstileRef.current, {
-            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            callback: (token: string) => {
-              console.log("Turnstile token:", token)
-            },
-          })
-          setTurnstileWidget(widgetId)
-        }
+    const loadTurnstile = () => {
+      if (document.getElementById("turnstile-script")) {
+        setTurnstileLoaded(true)
+        return
       }
 
-      return () => {
-        if (script.parentNode) {
-          script.parentNode.removeChild(script)
+      const script = document.createElement("script")
+      script.id = "turnstile-script"
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+      script.async = true
+      script.defer = true
+      script.onload = () => {
+        console.log("Turnstile script loaded")
+        setTurnstileLoaded(true)
+      }
+      script.onerror = (error) => {
+        console.error("Error loading Turnstile script:", error)
+      }
+      document.body.appendChild(script)
+    }
+
+    loadTurnstile()
+  }, [isDevelopment, turnstileLoaded])
+
+  // Initialize Turnstile widget when visible
+  useEffect(() => {
+    if (isDevelopment || !isVisible || !turnstileLoaded || !window.turnstile || turnstileWidget) return
+
+    // Small delay to ensure the DOM is ready
+    const timeoutId = setTimeout(() => {
+      // Then in the useEffect for initializing Turnstile widget, update the render call:
+      // Replace the turnstile render code with this:
+      if (turnstileRef.current) {
+        try {
+          // Clear any existing content
+          turnstileRef.current.innerHTML = ""
+
+          console.log("Rendering Turnstile widget")
+          const widgetId = window.turnstile?.render(turnstileRef.current, {
+            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
+            callback: (token: string) => {
+              console.log("Turnstile token generated")
+            },
+            "refresh-expired": "auto",
+          })
+          console.log("Turnstile widget ID:", widgetId)
+          if (widgetId) {
+            setTurnstileWidget(widgetId)
+          }
+        } catch (error) {
+          console.error("Error rendering Turnstile widget:", error)
+        }
+      } else {
+        console.warn("Turnstile container ref not available")
+      }
+    }, 300)
+
+    return () => {
+      clearTimeout(timeoutId)
+      // Clean up widget when component unmounts or becomes invisible
+      // And update the turnstile reset and getResponse calls with optional chaining:
+      // In the cleanup function:
+      if (turnstileWidget && window.turnstile) {
+        try {
+          window.turnstile?.reset(turnstileWidget)
+          setTurnstileWidget(null)
+        } catch (error) {
+          console.error("Error resetting Turnstile widget:", error)
         }
       }
     }
-  }, [isDevelopment, turnstileWidget])
+  }, [isDevelopment, isVisible, turnstileLoaded, turnstileWidget])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -82,14 +149,19 @@ export function ContactForm({ className = "" }: ContactFormProps) {
     try {
       let turnstileResponse = undefined
 
+      // In the handleSubmit function:
       if (!isDevelopment) {
-        if (!window.turnstile || !turnstileWidget) {
+        if (!window.turnstile) {
           throw new Error("Turnstile is not initialized")
         }
 
-        turnstileResponse = window.turnstile.getResponse(turnstileWidget)
-        if (!turnstileResponse) {
-          throw new Error("Failed to get Turnstile response")
+        if (turnstileWidget) {
+          turnstileResponse = window.turnstile?.getResponse(turnstileWidget)
+          if (!turnstileResponse) {
+            throw new Error("Please complete the Turnstile challenge")
+          }
+        } else {
+          throw new Error("Turnstile widget is not initialized")
         }
       }
 
@@ -120,10 +192,8 @@ export function ContactForm({ className = "" }: ContactFormProps) {
           setHasSubmitted(false)
         }, 5000)
 
-        if (!isDevelopment && turnstileWidget) {
-          if (window.turnstile) {
-            window.turnstile.reset(turnstileWidget)
-          }
+        if (!isDevelopment && turnstileWidget && window.turnstile) {
+          window.turnstile.reset(turnstileWidget)
         }
       } else {
         throw new Error(responseData.error || "Form submission failed")
@@ -238,7 +308,15 @@ export function ContactForm({ className = "" }: ContactFormProps) {
                 </div>
               </div>
 
-              {!isDevelopment && <div ref={turnstileRef} data-size="flexible" className="mt-4" />}
+              {!isDevelopment && (
+                <div
+                  ref={turnstileRef}
+                  className="mt-4 min-h-[70px] flex justify-center items-center"
+                  aria-label="Security challenge"
+                >
+                  {!turnstileLoaded && <div className="text-sm text-neutral-500">Loading security challenge...</div>}
+                </div>
+              )}
 
               {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
 

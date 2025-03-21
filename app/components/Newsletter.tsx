@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "motion/react"
 declare global {
   interface Window {
     turnstile?: {
-      render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void }) => string
+      render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; "refresh-expired"?: "auto" | "manual" }) => string
       getResponse: (widgetId: string) => string | null
       reset: (widgetId: string) => void
     }
