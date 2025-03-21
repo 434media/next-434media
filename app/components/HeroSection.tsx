@@ -241,7 +241,7 @@ export function HeroSection() {
         >
           <a
             href="#portfolio"
-            className="inline-block border border-white/60 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
+            className="inline-block border border-white/10 text-white px-6 sm:px-8 py-2.5 rounded-md text-base sm:text-lg font-medium backdrop-blur-sm bg-black/10 hover:bg-white/10 hover:border-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-1 focus:ring-offset-black/20 shadow-lg hover:shadow-xl"
             onClick={(e) => {
               e.preventDefault()
               document.querySelector("#portfolio")?.scrollIntoView({ behavior: "smooth" })

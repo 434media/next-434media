@@ -182,7 +182,7 @@ export function Newsletter() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full pr-16 px-6 py-4 bg-neutral-800 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 text-neutral-400 text-base"
+                className="w-full pr-16 px-6 py-4 bg-neutral-800 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 text-neutral-400 text-base"
                 aria-describedby={error ? "newsletter-error" : undefined}
                 disabled={isSubmitting}
                 autoComplete="email"
@@ -218,7 +218,7 @@ export function Newsletter() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="mt-6 bg-neutral-800 px-6 py-4 rounded-full text-emerald-500 text-center"
+            className="mt-6 bg-neutral-800 px-6 py-4 rounded-md text-emerald-500 text-center"
             role="status"
             aria-live="polite"
           >
