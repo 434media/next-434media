@@ -60,29 +60,26 @@ export function PortfolioGrid() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="mb-8 sm:mb-12 lg:mb-16 max-w-7xl mx-auto" // Reduced bottom margin
+            className="mb-8 sm:mb-12 lg:mb-16 max-w-7xl mx-auto"
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-8">
-              {" "}
-              {/* Reduced gap */}
               <div className="flex-1 text-center md:text-left order-2 md:order-1 md:pr-8">
                 <motion.h2
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                  className="text-neutral-950 font-geist-sans font-bold text-balance text-4xl/[1.1] sm:text-5xl/[1.1] lg:text-6xl/[1.1] xl:text-7xl/[1.1] tracking-tight leading-none mb-3 md:mb-4" // Reduced font size and margin
+                  className="text-neutral-950 font-ggx88 font-bold text-balance text-5xl/[1.1] sm:text-6xl/[1.1] lg:text-7xl/[1.1] xl:text-9xl/[1.1] tracking-tight leading-none mb-4 md:mb-6"
                   id="portfolio-heading"
                 >
-                  High Impact Media & Marketing
+                  Connecting Enterprises
                 </motion.h2>
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-                  className="text-neutral-700 text-base sm:text-lg max-w-xl leading-snug tracking-tight text-balance" // Reduced max-width and changed leading
+                  className="text-neutral-700 text-lg sm:text-xl lg:text-3xl max-w-2xl leading-snug tracking-tight text-balance"
                 >
-                  We specialize in brand storytelling, media strategy, video production, web development, and event
-                  production—all designed to elevate visibility, engagement, and impact.
+                  Leveraging networks to connect people, places and things through creative media and smart marketing.
                 </motion.p>
               </div>
               <motion.div
@@ -118,8 +115,6 @@ export function PortfolioGrid() {
           Featured Portfolio Items
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" aria-labelledby="featured-portfolio">
-          {" "}
-          {/* Reduced gap */}
           {portfolioArray.slice(0, 6).map((item, index) => (
             <PortfolioItem key={item.company} item={item} index={index} onClick={handleItemClick} />
           ))}
@@ -130,8 +125,6 @@ export function PortfolioGrid() {
           More Portfolio Items
         </h3>
         <div className="relative mt-8 sm:mt-12 lg:mt-16" aria-labelledby="more-portfolio">
-          {" "}
-          {/* Reduced margin-top */}
           {/* Navigation Arrows */}
           <div className="flex justify-between items-center">
             <motion.button
