@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
-import { useInView } from "motion/react"
+import { useEffect, useState } from "react"
 import { SDOHHero } from "../components/SDOHHero"
 import { SDOHNewsletter } from "../components/SDOHNewsletter"
 import { BackToTop } from "../components/BackToTop"
