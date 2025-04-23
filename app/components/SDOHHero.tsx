@@ -241,11 +241,8 @@ export function SDOHHero() {
   const isHeroInView = useInView(heroRef, { once: true })
   const isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
   const isMobile = useMobile()
-  const [isHovered, setIsHovered] = useState(false)
 
   // Scroll animation
-  const { scrollY } = useScroll()
-  const opacity = useTransform(scrollY, [0, 100], [0, 1])
   const [hasScrolled, setHasScrolled] = useState(false)
 
   // Common heading styles for consistency

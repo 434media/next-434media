@@ -11,8 +11,6 @@ import Script from "next/script"
 
 export default function SDOHClientPage() {
   const [mounted, setMounted] = useState(false)
-  const bannerRef = useRef(null)
-  const isBannerInView = useInView(bannerRef, { once: true, amount: 0.2 })
 
   useEffect(() => {
     setMounted(true)
@@ -454,7 +452,7 @@ export default function SDOHClientPage() {
                     </h2>
                     <p className="text-base sm:text-lg md:text-xl text-white/90 leading-relaxed">
                       If you&apos;ve ever asked,{" "}
-                      <strong className="text-yellow-300">"What can I do to make a difference?"</strong> — this is where
+                      <strong className="text-yellow-300">&quot;What can I do to make a difference?&quot;</strong> — this is where
                       you start.
                     </p>
                   </div>
