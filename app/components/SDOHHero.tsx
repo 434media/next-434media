@@ -23,12 +23,14 @@ const SessionCard = ({
   image,
   videoId,
   videoUrl,
+  href,
 }: {
   title: string
   description: string
   image: string
   videoId: string
   videoUrl?: string
+  href?: string
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -106,7 +108,14 @@ const SessionCard = ({
       </div>
 
       {/* Video Modal */}
-      <VideoModal isOpen={isModalOpen} closeModal={closeModal} title={title} videoId={videoId} videoUrl={videoUrl} />
+      <VideoModal
+        isOpen={isModalOpen}
+        closeModal={closeModal}
+        title={title}
+        videoId={videoId}
+        videoUrl={videoUrl}
+        href={href}
+      />
     </>
   )
 }
@@ -118,12 +127,14 @@ const VideoModal = ({
   title,
   videoId,
   videoUrl,
+  href,
 }: {
   isOpen: boolean
   closeModal: () => void
   title: string
   videoId: string
   videoUrl?: string
+  href?: string
 }) => {
   const videoRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -440,6 +451,30 @@ const VideoModal = ({
                 <div className="mt-6 flex flex-wrap justify-between items-center gap-4">
                   <div className="text-sm text-white/60">Session ID: {videoId}</div>
                   <div className="flex flex-wrap gap-3">
+                    {href && (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 mr-2"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                          <polyline points="15 3 21 3 21 9"></polyline>
+                          <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                        Visit Website
+                      </a>
+                    )}
                     {videoUrl && (
                       <button
                         type="button"
@@ -488,6 +523,7 @@ const SpeakerCard = ({
   imageUrl,
   logoUrl,
   role = "Speaker", // Default role is Speaker, can be overridden for Moderator
+  href,
 }: {
   name: string
   title: string
@@ -495,6 +531,7 @@ const SpeakerCard = ({
   imageUrl: string
   logoUrl: string
   role?: "Moderator" | "Speaker"
+  href?: string
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [isTouched, setIsTouched] = useState(false)
@@ -521,17 +558,28 @@ const SpeakerCard = ({
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault()
       setIsTouched(!isTouched)
+
+      // If href is provided, navigate to it on Enter/Space
+      if (href) {
+        window.open(href, "_blank", "noopener,noreferrer")
+      }
     }
   }
 
-  return (
+  // Wrap with Link if href is provided
+  const CardContent = () => (
     <motion.div
       ref={cardRef}
       className="bg-white rounded-xl shadow-md overflow-hidden relative h-[240px] sm:h-[280px]"
       whileHover={{ y: -5, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)" }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      onClick={handleTouch}
+      onClick={() => {
+        handleTouch()
+        if (href) {
+          window.open(href, "_blank", "noopener,noreferrer")
+        }
+      }}
       onTouchEnd={handleTouch}
       onFocus={handleFocus}
       onBlur={handleBlur}
@@ -539,7 +587,7 @@ const SpeakerCard = ({
       tabIndex={0}
       role="button"
       aria-pressed={isActive}
-      aria-label={`${name}, ${title} at ${company}, ${role}`}
+      aria-label={`${name}, ${title} at ${company}, ${role}${href ? ". Click to visit website" : ""}`}
     >
       {/* Role tag - positioned at the top right */}
       <div
@@ -552,6 +600,26 @@ const SpeakerCard = ({
       >
         {role}
       </div>
+
+      {/* Link indicator if href is provided */}
+      {href && (
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 px-2 sm:px-3 py-1 rounded-full bg-neutral-100 text-neutral-800 border border-neutral-200 text-xs font-medium flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-3 w-3 mr-1"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+          Website
+        </div>
+      )}
 
       <div className="p-4 sm:p-6 flex flex-col items-center justify-center h-full">
         {/* Speaker info with image */}
@@ -597,11 +665,19 @@ const SpeakerCard = ({
             <p className="text-sm sm:text-base font-medium text-cyan-400 border-t border-yellow-300/30 pt-2 sm:pt-3 mt-1 sm:mt-2">
               {company}
             </p>
+
+            {href && (
+              <button className="mt-4 px-4 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 rounded-full text-yellow-300 text-sm transition-colors duration-300">
+                Visit Website
+              </button>
+            )}
           </div>
         </motion.div>
       </div>
     </motion.div>
   )
+
+  return <CardContent />
 }
 
 // Create a decorative tech pattern component for the startup week vibe
@@ -869,6 +945,7 @@ export function SDOHHero() {
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/49d10ec854acc0af8a20810dd891eafb.jpeg"
                     logoUrl={companyLogos["434 MEDIA"]}
                     role="Moderator"
+                    href="https://434media.com"
                   />
 
                   {/* Speaker 1 */}
@@ -878,6 +955,7 @@ export function SDOHHero() {
                     company="SAVE Clinic"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Lyssa_Ochoa_LinkedIn_Headshot.jpeg"
                     logoUrl={companyLogos["The SAVE Clinic"]}
+                    href="https://thesaveclinic.org"
                   />
 
                   {/* Speaker 2 */}
@@ -887,6 +965,7 @@ export function SDOHHero() {
                     company="Tabiat"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/daniyal-liaqat.jpeg"
                     logoUrl={companyLogos["Tabiat Research"]}
+                    href="https://tabiat.ai"
                   />
 
                   {/* Speaker 3 */}
@@ -896,6 +975,7 @@ export function SDOHHero() {
                     company="Emerge & Rise"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/lina-rugova.jpeg"
                     logoUrl={companyLogos["Emerge and Rise"]}
+                    href="https://emergeandrise.org"
                   />
                 </div>
               </div>
@@ -1092,6 +1172,7 @@ export function SDOHHero() {
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card1.jpg"
                 videoId="session1"
                 videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
+                href="https://yumlish.com"
               />
 
               {/* Card 2 - With video implementation */}
@@ -1101,6 +1182,7 @@ export function SDOHHero() {
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card2.jpeg"
                 videoId="session2"
                 videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
+                href="https://padillalawllc.com"
               />
 
               {/* Card 3 - With placeholder */}
@@ -1109,6 +1191,7 @@ export function SDOHHero() {
                 description="Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card3.jpeg"
                 videoId="session3"
+                href="https://capitalfactory.com"
               />
             </div>
           </FadeIn>

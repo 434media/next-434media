@@ -89,12 +89,18 @@ export function SDOHMission() {
             </div>
           </div>
 
-          {/* Main Content */}
+          {/* Main Content - Updated with component number */}
           <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center mb-16 sm:mb-24">
             <div className="order-2 md:order-1">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600 mb-6">
-                Seminar + Speaker Series
-              </h2>
+              {/* Updated heading with component number */}
+              <div className="flex items-center mb-6">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-4 shadow-lg">
+                  1
+                </div>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600">
+                  Seminar + Speaker Series
+                </h2>
+              </div>
 
               <div className="space-y-6 text-neutral-700">
                 <p className="text-lg sm:text-xl leading-relaxed">

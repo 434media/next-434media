@@ -102,16 +102,22 @@ export default function SDOHClientPage() {
 
               {/* Content */}
               <div className="relative z-10">
-                {/* Startup Bootcamp Section */}
+                {/* Startup Bootcamp Section - Updated with component number */}
                 <FadeIn>
                   <div className="max-w-3xl mx-auto mb-16 sm:mb-20">
                     <div className="text-center mb-10">
+                      {/* Updated heading with component number */}
+                      <div className="flex items-center justify-center mb-6">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-4 shadow-lg">
+                          2
+                        </div>
+                        <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700">
+                          Startup Bootcamp
+                        </h2>
+                      </div>
                       <div className="inline-block p-1.5 px-3 mb-4 rounded-full bg-cyan-100/80 backdrop-blur-sm text-cyan-800 text-sm font-medium">
                         Early-Stage Program
                       </div>
-                      <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700 mb-6">
-                        Startup Bootcamp
-                      </h2>
                       <p className="text-lg sm:text-xl text-neutral-700 leading-relaxed max-w-2xl mx-auto">
                         A hands-on, early-stage program that helps local entrepreneurs turn ideas into action.
                         Participants receive guidance on business models, impact measurement, funding strategies, and
@@ -221,16 +227,22 @@ export default function SDOHClientPage() {
                   </div>
                 </FadeIn>
 
-                {/* Community Health Accelerator Section */}
+                {/* Community Health Accelerator Section - Updated with component number */}
                 <FadeIn>
                   <div className="max-w-3xl mx-auto mb-16 sm:mb-20">
                     <div className="text-center mb-10">
+                      {/* Updated heading with component number */}
+                      <div className="flex items-center justify-center mb-6">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-4 shadow-lg">
+                          3
+                        </div>
+                        <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700">
+                          Community Health Accelerator
+                        </h2>
+                      </div>
                       <div className="inline-block p-1.5 px-3 mb-4 rounded-full bg-yellow-100/80 backdrop-blur-sm text-yellow-800 text-sm font-medium">
                         Growth-Stage Program
                       </div>
-                      <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700 mb-6">
-                        Community Health Accelerator
-                      </h2>
                       <p className="text-lg sm:text-xl text-neutral-700 leading-relaxed max-w-2xl mx-auto">
                         For startups ready to scale, this accelerator provides deeper support—from mentoring and expert
                         workshops to connections with healthcare systems, investors, and ecosystem partners focused on
