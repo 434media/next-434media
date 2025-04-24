@@ -380,7 +380,7 @@ export function SDOHHero() {
 
           {/* Event Details Section */}
           <section className="py-8 sm:py-16">
-            <div className="container px-4 sm:px-6 max-w-5xl mx-auto text-center">
+            <div className="container px-4 sm:px-6 max-w-4xl mx-auto text-center">
               <FadeIn>
                 <h2 className={sectionHeadingClass}>¿WTF es SDOH? And What It Means to Y-O-U!</h2>
                 <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto mb-8 sm:mb-12">
