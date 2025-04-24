@@ -1,12 +1,488 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import type React from "react"
+
+import { useEffect, useState, useRef } from "react"
 import { SDOHHero } from "../components/SDOHHero"
 import { SDOHNewsletter } from "../components/SDOHNewsletter"
 import { BackToTop } from "../components/BackToTop"
 import { FadeIn } from "../components/FadeIn"
 import Image from "next/image"
 import Script from "next/script"
+import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
+import { Fragment } from "react"
+import dynamic from "next/dynamic"
+
+// Dynamically import ReactPlayer to avoid SSR issues
+const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
+
+// Add the SessionCard component
+const SessionCard = ({
+  title,
+  description,
+  image,
+  videoId,
+  videoUrl,
+}: {
+  title: string
+  description: string
+  image: string
+  videoId: string
+  videoUrl?: string
+}) => {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  const openModal = () => setIsModalOpen(true)
+  const closeModal = () => setIsModalOpen(false)
+
+  return (
+    <>
+      <div
+        ref={cardRef}
+        className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200 flex flex-col h-full transition-all duration-300 hover:shadow-xl hover:border-cyan-200 group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+      >
+        <div className="aspect-video relative overflow-hidden">
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/80 to-neutral-800/80 z-10"></div>
+
+          {/* Play button - appears on hover/focus */}
+          <div
+            className={`absolute inset-0 flex items-center justify-center z-20 transition-opacity duration-300 ${
+              isHovered || isFocused ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-4 border border-yellow-300/30 transform transition-transform duration-300 group-hover:scale-110">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-10 w-10 text-white"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
+
+          <Image
+            src={image || "/placeholder.svg?height=720&width=1280&query=conference presentation"}
+            alt={title}
+            width={640}
+            height={360}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </div>
+
+        <div className="p-6 flex-grow">
+          <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600 mb-3">
+            {title}
+          </h3>
+          <p className="text-neutral-700 mb-4">{description}</p>
+        </div>
+
+        <div className="px-6 pb-6 mt-auto">
+          <button
+            onClick={openModal}
+            className="inline-flex items-center justify-center w-full py-3 px-4 rounded-lg bg-gradient-to-r from-cyan-500 to-cyan-600 text-white font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-2"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="10 8 16 12 10 16 10 8"></polygon>
+            </svg>
+            View Session
+          </button>
+        </div>
+      </div>
+
+      {/* Video Modal */}
+      <VideoModal isOpen={isModalOpen} closeModal={closeModal} title={title} videoId={videoId} videoUrl={videoUrl} />
+    </>
+  )
+}
+
+// Add the VideoModal component
+const VideoModal = ({
+  isOpen,
+  closeModal,
+  title,
+  videoId,
+  videoUrl,
+}: {
+  isOpen: boolean
+  closeModal: () => void
+  title: string
+  videoId: string
+  videoUrl?: string
+}) => {
+  const videoRef = useRef<HTMLDivElement>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [volume, setVolume] = useState(0.8)
+  const [isMuted, setIsMuted] = useState(false)
+
+  // Handle keyboard events
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal()
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape)
+    }
+  }, [isOpen, closeModal])
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsPlaying(false)
+      setProgress(0)
+    }
+  }, [isOpen])
+
+  const handleReady = () => {
+    setIsLoading(false)
+  }
+
+  const handleProgress = (state: { played: number }) => {
+    setProgress(state.played)
+  }
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = Number.parseFloat(e.target.value)
+    setVolume(newVolume)
+    setIsMuted(newVolume === 0)
+  }
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+  }
+
+  const formatTime = (seconds: number) => {
+    const date = new Date(seconds * 1000)
+    const hh = date.getUTCHours()
+    const mm = date.getUTCMinutes()
+    const ss = date.getUTCSeconds().toString().padStart(2, "0")
+    if (hh) {
+      return `${hh}:${mm.toString().padStart(2, "0")}:${ss}`
+    }
+    return `${mm}:${ss}`
+  }
+
+  return (
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={closeModal}>
+        <TransitionChild
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/75" />
+        </TransitionChild>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-neutral-900 p-6 text-left align-middle shadow-xl transition-all">
+                <DialogTitle as="h3" className="text-xl font-bold text-white mb-4 pr-8">
+                  {title}
+                </DialogTitle>
+
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 rounded-full bg-neutral-800 p-2 text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-white"
+                  onClick={closeModal}
+                  aria-label="Close"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div ref={videoRef} className="aspect-video bg-black rounded-lg overflow-hidden relative">
+                  {videoUrl ? (
+                    <>
+                      {/* Loading overlay */}
+                      {isLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                            <p className="text-white text-sm">Loading video...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Video player */}
+                      <ReactPlayer
+                        url={videoUrl}
+                        width="100%"
+                        height="100%"
+                        playing={isPlaying}
+                        volume={isMuted ? 0 : volume}
+                        onReady={handleReady}
+                        onProgress={handleProgress}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        config={{
+                          youtube: {
+                            playerVars: {
+                              modestbranding: 1,
+                              rel: 0,
+                            },
+                          },
+                        }}
+                      />
+
+                      {/* Custom controls overlay */}
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
+                          isPlaying ? "opacity-0 hover:opacity-100" : "opacity-100"
+                        }`}
+                      >
+                        {/* Progress bar */}
+                        <div className="w-full h-1 bg-neutral-700 rounded-full mb-3 cursor-pointer">
+                          <div
+                            className="h-full bg-cyan-500 rounded-full"
+                            style={{ width: `${progress * 100}%` }}
+                          ></div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          {/* Play/Pause button */}
+                          <button
+                            onClick={() => setIsPlaying(!isPlaying)}
+                            className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400"
+                            aria-label={isPlaying ? "Pause" : "Play"}
+                          >
+                            {isPlaying ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            )}
+                          </button>
+
+                          {/* Volume controls */}
+                          <div className="flex items-center ml-4">
+                            <button
+                              onClick={toggleMute}
+                              className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 mr-2"
+                              aria-label={isMuted ? "Unmute" : "Mute"}
+                            >
+                              {isMuted ? (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                    clipRule="evenodd"
+                                  />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+                                  />
+                                </svg>
+                              ) : (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value={volume}
+                              onChange={handleVolumeChange}
+                              className="w-20 accent-cyan-500"
+                              aria-label="Volume"
+                            />
+                          </div>
+
+                          {/* Fullscreen button */}
+                          <button
+                            onClick={() => {
+                              if (videoRef.current) {
+                                if (document.fullscreenElement) {
+                                  document.exitFullscreen()
+                                } else {
+                                  videoRef.current.requestFullscreen()
+                                }
+                              }
+                            }}
+                            className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 ml-4"
+                            aria-label="Toggle fullscreen"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // Placeholder for videos that aren't available yet (Card 3)
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                      <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-6 border-2 border-yellow-300/30 mb-6">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-16 w-16 text-white"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-2xl font-bold text-cyan-400 mb-2">Coming Soon</h4>
+                      <p className="text-white/80 max-w-md">
+                        This video will be available after the event. Check back later to watch the full session.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex flex-wrap justify-between items-center gap-4">
+                  <div className="text-sm text-white/60">Session ID: {videoId}</div>
+                  <div className="flex flex-wrap gap-3">
+                    {videoUrl && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 mr-2"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                          <polyline points="16 6 12 2 8 6"></polyline>
+                          <line x1="12" y1="2" x2="12" y2="15"></line>
+                        </svg>
+                        Download Slides
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      onClick={closeModal}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  )
+}
 
 export default function SDOHClientPage() {
   const [mounted, setMounted] = useState(false)
@@ -53,173 +529,33 @@ export default function SDOHClientPage() {
                 </p>
               </div>
 
+              {/* Replace the grid of 3 cards with this updated implementation */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
-                {/* Card 1 */}
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200 flex flex-col h-full">
-                  <div className="aspect-video relative">
-                    {/* Video placeholder */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/80 to-neutral-800/80 z-10"></div>
-                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                      <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-4 border border-yellow-300/30">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-10 w-10 text-white"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/rgv-startup-week-banner.png"
-                      alt="Market Analysis and Value Delivery"
-                      fill
-                      className="object-cover opacity-60 z-0"
-                    />
-                  </div>
-                  <div className="p-6 flex-grow">
-                    <h3 className={cardHeadingClass}>Market Analysis and Value Delivery</h3>
-                    <p className="text-neutral-700">
-                      Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024
-                      MHM Accelerator Cohort Champion
-                    </p>
-                  </div>
-                  <div className="px-6 pb-6">
-                    <a
-                      href="https://rgvstartupweek.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-cyan-600 hover:text-cyan-700 font-medium"
-                    >
-                      Learn More
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 ml-1"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                      </svg>
-                    </a>
-                  </div>
-                </div>
+                {/* Card 1 - With video implementation */}
+                <SessionCard
+                  title="Market Analysis and Value Delivery"
+                  description="Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
+                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/rgv-startup-week-banner.png"
+                  videoId="session1"
+                  videoUrl="https://www.youtube.com/watch?v=jNQXAC9IVRw"
+                />
 
-                {/* Card 2 */}
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200 flex flex-col h-full">
-                  <div className="aspect-video relative">
-                    {/* Video placeholder */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/80 to-neutral-800/80 z-10"></div>
-                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                      <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-4 border border-yellow-300/30">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-10 w-10 text-white"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/methodist-healthcare-logo.png"
-                      alt="Legal Considerations for Raising Capital"
-                      fill
-                      className="object-cover opacity-60 z-0"
-                    />
-                  </div>
-                  <div className="p-6 flex-grow">
-                    <h3 className={cardHeadingClass}>Legal Considerations for Raising Capital</h3>
-                    <p className="text-neutral-700">
-                      Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI
-                    </p>
-                  </div>
-                  <div className="px-6 pb-6">
-                    <a
-                      href="https://www.mhm.org"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-cyan-600 hover:text-cyan-700 font-medium"
-                    >
-                      Learn More
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 ml-1"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                      </svg>
-                    </a>
-                  </div>
-                </div>
+                {/* Card 2 - With video implementation */}
+                <SessionCard
+                  title="Legal Considerations for Raising Capital"
+                  description="Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
+                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/methodist-healthcare-logo.png"
+                  videoId="session2"
+                  videoUrl="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                />
 
-                {/* Card 3 */}
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200 flex flex-col h-full">
-                  <div className="aspect-video relative">
-                    {/* Video placeholder */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/80 to-neutral-800/80 z-10"></div>
-                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                      <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-4 border border-yellow-300/30">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-10 w-10 text-white"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/velocitytx-logo.png"
-                      alt="The Perfect Pitch"
-                      fill
-                      className="object-cover opacity-60 z-0"
-                    />
-                  </div>
-                  <div className="p-6 flex-grow">
-                    <h3 className={cardHeadingClass}>The Perfect Pitch</h3>
-                    <p className="text-neutral-700">
-                      Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc.,
-                      Capital Factory
-                    </p>
-                  </div>
-                  <div className="px-6 pb-6">
-                    <a
-                      href="https://velocitytx.org"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-cyan-600 hover:text-cyan-700 font-medium"
-                    >
-                      Learn More
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 ml-1"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                      </svg>
-                    </a>
-                  </div>
-                </div>
+                {/* Card 3 - With placeholder */}
+                <SessionCard
+                  title="The Perfect Pitch"
+                  description="Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
+                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/velocitytx-logo.png"
+                  videoId="session3"
+                />
               </div>
             </FadeIn>
 
@@ -407,8 +743,8 @@ export default function SDOHClientPage() {
                     </h2>
                     <p className="text-base sm:text-lg md:text-xl text-white/90 leading-relaxed">
                       If you&apos;ve ever asked,{" "}
-                      <strong className="text-yellow-300">&quot;What can I do to make a difference?&quot;</strong> — this is where
-                      you start.
+                      <strong className="text-yellow-300">&quot;What can I do to make a difference?&quot;</strong> —
+                      this is where you start.
                     </p>
                   </div>
                   <div className="max-w-xl mx-auto">
