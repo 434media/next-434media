@@ -537,7 +537,7 @@ export default function SDOHClientPage() {
                   description="Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
                   image="https://ampd-asset.s3.us-east-2.amazonaws.com/rgv-startup-week-banner.png"
                   videoId="session1"
-                  videoUrl="https://www.youtube.com/watch?v=jNQXAC9IVRw"
+                  videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
                 />
 
                 {/* Card 2 - With video implementation */}
@@ -546,7 +546,7 @@ export default function SDOHClientPage() {
                   description="Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
                   image="https://ampd-asset.s3.us-east-2.amazonaws.com/methodist-healthcare-logo.png"
                   videoId="session2"
-                  videoUrl="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                  videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
                 />
 
                 {/* Card 3 - With placeholder */}
