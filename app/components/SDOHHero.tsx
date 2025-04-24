@@ -235,7 +235,7 @@ export function SDOHHero() {
             fill
             priority
             sizes="100vw"
-            className="object-cover"
+            className="object-contain object-center"
           />
         </div>
 
@@ -249,14 +249,18 @@ export function SDOHHero() {
             <div className="max-w-3xl mx-auto text-center mb-10 sm:mb-16">
               <h2 className={sectionHeadingClass}>
                 <span className="block text-xs sm:text-sm font-semibold text-neutral-500 mb-2">
-                  What the heck is Social Determinants of Health?
+                  What the Heck is Social Determinants of Health?
                 </span>
                 <span className="block">¿Qué es SDOH?</span>
               </h2>
               <p className="text-base sm:text-lg md:text-xl text-neutral-700 leading-relaxed max-w-prose mx-auto">
-                <strong>Social Determinants of Health (SDOH)</strong> are the conditions in the environments where
-                people are born, live, learn, work, play, worship, and age that affect a wide range of health,
-                functioning, and quality-of-life outcomes and risks.
+                Most of what affects our health doesn&apos;t happen in a hospital—it happens in our everyday lives.
+                Where we live, what we eat, how we get to work or school, whether we feel safe, supported, and seen...
+                these things shape our health long before a doctor ever gets involved.
+              </p>
+              <p className="text-base sm:text-lg md:text-xl text-neutral-700 leading-relaxed max-w-prose mx-auto mt-4">
+                That&apos;s what <strong>Social Determinants of Health (SDOH)</strong> are: the real-world conditions
+                that impact how long—and how well—we live.
               </p>
             </div>
 
@@ -273,7 +277,7 @@ export function SDOHHero() {
               </div>
 
               <div className="bg-white p-5 sm:p-8 rounded-xl shadow-md border-l-4 border-yellow-300">
-                <h3 className={subHeadingClass}>Our Focus</h3>
+                <h3 className={subHeadingClass}>Panel Focus</h3>
                 <p className="text-base sm:text-lg text-neutral-700">
                   This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how
                   we can address SDOH in the Rio Grande Valley. We&apos;ll explore how technology, community engagement,
