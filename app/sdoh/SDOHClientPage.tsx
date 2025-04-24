@@ -49,33 +49,15 @@ const SessionCard = ({
         onBlur={() => setIsFocused(false)}
       >
         <div className="aspect-video relative overflow-hidden">
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/80 to-neutral-800/80 z-10"></div>
-
-          {/* Play button - appears on hover/focus */}
-          <div
-            className={`absolute inset-0 flex items-center justify-center z-20 transition-opacity duration-300 ${
-              isHovered || isFocused ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-4 border border-yellow-300/30 transform transition-transform duration-300 group-hover:scale-110">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10 text-white"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          </div>
+          {/* Subtle gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/50 to-neutral-800/50 z-10"></div>
 
           <Image
             src={image || "/placeholder.svg?height=720&width=1280&query=conference presentation"}
             alt={title}
             width={640}
             height={360}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
         </div>
 
@@ -535,7 +517,7 @@ export default function SDOHClientPage() {
                 <SessionCard
                   title="Market Analysis and Value Delivery"
                   description="Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
-                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/rgv-startup-week-banner.png"
+                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/card1.jpg"
                   videoId="session1"
                   videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
                 />
@@ -544,7 +526,7 @@ export default function SDOHClientPage() {
                 <SessionCard
                   title="Legal Considerations for Raising Capital"
                   description="Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
-                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/methodist-healthcare-logo.png"
+                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/card2.jpeg"
                   videoId="session2"
                   videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
                 />
@@ -553,7 +535,7 @@ export default function SDOHClientPage() {
                 <SessionCard
                   title="The Perfect Pitch"
                   description="Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
-                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/velocitytx-logo.png"
+                  image="https://ampd-asset.s3.us-east-2.amazonaws.com/card3.jpeg"
                   videoId="session3"
                 />
               </div>
