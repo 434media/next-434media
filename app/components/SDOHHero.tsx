@@ -134,30 +134,6 @@ const SpeakerCard = ({
   )
 }
 
-// Scroll indicator component for better UX
-const ScrollIndicator = () => {
-  return (
-    <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce">
-      <span className="sr-only">Scroll down for more content</span>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-white drop-shadow-md"
-        aria-hidden="true"
-      >
-        <path d="M12 5v14M5 12l7 7 7-7" />
-      </svg>
-    </div>
-  )
-}
-
 // Update the SDOHHero component to add more spacing and improve the layout
 export function SDOHHero() {
   const controls = useAnimation()
@@ -263,8 +239,7 @@ export function SDOHHero() {
           />
         </div>
 
-        {/* Scroll indicator */}
-        {!prefersReducedMotion && <ScrollIndicator />}
+        {!prefersReducedMotion}
       </section>
 
       {/* What is SDOH Section */}
@@ -324,14 +299,14 @@ export function SDOHHero() {
             </div>
           </div>
 
-          {/* Video Section - Redesigned */}
+          {/* Video Section - Enhanced with placeholder styling */}
           <div className="max-w-6xl mx-auto mb-16 sm:mb-28">
             <div className="bg-gradient-to-r from-neutral-800 to-neutral-900 rounded-xl overflow-hidden shadow-lg border border-cyan-500/30">
               <div className="aspect-video relative flex items-center justify-center">
-                {/* Play button overlay */}
+                {/* Play button overlay with enhanced styling */}
                 <div className="absolute inset-0 flex items-center justify-center z-10">
                   <div
-                    className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-6 border-2 border-yellow-300/30"
+                    className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-6 border-2 border-yellow-300/30 transition-transform duration-300 hover:scale-110 hover:bg-cyan-500/30"
                     role="button"
                     tabIndex={0}
                     aria-label="Play video: ¿Qué es SDOH? (Coming Soon)"
@@ -354,13 +329,15 @@ export function SDOHHero() {
                   </div>
                 </div>
 
-                {/* Coming soon text */}
+                {/* Coming soon text with enhanced styling */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 z-10">
                   <h3 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300 mb-4">
                     COMING SOON
                   </h3>
                   <p className="text-xl md:text-2xl text-cyan-300 mb-2">¿Qué es SDOH?</p>
-                  <p className="text-lg md:text-xl text-white/80">An RGV Startup Week Main Stage Panel</p>
+                  <p className="text-lg md:text-xl text-white/80 max-w-md mx-auto">
+                    This video will be available after the event. Check back later to watch the full session.
+                  </p>
                 </div>
 
                 {/* Video thumbnail background with gradient overlay */}
