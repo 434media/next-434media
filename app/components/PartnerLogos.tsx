@@ -8,25 +8,25 @@ import { motion } from "motion/react"
 const partners = [
   {
     name: "VelocityTX",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSW%2BPartner%2Band%2BSponsors%2BLogos_VelocityTX.png",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/rgv4.png",
     width: 340,
     height: 170,
   },
   {
     name: "Methodist Healthcare Ministries",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSW%2BPartner%2Band%2BSponsors%2BLogos_Methodist.png",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/rgv3.png",
     width: 360,
     height: 170,
   },
   {
     name: "Brownsville Community Improvement Corporation",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSW%2B-%2BPartner%2BLogos_BCIC.jpg",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/rgv2.png",
     width: 360,
     height: 170,
   },
   {
     name: "UTRGV",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSW%2B-%2BPartner%2BLogos_UTRGV-03.jpg",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/rgv.png",
     width: 320,
     height: 170,
   },
@@ -38,7 +38,7 @@ export function PartnerLogos() {
 
   // Update the container and motion div for partner logos
   return (
-    <div ref={containerRef} className="relative overflow-hidden w-full lg:mt-16 lg:pt-16">
+    <div ref={containerRef} className="relative overflow-hidden w-full">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-16 justify-items-center">
         {partners.map((partner, index) => (
           <motion.div

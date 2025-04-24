@@ -39,50 +39,6 @@ export default function SDOHClientPage() {
 
       {/* Main content */}
       <div id="main-content" tabIndex={-1}>
-        {/* What is SDOH Section */}
-        <section className="py-16 sm:py-24 bg-neutral-50">
-          <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-            <FadeIn>
-              <div className="max-w-3xl mx-auto text-center mb-10 sm:mb-16">
-                <h2 className={sectionHeadingClass}>
-                  <span className="block text-xs sm:text-sm font-semibold text-neutral-500 mb-2">
-                    What the heck is Social Determinants of Health?
-                  </span>
-                  <span className="block">¿Qué es SDOH?</span>
-                </h2>
-                <p className="text-base sm:text-lg md:text-xl text-neutral-700 leading-relaxed">
-                  <strong>Social Determinants of Health (SDOH)</strong> are the conditions in the environments where
-                  people are born, live, learn, work, play, worship, and age that affect a wide range of health,
-                  functioning, and quality-of-life outcomes and risks.
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6 sm:gap-12 mb-10 sm:mb-16">
-                <div className="bg-white p-5 sm:p-8 rounded-xl shadow-md border-l-4 border-cyan-500">
-                  <h3 className={subHeadingClass}>Why It Matters</h3>
-                  <p className="text-base sm:text-lg text-neutral-700 text-balance">
-                    SDOH can be grouped into 5 domains: economic stability, education access and quality, health care
-                    access and quality, neighborhood and built environment, and social and community context. SDOH
-                    contribute to wide health disparities and inequities. For example, people who don&apos;t have access to
-                    grocery stores with healthy foods are less likely to have good nutrition. That raises their risk of
-                    health conditions like heart disease, diabetes, and obesity — and even lowers life expectancy.
-                  </p>
-                </div>
-
-                <div className="bg-white p-5 sm:p-8 rounded-xl shadow-md border-l-4 border-yellow-300">
-                  <h3 className={subHeadingClass}>Our Focus</h3>
-                  <p className="text-base sm:text-lg text-neutral-700 text-balance">
-                    This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss
-                    how we can address SDOH in the Rio Grande Valley. We&apos;ll explore how technology, community
-                    engagement, and cross-sector collaboration can create sustainable solutions to improve health
-                    outcomes for all residents.
-                  </p>
-                </div>
-              </div>
-            </FadeIn>
-          </div>
-        </section>
-
         {/* Powered By Section - Combined with Resources */}
         <section className="py-24 bg-white">
           <div className="container mx-auto px-6 max-w-6xl">
