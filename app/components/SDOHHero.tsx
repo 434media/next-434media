@@ -6,11 +6,481 @@ import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { motion, useAnimation, useInView } from "motion/react"
 import { useMobile } from "../hooks/use-mobile"
-import { PartnerLogos } from "./PartnerLogos"
 import { FadeIn } from "./FadeIn"
 import Link from "next/link"
+import { SDOHMission } from "./SDOHMission"
+import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
+import { Fragment } from "react"
+import dynamic from "next/dynamic"
 
-// Update the SpeakerCard component for better mobile display and accessibility
+// Dynamically import ReactPlayer to avoid SSR issues
+const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
+
+// Update the SessionCard component for better accessibility and UX
+const SessionCard = ({
+  title,
+  description,
+  image,
+  videoId,
+  videoUrl,
+}: {
+  title: string
+  description: string
+  image: string
+  videoId: string
+  videoUrl?: string
+}) => {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  const openModal = () => setIsModalOpen(true)
+  const closeModal = () => setIsModalOpen(false)
+
+  return (
+    <>
+      <div
+        ref={cardRef}
+        className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200 flex flex-col h-full transition-all duration-300 hover:shadow-xl hover:border-cyan-200 group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+      >
+        <div
+          className="aspect-video relative overflow-hidden cursor-pointer"
+          onClick={openModal}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              openModal()
+            }
+          }}
+          aria-label={`Open ${title} session video`}
+        >
+          {/* Subtle gradient overlay - reduced opacity for better image visibility */}
+          <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/30 to-neutral-800/30 z-10 transition-opacity duration-300 group-hover:opacity-50"></div>
+
+          <Image
+            src={image || "/placeholder.svg?height=720&width=1280&query=conference presentation"}
+            alt={title}
+            width={640}
+            height={360}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          />
+        </div>
+
+        <div className="p-6 flex-grow">
+          <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600 mb-3">
+            {title}
+          </h3>
+          <p className="text-neutral-700 mb-4 text-base leading-relaxed">{description}</p>
+        </div>
+
+        <div className="px-6 pb-6 mt-auto">
+          <button
+            onClick={openModal}
+            className="inline-flex items-center justify-center w-full py-3 px-4 rounded-lg bg-gradient-to-r from-cyan-500 to-cyan-600 text-white font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2"
+            aria-label={`View ${title} session`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-2"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="10 8 16 12 10 16 10 8"></polygon>
+            </svg>
+            View Session
+          </button>
+        </div>
+      </div>
+
+      {/* Video Modal */}
+      <VideoModal isOpen={isModalOpen} closeModal={closeModal} title={title} videoId={videoId} videoUrl={videoUrl} />
+    </>
+  )
+}
+
+// Add the VideoModal component
+const VideoModal = ({
+  isOpen,
+  closeModal,
+  title,
+  videoId,
+  videoUrl,
+}: {
+  isOpen: boolean
+  closeModal: () => void
+  title: string
+  videoId: string
+  videoUrl?: string
+}) => {
+  const videoRef = useRef<HTMLDivElement>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [volume, setVolume] = useState(0.8)
+  const [isMuted, setIsMuted] = useState(false)
+
+  // Handle keyboard events
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal()
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape)
+    }
+  }, [isOpen, closeModal])
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsPlaying(false)
+      setProgress(0)
+    }
+  }, [isOpen])
+
+  const handleReady = () => {
+    setIsLoading(false)
+  }
+
+  const handleProgress = (state: { played: number }) => {
+    setProgress(state.played)
+  }
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = Number.parseFloat(e.target.value)
+    setVolume(newVolume)
+    setIsMuted(newVolume === 0)
+  }
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+  }
+
+  const formatTime = (seconds: number) => {
+    const date = new Date(seconds * 1000)
+    const hh = date.getUTCHours()
+    const mm = date.getUTCMinutes()
+    const ss = date.getUTCSeconds().toString().padStart(2, "0")
+    if (hh) {
+      return `${hh}:${mm.toString().padStart(2, "0")}:${ss}`
+    }
+    return `${mm}:${ss}`
+  }
+
+  return (
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={closeModal}>
+        <TransitionChild
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/75" />
+        </TransitionChild>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-neutral-900 p-6 text-left align-middle shadow-xl transition-all">
+                <DialogTitle as="h3" className="text-xl font-bold text-white mb-4 pr-8">
+                  {title}
+                </DialogTitle>
+
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 rounded-full bg-neutral-800 p-2 text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-white"
+                  onClick={closeModal}
+                  aria-label="Close"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div ref={videoRef} className="aspect-video bg-black rounded-lg overflow-hidden relative">
+                  {videoUrl ? (
+                    <>
+                      {/* Loading overlay */}
+                      {isLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                            <p className="text-white text-sm">Loading video...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Video player */}
+                      <ReactPlayer
+                        url={videoUrl}
+                        width="100%"
+                        height="100%"
+                        playing={isPlaying}
+                        volume={isMuted ? 0 : volume}
+                        onReady={handleReady}
+                        onProgress={handleProgress}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        config={{
+                          youtube: {
+                            playerVars: {
+                              modestbranding: 1,
+                              rel: 0,
+                            },
+                          },
+                        }}
+                      />
+
+                      {/* Custom controls overlay */}
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
+                          isPlaying ? "opacity-0 hover:opacity-100" : "opacity-100"
+                        }`}
+                      >
+                        {/* Progress bar */}
+                        <div className="w-full h-1 bg-neutral-700 rounded-full mb-3 cursor-pointer">
+                          <div
+                            className="h-full bg-cyan-500 rounded-full"
+                            style={{ width: `${progress * 100}%` }}
+                          ></div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          {/* Play/Pause button */}
+                          <button
+                            onClick={() => setIsPlaying(!isPlaying)}
+                            className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400"
+                            aria-label={isPlaying ? "Pause" : "Play"}
+                          >
+                            {isPlaying ? (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            )}
+                          </button>
+
+                          {/* Volume controls */}
+                          <div className="flex items-center ml-4">
+                            <button
+                              onClick={toggleMute}
+                              className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 mr-2"
+                              aria-label={isMuted ? "Unmute" : "Mute"}
+                            >
+                              {isMuted ? (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                    clipRule="evenodd"
+                                  />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
+                                  />
+                                </svg>
+                              ) : (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value={volume}
+                              onChange={handleVolumeChange}
+                              className="w-20 accent-cyan-500"
+                              aria-label="Volume"
+                            />
+                          </div>
+
+                          {/* Fullscreen button */}
+                          <button
+                            onClick={() => {
+                              if (videoRef.current) {
+                                if (document.fullscreenElement) {
+                                  document.exitFullscreen()
+                                } else {
+                                  videoRef.current.requestFullscreen()
+                                }
+                              }
+                            }}
+                            className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 ml-4"
+                            aria-label="Toggle fullscreen"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // Placeholder for videos that aren't available yet (Card 3)
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                      <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-6 border-2 border-yellow-300/30 mb-6">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-16 w-16 text-white"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-2xl font-bold text-cyan-400 mb-2">Coming Soon</h4>
+                      <p className="text-white/80 max-w-md">
+                        This video will be available after the event. Check back later to watch the full session.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 flex flex-wrap justify-between items-center gap-4">
+                  <div className="text-sm text-white/60">Session ID: {videoId}</div>
+                  <div className="flex flex-wrap gap-3">
+                    {videoUrl && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 mr-2"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                          <polyline points="16 6 12 2 8 6"></polyline>
+                          <line x1="12" y1="2" x2="12" y2="15"></line>
+                        </svg>
+                        Download Slides
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      onClick={closeModal}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
+  )
+}
+
+// Update the SpeakerCard component for better accessibility and UX
 const SpeakerCard = ({
   name,
   title,
@@ -134,7 +604,75 @@ const SpeakerCard = ({
   )
 }
 
-// Update the SDOHHero component to add more spacing and improve the layout
+// Create a decorative tech pattern component for the startup week vibe
+const TechPattern = ({ className = "" }: { className?: string }) => {
+  return (
+    <div className={`absolute pointer-events-none ${className}`} aria-hidden="true">
+      <svg width="100%" height="100%" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="tech-grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path
+              d="M0 0 L40 0 L40 40 L0 40 Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="0.5"
+              strokeOpacity="0.1"
+            />
+          </pattern>
+          <pattern id="tech-dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="10" cy="10" r="1" fill="currentColor" fillOpacity="0.2" />
+          </pattern>
+          <linearGradient id="tech-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="currentColor" stopOpacity="0.05" />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#tech-grid)" />
+        <rect width="100%" height="100%" fill="url(#tech-dots)" />
+        <rect width="100%" height="100%" fill="url(#tech-gradient)" />
+      </svg>
+    </div>
+  )
+}
+
+// Create a floating tech elements component
+const FloatingElements = () => {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      {/* Floating circles */}
+      <motion.div
+        className="absolute w-20 h-20 rounded-full bg-yellow-300/10 border border-yellow-300/20"
+        initial={{ x: "10%", y: "20%" }}
+        animate={{ x: "15%", y: "15%" }}
+        transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute w-32 h-32 rounded-full bg-cyan-500/10 border border-cyan-500/20"
+        initial={{ x: "80%", y: "60%" }}
+        animate={{ x: "75%", y: "65%" }}
+        transition={{ duration: 10, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
+      />
+
+      {/* Code brackets */}
+      <motion.div
+        className="absolute text-4xl font-mono text-cyan-500/20"
+        initial={{ x: "85%", y: "15%", rotate: 15 }}
+        animate={{ x: "85%", y: "15%", rotate: -5 }}
+        transition={{ duration: 6, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
+      >
+        {"{ }"}
+      </motion.div>
+      <motion.div
+        className="absolute text-4xl font-mono text-yellow-500/20"
+        initial={{ x: "15%", y: "75%", rotate: -15 }}
+        animate={{ x: "15%", y: "75%", rotate: 5 }}
+        transition={{ duration: 7, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
+      />
+    </div>
+  )
+}
+
+// Update the SDOHHero component for better accessibility, spacing, and UX
 export function SDOHHero() {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
@@ -242,196 +780,165 @@ export function SDOHHero() {
         {!prefersReducedMotion}
       </section>
 
-      {/* What is SDOH Section */}
-      <section className="py-16 sm:py-24 bg-neutral-50">
-        <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+      {/* Mission Statement Section */}
+      <SDOHMission />
+
+      {/* Event Details Section - Enhanced with Startup Week vibe */}
+      <section className="py-16 sm:py-24 relative overflow-hidden">
+        {/* Tech pattern background */}
+        <TechPattern className="text-cyan-500 inset-0" />
+        <FloatingElements />
+
+        {/* RGV Startup Week Badge */}
+        <div className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 md:translate-x-1/3">
+          <div className="relative w-40 h-40 md:w-48 md:h-48">
+            <div className="absolute inset-0 bg-yellow-400 rounded-full animate-pulse opacity-20"></div>
+            <div className="absolute inset-2 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-lg">
+              <div className="text-center p-2">
+                <p className="text-xs font-bold text-yellow-900 uppercase tracking-wider">Part of</p>
+                <p className="text-sm md:text-base font-black text-neutral-900 leading-tight">RGV STARTUP WEEK</p>
+                <p className="text-xs font-medium text-yellow-900">2025</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="container px-4 sm:px-6 max-w-4xl mx-auto text-center relative z-10">
           <FadeIn>
-            <div className="max-w-3xl mx-auto text-center mb-10 sm:mb-16">
-              <h2 className={sectionHeadingClass}>
-                <span className="block text-xs sm:text-sm font-semibold text-neutral-500 mb-2">
-                  What the Heck is Social Determinants of Health?
-                </span>
-                <span className="block">¿Qué es SDOH?</span>
+            {/* Enhanced section header with startup week styling */}
+            <div className="inline-block relative mb-8">
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-yellow-500/20 blur-xl rounded-full"></div>
+              <h2 className={`${sectionHeadingClass} relative`}>
+                <span className="inline-block px-2 py-1">¿WTF es SDOH?</span>{" "}
+                <span className="text-neutral-800">And What It Means to Y-O-U!</span>
               </h2>
-              <p className="text-base sm:text-lg md:text-xl text-neutral-700 leading-relaxed max-w-prose mx-auto">
-                Most of what affects our health doesn&apos;t happen in a hospital—it happens in our everyday lives.
-                Where we live, what we eat, how we get to work or school, whether we feel safe, supported, and seen...
-                these things shape our health long before a doctor ever gets involved.
-              </p>
-              <p className="text-base sm:text-lg md:text-xl text-neutral-700 leading-relaxed max-w-prose mx-auto mt-4">
-                That&apos;s what <strong>Social Determinants of Health (SDOH)</strong> are: the real-world conditions
-                that impact how long—and how well—we live.
-              </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6 sm:gap-12 mb-10 sm:mb-16">
-              <div className="bg-white p-5 sm:p-8 rounded-xl shadow-md border-l-4 border-cyan-500">
-                <h3 className={subHeadingClass}>Why It Matters</h3>
-                <p className="text-base sm:text-lg text-neutral-700">
-                  SDOH can be grouped into 5 domains: economic stability, education access and quality, health care
-                  access and quality, neighborhood and built environment, and social and community context. SDOH
-                  contribute to wide health disparities and inequities. For example, people who don&apos;t have access
-                  to grocery stores with healthy foods are less likely to have good nutrition. That raises their risk of
-                  health conditions like heart disease, diabetes, and obesity — and even lowers life expectancy.
-                </p>
+            {/* Startup-style description with code-like elements */}
+            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl border border-cyan-200 shadow-lg mb-12">
+              <div className="flex items-start mb-4">
+                <div className="flex space-x-2 mr-3">
+                  <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                </div>
+                <p className="text-neutral-500 text-sm font-mono">// Join us for this innovative panel</p>
               </div>
-
-              <div className="bg-white p-5 sm:p-8 rounded-xl shadow-md border-l-4 border-yellow-300">
-                <h3 className={subHeadingClass}>Panel Focus</h3>
-                <p className="text-base sm:text-lg text-neutral-700">
-                  This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how
-                  we can address SDOH in the Rio Grande Valley. We&apos;ll explore how technology, community engagement,
-                  and cross-sector collaboration can create sustainable solutions to improve health outcomes for all
-                  residents.
-                </p>
+              <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto mb-4 font-medium">
+                This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we
+                can address SDOH in the Rio Grande Valley.
+              </p>
+              <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto font-medium">
+                We'll explore how technology, community engagement, and cross-sector collaboration can create
+                sustainable solutions to improve health outcomes for all residents.
+              </p>
+              <div className="mt-4 text-right">
+                <span className="inline-block px-3 py-1 bg-cyan-100 text-cyan-800 rounded-md text-sm font-mono">
+                  #innovation #healthcare #community
+                </span>
               </div>
             </div>
           </FadeIn>
         </div>
-      </section>
 
-      {/* Event details section that appears on scroll */}
-      <section ref={detailsRef} className="bg-white py-16 sm:py-24">
-        <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
-          {/* In Partnership With section */}
-          <div className="mb-16 sm:mb-28">
-            <h2 className={sectionHeadingClass}>In Partnership With</h2>
-            <div className="flex flex-wrap justify-center items-center">
-              <div className="w-full">
-                <PartnerLogos />
-              </div>
-            </div>
-          </div>
+        <div className="container px-4 sm:px-6 max-w-5xl mx-auto relative z-10">
+          <FadeIn>
+            {/* Panel Speakers Section - Enhanced with startup styling */}
+            <div className="mt-16 sm:mt-24 relative">
+              {/* Decorative elements */}
+              <div className="absolute -top-10 -left-10 w-20 h-20 border-t-2 border-l-2 border-yellow-400/30"></div>
+              <div className="absolute -bottom-10 -right-10 w-20 h-20 border-b-2 border-r-2 border-cyan-400/30"></div>
 
-          {/* Video Section - Enhanced with placeholder styling */}
-          <div className="max-w-6xl mx-auto mb-16 sm:mb-28">
-            <div className="bg-gradient-to-r from-neutral-800 to-neutral-900 rounded-xl overflow-hidden shadow-lg border border-cyan-500/30">
-              <div className="aspect-video relative flex items-center justify-center">
-                {/* Play button overlay with enhanced styling */}
-                <div className="absolute inset-0 flex items-center justify-center z-10">
-                  <div
-                    className="bg-cyan-500/20 backdrop-blur-sm rounded-full p-6 border-2 border-yellow-300/30 transition-transform duration-300 hover:scale-110 hover:bg-cyan-500/30"
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Play video: ¿Qué es SDOH? (Coming Soon)"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        // Video play functionality would go here
-                      }
-                    }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-16 w-16 text-white"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-cyan-100">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className={`${subHeadingClass} mb-0 flex items-center`}>
+                    <span className="inline-block w-3 h-8 bg-yellow-400 mr-3 rounded-sm"></span>
+                    Panel Speakers
+                  </h2>
+                  <div className="px-4 py-1 bg-cyan-100 text-cyan-800 rounded-full text-sm font-medium">
+                    Featured Session
                   </div>
                 </div>
 
-                {/* Coming soon text with enhanced styling */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 z-10">
-                  <h3 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300 mb-4">
-                    COMING SOON
-                  </h3>
-                  <p className="text-xl md:text-2xl text-cyan-300 mb-2">¿Qué es SDOH?</p>
-                  <p className="text-lg md:text-xl text-white/80 max-w-md mx-auto">
-                    This video will be available after the event. Check back later to watch the full session.
-                  </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 max-w-6xl mx-auto">
+                  {/* Moderator */}
+                  <SpeakerCard
+                    name="Marcos Resendez"
+                    title="Founder"
+                    company="434 MEDIA"
+                    imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/49d10ec854acc0af8a20810dd891eafb.jpeg"
+                    logoUrl={companyLogos["434 MEDIA"]}
+                    role="Moderator"
+                  />
+
+                  {/* Speaker 1 */}
+                  <SpeakerCard
+                    name="Dr. Lyssa Ochoa"
+                    title="Founder"
+                    company="SAVE Clinic"
+                    imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Lyssa_Ochoa_LinkedIn_Headshot.jpeg"
+                    logoUrl={companyLogos["The SAVE Clinic"]}
+                  />
+
+                  {/* Speaker 2 */}
+                  <SpeakerCard
+                    name="Daniyal Liaqat"
+                    title="Founder, 2024 MHM Accelerator Cohort"
+                    company="Tabiat"
+                    imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/daniyal-liaqat.jpeg"
+                    logoUrl={companyLogos["Tabiat Research"]}
+                  />
+
+                  {/* Speaker 3 */}
+                  <SpeakerCard
+                    name="Lina Rugova"
+                    title="Founder"
+                    company="Emerge & Rise"
+                    imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/lina-rugova.jpeg"
+                    logoUrl={companyLogos["Emerge and Rise"]}
+                  />
                 </div>
-
-                {/* Video thumbnail background with gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/80 to-neutral-800/80 z-[1]"></div>
-
-                {/* Background image */}
-                <Image
-                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/QueEsSDOHStory.png"
-                  alt="Video thumbnail for ¿Qué es SDOH?"
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1200px"
-                  className="object-cover opacity-30 z-0"
-                />
               </div>
             </div>
-          </div>
 
-          {/* Event Details Section */}
-          <section className="py-8 sm:py-16">
-            <div className="container px-4 sm:px-6 max-w-4xl mx-auto text-center">
-              <FadeIn>
-                <h2 className={sectionHeadingClass}>¿WTF es SDOH? And What It Means to Y-O-U!</h2>
-                <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto mb-8 sm:mb-12">
-                  Join us for a panel discussion on{" "}
-                  <strong className="text-cyan-600">Social Determinants of Health</strong> during RGV Startup Week.
-                  Learn how local leaders, innovators, and entrepreneurs can turn awareness into action.
-                </p>
+            {/* Event Card Design - Enhanced with startup week styling */}
+            <div className="mt-16 sm:mt-24 relative">
+              {/* Decorative elements */}
+              <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2">
+                <div className="w-16 h-16 rounded-full bg-yellow-400/10 animate-pulse"></div>
+              </div>
+              <div className="absolute top-1/4 right-0 transform translate-x-1/2 -translate-y-1/2">
+                <div className="w-24 h-24 rounded-full bg-cyan-500/10 animate-pulse"></div>
+              </div>
 
-                {/* Event Card Design */}
-                <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-3xl mx-auto border border-cyan-100">
-                  <div className="grid md:grid-cols-2">
-                    {/* Left side - Date and Time */}
-                    <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white p-6 sm:p-10 flex flex-col justify-center">
-                      <h3 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-white">When</h3>
-                      <div className="space-y-6">
-                        <div className="flex items-start gap-4">
-                          <div className="bg-white/20 p-3 rounded-full">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-6 sm:h-8 w-6 sm:w-8"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                              <line x1="16" y1="2" x2="16" y2="6"></line>
-                              <line x1="8" y1="2" x2="8" y2="6"></line>
-                              <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                          </div>
-                          <div>
-                            <span className="font-medium text-base sm:text-xl block text-white/90">Monday</span>
-                            <span className="font-bold text-lg sm:text-2xl block mt-1">April 28, 2025</span>
-                          </div>
-                        </div>
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-3xl mx-auto border-2 border-cyan-100 relative z-10">
+                {/* RGV Startup Week Banner */}
+                <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-neutral-900 py-2 px-4 text-center font-bold text-sm">
+                  <span className="animate-pulse inline-block w-2 h-2 bg-white rounded-full mr-2"></span>
+                  RGV STARTUP WEEK 2025 FEATURED EVENT
+                  <span className="animate-pulse inline-block w-2 h-2 bg-white rounded-full ml-2"></span>
+                </div>
 
-                        <div className="flex items-start gap-4">
-                          <div className="bg-white/20 p-3 rounded-full">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-6 sm:h-8 w-6 sm:w-8"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                          </div>
-                          <div>
-                            <span className="font-medium text-base sm:text-xl block text-white/90">Time</span>
-                            <span className="font-bold text-lg sm:text-2xl block mt-1">1:00 PM – 1:45 PM</span>
-                          </div>
-                        </div>
-                      </div>
+                <div className="grid md:grid-cols-2">
+                  {/* Left side - Date and Time */}
+                  <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white p-8 sm:p-10 flex flex-col justify-center relative overflow-hidden">
+                    {/* Tech pattern overlay */}
+                    <div className="absolute inset-0 opacity-10">
+                      <svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                          <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5" />
+                        </pattern>
+                        <rect width="100%" height="100%" fill="url(#grid)" />
+                      </svg>
                     </div>
 
-                    {/* Right side - Location */}
-                    <div className="p-6 sm:p-10 flex flex-col justify-center bg-white">
-                      <h3 className={subHeadingClass}>Where</h3>
+                    <h3 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-white relative">
+                      <span className="inline-block w-2 h-6 bg-yellow-400 mr-2"></span>
+                      When
+                    </h3>
+                    <div className="space-y-6 relative">
                       <div className="flex items-start gap-4">
-                        <div className="bg-yellow-100 p-3 rounded-full text-yellow-600">
+                        <div className="bg-white/20 p-3 rounded-full">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="h-6 sm:h-8 w-6 sm:w-8"
@@ -443,103 +950,168 @@ export function SDOHHero() {
                             strokeLinejoin="round"
                             aria-hidden="true"
                           >
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                            <circle cx="12" cy="10" r="3"></circle>
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
                           </svg>
                         </div>
                         <div>
-                          <span className="font-bold text-lg sm:text-2xl block text-neutral-800">eBridge Center</span>
-                          <span className="text-base sm:text-xl text-neutral-600 block mt-2">1304 E Adams St</span>
-                          <span className="text-base sm:text-xl text-neutral-600 block">Brownsville, TX 78520</span>
-                          <Link
-                            href="https://maps.google.com/?q=1304+E+Adams+St,+Brownsville,+TX+78520"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 rounded-md"
+                          <span className="font-medium text-base sm:text-xl block text-white/90">Monday</span>
+                          <span className="font-bold text-lg sm:text-2xl block mt-1">April 28, 2025</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className="bg-white/20 p-3 rounded-full">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-6 sm:h-8 w-6 sm:w-8"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
                           >
-                            View on Google Maps
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5 ml-1"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <line x1="7" y1="17" x2="17" y2="7"></line>
-                              <polyline points="7 7 17 7 17 17"></polyline>
-                            </svg>
-                          </Link>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                          </svg>
+                        </div>
+                        <div>
+                          <span className="font-medium text-base sm:text-xl block text-white/90">Time</span>
+                          <span className="font-bold text-lg sm:text-2xl block mt-1">1:00 PM – 1:45 PM</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Bottom CTA */}
-                  <div className="bg-neutral-50 p-6 flex justify-center border-t border-neutral-100">
-                    <Link
-                      href="https://rgvsw25.events.whova.com/registration"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block bg-gradient-to-r from-yellow-400 to-yellow-500 text-neutral-900 font-bold py-3 px-8 rounded-full text-lg shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
-                    >
-                      Register for RGV Startup Week
-                      <span className="ml-2 inline-block" aria-hidden="true">
-                        →
-                      </span>
-                    </Link>
+                  {/* Right side - Location */}
+                  <div className="p-8 sm:p-10 flex flex-col justify-center bg-white relative">
+                    {/* Decorative elements */}
+                    <div className="absolute top-0 right-0 w-16 h-16">
+                      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 0L100 0L100 20L20 20L20 100L0 100L0 0Z" fill="rgba(6, 182, 212, 0.1)" />
+                      </svg>
+                    </div>
+
+                    <h3 className={`${subHeadingClass} relative`}>
+                      <span className="inline-block w-2 h-6 bg-yellow-400 mr-2"></span>
+                      Where
+                    </h3>
+                    <div className="flex items-start gap-4">
+                      <div className="bg-yellow-100 p-3 rounded-full text-yellow-600">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 sm:h-8 w-6 sm:w-8"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                          <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="font-bold text-lg sm:text-2xl block text-neutral-800">eBridge Center</span>
+                        <span className="text-base sm:text-xl text-neutral-600 block mt-2">1304 E Adams St</span>
+                        <span className="text-base sm:text-xl text-neutral-600 block">Brownsville, TX 78520</span>
+                        <Link
+                          href="https://maps.google.com/?q=1304+E+Adams+St,+Brownsville,+TX+78520"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 rounded-md"
+                          aria-label="View eBridge Center on Google Maps"
+                        >
+                          View on Google Maps
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 ml-1"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <line x1="7" y1="17" x2="17" y2="7"></line>
+                            <polyline points="7 7 17 7 17 17"></polyline>
+                          </svg>
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </FadeIn>
+
+                {/* Bottom CTA - Enhanced with startup styling */}
+                <div className="bg-neutral-50 p-6 flex justify-center border-t border-neutral-100 relative overflow-hidden">
+                  {/* Tech pattern background */}
+                  <div className="absolute inset-0 opacity-5">
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                      <pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <circle cx="5" cy="5" r="1" fill="black" />
+                      </pattern>
+                      <rect width="100%" height="100%" fill="url(#dots)" />
+                    </svg>
+                  </div>
+
+                  <Link
+                    href="https://rgvsw25.events.whova.com/registration"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block bg-gradient-to-r from-yellow-400 to-yellow-500 text-neutral-900 font-bold py-3 px-8 rounded-full text-lg shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 relative z-10"
+                    aria-label="Register for RGV Startup Week"
+                  >
+                    Register for RGV Startup Week
+                    <span className="ml-2 inline-block" aria-hidden="true">
+                      →
+                    </span>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </section>
+          </FadeIn>
+        </div>
+      </section>
 
-          {/* Panel Speakers Section */}
-          <div className="mt-12 sm:mt-20">
-            <h2 className={sectionHeadingClass}>Panel Speakers</h2>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 max-w-6xl mx-auto">
-              {/* Moderator */}
-              <SpeakerCard
-                name="Marcos Resendez"
-                title="Founder"
-                company="434 MEDIA"
-                imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/49d10ec854acc0af8a20810dd891eafb.jpeg"
-                logoUrl={companyLogos["434 MEDIA"]}
-                role="Moderator"
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-6 max-w-6xl">
+          <FadeIn>
+            {/* Replace the grid of 3 cards with this updated implementation */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
+              {/* Card 1 - With video implementation */}
+              <SessionCard
+                title="Market Analysis and Value Delivery"
+                description="Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
+                image="https://ampd-asset.s3.us-east-2.amazonaws.com/card1.jpg"
+                videoId="session1"
+                videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
               />
 
-              {/* Speaker 1 */}
-              <SpeakerCard
-                name="Dr. Lyssa Ochoa"
-                title="Founder"
-                company="SAVE Clinic"
-                imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Lyssa_Ochoa_LinkedIn_Headshot.jpeg"
-                logoUrl={companyLogos["The SAVE Clinic"]}
+              {/* Card 2 - With video implementation */}
+              <SessionCard
+                title="Legal Considerations for Raising Capital"
+                description="Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
+                image="https://ampd-asset.s3.us-east-2.amazonaws.com/card2.jpeg"
+                videoId="session2"
+                videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
               />
 
-              {/* Speaker 2 */}
-              <SpeakerCard
-                name="Daniyal Liaqat"
-                title="Founder, 2024 MHM Accelerator Cohort"
-                company="Tabiat"
-                imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/daniyal-liaqat.jpeg"
-                logoUrl={companyLogos["Tabiat Research"]}
-              />
-
-              {/* Speaker 3 */}
-              <SpeakerCard
-                name="Lina Rugova"
-                title="Founder"
-                company="Emerge & Rise"
-                imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/lina-rugova.jpeg"
-                logoUrl={companyLogos["Emerge and Rise"]}
+              {/* Card 3 - With placeholder */}
+              <SessionCard
+                title="The Perfect Pitch"
+                description="Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
+                image="https://ampd-asset.s3.us-east-2.amazonaws.com/card3.jpeg"
+                videoId="session3"
               />
             </div>
-          </div>
+          </FadeIn>
         </div>
       </section>
     </>
