@@ -21,18 +21,16 @@ const nextConfig: NextConfig = {
       {
         source: '/SDOH',
         destination: '/sdoh',
-        permanent: true,
-        // Add this to prevent redirect loops
+        permanent: false,
         basePath: false,
-      },
-      // You can add more case-insensitive redirects if needed
-      {
-        source: '/Sdoh',
-        destination: '/sdoh',
-        permanent: true,
-        // Add this to prevent redirect loops
-        basePath: false,
-      },
+        // Only redirect exact matches
+        has: [
+          {
+            type: 'host',
+            value: '434media.com',
+          },
+        ],
+      }
     ];
   },
 };
