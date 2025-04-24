@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/SDOH',
+        destination: '/sdoh',
+        permanent: true,
+      },
+      // You can add more case-insensitive redirects if needed
+      {
+        source: '/Sdoh',
+        destination: '/sdoh',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
