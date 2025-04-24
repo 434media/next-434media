@@ -122,7 +122,7 @@ export function SDOHNewsletter() {
       }
 
       // Send data to the API
-      const response = await fetch("/api/sdoh-newsletter/route", {
+      const response = await fetch("/api/sdoh-newsletter", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
