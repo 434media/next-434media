@@ -1,19 +1,83 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useMobile } from "../hooks/use-mobile"
+
+// Extend the Window interface to include the turnstile property
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        element: HTMLElement,
+        options: {
+          sitekey: string
+          callback: (token: string) => void
+          "refresh-expired"?: "auto" | "manual"
+        },
+      ) => string
+      getResponse: (widgetId: string) => string | null
+      reset: (widgetId: string) => void
+    }
+  }
+}
+
+const isDevelopment = process.env.NODE_ENV === "development"
 
 export function SDOHNewsletter() {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isMobile = useMobile()
+
+  // Load Turnstile script only when needed
+  useEffect(() => {
+    if (isDevelopment || turnstileWidget) return
+
+    const loadTurnstile = () => {
+      if (document.getElementById("turnstile-script")) return
+
+      const script = document.createElement("script")
+      script.id = "turnstile-script"
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js"
+      script.async = true
+      script.defer = true
+      document.body.appendChild(script)
+
+      script.onload = () => {
+        if (window.turnstile && turnstileRef.current) {
+          const widgetId = window.turnstile.render(turnstileRef.current, {
+            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            callback: () => {
+              // Token received, no action needed here
+            },
+            "refresh-expired": "auto",
+          })
+          setTurnstileWidget(widgetId)
+        }
+      }
+    }
+
+    loadTurnstile()
+
+    return () => {
+      // Clean up widget when component unmounts
+      if (turnstileWidget && window.turnstile) {
+        try {
+          window.turnstile.reset(turnstileWidget)
+        } catch (error) {
+          console.error("Error resetting Turnstile widget:", error)
+        }
+      }
+    }
+  }, [turnstileWidget])
 
   // Email validation regex pattern
   const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
@@ -44,23 +108,47 @@ export function SDOHNewsletter() {
     setIsSubmitting(true)
 
     try {
-      // Here you would normally send the data to your API
-      // For now, we'll simulate a successful submission
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      let turnstileResponse = undefined
 
-      // Add a tag or category for SDOH
-      const data = {
-        email,
-        tags: ["SDOH"],
+      if (!isDevelopment) {
+        if (!window.turnstile || !turnstileWidget) {
+          throw new Error("Security verification not loaded. Please refresh and try again.")
+        }
+
+        turnstileResponse = window.turnstile.getResponse(turnstileWidget)
+        if (!turnstileResponse) {
+          throw new Error("Please complete the security verification")
+        }
       }
 
-      console.log("Submitting newsletter signup:", data)
+      // Send data to the API
+      const response = await fetch("/api/sdoh-newsletter/route", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(turnstileResponse && { "cf-turnstile-response": turnstileResponse }),
+        },
+        body: JSON.stringify({
+          email,
+          source: "SDOH",
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to subscribe to newsletter")
+      }
 
       setEmail("")
       setIsSuccess(true)
 
       // Reset form
       formRef.current?.reset()
+
+      // Reset Turnstile if needed
+      if (!isDevelopment && turnstileWidget && window.turnstile) {
+        window.turnstile.reset(turnstileWidget)
+      }
 
       // Reset success state after 5 seconds
       setTimeout(() => setIsSuccess(false), 5000)
@@ -134,6 +222,15 @@ export function SDOHNewsletter() {
               </div>
             </div>
 
+            {!isDevelopment && (
+              <div
+                ref={turnstileRef}
+                data-size="flexible"
+                className="w-full mt-4 flex justify-center"
+                aria-label="Security verification"
+              />
+            )}
+
             {error && (
               <div id="newsletter-error" className="text-white/90 text-sm mt-2 px-2" role="alert">
                 {error}
@@ -154,7 +251,7 @@ export function SDOHNewsletter() {
               <CheckIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
             <span className="text-white text-sm sm:text-base font-medium">
-              Thanks for subscribing to the SDOH newsletter! We&apos;ll be in touch soon.
+              Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.
             </span>
           </motion.div>
         )}
