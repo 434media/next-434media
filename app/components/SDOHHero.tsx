@@ -830,7 +830,7 @@ export function SDOHHero() {
             fill
             priority
             sizes="100vw"
-            className="object-contain object-center"
+            className="object-contain object-center -mt-12"
           />
         </div>
 
@@ -1144,8 +1144,7 @@ export function SDOHHero() {
       <section className="py-24 bg-white">
         <div className="container mx-auto px-6 max-w-6xl">
           <FadeIn>
-            {/* Replace the grid of 3 cards with this updated implementation */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
               {/* Card 1 - With video implementation */}
               <SessionCard
                 title="Market Analysis and Value Delivery"
