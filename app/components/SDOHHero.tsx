@@ -825,12 +825,12 @@ export function SDOHHero() {
         {/* Mobile hero image - shown only on mobile */}
         <div className="block md:hidden w-full h-full">
           <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Mobile.png"
+            src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
             alt="SDOH Conference - Awareness Drives Innovation"
             fill
             priority
             sizes="100vw"
-            className="object-contain object-center -mt-12"
+            className="object-contain object-center"
           />
         </div>
 
