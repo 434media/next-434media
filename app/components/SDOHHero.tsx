@@ -827,7 +827,7 @@ export function SDOHHero() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,rgba(0,0,0,0)_70%)]"></div>
           <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(6,182,212,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,182,212,0.05)_1px,transparent_1px)] bg-[size:14px_14px]"></div>
           <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Mobile.png"
+            src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
             alt="SDOH Conference - Awareness Drives Innovation"
             fill
             priority
