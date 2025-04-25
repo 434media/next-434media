@@ -823,14 +823,16 @@ export function SDOHHero() {
         </div>
 
         {/* Mobile hero image - shown only on mobile */}
-        <div className="block md:hidden w-full h-full -mt-16">
+        <div className="block md:hidden w-full h-full bg-gradient-to-br from-neutral-900 via-cyan-950 to-neutral-900">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,rgba(0,0,0,0)_70%)]"></div>
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(6,182,212,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,182,212,0.05)_1px,transparent_1px)] bg-[size:14px_14px]"></div>
           <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
+            src="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Mobile.png"
             alt="SDOH Conference - Awareness Drives Innovation"
             fill
             priority
             sizes="100vw"
-            className="object-contain"
+            className="object-contain object-center"
           />
         </div>
 
@@ -962,7 +964,7 @@ export function SDOHHero() {
               </div>
             </div>
 
-            {/* Event Card Design - Enhanced with startup week styling */}
+            {/* Event Card Design - Enhanced with startup styling */}
             <div className="mt-16 sm:mt-24 relative">
               {/* Decorative elements */}
               <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2">
@@ -1144,7 +1146,8 @@ export function SDOHHero() {
       <section className="py-24 bg-white">
         <div className="container mx-auto px-6 max-w-6xl">
           <FadeIn>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+            {/* Replace the grid of 3 cards with this updated implementation */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
               {/* Card 1 - With video implementation */}
               <SessionCard
                 title="Market Analysis and Value Delivery"
