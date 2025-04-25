@@ -8,11 +8,78 @@ import { FadeIn } from "./FadeIn"
 export function SDOHMission() {
   const missionRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(missionRef, { once: true, amount: 0.2 })
+  const introRef = useRef<HTMLDivElement>(null)
+  const introInView = useInView(introRef, { once: true, amount: 0.2 })
 
   return (
-    <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-neutral-50 to-white overflow-hidden">
+    <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-neutral-50 to-white overflow-hidden -mt-24 md:mt-0">
       <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
         <FadeIn>
+          {/* SDOH Introduction Section - Typography focused */}
+          <div ref={introRef} className="relative mb-20 sm:mb-28">
+            {/* Title with animated reveal and gradient */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={introInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.7 }}
+              className="mb-12 sm:mb-16 max-w-4xl mx-auto"
+            >
+              {/* Main heading with gradient */}
+              <motion.h2
+                initial={{ opacity: 0 }}
+                animate={introInView ? { opacity: 1 } : {}}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-cyan-500 to-cyan-700"
+              >
+                ¿Qué es SDOH?
+              </motion.h2>
+
+              {/* Subtitle with reveal animation */}
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={introInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.7, delay: 0.3 }}
+                className="text-xl sm:text-2xl md:text-3xl text-neutral-600 font-medium leading-snug"
+              >
+                (Or in plain terms: What the Heck is Social Determinants of Health?)
+              </motion.p>
+            </motion.div>
+
+            {/* Main text with staggered reveal */}
+            <div className="space-y-8 max-w-3xl mx-auto">
+              <motion.p
+                initial={{ opacity: 0, y: 15 }}
+                animate={introInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.7, delay: 0.5 }}
+                className="text-lg sm:text-xl leading-relaxed text-neutral-700"
+              >
+                Most of what affects our health doesn't happen in a hospital—it happens in our everyday lives. Where we
+                live, what we eat, how we get to work or school, whether we feel safe, supported, and seen... these
+                things shape our health long before a doctor ever gets involved.
+              </motion.p>
+
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={introInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.7, delay: 0.7 }}
+                className="pl-4 border-l-4 border-cyan-500"
+              >
+                <p className="text-lg sm:text-xl leading-relaxed text-neutral-700">
+                  That's what{" "}
+                  <motion.span
+                    initial={{ color: "#0891b2" }} // cyan-600
+                    animate={introInView ? { color: ["#0891b2", "#0e7490", "#0891b2"] } : {}}
+                    transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                    className="font-bold"
+                  >
+                    Social Determinants of Health (SDOH)
+                  </motion.span>{" "}
+                  are: the real-world conditions that impact how long—and how well—we live.
+                </p>
+              </motion.div>
+            </div>
+          </div>
+
           {/* Partnership Banner */}
           <div className="relative mb-16 sm:mb-24 rounded-2xl overflow-hidden shadow-2xl transform hover:scale-[1.01] transition-transform duration-500">
             {/* Background gradient with subtle pattern */}
@@ -142,6 +209,23 @@ export function SDOHMission() {
                     fill
                     className="object-cover"
                   />
+
+                  {/* Overlay with mission keywords */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-neutral-900/30 to-transparent flex flex-col justify-end p-6">
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {["Education", "Innovation", "Awareness", "Action", "Community"].map((keyword, index) => (
+                        <motion.span
+                          key={keyword}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={isInView ? { opacity: 1, y: 0 } : {}}
+                          transition={{ delay: index * 0.1 + 0.5, duration: 0.5 }}
+                          className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-medium"
+                        >
+                          {keyword}
+                        </motion.span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -566,8 +566,7 @@ const SpeakerCard = ({
     }
   }
 
-  // Wrap with Link if href is provided
-  const CardContent = () => (
+  return (
     <motion.div
       ref={cardRef}
       className="bg-white rounded-xl shadow-md overflow-hidden relative h-[240px] sm:h-[280px]"
@@ -576,7 +575,7 @@ const SpeakerCard = ({
       onHoverEnd={() => setIsHovered(false)}
       onClick={() => {
         handleTouch()
-        if (href) {
+        if (href && isActive) {
           window.open(href, "_blank", "noopener,noreferrer")
         }
       }}
@@ -601,34 +600,14 @@ const SpeakerCard = ({
         {role}
       </div>
 
-      {/* Link indicator if href is provided */}
-      {href && (
-        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-20 px-2 sm:px-3 py-1 rounded-full bg-neutral-100 text-neutral-800 border border-neutral-200 text-xs font-medium flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-3 w-3 mr-1"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
-          Website
-        </div>
-      )}
-
-      <div className="p-4 sm:p-6 flex flex-col items-center justify-center h-full">
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 sm:p-6">
         {/* Speaker info with image */}
         <motion.div
-          className="flex flex-col items-center text-center"
+          className="flex flex-col items-center justify-center text-center w-full"
           animate={{ opacity: isActive ? 0 : 1 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden mb-3 sm:mb-4 border-2 border-yellow-300/30">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden mb-3 sm:mb-4 border-2 border-yellow-300/30 flex-shrink-0">
             <Image
               src={imageUrl || "/placeholder.svg?height=96&width=96&query=person"}
               alt={`Photo of ${name}`}
@@ -640,7 +619,7 @@ const SpeakerCard = ({
           <h3 className="font-bold text-lg sm:text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600">
             {name}
           </h3>
-          <p className="text-xs sm:text-sm text-neutral-600 mt-1">
+          <p className="text-xs sm:text-sm text-neutral-600 mt-1 max-w-full">
             {title}, {company}
           </p>
         </motion.div>
@@ -652,8 +631,12 @@ const SpeakerCard = ({
           animate={{ opacity: isActive ? 1 : 0 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="flex flex-col items-center justify-center">
-            <motion.div animate={{ scale: isActive ? 1.1 : 1 }} transition={{ duration: 0.3 }}>
+          <div className="flex flex-col items-center justify-center w-full">
+            <motion.div
+              animate={{ scale: isActive ? 1.1 : 1 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center justify-center w-full"
+            >
               <Image
                 src={logoUrl || "/placeholder.svg?height=150&width=150&query=company logo"}
                 alt={`${company} logo`}
@@ -662,7 +645,7 @@ const SpeakerCard = ({
                 className="h-auto max-h-20 sm:max-h-28 w-auto object-contain mb-3 sm:mb-4"
               />
             </motion.div>
-            <p className="text-sm sm:text-base font-medium text-cyan-400 border-t border-yellow-300/30 pt-2 sm:pt-3 mt-1 sm:mt-2">
+            <p className="text-sm sm:text-base font-medium text-cyan-400 border-t border-yellow-300/30 pt-2 sm:pt-3 mt-1 sm:mt-2 text-center">
               {company}
             </p>
 
@@ -676,8 +659,6 @@ const SpeakerCard = ({
       </div>
     </motion.div>
   )
-
-  return <CardContent />
 }
 
 // Create a decorative tech pattern component for the startup week vibe
