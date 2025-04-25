@@ -823,14 +823,14 @@ export function SDOHHero() {
         </div>
 
         {/* Mobile hero image - shown only on mobile */}
-        <div className="block md:hidden w-full h-full">
+        <div className="block md:hidden w-full h-full -mt-16">
           <Image
             src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
             alt="SDOH Conference - Awareness Drives Innovation"
             fill
             priority
             sizes="100vw"
-            className="object-contain object-center"
+            className="object-contain"
           />
         </div>
 

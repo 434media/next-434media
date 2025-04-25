@@ -12,7 +12,7 @@ export function SDOHMission() {
   const introInView = useInView(introRef, { once: true, amount: 0.2 })
 
   return (
-    <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-white to-neutral-50 overflow-hidden -mt-32 md:mt-0">
+    <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-white to-neutral-50 overflow-hidden -mt-16 md:mt-0">
       <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
         <FadeIn>
           {/* SDOH Introduction Section - Typography focused */}
