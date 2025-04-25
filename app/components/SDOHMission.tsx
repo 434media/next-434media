@@ -210,22 +210,7 @@ export function SDOHMission() {
                     className="object-cover"
                   />
 
-                  {/* Overlay with mission keywords */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-neutral-900/30 to-transparent flex flex-col justify-end p-6">
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {["Education", "Innovation", "Awareness", "Action", "Community"].map((keyword, index) => (
-                        <motion.span
-                          key={keyword}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={isInView ? { opacity: 1, y: 0 } : {}}
-                          transition={{ delay: index * 0.1 + 0.5, duration: 0.5 }}
-                          className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-medium"
-                        >
-                          {keyword}
-                        </motion.span>
-                      ))}
-                    </div>
-                  </div>
+
                 </div>
               </div>
             </div>
