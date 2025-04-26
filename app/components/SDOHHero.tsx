@@ -142,6 +142,9 @@ const VideoModal = ({
   const [progress, setProgress] = useState(0)
   const [volume, setVolume] = useState(0.8)
   const [isMuted, setIsMuted] = useState(false)
+  const [showControls, setShowControls] = useState(true)
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [duration, setDuration] = useState(0)
 
   // Handle keyboard events
   useEffect(() => {
@@ -149,25 +152,62 @@ const VideoModal = ({
       if (e.key === "Escape") closeModal()
     }
 
+    const handleSpaceBar = (e: KeyboardEvent) => {
+      if (
+        e.key === " " &&
+        document.activeElement?.tagName !== "BUTTON" &&
+        document.activeElement?.tagName !== "INPUT"
+      ) {
+        e.preventDefault()
+        togglePlayback()
+      }
+    }
+
     if (isOpen) {
       document.addEventListener("keydown", handleEscape)
+      document.addEventListener("keydown", handleSpaceBar)
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape)
+      document.removeEventListener("keydown", handleSpaceBar)
     }
-  }, [isOpen, closeModal])
+  }, [isOpen, closeModal, isPlaying])
 
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setIsPlaying(false)
       setProgress(0)
+      setShowControls(true)
     }
   }, [isOpen])
 
+  // Auto-hide controls after inactivity
+  useEffect(() => {
+    if (isPlaying) {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current)
+      }
+
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false)
+      }, 3000)
+    }
+
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current)
+      }
+    }
+  }, [isPlaying, showControls])
+
   const handleReady = () => {
     setIsLoading(false)
+  }
+
+  const handleDuration = (duration: number) => {
+    setDuration(duration)
   }
 
   const handleProgress = (state: { played: number }) => {
@@ -182,6 +222,25 @@ const VideoModal = ({
 
   const toggleMute = () => {
     setIsMuted(!isMuted)
+  }
+
+  const togglePlayback = () => {
+    setIsPlaying(!isPlaying)
+    setShowControls(true)
+  }
+
+  const handleVideoContainerMouseMove = () => {
+    setShowControls(true)
+
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current)
+    }
+
+    if (isPlaying) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false)
+      }, 3000)
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -243,7 +302,12 @@ const VideoModal = ({
                   </svg>
                 </button>
 
-                <div ref={videoRef} className="aspect-video bg-black rounded-lg overflow-hidden relative">
+                <div
+                  ref={videoRef}
+                  className="aspect-video bg-black rounded-lg overflow-hidden relative"
+                  onMouseMove={handleVideoContainerMouseMove}
+                  onTouchStart={handleVideoContainerMouseMove}
+                >
                   {videoUrl ? (
                     <>
                       {/* Loading overlay */}
@@ -267,24 +331,77 @@ const VideoModal = ({
                         onProgress={handleProgress}
                         onPlay={() => setIsPlaying(true)}
                         onPause={() => setIsPlaying(false)}
+                        onDuration={handleDuration}
                         config={{
                           youtube: {
                             playerVars: {
                               modestbranding: 1,
                               rel: 0,
+                              controls: 0, // Hide default controls
                             },
                           },
                         }}
                       />
 
+                      {/* Large play button overlay - only shown when video is not playing */}
+                      {!isPlaying && !isLoading && (
+                        <button
+                          onClick={togglePlayback}
+                          className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/30 z-20 group focus:outline-none"
+                          aria-label="Play video"
+                        >
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transition-all duration-300 group-hover:scale-110 group-hover:bg-black/70 group-focus:scale-110 group-focus:bg-black/70 group-focus:border-cyan-400">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-10 w-10 sm:h-12 sm:w-12 text-white group-hover:text-cyan-400 group-focus:text-cyan-400 transition-colors duration-300"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Pause button overlay - only shown when video is playing */}
+                      {isPlaying && (
+                        <button
+                          onClick={togglePlayback}
+                          className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-black/40 flex items-center justify-center z-20 transition-opacity duration-300 ${
+                            showControls ? "opacity-100" : "opacity-0"
+                          } hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2`}
+                          aria-label="Pause video"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-10 w-10 text-white"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path fillRule="evenodd" d="M10 18V6h-4v12h4zm8 0V6h-4v12h4z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      )}
+
                       {/* Custom controls overlay */}
                       <div
                         className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
-                          isPlaying ? "opacity-0 hover:opacity-100" : "opacity-100"
+                          showControls ? "opacity-100" : "opacity-0"
                         }`}
                       >
                         {/* Progress bar */}
-                        <div className="w-full h-1 bg-neutral-700 rounded-full mb-3 cursor-pointer">
+                        <div
+                          className="w-full h-2 bg-neutral-700 rounded-full mb-3 cursor-pointer"
+                          onClick={(e) => {
+                            if (videoRef.current) {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              const pos = (e.clientX - rect.left) / rect.width
+                              // This would ideally seek the video, but ReactPlayer doesn't expose this directly
+                              // We'd need to use a ref to the player instance
+                            }
+                          }}
+                        >
                           <div
                             className="h-full bg-cyan-500 rounded-full"
                             style={{ width: `${progress * 100}%` }}
@@ -294,7 +411,7 @@ const VideoModal = ({
                         <div className="flex items-center justify-between">
                           {/* Play/Pause button */}
                           <button
-                            onClick={() => setIsPlaying(!isPlaying)}
+                            onClick={togglePlayback}
                             className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400"
                             aria-label={isPlaying ? "Pause" : "Play"}
                           >
@@ -302,40 +419,27 @@ const VideoModal = ({
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="h-6 w-6"
-                                fill="none"
                                 viewBox="0 0 24 24"
-                                stroke="currentColor"
+                                fill="currentColor"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
+                                <path fillRule="evenodd" d="M10 18V6h-4v12h4zm8 0V6h-4v12h4z" clipRule="evenodd" />
                               </svg>
                             ) : (
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="h-6 w-6"
-                                fill="none"
                                 viewBox="0 0 24 24"
-                                stroke="currentColor"
+                                fill="currentColor"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
+                                <path d="M8 5v14l11-7z" />
                               </svg>
                             )}
                           </button>
+
+                          {/* Time display */}
+                          <div className="text-white text-sm mx-4 hidden sm:block">
+                            {formatTime(progress * duration)}
+                          </div>
 
                           {/* Volume controls */}
                           <div className="flex items-center ml-4">
@@ -827,7 +931,7 @@ export function SDOHHero() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.15)_0%,rgba(0,0,0,0)_70%)]"></div>
           <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(6,182,212,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(6,182,212,0.05)_1px,transparent_1px)] bg-[size:14px_14px]"></div>
           <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
+            src="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Mobile.png"
             alt="SDOH Conference - Awareness Drives Innovation"
             fill
             priority
@@ -964,7 +1068,7 @@ export function SDOHHero() {
               </div>
             </div>
 
-            {/* Event Card Design - Enhanced with startup styling */}
+            {/* Event Card Design - Enhanced with startup week styling */}
             <div className="mt-16 sm:mt-24 relative">
               {/* Decorative elements */}
               <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2">
