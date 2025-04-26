@@ -619,7 +619,9 @@ const VideoModal = ({
   )
 }
 
-// Update the SpeakerCard component for better accessibility and UX
+// Update the SpeakerCard component to ensure consistent alignment and height
+// Replace the entire SpeakerCard component with this improved version:
+
 const SpeakerCard = ({
   name,
   title,
@@ -673,7 +675,7 @@ const SpeakerCard = ({
   return (
     <motion.div
       ref={cardRef}
-      className="bg-white rounded-xl shadow-md overflow-hidden relative h-[240px] sm:h-[280px]"
+      className="bg-white rounded-xl shadow-md overflow-hidden relative h-[280px] sm:h-[320px]"
       whileHover={{ y: -5, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)" }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
@@ -704,28 +706,62 @@ const SpeakerCard = ({
         {role}
       </div>
 
-      <div className="flex flex-col items-center justify-center h-full w-full p-4 sm:p-6">
-        {/* Speaker info with image */}
+      <div className="flex flex-col items-center justify-between h-full w-full p-4 sm:p-6">
+        {/* Speaker info with image - using a fixed layout structure */}
         <motion.div
-          className="flex flex-col items-center justify-center text-center w-full"
+          className="flex flex-col items-center justify-start text-center w-full h-full"
           animate={{ opacity: isActive ? 0 : 1 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden mb-3 sm:mb-4 border-2 border-yellow-300/30 flex-shrink-0">
-            <Image
-              src={imageUrl || "/placeholder.svg?height=96&width=96&query=person"}
-              alt={`Photo of ${name}`}
-              width={96}
-              height={96}
-              className="w-full h-full object-cover"
-            />
+          {/* Fixed height container for image to ensure consistent alignment */}
+          <div className="w-full flex justify-center items-center h-[100px] mb-3">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-yellow-300/30 flex-shrink-0">
+              <Image
+                src={imageUrl || "/placeholder.svg?height=96&width=96&query=person"}
+                alt={`Photo of ${name}`}
+                width={96}
+                height={96}
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
-          <h3 className="font-bold text-lg sm:text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600">
-            {name}
-          </h3>
-          <p className="text-xs sm:text-sm text-neutral-600 mt-1 max-w-full">
-            {title}, {company}
-          </p>
+
+          {/* Fixed height container for text to ensure consistent card heights */}
+          <div className="flex flex-col items-center justify-start h-[80px]">
+            <h3 className="font-bold text-lg sm:text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600 line-clamp-1 w-full">
+              {name}
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-600 mt-1 line-clamp-2 w-full">
+              {title}, {company}
+            </p>
+          </div>
+
+          {/* Website link at the bottom of the card */}
+          {href && (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mt-auto inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 border border-cyan-200 hover:border-cyan-300 rounded-lg transition-colors duration-200 w-full"
+              aria-label={`Visit ${company} website`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4 mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              Visit Website
+            </a>
+          )}
         </motion.div>
 
         {/* Company logo on hover/touch - darker background but keep RGV color accents */}
@@ -735,21 +771,21 @@ const SpeakerCard = ({
           animate={{ opacity: isActive ? 1 : 0 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="flex flex-col items-center justify-center w-full">
+          <div className="flex flex-col items-center justify-center w-full h-full">
             <motion.div
               animate={{ scale: isActive ? 1.1 : 1 }}
               transition={{ duration: 0.3 }}
-              className="flex items-center justify-center w-full"
+              className="flex items-center justify-center w-full h-[120px]"
             >
               <Image
                 src={logoUrl || "/placeholder.svg?height=150&width=150&query=company logo"}
                 alt={`${company} logo`}
                 width={150}
                 height={75}
-                className="h-auto max-h-20 sm:max-h-28 w-auto object-contain mb-3 sm:mb-4"
+                className="h-auto max-h-20 sm:max-h-28 w-auto object-contain"
               />
             </motion.div>
-            <p className="text-sm sm:text-base font-medium text-cyan-400 border-t border-yellow-300/30 pt-2 sm:pt-3 mt-1 sm:mt-2 text-center">
+            <p className="text-sm sm:text-base font-medium text-cyan-400 border-t border-yellow-300/30 pt-2 sm:pt-3 mt-1 sm:mt-2 text-center line-clamp-1 w-full">
               {company}
             </p>
 
@@ -1023,7 +1059,7 @@ export function SDOHHero() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 max-w-6xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 max-w-6xl mx-auto">
                   {/* Moderator */}
                   <SpeakerCard
                     name="Marcos Resendez"
@@ -1042,7 +1078,7 @@ export function SDOHHero() {
                     company="SAVE Clinic"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Lyssa_Ochoa_LinkedIn_Headshot.jpeg"
                     logoUrl={companyLogos["The SAVE Clinic"]}
-                    href="https://thesaveclinic.org"
+                    href="https://thesaveclinic.com"
                   />
 
                   {/* Speaker 2 */}
@@ -1052,7 +1088,7 @@ export function SDOHHero() {
                     company="Tabiat"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/daniyal-liaqat.jpeg"
                     logoUrl={companyLogos["Tabiat Research"]}
-                    href="https://tabiat.ai"
+                    href="https://tabiat.care"
                   />
 
                   {/* Speaker 3 */}
