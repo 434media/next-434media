@@ -2,13 +2,24 @@
 import Image from "next/image"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
+import { useEffect, useState } from "react"
 
 interface SDOHStartupBootcampProps {
   locale: Locale
   dict: any
 }
 
-export function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcampProps) {
+export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcampProps) {
+  // Track when dictionary or locale changes
+  const [key, setKey] = useState(0)
+
+  // Force re-render when locale or dictionary changes
+  useEffect(() => {
+    setKey((prev) => prev + 1)
+    console.log(`SDOHStartupBootcamp: Locale changed to ${locale}`)
+    console.log(`SDOHStartupBootcamp: Dictionary available:`, !!dict)
+  }, [locale, dict])
+
   // Use the dictionary if provided, otherwise use default English text
   const d = dict?.sdoh?.bootcamp || {
     // Default English text
@@ -25,7 +36,7 @@ export function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcampProps) 
   }
 
   return (
-    <FadeIn>
+    <FadeIn key={key}>
       <div className="max-w-3xl mx-auto mb-16 sm:mb-20">
         <div className="text-center mb-10">
           {/* Updated heading with component number */}

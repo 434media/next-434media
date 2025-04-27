@@ -1,11 +1,25 @@
 "use client"
-
-import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { Locale } from "../../../i18n-config"
+import { i18n } from "../../../i18n-config"
+import { useRouter } from "next/navigation"
 
-export default function SDOHLanguageToggle({ currentLocale }: { currentLocale: Locale }) {
+interface SDOHLanguageToggleProps {
+  currentLocale?: Locale
+  onLanguageChange?: (newLocale: Locale) => void
+}
+
+export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: SDOHLanguageToggleProps) {
+  const router = useRouter()
   const [hovered, setHovered] = useState<string | null>(null)
+  const [locale, setLocale] = useState<Locale>(currentLocale || i18n.defaultLocale)
+
+  // Update local state when prop changes
+  useEffect(() => {
+    if (currentLocale && i18n.locales.includes(currentLocale)) {
+      setLocale(currentLocale)
+    }
+  }, [currentLocale])
 
   // Country flag colors
   const flagColors = {
@@ -28,6 +42,22 @@ export default function SDOHLanguageToggle({ currentLocale }: { currentLocale: L
     },
   }
 
+  const handleLanguageChange = (newLocale: Locale) => {
+    // Only navigate if the locale is changing
+    if (newLocale !== locale) {
+      // Use the provided onLanguageChange prop if available
+      if (onLanguageChange) {
+        onLanguageChange(newLocale)
+      } else {
+        // Fall back to the original behavior
+        router.push(`/${newLocale}/sdoh`)
+      }
+
+      // Update local state
+      setLocale(newLocale)
+    }
+  }
+
   return (
     <div
       className="fixed top-3 right-3 z-[9999] bg-white/80 backdrop-blur-sm p-2 rounded-xl shadow-lg border border-gray-200"
@@ -42,10 +72,10 @@ export default function SDOHLanguageToggle({ currentLocale }: { currentLocale: L
       }}
     >
       <div className="flex gap-2 items-center">
-        <Link
-          href="/en/sdoh"
+        <button
+          onClick={() => handleLanguageChange("en")}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
-            currentLocale === "en"
+            locale === "en"
               ? `${flagColors.en.activeBg} ${flagColors.en.activeText} border-white`
               : `bg-gradient-to-r ${flagColors.en.bg} ${flagColors.en.border} ${flagColors.en.text}`
           } ${flagColors.en.hover} text-xs`}
@@ -83,12 +113,12 @@ export default function SDOHLanguageToggle({ currentLocale }: { currentLocale: L
               }}
             ></div>
           )}
-        </Link>
+        </button>
 
-        <Link
-          href="/es/sdoh"
+        <button
+          onClick={() => handleLanguageChange("es")}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
-            currentLocale === "es"
+            locale === "es"
               ? `${flagColors.es.activeBg} ${flagColors.es.activeText} border-white`
               : `bg-gradient-to-r ${flagColors.es.bg} ${flagColors.es.border} ${flagColors.es.text}`
           } ${flagColors.es.hover} text-xs`}
@@ -120,7 +150,7 @@ export default function SDOHLanguageToggle({ currentLocale }: { currentLocale: L
               }}
             ></div>
           )}
-        </Link>
+        </button>
       </div>
     </div>
   )

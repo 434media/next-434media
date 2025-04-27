@@ -1,22 +1,24 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import type { Locale } from "../../../i18n-config"
 import { i18n } from "../../../i18n-config"
-import type { Dictionary } from "../../types/dictionary"
 import { SDOHHero } from "../../components/SDOHHero"
-import { SDOHStartupBootcamp } from "../../components/SDOHStartupBootcamp"
-import { SDOHHealthAccelerator } from "../../components/SDOHHealthAccelerator"
+//import SDOHMission from "../../components/SDOHMission"
+import SDOHStartupBootcamp from "../../components/SDOHStartupBootcamp"
+import SDOHHealthAccelerator from "../../components/SDOHHealthAccelerator"
 import { SDOHDemoDay } from "../../components/SDOHDemoDay"
 import { SDOHImpactMessage } from "../../components/SDOHImpactMessage"
 import { SDOHNewsletter } from "../../components/SDOHNewsletter"
 import { BackToTop } from "../../components/BackToTop"
 import Script from "next/script"
+import SDOHLanguageToggle from "./SDOHLanguageToggle"
 
 // Create a minimal fallback dictionary
 const fallbackDict = {
   sdoh: {
-    title: "SDOH",
+    title: "¿Qué es SDOH?", // Keep the original title
     newsletter: {
       title: 'Signup for "Que es SDOH" newsletter',
       subtitle: "Join the conversation now.",
@@ -26,20 +28,79 @@ const fallbackDict = {
 
 interface SDOHClientPageProps {
   lang?: Locale
-  dict?: Dictionary
 }
 
-export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
-  // Ensure we have valid values even if props are undefined
-  const safeLocale = lang || i18n.defaultLocale
-  const safeDict = dict || fallbackDict
+export default function SDOHClientPage({ lang }: SDOHClientPageProps) {
+  const router = useRouter()
+  const pathname = usePathname()
 
-  // Debug logging
+  // Detect language from URL if not provided in props
+  const detectedLang =
+    lang || (pathname?.includes("/es/") ? "es" : pathname?.includes("/en/") ? "en" : i18n.defaultLocale)
+
+  // Ensure we have a valid locale
+  const [currentLocale, setCurrentLocale] = useState<Locale>(detectedLang as Locale)
+  const [dict, setDict] = useState(fallbackDict)
+  const [isLoading, setIsLoading] = useState(true)
+  const [componentKey, setComponentKey] = useState(0)
+
+  // Fetch dictionary on the client side
   useEffect(() => {
-    console.log("SDOHClientPage mounted with lang:", safeLocale)
-    console.log("Dictionary loaded:", !!safeDict)
+    async function loadDictionary() {
+      setIsLoading(true)
+      try {
+        console.log(`Fetching dictionary for locale: ${currentLocale}`)
+        const response = await fetch(`/api/dictionary?locale=${currentLocale}`)
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`Dictionary loaded:`, data)
+          setDict(data)
+          // Force re-render of all components
+          setComponentKey((prev) => prev + 1)
+        } else {
+          console.error(`Failed to load dictionary: ${response.status}`)
+        }
+      } catch (error) {
+        console.error("Error loading dictionary:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadDictionary()
     window.scrollTo(0, 0)
-  }, [safeLocale, safeDict])
+  }, [currentLocale])
+
+  // Update locale when URL changes
+  useEffect(() => {
+    if (pathname?.includes("/es/")) {
+      setCurrentLocale("es")
+    } else if (pathname?.includes("/en/")) {
+      setCurrentLocale("en")
+    }
+  }, [pathname])
+
+  // Handle language change
+  const handleLanguageChange = (newLocale: Locale) => {
+    // Navigate to the new locale
+    const newPath = pathname?.replace(`/${currentLocale}/`, `/${newLocale}/`) || `/${newLocale}/sdoh`
+    router.push(newPath)
+
+    // Update the current locale
+    setCurrentLocale(newLocale)
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Loading content...</h1>
+          <p className="mt-4">Please wait while we load the page content.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <main className="flex flex-col min-h-screen">
@@ -50,8 +111,11 @@ export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
         Skip to main content
       </a>
 
+      {/* Language Toggle */}
+      <SDOHLanguageToggle currentLocale={currentLocale} onLanguageChange={handleLanguageChange} />
+
       {/* Hero Section */}
-      <SDOHHero locale={safeLocale} dict={safeDict} />
+      <SDOHHero key={`hero-${componentKey}`} locale={currentLocale} dict={dict} />
 
       {/* Main content */}
       <div id="main-content" className="outline-none" tabIndex={-1}>
@@ -67,18 +131,27 @@ export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
 
               {/* Content */}
               <div className="relative z-10">
+                {/* Debugging: Rendering SDOHMission */}
+                {(() => {
+                  console.log("Rendering SDOHMission with locale:", currentLocale, "and dict:", !!dict);
+                  return null;
+                })()}
+                {/* Mission Section - Force render with inline style to ensure visibility */}
+                {/* <div style={{ display: "block" }}>
+                  <SDOHMission key={`mission-${componentKey}`} locale={currentLocale} dict={dict} />
+                </div> */}
 
                 {/* Startup Bootcamp Section */}
-                <SDOHStartupBootcamp locale={safeLocale} dict={safeDict} />
+                <SDOHStartupBootcamp key={`bootcamp-${componentKey}`} locale={currentLocale} dict={dict} />
 
                 {/* Community Health Accelerator Section */}
-                <SDOHHealthAccelerator locale={safeLocale} dict={safeDict} />
+                <SDOHHealthAccelerator key={`accelerator-${componentKey}`} locale={currentLocale} dict={dict} />
 
                 {/* Demo Day Video Section */}
-                <SDOHDemoDay locale={safeLocale} dict={safeDict} />
+                <SDOHDemoDay key={`demoday-${componentKey}`} locale={currentLocale} dict={dict} />
 
                 {/* Wow Impact Message Section */}
-                <SDOHImpactMessage locale={safeLocale} dict={safeDict} />
+                <SDOHImpactMessage key={`impact-${componentKey}`} locale={currentLocale} dict={dict} />
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-5xl mb-16 sm:mb-24">
                   {/* Newsletter Section - Enhanced with better visibility */}
@@ -90,14 +163,14 @@ export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
                     <div className="relative z-10">
                       <div className="max-w-3xl mx-auto text-center mb-8 sm:mb-10">
                         <h2 className="font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-4 sm:mb-6 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300">
-                          {safeDict?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
+                          {dict?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
                         </h2>
                         <p className="text-base sm:text-lg md:text-xl text-white/90 leading-relaxed">
-                          {safeDict?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
+                          {dict?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
                         </p>
                       </div>
                       <div className="max-w-xl mx-auto">
-                        <SDOHNewsletter locale={safeLocale} dict={safeDict} />
+                        <SDOHNewsletter key={`newsletter-${componentKey}`} locale={currentLocale} dict={dict} />
                       </div>
                     </div>
                   </div>

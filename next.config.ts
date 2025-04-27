@@ -15,6 +15,25 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Remove the redirects configuration since we're using middleware
+  experimental: {
+    // Any existing experimental options
+  },
+  
+  // Configure dynamic routes
+  async headers() {
+    return [
+      {
+        source: '/:lang/sdoh',
+        headers: [
+          {
+            key: 'x-nextjs-data',
+            value: '1',
+          },
+        ],
+      },
+    ]
+  },
 };
 
 export default nextConfig;

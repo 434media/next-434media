@@ -1,13 +1,24 @@
 "use client"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
+import { useEffect, useState } from "react"
 
 interface SDOHHealthAcceleratorProps {
   locale: Locale
   dict: any
 }
 
-export function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAcceleratorProps) {
+export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAcceleratorProps) {
+  // Track when dictionary or locale changes
+  const [key, setKey] = useState(0)
+
+  // Force re-render when locale or dictionary changes
+  useEffect(() => {
+    setKey((prev) => prev + 1)
+    console.log(`SDOHHealthAccelerator: Locale changed to ${locale}`)
+    console.log(`SDOHHealthAccelerator: Dictionary available:`, !!dict)
+  }, [locale, dict])
+
   // Use the dictionary if provided, otherwise use default English text
   const d = dict?.sdoh?.accelerator || {
     // Default English text
@@ -20,7 +31,7 @@ export function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAcceleratorPro
   }
 
   return (
-    <FadeIn>
+    <FadeIn key={key}>
       <div className="max-w-3xl mx-auto mb-16 sm:mb-20">
         <div className="text-center mb-10">
           {/* Updated heading with component number */}

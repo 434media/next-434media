@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useEffect, useState } from "react"
 import { motion, useInView } from "motion/react"
 import Image from "next/image"
 import { FadeIn } from "./FadeIn"
@@ -17,6 +17,18 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
   const isInView = useInView(missionRef, { once: true, amount: 0.2 })
   const introRef = useRef<HTMLDivElement>(null)
   const introInView = useInView(introRef, { once: true, amount: 0.2 })
+
+  // Track when dictionary or locale changes
+  const [key, setKey] = useState(0)
+
+  // Force re-render when locale or dictionary changes
+  useEffect(() => {
+    setKey((prev) => prev + 1)
+    console.log(`SDOHMission: Locale changed to ${locale}`)
+    console.log(`SDOHMission: Dictionary available:`, !!dict)
+  }, [locale, dict])
+
+  console.log("SDOHMission rendering with locale:", locale, "and dict available:", !!dict)
 
   // Ensure we have the partnership dictionary or provide fallbacks
   const partnershipDict = dict?.sdoh?.partnership || {
