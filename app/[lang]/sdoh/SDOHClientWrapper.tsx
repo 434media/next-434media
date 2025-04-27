@@ -3,6 +3,7 @@
 import { Suspense } from "react"
 import dynamic from "next/dynamic"
 import type { Locale } from "../../../i18n-config"
+import { i18n } from "../../../i18n-config"
 
 // Loading fallback component
 function LoadingFallback() {
@@ -27,9 +28,12 @@ interface SDOHClientWrapperProps {
 }
 
 export default function SDOHClientWrapper({ lang }: SDOHClientWrapperProps) {
+  // Ensure lang is defined with a fallback
+  const safeLocale: Locale = lang && (lang === "en" || lang === "es") ? lang : i18n.defaultLocale
+
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <SDOHClientPageDynamic lang={lang} />
+      <SDOHClientPageDynamic lang={safeLocale} />
     </Suspense>
   )
 }

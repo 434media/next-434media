@@ -23,9 +23,28 @@ export const dynamic = "force-dynamic"
 export const dynamicParams = true
 
 // This is the updated page component with minimal static content
+// Update the SDOHPage component with better error handling
+
+// Replace the current SDOHPage function with this more robust version:
 export default function SDOHPage({ params }: Props) {
-  // Defensive programming - ensure params exists and has a valid lang property
-  const locale = params?.lang && isValidLocale(params.lang) ? params.lang : i18n.defaultLocale
+  // More robust defensive programming to handle potential undefined values
+  if (!params) {
+    console.error("Missing params in SDOHPage")
+    // Fallback to default locale if params is undefined
+    const defaultLocale = i18n.defaultLocale
+
+    return (
+      <>
+        <div className="fixed top-[70px] right-5 z-[9999]">
+          <SDOHLanguageToggle currentLocale={defaultLocale} />
+        </div>
+        <SDOHClientWrapper lang={defaultLocale} />
+      </>
+    )
+  }
+
+  // Ensure lang exists and is valid
+  const locale = params.lang && isValidLocale(params.lang) ? params.lang : i18n.defaultLocale
 
   return (
     <>

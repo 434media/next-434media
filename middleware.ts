@@ -54,9 +54,17 @@ export function middleware(request: NextRequest) {
     // ONLY handle internationalization for the SDOH page
     // If the path is /sdoh, redirect to /en/sdoh or /es/sdoh based on locale
     if (pathname === "/sdoh" || pathname === "/SDOH") {
-      const locale = getLocale(request)
-      const newUrl = new URL(`/${locale}/sdoh`, request.url)
-      return NextResponse.redirect(newUrl)
+      // Add defensive programming here
+      try {
+        const locale = getLocale(request)
+        const newUrl = new URL(`/${locale}/sdoh`, request.url)
+        return NextResponse.redirect(newUrl)
+      } catch (error) {
+        console.error("Error redirecting to localized SDOH page:", error)
+        // Fallback to default locale
+        const newUrl = new URL(`/${i18n.defaultLocale}/sdoh`, request.url)
+        return NextResponse.redirect(newUrl)
+      }
     }
 
     // For all other paths, don't apply internationalization
