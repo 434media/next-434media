@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import type { Locale } from "../../../i18n-config"
 import { i18n } from "../../../i18n-config"
 import SDOHHero from "../../components/SDOHHero"
-//import SDOHMission from "../../components/SDOHMission"
+//import SDOHMission from "../../../components/SDOHMission"
 import SDOHStartupBootcamp from "../../components/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/SDOHHealthAccelerator"
 import { SDOHDemoDay } from "../../components/SDOHDemoDay"
@@ -35,11 +35,14 @@ export default function SDOHClientPage({ lang }: SDOHClientPageProps) {
   const pathname = usePathname()
 
   // Detect language from URL if not provided in props
+  // Use defensive programming to ensure we always have a valid locale
   const detectedLang =
     lang || (pathname?.includes("/es/") ? "es" : pathname?.includes("/en/") ? "en" : i18n.defaultLocale)
 
   // Ensure we have a valid locale
-  const [currentLocale, setCurrentLocale] = useState<Locale>(detectedLang as Locale)
+  const [currentLocale, setCurrentLocale] = useState<Locale>(
+    i18n.locales.includes(detectedLang as Locale) ? (detectedLang as Locale) : i18n.defaultLocale,
+  )
   const [dict, setDict] = useState(fallbackDict)
   const [isLoading, setIsLoading] = useState(true)
   const [componentKey, setComponentKey] = useState(0)
@@ -82,12 +85,19 @@ export default function SDOHClientPage({ lang }: SDOHClientPageProps) {
 
   // Handle language change
   const handleLanguageChange = (newLocale: Locale) => {
-    // Navigate to the new locale
-    const newPath = pathname?.replace(`/${currentLocale}/`, `/${newLocale}/`) || `/${newLocale}/sdoh`
-    router.push(newPath)
+    try {
+      // Navigate to the new locale
+      const newPath = pathname?.replace(`/${currentLocale}/`, `/${newLocale}/`) || `/${newLocale}/sdoh`
+      router.push(newPath)
 
-    // Update the current locale
-    setCurrentLocale(newLocale)
+      // Update the current locale
+      setCurrentLocale(newLocale)
+    } catch (error) {
+      console.error("Error changing language:", error)
+      // Fallback to default locale if there's an error
+      router.push(`/${i18n.defaultLocale}/sdoh`)
+      setCurrentLocale(i18n.defaultLocale)
+    }
   }
 
   // Show loading state

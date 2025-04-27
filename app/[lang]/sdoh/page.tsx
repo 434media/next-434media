@@ -5,11 +5,12 @@ import SDOHClientWrapper from "./SDOHClientWrapper"
 
 // Define the props type explicitly
 type Props = {
-  params: { lang: string }
+  params?: { lang?: string } // Make both params and lang optional
 }
 
 // Validate the language parameter
-function isValidLocale(lang: string): lang is Locale {
+function isValidLocale(lang?: string): lang is Locale {
+  if (!lang) return false
   return i18n.locales.includes(lang as Locale)
 }
 
@@ -22,30 +23,43 @@ export function generateStaticParams() {
 export const dynamic = "force-dynamic"
 export const dynamicParams = true
 
-// This is the updated page component with minimal static content
-// Update the SDOHPage component with better error handling
+// This is the updated page component with extremely defensive programming
+export default function SDOHPage(props: Props) {
+  // Default locale as fallback
+  const defaultLocale = i18n.defaultLocale
 
-// Replace the current SDOHPage function with this more robust version:
-export default function SDOHPage({ params }: Props) {
-  // More robust defensive programming to handle potential undefined values
-  if (!params) {
-    console.error("Missing params in SDOHPage")
-    // Fallback to default locale if params is undefined
-    const defaultLocale = i18n.defaultLocale
-
-    return (
-      <>
-        <div className="fixed top-[70px] right-5 z-[9999]">
-          <SDOHLanguageToggle currentLocale={defaultLocale} />
-        </div>
-        <SDOHClientWrapper lang={defaultLocale} />
-      </>
-    )
+  // Super defensive check for props and params
+  if (!props || typeof props !== "object") {
+    console.error("SDOHPage received invalid props")
+    return renderWithFallbackLocale(defaultLocale)
   }
 
-  // Ensure lang exists and is valid
-  const locale = params.lang && isValidLocale(params.lang) ? params.lang : i18n.defaultLocale
+  // Check if params exists
+  const { params } = props
+  if (!params || typeof params !== "object") {
+    console.error("SDOHPage missing params object")
+    return renderWithFallbackLocale(defaultLocale)
+  }
 
+  // Check if lang exists and is valid
+  const { lang } = params
+  if (!lang || typeof lang !== "string") {
+    console.error("SDOHPage missing lang parameter")
+    return renderWithFallbackLocale(defaultLocale)
+  }
+
+  // Validate the locale
+  if (!isValidLocale(lang)) {
+    console.error("SDOHPage received invalid locale:", lang)
+    return renderWithFallbackLocale(defaultLocale)
+  }
+
+  // If we got here, we have a valid locale
+  return renderWithFallbackLocale(lang as Locale)
+}
+
+// Helper function to render the page with a guaranteed valid locale
+function renderWithFallbackLocale(locale: Locale) {
   return (
     <>
       {/* Language toggle positioned to avoid navbar */}

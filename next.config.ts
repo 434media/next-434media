@@ -15,24 +15,36 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Remove the redirects configuration since we're using middleware
-  experimental: {
-    // Any existing experimental options
-  },
   
   // Configure dynamic routes
   async headers() {
     return [
       {
-        source: '/:lang/sdoh',
+        source: '/:path*',
         headers: [
           {
-            key: 'x-nextjs-data',
-            value: '1',
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
           },
         ],
       },
     ]
+  },
+
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Handle language-specific routes
+        {
+          source: '/sdoh',
+          destination: '/en/sdoh',
+        },
+        {
+          source: '/SDOH',
+          destination: '/en/sdoh',
+        },
+      ],
+    }
   },
 };
 
