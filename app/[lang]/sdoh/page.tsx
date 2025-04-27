@@ -22,30 +22,13 @@ export async function generateStaticParams() {
 
 // This is the updated page component with extra validation and error handling
 export default async function SDOHPage({ params }: Props) {
-  // Add defensive checks to handle potential undefined values
-  if (!params) {
-    console.error("Missing params in SDOHPage")
-    // Fallback to default locale if params is undefined
-    const defaultLocale = i18n.defaultLocale
-    const dict = await getDictionary(defaultLocale)
-
-    return (
-      <>
-        <div className="fixed top-[80px] right-5 z-[9999]">
-          <SDOHLanguageToggle currentLocale={defaultLocale} />
-        </div>
-        <SDOHClientPage lang={defaultLocale} dict={dict} />
-      </>
-    )
-  }
-
-  // Extract the language parameter with a fallback
-  const lang = params.lang || i18n.defaultLocale
+  // Ensure params exists and has a valid lang property
+  const lang = params?.lang || i18n.defaultLocale
 
   // Validate the language parameter
   if (!isValidLocale(lang)) {
     console.error(`Invalid language parameter: ${lang}`)
-    notFound()
+    return notFound()
   }
 
   try {
@@ -55,7 +38,7 @@ export default async function SDOHPage({ params }: Props) {
     return (
       <>
         {/* Language toggle positioned to avoid navbar */}
-        <div className="fixed top-[80px] right-5 z-[9999]">
+        <div className="fixed top-[70px] right-5 z-[9999]">
           <SDOHLanguageToggle currentLocale={lang} />
         </div>
 
@@ -71,7 +54,7 @@ export default async function SDOHPage({ params }: Props) {
 
     return (
       <>
-        <div className="fixed top-[80px] right-5 z-[9999]">
+        <div className="fixed top-[70px] right-5 z-[9999]">
           <SDOHLanguageToggle currentLocale={defaultLocale} />
         </div>
         <SDOHClientPage lang={defaultLocale} dict={dict} />
