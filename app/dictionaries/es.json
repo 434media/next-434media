@@ -1,0 +1,60 @@
+{
+  "sdoh": {
+    "title": "¿Qué es SDOH?",
+    "subtitle": "(O en términos simples: ¿Qué son los Determinantes Sociales de la Salud?)",
+    "intro1": "La mayoría de lo que afecta nuestra salud no ocurre en un hospital, sino en nuestra vida cotidiana. Dónde vivimos, qué comemos, cómo llegamos al trabajo o a la escuela, si nos sentimos seguros, apoyados y vistos... estas cosas dan forma a nuestra salud mucho antes de que un médico se involucre.",
+    "intro2Part1": "Eso es lo que son los",
+    "sdohFull": "Determinantes Sociales de la Salud (SDOH)",
+    "intro2Part2": ": las condiciones del mundo real que impactan cuánto tiempo y qué tan bien vivimos.",
+    "partnership": {
+      "label": "ALIANZA ESTRATÉGICA",
+      "title": "Impulsado por VelocityTX y Methodist Healthcare Ministries",
+      "description": "En asociación con VelocityTX y Methodist Healthcare Ministries, el programa Community Health Accelerator conecta educación, emprendimiento e innovación a través de tres componentes principales.",
+      "velocityAlt": "Logo de VelocityTX",
+      "methodistAlt": "Logo de Methodist Healthcare Ministries"
+    },
+    "seminar": {
+      "title": "Seminario + Serie de Conferencias",
+      "description1": "es un programa diseñado para desglosar este tema grande y a menudo mal entendido en un lenguaje cotidiano, y mostrar cómo los líderes locales, innovadores y emprendedores pueden convertir la conciencia en acción.",
+      "description2": "Creemos que al comprender las causas fundamentales de los resultados de salud",
+      "causa": "la causa principal",
+      "description2End": "—podemos inspirar a más personas a construir el futuro de la salud aquí mismo en nuestras comunidades.",
+      "highlight": "La serie presenta eventos en vivo y paneles diseñados para generar conversación, crear conciencia y hacer que los temas complejos de salud sean accesibles y relevantes, especialmente para aspirantes a fundadores, trabajadores de la salud, educadores y agentes de cambio comunitario.",
+      "imageAlt": "Ilustración de SDOH"
+    },
+    "bootcamp": {
+      "title": "Bootcamp de Startups",
+      "subtitle": "Programa para Etapa Inicial",
+      "description": "Un programa práctico de etapa inicial que ayuda a los emprendedores locales a convertir ideas en acción. Los participantes reciben orientación sobre modelos de negocio, medición de impacto, estrategias de financiamiento y cómo construir soluciones que aborden las necesidades reales de la comunidad.",
+      "rgvTitle": "Bootcamp de RGV Startup Week",
+      "when": "Cuándo",
+      "date": "25-27 de abril, 2025",
+      "where": "Dónde",
+      "location": "TSTC - Harlingen, Centro de Bienvenida",
+      "cta": "Reserva tu Lugar"
+    },
+    "accelerator": {
+      "title": "Acelerador de Salud Comunitaria",
+      "subtitle": "Programa para Etapa de Crecimiento",
+      "description1": "Para startups listas para escalar, este acelerador proporciona un apoyo más profundo—desde mentoría y talleres de expertos hasta conexiones con sistemas de salud, inversionistas y socios del ecosistema enfocados en innovación sostenible en salud.",
+      "description2": "Este programa existe para responder grandes preguntas de manera práctica—y para asegurar que las personas más cercanas a los problemas tengan las herramientas, recursos y apoyo para resolverlos."
+    },
+    "demoDay": {
+      "title": "Destacados del Demo Day",
+      "description": "Mira cómo las empresas de nuestra cohorte del acelerador están transformando la atención médica a través de la innovación.",
+      "loadingText": "Cargando video...",
+      "errorTitle": "Error de Video",
+      "errorMessage": "Hubo un problema al cargar el video. Por favor, inténtalo de nuevo más tarde.",
+      "learnMore": "Más Información Sobre el Acelerador"
+    },
+    "impact": {
+      "question": "¿Qué puedo hacer para marcar la diferencia?",
+      "message": "Si alguna vez te has preguntado, ",
+      "conclusion": " — aquí es donde comienzas."
+    },
+    "languageToggle": {
+      "en": "Inglés",
+      "es": "Español"
+    }
+  }
+}

@@ -8,10 +8,11 @@ import { motion, useAnimation, useInView } from "motion/react"
 import { useMobile } from "../hooks/use-mobile"
 import { FadeIn } from "./FadeIn"
 import Link from "next/link"
-import { SDOHMission } from "./SDOHMission"
+import SDOHMission from "./SDOHMission"
 import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
 import { Fragment } from "react"
 import dynamic from "next/dynamic"
+import type { Locale } from "../../i18n-config"
 
 // Dynamically import ReactPlayer to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
@@ -764,7 +765,7 @@ const SpeakerCard = ({
           )}
         </motion.div>
 
-        {/* Company logo on hover/touch - darker background but keep RGV color accents */}
+        {/* Company logo on hover/touch */}
         <motion.div
           className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900 p-4"
           initial={{ opacity: 0 }}
@@ -870,7 +871,7 @@ const FloatingElements = () => {
 }
 
 // Update the SDOHHero component for better accessibility, spacing, and UX
-export function SDOHHero() {
+export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
   const detailsRef = useRef<HTMLElement>(null)
@@ -942,6 +943,13 @@ export function SDOHHero() {
     "Tabiat Research": "https://ampd-asset.s3.us-east-2.amazonaws.com/tabiat.svg",
   }
 
+  // Use the dictionary if provided, otherwise use default English text
+  const d = dict?.sdoh || {
+    // Default English text
+    heroAlt: "SDOH Conference - Awareness Drives Innovation",
+    // Add other text that needs translation
+  }
+
   return (
     <>
       {/* Hero section with responsive images */}
@@ -954,7 +962,7 @@ export function SDOHHero() {
         <div className="hidden md:block w-full h-full">
           <Image
             src="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png"
-            alt="SDOH Conference - Awareness Drives Innovation"
+            alt={d.heroAlt || "SDOH Conference - Awareness Drives Innovation"}
             fill
             priority
             sizes="100vw"
@@ -978,7 +986,7 @@ export function SDOHHero() {
             <div className="w-[90%] max-w-md relative drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
               <Image
                 src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
-                alt="SDOH Conference - Awareness Drives Innovation"
+                alt={d.heroAlt || "SDOH Conference - Awareness Drives Innovation"}
                 width={600}
                 height={800}
                 priority
@@ -995,8 +1003,8 @@ export function SDOHHero() {
       </section>
 
       {/* Mission Statement Section */}
-      <SDOHMission />
-
+      <SDOHMission locale={locale} dict={dict} />
+      
       {/* Event Details Section - Enhanced with Startup Week vibe */}
       <section className="py-16 sm:py-24 relative overflow-hidden">
         {/* Tech pattern background */}
@@ -1119,7 +1127,7 @@ export function SDOHHero() {
               </div>
             </div>
 
-            {/* Event Card Design - Enhanced with startup week styling */}
+            {/* Event Card Design - Enhanced with startup styling */}
             <div className="mt-16 sm:mt-24 relative">
               {/* Decorative elements */}
               <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2">

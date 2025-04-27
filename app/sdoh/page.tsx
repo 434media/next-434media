@@ -1,25 +1,35 @@
-import type { Metadata } from "next"
-import SDOHClientPage from "./SDOHClientPage"
-import { FadeIn } from "../components/FadeIn"
+import { redirect } from "next/navigation"
+import { i18n } from "../../i18n-config"
+import { cookies, headers } from "next/headers"
 
-export const metadata: Metadata = {
-  title: "¿Qué es SDOH? | Social Determinants of Health Panel",
-  description:
-    "Join us for a panel discussion on Social Determinants of Health (SDOH) during RGV Startup Week. Learn how local leaders, innovators, and entrepreneurs can turn awareness into action.",
-  openGraph: {
-    title: "¿Qué es SDOH? | Social Determinants of Health Panel",
-    description:
-      "Join us for a panel discussion on Social Determinants of Health (SDOH) during RGV Startup Week. Learn how local leaders, innovators, and entrepreneurs can turn awareness into action.",
-    images: ["/images/sdoh/sdoh-og-image.jpg"],
-  },
+// Detect the user's preferred language
+async function getPreferredLocale(): Promise<string> {
+  // Check for cookies first
+  const cookieStore = await cookies()
+  const localeCookie = cookieStore.get("NEXT_LOCALE")
+  if (localeCookie?.value && i18n.locales.includes(localeCookie.value as any)) {
+    return localeCookie.value
+  }
+
+  // Check Accept-Language header
+  const headersList = await headers()
+  const acceptLanguage = headersList.get("accept-language") || ""
+
+  // Simple parsing of Accept-Language header
+  // This is a simplified version - in production you might want a more robust solution
+  if (acceptLanguage.includes("es")) {
+    return "es"
+  }
+
+  // Default to English
+  return i18n.defaultLocale
 }
 
-export default function SDOHPage() {
-  return (
-    <FadeIn>
-      <main className="min-h-screen bg-white">
-        <SDOHClientPage />
-      </main>
-    </FadeIn>
-  )
+// Instead of using [lang] dynamic route, we'll use a single SDOH page that redirects
+export default async function SDOHRedirectPage() {
+  // Get the preferred locale
+  const locale = await getPreferredLocale()
+
+  // Redirect to the appropriate locale
+  redirect(`/${locale}/sdoh`)
 }

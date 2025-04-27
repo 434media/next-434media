@@ -4,12 +4,29 @@ import { useRef } from "react"
 import { motion, useInView } from "motion/react"
 import Image from "next/image"
 import { FadeIn } from "./FadeIn"
+import type { Locale } from "../../i18n-config"
 
-export function SDOHMission() {
+interface SDOHMissionProps {
+  locale: Locale
+  dict: any
+}
+
+// Change from export function to export default function
+export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
   const missionRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(missionRef, { once: true, amount: 0.2 })
   const introRef = useRef<HTMLDivElement>(null)
   const introInView = useInView(introRef, { once: true, amount: 0.2 })
+
+  // Ensure we have the partnership dictionary or provide fallbacks
+  const partnershipDict = dict?.sdoh?.partnership || {
+    label: "STRATEGIC PARTNERSHIP",
+    title: "Powered by VelocityTX & Methodist Healthcare Ministries",
+    description:
+      "In partnership with VelocityTX and Methodist Healthcare Ministries, the Community Health Accelerator program connects education, entrepreneurship, and innovation through three core components.",
+    velocityAlt: "VelocityTX Logo",
+    methodistAlt: "Methodist Healthcare Ministries Logo",
+  }
 
   return (
     <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-white to-neutral-50 overflow-hidden">
@@ -31,7 +48,7 @@ export function SDOHMission() {
                 transition={{ duration: 1.2, ease: "easeOut" }}
                 className="text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-cyan-500 to-cyan-700"
               >
-                ¿Qué es SDOH?
+                {dict?.sdoh?.title || "¿Qué es SDOH?"}
               </motion.h2>
 
               {/* Subtitle with reveal animation */}
@@ -41,7 +58,7 @@ export function SDOHMission() {
                 transition={{ duration: 0.7, delay: 0.3 }}
                 className="text-xl sm:text-2xl md:text-3xl text-neutral-600 font-medium leading-snug"
               >
-                (Or in plain terms: What the Heck is Social Determinants of Health?)
+                {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
               </motion.p>
             </motion.div>
 
@@ -53,9 +70,8 @@ export function SDOHMission() {
                 transition={{ duration: 0.7, delay: 0.5 }}
                 className="text-lg sm:text-xl leading-relaxed text-neutral-700"
               >
-                Most of what affects our health doesn't happen in a hospital—it happens in our everyday lives. Where we
-                live, what we eat, how we get to work or school, whether we feel safe, supported, and seen... these
-                things shape our health long before a doctor ever gets involved.
+                {dict?.sdoh?.intro1 ||
+                  "Most of what affects our health doesn't happen in a hospital—it happens in our everyday lives. Where we live, what we eat, how we get to work or school, whether we feel safe, supported, and seen... these things shape our health long before a doctor ever gets involved."}
               </motion.p>
 
               <motion.div
@@ -65,16 +81,35 @@ export function SDOHMission() {
                 className="pl-4 border-l-4 border-cyan-500"
               >
                 <p className="text-lg sm:text-xl leading-relaxed text-neutral-700">
-                  That's what{" "}
-                  <motion.span
-                    initial={{ color: "#0891b2" }} // cyan-600
-                    animate={introInView ? { color: ["#0891b2", "#0e7490", "#0891b2"] } : {}}
-                    transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
-                    className="font-bold"
-                  >
-                    Social Determinants of Health (SDOH)
-                  </motion.span>{" "}
-                  are: the real-world conditions that impact how long—and how well—we live.
+                  {locale === "es" ? (
+                    <>
+                      {dict?.sdoh?.intro2Part1 || "Eso es lo que son los"}{" "}
+                      <motion.span
+                        initial={{ color: "#0891b2" }} // cyan-600
+                        animate={introInView ? { color: ["#0891b2", "#0e7490", "#0891b2"] } : {}}
+                        transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                        className="font-bold"
+                      >
+                        {dict?.sdoh?.sdohFull || "Determinantes Sociales de la Salud (SDOH)"}
+                      </motion.span>{" "}
+                      {dict?.sdoh?.intro2Part2 ||
+                        ": las condiciones del mundo real que impactan cuánto tiempo y qué tan bien vivimos."}
+                    </>
+                  ) : (
+                    <>
+                      {dict?.sdoh?.intro2Part1 || "That's what"}{" "}
+                      <motion.span
+                        initial={{ color: "#0891b2" }} // cyan-600
+                        animate={introInView ? { color: ["#0891b2", "#0e7490", "#0891b2"] } : {}}
+                        transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                        className="font-bold"
+                      >
+                        {dict?.sdoh?.sdohFull || "Social Determinants of Health (SDOH)"}
+                      </motion.span>{" "}
+                      {dict?.sdoh?.intro2Part2 ||
+                        "are: the real-world conditions that impact how long—and how well—we live."}
+                    </>
+                  )}
                 </p>
               </motion.div>
             </div>
@@ -94,16 +129,12 @@ export function SDOHMission() {
                 <div className="text-white max-w-2xl">
                   <div className="mb-6">
                     <div className="inline-block px-4 py-1 bg-white/10 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-3 border border-white/20">
-                      STRATEGIC PARTNERSHIP
+                      {partnershipDict.label}
                     </div>
                     <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-white">
-                      Powered by VelocityTX & Methodist Healthcare Ministries
+                      {partnershipDict.title}
                     </h2>
-                    <p className="text-white/90 text-base sm:text-lg">
-                      In partnership with VelocityTX and Methodist Healthcare Ministries, the Community Health
-                      Accelerator program connects education, entrepreneurship, and innovation through three core
-                      components.
-                    </p>
+                    <p className="text-white/90 text-base sm:text-lg">{partnershipDict.description}</p>
                   </div>
                 </div>
 
@@ -113,7 +144,7 @@ export function SDOHMission() {
                   <div className="relative h-16 w-48 bg-white rounded-lg p-3 shadow-lg transform hover:scale-105 transition-transform">
                     <Image
                       src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
-                      alt="VelocityTX Logo"
+                      alt={partnershipDict.velocityAlt}
                       fill
                       className="object-contain p-2"
                     />
@@ -126,7 +157,7 @@ export function SDOHMission() {
                   <div className="relative h-16 w-48 bg-white rounded-lg p-3 shadow-lg transform hover:scale-105 transition-transform">
                     <Image
                       src="https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png"
-                      alt="Methodist Healthcare Ministries Logo"
+                      alt={partnershipDict.methodistAlt}
                       fill
                       className="object-contain p-2"
                     />
@@ -165,28 +196,51 @@ export function SDOHMission() {
                   1
                 </div>
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600">
-                  Seminar + Speaker Series
+                  {dict?.sdoh?.seminar?.title || "Seminar + Speaker Series"}
                 </h2>
               </div>
 
               <div className="space-y-6 text-neutral-700">
                 <p className="text-lg sm:text-xl leading-relaxed">
-                  <span className="font-bold text-cyan-600">¿Qué es SDOH?</span> is a program designed to break down
-                  this big, often misunderstood topic into everyday language—and show how local leaders, innovators, and
-                  entrepreneurs can turn awareness into action.
+                  {locale === "es" ? (
+                    <>
+                      <span className="font-bold text-cyan-600">{dict?.sdoh?.title || "¿Qué es SDOH?"}</span>{" "}
+                      {dict?.sdoh?.seminar?.description1 ||
+                        "es un programa diseñado para desglosar este tema grande y a menudo mal entendido en un lenguaje cotidiano, y mostrar cómo los líderes locales, innovadores y emprendedores pueden convertir la conciencia en acción."}
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-cyan-600">¿Qué es SDOH?</span>{" "}
+                      {dict?.sdoh?.seminar?.description1 ||
+                        "is a program designed to break down this big, often misunderstood topic into everyday language—and show how local leaders, innovators, and entrepreneurs can turn awareness into action."}
+                    </>
+                  )}
                 </p>
 
                 <p className="text-lg sm:text-xl leading-relaxed">
-                  We believe that by understanding the root causes of health outcomes—
-                  <span className="italic font-medium">la causa principal</span>—we can inspire more people to build the
-                  future of health right here in our communities.
+                  {locale === "es" ? (
+                    <>
+                      {dict?.sdoh?.seminar?.description2 ||
+                        "Creemos que al comprender las causas fundamentales de los resultados de salud"}{" "}
+                      <span className="italic font-medium">{dict?.sdoh?.seminar?.causa || "la causa principal"}</span>
+                      {dict?.sdoh?.seminar?.description2End ||
+                        "—podemos inspirar a más personas a construir el futuro de la salud aquí mismo en nuestras comunidades."}
+                    </>
+                  ) : (
+                    <>
+                      {dict?.sdoh?.seminar?.description2 ||
+                        "We believe that by understanding the root causes of health outcomes"}
+                      —<span className="italic font-medium">{dict?.sdoh?.seminar?.causa || "la causa principal"}</span>
+                      {dict?.sdoh?.seminar?.description2End ||
+                        "—we can inspire more people to build the future of health right here in our communities."}
+                    </>
+                  )}
                 </p>
 
                 <div className="bg-gradient-to-r from-yellow-50 to-white p-6 rounded-xl border-l-4 border-yellow-400 shadow-sm">
                   <p className="text-lg leading-relaxed">
-                    The series features live events and panels designed to spark conversation, raise awareness, and make
-                    complex health topics feel approachable and relevant—especially for aspiring founders, healthcare
-                    workers, educators, and community changemakers.
+                    {dict?.sdoh?.seminar?.highlight ||
+                      "The series features live events and panels designed to spark conversation, raise awareness, and make complex health topics feel approachable and relevant—especially for aspiring founders, healthcare workers, educators, and community changemakers."}
                   </p>
                 </div>
               </div>
@@ -205,7 +259,7 @@ export function SDOHMission() {
                 <div className="aspect-square relative">
                   <Image
                     src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
-                    alt="SDOH Illustration"
+                    alt={dict?.sdoh?.seminar?.imageAlt || "SDOH Illustration"}
                     fill
                     className="object-cover"
                   />

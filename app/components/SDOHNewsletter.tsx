@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useMobile } from "../hooks/use-mobile"
+import type { Locale } from "../../i18n-config"
 
 // Extend the Window interface to include the turnstile property
 declare global {
@@ -25,7 +26,12 @@ declare global {
 
 const isDevelopment = process.env.NODE_ENV === "development"
 
-export function SDOHNewsletter() {
+interface SDOHNewsletterProps {
+  locale: Locale
+  dict: any
+}
+
+export function SDOHNewsletter({ locale, dict }: SDOHNewsletterProps) {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -35,6 +41,16 @@ export function SDOHNewsletter() {
   const formRef = useRef<HTMLFormElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isMobile = useMobile()
+
+  // Use the dictionary if provided, otherwise use default English text
+  const d = dict?.newsletter || {
+    placeholder: "Enter your email",
+    buttonText: "Subscribe",
+    successMessage: "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.",
+    errorMessage: "Please enter a valid email address",
+    securityError: "Security verification not loaded. Please refresh and try again.",
+    completeVerification: "Please complete the security verification",
+  }
 
   // Load Turnstile script only when needed
   useEffect(() => {
@@ -80,7 +96,7 @@ export function SDOHNewsletter() {
   }, [turnstileWidget])
 
   // Email validation regex pattern
-  const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0.9.-]+\.[a-zA-Z]{2,}$/
 
   const validateEmail = (email: string): boolean => {
     return emailPattern.test(email)
@@ -94,13 +110,13 @@ export function SDOHNewsletter() {
 
     // Validate email
     if (!email.trim()) {
-      setError("Please enter your email address")
+      setError(d.errorMessage || "Please enter your email address")
       inputRef.current?.focus()
       return
     }
 
     if (!validateEmail(email)) {
-      setError("Please enter a valid email address")
+      setError(d.errorMessage || "Please enter a valid email address")
       inputRef.current?.focus()
       return
     }
@@ -112,16 +128,16 @@ export function SDOHNewsletter() {
 
       if (!isDevelopment) {
         if (!window.turnstile || !turnstileWidget) {
-          throw new Error("Security verification not loaded. Please refresh and try again.")
+          throw new Error(d.securityError || "Security verification not loaded. Please refresh and try again.")
         }
 
         turnstileResponse = window.turnstile.getResponse(turnstileWidget)
         if (!turnstileResponse) {
-          throw new Error("Please complete the security verification")
+          throw new Error(d.completeVerification || "Please complete the security verification")
         }
       }
 
-      // Send data to the API
+      // Send data to the API - Fixed URL by removing "/route"
       const response = await fetch("/api/sdoh-newsletter", {
         method: "POST",
         headers: {
@@ -186,7 +202,7 @@ export function SDOHNewsletter() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                placeholder={d.placeholder || "Enter your email"}
                 className="w-full px-4 py-3 sm:py-4 bg-transparent focus:outline-none text-white text-sm sm:text-base placeholder-white/70"
                 aria-describedby={error ? "newsletter-error" : undefined}
                 disabled={isSubmitting}
@@ -196,7 +212,7 @@ export function SDOHNewsletter() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`${isMobile ? "w-full" : "w-12 h-12"} bg-white text-neutral-700 rounded-full flex items-center justify-center hover:bg-neutral-100 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-700 py-2 px-4`}
+                  className={`${isMobile ? "w-full" : "w-auto px-4 h-10"} bg-white text-neutral-700 rounded-full flex items-center justify-center hover:bg-neutral-100 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-700 py-2 px-4`}
                   aria-label="Subscribe to SDOH newsletter"
                 >
                   <motion.div
@@ -210,10 +226,12 @@ export function SDOHNewsletter() {
                       <>
                         {isMobile ? (
                           <span className="flex items-center">
-                            Subscribe <ArrowIcon className="h-5 w-5 ml-2" />
+                            {d.buttonText || "Subscribe"} <ArrowIcon className="h-5 w-5 ml-2" />
                           </span>
                         ) : (
-                          <ArrowIcon className="h-5 w-5" />
+                          <span className="flex items-center">
+                            {d.buttonText || "Subscribe"} <ArrowIcon className="h-5 w-5 ml-2" />
+                          </span>
                         )}
                       </>
                     )}
@@ -225,7 +243,8 @@ export function SDOHNewsletter() {
             {!isDevelopment && (
               <div
                 ref={turnstileRef}
-                data-size="flexible"
+                data-theme="dark"
+                data-size="compact"
                 className="w-full mt-4 flex justify-center"
                 aria-label="Security verification"
               />
@@ -251,7 +270,7 @@ export function SDOHNewsletter() {
               <CheckIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
             <span className="text-white text-sm sm:text-base font-medium">
-              Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.
+              {d.successMessage || "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon."}
             </span>
           </motion.div>
         )}

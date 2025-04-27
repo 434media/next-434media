@@ -1,0 +1,88 @@
+{
+  "sdoh": {
+    "hero": {
+      "title": "¿Qué es SDOH?",
+      "subtitle": "(Or in plain terms: What the Heck is Social Determinants of Health?)",
+      "date": "October 17, 2023",
+      "time": "10:00 AM - 11:30 AM",
+      "location": "VelocityTX, 1422 E Houston St, San Antonio, TX 78205",
+      "register": "Register Now"
+    },
+    "mission": {
+      "title": "Our Mission",
+      "description": "Join us for a panel discussion on Social Determinants of Health (SDOH) during RGV Startup Week. Learn how local leaders, innovators, and entrepreneurs can turn awareness into action.",
+      "cta": "Learn More"
+    },
+    "newsletter": {
+      "title": "Stay Updated",
+      "description": "Sign up for our newsletter to receive updates about the event and future SDOH initiatives.",
+      "placeholder": "Your email",
+      "button": "Subscribe",
+      "success": "Thank you for subscribing!",
+      "error": "An error occurred. Please try again."
+    },
+    "bootcamp": {
+      "title": "Startup Bootcamp",
+      "subtitle": "Early-Stage Program",
+      "description": "A hands-on, early-stage program that helps local entrepreneurs turn ideas into action. Participants receive guidance on business models, impact measurement, funding strategies, and how to build solutions that address real community needs.",
+      "rgvTitle": "RGV Startup Week Bootcamp",
+      "when": "When",
+      "date": "April 25-27, 2025",
+      "where": "Where",
+      "location": "TSTC - Harlingen, Welcome Center",
+      "cta": "Reserve Your Spot"
+    },
+    "accelerator": {
+      "title": "Community Health Accelerator",
+      "subtitle": "Growth-Stage Program",
+      "description1": "For startups ready to scale, this accelerator provides deeper support—from mentoring and expert workshops to connections with healthcare systems, investors, and ecosystem partners focused on sustainable health innovation.",
+      "description2": "This program exists to answer big questions in a practical way—and to make sure the people closest to the issues have the tools, resources, and support to solve them."
+    },
+    "demoDay": {
+      "title": "Demo Day Highlights",
+      "description": "Watch how our accelerator cohort companies are transforming healthcare through innovation.",
+      "loadingText": "Loading video...",
+      "errorTitle": "Video Error",
+      "errorMessage": "There was a problem loading the video. Please try again later.",
+      "learnMore": "Learn More About the Accelerator"
+    },
+    "impact": {
+      "question": "What can I do to make a difference?",
+      "message": "If you've ever asked, ",
+      "conclusion": " — this is where you start."
+    },
+    "title": "What is SDOH?",
+    "subtitle": "(Or in plain terms: What the Heck is Social Determinants of Health?)",
+    "intro1": "Most of what affects our health doesn't happen in a hospital—it happens in our everyday lives. Where we live, what we eat, how we get to work or school, whether we feel safe, supported, and seen... these things shape our health long before a doctor ever gets involved.",
+    "intro2Part1": "That's what",
+    "sdohFull": "Social Determinants of Health (SDOH)",
+    "intro2Part2": "are: the real-world conditions that impact how long—and how well—we live.",
+    "partnership": {
+      "label": "STRATEGIC PARTNERSHIP",
+      "title": "Powered by VelocityTX & Methodist Healthcare Ministries",
+      "description": "In partnership with VelocityTX and Methodist Healthcare Ministries, the Community Health Accelerator program connects education, entrepreneurship, and innovation through three core components.",
+      "velocityAlt": "VelocityTX Logo",
+      "methodistAlt": "Methodist Healthcare Ministries Logo"
+    },
+    "seminar": {
+      "title": "Seminar + Speaker Series",
+      "description1": "is a program designed to break down this big, often misunderstood topic into everyday language—and show how local leaders, innovators, and entrepreneurs can turn awareness into action.",
+      "description2": "We believe that by understanding the root causes of health outcomes",
+      "causa": "la causa principal",
+      "description2End": "—we can inspire more people to build the future of health right here in our communities.",
+      "highlight": "The series features live events and panels designed to spark conversation, raise awareness, and make complex health topics feel approachable and relevant—especially for aspiring founders, healthcare workers, educators, and community changemakers.",
+      "imageAlt": "SDOH Illustration"
+    },
+    "languageToggle": {
+      "en": "EN",
+      "es": "ES"
+    }
+  },
+  "common": {
+    "language": "Español"
+  },
+  "languageToggle": {
+    "en": "EN",
+    "es": "ES"
+  }
+}
