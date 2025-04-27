@@ -14,9 +14,8 @@ const nextConfig: NextConfig = {
         hostname: "ampd-asset.s3.us-east-2.amazonaws.com",
       },
     ],
-  },
-  
-  // Configure dynamic routes
+  },  
+  // Add cache control headers to prevent stale data
   async headers() {
     return [
       {
@@ -30,11 +29,11 @@ const nextConfig: NextConfig = {
       },
     ]
   },
-
+  
+  // Add explicit rewrites for the SDOH routes
   async rewrites() {
     return {
       beforeFiles: [
-        // Handle language-specific routes
         {
           source: '/sdoh',
           destination: '/en/sdoh',
