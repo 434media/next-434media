@@ -25,6 +25,13 @@ const SessionCard = ({
   videoId,
   videoUrl,
   href,
+  viewSessionText,
+  comingSoonText,
+  comingSoonDescriptionText,
+  visitWebsiteText,
+  downloadSlidesText,
+  closeText,
+  sessionIdText,
 }: {
   title: string
   description: string
@@ -32,6 +39,13 @@ const SessionCard = ({
   videoId: string
   videoUrl?: string
   href?: string
+  viewSessionText?: string
+  comingSoonText?: string
+  comingSoonDescriptionText?: string
+  visitWebsiteText?: string
+  downloadSlidesText?: string
+  closeText?: string
+  sessionIdText?: string
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -103,7 +117,7 @@ const SessionCard = ({
               <circle cx="12" cy="12" r="10"></circle>
               <polygon points="10 8 16 12 10 16 10 8"></polygon>
             </svg>
-            View Session
+            {viewSessionText || "View Session"}
           </button>
         </div>
       </div>
@@ -116,6 +130,12 @@ const SessionCard = ({
         videoId={videoId}
         videoUrl={videoUrl}
         href={href}
+        comingSoonText={comingSoonText}
+        comingSoonDescriptionText={comingSoonDescriptionText}
+        visitWebsiteText={visitWebsiteText}
+        downloadSlidesText={downloadSlidesText}
+        closeText={closeText}
+        sessionIdText={sessionIdText}
       />
     </>
   )
@@ -129,6 +149,12 @@ const VideoModal = ({
   videoId,
   videoUrl,
   href,
+  comingSoonText,
+  comingSoonDescriptionText,
+  visitWebsiteText,
+  downloadSlidesText,
+  closeText,
+  sessionIdText,
 }: {
   isOpen: boolean
   closeModal: () => void
@@ -136,6 +162,12 @@ const VideoModal = ({
   videoId: string
   videoUrl?: string
   href?: string
+  comingSoonText?: string
+  comingSoonDescriptionText?: string
+  visitWebsiteText?: string
+  downloadSlidesText?: string
+  closeText?: string
+  sessionIdText?: string
 }) => {
   const videoRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -545,16 +577,19 @@ const VideoModal = ({
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </div>
-                      <h4 className="text-2xl font-bold text-cyan-400 mb-2">Coming Soon</h4>
+                      <h4 className="text-2xl font-bold text-cyan-400 mb-2">{comingSoonText || "Coming Soon"}</h4>
                       <p className="text-white/80 max-w-md">
-                        This video will be available after the event. Check back later to watch the full session.
+                        {comingSoonDescriptionText ||
+                          "This video will be available after the event. Check back later to watch the full session."}
                       </p>
                     </div>
                   )}
                 </div>
 
                 <div className="mt-6 flex flex-wrap justify-between items-center gap-4">
-                  <div className="text-sm text-white/60">Session ID: {videoId}</div>
+                  <div className="text-sm text-white/60">
+                    {sessionIdText || "Session ID"}: {videoId}
+                  </div>
                   <div className="flex flex-wrap gap-3">
                     {href && (
                       <a
@@ -577,7 +612,7 @@ const VideoModal = ({
                           <polyline points="15 3 21 3 21 9"></polyline>
                           <line x1="10" y1="14" x2="21" y2="3"></line>
                         </svg>
-                        Visit Website
+                        {visitWebsiteText || "Visit Website"}
                       </a>
                     )}
                     {videoUrl && (
@@ -599,7 +634,7 @@ const VideoModal = ({
                           <polyline points="16 6 12 2 8 6"></polyline>
                           <line x1="12" y1="2" x2="12" y2="15"></line>
                         </svg>
-                        Download Slides
+                        {downloadSlidesText || "Download Slides"}
                       </button>
                     )}
                     <button
@@ -607,7 +642,7 @@ const VideoModal = ({
                       className="inline-flex items-center rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       onClick={closeModal}
                     >
-                      Close
+                      {closeText || "Close"}
                     </button>
                   </div>
                 </div>
@@ -871,7 +906,13 @@ const FloatingElements = () => {
 }
 
 // Update the SDOHHero component for better accessibility, spacing, and UX
-export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
+export interface SDOHHeroProps {
+  locale: Locale
+  dict?: any
+}
+
+// Change from export function to export default function
+export default function SDOHHero({ locale, dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
   const detailsRef = useRef<HTMLElement>(null)
@@ -1004,7 +1045,7 @@ export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
 
       {/* Mission Statement Section */}
       <SDOHMission locale={locale} dict={dict} />
-      
+
       {/* Event Details Section - Enhanced with Startup Week vibe */}
       <section className="py-16 sm:py-24 relative overflow-hidden">
         {/* Tech pattern background */}
@@ -1031,7 +1072,7 @@ export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
             <div className="inline-block relative mb-8">
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-yellow-500/20 blur-xl rounded-full"></div>
               <h2 className={`${sectionHeadingClass} relative`}>
-                <span className="inline-block px-2 py-1">¿WTF es SDOH?</span>{" "}
+                <span className="inline-block px-2 py-1">¿Que es SDOH?</span>{" "}
                 <span className="text-neutral-800">And What It Means to Y-O-U!</span>
               </h2>
             </div>
@@ -1044,19 +1085,21 @@ export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
                   <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                   <div className="w-3 h-3 rounded-full bg-green-400"></div>
                 </div>
-                <p className="text-neutral-500 text-sm font-mono">// Join us for this innovative panel</p>
+                <p className="text-neutral-500 text-sm font-mono">
+                  {dict?.sdoh?.mission?.codeComment || "// Join us for this innovative panel"}
+                </p>
               </div>
               <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto mb-4 font-medium">
-                This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we
-                can address SDOH in the Rio Grande Valley.
+                {dict?.sdoh?.mission?.description1 ||
+                  "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley."}
               </p>
               <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto font-medium">
-                We'll explore how technology, community engagement, and cross-sector collaboration can create
-                sustainable solutions to improve health outcomes for all residents.
+                {dict?.sdoh?.mission?.description2 ||
+                  "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents."}
               </p>
               <div className="mt-4 text-right">
                 <span className="inline-block px-3 py-1 bg-cyan-100 text-cyan-800 rounded-md text-sm font-mono">
-                  #innovation #healthcare #community
+                  {dict?.sdoh?.mission?.hashtags || "#innovation #healthcare #community"}
                 </span>
               </div>
             </div>
@@ -1101,7 +1144,7 @@ export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
                     company="SAVE Clinic"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Lyssa_Ochoa_LinkedIn_Headshot.jpeg"
                     logoUrl={companyLogos["The SAVE Clinic"]}
-                    href="https://thesaveclinic.org"
+                    href="https://thesaveclinic.com"
                   />
 
                   {/* Speaker 2 */}
@@ -1111,7 +1154,7 @@ export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
                     company="Tabiat"
                     imageUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/daniyal-liaqat.jpeg"
                     logoUrl={companyLogos["Tabiat Research"]}
-                    href="https://tabiat.ai"
+                    href="https://tabiat.care"
                   />
 
                   {/* Speaker 3 */}
@@ -1313,31 +1356,70 @@ export function SDOHHero({ locale, dict }: { locale: Locale; dict?: any }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
               {/* Card 1 - With video implementation */}
               <SessionCard
-                title="Market Analysis and Value Delivery"
-                description="Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
+                title={dict?.sdoh?.sessions?.card1?.title || "Market Analysis and Value Delivery"}
+                description={
+                  dict?.sdoh?.sessions?.card1?.description ||
+                  "Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
+                }
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card1.jpg"
                 videoId="session1"
                 videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
                 href="https://yumlish.com"
+                viewSessionText={dict?.sdoh?.sessions?.viewSession || "View Session"}
+                comingSoonText={dict?.sdoh?.sessions?.comingSoon || "Coming Soon"}
+                comingSoonDescriptionText={
+                  dict?.sdoh?.sessions?.comingSoonDescription ||
+                  "This video will be available after the event. Check back later to watch the full session."
+                }
+                visitWebsiteText={dict?.sdoh?.sessions?.visitWebsite || "Visit Website"}
+                downloadSlidesText={dict?.sdoh?.sessions?.downloadSlides || "Download Slides"}
+                closeText={dict?.sdoh?.sessions?.close || "Close"}
+                sessionIdText={dict?.sdoh?.sessions?.sessionId || "Session ID"}
               />
 
               {/* Card 2 - With video implementation */}
               <SessionCard
-                title="Legal Considerations for Raising Capital"
-                description="Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
+                title={dict?.sdoh?.sessions?.card2?.title || "Legal Considerations for Raising Capital"}
+                description={
+                  dict?.sdoh?.sessions?.card2?.description ||
+                  "Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
+                }
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card2.jpeg"
                 videoId="session2"
                 videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
                 href="https://padillalawllc.com"
+                viewSessionText={dict?.sdoh?.sessions?.viewSession || "View Session"}
+                comingSoonText={dict?.sdoh?.sessions?.comingSoon || "Coming Soon"}
+                comingSoonDescriptionText={
+                  dict?.sdoh?.sessions?.comingSoonDescription ||
+                  "This video will be available after the event. Check back later to watch the full session."
+                }
+                visitWebsiteText={dict?.sdoh?.sessions?.visitWebsite || "Visit Website"}
+                downloadSlidesText={dict?.sdoh?.sessions?.downloadSlides || "Download Slides"}
+                closeText={dict?.sdoh?.sessions?.close || "Close"}
+                sessionIdText={dict?.sdoh?.sessions?.sessionId || "Session ID"}
               />
 
               {/* Card 3 - With placeholder */}
               <SessionCard
-                title="The Perfect Pitch"
-                description="Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
+                title={dict?.sdoh?.sessions?.card3?.title || "The Perfect Pitch"}
+                description={
+                  dict?.sdoh?.sessions?.card3?.description ||
+                  "Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
+                }
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card3.jpeg"
                 videoId="session3"
                 href="https://capitalfactory.com"
+                viewSessionText={dict?.sdoh?.sessions?.viewSession || "View Session"}
+                comingSoonText={dict?.sdoh?.sessions?.comingSoon || "Coming Soon"}
+                comingSoonDescriptionText={
+                  dict?.sdoh?.sessions?.comingSoonDescription ||
+                  "This video will be available after the event. Check back later to watch the full session."
+                }
+                visitWebsiteText={dict?.sdoh?.sessions?.visitWebsite || "Visit Website"}
+                downloadSlidesText={dict?.sdoh?.sessions?.downloadSlides || "Download Slides"}
+                closeText={dict?.sdoh?.sessions?.close || "Close"}
+                sessionIdText={dict?.sdoh?.sessions?.sessionId || "Session ID"}
               />
             </div>
           </FadeIn>

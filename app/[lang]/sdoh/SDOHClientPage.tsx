@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import type { Locale } from "../../../i18n-config"
 import { i18n } from "../../../i18n-config"
-import { SDOHHero } from "../../components/SDOHHero"
+import SDOHHero from "../../components/SDOHHero"
 //import SDOHMission from "../../components/SDOHMission"
 import SDOHStartupBootcamp from "../../components/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/SDOHHealthAccelerator"
@@ -133,8 +133,8 @@ export default function SDOHClientPage({ lang }: SDOHClientPageProps) {
               <div className="relative z-10">
                 {/* Debugging: Rendering SDOHMission */}
                 {(() => {
-                  console.log("Rendering SDOHMission with locale:", currentLocale, "and dict:", !!dict);
-                  return null;
+                  console.log("Rendering SDOHMission with locale:", currentLocale, "and dict:", !!dict)
+                  return null
                 })()}
                 {/* Mission Section - Force render with inline style to ensure visibility */}
                 {/* <div style={{ display: "block" }}>

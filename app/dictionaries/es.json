@@ -48,13 +48,52 @@
       "learnMore": "Más Información Sobre el Acelerador"
     },
     "impact": {
-      "question": "¿Qué puedo hacer para marcar la diferencia?",
+      "question": "¿Qué puedo hacer para causar un impacto significativo?",
       "message": "Si alguna vez te has preguntado, ",
       "conclusion": " — aquí es donde comienzas."
     },
     "languageToggle": {
       "en": "Inglés",
       "es": "Español"
+    },
+    "mission": {
+      "title": "Nuestra Misión",
+      "description": "Únase a nosotros para un panel de discusión sobre los Determinantes Sociales de la Salud (SDOH) durante la Semana de Startups RGV. Aprenda cómo los líderes locales, innovadores y emprendedores pueden convertir la conciencia en acción.",
+      "cta": "Más Información",
+      "codeComment": "// Únase a nosotros para este panel innovador",
+      "description1": "Este panel reúne a innovadores de la salud, emprendedores y líderes comunitarios para discutir cómo podemos abordar los SDOH en el Valle del Río Grande.",
+      "description2": "Exploraremos cómo la tecnología, la participación comunitaria y la colaboración intersectorial pueden crear soluciones sostenibles para mejorar los resultados de salud de todos los residentes.",
+      "hashtags": "#innovación #salud #comunidad"
+    },
+    "newsletter": {
+      "title": "Mantente Actualizado",
+      "subtitle": "Únete a la conversación ahora.",
+      "description": "Regístrate en nuestro boletín para recibir actualizaciones sobre el evento y futuras iniciativas de SDOH.",
+      "placeholder": "Tu correo electrónico",
+      "button": "Suscribirse",
+      "success": "¡Gracias por suscribirte!",
+      "error": "Ocurrió un error. Por favor, inténtalo de nuevo."
+    },
+    "sessions": {
+      "viewSession": "Ver Sesión",
+      "comingSoon": "Próximamente",
+      "comingSoonDescription": "Este video estará disponible después del evento. Vuelve más tarde para ver la sesión completa.",
+      "visitWebsite": "Visitar Sitio Web",
+      "downloadSlides": "Descargar Diapositivas",
+      "close": "Cerrar",
+      "sessionId": "ID de Sesión",
+      "card1": {
+        "title": "Análisis de Mercado y Entrega de Valor",
+        "description": "Entendiendo las Necesidades y Soluciones de Calidad presentado por Shireen Abdullah, Fundadora, Yumlish, Campeona de la Cohorte del Acelerador MHM 2024"
+      },
+      "card2": {
+        "title": "Consideraciones Legales para Recaudar Capital",
+        "description": "Entendiendo el Proceso presentado por Jose Padilla, Fundador, Padilla Law, LLC y LegalmenteAI"
+      },
+      "card3": {
+        "title": "El Pitch Perfecto",
+        "description": "Cautivando a Inversionistas y Cerrando Acuerdos presentado por Luis Martinez, PhD, Sr. Asociado de Venture, Capital Factory"
+      }
     }
   }
 }

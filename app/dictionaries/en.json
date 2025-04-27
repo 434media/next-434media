@@ -11,7 +11,11 @@
     "mission": {
       "title": "Our Mission",
       "description": "Join us for a panel discussion on Social Determinants of Health (SDOH) during RGV Startup Week. Learn how local leaders, innovators, and entrepreneurs can turn awareness into action.",
-      "cta": "Learn More"
+      "cta": "Learn More",
+      "codeComment": "// Join us for this innovative panel",
+      "description1": "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley.",
+      "description2": "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents.",
+      "hashtags": "#innovation #healthcare #community"
     },
     "newsletter": {
       "title": "Stay Updated",
@@ -76,6 +80,27 @@
     "languageToggle": {
       "en": "EN",
       "es": "ES"
+    },
+    "sessions": {
+      "viewSession": "View Session",
+      "comingSoon": "Coming Soon",
+      "comingSoonDescription": "This video will be available after the event. Check back later to watch the full session.",
+      "visitWebsite": "Visit Website",
+      "downloadSlides": "Download Slides",
+      "close": "Close",
+      "sessionId": "Session ID",
+      "card1": {
+        "title": "Market Analysis and Value Delivery",
+        "description": "Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
+      },
+      "card2": {
+        "title": "Legal Considerations for Raising Capital",
+        "description": "Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
+      },
+      "card3": {
+        "title": "The Perfect Pitch",
+        "description": "Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
+      }
     }
   },
   "common": {
