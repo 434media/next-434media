@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import type { Locale } from "../../../i18n-config"
+import { i18n } from "../../../i18n-config"
 import type { Dictionary } from "../../types/dictionary"
 import { SDOHHero } from "../../components/SDOHHero"
 import { SDOHStartupBootcamp } from "../../components/SDOHStartupBootcamp"
@@ -12,18 +13,33 @@ import { SDOHNewsletter } from "../../components/SDOHNewsletter"
 import { BackToTop } from "../../components/BackToTop"
 import Script from "next/script"
 
+// Create a minimal fallback dictionary
+const fallbackDict = {
+  sdoh: {
+    title: "SDOH",
+    newsletter: {
+      title: 'Signup for "Que es SDOH" newsletter',
+      subtitle: "Join the conversation now.",
+    },
+  },
+}
+
 interface SDOHClientPageProps {
-  lang: Locale
-  dict: Dictionary
+  lang?: Locale
+  dict?: Dictionary
 }
 
 export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
+  // Ensure we have valid values even if props are undefined
+  const safeLocale = lang || i18n.defaultLocale
+  const safeDict = dict || fallbackDict
+
   // Debug logging
   useEffect(() => {
-    console.log("SDOHClientPage mounted with lang:", lang)
-    console.log("Dictionary loaded:", !!dict)
+    console.log("SDOHClientPage mounted with lang:", safeLocale)
+    console.log("Dictionary loaded:", !!safeDict)
     window.scrollTo(0, 0)
-  }, [lang, dict])
+  }, [safeLocale, safeDict])
 
   return (
     <main className="flex flex-col min-h-screen">
@@ -35,7 +51,7 @@ export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
       </a>
 
       {/* Hero Section */}
-      <SDOHHero locale={lang} dict={dict} />
+      <SDOHHero locale={safeLocale} dict={safeDict} />
 
       {/* Main content */}
       <div id="main-content" className="outline-none" tabIndex={-1}>
@@ -53,16 +69,16 @@ export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
               <div className="relative z-10">
 
                 {/* Startup Bootcamp Section */}
-                <SDOHStartupBootcamp locale={lang} dict={dict} />
+                <SDOHStartupBootcamp locale={safeLocale} dict={safeDict} />
 
                 {/* Community Health Accelerator Section */}
-                <SDOHHealthAccelerator locale={lang} dict={dict} />
+                <SDOHHealthAccelerator locale={safeLocale} dict={safeDict} />
 
                 {/* Demo Day Video Section */}
-                <SDOHDemoDay locale={lang} dict={dict} />
+                <SDOHDemoDay locale={safeLocale} dict={safeDict} />
 
                 {/* Wow Impact Message Section */}
-                <SDOHImpactMessage locale={lang} dict={dict} />
+                <SDOHImpactMessage locale={safeLocale} dict={safeDict} />
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-5xl mb-16 sm:mb-24">
                   {/* Newsletter Section - Enhanced with better visibility */}
@@ -74,14 +90,14 @@ export default function SDOHClientPage({ lang, dict }: SDOHClientPageProps) {
                     <div className="relative z-10">
                       <div className="max-w-3xl mx-auto text-center mb-8 sm:mb-10">
                         <h2 className="font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-4 sm:mb-6 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300">
-                          {dict?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
+                          {safeDict?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
                         </h2>
                         <p className="text-base sm:text-lg md:text-xl text-white/90 leading-relaxed">
-                          {dict?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
+                          {safeDict?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
                         </p>
                       </div>
                       <div className="max-w-xl mx-auto">
-                        <SDOHNewsletter locale={lang} dict={dict} />
+                        <SDOHNewsletter locale={safeLocale} dict={safeDict} />
                       </div>
                     </div>
                   </div>
