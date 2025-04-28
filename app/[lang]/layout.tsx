@@ -66,13 +66,22 @@ type Props = {
 
 export default async function Layout({ children, params }: Props) {
   // Add defensive checks to handle potential undefined values
-  if (!params || !params.lang) {
+  if (!params || typeof params !== "object" || !params.lang) {
     console.error("Missing params or params.lang in Layout")
     // Fallback to default locale
     const defaultLocale = i18n.defaultLocale
-    const dict = await getDictionary(defaultLocale as Locale)
 
-    return <ClientLayout params={{ lang: defaultLocale as Locale }}>{children}</ClientLayout>
+    try {
+      const dict = await getDictionary(defaultLocale as Locale)
+      return (
+        <ClientLayout params={{ lang: defaultLocale as Locale }} dict={dict}>
+          {children}
+        </ClientLayout>
+      )
+    } catch (error) {
+      console.error("Error getting dictionary in Layout fallback:", error)
+      return <ClientLayout params={{ lang: defaultLocale as Locale }}>{children}</ClientLayout>
+    }
   }
 
   try {

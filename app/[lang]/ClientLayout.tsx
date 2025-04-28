@@ -17,7 +17,14 @@ export default function ClientLayout({ params, children, dict }: ClientLayoutPro
   const [isToggleVisible, setIsToggleVisible] = useState(true)
 
   // Ensure params.lang exists with a fallback to the default locale
-  const lang = params?.lang || i18n.defaultLocale
+  const lang =
+    params &&
+    typeof params === "object" &&
+    params.lang &&
+    typeof params.lang === "string" &&
+    i18n.locales.includes(params.lang as Locale)
+      ? params.lang
+      : i18n.defaultLocale
 
   // Debug logging
   useEffect(() => {
@@ -64,6 +71,39 @@ export default function ClientLayout({ params, children, dict }: ClientLayoutPro
 
     return () => {
       document.documentElement.classList.remove(`lang-${lang}`)
+    }
+  }, [lang])
+
+  // Handle language toggle more robustly
+  useEffect(() => {
+    console.log("ClientLayout language effect running with lang:", lang)
+
+    // Force language attribute on html element
+    document.documentElement.lang = lang
+    document.documentElement.setAttribute("data-language", lang)
+
+    // Set a data attribute on body for CSS targeting
+    document.body.setAttribute("data-language", lang)
+
+    // Set cookie to ensure consistency
+    document.cookie = `NEXT_LOCALE=${lang}; path=/; max-age=31536000`
+
+    // Add event listener for language toggle button clicks
+    const handleLanguageToggle = (event: Event) => {
+      const target = event.target as HTMLElement
+      if (target.closest('[aria-label*="Switch to"]')) {
+        console.log("Language toggle button clicked")
+        // Force reload after a short delay to ensure cookie is set
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      }
+    }
+
+    document.addEventListener("click", handleLanguageToggle)
+
+    return () => {
+      document.removeEventListener("click", handleLanguageToggle)
     }
   }, [lang])
 

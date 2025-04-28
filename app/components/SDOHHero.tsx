@@ -912,7 +912,7 @@ export interface SDOHHeroProps {
 }
 
 // Change from export function to export default function
-export default function SDOHHero({ locale, dict }: SDOHHeroProps) {
+export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
   const detailsRef = useRef<HTMLElement>(null)
@@ -988,6 +988,24 @@ export default function SDOHHero({ locale, dict }: SDOHHeroProps) {
   const d = dict?.sdoh || {
     // Default English text
     heroAlt: "SDOH Conference - Awareness Drives Innovation",
+    mission: {
+      codeComment: "// Join us for this innovative panel",
+      description1:
+        "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley.",
+      description2:
+        "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents.",
+      hashtags: "#innovation #healthcare #community",
+    },
+    sessions: {
+      viewSession: "View Session",
+      comingSoon: "Coming Soon",
+      comingSoonDescription:
+        "This video will be available after the event. Check back later to watch the full session.",
+      visitWebsite: "Visit Website",
+      downloadSlides: "Download Slides",
+      close: "Close",
+      sessionId: "Session ID",
+    },
     // Add other text that needs translation
   }
 

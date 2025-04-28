@@ -28,9 +28,10 @@ interface SDOHClientPageProps {
   locale?: Locale
 }
 
-export default function SDOHClientPage({ locale }: SDOHClientPageProps) {
-  // Ensure we have a valid locale
-  const safeLocale: Locale = locale && i18n.locales.includes(locale) ? locale : i18n.defaultLocale
+export default function SDOHClientPage({ locale = i18n.defaultLocale }: SDOHClientPageProps) {
+  // Ensure we have a valid locale with stronger type checking
+  const safeLocale: Locale =
+    typeof locale === "string" && i18n.locales.includes(locale as Locale) ? (locale as Locale) : i18n.defaultLocale
 
   const [dict, setDict] = useState(fallbackDict)
   const [isLoading, setIsLoading] = useState(true)
@@ -46,14 +47,21 @@ export default function SDOHClientPage({ locale }: SDOHClientPageProps) {
         if (response.ok) {
           const data = await response.json()
           console.log(`Dictionary loaded:`, data)
-          setDict(data)
-          // Force re-render of all components
-          setComponentKey((prev) => prev + 1)
+          if (data && typeof data === "object") {
+            setDict(data)
+            // Force re-render of all components
+            setComponentKey((prev) => prev + 1)
+          } else {
+            console.error("Invalid dictionary data format")
+            // Use fallback dictionary
+          }
         } else {
           console.error(`Failed to load dictionary: ${response.status}`)
+          // Continue with fallback dictionary
         }
       } catch (error) {
         console.error("Error loading dictionary:", error)
+        // Continue with fallback dictionary
       } finally {
         setIsLoading(false)
       }
