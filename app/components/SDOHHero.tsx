@@ -993,55 +993,82 @@ export default function SDOHHero({ locale, dict }: SDOHHeroProps) {
 
   return (
     <>
-      {/* Hero section with responsive images */}
+      {/* Hero section with video - simplified without text overlay */}
       <section
         className="relative w-full h-screen overflow-hidden"
         ref={heroRef}
-        aria-label="SDOH Conference Hero Banner"
+        aria-label="SDOH Conference Hero Video"
       >
-        {/* Desktop hero image - hidden on mobile */}
-        <div className="hidden md:block w-full h-full">
-          <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png"
-            alt={d.heroAlt || "SDOH Conference - Awareness Drives Innovation"}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-        </div>
+        <div className="absolute inset-0 bg-black">
+          {/* Video background with poster image for faster perceived loading */}
+          <div className="relative w-full h-full">
+            {/* Fallback poster image while video loads */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#1a2a3a] via-[#2d4356] to-[#1a2a3a] z-0">
+              {/* Subtle patterns for visual interest while video loads */}
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(229,95,43,0.15)_0%,rgba(0,0,0,0)_70%)]"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/30"></div>
+            </div>
 
-        {/* Mobile hero image - shown only on mobile */}
-        <div className="block md:hidden w-full h-full relative overflow-hidden">
-          {/* Clean gradient background that makes the image pop */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#1a2a3a] via-[#2d4356] to-[#1a2a3a]">
-            {/* Radial glow effect */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(229,95,43,0.15)_0%,rgba(0,0,0,0)_70%)]"></div>
-
-            {/* Subtle vignette effect */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/30"></div>
-          </div>
-
-          {/* Main hero image with enhanced shadow for depth */}
-          <div className="relative w-full h-full flex items-center justify-center">
-            <div className="w-[90%] max-w-md relative drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-              <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/hero-mobile.png"
-                alt={d.heroAlt || "SDOH Conference - Awareness Drives Innovation"}
-                width={600}
-                height={800}
-                priority
-                className="w-full h-auto object-contain z-10"
+            {/* Video player with optimizations */}
+            <div className="absolute inset-0 z-10">
+              <ReactPlayer
+                url="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                playing={true}
+                loop={true}
+                muted={true}
+                playsinline={true}
+                width="100%"
+                height="100%"
+                config={{
+                  file: {
+                    attributes: {
+                      preload: "auto",
+                      poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png",
+                    },
+                  },
+                }}
+                style={{ objectFit: "cover" }}
+                className="object-cover"
               />
+            </div>
 
-              {/* Subtle glow behind the image */}
-              <div className="absolute -inset-4 bg-[#e95f2b]/10 blur-xl rounded-full -z-10"></div>
+            {/* Video controls - mute/unmute button */}
+            <div className="absolute bottom-6 right-6 z-40">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation() // Prevent event bubbling
+                  const video = document.querySelector("video")
+                  if (video) {
+                    video.muted = !video.muted
+                    // Force a re-render by updating state
+                    setHasScrolled((prev) => !prev)
+                    setTimeout(() => setHasScrolled((prev) => !prev), 10)
+                  }
+                }}
+                className="p-3 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                aria-label="Toggle video sound"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                  />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
-
-        {!prefersReducedMotion}
       </section>
+
+      {/* Remove the line below if it exists */}
 
       {/* Mission Statement Section */}
       <SDOHMission locale={locale} dict={dict} />

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import type { Locale } from "../../../i18n-config"
 import { i18n } from "../../../i18n-config"
 import SDOHHero from "../../components/SDOHHero"
-//import SDOHMission from "../../../components/SDOHMission"
+//import SDOHMission from "../../components/SDOHMission"
 import SDOHStartupBootcamp from "../../components/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/SDOHHealthAccelerator"
 import { SDOHDemoDay } from "../../components/SDOHDemoDay"
@@ -61,6 +61,34 @@ export default function SDOHClientPage({ locale }: SDOHClientPageProps) {
 
     loadDictionary()
     window.scrollTo(0, 0)
+  }, [safeLocale])
+
+  // Handle language changes more robustly
+  useEffect(() => {
+    // Force reload when language changes to ensure all components update
+    const handleLanguageChange = () => {
+      console.log("Language changed, refreshing components")
+      setComponentKey((prev) => prev + 1)
+
+      // Force scroll to top on language change
+      window.scrollTo(0, 0)
+    }
+
+    // Listen for storage events (cookies can trigger this in some browsers)
+    window.addEventListener("storage", handleLanguageChange)
+
+    // Check for language in URL and cookies
+    const urlLang = window.location.pathname.split("/")[1]
+    const cookieLang = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("NEXT_LOCALE="))
+      ?.split("=")[1]
+
+    console.log(`Current URL language: ${urlLang}, Cookie language: ${cookieLang}`)
+
+    return () => {
+      window.removeEventListener("storage", handleLanguageChange)
+    }
   }, [safeLocale])
 
   // Show loading state

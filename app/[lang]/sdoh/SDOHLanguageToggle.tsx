@@ -13,6 +13,7 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
   const router = useRouter()
   const [hovered, setHovered] = useState<string | null>(null)
   const [locale, setLocale] = useState<Locale>(currentLocale || i18n.defaultLocale)
+  const [isChangingLanguage, setIsChangingLanguage] = useState(false)
 
   // Update local state when prop changes
   useEffect(() => {
@@ -43,14 +44,16 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
   }
 
   const handleLanguageChange = (newLocale: Locale) => {
-    // Only navigate if the locale is changing
-    if (newLocale !== locale) {
+    // Only navigate if the locale is changing and not already in transition
+    if (newLocale !== locale && !isChangingLanguage) {
+      setIsChangingLanguage(true)
+
       // Use the provided onLanguageChange prop if available
       if (onLanguageChange) {
         onLanguageChange(newLocale)
       } else {
-        // Fall back to the original behavior
-        router.push(`/${newLocale}/sdoh`)
+        // Force a hard navigation to ensure proper reload
+        window.location.href = `/${newLocale}/sdoh`
       }
 
       // Update local state
@@ -74,6 +77,7 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
       <div className="flex gap-2 items-center">
         <button
           onClick={() => handleLanguageChange("en")}
+          disabled={isChangingLanguage || locale === "en"}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
             locale === "en"
               ? `${flagColors.en.activeBg} ${flagColors.en.activeText} border-white`
@@ -117,6 +121,7 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
 
         <button
           onClick={() => handleLanguageChange("es")}
+          disabled={isChangingLanguage || locale === "es"}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
             locale === "es"
               ? `${flagColors.es.activeBg} ${flagColors.es.activeText} border-white`
