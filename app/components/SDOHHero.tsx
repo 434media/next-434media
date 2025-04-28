@@ -354,27 +354,33 @@ const VideoModal = ({
                       )}
 
                       {/* Video player */}
-                      <ReactPlayer
-                        url={videoUrl}
-                        width="100%"
-                        height="100%"
-                        playing={isPlaying}
-                        volume={isMuted ? 0 : volume}
-                        onReady={handleReady}
-                        onProgress={handleProgress}
-                        onPlay={() => setIsPlaying(true)}
-                        onPause={() => setIsPlaying(false)}
-                        onDuration={handleDuration}
-                        config={{
-                          youtube: {
-                            playerVars: {
-                              modestbranding: 1,
-                              rel: 0,
-                              controls: 0, // Hide default controls
-                            },
-                          },
-                        }}
-                      />
+                      {/* Video player with optimizations */}
+                      <div className="absolute inset-0 z-10">
+                        {/* Preload hint for the video */}
+                        <link
+                          rel="preload"
+                          href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                          as="video"
+                          type="video/mp4"
+                        />
+
+                        {/* Optimized video element instead of ReactPlayer for better performance */}
+                        <video
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          poster="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png"
+                          className="w-full h-full object-cover"
+                          preload="auto"
+                        >
+                          <source
+                            src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                            type="video/mp4"
+                          />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
 
                       {/* Large play button overlay - only shown when video is not playing */}
                       {!isPlaying && !isLoading && (
@@ -1017,6 +1023,8 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
         ref={heroRef}
         aria-label="SDOH Conference Hero Video"
       >
+        {/* We don't need to add the language toggle here as it's already handled in the parent component */}
+
         <div className="absolute inset-0 bg-black">
           {/* Video background with poster image for faster perceived loading */}
           <div className="relative w-full h-full">
@@ -1029,25 +1037,30 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
 
             {/* Video player with optimizations */}
             <div className="absolute inset-0 z-10">
-              <ReactPlayer
-                url="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
-                playing={true}
-                loop={true}
-                muted={true}
-                playsinline={true}
-                width="100%"
-                height="100%"
-                config={{
-                  file: {
-                    attributes: {
-                      preload: "auto",
-                      poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png",
-                    },
-                  },
-                }}
-                style={{ objectFit: "cover" }}
-                className="object-cover"
+              {/* Preload hint for the video */}
+              <link
+                rel="preload"
+                href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                as="video"
+                type="video/mp4"
               />
+
+              {/* Optimized video element instead of ReactPlayer for better performance */}
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                poster="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png"
+                className="w-full h-full object-cover"
+                preload="auto"
+              >
+                <source
+                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                  type="video/mp4"
+                />
+                Your browser does not support the video tag.
+              </video>
             </div>
 
             {/* Video controls - mute/unmute button */}
