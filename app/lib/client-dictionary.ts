@@ -21,5 +21,5 @@ export async function getClientDictionary(locale: Locale) {
   return dictionary
 }
 
-// Add this export to match the function name used in SDOHClientPage
+// Export both names for compatibility
 export const getDictionaryClient = getClientDictionary

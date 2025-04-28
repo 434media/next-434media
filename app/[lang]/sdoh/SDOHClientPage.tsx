@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { i18n } from "../../../i18n-config"
 import type { Locale } from "../../../i18n-config"
 import SDOHHero from "../../components/SDOHHero"
@@ -12,88 +12,19 @@ import { SDOHNewsletter } from "../../components/SDOHNewsletter"
 import { BackToTop } from "../../components/BackToTop"
 import { PartnerLogos } from "../../components/PartnerLogos"
 import Script from "next/script"
-import { getClientDictionary } from "@/app/lib/client-dictionary"
-// Import the SDOHLanguageToggle component at the top of the file with the other imports
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
-
-// Create a minimal fallback dictionary
-const fallbackDict = {
-  sdoh: {
-    title: "¿Qué es SDOH?", // Keep the original title
-    newsletter: {
-      title: 'Signup for "Que es SDOH" newsletter',
-      subtitle: "Join the conversation now.",
-    },
-  },
-}
+import { useLanguage } from "@/app/context/language-context"
 
 export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale?: Locale }) {
-  // Ensure we have a valid locale with stronger type checking
-  const safeLocale: Locale =
-    typeof locale === "string" && i18n.locales.includes(locale as Locale) ? (locale as Locale) : i18n.defaultLocale
+  const { dictionary, isLoading } = useLanguage()
 
-  const [dict, setDict] = useState(fallbackDict)
-  const [isLoading, setIsLoading] = useState(true)
-  const [componentKey, setComponentKey] = useState(0)
-
-  // Fetch dictionary on the client side
+  // Scroll to top on initial load
   useEffect(() => {
-    async function loadDictionary() {
-      setIsLoading(true)
-      try {
-        console.log(`Fetching dictionary for locale: ${safeLocale}`)
-        const data = await getClientDictionary(safeLocale)
-        console.log(`Dictionary loaded:`, data)
-        if (data && typeof data === "object") {
-          setDict(data)
-          // Force re-render of all components
-          setComponentKey((prev) => prev + 1)
-        } else {
-          console.error("Invalid dictionary data format")
-          // Use fallback dictionary
-        }
-      } catch (error) {
-        console.error("Error loading dictionary:", error)
-        // Continue with fallback dictionary
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadDictionary()
     window.scrollTo(0, 0)
-  }, [safeLocale])
-
-  // Handle language changes more robustly
-  useEffect(() => {
-    // Force reload when language changes to ensure all components update
-    const handleLanguageChange = () => {
-      console.log("Language changed, refreshing components")
-      setComponentKey((prev) => prev + 1)
-
-      // Force scroll to top on language change
-      window.scrollTo(0, 0)
-    }
-
-    // Listen for storage events (cookies can trigger this in some browsers)
-    window.addEventListener("storage", handleLanguageChange)
-
-    // Check for language in URL and cookies
-    const urlLang = window.location.pathname.split("/")[1]
-    const cookieLang = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("NEXT_LOCALE="))
-      ?.split("=")[1]
-
-    console.log(`Current URL language: ${urlLang}, Cookie language: ${cookieLang}`)
-
-    return () => {
-      window.removeEventListener("storage", handleLanguageChange)
-    }
-  }, [safeLocale])
+  }, [])
 
   // Show loading state
-  if (isLoading) {
+  if (isLoading && !dictionary) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -114,16 +45,10 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
       </a>
 
       {/* Language Toggle */}
-      <SDOHLanguageToggle
-        key={`language-toggle-${componentKey}`}
-        currentLocale={safeLocale}
-        onLanguageChange={(newLocale) => {
-          window.location.href = `/${newLocale}/sdoh`
-        }}
-      />
+      <SDOHLanguageToggle />
 
       {/* Hero Section */}
-      <SDOHHero key={`hero-${componentKey}`} locale={safeLocale} dict={dict} />
+      <SDOHHero locale={locale} dict={dictionary} />
 
       {/* Main content */}
       <div id="main-content" className="outline-none" tabIndex={-1}>
@@ -140,16 +65,16 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
               {/* Content */}
               <div className="relative z-10">
                 {/* Startup Bootcamp Section */}
-                <SDOHStartupBootcamp key={`bootcamp-${componentKey}`} locale={safeLocale} dict={dict} />
+                <SDOHStartupBootcamp locale={locale} dict={dictionary} />
 
                 {/* Community Health Accelerator Section */}
-                <SDOHHealthAccelerator key={`accelerator-${componentKey}`} locale={safeLocale} dict={dict} />
+                <SDOHHealthAccelerator locale={locale} dict={dictionary} />
 
                 {/* Demo Day Video Section */}
-                <SDOHDemoDay key={`demoday-${componentKey}`} locale={safeLocale} dict={dict} />
+                <SDOHDemoDay locale={locale} dict={dictionary} />
 
                 {/* Wow Impact Message Section */}
-                <SDOHImpactMessage key={`impact-${componentKey}`} locale={safeLocale} dict={dict} />
+                <SDOHImpactMessage locale={locale} dict={dictionary} />
 
                 {/* Partner Logos Section */}
                 <PartnerLogos />
@@ -164,14 +89,14 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
                     <div className="relative z-10">
                       <div className="max-w-3xl mx-auto text-center mb-8 sm:mb-10">
                         <h2 className="font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-4 sm:mb-6 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300">
-                          {dict?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
+                          {dictionary?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
                         </h2>
                         <p className="text-base sm:text-lg md:text-xl text-white/90 leading-relaxed">
-                          {dict?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
+                          {dictionary?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
                         </p>
                       </div>
                       <div className="max-w-xl mx-auto">
-                        <SDOHNewsletter key={`newsletter-${componentKey}`} locale={safeLocale} dict={dict} />
+                        <SDOHNewsletter locale={locale} dict={dictionary} />
                       </div>
                     </div>
                   </div>

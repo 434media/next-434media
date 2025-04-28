@@ -1,26 +1,24 @@
 "use client"
-import { useState, useEffect } from "react"
+
+import { useEffect, useState } from "react"
 import type { Locale } from "../../../i18n-config"
-import { i18n } from "../../../i18n-config"
-import { useRouter } from "next/navigation"
+import { useLanguage } from "@/app/context/language-context"
 
 interface SDOHLanguageToggleProps {
   currentLocale?: Locale
-  onLanguageChange?: (newLocale: Locale) => void
 }
 
-export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: SDOHLanguageToggleProps) {
-  const router = useRouter()
+export default function SDOHLanguageToggle({ currentLocale }: SDOHLanguageToggleProps) {
+  const { locale, setLocale, isLoading } = useLanguage()
   const [hovered, setHovered] = useState<string | null>(null)
-  const [locale, setLocale] = useState<Locale>(currentLocale || i18n.defaultLocale)
-  const [isChangingLanguage, setIsChangingLanguage] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  // Update local state when prop changes
+  // Ensure component is mounted before rendering to avoid hydration issues
   useEffect(() => {
-    if (currentLocale && i18n.locales.includes(currentLocale)) {
-      setLocale(currentLocale)
-    }
-  }, [currentLocale])
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
 
   // Country flag colors
   const flagColors = {
@@ -43,21 +41,9 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
     },
   }
 
-  const handleLanguageChange = (newLocale: Locale) => {
-    // Only navigate if the locale is changing and not already in transition
-    if (newLocale !== locale && !isChangingLanguage) {
-      setIsChangingLanguage(true)
-
-      // Use the provided onLanguageChange prop if available
-      if (onLanguageChange) {
-        onLanguageChange(newLocale)
-      } else {
-        // Force a hard navigation to ensure proper reload
-        window.location.href = `/${newLocale}/sdoh`
-      }
-
-      // Update local state
-      setLocale(newLocale)
+  const handleLanguageChange = async (newLocale: Locale) => {
+    if (newLocale !== locale && !isLoading) {
+      await setLocale(newLocale)
     }
   }
 
@@ -70,7 +56,7 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
         opacity: 1,
         pointerEvents: "auto",
         fontSize: "0.75rem", // Smaller font size
-        top: "5rem", // Changed from "1rem" to "5rem" to position below navbar
+        top: "5rem", // Position below navbar
         right: "1rem", // Position at the right
         zIndex: 9999, // Ensure it's above everything else
       }}
@@ -78,7 +64,7 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
       <div className="flex gap-2 items-center">
         <button
           onClick={() => handleLanguageChange("en")}
-          disabled={isChangingLanguage || locale === "en"}
+          disabled={isLoading || locale === "en"}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
             locale === "en"
               ? `${flagColors.en.activeBg} ${flagColors.en.activeText} border-white`
@@ -122,7 +108,7 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
 
         <button
           onClick={() => handleLanguageChange("es")}
-          disabled={isChangingLanguage || locale === "es"}
+          disabled={isLoading || locale === "es"}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
             locale === "es"
               ? `${flagColors.es.activeBg} ${flagColors.es.activeText} border-white`
@@ -158,6 +144,13 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
           )}
         </button>
       </div>
+
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center rounded-xl">
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+        </div>
+      )}
     </div>
   )
 }

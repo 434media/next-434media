@@ -1,6 +1,4 @@
 import type React from "react"
-import { Geist, Geist_Mono } from "next/font/google"
-import localFont from "next/font/local"
 import "../globals.css"
 import "remixicon/fonts/remixicon.css"
 import { i18n } from "../../i18n-config"
@@ -15,10 +13,8 @@ export function generateStaticParams() {
 
 export default function Layout({
   children,
-  params,
 }: {
   children: React.ReactNode
-  params: { lang: string }
 }) {
   return (
    
