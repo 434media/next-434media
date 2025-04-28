@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Output standalone for optimized Lambda deployment
+  output: 'standalone',
+  
+  // Use SWC minification for faster builds
+  swcMinify: true,
+  
+  // Keep your existing configurations
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -14,12 +21,21 @@ const nextConfig: NextConfig = {
         hostname: "ampd-asset.s3.us-east-2.amazonaws.com",
       },
     ],
-  },  
-  // Add cache control headers to prevent stale data
+  },
+  
+  // Improved cache control headers
   async headers() {
     return [
       {
+        // No caching for HTML/API routes
         source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'Accept',
+            value: '.*text/html.*',
+          },
+        ],
         headers: [
           {
             key: 'Cache-Control',
@@ -27,10 +43,10 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-    ]
+    ];
   },
   
-  // Add explicit rewrites for the SDOH routes
+  // Keep your existing rewrites
   async rewrites() {
     return {
       beforeFiles: [
@@ -43,7 +59,15 @@ const nextConfig: NextConfig = {
           destination: '/en/sdoh',
         },
       ],
-    }
+    };
+  },
+  
+  // Optimize memory usage during builds
+  experimental: {
+    // Enable memory optimizations for large builds
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    // Improve tree-shaking
+    optimizeCss: true,
   },
 };
 

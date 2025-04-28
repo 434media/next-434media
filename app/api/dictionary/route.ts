@@ -1,30 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { i18n } from "../../../i18n-config"
+import { getDictionary } from "@/app/lib/dictionary"
+
+// Convert to Edge Function
+export const runtime = "edge"
 
 export async function GET(request: NextRequest) {
   try {
-    // Get locale from query parameter
-    const { searchParams } = new URL(request.url)
-    let locale = searchParams.get("locale") || i18n.defaultLocale
+    const locale = request.nextUrl.searchParams.get("locale") || "en"
 
     // Validate locale
-    if (!i18n.locales.includes(locale as any)) {
-      locale = i18n.defaultLocale
+    if (locale !== "en" && locale !== "es") {
+      return NextResponse.json({ error: "Invalid locale" }, { status: 400 })
     }
 
-    // Import the dictionary
-    const dictionary = await import(`../../dictionaries/${locale}.json`)
+    const dictionary = await getDictionary(locale as "en" | "es")
 
-    // Set cache headers
-    const headers = new Headers()
-    headers.set("Cache-Control", "public, max-age=60, s-maxage=60")
+    // Add cache headers for better performance
+    const response = NextResponse.json(dictionary)
+    response.headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600")
 
-    return NextResponse.json(dictionary, {
-      headers,
-      status: 200,
-    })
+    return response
   } catch (error) {
-    console.error("Error in dictionary API route:", error)
-    return NextResponse.json({ error: "Failed to load dictionary" }, { status: 500 })
+    console.error("Error fetching dictionary:", error)
+    return NextResponse.json({ error: "Failed to fetch dictionary" }, { status: 500 })
   }
 }
