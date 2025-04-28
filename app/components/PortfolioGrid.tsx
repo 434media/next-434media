@@ -348,9 +348,9 @@ export const portfolioArray: PortfolioItem[] = [
     content: "Premier platform uniting academia, industry, and the military",
     linkedin: "https://www.linkedin.com/company/velocitytx/",
     instagram: "https://www.instagram.com/velocitytx/",
-    website: "https://velocitytx.org/startup-programs/funding/aim-conference/",
-    showLinkedin: true,
-    showInstagram: true,
+    website: " www.aimsatx.com",
+    showLinkedin: false,
+    showInstagram: false,
     showWebsite: true,
   },
   {
@@ -393,9 +393,9 @@ export const portfolioArray: PortfolioItem[] = [
   },
   {
     company: "Methodist Healthcare Ministries",
-    title: "Driving Innovation in Health Equity",
+    title: "South Texas Community Health Accelerator",
     description:
-      "The Community Health Accelerator Demo Day highlights groundbreaking solutions from entrepreneurial leaders dedicated to advancing health equity by addressing social determinants of health. This unique event showcases innovative founders competing for the opportunity to pilot their transformative technologies with Methodist Healthcare Ministries of South Texas.",
+      "Powered by VelocityTX & Methodist Healthcare Ministries, the South Texas Community Health Accelerator program connects education, entrepreneurship, and innovation through three core components: Que es SDOH? a Speaker + Seminar Series, Startup Bootcamp and a competitive Health Accelerator resulting in the opportunity to pilot your program within the MHM network.",
     video: "https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mov",
     poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png",
     photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png",
@@ -405,9 +405,9 @@ export const portfolioArray: PortfolioItem[] = [
     content: "Advancing health equity by addressing social determinants of health",
     linkedin: "https://www.linkedin.com/company/methodist-healthcare-ministries/",
     instagram: "https://www.instagram.com/mhmstx",
-    website: "https://www.mhm.org/",
-    showLinkedin: true,
-    showInstagram: true,
+    website: "https://www.434media.com/sdoh",
+    showLinkedin: false,
+    showInstagram: false,
     showWebsite: true,
   },
   {
@@ -431,7 +431,7 @@ export const portfolioArray: PortfolioItem[] = [
   },
   {
     company: "TXMX Boxing",
-    title: "Connecting Brands to Fans",
+    title: "Levantamos Los Puños",
     description:
       "TXMX Boxing is a dynamic media platform designed to connect brands with a passionate fight fan audience. By celebrating the rich cultural heritage of Texas and Mexico, TXMX Boxing offers unique opportunities for brands to authentically engage with a community that is deeply rooted in both sport and culture.",
     video: "https://ampd-asset.s3.us-east-2.amazonaws.com/Copy+of+TXMX+Teaser+1.mp4",
@@ -469,9 +469,9 @@ export const portfolioArray: PortfolioItem[] = [
   },
   {
     company: "VemosVamos",
-    title: "Your Bilingual Community for Entrepreneurial Success",
+    title: "Creatively Raw. Curiosity Driven.",
     description:
-      "VemosVamos is a purpose-driven media influencer network designed to connect brands with the vibrant LatinX audience. Through authentic storytelling and culturally resonant content, VemosVamos bridges brands and communities, fostering meaningful engagement with this dynamic and influential demographic.",
+      "A bilingual space for those who aren’t afraid to question, create, and grow.",
     video: "",
     poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/large.jpg",
     photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/large.jpg",
