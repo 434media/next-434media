@@ -370,7 +370,7 @@ const VideoModal = ({
                           loop
                           muted
                           playsInline
-                          poster="https://ampd-asset.s3.us-east-2.amazonaws.com/AWARENESS+DRIVES+INNOVATION+Desktop.png"
+                          poster="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
                           className="w-full h-full object-cover"
                           preload="auto"
                         >
