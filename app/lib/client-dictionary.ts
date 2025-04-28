@@ -20,3 +20,6 @@ export async function getClientDictionary(locale: Locale) {
   cachedDictionaries[locale] = dictionary
   return dictionary
 }
+
+// Add this export to match the function name used in SDOHClientPage
+export const getDictionaryClient = getClientDictionary

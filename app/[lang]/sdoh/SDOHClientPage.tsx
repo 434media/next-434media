@@ -1,17 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { Locale } from "../../../i18n-config"
 import { i18n } from "../../../i18n-config"
+import type { Locale } from "../../../i18n-config"
 import SDOHHero from "../../components/SDOHHero"
-//import SDOHMission from "../../components/SDOHMission"
 import SDOHStartupBootcamp from "../../components/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/SDOHHealthAccelerator"
 import { SDOHDemoDay } from "../../components/SDOHDemoDay"
 import { SDOHImpactMessage } from "../../components/SDOHImpactMessage"
 import { SDOHNewsletter } from "../../components/SDOHNewsletter"
 import { BackToTop } from "../../components/BackToTop"
+import { PartnerLogos } from "../../components/PartnerLogos"
 import Script from "next/script"
+import { getClientDictionary } from "@/app/lib/client-dictionary"
 
 // Create a minimal fallback dictionary
 const fallbackDict = {
@@ -24,11 +25,7 @@ const fallbackDict = {
   },
 }
 
-interface SDOHClientPageProps {
-  locale?: Locale
-}
-
-export default function SDOHClientPage({ locale = i18n.defaultLocale }: SDOHClientPageProps) {
+export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale?: Locale }) {
   // Ensure we have a valid locale with stronger type checking
   const safeLocale: Locale =
     typeof locale === "string" && i18n.locales.includes(locale as Locale) ? (locale as Locale) : i18n.defaultLocale
@@ -43,21 +40,15 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: SDOHClie
       setIsLoading(true)
       try {
         console.log(`Fetching dictionary for locale: ${safeLocale}`)
-        const response = await fetch(`/api/dictionary?locale=${safeLocale}`)
-        if (response.ok) {
-          const data = await response.json()
-          console.log(`Dictionary loaded:`, data)
-          if (data && typeof data === "object") {
-            setDict(data)
-            // Force re-render of all components
-            setComponentKey((prev) => prev + 1)
-          } else {
-            console.error("Invalid dictionary data format")
-            // Use fallback dictionary
-          }
+        const data = await getClientDictionary(safeLocale)
+        console.log(`Dictionary loaded:`, data)
+        if (data && typeof data === "object") {
+          setDict(data)
+          // Force re-render of all components
+          setComponentKey((prev) => prev + 1)
         } else {
-          console.error(`Failed to load dictionary: ${response.status}`)
-          // Continue with fallback dictionary
+          console.error("Invalid dictionary data format")
+          // Use fallback dictionary
         }
       } catch (error) {
         console.error("Error loading dictionary:", error)
@@ -137,16 +128,6 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: SDOHClie
 
               {/* Content */}
               <div className="relative z-10">
-                {/* Debugging: Rendering SDOHMission */}
-                {(() => {
-                  console.log("Rendering SDOHMission with locale:", safeLocale, "and dict:", !!dict)
-                  return null
-                })()}
-                {/* Mission Section - Force render with inline style to ensure visibility */}
-                {/* <div style={{ display: "block" }}>
-                  <SDOHMission key={`mission-${componentKey}`} locale={safeLocale} dict={dict} />
-                </div> */}
-
                 {/* Startup Bootcamp Section */}
                 <SDOHStartupBootcamp key={`bootcamp-${componentKey}`} locale={safeLocale} dict={dict} />
 
@@ -158,6 +139,9 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: SDOHClie
 
                 {/* Wow Impact Message Section */}
                 <SDOHImpactMessage key={`impact-${componentKey}`} locale={safeLocale} dict={dict} />
+
+                {/* Partner Logos Section */}
+                <PartnerLogos />
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-5xl mb-16 sm:mb-24">
                   {/* Newsletter Section - Enhanced with better visibility */}

@@ -1,7 +1,11 @@
 "use client"
+
 import { i18n } from "../../../i18n-config"
 import type { Locale } from "../../../i18n-config"
 import dynamic from "next/dynamic"
+import { useState, useEffect } from "react"
+
+// Import the language toggle directly
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
 
 // Loading fallback component
@@ -31,26 +35,35 @@ export default function SDOHClientWrapper({ initialLocale = i18n.defaultLocale }
   const safeLocale =
     initialLocale && i18n.locales.includes(initialLocale as Locale) ? (initialLocale as Locale) : i18n.defaultLocale
 
+  // Add state to track if we're in the browser
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Only render client components after mount
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Handle language change
   const handleLanguageChange = (newLocale: Locale) => {
-    // Implement your language change logic here, e.g., redirecting to the new locale
-    window.location.href = `/${newLocale}/sdoh`
+    if (typeof window !== "undefined") {
+      window.location.href = `/${newLocale}/sdoh`
+    }
+  }
+
+  // Don't render anything during SSR to prevent hydration errors
+  if (!isMounted) {
+    return <LoadingFallback />
   }
 
   return (
     <>
       {/* Language toggle positioned to avoid navbar */}
       <div className="fixed top-[70px] right-5 z-[9999]">
-        <SDOHLanguageToggle
-          currentLocale={safeLocale}
-          onLanguageChange={(newLocale) => {
-            // Navigate to the new locale
-            window.location.href = `/${newLocale}/sdoh`
-          }}
-        />
+        <SDOHLanguageToggle currentLocale={safeLocale as Locale} onLanguageChange={handleLanguageChange} />
       </div>
 
       {/* Client page that doesn't rely on server props */}
-      <SDOHClientPageDynamic locale={safeLocale} />
+      <SDOHClientPageDynamic locale={safeLocale as Locale} />
     </>
   )
 }

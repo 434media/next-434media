@@ -1,21 +1,29 @@
-import { i18n } from "../../../i18n-config"
-import SDOHClientWrapper from "./SDOHClientWrapper"
-import type { Locale } from "@/i18n-config"
+import { Suspense } from "react"
+import { i18n, type Locale } from "../../../i18n-config"
+import Loading from "./loading"
+import SDOHClientLoader from "./SDOHClientLoader"
 
-// Force static rendering with client-side navigation
-export const dynamic = "error"
-export const dynamicParams = false
-
-// Pre-render all supported locales at build time
-export function generateStaticParams() {
+// Generate static params for all supported locales
+export async function generateStaticParams() {
   return i18n.locales.map((lang) => ({ lang }))
 }
 
-// Simplified page component with defensive programming
-export default function SDOHPage({ params }: { params?: { lang?: string } }) {
-  // Ensure we have a valid locale, defaulting to "en" if not provided
-  const safeLocale =
-    params?.lang && i18n.locales.includes(params.lang as Locale) ? (params.lang as Locale) : i18n.defaultLocale
+// Helper function to validate and type-cast the locale
+function getValidLocale(lang: string | undefined): Locale {
+  if (lang && i18n.locales.includes(lang as Locale)) {
+    return lang as Locale
+  }
+  return i18n.defaultLocale
+}
 
-  return <SDOHClientWrapper initialLocale={safeLocale} />
+export default function Page({ params }: { params: { lang?: string } }) {
+  // Use default locale for server rendering to avoid hydration mismatch
+  // The actual locale will be handled by client components
+  const defaultLocale = i18n.defaultLocale
+
+  return (
+    <Suspense fallback={<Loading />}>
+      <SDOHClientLoader locale={defaultLocale} />
+    </Suspense>
+  )
 }
