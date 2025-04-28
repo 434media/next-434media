@@ -472,12 +472,12 @@ export const portfolioArray: PortfolioItem[] = [
     title: "Creatively Raw. Curiosity Driven.",
     description:
       "A bilingual space for those who aren’t afraid to question, create, and grow.",
-    video: "",
-    poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/large.jpg",
-    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/large.jpg",
-    gif: "https://ampd-asset.s3.us-east-2.amazonaws.com/large.jpg",
+    video: "https://ampd-asset.s3.us-east-2.amazonaws.com/VV+Web+Banner+2.mp4",
+    poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/vv-poster.png",
+    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/vv-poster.png",
+    gif: "https://ampd-asset.s3.us-east-2.amazonaws.com/vv-poster.png",
     showImage: true,
-    showVideo: false,
+    showVideo: true,
     content:
       "We are a bilingual platform that helps people turn their passions into profits by connecting them with a network of individuals who have already done it in the community",
     linkedin: "https://www.linkedin.com/company/vemosvamos/",
