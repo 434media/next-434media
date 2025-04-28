@@ -355,32 +355,28 @@ const VideoModal = ({
 
                       {/* Video player */}
                       {/* Video player with optimizations */}
-                      <div className="absolute inset-0 z-10">
-                        {/* Preload hint for the video */}
-                        <link
-                          rel="preload"
-                          href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
-                          as="video"
-                          type="video/mp4"
-                        />
-
-                        {/* Optimized video element instead of ReactPlayer for better performance */}
-                        <video
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          poster="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
-                          className="w-full h-full object-cover"
-                          preload="auto"
-                        >
-                          <source
-                            src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
-                            type="video/mp4"
-                          />
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
+                      {/* Video player with optimizations */}
+                      <ReactPlayer
+                        url={videoUrl}
+                        playing={isPlaying}
+                        controls={false}
+                        width="100%"
+                        height="100%"
+                        onReady={handleReady}
+                        onDuration={handleDuration}
+                        onProgress={handleProgress}
+                        volume={isMuted ? 0 : volume}
+                        playsinline
+                        config={{
+                          file: {
+                            attributes: {
+                              preload: "auto",
+                              poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png",
+                            },
+                            forceVideo: true,
+                          },
+                        }}
+                      />
 
                       {/* Large play button overlay - only shown when video is not playing */}
                       {!isPlaying && !isLoading && (
@@ -1015,6 +1011,54 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
     // Add other text that needs translation
   }
 
+  // Optimize video loading
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Get the video element
+      const videoElement = document.querySelector("video")
+
+      if (videoElement) {
+        // Add loading event listeners
+        const handleLoadStart = () => console.log("Video loading started")
+        const handleLoadedData = () => console.log("Video data loaded")
+        const handleCanPlay = () => {
+          console.log("Video can play")
+          // Force play when ready if autoplay fails
+          videoElement.play().catch((e) => console.log("Autoplay prevented:", e))
+        }
+
+        videoElement.addEventListener("loadstart", handleLoadStart)
+        videoElement.addEventListener("loadeddata", handleLoadedData)
+        videoElement.addEventListener("canplay", handleCanPlay)
+
+        // Use Intersection Observer to load video only when in viewport
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                // When video is in viewport, set source and load
+                if (videoElement.preload === "none") {
+                  videoElement.preload = "auto"
+                }
+                observer.unobserve(videoElement)
+              }
+            })
+          },
+          { threshold: 0.1 },
+        )
+
+        observer.observe(videoElement)
+
+        return () => {
+          videoElement.removeEventListener("loadstart", handleLoadStart)
+          videoElement.removeEventListener("loadeddata", handleLoadedData)
+          videoElement.removeEventListener("canplay", handleCanPlay)
+          observer.disconnect()
+        }
+      }
+    }
+  }, [])
+
   return (
     <>
       {/* Hero section with video - simplified without text overlay */}
@@ -1037,15 +1081,25 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
 
             {/* Video player with optimizations */}
             <div className="absolute inset-0 z-10">
-              {/* Preload hint for the video */}
+              {/* Resource hints for faster video loading */}
               <link
                 rel="preload"
                 href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
                 as="video"
                 type="video/mp4"
+                fetchPriority="high"
+                crossOrigin="anonymous"
+              />
+              <link
+                rel="preload"
+                href="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
+                as="image"
+                type="image/png"
+                fetchPriority="high"
+                crossOrigin="anonymous"
               />
 
-              {/* Optimized video element instead of ReactPlayer for better performance */}
+              {/* Optimized video element with priority attributes */}
               <video
                 autoPlay
                 loop
@@ -1053,7 +1107,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                 playsInline
                 poster="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
                 className="w-full h-full object-cover"
-                preload="auto"
+                preload="metadata"
               >
                 <source
                   src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
