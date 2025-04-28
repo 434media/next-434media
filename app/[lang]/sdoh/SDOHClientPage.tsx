@@ -13,6 +13,8 @@ import { BackToTop } from "../../components/BackToTop"
 import { PartnerLogos } from "../../components/PartnerLogos"
 import Script from "next/script"
 import { getClientDictionary } from "@/app/lib/client-dictionary"
+// Import the SDOHLanguageToggle component at the top of the file with the other imports
+import SDOHLanguageToggle from "./SDOHLanguageToggle"
 
 // Create a minimal fallback dictionary
 const fallbackDict = {
@@ -110,6 +112,15 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
       >
         Skip to main content
       </a>
+
+      {/* Language Toggle */}
+      <SDOHLanguageToggle
+        key={`language-toggle-${componentKey}`}
+        currentLocale={safeLocale}
+        onLanguageChange={(newLocale) => {
+          window.location.href = `/${newLocale}/sdoh`
+        }}
+      />
 
       {/* Hero Section */}
       <SDOHHero key={`hero-${componentKey}`} locale={safeLocale} dict={dict} />

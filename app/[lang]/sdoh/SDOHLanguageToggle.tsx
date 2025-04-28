@@ -70,8 +70,9 @@ export default function SDOHLanguageToggle({ currentLocale, onLanguageChange }: 
         opacity: 1,
         pointerEvents: "auto",
         fontSize: "0.75rem", // Smaller font size
-        top: "70px", // Added more margin-top to clear the navbar
-        right: "12px",
+        top: "5rem", // Changed from "1rem" to "5rem" to position below navbar
+        right: "1rem", // Position at the right
+        zIndex: 9999, // Ensure it's above everything else
       }}
     >
       <div className="flex gap-2 items-center">
