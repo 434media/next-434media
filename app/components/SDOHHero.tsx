@@ -178,6 +178,7 @@ const VideoModal = ({
   const [showControls, setShowControls] = useState(true)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [duration, setDuration] = useState(0)
+  const [isVideoError, setIsVideoError] = useState(false)
 
   // Handle keyboard events
   useEffect(() => {
@@ -923,6 +924,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const isMobile = useMobile()
   const [hasScrolled, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [isVideoError, setIsVideoError] = useState(false)
 
   // Check for reduced motion preference
   useEffect(() => {
@@ -1059,6 +1061,62 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
     }
   }, [])
 
+  // Optimize video loading with Intersection Observer
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Get the video element
+      const videoElement = document.querySelector("video")
+
+      if (videoElement) {
+        // Add loading event listeners
+        const handleLoadStart = () => console.log("Video loading started")
+        const handleLoadedData = () => console.log("Video data loaded")
+        const handleCanPlay = () => {
+          console.log("Video can play")
+          // Force play when ready if autoplay fails
+          if (!prefersReducedMotion) {
+            videoElement.play().catch((e) => console.log("Autoplay prevented:", e))
+          }
+        }
+        const handleError = (e: any) => {
+          console.error("Video error:", e)
+          // Could add fallback behavior here
+        }
+
+        videoElement.addEventListener("loadstart", handleLoadStart)
+        videoElement.addEventListener("loadeddata", handleLoadedData)
+        videoElement.addEventListener("canplay", handleCanPlay)
+        videoElement.addEventListener("error", handleError)
+
+        // Use Intersection Observer to load video only when in viewport
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                // When video is in viewport, set source and load
+                if (videoElement.preload === "none") {
+                  videoElement.preload = "auto"
+                }
+                observer.unobserve(videoElement)
+              }
+            })
+          },
+          { threshold: 0.1 },
+        )
+
+        observer.observe(videoElement)
+
+        return () => {
+          videoElement.removeEventListener("loadstart", handleLoadStart)
+          videoElement.removeEventListener("loadeddata", handleLoadedData)
+          videoElement.removeEventListener("canplay", handleCanPlay)
+          videoElement.removeEventListener("error", handleError)
+          observer.disconnect()
+        }
+      }
+    }
+  }, [prefersReducedMotion])
+
   return (
     <>
       {/* Hero section with video - simplified without text overlay */}
@@ -1101,7 +1159,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
 
               {/* Optimized video element with priority attributes */}
               <video
-                autoPlay
+                autoPlay={!prefersReducedMotion}
                 loop
                 muted
                 playsInline
@@ -1113,6 +1171,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                   src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
                   type="video/mp4"
                 />
+                <track kind="captions" src="/captions.vtt" label="English captions" />
                 Your browser does not support the video tag.
               </video>
             </div>
