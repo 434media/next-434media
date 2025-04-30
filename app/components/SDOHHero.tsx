@@ -354,8 +354,6 @@ const VideoModal = ({
                       )}
 
                       {/* Video player */}
-                      {/* Video player with optimizations */}
-                      {/* Video player with optimizations */}
                       <ReactPlayer
                         url={videoUrl}
                         playing={isPlaying}
@@ -1352,7 +1350,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
               {/* Resource hints for faster video loading */}
               <link
                 rel="preload"
-                href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Post+Promo+WEB.mp4"
                 as="video"
                 type="video/mp4"
                 fetchPriority="high"
@@ -1378,7 +1376,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                 preload="metadata"
               >
                 <source
-                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Video+V3.mp4"
+                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Post+Promo+WEB.mp4"
                   type="video/mp4"
                 />
                 <track kind="captions" src="/captions.vtt" label="English captions" />
@@ -1421,8 +1419,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
           </div>
         </div>
       </section>
-
-      {/* Remove the line below if it exists */}
 
       {/* Mission Statement Section */}
       <SDOHMission locale={locale} dict={dict} />
