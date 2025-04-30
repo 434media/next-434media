@@ -2,12 +2,11 @@
 
 import type React from "react"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import Image from "next/image"
-import { motion, useAnimation, useInView } from "motion/react"
+import { useAnimation, useInView } from "motion/react"
 import { useMobile } from "../hooks/use-mobile"
 import { FadeIn } from "./FadeIn"
-import Link from "next/link"
 import SDOHMission from "./SDOHMission"
 import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
 import { Fragment } from "react"
@@ -658,255 +657,466 @@ const VideoModal = ({
   )
 }
 
-// Update the SpeakerCard component to ensure consistent alignment and height
-// Replace the entire SpeakerCard component with this improved version:
+// Dynamic Event Carousel with 3D effects and interactive elements
+const EventCarousel = () => {
+  const [activeSlide, setActiveSlide] = useState(0)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const [touchStart, setTouchStart] = useState(0)
+  const [touchEnd, setTouchEnd] = useState(0)
+  const carouselRef = useRef<HTMLDivElement>(null)
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
+  const isMobile = useMobile()
 
+  // Event images and content
+  const slides = [
+    {
+      id: "slide1",
+      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-28.jpg",
+      title: "RGV Startup Week 2025",
+      subtitle: "¿Que es SDOH?",
+      description: "A successful gathering at the intersection of healthcare and technology.",
+      highlight: "Featured Event",
+    },
+    {
+      id: "slide2",
+      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-27.jpg",
+      title: "Community Engagement",
+      subtitle: "Empowering Local Communities",
+      description:
+        "The event emphasized the importance of community involvement in addressing social determinants of health.",
+      highlight: "Community-driven initiatives",
+    },
+    {
+      id: "slide3",
+      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-15.jpg",
+      title: "Innovation Showcase",
+      subtitle: "Cutting-edge Healthcare Solutions",
+      description: "The event featured innovative approaches to addressing social determinants of health.",
+      highlight: "Technology-driven solutions",
+    },
+    {
+      id: "slide4",
+      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-47.jpg",
+      title: "Networking Opportunities",
+      subtitle: "Connections Made",
+      description:
+        "Attendees built valuable relationships with entrepreneurs, investors, and healthcare professionals.",
+      highlight: "Cross-sector collaboration",
+    },
+    {
+      id: "slide5",
+      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-50.jpg",
+      title: "Future of Healthcare",
+      subtitle: "A Vision for Tomorrow",
+      description:
+        "The event inspired attendees to envision a future where healthcare is accessible and equitable for all.",
+      highlight: "Visionary insights",
+    },
+    {
+      id: "slide6",
+      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-51.jpg",
+      title: "RGV Startup Week 2025",
+      subtitle: "¿Que es SDOH?",
+      description: "A successful gathering at the intersection of healthcare and technology.",
+      highlight: "Featured Event",
+    }
+  ]
+
+  // Handle slide navigation - simplified to fix navigation issues
+  const nextSlide = useCallback(() => {
+    setActiveSlide((prev) => (prev + 1) % slides.length)
+  }, [slides.length])
+
+  const prevSlide = useCallback(() => {
+    setActiveSlide((prev) => (prev - 1 + slides.length) % slides.length)
+  }, [slides.length])
+
+  // Auto-play functionality
+  useEffect(() => {
+    if (isAutoPlaying) {
+      if (autoPlayRef.current) {
+        clearInterval(autoPlayRef.current)
+      }
+
+      autoPlayRef.current = setInterval(() => {
+        nextSlide()
+      }, 5000)
+    }
+
+    return () => {
+      if (autoPlayRef.current) {
+        clearInterval(autoPlayRef.current)
+      }
+    }
+  }, [isAutoPlaying, nextSlide])
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        prevSlide()
+      } else if (e.key === "ArrowRight") {
+        nextSlide()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [nextSlide, prevSlide])
+
+  // Touch navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const handleTouchEnd = () => {
+    if (touchStart - touchEnd > 50) {
+      // Swipe left
+      nextSlide()
+    }
+
+    if (touchStart - touchEnd < -50) {
+      // Swipe right
+      prevSlide()
+    }
+  }
+
+  // Pause auto-play on hover
+  const handleMouseEnter = () => {
+    setIsAutoPlaying(false)
+  }
+
+  const handleMouseLeave = () => {
+    setIsAutoPlaying(true)
+  }
+
+  // Direct navigation to a specific slide
+  const goToSlide = (index: number) => {
+    setActiveSlide(index)
+  }
+
+  return (
+    <div
+      className="relative max-w-5xl mx-auto overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-neutral-900 to-neutral-800"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      ref={carouselRef}
+      aria-roledescription="carousel"
+      aria-label="Event highlights carousel"
+    >
+      {/* Decorative elements */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-yellow-400 z-10"></div>
+      <div className="absolute -top-20 -left-20 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl"></div>
+      <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-yellow-500/20 rounded-full blur-3xl"></div>
+
+      {/* Progress bar */}
+      <div
+        className="absolute top-0 left-0 h-1 bg-yellow-400 z-20 transition-all duration-5000 ease-linear"
+        style={{ width: `${(activeSlide / (slides.length - 1)) * 100}%` }}
+      ></div>
+
+      {/* Slides container */}
+      <div className="relative h-[400px] sm:h-[500px]">
+        {slides.map((slide, index) => (
+          <div
+            key={slide.id}
+            className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+              index === activeSlide
+                ? "opacity-100 translate-x-0 scale-100 z-10"
+                : index < activeSlide
+                  ? "opacity-0 -translate-x-full scale-95 z-0"
+                  : "opacity-0 translate-x-full scale-95 z-0"
+            }`}
+            aria-hidden={index !== activeSlide}
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`Slide ${index + 1} of ${slides.length}: ${slide.title}`}
+          >
+            {/* Background image with parallax effect */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div
+                className="absolute inset-0 scale-110 transition-transform duration-[15000ms] ease-linear"
+                style={{
+                  backgroundImage: `url(${slide.image})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  transform: index === activeSlide ? "scale(1.05)" : "scale(1)",
+                }}
+              ></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/70 to-neutral-900/30"></div>
+            </div>
+
+            {/* Content - Only show on first slide */}
+            {index === 0 && (
+              <div className="relative h-full flex flex-col justify-end p-8 sm:p-12">
+                <div
+                  className={`transition-all duration-700 delay-100 transform ${
+                    index === activeSlide ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                  }`}
+                >
+                  {/* RGV Startup Week badge */}
+                  <div className="inline-block bg-yellow-400 text-neutral-900 px-3 py-1 rounded-full text-xs font-bold tracking-wider mb-4 animate-pulse">
+                    RGV STARTUP WEEK 2025
+                  </div>
+
+                  <h3 className="text-3xl sm:text-4xl font-bold text-white mb-2">{slide.title}</h3>
+                  <p className="text-xl sm:text-2xl text-cyan-400 font-medium mb-4">{slide.subtitle}</p>
+                  <p className="text-white/80 text-lg max-w-2xl mb-6">{slide.description}</p>
+
+                  {/* Event highlights */}
+                  {slide.highlight && (
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center mr-3">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 text-cyan-400"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-white">{slide.highlight}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation controls */}
+      <div className="absolute bottom-6 left-0 right-0 flex justify-between items-center px-6 z-30">
+        {/* Slide counter */}
+        <div className="text-white/70 text-sm font-mono">
+          {activeSlide + 1} / {slides.length}
+        </div>
+
+        {/* Pagination dots */}
+        <div className="flex items-center justify-center space-x-2">
+          {slides.map((_, index) => (
+            <button
+              key={`dot-${index}`}
+              onClick={() => goToSlide(index)}
+              className={`transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded-full ${
+                index === activeSlide ? "w-8 h-2 bg-yellow-400" : "w-2 h-2 bg-white/50 hover:bg-white/80"
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+              aria-current={index === activeSlide ? "true" : "false"}
+            />
+          ))}
+        </div>
+
+        {/* Auto-play toggle */}
+        <button
+          onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+          className="text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded-full p-2"
+          aria-label={isAutoPlaying ? "Pause auto-play" : "Start auto-play"}
+        >
+          {isAutoPlaying ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                clipRule="evenodd"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Previous/Next buttons */}
+      <button
+        onClick={prevSlide}
+        className="absolute left-4 top-1/2 transform -translate-y-1/2 w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center z-20 hover:bg-black/50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        aria-label="Previous slide"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <button
+        onClick={nextSlide}
+        className="absolute right-4 top-1/2 transform -translate-y-1/2 w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center z-20 hover:bg-black/50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        aria-label="Next slide"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
+      {/* Floating particles for visual interest */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-cyan-400 rounded-full animate-float-slow"></div>
+        <div className="absolute top-3/4 left-1/3 w-3 h-3 bg-yellow-400 rounded-full animate-float-medium"></div>
+        <div className="absolute top-1/2 right-1/4 w-2 h-2 bg-cyan-400 rounded-full animate-float-fast"></div>
+        <div className="absolute bottom-1/4 right-1/3 w-1 h-1 bg-yellow-400 rounded-full animate-float-slow"></div>
+      </div>
+
+      {/* Add these animations to your globals.css or use inline styles */}
+      <style jsx>{`
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0) translateX(0); }
+          50% { transform: translateY(-20px) translateX(10px); }
+        }
+        @keyframes float-medium {
+          0%, 100% { transform: translateY(0) translateX(0); }
+          50% { transform: translateY(-15px) translateX(-10px); }
+        }
+        @keyframes float-fast {
+          0%, 100% { transform: translateY(0) translateX(0); }
+          50% { transform: translateY(-10px) translateX(5px); }
+        }
+        .animate-float-slow {
+          animation: float-slow 8s ease-in-out infinite;
+        }
+        .animate-float-medium {
+          animation: float-medium 6s ease-in-out infinite;
+        }
+        .animate-float-fast {
+          animation: float-fast 4s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// SpeakerCard Component
 const SpeakerCard = ({
   name,
   title,
   company,
   imageUrl,
   logoUrl,
-  role = "Speaker", // Default role is Speaker, can be overridden for Moderator
+  role,
   href,
 }: {
   name: string
   title: string
   company: string
   imageUrl: string
-  logoUrl: string
-  role?: "Moderator" | "Speaker"
+  logoUrl?: string
+  role?: string
   href?: string
 }) => {
-  const [isHovered, setIsHovered] = useState(false)
-  const [isTouched, setIsTouched] = useState(false)
-  const [isFocused, setIsFocused] = useState(false)
-  const isMobile = useMobile()
-  const cardRef = useRef<HTMLDivElement>(null)
-
-  // For mobile, toggle on touch instead of hover
-  const handleTouch = () => {
-    if (isMobile) {
-      setIsTouched(!isTouched)
-    }
-  }
-
-  // Handle keyboard focus for accessibility
-  const handleFocus = () => setIsFocused(true)
-  const handleBlur = () => setIsFocused(false)
-
-  // Use either hover, touch, or focus state depending on interaction method
-  const isActive = isMobile ? isTouched : isHovered || isFocused
-
-  // Handle keyboard interaction
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault()
-      setIsTouched(!isTouched)
-
-      // If href is provided, navigate to it on Enter/Space
-      if (href) {
-        window.open(href, "_blank", "noopener,noreferrer")
-      }
-    }
-  }
-
   return (
-    <motion.div
-      ref={cardRef}
-      className="bg-white rounded-xl shadow-md overflow-hidden relative h-[280px] sm:h-[320px]"
-      whileHover={{ y: -5, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)" }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      onClick={() => {
-        handleTouch()
-        if (href && isActive) {
-          window.open(href, "_blank", "noopener,noreferrer")
-        }
-      }}
-      onTouchEnd={handleTouch}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
-      role="button"
-      aria-pressed={isActive}
-      aria-label={`${name}, ${title} at ${company}, ${role}${href ? ". Click to visit website" : ""}`}
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block rounded-xl shadow-lg overflow-hidden border border-neutral-200 transition-all duration-300 hover:shadow-xl hover:border-cyan-200"
     >
-      {/* Role tag - positioned at the top right */}
-      <div
-        className={`absolute top-2 sm:top-3 right-2 sm:right-3 z-20 px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
-          role === "Moderator"
-            ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
-            : "bg-cyan-100 text-cyan-800 border border-cyan-300"
-        }`}
-        aria-hidden="true"
-      >
-        {role}
-      </div>
-
-      <div className="flex flex-col items-center justify-between h-full w-full p-4 sm:p-6">
-        {/* Speaker info with image - using a fixed layout structure */}
-        <motion.div
-          className="flex flex-col items-center justify-start text-center w-full h-full"
-          animate={{ opacity: isActive ? 0 : 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          {/* Fixed height container for image to ensure consistent alignment */}
-          <div className="w-full flex justify-center items-center h-[100px] mb-3">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-yellow-300/30 flex-shrink-0">
-              <Image
-                src={imageUrl || "/placeholder.svg?height=96&width=96&query=person"}
-                alt={`Photo of ${name}`}
-                width={96}
-                height={96}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-
-          {/* Fixed height container for text to ensure consistent card heights */}
-          <div className="flex flex-col items-center justify-start h-[80px]">
-            <h3 className="font-bold text-lg sm:text-xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600 line-clamp-1 w-full">
-              {name}
-            </h3>
-            <p className="text-xs sm:text-sm text-neutral-600 mt-1 line-clamp-2 w-full">
-              {title}, {company}
-            </p>
-          </div>
-
-          {/* Website link at the bottom of the card */}
-          {href && (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="mt-auto inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 border border-cyan-200 hover:border-cyan-300 rounded-lg transition-colors duration-200 w-full"
-              aria-label={`Visit ${company} website`}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 mr-2"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-              </svg>
-              Visit Website
-            </a>
-          )}
-        </motion.div>
-
-        {/* Company logo on hover/touch */}
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900 p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isActive ? 1 : 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="flex flex-col items-center justify-center w-full h-full">
-            <motion.div
-              animate={{ scale: isActive ? 1.1 : 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center justify-center w-full h-[120px]"
-            >
-              <Image
-                src={logoUrl || "/placeholder.svg?height=150&width=150&query=company logo"}
-                alt={`${company} logo`}
-                width={150}
-                height={75}
-                className="h-auto max-h-20 sm:max-h-28 w-auto object-contain"
-              />
-            </motion.div>
-            <p className="text-sm sm:text-base font-medium text-cyan-400 border-t border-yellow-300/30 pt-2 sm:pt-3 mt-1 sm:mt-2 text-center line-clamp-1 w-full">
-              {company}
-            </p>
-
-            {href && (
-              <button className="mt-4 px-4 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 rounded-full text-yellow-300 text-sm transition-colors duration-300">
-                Visit Website
-              </button>
-            )}
-          </div>
-        </motion.div>
-      </div>
-    </motion.div>
-  )
-}
-
-// Create a decorative tech pattern component for the startup week vibe
-const TechPattern = ({ className = "" }: { className?: string }) => {
-  return (
-    <div className={`absolute pointer-events-none ${className}`} aria-hidden="true">
-      <svg width="100%" height="100%" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="tech-grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path
-              d="M0 0 L40 0 L40 40 L0 40 Z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="0.5"
-              strokeOpacity="0.1"
+      <div className="relative">
+        <Image
+          src={imageUrl || "/placeholder.svg"}
+          alt={`${name} - ${title}, ${company}`}
+          width={512}
+          height={512}
+          className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110"
+        />
+        {logoUrl && (
+          <div className="absolute bottom-3 right-3 bg-neutral-950/30 backdrop-blur-sm rounded-full p-2 shadow-md">
+            <Image
+              src={logoUrl || "/placeholder.svg"}
+              alt={`${company} Logo`}
+              width={40}
+              height={40}
+              className="w-10 h-10 object-contain"
             />
-          </pattern>
-          <pattern id="tech-dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-            <circle cx="10" cy="10" r="1" fill="currentColor" fillOpacity="0.2" />
-          </pattern>
-          <linearGradient id="tech-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.05" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#tech-grid)" />
-        <rect width="100%" height="100%" fill="url(#tech-dots)" />
-        <rect width="100%" height="100%" fill="url(#tech-gradient)" />
-      </svg>
-    </div>
+          </div>
+        )}
+      </div>
+      <div className="p-4">
+        <h4 className="text-lg font-bold text-neutral-800 group-hover:text-cyan-600 transition-colors duration-300">
+          {name}
+        </h4>
+        <p className="text-sm text-neutral-600">
+          {title}, {company}
+        </p>
+        {role && <p className="text-xs font-medium text-cyan-500 mt-1">{role}</p>}
+      </div>
+    </a>
   )
 }
 
-// Create a floating tech elements component
-const FloatingElements = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      {/* Floating circles */}
-      <motion.div
-        className="absolute w-20 h-20 rounded-full bg-yellow-300/10 border border-yellow-300/20"
-        initial={{ x: "10%", y: "20%" }}
-        animate={{ x: "15%", y: "15%" }}
-        transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute w-32 h-32 rounded-full bg-cyan-500/10 border border-cyan-500/20"
-        initial={{ x: "80%", y: "60%" }}
-        animate={{ x: "75%", y: "65%" }}
-        transition={{ duration: 10, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
-      />
+const TechPattern = ({ className }: { className: string }) => (
+  <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
+    <svg
+      width="200"
+      height="200"
+      viewBox="0 0 200 200"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="opacity-5"
+    >
+      <path d="M0 0H200V200H0V0Z" fill="url(#techPattern)" />
+      <defs>
+        <pattern id="techPattern" patternContentUnits="userSpaceOnUse" width="20" height="20" viewBox="0 0 20 20">
+          <rect width="2" height="2" fill="currentColor" />
+          <rect x="8" width="2" height="2" fill="currentColor" />
+          <rect x="4" y="4" width="2" height="2" fill="currentColor" />
+          <rect x="12" y="4" width="2" height="2" fill="currentColor" />
+          <rect x="16" y="4" width="2" height="2" fill="currentColor" />
+          <rect y="8" width="2" height="2" fill="currentColor" />
+          <rect x="8" y="8" width="2" height="2" fill="currentColor" />
+          <rect x="18" y="8" width="2" height="2" fill="currentColor" />
+          <rect x="4" y="12" width="2" height="2" fill="currentColor" />
+          <rect x="12" y="12" width="2" height="2" fill="currentColor" />
+          <rect x="16" y="12" width="2" height="2" fill="currentColor" />
+          <rect y="16" width="2" height="2" fill="currentColor" />
+          <rect x="8" y="16" width="2" height="2" fill="currentColor" />
+        </pattern>
+      </defs>
+    </svg>
+  </div>
+)
 
-      {/* Code brackets */}
-      <motion.div
-        className="absolute text-4xl font-mono text-cyan-500/20"
-        initial={{ x: "85%", y: "15%", rotate: 15 }}
-        animate={{ x: "85%", y: "15%", rotate: -5 }}
-        transition={{ duration: 6, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
-      >
-        {"{ }"}
-      </motion.div>
-      <motion.div
-        className="absolute text-4xl font-mono text-yellow-500/20"
-        initial={{ x: "15%", y: "75%", rotate: -15 }}
-        animate={{ x: "15%", y: "75%", rotate: 5 }}
-        transition={{ duration: 7, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse", ease: "easeInOut" }}
-      />
-    </div>
-  )
-}
+const FloatingElements = () => (
+  <>
+    <div className="absolute top-1/4 left-1/4 w-6 h-6 bg-cyan-400 rounded-full animate-float-slow opacity-20"></div>
+    <div className="absolute top-3/4 left-1/3 w-8 h-8 bg-yellow-400 rounded-full animate-float-medium opacity-20"></div>
+    <div className="absolute top-1/2 right-1/4 w-4 h-4 bg-cyan-400 rounded-full animate-float-fast opacity-20"></div>
+    <div className="absolute bottom-1/4 right-1/3 w-5 h-5 bg-yellow-400 rounded-full animate-float-slow opacity-20"></div>
+  </>
+)
 
 // Update the SDOHHero component for better accessibility, spacing, and UX
 export interface SDOHHeroProps {
@@ -1341,180 +1551,18 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
               </div>
             </div>
 
-            {/* Event Card Design - Enhanced with startup styling */}
+            {/* Event Highlights Image Carousel - Replacing the static event card */}
             <div className="mt-16 sm:mt-24 relative">
               {/* Decorative elements */}
-              <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2">
+              <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2 z-0">
                 <div className="w-16 h-16 rounded-full bg-yellow-400/10 animate-pulse"></div>
               </div>
-              <div className="absolute top-1/4 right-0 transform translate-x-1/2 -translate-y-1/2">
+              <div className="absolute top-1/4 right-0 transform translate-x-1/2 -translate-y-1/2 z-0">
                 <div className="w-24 h-24 rounded-full bg-cyan-500/10 animate-pulse"></div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-3xl mx-auto border-2 border-cyan-100 relative z-10">
-                {/* RGV Startup Week Banner */}
-                <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-neutral-900 py-2 px-4 text-center font-bold text-sm">
-                  <span className="animate-pulse inline-block w-2 h-2 bg-white rounded-full mr-2"></span>
-                  RGV STARTUP WEEK 2025 FEATURED EVENT
-                  <span className="animate-pulse inline-block w-2 h-2 bg-white rounded-full ml-2"></span>
-                </div>
-
-                <div className="grid md:grid-cols-2">
-                  {/* Left side - Date and Time */}
-                  <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 text-white p-8 sm:p-10 flex flex-col justify-center relative overflow-hidden">
-                    {/* Tech pattern overlay */}
-                    <div className="absolute inset-0 opacity-10">
-                      <svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                          <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5" />
-                        </pattern>
-                        <rect width="100%" height="100%" fill="url(#grid)" />
-                      </svg>
-                    </div>
-
-                    <h3 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-white relative">
-                      <span className="inline-block w-2 h-6 bg-yellow-400 mr-2"></span>
-                      When
-                    </h3>
-                    <div className="space-y-6 relative">
-                      <div className="flex items-start gap-4">
-                        <div className="bg-white/20 p-3 rounded-full">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 sm:h-8 w-6 sm:w-8"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium text-base sm:text-xl block text-white/90">Monday</span>
-                          <span className="font-bold text-lg sm:text-2xl block mt-1">April 28, 2025</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-4">
-                        <div className="bg-white/20 p-3 rounded-full">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 sm:h-8 w-6 sm:w-8"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                          </svg>
-                        </div>
-                        <div>
-                          <span className="font-medium text-base sm:text-xl block text-white/90">Time</span>
-                          <span className="font-bold text-lg sm:text-2xl block mt-1">1:00 PM – 1:45 PM</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right side - Location */}
-                  <div className="p-8 sm:p-10 flex flex-col justify-center bg-white relative">
-                    {/* Decorative elements */}
-                    <div className="absolute top-0 right-0 w-16 h-16">
-                      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M0 0L100 0L100 20L20 20L20 100L0 100L0 0Z" fill="rgba(6, 182, 212, 0.1)" />
-                      </svg>
-                    </div>
-
-                    <h3 className={`${subHeadingClass} relative`}>
-                      <span className="inline-block w-2 h-6 bg-yellow-400 mr-2"></span>
-                      Where
-                    </h3>
-                    <div className="flex items-start gap-4">
-                      <div className="bg-yellow-100 p-3 rounded-full text-yellow-600">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-6 sm:h-8 w-6 sm:w-8"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                      </div>
-                      <div>
-                        <span className="font-bold text-lg sm:text-2xl block text-neutral-800">eBridge Center</span>
-                        <span className="text-base sm:text-xl text-neutral-600 block mt-2">1304 E Adams St</span>
-                        <span className="text-base sm:text-xl text-neutral-600 block">Brownsville, TX 78520</span>
-                        <Link
-                          href="https://maps.google.com/?q=1304+E+Adams+St,+Brownsville,+TX+78520"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center mt-4 text-cyan-600 hover:text-cyan-700 font-medium focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 rounded-md"
-                          aria-label="View eBridge Center on Google Maps"
-                        >
-                          View on Google Maps
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 ml-1"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <line x1="7" y1="17" x2="17" y2="7"></line>
-                            <polyline points="7 7 17 7 17 17"></polyline>
-                          </svg>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom CTA - Enhanced with startup styling */}
-                <div className="bg-neutral-50 p-6 flex justify-center border-t border-neutral-100 relative overflow-hidden">
-                  {/* Tech pattern background */}
-                  <div className="absolute inset-0 opacity-5">
-                    <svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                      <pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse">
-                        <circle cx="5" cy="5" r="1" fill="black" />
-                      </pattern>
-                      <rect width="100%" height="100%" fill="url(#dots)" />
-                    </svg>
-                  </div>
-
-                  <Link
-                    href="https://rgvsw25.events.whova.com/registration"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block bg-gradient-to-r from-yellow-400 to-yellow-500 text-neutral-900 font-bold py-3 px-8 rounded-full text-lg shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 relative z-10"
-                    aria-label="Register for RGV Startup Week"
-                  >
-                    Register for RGV Startup Week
-                    <span className="ml-2 inline-block" aria-hidden="true">
-                      →
-                    </span>
-                  </Link>
-                </div>
-              </div>
+              {/* Event Carousel Component */}
+              <EventCarousel />
             </div>
           </FadeIn>
         </div>
