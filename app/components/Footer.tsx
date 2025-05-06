@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "motion/react"
 import { ScrambleText } from "./ScrambleText"
 import { Newsletter } from "./Newsletter"
 import Link from "next/link"
+import Image from "next/image"
+import { AIMLogo } from "./AIMLogo"
 
 interface FooterLink {
   label: string
@@ -28,7 +30,7 @@ export default function Footer() {
     // Use IntersectionObserver to detect when footer is visible
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0] && entries[0].isIntersecting) {
           setIsVisible(true)
           // Once visible, we can disconnect the observer
           if (footerRef.current) {
@@ -82,40 +84,82 @@ export default function Footer() {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 mb-8">
-                
                 <h2 id="footer-heading" className="text-white font-menda-black text-3xl sm:text-4xl lg:text-5xl">
-                  <Link
-                    href="/"
-                    aria-label="434 Media - Home"
-                  >
-                    <ScrambleText 
-                      text="434 MEDIA" 
-                      className="inline-block cursor-pointer" 
+                  <Link href="/" aria-label="434 Media - Home">
+                    <ScrambleText
+                      text="434 MEDIA"
+                      className="inline-block cursor-pointer"
                       scrambleOnMount={false}
                       scrambleOnHover={true}
                     />
                   </Link>
                 </h2>
 
-                {/* LinkedIn link - smaller and aligned to the right */}
-                <a
-                  href="https://www.linkedin.com/company/434media"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1"
-                  aria-label="Follow 434 Media on LinkedIn"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
+                <div className="flex items-center gap-4">
+                  {/* SDOH Link with gradient effect */}
+                  <Link
+                    href="/sdoh"
+                    className="group relative overflow-hidden rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
+                    aria-label="Learn about SDOH"
                   >
-                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-                  </svg>
-                </a>
+                    <span className="relative z-10 text-sm sm:text-base font-medium bg-gradient-to-r from-emerald-400 via-sky-400 to-purple-500 bg-clip-text text-transparent transition-all duration-300 group-hover:bg-gradient-to-l">
+                      ¿Qué es SDOH?
+                    </span>
+                    <span className="absolute inset-0 z-0 bg-gradient-to-r from-emerald-400/10 via-sky-400/10 to-purple-500/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded"></span>
+                  </Link>
+
+                  {/* AIM Logo Link */}
+                  <Link
+                    href="https://www.aimsatx.com/"
+                    className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1 flex items-center justify-center"
+                    aria-label="Visit AIM page"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <div className="w-7 h-7 relative flex items-center justify-center">
+                      <AIMLogo
+                        variant="white"
+                        className="w-full h-full transition-transform duration-300 hover:scale-110"
+                      />
+                    </div>
+                  </Link>
+
+                  {/* Shopify Store Link */}
+                  <Link
+                    href="/shop"
+                    className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1 flex items-center justify-center"
+                    aria-label="Visit our Shopify store"
+                  >
+                    <div className="w-6 h-6 relative">
+                      <Image
+                        src="https://ampd-asset.s3.us-east-2.amazonaws.com/shopify_glyph_white.svg"
+                        alt="Shopify"
+                        fill
+                        className="object-contain transition-transform duration-300 hover:scale-110"
+                      />
+                    </div>
+                  </Link>
+
+                  {/* LinkedIn link */}
+                  <a
+                    href="https://www.linkedin.com/company/434media"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1"
+                    aria-label="Follow 434 Media on LinkedIn"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                    </svg>
+                  </a>
+                </div>
               </div>
 
               <div className="border-t border-white/30 pt-8 sm:pt-16">
@@ -173,4 +217,3 @@ export default function Footer() {
     </footer>
   )
 }
-

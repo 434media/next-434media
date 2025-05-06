@@ -244,7 +244,7 @@ export function SDOHNewsletter({ locale, dict }: SDOHNewsletterProps) {
               <div
                 ref={turnstileRef}
                 data-theme="dark"
-                data-size="compact"
+                data-size="flexible"
                 className="w-full mt-4 flex justify-center"
                 aria-label="Security verification"
               />
