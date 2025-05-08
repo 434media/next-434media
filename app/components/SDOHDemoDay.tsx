@@ -2,21 +2,7 @@
 import { useState, useRef } from "react"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
-
-// Improved TypeScript typing for the dictionary structure
-interface DemoDayDictionary {
-  title: string
-  description: string
-  learnMore: string
-}
-
-interface SDOHDictionary {
-  demoDay: DemoDayDictionary
-}
-
-interface Dictionary {
-  sdoh: SDOHDictionary
-}
+import type { Dictionary } from "../types/dictionary"
 
 interface SDOHDemoDayProps {
   locale: Locale
@@ -24,17 +10,15 @@ interface SDOHDemoDayProps {
 }
 
 export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
-  // Removed the unused locale parameter to fix the ESLint error
-
   // Minimal state - just track if playing
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  // Use the dictionary if provided, otherwise use default English text
-  // Improved type safety with optional chaining and fallbacks
-  const demoDayDict = dict?.sdoh?.demoDay
+  // Use type guards to safely access dictionary values
+  const sdohDict = dict?.sdoh
+  const demoDayDict = sdohDict?.demoDay
 
-  // Default text
+  // Default text with proper type guards
   const title = demoDayDict?.title || "Demo Day Highlights"
   const description =
     demoDayDict?.description ||
