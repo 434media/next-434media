@@ -135,7 +135,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <GoogleTagManager gtmId="G-3M5L9P097N" />
+      <GoogleTagManager gtmId="G-FTWW298D70" />
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
