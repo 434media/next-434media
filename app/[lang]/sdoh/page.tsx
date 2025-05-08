@@ -3,14 +3,20 @@ import { LanguageProvider } from "@/app/context/language-context"
 import SDOHClientPage from "./SDOHClientPage"
 import { getDictionary } from "@/app/lib/dictionary"
 
+// Define the correct type for Next.js App Router page props
+interface PageProps {
+  params: {
+    lang: string
+  }
+  searchParams?: Record<string, string | string[] | undefined>
+}
+
 export async function generateStaticParams() {
   return i18n.locales.map((locale) => ({ lang: locale }))
 }
 
-// In Next.js v15, params are properly typed and can be accessed synchronously
-export default async function Page({ params }: { params: { lang: string } }) {
+export default async function Page({ params }: PageProps) {
   // Validate and type-cast locale
-
   const validLocale = i18n.locales.includes(params.lang as Locale) ? (params.lang as Locale) : i18n.defaultLocale
 
   // Get dictionary for server-side rendering

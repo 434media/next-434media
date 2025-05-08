@@ -1031,7 +1031,7 @@ const SpeakerCard = ({
           className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110"
         />
         {logoUrl && (
-          <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-md">
+          <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-2 shadow-md">
             <Image
               src={logoUrl || "/placeholder.svg"}
               alt={`${company} Logo`}
