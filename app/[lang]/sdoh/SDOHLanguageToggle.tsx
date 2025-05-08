@@ -4,9 +4,7 @@ import { useEffect, useState } from "react"
 import type { Locale } from "../../../i18n-config"
 import { useLanguage } from "@/app/context/language-context"
 
-type SDOHLanguageToggleProps = Record<string, never>
-
-export default function SDOHLanguageToggle(_props: SDOHLanguageToggleProps) {
+export default function SDOHLanguageToggle() {
   const { locale, setLocale, isLoading } = useLanguage()
   const [hovered, setHovered] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)

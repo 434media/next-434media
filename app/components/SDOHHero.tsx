@@ -47,7 +47,6 @@ const SessionCard = ({
   sessionIdText?: string
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  // Fix 1: Remove unused state variables but keep setters for side effects
   const [, setIsHovered] = useState(false)
   const [, setIsFocused] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -178,8 +177,6 @@ const VideoModal = ({
   const [showControls, setShowControls] = useState(true)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [duration, setDuration] = useState(0)
-  // Fix 2: Remove unused state variables
-  // const [_isVideoError, _setIsVideoError] = useState(false)
 
   const togglePlayback = useCallback(() => {
     setIsPlaying(!isPlaying)
@@ -425,24 +422,6 @@ const VideoModal = ({
                           showControls ? "opacity-100" : "opacity-0"
                         }`}
                       >
-                        {/* Progress bar */}
-                        <div
-                          className="w-full h-2 bg-neutral-700 rounded-full mb-3 cursor-pointer"
-                          onClick={(e) => {
-                            if (videoRef.current) {
-                              // Fix 3: Remove unused variable
-                              // const _pos = (e.clientX - rect.left) / rect.width
-                              // This would ideally seek the video, but ReactPlayer doesn't expose this directly
-                              // We'd need to use a ref to the player instance
-                            }
-                          }}
-                        >
-                          <div
-                            className="h-full bg-cyan-500 rounded-full"
-                            style={{ width: `${progress * 100}%` }}
-                          ></div>
-                        </div>
-
                         <div className="flex items-center justify-between">
                           {/* Play/Pause button */}
                           <button
@@ -665,8 +644,6 @@ const EventCarousel = () => {
   const [touchEnd, setTouchEnd] = useState(0)
   const carouselRef = useRef<HTMLDivElement>(null)
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
-  // Fix 4: Remove unused variable
-  // const _isMobile = useMobile()
 
   // Event images and content
   const slides = [
@@ -1129,12 +1106,6 @@ export interface SDOHHeroProps {
 export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
-  // Fix the unused 'detailsRef' variable (around line 1133):
-  const _detailsRef = useRef<HTMLElement>(null)
-  // Fix 5: Remove unused variables
-  // const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
-  // const _hasScrolled = useState(false)[0]
-  // const [_isVideoError, _setIsVideoError] = useState(false)
   const [, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const isHeroInView = useInView(heroRef, { once: true })
@@ -1294,7 +1265,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             videoElement.play().catch((e) => console.log("Autoplay prevented:", e))
           }
         }
-        // Fix 7: Use proper type for error event
         const handleError = (e: Event) => {
           console.error("Video error:", e)
           // Could add fallback behavior here
