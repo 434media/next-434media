@@ -91,7 +91,6 @@ export default function SDOHLanguageToggle({
           // Use Next.js router for client-side navigation
           router.push(`/${newLocale}${pathWithoutLocale}`)
         }
-      } catch (error) {
         // Silently handle errors to prevent unhandled errors
       } finally {
         setIsLoading(false)
