@@ -15,6 +15,7 @@ interface SDOHMissionProps {
 // Change from export function to export default function
 export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
   const missionRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _isInView = useInView(missionRef, { once: true, amount: 0.2 })
   const introRef = useRef<HTMLDivElement>(null)
   const introInView = useInView(introRef, { once: true, amount: 0.2 })

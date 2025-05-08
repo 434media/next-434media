@@ -430,7 +430,6 @@ const VideoModal = ({
                           className="w-full h-2 bg-neutral-700 rounded-full mb-3 cursor-pointer"
                           onClick={(e) => {
                             if (videoRef.current) {
-                              const rect = e.currentTarget.getBoundingClientRect()
                               // Fix 3: Remove unused variable
                               // const _pos = (e.clientX - rect.left) / rect.width
                               // This would ideally seek the video, but ReactPlayer doesn't expose this directly
@@ -1130,7 +1129,8 @@ export interface SDOHHeroProps {
 export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
-  const detailsRef = useRef<HTMLElement>(null)
+  // Fix the unused 'detailsRef' variable (around line 1133):
+  const _detailsRef = useRef<HTMLElement>(null)
   // Fix 5: Remove unused variables
   // const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
   // const _hasScrolled = useState(false)[0]

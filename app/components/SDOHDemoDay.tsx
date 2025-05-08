@@ -3,19 +3,36 @@ import { useState, useRef } from "react"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
 
-interface SDOHDemoDayProps {
-  locale: Locale
-  dict: Record<string, unknown>
+// Improved TypeScript typing for the dictionary structure
+interface DemoDayDictionary {
+  title: string
+  description: string
+  learnMore: string
 }
 
-export default function SDOHDemoDay({ locale: _locale, dict }: SDOHDemoDayProps) {
+interface SDOHDictionary {
+  demoDay: DemoDayDictionary
+}
+
+interface Dictionary {
+  sdoh: SDOHDictionary
+}
+
+interface SDOHDemoDayProps {
+  locale: Locale
+  dict: Partial<Dictionary>
+}
+
+export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
+  // Removed the unused locale parameter to fix the ESLint error
+
   // Minimal state - just track if playing
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
   // Use the dictionary if provided, otherwise use default English text
-  const sdohDict = dict?.sdoh as Record<string, unknown> | undefined
-  const demoDayDict = sdohDict?.demoDay as Record<string, string> | undefined
+  // Improved type safety with optional chaining and fallbacks
+  const demoDayDict = dict?.sdoh?.demoDay
 
   // Default text
   const title = demoDayDict?.title || "Demo Day Highlights"
@@ -97,6 +114,8 @@ export default function SDOHDemoDay({ locale: _locale, dict }: SDOHDemoDayProps)
           <a
             href="https://velocitytx.org/startup-programs/support/accelerator/"
             className="inline-flex items-center text-cyan-700 hover:text-cyan-800 font-medium"
+            target="_blank"
+            rel="noopener noreferrer"
             aria-label="Learn more about the Community Health Accelerator"
           >
             {learnMore}
