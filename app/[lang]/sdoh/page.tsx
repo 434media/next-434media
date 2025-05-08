@@ -3,17 +3,18 @@ import { LanguageProvider } from "@/app/context/language-context"
 import SDOHClientPage from "./SDOHClientPage"
 import { getDictionary } from "@/app/lib/dictionary"
 
-// Use Next.js's built-in types instead of defining our own
 export async function generateStaticParams() {
   return i18n.locales.map((locale) => ({ lang: locale }))
 }
 
-// Use the correct type for Next.js App Router page props
-export default async function Page({
-  params,
-}: {
-  params: { lang: string }
-}) {
+// Use a more generic approach to avoid type conflicts
+type Props = {
+  params: {
+    lang: string
+  }
+}
+
+const Page = async ({ params }: Props) => {
   // Validate and type-cast locale
   const validLocale = i18n.locales.includes(params.lang as Locale) ? (params.lang as Locale) : i18n.defaultLocale
 
@@ -26,3 +27,5 @@ export default async function Page({
     </LanguageProvider>
   )
 }
+
+export default Page
