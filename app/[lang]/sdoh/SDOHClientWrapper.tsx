@@ -43,13 +43,6 @@ export default function SDOHClientWrapper({ initialLocale = i18n.defaultLocale }
     setIsMounted(true)
   }, [])
 
-  // Handle language change
-  const handleLanguageChange = (newLocale: Locale) => {
-    if (typeof window !== "undefined") {
-      window.location.href = `/${newLocale}/sdoh`
-    }
-  }
-
   // Don't render anything during SSR to prevent hydration errors
   if (!isMounted) {
     return <LoadingFallback />
