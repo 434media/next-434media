@@ -59,7 +59,7 @@ export default function SDOHClientWrapper({ initialLocale = i18n.defaultLocale }
     <>
       {/* Language toggle positioned to avoid navbar */}
       <div className="fixed top-[70px] right-5 z-[9999]">
-        <SDOHLanguageToggle currentLocale={safeLocale as Locale} onLanguageChange={handleLanguageChange} />
+        <SDOHLanguageToggle showOnScroll={true} />
       </div>
 
       {/* Client page that doesn't rely on server props */}
