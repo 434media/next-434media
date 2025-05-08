@@ -9,12 +9,13 @@ export async function generateStaticParams() {
 
 // Use a more generic approach to avoid type conflicts
 type Props = {
-  params: {
+  params: Promise<{
     lang: string
-  }
+  }>
 }
 
-const Page = async ({ params }: Props) => {
+const Page = async (props: Props) => {
+  const params = await props.params;
   // Validate and type-cast locale
   const validLocale = i18n.locales.includes(params.lang as Locale) ? (params.lang as Locale) : i18n.defaultLocale
 
