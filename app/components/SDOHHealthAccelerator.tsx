@@ -3,9 +3,18 @@ import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
 import { useEffect, useState } from "react"
 
+// Define the structure of the accelerator dictionary
+interface AcceleratorDictionary {
+  title: string
+  subtitle: string
+  description1: string
+  description2: string
+}
+
+// Define the structure of the dictionary props
 interface SDOHHealthAcceleratorProps {
   locale: Locale
-  dict: any
+  dict: Record<string, unknown>
 }
 
 export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAcceleratorProps) {
@@ -19,9 +28,8 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
     console.log(`SDOHHealthAccelerator: Dictionary available:`, !!dict)
   }, [locale, dict])
 
-  // Use the dictionary if provided, otherwise use default English text
-  const d = dict?.sdoh?.accelerator || {
-    // Default English text
+  // Default English text
+  const defaultDictionary: AcceleratorDictionary = {
     title: "Community Health Accelerator",
     subtitle: "Growth-Stage Program",
     description1:
@@ -29,6 +37,10 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
     description2:
       "This program exists to answer big questions in a practical way—and to make sure the people closest to the issues have the tools, resources, and support to solve them.",
   }
+
+  // Use the dictionary if provided, otherwise use default English text
+  const sdohDict = dict?.sdoh as Record<string, unknown> | undefined
+  const d = (sdohDict?.accelerator as AcceleratorDictionary) || defaultDictionary
 
   return (
     <FadeIn key={key}>

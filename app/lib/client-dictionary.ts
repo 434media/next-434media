@@ -1,4 +1,5 @@
 import type { Locale } from "../../i18n-config"
+import type { Dictionary } from "../types/dictionary"
 
 // Client-safe version of the dictionary utility
 const dictionaries = {
@@ -7,7 +8,7 @@ const dictionaries = {
 }
 
 // Cache dictionaries to avoid repeated imports
-const cachedDictionaries: Record<string, any> = {}
+const cachedDictionaries: Record<string, Dictionary> = {}
 
 export async function getClientDictionary(locale: Locale) {
   // Return from cache if available

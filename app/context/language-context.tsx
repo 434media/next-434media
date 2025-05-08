@@ -3,8 +3,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { i18n, type Locale } from "../../i18n-config"
 import { getDictionaryClient } from "@/app/lib/client-dictionary"
-
-type Dictionary = Record<string, any>
+import type { Dictionary } from "@/app/types/dictionary"
 
 type LanguageContextType = {
   locale: Locale
@@ -18,7 +17,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({
   children,
   initialLocale = i18n.defaultLocale,
-  initialDictionary = {},
+  initialDictionary = {} as Dictionary,
 }: {
   children: ReactNode
   initialLocale?: Locale
@@ -35,7 +34,7 @@ export function LanguageProvider({
       return dict
     } catch (error) {
       console.error("Failed to load dictionary:", error)
-      return {}
+      return {} as Dictionary
     }
   }
 
@@ -110,7 +109,7 @@ export function LanguageProvider({
 
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
-  }, [])
+  }, [dictionary, locale])
 
   return (
     <LanguageContext.Provider value={{ locale, dictionary, setLocale, isLoading }}>{children}</LanguageContext.Provider>

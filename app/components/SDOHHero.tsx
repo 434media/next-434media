@@ -47,8 +47,8 @@ const SessionCard = ({
   sessionIdText?: string
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [isFocused, setIsFocused] = useState(false)
+  const [_isHovered, setIsHovered] = useState(false)
+  const [_isFocused, setIsFocused] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const openModal = () => setIsModalOpen(true)
@@ -177,7 +177,12 @@ const VideoModal = ({
   const [showControls, setShowControls] = useState(true)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [duration, setDuration] = useState(0)
-  const [isVideoError, setIsVideoError] = useState(false)
+  const [_isVideoError, _setIsVideoError] = useState(false)
+
+  const togglePlayback = useCallback(() => {
+    setIsPlaying(!isPlaying)
+    setShowControls(true)
+  }, [isPlaying])
 
   // Handle keyboard events
   useEffect(() => {
@@ -205,7 +210,7 @@ const VideoModal = ({
       document.removeEventListener("keydown", handleEscape)
       document.removeEventListener("keydown", handleSpaceBar)
     }
-  }, [isOpen, closeModal, isPlaying])
+  }, [isOpen, closeModal, isPlaying, togglePlayback])
 
   // Reset state when modal closes
   useEffect(() => {
@@ -255,11 +260,6 @@ const VideoModal = ({
 
   const toggleMute = () => {
     setIsMuted(!isMuted)
-  }
-
-  const togglePlayback = () => {
-    setIsPlaying(!isPlaying)
-    setShowControls(true)
   }
 
   const handleVideoContainerMouseMove = () => {
@@ -353,7 +353,7 @@ const VideoModal = ({
                         </div>
                       )}
 
-                      {/* Video player */}
+                      {/* Video player with optimizations */}
                       <ReactPlayer
                         url={videoUrl}
                         playing={isPlaying}
@@ -429,7 +429,7 @@ const VideoModal = ({
                           onClick={(e) => {
                             if (videoRef.current) {
                               const rect = e.currentTarget.getBoundingClientRect()
-                              const pos = (e.clientX - rect.left) / rect.width
+                              const _pos = (e.clientX - rect.left) / rect.width
                               // This would ideally seek the video, but ReactPlayer doesn't expose this directly
                               // We'd need to use a ref to the player instance
                             }
@@ -1051,7 +1051,7 @@ const SpeakerCard = ({
           className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110"
         />
         {logoUrl && (
-          <div className="absolute bottom-3 right-3 bg-neutral-950/30 backdrop-blur-sm rounded-full p-2 shadow-md">
+          <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-md">
             <Image
               src={logoUrl || "/placeholder.svg"}
               alt={`${company} Logo`}
@@ -1128,11 +1128,11 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const heroRef = useRef<HTMLElement>(null)
   const detailsRef = useRef<HTMLElement>(null)
   const isHeroInView = useInView(heroRef, { once: true })
-  const isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
-  const isMobile = useMobile()
-  const [hasScrolled, setHasScrolled] = useState(false)
+  const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
+  const _isMobile = useMobile()
+  const [_hasScrolled, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
-  const [isVideoError, setIsVideoError] = useState(false)
+  const [_isVideoError, _setIsVideoError] = useState(false)
 
   // Check for reduced motion preference
   useEffect(() => {
@@ -1168,7 +1168,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
     }
   }, [controls, isHeroInView])
 
-  const containerVariants = {
+  const _containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -1179,7 +1179,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
     },
   }
 
-  const itemVariants = {
+  const _itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
@@ -1197,7 +1197,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   }
 
   // Use the dictionary if provided, otherwise use default English text
-  const d = dict?.sdoh || {
+  const _d = dict?.sdoh || {
     // Default English text
     heroAlt: "SDOH Conference - Awareness Drives Innovation",
     mission: {
@@ -1286,7 +1286,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             videoElement.play().catch((e) => console.log("Autoplay prevented:", e))
           }
         }
-        const handleError = (e: any) => {
+        const handleError = (e: Event) => {
           console.error("Video error:", e)
           // Could add fallback behavior here
         }
@@ -1419,6 +1419,8 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
           </div>
         </div>
       </section>
+
+      {/* Remove the line below if it exists */}
 
       {/* Mission Statement Section */}
       <SDOHMission locale={locale} dict={dict} />

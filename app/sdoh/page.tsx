@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { i18n } from "../../i18n-config"
+import { i18n, type Locale } from "../../i18n-config"
 import { cookies, headers } from "next/headers"
 
 // Detect the user's preferred language
@@ -7,7 +7,7 @@ async function getPreferredLocale(): Promise<string> {
   // Check for cookies first
   const cookieStore = await cookies()
   const localeCookie = cookieStore.get("NEXT_LOCALE")
-  if (localeCookie?.value && i18n.locales.includes(localeCookie.value as any)) {
+  if (localeCookie?.value && i18n.locales.includes(localeCookie.value as Locale)) {
     return localeCookie.value
   }
 

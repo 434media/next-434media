@@ -4,10 +4,11 @@ import type React from "react"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
 import { useEffect, useState, useRef, useCallback } from "react"
+import type { Dictionary } from "@/app/types/dictionary"
 
 interface SDOHStartupBootcampProps {
   locale: Locale
-  dict: any
+  dict: Dictionary
 }
 
 const BootcampCarousel = () => {

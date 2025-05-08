@@ -92,7 +92,7 @@ export default function ShopComingSoon() {
               className="max-w-2xl mx-auto"
             >
               <p className="text-xl md:text-2xl lg:text-3xl text-gray-300 leading-relaxed">
-                We're crafting an exclusive collection of merchandise that embodies our creative spirit.
+                We&apos;re crafting an exclusive collection of merchandise that embodies our creative spirit.
               </p>
             </motion.div>
 

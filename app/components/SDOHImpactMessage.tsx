@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
+import type { Dictionary } from "@/app/types/dictionary"
 
 // Client-side only floating particles component
 function FloatingParticles() {
@@ -76,10 +77,14 @@ function FloatingParticles() {
 
 interface SDOHImpactMessageProps {
   locale: Locale
-  dict: any
+  dict: Dictionary
 }
 
-export function SDOHImpactMessage({ locale, dict }: SDOHImpactMessageProps) {
+export default function SDOHImpactMessage({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  locale,
+  dict,
+}: SDOHImpactMessageProps) {
   // Use the dictionary if provided, otherwise use default English text
   const d = dict?.sdoh?.impact || {
     // Default English text
@@ -119,7 +124,7 @@ export function SDOHImpactMessage({ locale, dict }: SDOHImpactMessageProps) {
                   <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight sm:leading-tight md:leading-tight lg:leading-tight">
                     <span className="text-neutral-800">{d.message}</span>
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700 italic">
-                      "{d.question}"
+                      &quot;{d.question}&quot;
                     </span>
                     <span className="text-neutral-800">{d.conclusion}</span>
                   </p>
@@ -127,10 +132,10 @@ export function SDOHImpactMessage({ locale, dict }: SDOHImpactMessageProps) {
 
                 {/* Decorative quotes */}
                 <div className="absolute -top-20 -left-16 text-9xl text-cyan-200/30 font-serif" aria-hidden="true">
-                  "
+                  &quot;
                 </div>
                 <div className="absolute -bottom-20 -right-16 text-9xl text-cyan-200/30 font-serif" aria-hidden="true">
-                  "
+                  &quot;
                 </div>
               </blockquote>
             </div>
@@ -145,20 +150,20 @@ export function SDOHImpactMessage({ locale, dict }: SDOHImpactMessageProps) {
 
       {/* Add animation keyframes */}
       <style jsx>{`
-        @keyframes float-slow {
-          0% { transform: translateY(0) translateX(0); opacity: 0; }
-          50% { opacity: 1; }
-          100% { transform: translateY(-100px) translateX(100px); opacity: 0; }
-        }
-        .animate-float-slow {
-          animation: float-slow linear infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .animate-float-slow, .animate-pulse {
-            animation: none !important;
-          }
-        }
-      `}</style>
+       @keyframes float-slow {
+         0% { transform: translateY(0) translateX(0); opacity: 0; }
+         50% { opacity: 1; }
+         100% { transform: translateY(-100px) translateX(100px); opacity: 0; }
+       }
+       .animate-float-slow {
+         animation: float-slow linear infinite;
+       }
+       @media (prefers-reduced-motion: reduce) {
+         .animate-float-slow, .animate-pulse {
+           animation: none !important;
+         }
+       }
+     `}</style>
     </section>
   )
 }

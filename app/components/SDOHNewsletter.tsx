@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useMobile } from "../hooks/use-mobile"
 import type { Locale } from "../../i18n-config"
+import type { Dictionary } from "@/app/types/dictionary"
 
 // Extend the Window interface to include the turnstile property
 declare global {
@@ -24,14 +25,40 @@ declare global {
   }
 }
 
+// Define a specific type for the newsletter section of the dictionary
+interface NewsletterDictionary {
+  placeholder: string
+  buttonText: string
+  successMessage: string
+  errorMessage: string
+  securityError: string
+  completeVerification: string
+  [key: string]: string
+}
+
+// Default newsletter text
+const defaultNewsletterText: NewsletterDictionary = {
+  placeholder: "Enter your email",
+  buttonText: "Subscribe",
+  successMessage: "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.",
+  errorMessage: "Please enter a valid email address",
+  securityError: "Security verification not loaded. Please refresh and try again.",
+  completeVerification: "Please complete the security verification",
+}
+
 const isDevelopment = process.env.NODE_ENV === "development"
 
 interface SDOHNewsletterProps {
   locale: Locale
-  dict: any
+  dict: Dictionary
 }
 
-export function SDOHNewsletter({ locale, dict }: SDOHNewsletterProps) {
+// Change from export function to export default function
+export default function SDOHNewsletter({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  locale,
+  dict,
+}: SDOHNewsletterProps) {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -43,14 +70,10 @@ export function SDOHNewsletter({ locale, dict }: SDOHNewsletterProps) {
   const isMobile = useMobile()
 
   // Use the dictionary if provided, otherwise use default English text
-  const d = dict?.newsletter || {
-    placeholder: "Enter your email",
-    buttonText: "Subscribe",
-    successMessage: "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.",
-    errorMessage: "Please enter a valid email address",
-    securityError: "Security verification not loaded. Please refresh and try again.",
-    completeVerification: "Please complete the security verification",
-  }
+  const d =
+    dict?.newsletter && typeof dict.newsletter === "object"
+      ? (dict.newsletter as unknown as NewsletterDictionary)
+      : defaultNewsletterText
 
   // Load Turnstile script only when needed
   useEffect(() => {
@@ -70,7 +93,6 @@ export function SDOHNewsletter({ locale, dict }: SDOHNewsletterProps) {
         if (window.turnstile && turnstileRef.current) {
           const widgetId = window.turnstile.render(turnstileRef.current, {
             sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             callback: () => {
               // Token received, no action needed here
             },
@@ -244,7 +266,7 @@ export function SDOHNewsletter({ locale, dict }: SDOHNewsletterProps) {
               <div
                 ref={turnstileRef}
                 data-theme="dark"
-                data-size="flexible"
+                data-size="compact"
                 className="w-full mt-4 flex justify-center"
                 aria-label="Security verification"
               />

@@ -5,10 +5,11 @@ import { motion, useInView } from "motion/react"
 import Image from "next/image"
 import { FadeIn } from "./FadeIn"
 import type { Locale } from "../../i18n-config"
+import type { Dictionary } from "@/app/types/dictionary"
 
 interface SDOHMissionProps {
   locale: Locale
-  dict: any
+  dict: Dictionary
 }
 
 // Change from export function to export default function
@@ -156,7 +157,7 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
                   <div className="relative h-16 w-48 bg-white rounded-lg p-3 shadow-lg transform hover:scale-105 transition-transform">
                     <Image
                       src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
-                      alt={partnershipDict.velocityAlt}
+                      alt={partnershipDict.velocityAlt ?? "VelocityTX Logo"}
                       fill
                       className="object-contain p-2"
                     />
@@ -169,7 +170,7 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
                   <div className="relative h-16 w-48 bg-white rounded-lg p-3 shadow-lg transform hover:scale-105 transition-transform">
                     <Image
                       src="https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png"
-                      alt={partnershipDict.methodistAlt}
+                      alt={partnershipDict.methodistAlt ?? "Methodist Healthcare Ministries Logo"}
                       fill
                       className="object-contain p-2"
                     />
@@ -271,7 +272,7 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
                 <div className="aspect-square relative">
                   <Image
                     src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
-                    alt={dict?.sdoh?.seminar?.imageAlt || "SDOH Illustration"}
+                    alt={(dict?.sdoh?.seminar?.imageAlt as string) ?? "SDOH Illustration"}
                     fill
                     className="object-cover"
                   />

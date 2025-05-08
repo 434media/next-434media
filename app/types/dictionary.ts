@@ -1,4 +1,8 @@
 // Comprehensive type definitions for the dictionary
+
+// Define the recursive type for dictionary values
+type DictionaryValue = string | number | boolean | Record<string, unknown> | DictionaryValue[] | undefined
+
 export interface Dictionary {
   common?: {
     learnMore?: string
@@ -8,7 +12,7 @@ export interface Dictionary {
     error?: string
     success?: string
     language?: string
-    [key: string]: any
+    [key: string]: DictionaryValue
   }
   navigation?: {
     home?: string
@@ -17,14 +21,14 @@ export interface Dictionary {
     portfolio?: string
     contact?: string
     blog?: string
-    [key: string]: any
+    [key: string]: DictionaryValue
   }
   home?: {
     hero?: {
       title?: string
       subtitle?: string
       cta?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     services?: {
       title?: string
@@ -33,15 +37,15 @@ export interface Dictionary {
         [key: string]: {
           title?: string
           description?: string
-          [key: string]: any
+          [key: string]: DictionaryValue
         }
       }
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     about?: {
       title?: string
       content?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     contact?: {
       title?: string
@@ -51,11 +55,11 @@ export interface Dictionary {
         email?: string
         message?: string
         submit?: string
-        [key: string]: any
+        [key: string]: DictionaryValue
       }
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
-    [key: string]: any
+    [key: string]: DictionaryValue
   }
   sdoh?: {
     title?: string
@@ -68,13 +72,13 @@ export interface Dictionary {
       title?: string
       subtitle?: string
       cta?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     mission?: {
       title?: string
       content?: string
       partnershipTitle?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     features?: {
       title?: string
@@ -82,10 +86,10 @@ export interface Dictionary {
         [key: string]: {
           title?: string
           description?: string
-          [key: string]: any
+          [key: string]: DictionaryValue
         }
       }
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     newsletter?: {
       title?: string
@@ -94,7 +98,7 @@ export interface Dictionary {
       submit?: string
       success?: string
       error?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     bootcamp?: {
       title?: string
@@ -106,14 +110,14 @@ export interface Dictionary {
       where?: string
       location?: string
       cta?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     accelerator?: {
       title?: string
       subtitle?: string
       description1?: string
       description2?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     demoDay?: {
       title?: string
@@ -122,13 +126,13 @@ export interface Dictionary {
       errorTitle?: string
       errorMessage?: string
       learnMore?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     impact?: {
       question?: string
       message?: string
       conclusion?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     partnership?: {
       label?: string
@@ -136,7 +140,7 @@ export interface Dictionary {
       description?: string
       velocityAlt?: string
       methodistAlt?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     seminar?: {
       title?: string
@@ -146,19 +150,19 @@ export interface Dictionary {
       description2End?: string
       highlight?: string
       imageAlt?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
     languageToggle?: {
       en?: string
       es?: string
-      [key: string]: any
+      [key: string]: DictionaryValue
     }
-    [key: string]: any
+    [key: string]: DictionaryValue
   }
   languageToggle?: {
     en?: string
     es?: string
-    [key: string]: any
+    [key: string]: DictionaryValue
   }
-  [key: string]: any
+  [key: string]: DictionaryValue
 }
