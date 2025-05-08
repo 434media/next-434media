@@ -14,14 +14,18 @@ import { PartnerLogos } from "../..//components/PartnerLogos"
 import Script from "next/script"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
 import { useLanguage } from "@/app/context/language-context"
+import type { Dictionary } from "@/app/types/dictionary"
 
 export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale?: Locale }) {
-  const { dictionary, isLoading } = useLanguage()
+  const { dictionary, isLoading, currentLocale } = useLanguage()
 
   // Scroll to top on initial load
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
+
+  // Create a safe dictionary that's never null
+  const safeDictionary: Dictionary = dictionary || ({} as Dictionary)
 
   // Show loading state
   if (isLoading && !dictionary) {
@@ -35,6 +39,9 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
     )
   }
 
+  // Use the locale from context instead of prop
+  const activeLocale = currentLocale || locale
+
   return (
     <main className="flex flex-col min-h-screen">
       <a
@@ -44,11 +51,11 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
         Skip to main content
       </a>
 
-      {/* Language Toggle - Updated to show on scroll and pass the current locale */}
-      <SDOHLanguageToggle currentLocale={locale} showOnScroll={true} />
+      {/* Language Toggle - Updated to show on scroll */}
+      <SDOHLanguageToggle showOnScroll={true} />
 
       {/* Hero Section */}
-      <SDOHHero locale={locale} dict={dictionary} />
+      <SDOHHero locale={activeLocale} dict={safeDictionary} />
 
       {/* Main content */}
       <div id="main-content" className="outline-none" tabIndex={-1}>
@@ -65,16 +72,16 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
               {/* Content */}
               <div className="relative z-10">
                 {/* Startup Bootcamp Section */}
-                <SDOHStartupBootcamp locale={locale} dict={dictionary} />
+                <SDOHStartupBootcamp locale={activeLocale} dict={safeDictionary} />
 
                 {/* Community Health Accelerator Section */}
-                <SDOHHealthAccelerator locale={locale} dict={dictionary} />
+                <SDOHHealthAccelerator locale={activeLocale} dict={safeDictionary} />
 
                 {/* Demo Day Video Section */}
-                <SDOHDemoDay locale={locale} dict={dictionary} />
+                <SDOHDemoDay locale={activeLocale} dict={safeDictionary} />
 
                 {/* Wow Impact Message Section */}
-                <SDOHImpactMessage locale={locale} dict={dictionary} />
+                <SDOHImpactMessage locale={activeLocale} dict={safeDictionary} />
 
                 {/* Partner Logos Section */}
                 <PartnerLogos />
@@ -89,14 +96,14 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
                     <div className="relative z-10">
                       <div className="max-w-3xl mx-auto text-center mb-8 sm:mb-10">
                         <h2 className="font-bold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-4 sm:mb-6 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300">
-                          {dictionary?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
+                          {safeDictionary?.sdoh?.newsletter?.title || 'Signup for "Que es SDOH" newsletter'}
                         </h2>
                         <p className="text-base sm:text-lg md:text-xl text-white/90 leading-relaxed">
-                          {dictionary?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
+                          {safeDictionary?.sdoh?.newsletter?.subtitle || "Join the conversation now."}
                         </p>
                       </div>
                       <div className="max-w-xl mx-auto">
-                        <SDOHNewsletter locale={locale} dict={dictionary} />
+                        <SDOHNewsletter locale={activeLocale} dict={safeDictionary} />
                       </div>
                     </div>
                   </div>

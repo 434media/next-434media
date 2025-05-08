@@ -1,125 +1,106 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { i18n, type Locale } from "../../i18n-config"
-import { getDictionaryClient } from "@/app/lib/client-dictionary"
-import type { Dictionary } from "@/app/types/dictionary"
+import type React from "react"
+import { createContext, useContext, useState, useEffect } from "react"
+import type { Locale } from "../../i18n-config"
+import { i18n } from "../../i18n-config"
+import type { Dictionary } from "../types/dictionary"
 
-type LanguageContextType = {
-  locale: Locale
-  dictionary: Dictionary
-  setLocale: (locale: Locale) => Promise<void>
+interface LanguageContextType {
+  dictionary: Dictionary | null
   isLoading: boolean
+  currentLocale: Locale | null
+  switchLanguage: (newLocale: Locale) => Promise<void>
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
+const LanguageContext = createContext<LanguageContextType>({
+  dictionary: null,
+  isLoading: true,
+  currentLocale: null,
+  switchLanguage: async () => {},
+})
 
 export function LanguageProvider({
   children,
-  initialLocale = i18n.defaultLocale,
-  initialDictionary = {} as Dictionary,
+  dictionary: initialDictionary,
+  locale: initialLocale,
 }: {
-  children: ReactNode
-  initialLocale?: Locale
-  initialDictionary?: Dictionary
+  children: React.ReactNode
+  dictionary: Dictionary
+  locale: Locale
 }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale)
-  const [dictionary, setDictionary] = useState<Dictionary>(initialDictionary)
+  const [dictionary, setDictionary] = useState<Dictionary | null>(initialDictionary)
   const [isLoading, setIsLoading] = useState(false)
+  const [currentLocale, setCurrentLocale] = useState<Locale>(initialLocale)
 
-  // Load dictionary when locale changes
-  const loadDictionary = async (locale: Locale) => {
-    try {
-      const dict = await getDictionaryClient(locale)
-      return dict
-    } catch (error) {
-      console.error("Failed to load dictionary:", error)
-      return {} as Dictionary
+  // Load saved language preference on initial mount
+  useEffect(() => {
+    const savedLocale = localStorage.getItem("preferredLanguage") as Locale | null
+
+    if (savedLocale && i18n.locales.includes(savedLocale) && savedLocale !== currentLocale) {
+      // Don't switch immediately on page load to avoid flashing
+      // Just update the state if different
+      setCurrentLocale(savedLocale)
     }
-  }
+  }, [currentLocale])
 
-  // Set locale and update dictionary
-  const setLocale = async (newLocale: Locale) => {
-    if (newLocale === locale || isLoading) return
-
-    // Save current scroll position
-    const scrollPosition = window.scrollY
+  // Function to switch language without page refresh
+  const switchLanguage = async (newLocale: Locale): Promise<void> => {
+    if (newLocale === currentLocale) return
 
     setIsLoading(true)
 
     try {
-      // Update URL without refreshing the page
-      const currentPath = window.location.pathname
-      const newPath = currentPath.replace(`/${locale}/`, `/${newLocale}/`)
+      // Fetch the dictionary for the new locale
+      const response = await fetch(`/api/dictionary?locale=${newLocale}`)
 
-      // Update browser history
-      window.history.pushState({ scrollPosition, locale: newLocale }, "", newPath)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dictionary: ${response.status}`)
+      }
 
-      // Set cookie for server-side rendering
-      document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000`
+      const newDictionary = await response.json()
 
-      // Store in localStorage for persistence
-      localStorage.setItem("NEXT_LOCALE", newLocale)
-
-      // Load new dictionary
-      const newDictionary = await loadDictionary(newLocale)
-
-      // Update state
-      setLocaleState(newLocale)
+      // Update state with new dictionary and locale
       setDictionary(newDictionary)
+      setCurrentLocale(newLocale)
 
-      // Restore scroll position after a short delay to ensure content has updated
-      setTimeout(() => {
-        window.scrollTo(0, scrollPosition)
-      }, 100)
+      // Save preference to localStorage
+      localStorage.setItem("preferredLanguage", newLocale)
+
+      // Update URL without navigation
+      const currentPath = window.location.pathname
+      const segments = currentPath.split("/")
+
+      // Replace the locale segment (index 1)
+      if (segments.length > 1) {
+        segments[1] = newLocale
+      }
+
+      const newPath = segments.join("/")
+
+      // Update URL without causing navigation
+      window.history.pushState({}, "", newPath)
+
+      // Broadcast language change event for other components
+      window.dispatchEvent(
+        new CustomEvent("languageChanged", {
+          detail: { locale: newLocale },
+        }),
+      )
     } catch (error) {
-      console.error("Error changing language:", error)
+      console.error("Error switching language:", error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Initialize dictionary on mount
-  useEffect(() => {
-    const initDictionary = async () => {
-      if (Object.keys(dictionary).length === 0) {
-        setIsLoading(true)
-        const dict = await loadDictionary(locale)
-        setDictionary(dict)
-        setIsLoading(false)
-      }
-    }
-
-    initDictionary()
-
-    // Handle browser back/forward navigation
-    const handlePopState = (event: PopStateEvent) => {
-      if (event.state?.locale) {
-        setLocaleState(event.state.locale)
-        loadDictionary(event.state.locale).then(setDictionary)
-
-        // Restore scroll position if available
-        if (event.state?.scrollPosition !== undefined) {
-          setTimeout(() => {
-            window.scrollTo(0, event.state.scrollPosition)
-          }, 100)
-        }
-      }
-    }
-
-    window.addEventListener("popstate", handlePopState)
-    return () => window.removeEventListener("popstate", handlePopState)
-  }, [dictionary, locale])
-
   return (
-    <LanguageContext.Provider value={{ locale, dictionary, setLocale, isLoading }}>{children}</LanguageContext.Provider>
+    <LanguageContext.Provider value={{ dictionary, isLoading, currentLocale, switchLanguage }}>
+      {children}
+    </LanguageContext.Provider>
   )
 }
 
 export function useLanguage() {
-  const context = useContext(LanguageContext)
-  if (context === undefined) {
-    throw new Error("useLanguage must be used within a LanguageProvider")
-  }
-  return context
+  return useContext(LanguageContext)
 }
