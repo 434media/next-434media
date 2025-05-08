@@ -5,18 +5,17 @@ import { getDictionary } from "@/app/lib/dictionary"
 
 // Define the correct type for Next.js App Router page props
 interface PageProps {
-  params: Promise<{
+  params: {
     lang: string
-  }>
-  searchParams?: Promise<Record<string, string | string[] | undefined>>
+  }
+  searchParams?: Record<string, string | string[] | undefined>
 }
 
 export async function generateStaticParams() {
   return i18n.locales.map((locale) => ({ lang: locale }))
 }
 
-export default async function Page(props: PageProps) {
-  const params = await props.params;
+export default async function Page({ params }: PageProps) {
   // Validate and type-cast locale
   const validLocale = i18n.locales.includes(params.lang as Locale) ? (params.lang as Locale) : i18n.defaultLocale
 
@@ -24,7 +23,7 @@ export default async function Page(props: PageProps) {
   const dictionary = await getDictionary(validLocale)
 
   return (
-    <LanguageProvider initialLocale={validLocale} initialDictionary={dictionary}>
+    <LanguageProvider dictionary={dictionary} locale={validLocale}>
       <SDOHClientPage locale={validLocale} />
     </LanguageProvider>
   )
