@@ -15,12 +15,12 @@ interface SDOHMissionProps {
 // Change from export function to export default function
 export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
   const missionRef = useRef<HTMLDivElement>(null)
-  const isInView = useInView(missionRef, { once: true, amount: 0.2 })
+  const _isInView = useInView(missionRef, { once: true, amount: 0.2 })
   const introRef = useRef<HTMLDivElement>(null)
   const introInView = useInView(introRef, { once: true, amount: 0.2 })
 
   // Track when dictionary or locale changes
-  const [key, setKey] = useState(0)
+  const [, setKey] = useState(0)
 
   // Force re-render when locale or dictionary changes
   useEffect(() => {

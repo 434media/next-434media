@@ -1,24 +1,30 @@
 "use client"
 
 import type React from "react"
-import { useEffect } from "react"
-import { i18n } from "../../i18n-config"
+import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
+import type { Locale } from "../../i18n-config"
 
-export default function ClientLayout({
-  children,
-  params,
-}: {
+interface Props {
   children: React.ReactNode
-  params: { lang: string }
-}) {
-  // Ensure lang is a valid locale
-  const lang = i18n.locales.includes(params.lang as any) ? params.lang : i18n.defaultLocale
+  dict: Record<string, string | Record<string, string>>
+}
 
-  // Set language in document
+export default function ClientLayout({ children, dict }: Props) {
+  const pathname = usePathname()
+  const [language, setLanguage] = useState<Locale | "">("")
+
   useEffect(() => {
-    // Don't modify the DOM directly in useEffect to avoid hydration mismatches
-    document.cookie = `NEXT_LOCALE=${lang}; path=/; max-age=31536000`
-  }, [lang])
+    const pathParts = pathname.split("/")
+    setLanguage(pathParts[1] as Locale)
 
-  return <>{children}</>
+    // Set HTML lang attribute for accessibility and SEO
+    document.documentElement.lang = pathParts[1]
+
+    // Optionally store language preference
+    localStorage.setItem("NEXT_LOCALE", pathParts[1])
+  }, [pathname])
+
+  // Use a data attribute on the wrapper to enable language-specific styling
+  return <div data-language={language}>{children}</div>
 }

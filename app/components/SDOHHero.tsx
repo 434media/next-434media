@@ -663,7 +663,7 @@ const EventCarousel = () => {
   const [touchEnd, setTouchEnd] = useState(0)
   const carouselRef = useRef<HTMLDivElement>(null)
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
-  const isMobile = useMobile()
+  const _isMobile = useMobile()
 
   // Event images and content
   const slides = [
@@ -717,7 +717,7 @@ const EventCarousel = () => {
       subtitle: "¿Que es SDOH?",
       description: "A successful gathering at the intersection of healthcare and technology.",
       highlight: "Featured Event",
-    }
+    },
   ]
 
   // Handle slide navigation - simplified to fix navigation issues
@@ -1127,12 +1127,11 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
   const detailsRef = useRef<HTMLElement>(null)
-  const isHeroInView = useInView(heroRef, { once: true })
   const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
-  const _isMobile = useMobile()
   const [_hasScrolled, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [_isVideoError, _setIsVideoError] = useState(false)
+  const [isHeroInView, setIsHeroInView] = useState(false)
 
   // Check for reduced motion preference
   useEffect(() => {
@@ -1167,26 +1166,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
       controls.start("visible")
     }
   }, [controls, isHeroInView])
-
-  const _containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.3,
-      },
-    },
-  }
-
-  const _itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, ease: "easeOut" },
-    },
-  }
 
   // Placeholder company logos - replace with actual logos
   const companyLogos = {
