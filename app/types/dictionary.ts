@@ -66,8 +66,9 @@ export interface Dictionary {
     subtitle?: string
     intro1?: string
     intro2Part1?: string
-    sdohFull?: string
     intro2Part2?: string
+    sdohFull?: string
+    heroAlt?: string
     hero?: {
       title?: string
       subtitle?: string
@@ -78,6 +79,10 @@ export interface Dictionary {
       title?: string
       content?: string
       partnershipTitle?: string
+      codeComment?: string
+      description1?: string
+      description2?: string
+      hashtags?: string
       [key: string]: DictionaryValue
     }
     features?: {
@@ -146,8 +151,8 @@ export interface Dictionary {
       title?: string
       description1?: string
       description2?: string
-      causa?: string
       description2End?: string
+      causa?: string
       highlight?: string
       imageAlt?: string
       [key: string]: DictionaryValue
@@ -156,6 +161,27 @@ export interface Dictionary {
       en?: string
       es?: string
       [key: string]: DictionaryValue
+    }
+    sessions?: {
+      viewSession?: string
+      comingSoon?: string
+      comingSoonDescription?: string
+      visitWebsite?: string
+      downloadSlides?: string
+      close?: string
+      sessionId?: string
+      card1?: {
+        title?: string
+        description?: string
+      }
+      card2?: {
+        title?: string
+        description?: string
+      }
+      card3?: {
+        title?: string
+        description?: string
+      }
     }
     [key: string]: DictionaryValue
   }

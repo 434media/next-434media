@@ -10,6 +10,7 @@ export async function generateStaticParams() {
 // In Next.js v15, params are properly typed and can be accessed synchronously
 export default async function Page({ params }: { params: { lang: string } }) {
   // Validate and type-cast locale
+
   const validLocale = i18n.locales.includes(params.lang as Locale) ? (params.lang as Locale) : i18n.defaultLocale
 
   // Get dictionary for server-side rendering

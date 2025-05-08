@@ -5,6 +5,12 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import type { Locale } from "../../i18n-config"
 
+// Create a context to provide dictionary to all child components
+import { createContext } from "react"
+
+// Create a dictionary context that can be consumed by child components
+export const DictionaryContext = createContext<Record<string, string | Record<string, string>>>({})
+
 interface Props {
   children: React.ReactNode
   dict: Record<string, string | Record<string, string>>
@@ -25,6 +31,10 @@ export default function ClientLayout({ children, dict }: Props) {
     localStorage.setItem("NEXT_LOCALE", pathParts[1])
   }, [pathname])
 
-  // Use a data attribute on the wrapper to enable language-specific styling
-  return <div data-language={language}>{children}</div>
+  // Provide the dictionary to all child components via context
+  return (
+    <DictionaryContext.Provider value={dict}>
+      <div data-language={language}>{children}</div>
+    </DictionaryContext.Provider>
+  )
 }

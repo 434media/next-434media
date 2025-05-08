@@ -23,7 +23,7 @@ export default function LanguageToggle({ currentLocale }: { currentLocale: Local
 
     // For other pages, keep the current path structure
     const segments = pathname.split("/")
-    if (i18n.locales.includes(segments[1] as any)) {
+    if (i18n.locales.includes(segments[1] as Locale)) {
       segments[1] = locale
     } else {
       segments.unshift(locale)
@@ -168,7 +168,7 @@ export default function LanguageToggle({ currentLocale }: { currentLocale: Local
                 <Link
                   key={locale}
                   href={getRedirectedPath(locale)}
-                  className={`px-3 py-2 text-xs transition-all duration-200 flex items-center space-x-2
+                  className={`block px-3 py-2 text-xs transition-all duration-200 items-center space-x-2
                     ${
                       locale === currentLocale
                         ? locale === "en"

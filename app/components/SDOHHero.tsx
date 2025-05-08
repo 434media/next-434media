@@ -5,13 +5,13 @@ import type React from "react"
 import { useEffect, useRef, useState, useCallback } from "react"
 import Image from "next/image"
 import { useAnimation, useInView } from "motion/react"
-import { useMobile } from "../hooks/use-mobile"
 import { FadeIn } from "./FadeIn"
 import SDOHMission from "./SDOHMission"
 import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
 import { Fragment } from "react"
 import dynamic from "next/dynamic"
 import type { Locale } from "../../i18n-config"
+import type { Dictionary } from "@/app/types/dictionary"
 
 // Dynamically import ReactPlayer to avoid SSR issues
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
@@ -47,8 +47,9 @@ const SessionCard = ({
   sessionIdText?: string
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [_isHovered, setIsHovered] = useState(false)
-  const [_isFocused, setIsFocused] = useState(false)
+  // Fix 1: Remove unused state variables but keep setters for side effects
+  const [, setIsHovered] = useState(false)
+  const [, setIsFocused] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const openModal = () => setIsModalOpen(true)
@@ -177,7 +178,8 @@ const VideoModal = ({
   const [showControls, setShowControls] = useState(true)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [duration, setDuration] = useState(0)
-  const [_isVideoError, _setIsVideoError] = useState(false)
+  // Fix 2: Remove unused state variables
+  // const [_isVideoError, _setIsVideoError] = useState(false)
 
   const togglePlayback = useCallback(() => {
     setIsPlaying(!isPlaying)
@@ -429,7 +431,8 @@ const VideoModal = ({
                           onClick={(e) => {
                             if (videoRef.current) {
                               const rect = e.currentTarget.getBoundingClientRect()
-                              const _pos = (e.clientX - rect.left) / rect.width
+                              // Fix 3: Remove unused variable
+                              // const _pos = (e.clientX - rect.left) / rect.width
                               // This would ideally seek the video, but ReactPlayer doesn't expose this directly
                               // We'd need to use a ref to the player instance
                             }
@@ -663,7 +666,8 @@ const EventCarousel = () => {
   const [touchEnd, setTouchEnd] = useState(0)
   const carouselRef = useRef<HTMLDivElement>(null)
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
-  const _isMobile = useMobile()
+  // Fix 4: Remove unused variable
+  // const _isMobile = useMobile()
 
   // Event images and content
   const slides = [
@@ -1119,7 +1123,7 @@ const FloatingElements = () => (
 // Update the SDOHHero component for better accessibility, spacing, and UX
 export interface SDOHHeroProps {
   locale: Locale
-  dict?: any
+  dict?: Dictionary
 }
 
 // Change from export function to export default function
@@ -1127,11 +1131,13 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
   const detailsRef = useRef<HTMLElement>(null)
-  const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
-  const [_hasScrolled, setHasScrolled] = useState(false)
+  // Fix 5: Remove unused variables
+  // const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
+  // const _hasScrolled = useState(false)[0]
+  // const [_isVideoError, _setIsVideoError] = useState(false)
+  const [, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
-  const [_isVideoError, _setIsVideoError] = useState(false)
-  const [isHeroInView, setIsHeroInView] = useState(false)
+  const isHeroInView = useInView(heroRef, { once: true })
 
   // Check for reduced motion preference
   useEffect(() => {
@@ -1175,29 +1181,52 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
     "Tabiat Research": "https://ampd-asset.s3.us-east-2.amazonaws.com/tabiat.svg",
   }
 
-  // Use the dictionary if provided, otherwise use default English text
-  const _d = dict?.sdoh || {
-    // Default English text
-    heroAlt: "SDOH Conference - Awareness Drives Innovation",
-    mission: {
-      codeComment: "// Join us for this innovative panel",
-      description1:
-        "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley.",
-      description2:
-        "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents.",
-      hashtags: "#innovation #healthcare #community",
+  // Create a default dictionary for fallbacks
+  const defaultDict = {
+    sdoh: {
+      mission: {
+        codeComment: "// Join us for this innovative panel",
+        description1:
+          "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley.",
+        description2:
+          "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents.",
+        hashtags: "#innovation #healthcare #community",
+      },
+      sessions: {
+        viewSession: "View Session",
+        comingSoon: "Coming Soon",
+        comingSoonDescription:
+          "This video will be available after the event. Check back later to watch the full session.",
+        visitWebsite: "Visit Website",
+        downloadSlides: "Download Slides",
+        close: "Close",
+        sessionId: "Session ID",
+        card1: {
+          title: "Market Analysis and Value Delivery",
+          description:
+            "Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion",
+        },
+        card2: {
+          title: "Legal Considerations for Raising Capital",
+          description:
+            "Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI",
+        },
+        card3: {
+          title: "The Perfect Pitch",
+          description:
+            "Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory",
+        },
+      },
     },
-    sessions: {
-      viewSession: "View Session",
-      comingSoon: "Coming Soon",
-      comingSoonDescription:
-        "This video will be available after the event. Check back later to watch the full session.",
-      visitWebsite: "Visit Website",
-      downloadSlides: "Download Slides",
-      close: "Close",
-      sessionId: "Session ID",
+  }
+
+  // Merge the provided dictionary with defaults
+  const mergedDict = {
+    ...defaultDict,
+    sdoh: {
+      ...defaultDict.sdoh,
+      ...(dict?.sdoh || {}),
     },
-    // Add other text that needs translation
   }
 
   // Optimize video loading
@@ -1265,6 +1294,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             videoElement.play().catch((e) => console.log("Autoplay prevented:", e))
           }
         }
+        // Fix 7: Use proper type for error event
         const handleError = (e: Event) => {
           console.error("Video error:", e)
           // Could add fallback behavior here
@@ -1402,7 +1432,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
       {/* Remove the line below if it exists */}
 
       {/* Mission Statement Section */}
-      <SDOHMission locale={locale} dict={dict} />
+      <SDOHMission locale={locale} dict={mergedDict} />
 
       {/* Event Details Section - Enhanced with Startup Week vibe */}
       <section className="py-16 sm:py-24 relative overflow-hidden">
@@ -1444,20 +1474,20 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                   <div className="w-3 h-3 rounded-full bg-green-400"></div>
                 </div>
                 <p className="text-neutral-500 text-sm font-mono">
-                  {dict?.sdoh?.mission?.codeComment || "// Join us for this innovative panel"}
+                  {mergedDict.sdoh?.mission?.codeComment || "// Join us for this innovative panel"}
                 </p>
               </div>
               <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto mb-4 font-medium">
-                {dict?.sdoh?.mission?.description1 ||
+                {mergedDict.sdoh?.mission?.description1 ||
                   "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley."}
               </p>
               <p className="text-lg sm:text-xl md:text-2xl text-neutral-700 leading-relaxed max-w-2xl mx-auto font-medium">
-                {dict?.sdoh?.mission?.description2 ||
+                {mergedDict.sdoh?.mission?.description2 ||
                   "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents."}
               </p>
               <div className="mt-4 text-right">
                 <span className="inline-block px-3 py-1 bg-cyan-100 text-cyan-800 rounded-md text-sm font-mono">
-                  {dict?.sdoh?.mission?.hashtags || "#innovation #healthcare #community"}
+                  {mergedDict.sdoh?.mission?.hashtags || "#innovation #healthcare #community"}
                 </span>
               </div>
             </div>
@@ -1552,70 +1582,70 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
               {/* Card 1 - With video implementation */}
               <SessionCard
-                title={dict?.sdoh?.sessions?.card1?.title || "Market Analysis and Value Delivery"}
+                title={mergedDict.sdoh?.sessions?.card1?.title || "Market Analysis and Value Delivery"}
                 description={
-                  dict?.sdoh?.sessions?.card1?.description ||
+                  mergedDict.sdoh?.sessions?.card1?.description ||
                   "Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
                 }
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card1.jpg"
                 videoId="session1"
                 videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
                 href="https://yumlish.com"
-                viewSessionText={dict?.sdoh?.sessions?.viewSession || "View Session"}
-                comingSoonText={dict?.sdoh?.sessions?.comingSoon || "Coming Soon"}
+                viewSessionText={mergedDict.sdoh?.sessions?.viewSession || "View Session"}
+                comingSoonText={mergedDict.sdoh?.sessions?.comingSoon || "Coming Soon"}
                 comingSoonDescriptionText={
-                  dict?.sdoh?.sessions?.comingSoonDescription ||
+                  mergedDict.sdoh?.sessions?.comingSoonDescription ||
                   "This video will be available after the event. Check back later to watch the full session."
                 }
-                visitWebsiteText={dict?.sdoh?.sessions?.visitWebsite || "Visit Website"}
-                downloadSlidesText={dict?.sdoh?.sessions?.downloadSlides || "Download Slides"}
-                closeText={dict?.sdoh?.sessions?.close || "Close"}
-                sessionIdText={dict?.sdoh?.sessions?.sessionId || "Session ID"}
+                visitWebsiteText={mergedDict.sdoh?.sessions?.visitWebsite || "Visit Website"}
+                downloadSlidesText={mergedDict.sdoh?.sessions?.downloadSlides || "Download Slides"}
+                closeText={mergedDict.sdoh?.sessions?.close || "Close"}
+                sessionIdText={mergedDict.sdoh?.sessions?.sessionId || "Session ID"}
               />
 
               {/* Card 2 - With video implementation */}
               <SessionCard
-                title={dict?.sdoh?.sessions?.card2?.title || "Legal Considerations for Raising Capital"}
+                title={mergedDict.sdoh?.sessions?.card2?.title || "Legal Considerations for Raising Capital"}
                 description={
-                  dict?.sdoh?.sessions?.card2?.description ||
+                  mergedDict.sdoh?.sessions?.card2?.description ||
                   "Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
                 }
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card2.jpeg"
                 videoId="session2"
                 videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
                 href="https://padillalawllc.com"
-                viewSessionText={dict?.sdoh?.sessions?.viewSession || "View Session"}
-                comingSoonText={dict?.sdoh?.sessions?.comingSoon || "Coming Soon"}
+                viewSessionText={mergedDict.sdoh?.sessions?.viewSession || "View Session"}
+                comingSoonText={mergedDict.sdoh?.sessions?.comingSoon || "Coming Soon"}
                 comingSoonDescriptionText={
-                  dict?.sdoh?.sessions?.comingSoonDescription ||
+                  mergedDict.sdoh?.sessions?.comingSoonDescription ||
                   "This video will be available after the event. Check back later to watch the full session."
                 }
-                visitWebsiteText={dict?.sdoh?.sessions?.visitWebsite || "Visit Website"}
-                downloadSlidesText={dict?.sdoh?.sessions?.downloadSlides || "Download Slides"}
-                closeText={dict?.sdoh?.sessions?.close || "Close"}
-                sessionIdText={dict?.sdoh?.sessions?.sessionId || "Session ID"}
+                visitWebsiteText={mergedDict.sdoh?.sessions?.visitWebsite || "Visit Website"}
+                downloadSlidesText={mergedDict.sdoh?.sessions?.downloadSlides || "Download Slides"}
+                closeText={mergedDict.sdoh?.sessions?.close || "Close"}
+                sessionIdText={mergedDict.sdoh?.sessions?.sessionId || "Session ID"}
               />
 
               {/* Card 3 - With placeholder */}
               <SessionCard
-                title={dict?.sdoh?.sessions?.card3?.title || "The Perfect Pitch"}
+                title={mergedDict.sdoh?.sessions?.card3?.title || "The Perfect Pitch"}
                 description={
-                  dict?.sdoh?.sessions?.card3?.description ||
+                  mergedDict.sdoh?.sessions?.card3?.description ||
                   "Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
                 }
                 image="https://ampd-asset.s3.us-east-2.amazonaws.com/card3.jpeg"
                 videoId="session3"
                 href="https://capitalfactory.com"
-                viewSessionText={dict?.sdoh?.sessions?.viewSession || "View Session"}
-                comingSoonText={dict?.sdoh?.sessions?.comingSoon || "Coming Soon"}
+                viewSessionText={mergedDict.sdoh?.sessions?.viewSession || "View Session"}
+                comingSoonText={mergedDict.sdoh?.sessions?.comingSoon || "Coming Soon"}
                 comingSoonDescriptionText={
-                  dict?.sdoh?.sessions?.comingSoonDescription ||
+                  mergedDict.sdoh?.sessions?.comingSoonDescription ||
                   "This video will be available after the event. Check back later to watch the full session."
                 }
-                visitWebsiteText={dict?.sdoh?.sessions?.visitWebsite || "Visit Website"}
-                downloadSlidesText={dict?.sdoh?.sessions?.downloadSlides || "Download Slides"}
-                closeText={dict?.sdoh?.sessions?.close || "Close"}
-                sessionIdText={dict?.sdoh?.sessions?.sessionId || "Session ID"}
+                visitWebsiteText={mergedDict.sdoh?.sessions?.visitWebsite || "Visit Website"}
+                downloadSlidesText={mergedDict.sdoh?.sessions?.downloadSlides || "Download Slides"}
+                closeText={mergedDict.sdoh?.sessions?.close || "Close"}
+                sessionIdText={mergedDict.sdoh?.sessions?.sessionId || "Session ID"}
               />
             </div>
           </FadeIn>
