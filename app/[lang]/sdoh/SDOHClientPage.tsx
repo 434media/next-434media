@@ -3,14 +3,14 @@
 import { useEffect } from "react"
 import { i18n } from "../../../i18n-config"
 import type { Locale } from "../../../i18n-config"
-import SDOHHero from "../../components/SDOHHero"
-import SDOHStartupBootcamp from "../../components/SDOHStartupBootcamp"
-import SDOHHealthAccelerator from "../../components/SDOHHealthAccelerator"
-import SDOHDemoDay from "../../components/SDOHDemoDay"
-import SDOHImpactMessage from "../../components/SDOHImpactMessage"
-import SDOHNewsletter from "../../components/SDOHNewsletter"
-import { BackToTop } from "../../components/BackToTop"
-import { PartnerLogos } from "../../components/PartnerLogos"
+import SDOHHero from "../..//components/SDOHHero"
+import SDOHStartupBootcamp from "../..//components/SDOHStartupBootcamp"
+import SDOHHealthAccelerator from "../..//components/SDOHHealthAccelerator"
+import SDOHDemoDay from "../..//components/SDOHDemoDay"
+import SDOHImpactMessage from "../..//components/SDOHImpactMessage"
+import SDOHNewsletter from "../..//components/SDOHNewsletter"
+import { BackToTop } from "../..//components/BackToTop"
+import { PartnerLogos } from "../..//components/PartnerLogos"
 import Script from "next/script"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
 import { useLanguage } from "@/app/context/language-context"
@@ -44,8 +44,8 @@ export default function SDOHClientPage({ locale = i18n.defaultLocale }: { locale
         Skip to main content
       </a>
 
-      {/* Language Toggle */}
-      <SDOHLanguageToggle />
+      {/* Language Toggle - Updated to show on scroll and pass the current locale */}
+      <SDOHLanguageToggle currentLocale={locale} showOnScroll={true} />
 
       {/* Hero Section */}
       <SDOHHero locale={locale} dict={dictionary} />

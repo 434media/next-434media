@@ -2,17 +2,52 @@
 
 import { useEffect, useState } from "react"
 import type { Locale } from "../../../i18n-config"
-import { useLanguage } from "@/app/context/language-context"
+import { useRouter } from "next/navigation"
 
-export default function SDOHLanguageToggle() {
-  const { locale, setLocale, isLoading } = useLanguage()
+// Update the props interface to include currentLocale and onLanguageChange
+interface SDOHLanguageToggleProps {
+  currentLocale: Locale
+  onLanguageChange?: (newLocale: Locale) => void // Make it optional to prevent errors
+  showOnScroll?: boolean // Add option to show only after scrolling
+}
+
+export default function SDOHLanguageToggle({
+  currentLocale,
+  onLanguageChange,
+  showOnScroll = false,
+}: SDOHLanguageToggleProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isVisible, setIsVisible] = useState(!showOnScroll) // Initially visible if showOnScroll is false
+  const router = useRouter()
 
   // Ensure component is mounted before rendering to avoid hydration issues
   useEffect(() => {
     setMounted(true)
-  }, [])
+
+    // Add scroll listener if showOnScroll is true
+    if (showOnScroll) {
+      const handleScroll = () => {
+        // Get the height of the viewport
+        const viewportHeight = window.innerHeight
+        // Show the toggle when scrolled past 90% of the viewport height
+        if (window.scrollY > viewportHeight * 0.9) {
+          setIsVisible(true)
+        } else {
+          setIsVisible(false)
+        }
+      }
+
+      window.addEventListener("scroll", handleScroll)
+      // Initial check
+      handleScroll()
+
+      return () => {
+        window.removeEventListener("scroll", handleScroll)
+      }
+    }
+  }, [showOnScroll])
 
   if (!mounted) return null
 
@@ -37,32 +72,51 @@ export default function SDOHLanguageToggle() {
     },
   }
 
+  // Update the handleLanguageChange function to prevent full page refresh
   const handleLanguageChange = async (newLocale: Locale) => {
-    if (newLocale !== locale && !isLoading) {
-      await setLocale(newLocale)
+    if (newLocale !== currentLocale && !isLoading) {
+      setIsLoading(true)
+      try {
+        // Check if onLanguageChange is a function before calling it
+        if (typeof onLanguageChange === "function") {
+          await onLanguageChange(newLocale)
+        } else {
+          // Instead of using console.error which can trigger unhandled errors,
+          // we'll implement a fallback that doesn't cause a full page refresh
+
+          // Get the current path without the locale prefix
+          const currentPath = window.location.pathname
+          const pathWithoutLocale = currentPath.substring(currentPath.indexOf("/", 1) || currentPath.length)
+
+          // Use Next.js router for client-side navigation
+          router.push(`/${newLocale}${pathWithoutLocale}`)
+        }
+      } catch (error) {
+        // Silently handle errors to prevent unhandled errors
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
   return (
     <div
-      className="fixed top-3 right-3 z-[9999] bg-white/80 backdrop-blur-sm p-2 rounded-xl shadow-lg border border-gray-200"
+      className={`fixed top-20 right-4 bg-white/40 backdrop-blur-md p-2 rounded-xl shadow-sm border border-gray-200/50 transition-all duration-300 ${
+        isVisible ? "opacity-90 hover:opacity-100" : "opacity-0 pointer-events-none"
+      } z-[100]`}
       data-testid="sdoh-language-toggle"
       style={{
-        visibility: "visible",
-        opacity: 1,
-        pointerEvents: "auto",
         fontSize: "0.75rem", // Smaller font size
-        top: "5rem", // Position below navbar
-        right: "1rem", // Position at the right
-        zIndex: 9999, // Ensure it's above everything else
+        maxWidth: "fit-content", // Ensure it's not full width
+        transform: "scale(0.9)", // Make it slightly smaller for subtlety
       }}
     >
       <div className="flex gap-2 items-center">
         <button
           onClick={() => handleLanguageChange("en")}
-          disabled={isLoading || locale === "en"}
+          disabled={isLoading || currentLocale === "en"}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
-            locale === "en"
+            currentLocale === "en"
               ? `${flagColors.en.activeBg} ${flagColors.en.activeText} border-white`
               : `bg-gradient-to-r ${flagColors.en.bg} ${flagColors.en.border} ${flagColors.en.text}`
           } ${flagColors.en.hover} text-xs`}
@@ -104,9 +158,9 @@ export default function SDOHLanguageToggle() {
 
         <button
           onClick={() => handleLanguageChange("es")}
-          disabled={isLoading || locale === "es"}
+          disabled={isLoading || currentLocale === "es"}
           className={`relative px-2 py-1 rounded-lg transition-all duration-300 border-2 ${
-            locale === "es"
+            currentLocale === "es"
               ? `${flagColors.es.activeBg} ${flagColors.es.activeText} border-white`
               : `bg-gradient-to-r ${flagColors.es.bg} ${flagColors.es.border} ${flagColors.es.text}`
           } ${flagColors.es.hover} text-xs`}
