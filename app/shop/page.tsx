@@ -27,3 +27,40 @@ export default function ShopPage() {
     </main>
   )
 }
+
+
+/* import { InteractiveShopHero } from "../../components/interactive-shop-hero"
+import { getCollections } from "lib/shopify"
+
+export const dynamic = "force-static" // Force static generation for faster loads
+export const revalidate = 3600 // Revalidate every hour
+
+export default async function ShopPage() {
+  // Get collections for our interactive hotspots
+  const collections = await getCollections()
+
+  // Fallback: if collections is empty, use a default object
+  const fallbackCollection = {
+    handle: "default",
+    title: "Default Collection",
+    description: "",
+    image: undefined,
+    path: "/",
+    seo: { title: "Default SEO Title", description: "Default SEO Description" }, // Add default SEO
+    updatedAt: new Date().toISOString(), // Add updatedAt with current timestamp
+  }
+
+  const frameOneCollection = collections.find((c) => c.handle === "434-media") ?? collections[0] ?? fallbackCollection
+  const frameTwoCollection = collections.find((c) => c.handle === "vemosvamos") ?? collections[0] ?? fallbackCollection
+  const computerCollection = collections.find((c) => c.handle === "devsa") ?? collections[0] ?? fallbackCollection
+  const boxingCollection = collections.find((c) => c.handle === "txmx-boxing") ?? collections[0] ?? fallbackCollection
+
+  return (
+    <InteractiveShopHero
+      frameOneCollection={frameOneCollection}
+      frameTwoCollection={frameTwoCollection}
+      computerCollection={computerCollection}
+      boxingCollection={boxingCollection}
+    />
+  )
+} */
