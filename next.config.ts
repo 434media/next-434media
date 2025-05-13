@@ -8,9 +8,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   }, */
 
-   experimental: {
+  /*  experimental: {
     useCache: true,
-  },
+  }, */
 
   images: {
     formats: ['image/avif', 'image/webp'],
