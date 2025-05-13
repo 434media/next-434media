@@ -7,7 +7,7 @@ import "remixicon/fonts/remixicon.css"
 import { CombinedNavbar} from "./components/combined-navbar"
 import Footer from "./components/Footer"
 import { Analytics } from '@vercel/analytics/next';
-import { GoogleTagManager } from '@next/third-parties/google'
+//import { GoogleTagManager } from '@next/third-parties/google'
 import { Toaster } from "sonner"
 import { getCart, getMenu } from "./lib/shopify"
 import { CartProvider } from "./components/shopify/cart/cart-context"
@@ -146,7 +146,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <GoogleTagManager gtmId="G-FTWW298D70" />
+      {/* <GoogleTagManager gtmId="G-FTWW298D70" /> */}
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
