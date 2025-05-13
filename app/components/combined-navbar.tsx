@@ -14,14 +14,7 @@ import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
 import { AIMLogo } from "./AIMLogo"
 
-interface CombinedNavbarProps {
-  menu: Array<{
-    title: string
-    path: string
-  }>
-}
-
-export function CombinedNavbar({ menu }: CombinedNavbarProps) {
+export function CombinedNavbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)

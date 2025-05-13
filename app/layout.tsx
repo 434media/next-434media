@@ -152,7 +152,7 @@ export default async function RootLayout({
       >
        <CartProvider cartPromise={cart}>
           <Suspense>
-            <CombinedNavbar menu={menu}/>
+            <CombinedNavbar />
           </Suspense>
           <main>
             <PageTransition>{children}</PageTransition>

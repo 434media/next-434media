@@ -244,7 +244,7 @@ export default function CartModal() {
             <i className="ri-shopping-cart-line text-3xl text-neutral-400" aria-hidden="true"></i>
           </div>
           <p className="text-xl font-medium mb-2">Your cart is empty</p>
-          <p className="text-neutral-400 mb-6">Looks like you haven't added anything to your cart yet.</p>
+          <p className="text-neutral-400 mb-6">Looks like you haven&apos;t added anything to your cart yet.</p>
           <button
             onClick={closeCart}
             className="px-6 py-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"

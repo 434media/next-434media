@@ -46,8 +46,6 @@ export function CollectionBanner({
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
-  const [logoLoaded, setLogoLoaded] = useState(false)
-  const [logoError, setLogoError] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const isVideo = isVideoUrl(imageSrc)
@@ -56,13 +54,20 @@ export function CollectionBanner({
   // Handle video loading
   useEffect(() => {
     if (isVideo && videoRef.current) {
-      videoRef.current.addEventListener("loadeddata", () => {
+      const video = videoRef.current
+
+      video.addEventListener("loadeddata", () => {
         setVideoLoaded(true)
       })
 
-      videoRef.current.addEventListener("error", () => {
+      video.addEventListener("error", () => {
         setImageError(true)
       })
+
+      return () => {
+        video.removeEventListener("loadeddata", () => setVideoLoaded(true))
+        video.removeEventListener("error", () => setImageError(true))
+      }
     }
   }, [isVideo])
 
@@ -73,6 +78,8 @@ export function CollectionBanner({
   // Handle video loading with optimized strategy
   useEffect(() => {
     if (isVideo && videoRef.current) {
+      const video = videoRef.current
+
       // Set a timeout to force show video after a reasonable time
       const timeoutId = setTimeout(() => {
         if (!videoLoaded) {
@@ -91,19 +98,17 @@ export function CollectionBanner({
         clearTimeout(timeoutId)
       }
 
-      videoRef.current.addEventListener("canplay", handleCanPlay)
-      videoRef.current.addEventListener("loadeddata", handleCanPlay)
-      videoRef.current.addEventListener("error", handleError)
+      video.addEventListener("canplay", handleCanPlay)
+      video.addEventListener("loadeddata", handleCanPlay)
+      video.addEventListener("error", handleError)
 
       // Try to manually load the video
-      videoRef.current.load()
+      video.load()
 
       return () => {
-        if (videoRef.current) {
-          videoRef.current.removeEventListener("canplay", handleCanPlay)
-          videoRef.current.removeEventListener("loadeddata", handleCanPlay)
-          videoRef.current.removeEventListener("error", handleError)
-        }
+        video.removeEventListener("canplay", handleCanPlay)
+        video.removeEventListener("loadeddata", handleCanPlay)
+        video.removeEventListener("error", handleError)
         clearTimeout(timeoutId)
       }
     }
@@ -224,10 +229,11 @@ export function CollectionBanner({
                 height={logoHeight}
                 className="max-w-full h-auto md:w-[400px] lg:w-[500px]"
                 priority
-                onLoad={() => setLogoLoaded(true)}
+                onLoad={() => {
+                  /* Logo loaded */
+                }}
                 onError={() => {
                   console.error("Logo failed to load:", logoSrc)
-                  setLogoError(true)
                 }}
               />
             </motion.div>

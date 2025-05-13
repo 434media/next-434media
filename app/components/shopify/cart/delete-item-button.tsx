@@ -3,23 +3,23 @@
 import { removeItem } from "./actions"
 import type { CartItem } from "../../../lib/shopify/types"
 import { useActionState } from "react"
+import type { UpdateType } from "./cart-context"
 
 export function DeleteItemButton({
   item,
   optimisticUpdate,
 }: {
   item: CartItem
-  optimisticUpdate: any
+  optimisticUpdate: (merchandiseId: string, updateType: UpdateType) => void
 }) {
-  const [message, formAction] = useActionState(removeItem, null)
   const merchandiseId = item.merchandise.id
-  const removeItemAction = formAction.bind(null, merchandiseId)
+  const [message, formAction] = useActionState(removeItem, null)
 
   return (
     <form
       action={async () => {
         optimisticUpdate(merchandiseId, "delete")
-        removeItemAction()
+        await formAction(merchandiseId)
       }}
     >
       <button

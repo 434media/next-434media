@@ -4,7 +4,7 @@ import type { Cart, CartItem, Product, ProductVariant } from "../../../lib/shopi
 import type React from "react"
 import { createContext, use, useContext, useMemo, useOptimistic } from "react"
 
-type UpdateType = "plus" | "minus" | "delete"
+export type UpdateType = "plus" | "minus" | "delete"
 
 type CartAction =
   | {
@@ -196,6 +196,6 @@ export function useCart() {
       addCartItem,
       hasValidCheckout,
     }),
-    [optimisticCart, hasValidCheckout],
+    [optimisticCart, hasValidCheckout, updateOptimisticCart],
   )
 }

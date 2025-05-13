@@ -6,21 +6,7 @@ import { revalidateTag } from "next/cache"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
-
-export async function addItem(prevState: any, selectedVariantId: string | undefined) {
-  if (!selectedVariantId) {
-    return "Error adding item to cart"
-  }
-
-  try {
-    await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }])
-    revalidateTag(TAGS.cart)
-  } catch (e) {
-    return "Error adding item to cart"
-  }
-}
-
-export async function removeItem(prevState: any, merchandiseId: string) {
+export async function removeItem(_prevState: unknown, merchandiseId: string) {
   try {
     const cart = await getCart()
 
@@ -36,13 +22,13 @@ export async function removeItem(prevState: any, merchandiseId: string) {
     } else {
       return "Item not found in cart"
     }
-  } catch (e) {
+  } catch (_e) {
     return "Error removing item from cart"
   }
 }
 
 export async function updateItemQuantity(
-  prevState: any,
+  _prevState: unknown,
   payload: {
     merchandiseId: string
     quantity: number
@@ -137,5 +123,19 @@ export async function getCheckoutUrl() {
 
 export async function createCartAndSetCookie() {
   const cart = await createCart()
-  ;(await cookies()).set("cartId", cart.id!)
+  const cookieStore = await cookies()
+  cookieStore.set("cartId", cart.id!)
+}
+
+export async function addItem(_prevState: unknown, selectedVariantId: string | undefined) {
+  if (!selectedVariantId) {
+    return "Error adding item to cart"
+  }
+
+  try {
+    await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }])
+    revalidateTag(TAGS.cart)
+  } catch (_e) {
+    return "Error adding item to cart"
+  }
 }
