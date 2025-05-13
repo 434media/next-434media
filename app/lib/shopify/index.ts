@@ -340,7 +340,7 @@ export async function getCart(): Promise<Cart | undefined> {
 export async function getCollection(
   handle: string
 ): Promise<Collection | undefined> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.collections);
   // cacheLife('days');
 
@@ -363,7 +363,7 @@ export async function getCollectionProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.collections, TAGS.products);
   // cacheLife('days');
 
@@ -387,7 +387,7 @@ export async function getCollectionProducts({
 }
 
 export async function getCollections(): Promise<Collection[]> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.collections);
   // cacheLife('days');
 
@@ -418,7 +418,7 @@ export async function getCollections(): Promise<Collection[]> {
 }
 
 export async function getMenu(handle: string): Promise<Menu[]> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.collections);
   // cacheLife('days');
 
@@ -458,7 +458,7 @@ export async function getPages(): Promise<Page[]> {
 }
 
 export async function getProduct(handle: string): Promise<Product | undefined> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.products);
   // cacheLife('days');
 
@@ -475,7 +475,7 @@ export async function getProduct(handle: string): Promise<Product | undefined> {
 export async function getProductRecommendations(
   productId: string
 ): Promise<Product[]> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.products);
   // cacheLife('days');
 
@@ -498,7 +498,7 @@ export async function getProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  'use cache';
+  // 'use cache';
   // cacheTag(TAGS.products);
   // cacheLife('days');
 
