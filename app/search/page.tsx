@@ -1,10 +1,10 @@
 import { Suspense } from "react"
 import { defaultSort, sorting } from "../lib/constants"
 import { getProducts, getCollections } from "../lib/shopify"
-import Grid from "../components/grid"
-import ProductGridItems from "components/layout/product-grid-items"
-import { CollectionNavbar } from "components/collection-navbar"
-import { Skeleton } from "../../components/ui/skeleton"
+import Grid from "../components/shopify/grid"
+import ProductGridItems from "../components/shopify/layout/product-grid-items"
+import { CollectionNavbar } from "../components/shopify/collection-navbar"
+import { Skeleton } from "../components/shopify/skeleton"
 
 export const metadata = {
   title: "Search",

@@ -1,5 +1,8 @@
 import type { Metadata } from "next"
-import ShopComingSoon from "../components/ShopComingSoon"
+import { InteractiveShopHero } from "../components/shopify/interactive-shop-hero"
+import { getCollections } from "../lib/shopify"
+export const dynamic = "force-static" // Force static generation for faster loads
+export const revalidate = 3600 // Revalidate every hour
 
 export const metadata: Metadata = {
   title: "Shop Coming Soon | 434 MEDIA",
@@ -19,21 +22,6 @@ export const metadata: Metadata = {
     ],
   },
 }
-
-export default function ShopPage() {
-  return (
-    <main className="flex-1">
-      <ShopComingSoon />
-    </main>
-  )
-}
-
-
-/* import { InteractiveShopHero } from "../../components/interactive-shop-hero"
-import { getCollections } from "lib/shopify"
-
-export const dynamic = "force-static" // Force static generation for faster loads
-export const revalidate = 3600 // Revalidate every hour
 
 export default async function ShopPage() {
   // Get collections for our interactive hotspots
@@ -63,4 +51,4 @@ export default async function ShopPage() {
       boxingCollection={boxingCollection}
     />
   )
-} */
+}

@@ -96,15 +96,21 @@ export default function Footer() {
                 </h2>
 
                 <div className="flex items-center gap-4">
-                  {/* SDOH Link with gradient effect */}
+                  {/* SDOH Logo Link - Replaced text with SVG image */}
                   <Link
                     href="/sdoh"
                     className="group relative overflow-hidden rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
                     aria-label="Learn about SDOH"
                   >
-                    <span className="relative z-10 text-sm sm:text-base font-medium bg-gradient-to-r from-emerald-400 via-sky-400 to-purple-500 bg-clip-text text-transparent transition-all duration-300 group-hover:bg-gradient-to-l">
-                      ¿Qué es SDOH?
-                    </span>
+                    <div className="relative z-10 h-6 w-auto">
+                      <Image
+                        src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+                        alt="¿Qué es SDOH?"
+                        width={100}
+                        height={24}
+                        className="w-auto h-full grayscale"
+                      />
+                    </div>
                     <span className="absolute inset-0 z-0 bg-gradient-to-r from-emerald-400/10 via-sky-400/10 to-purple-500/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded"></span>
                   </Link>
 

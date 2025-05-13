@@ -5,11 +5,11 @@ import { Suspense } from "react"
 import { HIDDEN_PRODUCT_TAG } from "../../lib/constants"
 import { getProduct, getProductRecommendations } from "../../lib/shopify"
 import type { Image } from "../../lib/shopify/types"
-import { GridTileImage } from "../../components/grid/tile"
-import { Gallery } from "components/product/gallery"
-import { ProductProvider } from "components/product/product-context"
-import { ProductDescription } from "components/product/product-description"
-import BackButton from "components/product/back-button"
+import { GridTileImage } from "../../components/shopify/grid/tile"
+import { Gallery } from "../../components/shopify/product/gallery"
+import { ProductProvider } from "../../components/shopify/product/product-context"
+import { ProductDescription } from "../../components/shopify/product/product-description"
+import BackButton from "../../components/shopify/product/back-button"
 
 export async function generateMetadata(props: {
   params: Promise<{ handle: string }>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { i18n, type Locale } from "@/i18n-config"
-import { useLanguage } from "@/app/context/language-context"
+import { useLanguage } from "../../context/language-context"
 import { motion, AnimatePresence } from "motion/react"
 
 interface SDOHLanguageToggleProps {

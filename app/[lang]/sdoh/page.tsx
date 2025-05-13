@@ -1,7 +1,7 @@
 import { i18n, type Locale } from "../../../i18n-config"
-import { LanguageProvider } from "@/app/context/language-context"
+import { LanguageProvider } from "../../context/language-context"
 import SDOHClientPage from "./SDOHClientPage"
-import { getDictionary } from "@/app/lib/dictionary"
+import { getDictionary } from "../../lib/dictionary"
 
 export async function generateStaticParams() {
   return i18n.locales.map((locale) => ({ lang: locale }))

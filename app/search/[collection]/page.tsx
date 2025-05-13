@@ -7,11 +7,11 @@ import { defaultSort, sorting } from "../../lib/constants"
 import { getCollectionBannerImage } from "../../lib/collection-images"
 import { getCollections } from "../../lib/shopify"
 import { getCollectionConfig } from "../../lib/collection-config"
-import Grid from "../../components/grid"
-import ProductGridItems from "components/layout/product-grid-items"
-import { CollectionBanner } from "components/collection-banner"
-import { Skeleton } from "components/ui/skeleton"
-import { CollectionNavbar } from "components/collection-navbar"
+import Grid from "../../components/shopify/grid"
+import ProductGridItems from "../../components/shopify/layout/product-grid-items"
+import { CollectionBanner } from "../../components/shopify/collection-banner"
+import { Skeleton } from "../../components/shopify/skeleton"
+import { CollectionNavbar } from "../../components/shopify/collection-navbar"
 
 export const dynamic = "force-static" // Force static generation for faster loads
 export const revalidate = 3600 // Revalidate every hour

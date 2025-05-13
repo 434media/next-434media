@@ -8,7 +8,7 @@ import { useMediaQuery } from "../hooks/use-mobile"
 import { PortfolioModal } from "./PortfolioModal"
 import { FadeIn } from "./FadeIn"
 import Image from "next/image"
-import { useHorizontalScroll } from "../hooks/use-horizontaal-scroll"
+import { useHorizontalScroll } from "../hooks/use-horizontal-scroll"
 import { KeyboardNavigation } from "./keyboardNavigation"
 
 interface PortfolioItem {
