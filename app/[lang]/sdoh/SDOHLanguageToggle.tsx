@@ -1,24 +1,21 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
 import { i18n, type Locale } from "@/i18n-config"
-import { useLanguage } from "../../context/language-context"
-import { motion, AnimatePresence } from "motion/react"
+import { useLanguage } from "@/app/context/language-context"
+import { AnimatePresence, motion } from "motion/react"
 
 interface SDOHLanguageToggleProps {
   showOnScroll?: boolean
 }
 
 export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguageToggleProps) {
-  const pathname = usePathname()
-  const { currentLocale, switchLanguage } = useLanguage()
-  const [isLoading, setIsLoading] = useState(false)
+  const { currentLocale, switchLanguage, isLoading } = useLanguage()
   const [isVisible, setIsVisible] = useState(!showOnScroll)
   const [isHovered, setIsHovered] = useState(false)
-
-  // Determine the active locale
-  const activeLocale = currentLocale || (pathname?.split("/")[1] as Locale) || i18n.defaultLocale
+  const [localLoading, setLocalLoading] = useState(false)
 
   // Handle scroll events to show/hide the toggle
   useEffect(() => {
@@ -41,19 +38,21 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
     }
   }, [showOnScroll])
 
-  // Handle language change
-  const handleLanguageChange = async (newLocale: Locale) => {
-    if (newLocale === activeLocale) return
+  // Simple direct language change handler
+  const handleLanguageChange = async (e: React.MouseEvent, locale: Locale) => {
+    e.preventDefault()
 
-    setIsLoading(true)
+    if (locale === currentLocale || isLoading || localLoading) return
+
+    setLocalLoading(true)
+    console.log(`Language toggle clicked: ${locale}`)
 
     try {
-      // Use the switchLanguage function from context
-      await switchLanguage(newLocale)
+      await switchLanguage(locale)
     } catch (error) {
-      console.error("Error changing language:", error)
+      console.error("Error in language toggle:", error)
     } finally {
-      setIsLoading(false)
+      setLocalLoading(false)
     }
   }
 
@@ -65,7 +64,7 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
           animate={{ opacity: 0.9, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-20 right-4 z-100 opacity-90 hover:opacity-100 transition-opacity"
+          className="fixed top-20 right-4 z-50 opacity-90 hover:opacity-100 transition-opacity"
           style={{ maxWidth: "fit-content", transform: "scale(0.9)" }}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
@@ -78,17 +77,20 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
             {i18n.locales.map((locale) => (
               <button
                 key={locale}
-                onClick={() => handleLanguageChange(locale)}
-                disabled={isLoading || locale === activeLocale}
+                onClick={(e) => handleLanguageChange(e, locale)}
+                disabled={isLoading || localLoading || locale === currentLocale}
                 className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
-                  locale === activeLocale
+                  locale === currentLocale
                     ? "bg-gradient-to-r from-cyan-500 to-cyan-600 text-white"
                     : "text-gray-700 hover:bg-gray-100/80"
                 }`}
                 aria-label={`Switch to ${locale === "en" ? "English" : "Spanish"} language`}
-                aria-current={locale === activeLocale ? "true" : "false"}
+                aria-current={locale === currentLocale ? "true" : "false"}
+                type="button"
               >
-                <span className="flex items-center">
+                <span
+                  className={`flex items-center ${(isLoading || localLoading) && locale !== currentLocale ? "opacity-0" : ""}`}
+                >
                   {locale === "en" ? (
                     <>
                       <span className="mr-1.5">🇺🇸</span>
@@ -102,10 +104,10 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
                   )}
                 </span>
 
-                {isLoading && locale === activeLocale && (
+                {(isLoading || localLoading) && locale !== currentLocale && (
                   <span className="absolute inset-0 flex items-center justify-center">
                     <svg
-                      className="animate-spin h-4 w-4 text-white"
+                      className="animate-spin h-4 w-4 text-gray-700"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
