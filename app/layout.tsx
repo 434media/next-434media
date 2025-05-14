@@ -4,10 +4,10 @@ import { Geist, Geist_Mono } from "next/font/google"
 import localFont from "next/font/local"
 import "./globals.css"
 import "remixicon/fonts/remixicon.css"
-import { CombinedNavbar} from "./components/combined-navbar"
+import { CombinedNavbar } from "./components/combined-navbar"
 import Footer from "./components/Footer"
-import { Analytics } from '@vercel/analytics/next';
-//import { GoogleTagManager } from '@next/third-parties/google'
+import { Analytics } from "@vercel/analytics/next"
+import { GoogleTagManager } from "@next/third-parties/google"
 import { Toaster } from "sonner"
 import { getCart, getMenu } from "./lib/shopify"
 import { CartProvider } from "./components/shopify/cart/cart-context"
@@ -135,7 +135,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  
   // Don't await the fetch, pass the Promise to the context provider
   const cart = getCart()
   const menu = await getMenu("next-js-frontend-header-menu")
@@ -146,13 +145,13 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      {/* <GoogleTagManager gtmId="G-FTWW298D70" /> */}
+      <GoogleTagManager gtmId="G-FTWW298D70" />
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
-       <CartProvider cartPromise={cart}>
+        <CartProvider cartPromise={cart}>
           <Suspense>
-            <CombinedNavbar />
+            <CombinedNavbar menu={menu} />
           </Suspense>
           <main>
             <PageTransition>{children}</PageTransition>
@@ -166,4 +165,3 @@ export default async function RootLayout({
     </html>
   )
 }
-

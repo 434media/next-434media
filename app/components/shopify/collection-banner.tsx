@@ -1,101 +1,118 @@
 "use client"
-import Image from "next/image"
-import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
-import { isVideoUrl } from "../../lib/collection-images"
-import { motion } from "motion/react"
-import { ChevronDown } from "lucide-react"
-import Link from "next/link"
+import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
+import { motion, AnimatePresence } from "motion/react"
+import clsx from "clsx"
 
 interface CollectionBannerProps {
   title: string
-  description: string
-  imageSrc: string
-  ctaText?: string
-  ctaLink?: string
-  overlayPosition?: "center" | "left" | "right"
-  textColor?: string
-  buttonStyle?: "primary" | "secondary" | "outline" | "transparent" | "custom"
-  customButtonClasses?: string
-  logoSrc?: string
-  logoWidth?: number
-  logoHeight?: number
-  scrollToProducts?: boolean
-  hideDownArrow?: boolean
-  hideText?: boolean
+  description?: string
+  image?: string
+  video?: string
+  logo?: string
+  className?: string
+  imageClassName?: string
+  textClassName?: string
+  logoClassName?: string
+  isFullHeight?: boolean
+  isVideo?: boolean
+  isOverlay?: boolean
+  isTextCentered?: boolean
+  isTextLeft?: boolean
+  isTextRight?: boolean
+  isTextBottom?: boolean
+  isTextTop?: boolean
+  isTextOverlay?: boolean
+  isTextOverlayBottom?: boolean
+  isTextOverlayTop?: boolean
+  isTextOverlayLeft?: boolean
+  isTextOverlayRight?: boolean
+  isTextOverlayCentered?: boolean
+  isLogoOverlay?: boolean
+  isLogoOverlayBottom?: boolean
+  isLogoOverlayTop?: boolean
+  isLogoOverlayLeft?: boolean
+  isLogoOverlayRight?: boolean
+  isLogoOverlayCentered?: boolean
+  isLogoBottom?: boolean
+  isLogoTop?: boolean
+  isLogoLeft?: boolean
+  isLogoRight?: boolean
+  isLogoCentered?: boolean
 }
 
 export function CollectionBanner({
   title,
   description,
-  imageSrc,
-  ctaText = "Shop Now",
-  ctaLink,
-  overlayPosition = "center",
-  textColor = "white",
-  buttonStyle = "primary",
-  customButtonClasses,
-  logoSrc,
-  logoWidth = 300,
-  logoHeight = 150,
-  scrollToProducts = false,
-  hideDownArrow = false,
-  hideText = false,
+  image,
+  video,
+  logo,
+  className,
+  imageClassName,
+  textClassName,
+  logoClassName,
+  isFullHeight = false,
+  isVideo = false,
+  isOverlay = false,
+  isTextCentered = false,
+  isTextLeft = false,
+  isTextRight = false,
+  isTextBottom = false,
+  isTextTop = false,
+  isTextOverlay = false,
+  isTextOverlayBottom = false,
+  isTextOverlayTop = false,
+  isTextOverlayLeft = false,
+  isTextOverlayRight = false,
+  isTextOverlayCentered = false,
+  isLogoOverlay = false,
+  isLogoOverlayBottom = false,
+  isLogoOverlayTop = false,
+  isLogoOverlayLeft = false,
+  isLogoOverlayRight = false,
+  isLogoOverlayCentered = false,
+  isLogoBottom = false,
+  isLogoTop = false,
+  isLogoLeft = false,
+  isLogoRight = false,
+  isLogoCentered = false,
 }: CollectionBannerProps) {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [videoLoaded, setVideoLoaded] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const timeoutId = useRef<NodeJS.Timeout | undefined>(undefined)
 
-  const isVideo = isVideoUrl(imageSrc)
-  const hasLogo = Boolean(logoSrc)
+  // Set a timeout to handle slow-loading or failed media
+  useEffect(() => {
+    timeoutId.current = setTimeout(() => {
+      if (!imageLoaded && !videoLoaded) {
+        setImageError(true)
+      }
+    }, 5000)
+
+    return () => {
+      if (timeoutId.current) {
+        clearTimeout(timeoutId.current)
+      }
+    }
+  }, [imageLoaded, videoLoaded])
 
   // Handle video loading
   useEffect(() => {
     if (isVideo && videoRef.current) {
       const video = videoRef.current
 
-      video.addEventListener("loadeddata", () => {
-        setVideoLoaded(true)
-      })
-
-      video.addEventListener("error", () => {
-        setImageError(true)
-      })
-
-      return () => {
-        video.removeEventListener("loadeddata", () => setVideoLoaded(true))
-        video.removeEventListener("error", () => setImageError(true))
-      }
-    }
-  }, [isVideo])
-
-  // Fallback to placeholder if there's an error loading the image or video
-  const fallbackSrc = `/placeholder.svg?height=600&width=1600&text=${encodeURIComponent(title)}`
-  const finalImageSrc = imageError ? fallbackSrc : imageSrc
-
-  // Handle video loading with optimized strategy
-  useEffect(() => {
-    if (isVideo && videoRef.current) {
-      const video = videoRef.current
-
-      // Set a timeout to force show video after a reasonable time
-      const timeoutId = setTimeout(() => {
-        if (!videoLoaded) {
-          setVideoLoaded(true)
-        }
-      }, 1000) // Show video after 1 second even if not fully loaded
-
       // Event listeners for video loading
       const handleCanPlay = () => {
         setVideoLoaded(true)
-        clearTimeout(timeoutId)
+        clearTimeout(timeoutId.current)
       }
 
       const handleError = () => {
         setImageError(true)
-        clearTimeout(timeoutId)
+        clearTimeout(timeoutId.current)
       }
 
       video.addEventListener("canplay", handleCanPlay)
@@ -109,201 +126,145 @@ export function CollectionBanner({
         video.removeEventListener("canplay", handleCanPlay)
         video.removeEventListener("loadeddata", handleCanPlay)
         video.removeEventListener("error", handleError)
-        clearTimeout(timeoutId)
+        clearTimeout(timeoutId.current)
       }
     }
   }, [isVideo, videoLoaded])
 
-  // Determine overlay position classes
-  const overlayPositionClasses = {
-    center: "items-center text-center",
-    left: "items-start text-left pl-8 md:pl-16",
-    right: "items-end text-right pr-8 md:pr-16",
-  }[overlayPosition]
-
-  // Determine button style classes
-  const buttonClasses =
-    buttonStyle === "custom"
-      ? customButtonClasses || "bg-black/40 backdrop-blur-sm text-white border border-white/30 hover:bg-white/10"
-      : {
-          primary: "bg-white text-black hover:bg-gray-200",
-          secondary: "bg-black text-white hover:bg-gray-800",
-          outline: "bg-transparent border-2 border-white text-white hover:bg-white/10",
-          transparent: "bg-transparent border border-white/50 text-white hover:bg-white/10 backdrop-blur-sm",
-        }[buttonStyle]
-
-  // Function to scroll to products section
-  const scrollToProductsSection = () => {
-    const productsSection = document.querySelector(".products-section")
-    if (productsSection) {
-      productsSection.scrollIntoView({ behavior: "smooth" })
-    }
+  // Handle image loading
+  const handleImageLoad = () => {
+    setImageLoaded(true)
+    clearTimeout(timeoutId.current)
   }
 
-  // Button click handler
-  const handleButtonClick = (e: React.MouseEvent) => {
-    if (scrollToProducts) {
-      e.preventDefault()
-      scrollToProductsSection()
-    }
+  // Handle image error
+  const handleImageError = () => {
+    setImageError(true)
+    clearTimeout(timeoutId.current)
+  }
+
+  // Handle logo loading
+  const handleLogoLoad = () => {}
+
+  // Handle logo error
+  const handleLogoError = (error: any) => {
+    console.error("Error loading logo:", error)
   }
 
   return (
-    <motion.div
-      className="relative h-[100vh] min-h-[350px] lg:-mt-26 w-full overflow-hidden"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
+    <div
+      className={clsx(
+        "relative w-full overflow-hidden bg-neutral-900",
+        isFullHeight ? "h-[80vh]" : "aspect-[21/9] md:aspect-[21/9]",
+        className,
+      )}
     >
-      {/* Background media - either video or image */}
-      {isVideo ? (
-        <>
-          <video
-            ref={videoRef}
-            src={finalImageSrc}
-            poster={fallbackSrc} // Show static image while video loads
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
-              videoLoaded ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <source src={finalImageSrc} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
-          {/* Loading placeholder for video */}
-          {!videoLoaded && (
-            <div className="absolute inset-0 bg-neutral-800">
-              {/* Static placeholder instead of animation */}
+      {/* Background Media */}
+      <div className="absolute inset-0 bg-neutral-900">
+        {isVideo && video ? (
+          <div className="absolute inset-0 bg-neutral-900">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className={clsx(
+                "h-full w-full object-cover transition-opacity duration-500",
+                videoLoaded ? "opacity-100" : "opacity-0",
+                imageClassName,
+              )}
+            >
+              <source src={video} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        ) : (
+          image && (
+            <div className="absolute inset-0 bg-neutral-900">
               <Image
-                src={fallbackSrc || "/placeholder.svg"}
-                alt=""
+                src={image || "/placeholder.svg"}
+                alt={title}
                 fill
                 priority
-                sizes="100vw"
-                className="object-cover"
+                className={clsx(
+                  "object-cover transition-opacity duration-500",
+                  imageLoaded ? "opacity-100" : "opacity-0",
+                  imageClassName,
+                )}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
               />
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          <Image
-            src={finalImageSrc || fallbackSrc}
-            alt=""
-            fill
-            className={`object-cover transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
-            priority
-            sizes="100vw"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => {
-              setImageError(true)
-              setImageLoaded(true)
-            }}
-          />
-          {/* Loading placeholder for image */}
-          {!imageLoaded && <div className="absolute inset-0 bg-neutral-800 animate-pulse" />}
-        </>
-      )}
+          )
+        )}
 
-      {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/30" />
+        {/* Overlay */}
+        {isOverlay && <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />}
+      </div>
 
-      {/* Content container with text overlay or logo */}
-      <div className={`absolute inset-0 flex flex-col justify-center ${overlayPositionClasses}`}>
-        <div className="max-w-3xl px-6 py-8 md:px-8">
-          {hasLogo ? (
-            <motion.div
-              className="mb-8 flex justify-center mt-0 md:mt-12 lg:mt-16"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Image
-                src={logoSrc || "/placeholder.svg"}
-                alt={title}
-                width={logoWidth}
-                height={logoHeight}
-                className="max-w-full h-auto md:w-[400px] lg:w-[500px]"
-                priority
-                onLoad={() => {
-                  /* Logo loaded */
-                }}
-                onError={() => {
-                  console.error("Logo failed to load:", logoSrc)
-                }}
-              />
-            </motion.div>
-          ) : !hideText ? (
-            <>
-              <motion.h1
-                className={`text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-${textColor}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                {title}
-              </motion.h1>
+      {/* Content */}
+      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center p-6 text-center text-white">
+        {/* Logo */}
+        {logo && (
+          <div
+            className={clsx(
+              "mb-6 w-full max-w-[200px]",
+              isLogoOverlay && "absolute z-20",
+              isLogoOverlayBottom && "bottom-6",
+              isLogoOverlayTop && "top-6",
+              isLogoOverlayLeft && "left-6 text-left",
+              isLogoOverlayRight && "right-6 text-right",
+              isLogoOverlayCentered && "left-1/2 -translate-x-1/2",
+              isLogoBottom && "mt-auto",
+              isLogoTop && "mb-auto",
+              isLogoLeft && "mr-auto text-left",
+              isLogoRight && "ml-auto text-right",
+              isLogoCentered && "mx-auto",
+              logoClassName,
+            )}
+          >
+            <Image
+              src={logo || "/placeholder.svg"}
+              alt={`${title} logo`}
+              width={200}
+              height={100}
+              className="h-auto w-full object-contain"
+              onLoad={handleLogoLoad}
+              onError={handleLogoError}
+            />
+          </div>
+        )}
 
-              <motion.p
-                className={`text-lg md:text-xl mb-8 text-${textColor}/90 max-w-xl`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-              >
-                {description}
-              </motion.p>
-            </>
-          ) : null}
-
-          {ctaText && (
+        {/* Text Content */}
+        <AnimatePresence>
+          {(imageLoaded || videoLoaded || imageError) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex justify-center"
-            >
-              {scrollToProducts ? (
-                <button
-                  onClick={handleButtonClick}
-                  className={`inline-block px-8 py-3 rounded-md font-medium text-base transition-all duration-200 ${buttonClasses}`}
-                >
-                  {ctaText}
-                </button>
-              ) : (
-                <Link
-                  href={ctaLink || "#"}
-                  className={`inline-block px-8 py-3 rounded-md font-medium text-base transition-all duration-200 ${buttonClasses}`}
-                >
-                  {ctaText}
-                </Link>
+              className={clsx(
+                "w-full max-w-4xl",
+                isTextOverlay && "absolute z-20",
+                isTextOverlayBottom && "bottom-6",
+                isTextOverlayTop && "top-6",
+                isTextOverlayLeft && "left-6 text-left",
+                isTextOverlayRight && "right-6 text-right",
+                isTextOverlayCentered && "left-1/2 -translate-x-1/2",
+                isTextBottom && "mt-auto",
+                isTextTop && "mb-auto",
+                isTextLeft && "mr-auto text-left",
+                isTextRight && "ml-auto text-right",
+                isTextCentered && "mx-auto text-center",
+                textClassName,
               )}
+            >
+              <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">{title}</h1>
+              {description && <p className="mx-auto max-w-2xl text-base text-neutral-200 md:text-lg">{description}</p>}
             </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </div>
-
-      {/* Visual indicator positioned at the bottom - only if not hidden */}
-      {!hideDownArrow && (
-        <motion.div
-          className="absolute bottom-8 left-0 right-0 flex justify-center w-full"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <div
-            className="text-white opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-            onClick={scrollToProductsSection}
-          >
-            <span className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-              <ChevronDown className="w-6 h-6" aria-hidden="true" />
-            </span>
-          </div>
-        </motion.div>
-      )}
-    </motion.div>
+    </div>
   )
 }

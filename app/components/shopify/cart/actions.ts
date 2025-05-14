@@ -22,7 +22,8 @@ export async function removeItem(_prevState: unknown, merchandiseId: string) {
     } else {
       return "Item not found in cart"
     }
-  } catch (_e) {
+  } catch (error) {
+    console.error("Error removing item from cart:", error)
     return "Error removing item from cart"
   }
 }
@@ -63,8 +64,8 @@ export async function updateItemQuantity(
     }
 
     revalidateTag(TAGS.cart)
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error("Error updating item quantity:", error)
     return "Error updating item quantity"
   }
 }
@@ -135,7 +136,8 @@ export async function addItem(_prevState: unknown, selectedVariantId: string | u
   try {
     await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }])
     revalidateTag(TAGS.cart)
-  } catch (_e) {
+  } catch (error) {
+    console.error("Error adding item to cart:", error)
     return "Error adding item to cart"
   }
 }

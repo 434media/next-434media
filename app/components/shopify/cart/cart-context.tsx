@@ -1,201 +1,173 @@
 "use client"
 
-import type { Cart, CartItem, Product, ProductVariant } from "../../../lib/shopify/types"
 import type React from "react"
-import { createContext, use, useContext, useMemo, useOptimistic } from "react"
+
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react"
+import type { Cart, Product, ProductVariant } from "../../../lib/shopify/types"
 
 export type UpdateType = "plus" | "minus" | "delete"
 
-type CartAction =
-  | {
-      type: "UPDATE_ITEM"
-      payload: { merchandiseId: string; updateType: UpdateType }
-    }
-  | {
-      type: "ADD_ITEM"
-      payload: { variant: ProductVariant; product: Product }
-    }
-
-type CartContextType = {
-  cartPromise: Promise<Cart | undefined>
+interface CartState {
+  cart: Cart | undefined
+  addCartItem: (variant: ProductVariant, product: Product) => void
+  updateCartItem: (merchandiseId: string, updateType: UpdateType) => void
+  hasValidCheckout: boolean
 }
 
-const CartContext = createContext<CartContextType | undefined>(undefined)
-
-function calculateItemCost(quantity: number, price: string): string {
-  return (Number(price) * quantity).toString()
-}
-
-function updateCartItem(item: CartItem, updateType: UpdateType): CartItem | null {
-  if (updateType === "delete") return null
-
-  const newQuantity = updateType === "plus" ? item.quantity + 1 : item.quantity - 1
-  if (newQuantity === 0) return null
-
-  const singleItemAmount = Number(item.cost.totalAmount.amount) / item.quantity
-  const newTotalAmount = calculateItemCost(newQuantity, singleItemAmount.toString())
-
-  return {
-    ...item,
-    quantity: newQuantity,
-    cost: {
-      ...item.cost,
-      totalAmount: {
-        ...item.cost.totalAmount,
-        amount: newTotalAmount,
-      },
-    },
+interface OptimisticAction {
+  type: "UPDATE_ITEM" | "ADD_ITEM"
+  payload: {
+    merchandiseId?: string
+    updateType?: UpdateType
+    variant?: ProductVariant
+    product?: Product
   }
 }
 
-function createOrUpdateCartItem(
-  existingItem: CartItem | undefined,
-  variant: ProductVariant,
-  product: Product,
-): CartItem {
-  const quantity = existingItem ? existingItem.quantity + 1 : 1
-  const totalAmount = calculateItemCost(quantity, variant.price.amount)
-
-  return {
-    id: existingItem?.id,
-    quantity,
-    cost: {
-      totalAmount: {
-        amount: totalAmount,
-        currencyCode: variant.price.currencyCode,
-      },
-    },
-    merchandise: {
-      id: variant.id,
-      title: variant.title,
-      selectedOptions: variant.selectedOptions,
-      product: {
-        id: product.id,
-        handle: product.handle,
-        title: product.title,
-        featuredImage: product.featuredImage,
-      },
-    },
-  }
-}
-
-function updateCartTotals(lines: CartItem[]): Pick<Cart, "totalQuantity" | "cost"> {
-  const totalQuantity = lines.reduce((sum, item) => sum + item.quantity, 0)
-  const totalAmount = lines.reduce((sum, item) => sum + Number(item.cost.totalAmount.amount), 0)
-  const currencyCode = lines[0]?.cost.totalAmount.currencyCode ?? "USD"
-
-  return {
-    totalQuantity,
-    cost: {
-      subtotalAmount: { amount: totalAmount.toString(), currencyCode },
-      totalAmount: { amount: totalAmount.toString(), currencyCode },
-      totalTaxAmount: { amount: "0", currencyCode },
-    },
-  }
-}
-
-function createEmptyCart(): Cart {
-  return {
-    id: undefined,
-    checkoutUrl: "",
-    totalQuantity: 0,
-    lines: [],
-    cost: {
-      subtotalAmount: { amount: "0", currencyCode: "USD" },
-      totalAmount: { amount: "0", currencyCode: "USD" },
-      totalTaxAmount: { amount: "0", currencyCode: "USD" },
-    },
-  }
-}
-
-function cartReducer(state: Cart | undefined, action: CartAction): Cart {
-  const currentCart = state || createEmptyCart()
-
-  switch (action.type) {
-    case "UPDATE_ITEM": {
-      const { merchandiseId, updateType } = action.payload
-      const updatedLines = currentCart.lines
-        .map((item) => (item.merchandise.id === merchandiseId ? updateCartItem(item, updateType) : item))
-        .filter(Boolean) as CartItem[]
-
-      if (updatedLines.length === 0) {
-        return {
-          ...currentCart,
-          lines: [],
-          totalQuantity: 0,
-          cost: {
-            ...currentCart.cost,
-            totalAmount: { ...currentCart.cost.totalAmount, amount: "0" },
-          },
-        }
-      }
-
-      return {
-        ...currentCart,
-        ...updateCartTotals(updatedLines),
-        lines: updatedLines,
-      }
-    }
-    case "ADD_ITEM": {
-      const { variant, product } = action.payload
-      const existingItem = currentCart.lines.find((item) => item.merchandise.id === variant.id)
-      const updatedItem = createOrUpdateCartItem(existingItem, variant, product)
-
-      const updatedLines = existingItem
-        ? currentCart.lines.map((item) => (item.merchandise.id === variant.id ? updatedItem : item))
-        : [...currentCart.lines, updatedItem]
-
-      return {
-        ...currentCart,
-        ...updateCartTotals(updatedLines),
-        lines: updatedLines,
-      }
-    }
-    default:
-      return currentCart
-  }
-}
-
-export function CartProvider({
-  children,
-  cartPromise,
-}: {
-  children: React.ReactNode
-  cartPromise: Promise<Cart | undefined>
-}) {
-  return <CartContext.Provider value={{ cartPromise }}>{children}</CartContext.Provider>
-}
+const CartContext = createContext<CartState | null>(null)
 
 export function useCart() {
   const context = useContext(CartContext)
-  if (context === undefined) {
+
+  if (!context) {
     throw new Error("useCart must be used within a CartProvider")
   }
 
-  const initialCart = use(context.cartPromise)
-  const [optimisticCart, updateOptimisticCart] = useOptimistic(initialCart, cartReducer)
+  return context
+}
 
-  const updateCartItem = (merchandiseId: string, updateType: UpdateType) => {
-    updateOptimisticCart({
-      type: "UPDATE_ITEM",
-      payload: { merchandiseId, updateType },
+interface CartProviderProps {
+  children: React.ReactNode
+  cartPromise: Promise<Cart | undefined>
+}
+
+export function CartProvider({ children, cartPromise }: CartProviderProps) {
+  const [cart, setCart] = useState<Cart | undefined>(undefined)
+  const [optimisticCart, setOptimisticCart] = useState<Cart | undefined>(undefined)
+  const [hasValidCheckout, setHasValidCheckout] = useState(false)
+
+  useEffect(() => {
+    cartPromise.then((cart) => {
+      setCart(cart)
+      setOptimisticCart(cart)
+      setHasValidCheckout(Boolean(cart?.checkoutUrl))
     })
-  }
+  }, [cartPromise])
 
-  const addCartItem = (variant: ProductVariant, product: Product) => {
-    updateOptimisticCart({ type: "ADD_ITEM", payload: { variant, product } })
-  }
+  const updateOptimisticCart = useCallback(
+    (action: OptimisticAction) => {
+      if (!optimisticCart) return
 
-  // Check if the cart has a valid checkout URL
-  const hasValidCheckout = optimisticCart?.checkoutUrl && optimisticCart.checkoutUrl !== ""
+      const { type, payload } = action
+      const { merchandiseId, updateType, variant, product } = payload
 
-  return useMemo(
+      const newCart = { ...optimisticCart }
+
+      if (type === "UPDATE_ITEM" && merchandiseId && updateType) {
+        const lineItem = newCart.lines.find((item) => item.merchandise.id === merchandiseId)
+
+        if (!lineItem) return
+
+        if (updateType === "delete") {
+          newCart.lines = newCart.lines.filter((item) => item.merchandise.id !== merchandiseId)
+          newCart.totalQuantity = (newCart.totalQuantity || 0) - lineItem.quantity
+        } else {
+          const quantity = updateType === "plus" ? lineItem.quantity + 1 : lineItem.quantity - 1
+
+          if (quantity <= 0) {
+            newCart.lines = newCart.lines.filter((item) => item.merchandise.id !== merchandiseId)
+            newCart.totalQuantity = (newCart.totalQuantity || 0) - lineItem.quantity
+          } else {
+            const updatedLines = newCart.lines.map((item) => {
+              if (item.merchandise.id === merchandiseId) {
+                return {
+                  ...item,
+                  quantity,
+                }
+              }
+              return item
+            })
+            newCart.lines = updatedLines
+            newCart.totalQuantity = (newCart.totalQuantity || 0) + (updateType === "plus" ? 1 : -1)
+          }
+        }
+      } else if (type === "ADD_ITEM" && variant && product) {
+        // Check if the item already exists in the cart
+        const existingItem = newCart.lines.find((item) => item.merchandise.id === variant.id)
+
+        if (existingItem) {
+          // Update the quantity of the existing item
+          const updatedLines = newCart.lines.map((item) => {
+            if (item.merchandise.id === variant.id) {
+              return {
+                ...item,
+                quantity: item.quantity + 1,
+              }
+            }
+            return item
+          })
+          newCart.lines = updatedLines
+        } else {
+          // Add the new item to the cart
+          const newItem = {
+            id: `temp-${Date.now()}`,
+            quantity: 1,
+            cost: {
+              totalAmount: {
+                amount: variant.price.amount,
+                currencyCode: variant.price.currencyCode,
+              },
+            },
+            merchandise: {
+              id: variant.id,
+              title: product.title,
+              selectedOptions: variant.selectedOptions,
+              product: {
+                id: product.id, // Added the id property
+                title: product.title,
+                handle: product.handle,
+                featuredImage: product.featuredImage,
+              },
+            },
+          }
+
+          newCart.lines = [...newCart.lines, newItem]
+        }
+
+        newCart.totalQuantity = (newCart.totalQuantity || 0) + 1
+      }
+
+      setOptimisticCart(newCart)
+    },
+    [optimisticCart],
+  )
+
+  const updateCartItem = useCallback(
+    (merchandiseId: string, updateType: UpdateType) => {
+      updateOptimisticCart({
+        type: "UPDATE_ITEM",
+        payload: { merchandiseId, updateType },
+      })
+    },
+    [updateOptimisticCart],
+  )
+
+  const addCartItem = useCallback(
+    (variant: ProductVariant, product: Product) => {
+      updateOptimisticCart({ type: "ADD_ITEM", payload: { variant, product } })
+    },
+    [updateOptimisticCart],
+  )
+
+  const value = useMemo(
     () => ({
       cart: optimisticCart,
       updateCartItem,
       addCartItem,
       hasValidCheckout,
     }),
-    [optimisticCart, hasValidCheckout, updateOptimisticCart],
+    [optimisticCart, hasValidCheckout, updateCartItem, addCartItem],
   )
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }

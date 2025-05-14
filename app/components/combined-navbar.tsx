@@ -13,8 +13,24 @@ import NavMenu from "./Navmenu"
 import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
 import { AIMLogo } from "./AIMLogo"
+import type { Menu } from "@/app/lib/shopify/types"
 
-export function CombinedNavbar() {
+interface CombinedNavbarProps {
+  menu?: Menu[]
+}
+
+// Custom hook to check if component has mounted
+function useHasMounted() {
+  const [hasMounted, setHasMounted] = useState(false)
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  return hasMounted
+}
+
+export function CombinedNavbar({ menu }: CombinedNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
@@ -22,9 +38,10 @@ export function CombinedNavbar() {
   const pathname = usePathname()
   const { cart } = useCart()
   const isMobile = useMobile()
+  const hasMounted = useHasMounted()
 
-  // Check if cart has items
-  const hasCartItems = typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
+  // Check if cart has items - only after component has mounted
+  const hasCartItems = hasMounted && typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
 
   // Check if we're in the shop section
   const isInShop = pathname?.startsWith("/shop") || pathname?.startsWith("/product") || pathname?.startsWith("/search")
@@ -108,7 +125,7 @@ export function CombinedNavbar() {
   return (
     <>
       {/* Mobile Marquee - Only on mobile */}
-      {isMobile && (
+      {hasMounted && isMobile && (
         <div className="fixed top-0 left-0 right-0 z-50 w-full overflow-hidden py-2 border-b border-emerald-500/10 bg-black/80 backdrop-blur-md">
           <MarqueeText
             text="ACTION SPEAKS LOUDER"
@@ -119,7 +136,7 @@ export function CombinedNavbar() {
         </div>
       )}
       <motion.header
-        className={`fixed ${isMobile ? "top-[40px]" : "top-0"} left-0 right-0 z-40 transition-all duration-300 backdrop-blur-md ${
+        className={`fixed ${hasMounted && isMobile ? "top-[40px]" : "top-0"} left-0 right-0 z-40 transition-all duration-300 backdrop-blur-md ${
           isScrolled ? "bg-black/80 shadow-lg py-2" : "bg-gradient-to-b from-black/70 to-black/10 py-4"
         }`}
         initial={{ y: -100 }}
@@ -223,7 +240,7 @@ export function CombinedNavbar() {
                 </Link>
               </motion.div>
 
-              {isInShop ? (
+              {hasMounted && isInShop ? (
                 <>
                   {/* Search Toggle - Only in shop */}
                   <button
@@ -280,7 +297,7 @@ export function CombinedNavbar() {
                   </motion.div>
 
                   {/* Action Speaks Louder Button - Only on desktop outside shop, now fourth */}
-                  {!isMobile && (
+                  {hasMounted && !isMobile && (
                     <motion.button
                       onClick={toggleActionMenu}
                       className="relative text-white px-4 py-2 text-sm font-geist-sans rounded-md flex items-center transition-all duration-300 shadow-md hover:shadow-lg border border-white/20 hover:border-white/40"
@@ -316,7 +333,7 @@ export function CombinedNavbar() {
               )}
 
               {/* Cart - Show on all pages when items exist */}
-              {!isInShop && hasCartItems && (
+              {hasMounted && !isInShop && hasCartItems && (
                 <div className="flex items-center">
                   <CartModal />
                 </div>
@@ -325,7 +342,7 @@ export function CombinedNavbar() {
           </div>
 
           {/* Search Dropdown - Only visible in shop section */}
-          {isInShop && (
+          {hasMounted && isInShop && (
             <AnimatePresence>
               {showSearch && (
                 <motion.div

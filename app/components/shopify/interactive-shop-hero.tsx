@@ -323,7 +323,7 @@ export function InteractiveShopHero({
   const fallbackImageUrl = "/placeholder.svg?height=800&width=1200&text=Interactive+Shop"
 
   // Use a reliable image URL or placeholder
-  const imageUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434Shop2Upscale.png"
+  const imageUrl = imageError ? fallbackImageUrl : "https://ampd-asset.s3.us-east-2.amazonaws.com/434Shop2Upscale.png"
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-neutral-950 pt-16 md:pt-20">

@@ -1,83 +1,38 @@
 "use client"
 
-import type React from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { motion } from "motion/react"
-import { useEffect, useState, useRef } from "react"
-import { ArrowLeft } from "lucide-react"
+import clsx from "clsx"
 
-export default function BackButton() {
+interface BackButtonProps {
+  className?: string
+  size?: "sm" | "md" | "lg"
+  variant?: "ghost" | "outline" | "solid"
+  label?: string
+  showLabel?: boolean
+  showArrow?: boolean
+  referrer?: string
+}
+
+export function BackButton({
+  className,
+  size = "md",
+  variant = "ghost",
+  label = "Back",
+  showLabel = true,
+  showArrow = true,
+  referrer = "/shop",
+}: BackButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const [referrer, setReferrer] = useState<string>("/search")
-  const [collectionName, setCollectionName] = useState<string>("Store")
-  // Create our own navigating ref instead of using the context
-  const isNavigating = useRef<boolean>(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isPressed, setIsPressed] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
-  // Capture the referrer when component mounts
-  useEffect(() => {
-    // Get referrer from document.referrer or sessionStorage
-    const previousPage = sessionStorage.getItem("previousPage") || document.referrer
-
-    // Extract the path from the full URL if it's from the same origin
-    let referrerPath = "/search" // Default fallback
-    let collection = "Store" // Default collection name
-
-    if (previousPage) {
-      try {
-        // For same-origin referrers, we can extract the path
-        if (previousPage.includes(window.location.origin)) {
-          const url = new URL(previousPage)
-          referrerPath = url.pathname
-
-          // Extract collection name from path
-          const pathParts = url.pathname.split("/")
-          if (pathParts.includes("search") && pathParts.length > 2) {
-            const searchIndex = pathParts.indexOf("search")
-            // Make sure there's an element after "search" in the path
-            if (searchIndex < pathParts.length - 1) {
-              const collectionSlug = pathParts[searchIndex + 1]
-              // Check if collectionSlug exists before using it
-              if (collectionSlug) {
-                // Convert slug to readable name (e.g., "txmx-boxing" to "TXMX Boxing")
-                collection = collectionSlug
-                  .split("-")
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(" ")
-              }
-            }
-          }
-        } else if (previousPage.startsWith("/")) {
-          // If it's already a path
-          referrerPath = previousPage
-        }
-
-        // If referrer is a collection page, use it
-        if (referrerPath.includes("/search/")) {
-          setReferrer(referrerPath)
-          setCollectionName(collection)
-        } else if (referrerPath !== pathname) {
-          // Only use referrer if it's not the current page
-          setReferrer(referrerPath)
-        }
-      } catch (e) {
-        console.error("Error parsing referrer:", e)
-      }
-    }
-
-    // Store current page for future reference
-    sessionStorage.setItem("previousPage", pathname)
-  }, [pathname])
-
-  // Force direct navigation without going through product state management
-  const handleBack = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    // Set the navigating flag
-    isNavigating.current = true
-
-    // Try using window.history first
+  // Handle back navigation
+  const handleBack = () => {
     try {
       window.history.back()
 
@@ -89,18 +44,24 @@ export default function BackButton() {
         }
       }, 100)
     } catch (error) {
+      console.error("Error navigating back:", error)
       // Direct fallback if history.back() fails
       router.push(referrer)
     }
   }
 
-  // Add keyboard shortcut for Escape key
+  // Handle keyboard navigation
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        // Set the navigating flag
-        isNavigating.current = true
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Navigate back on Backspace or Alt+Left Arrow
+      if ((e.key === "Backspace" && !isInputElement(e.target)) || (e.key === "ArrowLeft" && e.altKey)) {
+        e.preventDefault()
+        handleBack()
+      }
 
+      // Navigate back on Escape if the button is focused
+      if (e.key === "Escape" && document.activeElement === buttonRef.current) {
+        e.preventDefault()
         try {
           window.history.back()
 
@@ -111,27 +72,77 @@ export default function BackButton() {
             }
           }, 100)
         } catch (error) {
+          console.error("Error navigating back with Escape key:", error)
           router.push(referrer)
         }
       }
     }
 
-    window.addEventListener("keydown", handleEscape)
-    return () => window.removeEventListener("keydown", handleEscape)
-  }, [router, pathname, referrer])
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [pathname, referrer, router])
+
+  // Helper function to check if the target is an input element
+  const isInputElement = (target: EventTarget | null): boolean => {
+    if (!target) return false
+    const element = target as HTMLElement
+    const tagName = element.tagName.toLowerCase()
+    return tagName === "input" || tagName === "textarea" || tagName === "select" || element.isContentEditable
+  }
+
+  // Size classes
+  const sizeClasses = {
+    sm: "h-8 text-xs",
+    md: "h-10 text-sm",
+    lg: "h-12 text-base",
+  }
+
+  // Variant classes
+  const variantClasses = {
+    ghost: "hover:bg-neutral-800 active:bg-neutral-700",
+    outline: "border border-neutral-700 hover:bg-neutral-800 active:bg-neutral-700",
+    solid: "bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600",
+  }
 
   return (
     <motion.button
+      ref={buttonRef}
       onClick={handleBack}
-      className="absolute top-4 right-4 z-50 flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-black"
-      aria-label={`Back to ${collectionName}`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onMouseDown={() => setIsPressed(true)}
+      onMouseUp={() => setIsPressed(false)}
+      onBlur={() => {
+        setIsHovered(false)
+        setIsPressed(false)
+      }}
+      className={clsx(
+        "flex items-center justify-center rounded-md px-3 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white",
+        sizeClasses[size],
+        variantClasses[variant],
+        className,
+      )}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
+      aria-label="Go back"
     >
-      <ArrowLeft className="h-4 w-4" />
-      <span>Back to {collectionName}</span>
+      {showArrow && (
+        <motion.svg
+          xmlns="http://www.w3.org/2000/svg"
+          className={clsx("h-4 w-4", showLabel && "mr-2")}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          animate={{ x: isHovered ? -2 : 0 }}
+          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+        >
+          <path
+            fillRule="evenodd"
+            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+            clipRule="evenodd"
+          />
+        </motion.svg>
+      )}
+      {showLabel && <span>{label}</span>}
     </motion.button>
   )
 }
