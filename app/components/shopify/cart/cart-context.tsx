@@ -42,7 +42,7 @@ interface CartProviderProps {
 }
 
 export function CartProvider({ children, cartPromise }: CartProviderProps) {
-  const [cart, setCart] = useState<Cart | undefined>(undefined)
+  const [, setCart] = useState<Cart | undefined>(undefined)
   const [optimisticCart, setOptimisticCart] = useState<Cart | undefined>(undefined)
   const [hasValidCheckout, setHasValidCheckout] = useState(false)
 

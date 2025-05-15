@@ -28,7 +28,6 @@ export function BackButton({
   const router = useRouter()
   const pathname = usePathname()
   const [isHovered, setIsHovered] = useState(false)
-  const [isPressed, setIsPressed] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
   // Handle back navigation
@@ -110,11 +109,10 @@ export function BackButton({
       onClick={handleBack}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onMouseDown={() => setIsPressed(true)}
-      onMouseUp={() => setIsPressed(false)}
+      onMouseDown={() => {}}
+      onMouseUp={() => {}}
       onBlur={() => {
         setIsHovered(false)
-        setIsPressed(false)
       }}
       className={clsx(
         "flex items-center justify-center rounded-md px-3 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white",

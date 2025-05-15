@@ -12,11 +12,8 @@ import NavMenu from "./Navmenu"
 import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
 import { AIMLogo } from "./AIMLogo"
-import type { Menu } from "@/app/lib/shopify/types"
 
-interface CombinedNavbarProps {
-  menu?: Menu[]
-}
+type CombinedNavbarProps = {}
 
 // Custom hook to check if component has mounted
 function useHasMounted() {
@@ -29,7 +26,7 @@ function useHasMounted() {
   return hasMounted
 }
 
-export function CombinedNavbar({ menu }: CombinedNavbarProps) {
+export function CombinedNavbar({}: CombinedNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [hoveredLogo, setHoveredLogo] = useState<string | null>(null)
