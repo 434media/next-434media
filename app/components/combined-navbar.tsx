@@ -6,7 +6,6 @@ import Image from "next/image"
 import { motion, AnimatePresence } from "motion/react"
 import { usePathname } from "next/navigation"
 import CartModal from "./shopify/cart/modal"
-import Search from "./shopify/layout/navbar/search"
 import { useCart } from "./shopify/cart/cart-context"
 import { ScrambleText } from "./ScrambleText"
 import NavMenu from "./Navmenu"
@@ -32,7 +31,6 @@ function useHasMounted() {
 
 export function CombinedNavbar({ menu }: CombinedNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [hoveredLogo, setHoveredLogo] = useState<string | null>(null)
   const pathname = usePathname()
@@ -64,60 +62,7 @@ export function CombinedNavbar({ menu }: CombinedNavbarProps) {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  // Close search on route change
-  useEffect(() => {
-    setShowSearch(false)
-  }, [pathname])
-
-  // Handle keyboard navigation
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (showSearch) {
-          setShowSearch(false)
-        }
-      }
-    }
-
-    document.addEventListener("keydown", handleEscape)
-    return () => document.removeEventListener("keydown", handleEscape)
-  }, [showSearch])
-
-  // Focus management for search
-  useEffect(() => {
-    if (showSearch) {
-      // Small delay to ensure the search input is visible
-      setTimeout(() => {
-        const searchInput = document.querySelector('#search-panel input[type="text"]') as HTMLInputElement
-        if (searchInput) searchInput.focus()
-      }, 100)
-    }
-  }, [showSearch])
-
   // Animation variants
-  const searchVariants = {
-    open: {
-      height: "auto",
-      opacity: 1,
-      transition: {
-        height: {
-          type: "spring",
-          stiffness: 300,
-          damping: 30,
-        },
-        opacity: { duration: 0.2 },
-      },
-    },
-    closed: {
-      height: 0,
-      opacity: 0,
-      transition: {
-        height: { duration: 0.2 },
-        opacity: { duration: 0.1 },
-      },
-    },
-  }
-
   const toggleActionMenu = () => {
     setIsActionMenuOpen(!isActionMenuOpen)
   }
@@ -185,7 +130,7 @@ export function CombinedNavbar({ menu }: CombinedNavbarProps) {
                       alt="¿Qué es SDOH?"
                       width={100}
                       height={24}
-                      className="w-auto h-full grayscale"
+                      className="w-auto h-full"
                       priority={true}
                     />
                   </motion.div>
@@ -242,17 +187,6 @@ export function CombinedNavbar({ menu }: CombinedNavbarProps) {
 
               {hasMounted && isInShop ? (
                 <>
-                  {/* Search Toggle - Only in shop */}
-                  <button
-                    onClick={() => setShowSearch(!showSearch)}
-                    className="group flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                    aria-expanded={showSearch}
-                    aria-controls="search-panel"
-                    aria-label={showSearch ? "Close search" : "Open search"}
-                  >
-                    <i className="ri-search-line text-xl transition-transform group-hover:scale-110"></i>
-                  </button>
-
                   {/* Cart - Always shown in shop */}
                   <div className="flex items-center">
                     <CartModal />
@@ -340,27 +274,6 @@ export function CombinedNavbar({ menu }: CombinedNavbarProps) {
               )}
             </div>
           </div>
-
-          {/* Search Dropdown - Only visible in shop section */}
-          {hasMounted && isInShop && (
-            <AnimatePresence>
-              {showSearch && (
-                <motion.div
-                  id="search-panel"
-                  initial="closed"
-                  animate="open"
-                  exit="closed"
-                  variants={searchVariants}
-                  className="overflow-hidden border-t border-neutral-700/50 bg-black/80 backdrop-blur-md shadow-md"
-                  aria-label="Search panel"
-                >
-                  <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-                    <Search />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          )}
         </div>
       </motion.header>
 

@@ -38,3 +38,44 @@ export const validateEnvironmentVariables = () => {
     )
   }
 }
+
+/**
+ * Format a price with the appropriate currency symbol
+ * @param amount - The price amount (string or number)
+ * @param currencyCode - The currency code (e.g., 'USD', 'EUR')
+ * @returns Formatted price string
+ */
+export const formatPrice = (amount: string | number, currencyCode = "USD"): string => {
+  const numericAmount = typeof amount === "string" ? Number.parseFloat(amount) : amount
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numericAmount)
+}
+
+/**
+ * Format a price range with the appropriate currency symbol
+ * @param minPrice - The minimum price in the range
+ * @param maxPrice - The maximum price in the range
+ * @param currencyCode - The currency code (e.g., 'USD', 'EUR')
+ * @returns Formatted price range string
+ */
+export const formatPriceRange = (
+  minPrice: string | number,
+  maxPrice: string | number,
+  currencyCode = "USD",
+): string => {
+  const minNumeric = typeof minPrice === "string" ? Number.parseFloat(minPrice) : minPrice
+  const maxNumeric = typeof maxPrice === "string" ? Number.parseFloat(maxPrice) : maxPrice
+
+  // If min and max are the same, just return a single price
+  if (minNumeric === maxNumeric) {
+    return formatPrice(minNumeric, currencyCode)
+  }
+
+  // Otherwise, return a price range
+  return `${formatPrice(minNumeric, currencyCode)} - ${formatPrice(maxNumeric, currencyCode)}`
+}

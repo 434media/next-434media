@@ -51,5 +51,17 @@ export function getCollectionBannerImage(handle: string): string {
  * @returns True if the URL is a video
  */
 export function isVideoUrl(url: string): boolean {
-  return url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".mov")
+  // Convert to lowercase for case-insensitive comparison
+  const lowerUrl = url.toLowerCase()
+
+  // Check for common video extensions
+  // Also handle URLs with query parameters
+  return (
+    lowerUrl.endsWith(".mp4") ||
+    lowerUrl.endsWith(".webm") ||
+    lowerUrl.endsWith(".mov") ||
+    lowerUrl.includes(".mp4?") ||
+    lowerUrl.includes(".webm?") ||
+    lowerUrl.includes(".mov?")
+  )
 }

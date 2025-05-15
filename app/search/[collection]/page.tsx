@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Suspense } from "react"
+import type { Product } from "../../lib/shopify/types"
 import { getCollection } from "../../lib/shopify"
 import { safeGetCollectionProducts } from "../../lib/safe-fetch"
 import { defaultSort, sorting } from "../../lib/constants"
@@ -12,6 +13,7 @@ import ProductGridItems from "../../components/shopify/layout/product-grid-items
 import { CollectionBanner } from "../../components/shopify/collection-banner"
 import { Skeleton } from "../../components/shopify/skeleton"
 import { CollectionNavbar } from "../../components/shopify/collection-navbar"
+import { EmptyCollectionState } from "../../components/shopify/empty-collection-state"
 
 export const dynamic = "force-static" // Force static generation for faster loads
 export const revalidate = 3600 // Revalidate every hour
@@ -39,8 +41,23 @@ export default async function CategoryPage(props: {
   const { sort } = searchParams as { [key: string]: string }
   const { sortKey, reverse } = sorting.find((item) => item.slug === sort) || defaultSort
 
-  const collection = await getCollection(params.collection)
-  if (!collection) return notFound()
+  // Safely get collection with error handling
+  let collection
+  try {
+    collection = await getCollection(params.collection)
+    if (!collection) return notFound()
+  } catch (error) {
+    console.error(`Error fetching collection ${params.collection}:`, error)
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8">
+        <h1 className="text-2xl font-bold mb-4">Collection Not Available</h1>
+        <p className="text-gray-600 mb-6">We're having trouble loading this collection. Please try again later.</p>
+        <a href="/search" className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800">
+          Browse All Collections
+        </a>
+      </div>
+    )
+  }
 
   // Get all collections for the navbar dropdown
   const collections = await getCollections()
@@ -50,9 +67,6 @@ export default async function CategoryPage(props: {
 
   // Get collection-specific configuration
   const collectionConfig = getCollectionConfig(params.collection, `/search/${params.collection}`)
-
-  // Log collection handle for debugging
-  console.log("Collection handle:", params.collection, "Config:", collectionConfig)
 
   // Prefetch products data to avoid waterfall
   const productsPromise = safeGetCollectionProducts({
@@ -68,9 +82,11 @@ export default async function CategoryPage(props: {
         description={
           collectionConfig.description || collection.description || `Explore our ${collection.title} collection`
         }
-        imageSrc={bannerImage}
-        ctaText={collectionConfig.ctaText}
-        ctaLink={collectionConfig.ctaLink}
+        image={bannerImage}
+        ctaText="Shop Now"
+        scrollToProducts={true}
+        hideDownArrow={true}
+        hideText={true}
         overlayPosition={collectionConfig.overlayPosition}
         textColor={collectionConfig.textColor}
         buttonStyle={collectionConfig.buttonStyle}
@@ -78,9 +94,6 @@ export default async function CategoryPage(props: {
         logoSrc={collectionConfig.logoSrc}
         logoWidth={collectionConfig.logoWidth}
         logoHeight={collectionConfig.logoHeight}
-        scrollToProducts={collectionConfig.scrollToProducts}
-        hideDownArrow={collectionConfig.hideDownArrow}
-        hideText={collectionConfig.hideText}
       />
 
       <CollectionNavbar collections={collections} sortOptions={sorting} currentCollection={params.collection} />
@@ -96,7 +109,7 @@ export default async function CategoryPage(props: {
             </div>
           }
         >
-          <ProductsGrid productsPromise={productsPromise} />
+          <ProductsGrid productsPromise={productsPromise} collectionName={collection.title} />
         </Suspense>
       </div>
     </section>
@@ -106,13 +119,22 @@ export default async function CategoryPage(props: {
 // Optimize ProductsGrid to use the promise we already started
 async function ProductsGrid({
   productsPromise,
+  collectionName,
 }: {
-  productsPromise: Promise<any[]>
+  productsPromise: Promise<Product[]>
+  collectionName: string
 }) {
-  const products = await productsPromise
+  // Add error handling for the products promise
+  let products: Product[] = []
+  try {
+    products = await productsPromise
+  } catch (error) {
+    console.error("Error resolving products promise:", error)
+    // Continue with empty products array
+  }
 
   if (products.length === 0) {
-    return <p className="py-3 text-lg text-white">No products found in this collection</p>
+    return <EmptyCollectionState collectionName={collectionName} />
   }
 
   return (
