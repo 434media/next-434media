@@ -43,7 +43,7 @@ export function EmptyCollectionState({ collectionName }: EmptyCollectionStatePro
           transition={{ delay: 0.4 }}
           className="text-lg text-neutral-600 mb-8"
         >
-          We're working on something special for this collection. Check back soon for new products!
+          We&apos;re working on something special for this collection. Check back soon for new products!
         </motion.p>
 
         <motion.div

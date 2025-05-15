@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
+import Link from "next/link"
 import { Suspense } from "react"
 import type { Product } from "../../lib/shopify/types"
 import { getCollection } from "../../lib/shopify"
@@ -51,10 +52,10 @@ export default async function CategoryPage(props: {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-8">
         <h1 className="text-2xl font-bold mb-4">Collection Not Available</h1>
-        <p className="text-gray-600 mb-6">We're having trouble loading this collection. Please try again later.</p>
-        <a href="/search" className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800">
+        <p className="text-gray-600 mb-6">We&apos;re having trouble loading this collection. Please try again later.</p>
+        <Link href="/search" className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800">
           Browse All Collections
-        </a>
+        </Link>
       </div>
     )
   }
