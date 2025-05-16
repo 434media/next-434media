@@ -1,30 +1,19 @@
-import seoFragment from "../fragments/seo"
-
-const pageFragment = /* GraphQL */ `
-  fragment page on Page {
-    ... on Page {
+export const getPageQuery = /* GraphQL */ `
+  query getPage($handle: String!) {
+    pageByHandle(handle: $handle) {
       id
       title
       handle
       body
       bodySummary
       seo {
-        ...seo
+        title
+        description
       }
       createdAt
       updatedAt
     }
   }
-  ${seoFragment}
-`
-
-export const getPageQuery = /* GraphQL */ `
-  query getPage($handle: String!) {
-    pageByHandle(handle: $handle) {
-      ...page
-    }
-  }
-  ${pageFragment}
 `
 
 export const getPagesQuery = /* GraphQL */ `
@@ -32,10 +21,16 @@ export const getPagesQuery = /* GraphQL */ `
     pages(first: 100) {
       edges {
         node {
-          ...page
+          id
+          title
+          handle
+          bodySummary
+          createdAt
+          updatedAt
         }
       }
     }
   }
-  ${pageFragment}
 `
+
+export default { getPageQuery, getPagesQuery }

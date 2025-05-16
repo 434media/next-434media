@@ -1,44 +1,16 @@
-import productFragment from "../fragments/product"
-import seoFragment from "../fragments/seo"
-import imageFragment from "../fragments/image"
-
-const collectionFragment = /* GraphQL */ `
-  fragment collection on Collection {
-    handle
-    title
-    description
-    seo {
-      ...seo
-    }
-    image {
-      ...image
-    }
-    updatedAt
-  }
-  ${seoFragment}
-  ${imageFragment}
-`
-
 export const getCollectionQuery = /* GraphQL */ `
   query getCollection($handle: String!) {
     collection(handle: $handle) {
-      ...collection
-    }
-  }
-  ${collectionFragment}
-`
-
-export const getCollectionsQuery = /* GraphQL */ `
-  query getCollections {
-    collections(first: 100, sortKey: TITLE) {
-      edges {
-        node {
-          ...collection
-        }
+      handle
+      title
+      description
+      seo {
+        title
+        description
       }
+      updatedAt
     }
   }
-  ${collectionFragment}
 `
 
 export const getCollectionProductsQuery = /* GraphQL */ `
@@ -51,11 +23,88 @@ export const getCollectionProductsQuery = /* GraphQL */ `
       products(sortKey: $sortKey, reverse: $reverse, first: 100) {
         edges {
           node {
-            ...product
+            id
+            handle
+            availableForSale
+            title
+            description
+            descriptionHtml
+            options {
+              id
+              name
+              values
+            }
+            priceRange {
+              maxVariantPrice {
+                amount
+                currencyCode
+              }
+              minVariantPrice {
+                amount
+                currencyCode
+              }
+            }
+            variants(first: 250) {
+              edges {
+                node {
+                  id
+                  title
+                  availableForSale
+                  selectedOptions {
+                    name
+                    value
+                  }
+                  price {
+                    amount
+                    currencyCode
+                  }
+                }
+              }
+            }
+            featuredImage {
+              url
+              altText
+              width
+              height
+            }
+            images(first: 20) {
+              edges {
+                node {
+                  url
+                  altText
+                  width
+                  height
+                }
+              }
+            }
+            seo {
+              title
+              description
+            }
+            tags
+            updatedAt
           }
         }
       }
     }
   }
-  ${productFragment}
+`
+
+export const getCollectionsQuery = /* GraphQL */ `
+  query getCollections {
+    collections(first: 100) {
+      edges {
+        node {
+          handle
+          title
+          description
+          seo {
+            title
+            description
+          }
+          updatedAt
+        }
+      }
+    }
+  }
 `

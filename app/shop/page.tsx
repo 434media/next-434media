@@ -1,23 +1,22 @@
 import type { Metadata } from "next"
-import { InteractiveShopHero } from "../components/shopify/interactive-shop-hero"
+import { VideoHero } from "../components/shopify/video-hero"
 import { getCollections } from "../lib/shopify"
+
 export const dynamic = "force-static" // Force static generation for faster loads
 export const revalidate = 3600 // Revalidate every hour
 
 export const metadata: Metadata = {
-  title: "Shop Coming Soon | 434 MEDIA",
-  description:
-    "Our exclusive merchandise shop is coming soon. Sign up to be notified when we launch and get early access to limited edition items.",
+  title: "434 MEDIA Shop | Exclusive Merchandise",
+  description: "Shop exclusive 434 MEDIA merchandise featuring TXMX Boxing, DEVSA, and Vemos Vamos collections.",
   openGraph: {
-    title: "Shop Coming Soon | 434 MEDIA",
-    description:
-      "Our exclusive merchandise shop is coming soon. Sign up to be notified when we launch and get early access to limited edition items.",
+    title: "434 MEDIA Shop | Exclusive Merchandise",
+    description: "Shop exclusive 434 MEDIA merchandise featuring TXMX Boxing, DEVSA, and Vemos Vamos collections.",
     images: [
       {
         url: "/shop-coming-soon-og.jpg",
         width: 1200,
         height: 630,
-        alt: "434 MEDIA Shop Coming Soon",
+        alt: "434 MEDIA Shop",
       },
     ],
   },
@@ -33,22 +32,27 @@ export default async function ShopPage() {
     title: "Default Collection",
     description: "",
     image: undefined,
-    path: "/",
-    seo: { title: "Default SEO Title", description: "Default SEO Description" }, // Add default SEO
-    updatedAt: new Date().toISOString(), // Add updatedAt with current timestamp
+    path: "/search/all",
+    seo: { title: "Default SEO Title", description: "Default SEO Description" },
+    updatedAt: new Date().toISOString(),
   }
 
-  const frameOneCollection = collections.find((c) => c.handle === "434-media") ?? collections[0] ?? fallbackCollection
-  const frameTwoCollection = collections.find((c) => c.handle === "vemosvamos") ?? collections[0] ?? fallbackCollection
-  const computerCollection = collections.find((c) => c.handle === "devsa") ?? collections[0] ?? fallbackCollection
-  const boxingCollection = collections.find((c) => c.handle === "txmx-boxing") ?? collections[0] ?? fallbackCollection
+  // Get the specific collections featured in the video
+  const txmxCollection = collections.find((c) => c.handle === "txmx-boxing") ?? collections[0] ?? fallbackCollection
+  const devsaCollection = collections.find((c) => c.handle === "devsa") ?? collections[1] ?? fallbackCollection
+  const vemosVamosCollection =
+    collections.find((c) => c.handle === "vemosvamos") ?? collections[2] ?? fallbackCollection
 
   return (
-    <InteractiveShopHero
-      frameOneCollection={frameOneCollection}
-      frameTwoCollection={frameTwoCollection}
-      computerCollection={computerCollection}
-      boxingCollection={boxingCollection}
-    />
+    <main className="flex-1">
+      <VideoHero
+        videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/434_SHOP_1080_V001.mp4"
+        featuredCollection={txmxCollection}
+        secondaryCollection={vemosVamosCollection}
+        tertiaryCollection={devsaCollection}
+        allCollectionsPath="/search"
+        ctaText="Shop Collections"
+      />
+    </main>
   )
 }

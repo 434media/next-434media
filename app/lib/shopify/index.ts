@@ -2,27 +2,8 @@ import { SHOPIFY_GRAPHQL_API_ENDPOINT, TAGS } from "../constants"
 import { isShopifyError } from "../type-guards"
 import { ensureStartsWith } from "../utils"
 import { revalidateTag } from "next/cache"
-import { NextResponse } from "next/server"
+import { NextResponse, NextRequest } from "next/server"
 import { cookies, headers } from "next/headers"
-import { NextRequest } from "next/server"
-import {
-  addToCartMutation,
-  createCartMutation,
-  editCartItemsMutation,
-  removeFromCartMutation,
-} from "./mutations/cart"
-import {
-  getCartQuery,
-  getCollectionProductsQuery,
-  getCollectionQuery,
-  getCollectionsQuery,
-  getMenuQuery,
-  getPageQuery,
-  getPagesQuery,
-  getProductRecommendationsQuery,
-  getProductQuery,
-  getProductsQuery,
-} from "./queries"
 import {
   Cart,
   Collection,
@@ -46,6 +27,27 @@ import {
   ShopifyUpdateCartOperation,
 } from "./types"
 
+import { 
+  createCartMutation,
+  addToCartMutation,
+  removeFromCartMutation,
+  editCartItemsMutation 
+} from "./mutations/cart"
+
+import { getCartQuery } from "./queries/cart"
+import { 
+  getCollectionQuery,
+  getCollectionsQuery,
+  getCollectionProductsQuery 
+} from "./queries/collection"
+import { getMenuQuery } from "./queries/menu"
+import { getPageQuery, getPagesQuery } from "./queries/page"
+import { 
+  getProductQuery,
+  getProductsQuery,
+  getProductRecommendationsQuery 
+} from "./queries/product"
+
 const domain = process.env.SHOPIFY_STORE_DOMAIN ? ensureStartsWith(process.env.SHOPIFY_STORE_DOMAIN, "https://") : ""
 const endpoint = `${domain}${SHOPIFY_GRAPHQL_API_ENDPOINT}`
 const key = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN!
@@ -62,7 +64,7 @@ export async function shopifyFetch<T>({
 }: {
   headers?: HeadersInit
   query: string
-  variables?: any
+  variables?: Record<string, unknown>
 }): Promise<{ status: number; body: T } | never> {
   try {
     const result = await fetch(endpoint, {
@@ -88,7 +90,7 @@ export async function shopifyFetch<T>({
       status: result.status,
       body,
     }
-  } catch (e) {
+  } catch (e: any) {
     if (isShopifyError(e)) {
       throw {
         cause: e.cause?.toString() || "unknown",
@@ -106,7 +108,7 @@ export async function shopifyFetch<T>({
 }
 
 const removeEdgesAndNodes = <T>(array: Connection<T>): T[] => {
-  return array.edges.map((edge) => edge?.node);
+  return array.edges.map((edge) => edge.node);
 };
 
 const reshapeCart = (shopifyCart: any): Cart => {
@@ -125,12 +127,22 @@ const reshapeCart = (shopifyCart: any): Cart => {
     };
   }
 
+  // Ensure totalTaxAmount has non-undefined values
+  const totalTaxAmount = {
+    amount: shopifyCart.cost.totalTaxAmount?.amount || "0.0",
+    currencyCode: shopifyCart.cost.totalTaxAmount?.currencyCode || shopifyCart.cost.totalAmount.currencyCode
+  };
+
   return {
-    id: shopifyCart.id,
+    id: shopifyCart.id || "",
     checkoutUrl: shopifyCart.checkoutUrl,
     totalQuantity: shopifyCart.totalQuantity,
     lines: removeEdgesAndNodes(shopifyCart.lines),
-    cost: shopifyCart.cost
+    cost: {
+      subtotalAmount: shopifyCart.cost.subtotalAmount,
+      totalAmount: shopifyCart.cost.totalAmount,
+      totalTaxAmount: totalTaxAmount
+    }
   };
 };
 
@@ -149,7 +161,7 @@ const reshapeCollection = (
 };
 
 const reshapeCollections = (collections: any[]): Collection[] => {
-  const reshapedCollections = [];
+  const reshapedCollections: Collection[] = [];
 
   for (const collection of collections) {
     if (collection) {
@@ -168,8 +180,8 @@ const reshapeImages = (images: Connection<Image>, productTitle: string): Image[]
   const flattened = removeEdgesAndNodes(images);
 
   return flattened.map((image) => {
-    const filename = image.url.match(/.*\/(.*)\..*/)?.[1];
-    const altText = image.altText;
+    const filename = image?.url?.match(/.*\/(.*)\..*/)?.[1];
+    const altText = image?.altText;
     return {
       ...image,
       altText: altText || `${productTitle} - ${filename}`
@@ -226,7 +238,7 @@ export async function createCart(): Promise<Cart> {
       console.error("Shopify returned a cart without a checkout URL");
       // Create a basic cart structure with default values
       return {
-        id: undefined,
+        id: "",
         checkoutUrl: "",
         totalQuantity: 0,
         lines: [],
@@ -243,7 +255,7 @@ export async function createCart(): Promise<Cart> {
     console.error("Error creating cart:", error);
     // Return a default cart on error
     return {
-      id: undefined,
+      id: "",
       checkoutUrl: "",
       totalQuantity: 0,
       lines: [],
@@ -528,7 +540,11 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
     'products/delete',
     'products/update'
   ];
-  const topic = (await headers()).get('x-shopify-topic') || 'unknown';
+  
+  // Use await with headers() since it returns a Promise
+  const headersList = await headers();
+  const topic = headersList.get('x-shopify-topic') || 'unknown';
+  
   const secret = req.nextUrl.searchParams.get('secret');
   const isCollectionUpdate = collectionWebhooks.includes(topic);
   const isProductUpdate = productWebhooks.includes(topic);
@@ -552,4 +568,15 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json({ status: 200, revalidated: true, now: Date.now() });
+}
+
+export function createUrl(pathname: string, params: URLSearchParams | Record<string, string> = {}) {
+  const searchParams = params instanceof URLSearchParams
+    ? params
+    : new URLSearchParams(Object.entries(params).filter(([_, value]) => value !== undefined));
+
+  const paramsString = searchParams.toString();
+  const queryString = paramsString.length > 0 ? `?${paramsString}` : '';
+
+  return `${pathname}${queryString}`;
 }

@@ -8,19 +8,20 @@ export type Edge<T> = {
   node: T
 }
 
-export type Cart = Omit<ShopifyCart, "lines"> & {
-  lines: CartItem[]
-}
-
-export type CartProduct = {
+export type Cart = {
   id: string
-  handle: string
-  title: string
-  featuredImage: Image
+  checkoutUrl: string
+  cost: {
+    subtotalAmount: Money
+    totalAmount: Money
+    totalTaxAmount: Money
+  }
+  lines: CartItem[]
+  totalQuantity: number
 }
 
 export type CartItem = {
-  id: string | undefined
+  id: string
   quantity: number
   cost: {
     totalAmount: Money
@@ -32,13 +33,18 @@ export type CartItem = {
       name: string
       value: string
     }[]
-    product: CartProduct
+    product: Product
   }
 }
 
-export type Collection = ShopifyCollection & {
+export type Collection = {
+  handle: string
+  title: string
+  description: string
+  seo: SEO
   path: string
-  image?: Image // Add this line to include the collection image
+  updatedAt: string
+  image?: Image
 }
 
 export type Image = {
@@ -69,9 +75,26 @@ export type Page = {
   updatedAt: string
 }
 
-export type Product = Omit<ShopifyProduct, "variants" | "images"> & {
+export type Product = {
+  id: string
+  handle: string
+  availableForSale: boolean
+  title: string
+  description: string
+  descriptionHtml: string
+  options: ProductOption[]
+  priceRange: {
+    maxVariantPrice: Money
+    minVariantPrice: Money
+  }
   variants: ProductVariant[]
+  featuredImage: Image
   images: Image[]
+  seo: SEO
+  tags: string[]
+  updatedAt: string
+  vendor?: string
+  productType?: string
 }
 
 export type ProductOption = {
@@ -97,12 +120,12 @@ export type SEO = {
 }
 
 export type ShopifyCart = {
-  id: string | undefined
+  id: string
   checkoutUrl: string
   cost: {
     subtotalAmount: Money
     totalAmount: Money
-    totalTaxAmount: Money
+    totalTaxAmount?: Money
   }
   lines: Connection<CartItem>
   totalQuantity: number
@@ -112,9 +135,9 @@ export type ShopifyCollection = {
   handle: string
   title: string
   description: string
-  image?: Image // Add this line to include the collection image
   seo: SEO
   updatedAt: string
+  image?: Image
 }
 
 export type ShopifyProduct = {
@@ -135,19 +158,14 @@ export type ShopifyProduct = {
   seo: SEO
   tags: string[]
   updatedAt: string
+  vendor?: string
+  productType?: string
 }
 
-export type ShopifyCartOperation = {
-  data: {
-    cart: ShopifyCart
-  }
-  variables: {
-    cartId: string
-  }
-}
-
-export type ShopifyCreateCartOperation = {
-  data: { cartCreate: { cart: ShopifyCart } }
+export type ShopifyErrorLike = {
+  status: number
+  message: string
+  cause?: Error
 }
 
 export type ShopifyAddToCartOperation = {
@@ -165,31 +183,12 @@ export type ShopifyAddToCartOperation = {
   }
 }
 
-export type ShopifyRemoveFromCartOperation = {
+export type ShopifyCartOperation = {
   data: {
-    cartLinesRemove: {
-      cart: ShopifyCart
-    }
+    cart: ShopifyCart
   }
   variables: {
     cartId: string
-    lineIds: string[]
-  }
-}
-
-export type ShopifyUpdateCartOperation = {
-  data: {
-    cartLinesUpdate: {
-      cart: ShopifyCart
-    }
-  }
-  variables: {
-    cartId: string
-    lines: {
-      id: string
-      merchandiseId: string
-      quantity: number
-    }[]
   }
 }
 
@@ -219,6 +218,10 @@ export type ShopifyCollectionsOperation = {
   data: {
     collections: Connection<ShopifyCollection>
   }
+}
+
+export type ShopifyCreateCartOperation = {
+  data: { cartCreate: { cart: ShopifyCart } }
 }
 
 export type ShopifyMenuOperation = {
@@ -270,5 +273,33 @@ export type ShopifyProductsOperation = {
     query?: string
     reverse?: boolean
     sortKey?: string
+  }
+}
+
+export type ShopifyRemoveFromCartOperation = {
+  data: {
+    cartLinesRemove: {
+      cart: ShopifyCart
+    }
+  }
+  variables: {
+    cartId: string
+    lineIds: string[]
+  }
+}
+
+export type ShopifyUpdateCartOperation = {
+  data: {
+    cartLinesUpdate: {
+      cart: ShopifyCart
+    }
+  }
+  variables: {
+    cartId: string
+    lines: {
+      id: string
+      merchandiseId: string
+      quantity: number
+    }[]
   }
 }

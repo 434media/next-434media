@@ -123,10 +123,21 @@ export function CartProvider({ children, cartPromise }: CartProviderProps) {
               title: product.title,
               selectedOptions: variant.selectedOptions,
               product: {
-                id: product.id, // Added the id property
+                id: product.id,
                 title: product.title,
                 handle: product.handle,
                 featuredImage: product.featuredImage,
+                // Added required properties to match the Product type
+                availableForSale: product.availableForSale,
+                description: product.description,
+                descriptionHtml: product.descriptionHtml,
+                options: product.options,
+                priceRange: product.priceRange,
+                variants: product.variants,
+                images: product.images,
+                seo: product.seo,
+                tags: product.tags,
+                updatedAt: product.updatedAt,
               },
             },
           }

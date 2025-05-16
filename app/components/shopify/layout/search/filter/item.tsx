@@ -1,71 +1,36 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import clsx from "clsx"
+import type { SortFilterItem } from "../../../../../lib/constants"
+import { createUrl } from "../../../../../lib/utils"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 
-export function FilterItem({
-  item,
-}: {
-  item:
-    | {
-        title: string
-        path: string
-      }
-    | {
-        title: string
-        slug: string
-      }
-}) {
+export default function FilterItem({ item }: { item: SortFilterItem }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [active, setActive] = useState(false)
-
-  useEffect(() => {
-    if ("path" in item) {
-      const itemPath = item.path.split("?")[0]
-      setActive(pathname === itemPath)
-    } else {
-      setActive(searchParams.get("sort") === item.slug)
-    }
-  }, [pathname, searchParams, item])
-
-  if ("path" in item) {
-    return (
-      <div className="w-full">
-        <Link
-          href={item.path}
-          className={clsx("block w-full px-4 py-2 text-sm font-medium rounded-md transition-colors", {
-            "bg-emerald-600 text-white hover:bg-emerald-500": active,
-            "bg-neutral-700 text-white hover:bg-neutral-600": !active,
-          })}
-        >
-          {item.title}
-        </Link>
-      </div>
-    )
-  }
-
-  function clsx(...classes: any[]) {
-    return classes.filter(Boolean).join(" ")
-  }
+  const active = searchParams.get("sort") === item.slug
+  const q = searchParams.get("q")
+  const href = createUrl(
+    pathname,
+    new URLSearchParams({
+      ...(q && { q }),
+      ...(item.slug && { sort: item.slug }),
+    }),
+  )
+  const DynamicTag = active ? "p" : Link
 
   return (
-    <div className="w-full">
-      <Link
-        href={{
-          pathname,
-          query: {
-            sort: item.slug,
-          },
-        }}
-        className={clsx("block w-full px-4 py-2 text-sm font-medium rounded-md transition-colors", {
-          "bg-emerald-600 text-white hover:bg-emerald-500": active,
-          "bg-neutral-700 text-white hover:bg-neutral-600": !active,
+    <li className="mt-2 flex text-sm text-gray-400" key={item.slug}>
+      <DynamicTag
+        href={href}
+        className={clsx("w-full hover:text-gray-800 dark:hover:text-gray-100", {
+          "text-gray-600 dark:text-gray-400": !active,
+          "font-semibold text-black dark:text-white": active,
         })}
       >
         {item.title}
-      </Link>
-    </div>
+      </DynamicTag>
+    </li>
   )
 }
