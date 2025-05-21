@@ -3,8 +3,8 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { useMobile } from "../hooks/use-mobile"
-import type { Locale } from "../../i18n-config"
+import { useMobile } from "../../hooks/use-mobile"
+import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
 // Extend the Window interface to include the turnstile property

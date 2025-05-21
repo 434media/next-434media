@@ -3,8 +3,8 @@
 import { useRef, useEffect, useState } from "react"
 import { motion, useInView } from "motion/react"
 import Image from "next/image"
-import { FadeIn } from "./FadeIn"
-import type { Locale } from "../../i18n-config"
+import { FadeIn } from "../FadeIn"
+import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
 interface SDOHMissionProps {
@@ -12,7 +12,6 @@ interface SDOHMissionProps {
   dict: Dictionary
 }
 
-// Change from export function to export default function
 export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
   const missionRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -44,7 +43,7 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
 
   return (
     <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-white to-neutral-50 overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
         <FadeIn>
           {/* SDOH Introduction Section - Typography focused */}
           <div ref={introRef} className="relative mb-20 sm:mb-28">
@@ -53,7 +52,7 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={introInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.7 }}
-              className="mb-12 sm:mb-16 max-w-4xl mx-auto"
+              className="mb-12 sm:mb-16 max-w-5xl mx-auto"
             >
               {/* Main heading with gradient */}
               <motion.h2
@@ -65,19 +64,19 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
                 {dict?.sdoh?.title || "¿Qué es SDOH?"}
               </motion.h2>
 
-              {/* Subtitle with reveal animation */}
+              {/* Subtitle with reveal animation - fixed to prevent wrapping */}
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={introInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.7, delay: 0.3 }}
-                className="text-xl sm:text-2xl md:text-3xl text-neutral-600 font-medium leading-snug"
+                className="text-lg sm:text-xl md:text-2xl text-neutral-600 font-medium leading-snug tracking-tight whitespace-nowrap overflow-hidden text-ellipsis px-4"
               >
                 {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
               </motion.p>
             </motion.div>
 
             {/* Main text with staggered reveal */}
-            <div className="space-y-8 max-w-3xl mx-auto">
+            <div className="space-y-8 max-w-5xl mx-auto">
               <motion.p
                 initial={{ opacity: 0, y: 15 }}
                 animate={introInView ? { opacity: 1, y: 0 } : {}}

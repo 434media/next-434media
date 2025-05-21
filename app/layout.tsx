@@ -4,10 +4,16 @@ import { Geist, Geist_Mono } from "next/font/google"
 import localFont from "next/font/local"
 import "./globals.css"
 import "remixicon/fonts/remixicon.css"
-import Navbar from "./components/Navbar"
+import { CombinedNavbar } from "./components/combined-navbar"
 import Footer from "./components/Footer"
-import { Analytics } from '@vercel/analytics/next';
-import { GoogleTagManager } from '@next/third-parties/google'
+import { Analytics } from "@vercel/analytics/next"
+import { GoogleTagManager } from "@next/third-parties/google"
+import { Toaster } from "sonner"
+import { getCart, getMenu } from "./lib/shopify"
+import { CartProvider } from "./components/shopify/cart/cart-context"
+import { PageTransition } from "./components/shopify/page-transition"
+import { WelcomeToast } from "./components/shopify//welcome-toast"
+import { Suspense } from "react"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -124,11 +130,15 @@ export const viewport = {
   minimumScale: 1,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Don't await the fetch, pass the Promise to the context provider
+  const cart = getCart()
+  const menu = await getMenu("next-js-frontend-header-menu")
+
   return (
     <html lang="en" className="scroll-smooth">
       <head>
@@ -139,12 +149,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
-        <Navbar />
-        {children}
-        <Analytics />
-        <Footer />
+        <CartProvider cartPromise={cart}>
+          <Suspense>
+            <CombinedNavbar menu={menu} />
+          </Suspense>
+          <main>
+            <PageTransition>{children}</PageTransition>
+            <Toaster closeButton />
+            <WelcomeToast />
+          </main>
+          <Analytics />
+          <Footer />
+        </CartProvider>
       </body>
     </html>
   )
 }
-
