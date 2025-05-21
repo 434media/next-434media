@@ -11,7 +11,6 @@ interface CollectionBannerProps {
   description?: string
   image?: string
   ctaText?: string
-  ctaLink?: string
   overlayPosition?: "center" | "left" | "right"
   textColor?: string
   buttonStyle?: "primary" | "secondary" | "outline" | "transparent" | "custom"
@@ -24,12 +23,6 @@ interface CollectionBannerProps {
   hideText?: boolean
   customAnimation?: "none" | "fade" | "slide" | "zoom" | "pulse"
   videoOverlay?: string
-  secondaryCta?: {
-    text: string
-    link: string
-    style: "primary" | "secondary" | "outline" | "transparent" | "custom"
-    customClasses?: string
-  }
 }
 
 export function CollectionBanner({
@@ -37,7 +30,6 @@ export function CollectionBanner({
   description,
   image,
   ctaText = "Shop Now", // Default to "Shop Now"
-  ctaLink,
   overlayPosition = "center",
   textColor = "text-white",
   buttonStyle = "primary",
@@ -45,14 +37,11 @@ export function CollectionBanner({
   logoSrc,
   logoWidth = 200,
   logoHeight = 100,
-  scrollToProducts = true, // Default to true - always scroll to products
-  hideDownArrow = true, // Default to true - hide down arrow
   hideText = true, // Default to true - hide text overlay
   customAnimation = "fade",
   videoOverlay,
-  secondaryCta,
 }: CollectionBannerProps) {
-  const [mediaLoaded, setMediaLoaded] = useState(false)
+  const [, setMediaLoaded] = useState(false)
   const [mediaError, setMediaError] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const bannerRef = useRef<HTMLDivElement>(null)
