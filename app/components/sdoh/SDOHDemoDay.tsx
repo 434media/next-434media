@@ -1,5 +1,4 @@
 "use client"
-
 import { useState, useRef } from "react"
 import { FadeIn } from "../FadeIn"
 import type { Locale } from "../../../i18n-config"
@@ -24,7 +23,6 @@ export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
   const description =
     demoDayDict?.description ||
     "Watch how our accelerator cohort companies are transforming healthcare through innovation."
-  const learnMore = demoDayDict?.learnMore || "Learn More About the Accelerator"
 
   // Simple toggle function
   const togglePlay = () => {
@@ -49,7 +47,8 @@ export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
     <FadeIn>
       <div className="max-w-4xl mx-auto">
         <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-2xl overflow-hidden shadow-xl border border-cyan-500/30">
-          <div className="aspect-video relative">
+          {/* Video container with aspect ratio - 16:9 on mobile, 4:5 (1080x1350) on desktop */}
+          <div className="aspect-video md:aspect-[4/5] relative">
             {/* Simplified video element with direct src */}
             <video
               ref={videoRef}
@@ -92,32 +91,6 @@ export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
               <p className="text-base md:text-lg text-white/90 max-w-md">{description}</p>
             </div>
           </div>
-        </div>
-
-        {/* Learn more link */}
-        <div className="text-center mt-8">
-          <a
-            href="https://velocitytx.org/startup-programs/support/accelerator/"
-            className="inline-flex items-center text-cyan-700 hover:text-cyan-800 font-medium"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Learn more about the Community Health Accelerator"
-          >
-            {learnMore}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 ml-1"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
-          </a>
         </div>
       </div>
     </FadeIn>

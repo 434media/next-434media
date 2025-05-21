@@ -339,34 +339,43 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
 
   return (
     <FadeIn key={key}>
-      <div className="max-w-3xl mx-auto mb-16 sm:mb-20">
-        <div className="text-center mb-10">
-          {/* Updated heading with component number */}
-          <div className="flex items-center justify-center mb-6">
-            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-4 shadow-lg">
-              2
+      <div className="max-w-5xl mx-auto mb-16 sm:mb-20">
+        {/* Main Content - Updated with grid layout similar to SDOHMission */}
+        <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-center">
+          <div className="order-2 md:order-1">
+            {/* Updated heading with component number */}
+            <div className="flex items-center mb-8">
+              <div className="flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-5 shadow-lg">
+                2
+              </div>
+              <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700">
+                {d.title}
+              </h2>
             </div>
-            <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700">
-              {d.title}
-            </h2>
+            <div className="inline-block p-2 px-4 mb-6 rounded-full bg-cyan-100/90 backdrop-blur-sm text-cyan-800 text-sm font-medium shadow-sm border border-cyan-200/50">
+              {d.subtitle}
+            </div>
+            <p className="text-lg md:text-xl text-neutral-700 leading-relaxed font-light max-w-2xl">{d.description}</p>
+
+            {/* Added feature highlight box for wow factor */}
+            <div className="mt-8 bg-gradient-to-r from-cyan-50 to-white p-8 rounded-xl border-l-4 border-cyan-400 shadow-sm hover:shadow-md transition-all duration-300">
+              <p className="text-lg md:text-xl leading-relaxed text-neutral-700 font-light">
+                <span className="font-medium text-cyan-700">Key Focus:</span> Participants received hands-on mentorship,
+                networking opportunities, and practical tools to build solutions addressing real community health needs.
+              </p>
+            </div>
           </div>
-          <div className="inline-block p-1.5 px-3 mb-4 rounded-full bg-cyan-100/80 backdrop-blur-sm text-cyan-800 text-sm font-medium">
-            {d.subtitle}
-          </div>
-          <p className="text-lg sm:text-xl text-neutral-700 leading-relaxed max-w-2xl mx-auto">{d.description}</p>
-        </div>
 
-        {/* Enhanced Image Carousel */}
-        <div className="relative overflow-hidden rounded-2xl shadow-xl border border-cyan-200 group transition-all duration-500 hover:shadow-cyan-200/30 hover:border-cyan-300">
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-cyan-300/10 z-0 group-hover:opacity-70 transition-opacity duration-500"></div>
+          <div className="order-1 md:order-2 relative">
+            {/* Decorative elements */}
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-cyan-400/10 rounded-full filter blur-3xl -translate-x-1/2 -translate-y-1/2 z-0"></div>
+            <div className="absolute bottom-0 right-0 w-60 h-60 bg-cyan-300/10 rounded-full filter blur-3xl translate-x-1/3 translate-y-1/3 z-0"></div>
 
-          {/* Decorative elements */}
-          <div className="absolute top-0 left-0 w-40 h-40 bg-cyan-400/10 rounded-full filter blur-3xl -translate-x-1/2 -translate-y-1/2 z-0"></div>
-          <div className="absolute bottom-0 right-0 w-60 h-60 bg-cyan-300/10 rounded-full filter blur-3xl translate-x-1/3 translate-y-1/3 z-0"></div>
-
-          {/* Carousel Container */}
-          <div className="relative z-10 p-6 sm:p-8">
-            <BootcampCarousel />
+            {/* Enhanced Carousel Container */}
+            <div className="relative z-10 overflow-hidden rounded-2xl shadow-xl border border-cyan-200 group transition-all duration-500 hover:shadow-cyan-200/50 hover:border-cyan-300 transform hover:-translate-y-1">
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-cyan-300/10 z-0 group-hover:opacity-70 transition-opacity duration-500"></div>
+              <BootcampCarousel />
+            </div>
           </div>
         </div>
       </div>

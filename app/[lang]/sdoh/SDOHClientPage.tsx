@@ -6,7 +6,6 @@ import SDOHHero from "../../components/sdoh/SDOHHero"
 import SDOHImpactMessage from "../../components/sdoh/SDOHImpactMessage"
 import SDOHStartupBootcamp from "../../components/sdoh/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/sdoh/SDOHHealthAccelerator"
-import SDOHDemoDay from "../../components/sdoh/SDOHDemoDay"
 import SDOHNewsletter from "../../components/sdoh/SDOHNewsletter"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
 import { PartnerLogos } from "../../components/sdoh/PartnerLogos"
@@ -88,9 +87,6 @@ export default function SDOHClientPage() {
 
                   {/* Community Health Accelerator Section */}
                   <SDOHHealthAccelerator locale={currentLocale} dict={dictionary} />
-
-                  {/* Demo Day Video Section */}
-                  <SDOHDemoDay locale={currentLocale} dict={dictionary} />
 
                   {/* Wow Impact Message Section */}
                   <SDOHImpactMessage locale={currentLocale} dict={dictionary} />

@@ -337,8 +337,7 @@ export const portfolioArray: PortfolioItem[] = [
   {
     company: "AIM",
     title: "A Catalyst for Life Sciences Innovation & Commercialization",
-    description:
-      "San Antonio, often referred to as 'Military Health City USA,' serves as a vital hub for military medicine and life sciences innovation. The AIM Health R&D Summit is a premier platform uniting academia, industry, and the military to drive collaboration and innovation in life sciences while also providing pathways to tech transfer and dual use commercialization.",
+    description: "Accelerating innovation in military medicine through collaboration between academia, industry, and the military.",
     video: "https://ampd-asset.s3.us-east-2.amazonaws.com/AIM2025_V3.mp4",
     poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/aim-poster.png",
     photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/aim-poster.png",
@@ -348,7 +347,7 @@ export const portfolioArray: PortfolioItem[] = [
     content: "Premier platform uniting academia, industry, and the military",
     linkedin: "https://www.linkedin.com/company/velocitytx/",
     instagram: "https://www.instagram.com/velocitytx/",
-    website: " www.aimsatx.com",
+    website: "https://aimsatx.com/",
     showLinkedin: false,
     showInstagram: false,
     showWebsite: true,
@@ -396,9 +395,9 @@ export const portfolioArray: PortfolioItem[] = [
     title: "South Texas Community Health Accelerator",
     description:
       "Powered by VelocityTX & Methodist Healthcare Ministries, the South Texas Community Health Accelerator program connects education, entrepreneurship, and innovation through three core components: Que es SDOH? a Speaker + Seminar Series, Startup Bootcamp and a competitive Health Accelerator resulting in the opportunity to pilot your program within the MHM network.",
-    video: "https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mov",
-    poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png",
-    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png",
+    video: "https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Post+Promo+WEB.mp4",
+    poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png",
+    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png",
     gif: "https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.gif",
     showImage: true,
     showVideo: true,

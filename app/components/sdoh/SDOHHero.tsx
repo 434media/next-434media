@@ -9,12 +9,11 @@ import { FadeIn } from "../FadeIn"
 import SDOHMission from "./SDOHMission"
 import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
 import { Fragment } from "react"
-import dynamic from "next/dynamic"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
-// Dynamically import ReactPlayer to avoid SSR issues
-const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
+// Removed dynamic import of ReactPlayer in favor of native HTML video elements
+// const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
 
 // Update the SessionCard component for better accessibility and UX
 const SessionCard = ({
@@ -28,7 +27,6 @@ const SessionCard = ({
   comingSoonText,
   comingSoonDescriptionText,
   visitWebsiteText,
-  downloadSlidesText,
   closeText,
   sessionIdText,
 }: {
@@ -42,11 +40,11 @@ const SessionCard = ({
   comingSoonText?: string
   comingSoonDescriptionText?: string
   visitWebsiteText?: string
-  downloadSlidesText?: string
   closeText?: string
   sessionIdText?: string
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  // Fix 1: Remove unused state variables but keep setters for side effects
   const [, setIsHovered] = useState(false)
   const [, setIsFocused] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -129,10 +127,10 @@ const SessionCard = ({
         videoId={videoId}
         videoUrl={videoUrl}
         href={href}
+        image={image}
         comingSoonText={comingSoonText}
         comingSoonDescriptionText={comingSoonDescriptionText}
         visitWebsiteText={visitWebsiteText}
-        downloadSlidesText={downloadSlidesText}
         closeText={closeText}
         sessionIdText={sessionIdText}
       />
@@ -148,10 +146,10 @@ const VideoModal = ({
   videoId,
   videoUrl,
   href,
+  image,
   comingSoonText,
   comingSoonDescriptionText,
   visitWebsiteText,
-  downloadSlidesText,
   closeText,
   sessionIdText,
 }: {
@@ -161,10 +159,10 @@ const VideoModal = ({
   videoId: string
   videoUrl?: string
   href?: string
+  image: string
   comingSoonText?: string
   comingSoonDescriptionText?: string
   visitWebsiteText?: string
-  downloadSlidesText?: string
   closeText?: string
   sessionIdText?: string
 }) => {
@@ -177,10 +175,22 @@ const VideoModal = ({
   const [showControls, setShowControls] = useState(true)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [duration, setDuration] = useState(0)
+  // Fix 2: Remove unused state variables
+  // const [_isVideoError, _setIsVideoError] = useState(false)
 
   const togglePlayback = useCallback(() => {
     setIsPlaying(!isPlaying)
     setShowControls(true)
+
+    // Find the video element and play/pause
+    const videoElement = videoRef.current?.querySelector("video")
+    if (videoElement) {
+      if (isPlaying) {
+        videoElement.pause()
+      } else {
+        videoElement.play().catch((e) => console.log("Playback prevented:", e))
+      }
+    }
   }, [isPlaying])
 
   // Handle keyboard events
@@ -255,10 +265,22 @@ const VideoModal = ({
     const newVolume = Number.parseFloat(e.target.value)
     setVolume(newVolume)
     setIsMuted(newVolume === 0)
+
+    // Update video volume directly
+    const videoElement = videoRef.current?.querySelector("video")
+    if (videoElement) {
+      videoElement.volume = newVolume
+    }
   }
 
   const toggleMute = () => {
     setIsMuted(!isMuted)
+
+    // Update video mute state directly
+    const videoElement = videoRef.current?.querySelector("video")
+    if (videoElement) {
+      videoElement.muted = !isMuted
+    }
   }
 
   const handleVideoContainerMouseMove = () => {
@@ -312,7 +334,7 @@ const VideoModal = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-neutral-900 p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-5xl transform overflow-hidden rounded-2xl bg-neutral-900 p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle as="h3" className="text-xl font-bold text-white mb-4 pr-8">
                   {title}
                 </DialogTitle>
@@ -339,6 +361,9 @@ const VideoModal = ({
                   className="aspect-video bg-black rounded-lg overflow-hidden relative"
                   onMouseMove={handleVideoContainerMouseMove}
                   onTouchStart={handleVideoContainerMouseMove}
+                  onClick={() => {
+                    if (!isLoading) togglePlayback()
+                  }}
                 >
                   {videoUrl ? (
                     <>
@@ -346,33 +371,50 @@ const VideoModal = ({
                       {isLoading && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
                           <div className="flex flex-col items-center">
-                            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                            <p className="text-white text-sm">Loading video...</p>
+                            <div className="relative w-16 h-16">
+                              <div className="absolute inset-0 w-16 h-16 border-4 border-cyan-500/20 rounded-full"></div>
+                              <div className="absolute inset-0 w-16 h-16 border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-8 w-8 text-cyan-500"
+                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                >
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <p className="text-white text-sm mt-4 font-medium">Preparing your video...</p>
                           </div>
                         </div>
                       )}
 
-                      {/* Video player with optimizations */}
-                      <ReactPlayer
-                        url={videoUrl}
-                        playing={isPlaying}
-                        controls={false}
-                        width="100%"
-                        height="100%"
-                        onReady={handleReady}
-                        onDuration={handleDuration}
-                        onProgress={handleProgress}
-                        volume={isMuted ? 0 : volume}
-                        playsinline
-                        config={{
-                          file: {
-                            attributes: {
-                              preload: "auto",
-                              poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png",
-                            },
-                            forceVideo: true,
-                          },
+                      {/* Native HTML5 video player with optimizations */}
+                      <video
+                        ref={(el) => {
+                          if (el) {
+                            el.addEventListener("loadedmetadata", () => {
+                              handleReady()
+                              handleDuration(el.duration)
+                            })
+                            el.addEventListener("timeupdate", () => {
+                              handleProgress({ played: el.currentTime / (el.duration || 1) })
+                            })
+                            el.volume = isMuted ? 0 : volume
+                            if (isPlaying) {
+                              el.play().catch((e) => console.log("Autoplay prevented:", e))
+                            } else {
+                              el.pause()
+                            }
+                          }
                         }}
+                        src={videoUrl}
+                        poster={image}
+                        preload="auto"
+                        playsInline
+                        className="w-full h-full object-cover"
+                        onError={(e) => console.error("Video error:", e)}
                       />
 
                       {/* Large play button overlay - only shown when video is not playing */}
@@ -422,6 +464,26 @@ const VideoModal = ({
                           showControls ? "opacity-100" : "opacity-0"
                         }`}
                       >
+                        {/* Progress bar */}
+                        <div
+                          className="w-full h-2 bg-neutral-700 rounded-full mb-3 cursor-pointer"
+                          onClick={(e) => {
+                            if (videoRef.current) {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              const pos = (e.clientX - rect.left) / rect.width
+                              const videoElement = videoRef.current.querySelector("video")
+                              if (videoElement) {
+                                videoElement.currentTime = pos * duration
+                              }
+                            }
+                          }}
+                        >
+                          <div
+                            className="h-full bg-cyan-500 rounded-full"
+                            style={{ width: `${progress * 100}%` }}
+                          ></div>
+                        </div>
+
                         <div className="flex items-center justify-between">
                           {/* Play/Pause button */}
                           <button
@@ -596,28 +658,6 @@ const VideoModal = ({
                         {visitWebsiteText || "Visit Website"}
                       </a>
                     )}
-                    {videoUrl && (
-                      <button
-                        type="button"
-                        className="inline-flex items-center rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 mr-2"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                          <polyline points="16 6 12 2 8 6"></polyline>
-                          <line x1="12" y1="2" x2="12" y2="15"></line>
-                        </svg>
-                        {downloadSlidesText || "Download Slides"}
-                      </button>
-                    )}
                     <button
                       type="button"
                       className="inline-flex items-center rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -644,6 +684,8 @@ const EventCarousel = () => {
   const [touchEnd, setTouchEnd] = useState(0)
   const carouselRef = useRef<HTMLDivElement>(null)
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
+  // Fix 4: Remove unused variable
+  // const _isMobile = useMobile()
 
   // Event images and content
   const slides = [
@@ -945,22 +987,6 @@ const EventCarousel = () => {
         </svg>
       </button>
 
-      <button
-        onClick={nextSlide}
-        className="absolute right-4 top-1/2 transform -translate-y-1/2 w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center z-20 hover:bg-black/50 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-        aria-label="Next slide"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-
       {/* Floating particles for visual interest */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-cyan-400 rounded-full animate-float-slow"></div>
@@ -1031,7 +1057,7 @@ const SpeakerCard = ({
           className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110"
         />
         {logoUrl && (
-          <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-2 shadow-md">
+          <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-md">
             <Image
               src={logoUrl || "/placeholder.svg"}
               alt={`${company} Logo`}
@@ -1106,6 +1132,12 @@ export interface SDOHHeroProps {
 export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
+  // Fix the unused 'detailsRef' variable (around line 1133):
+  const _detailsRef = useRef<HTMLElement>(null)
+  // Fix 5: Remove unused variables
+  // const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
+  // const _hasScrolled = useState(false)[0]
+  // const [_isVideoError, _setIsVideoError] = useState(false)
   const [, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const isHeroInView = useInView(heroRef, { once: true })
@@ -1265,6 +1297,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             videoElement.play().catch((e) => console.log("Autoplay prevented:", e))
           }
         }
+        // Fix 7: Use proper type for error event
         const handleError = (e: Event) => {
           console.error("Video error:", e)
           // Could add fallback behavior here
@@ -1407,7 +1440,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
       {/* Event Details Section - Enhanced with Startup Week vibe */}
       <section className="py-16 sm:py-24 relative overflow-hidden">
         {/* Tech pattern background */}
-        <TechPattern className="text-cyan-500 inset-0" />
         <FloatingElements />
 
         {/* RGV Startup Week Badge */}
@@ -1424,7 +1456,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
           </div>
         </div>
 
-        <div className="container px-4 sm:px-6 max-w-4xl mx-auto text-center relative z-10">
+        <div className="container px-4 sm:px-6 max-w-5xl mx-auto text-center relative z-10">
           <FadeIn>
             {/* Enhanced section header with startup week styling */}
             <div className="inline-block relative mb-8">
@@ -1483,7 +1515,7 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 max-w-6xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 max-w-5xl mx-auto">
                   {/* Moderator */}
                   <SpeakerCard
                     name="Marcos Resendez"
@@ -1546,10 +1578,10 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
       </section>
 
       <section className="py-24 bg-white">
-        <div className="container mx-auto px-6 max-w-6xl">
+        <div className="container mx-auto px-6 max-w-5xl">
           <FadeIn>
             {/* Replace the grid of 3 cards with this updated implementation */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
               {/* Card 1 - With video implementation */}
               <SessionCard
                 title={mergedDict.sdoh?.sessions?.card1?.title || "Market Analysis and Value Delivery"}
@@ -1568,7 +1600,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                   "This video will be available after the event. Check back later to watch the full session."
                 }
                 visitWebsiteText={mergedDict.sdoh?.sessions?.visitWebsite || "Visit Website"}
-                downloadSlidesText={mergedDict.sdoh?.sessions?.downloadSlides || "Download Slides"}
                 closeText={mergedDict.sdoh?.sessions?.close || "Close"}
                 sessionIdText={mergedDict.sdoh?.sessions?.sessionId || "Session ID"}
               />
@@ -1591,7 +1622,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                   "This video will be available after the event. Check back later to watch the full session."
                 }
                 visitWebsiteText={mergedDict.sdoh?.sessions?.visitWebsite || "Visit Website"}
-                downloadSlidesText={mergedDict.sdoh?.sessions?.downloadSlides || "Download Slides"}
                 closeText={mergedDict.sdoh?.sessions?.close || "Close"}
                 sessionIdText={mergedDict.sdoh?.sessions?.sessionId || "Session ID"}
               />
@@ -1613,7 +1643,6 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
                   "This video will be available after the event. Check back later to watch the full session."
                 }
                 visitWebsiteText={mergedDict.sdoh?.sessions?.visitWebsite || "Visit Website"}
-                downloadSlidesText={mergedDict.sdoh?.sessions?.downloadSlides || "Download Slides"}
                 closeText={mergedDict.sdoh?.sessions?.close || "Close"}
                 sessionIdText={mergedDict.sdoh?.sessions?.sessionId || "Session ID"}
               />

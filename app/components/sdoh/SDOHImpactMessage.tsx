@@ -95,7 +95,7 @@ export default function SDOHImpactMessage({
 
   return (
     <section className="py-16 sm:py-24 overflow-hidden relative">
-      <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 max-w-5xl relative z-10">
         <FadeIn>
           <div className="relative">
             {/* Background elements */}
@@ -105,7 +105,7 @@ export default function SDOHImpactMessage({
             </div>
 
             {/* Main content */}
-            <div className="max-w-4xl mx-auto text-center">
+            <div className="max-w-5xl mx-auto text-center">
               <div className="inline-block mb-6">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
