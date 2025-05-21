@@ -6,37 +6,18 @@ import type { Collection } from "../../lib/shopify/types"
 import { useMediaQuery } from "../../hooks/use-mobile"
 
 interface HomeClientProps {
-  collections: Collection[]
+  collections?: Collection[]
   collectionImages: Record<string, string>
 }
 
-export function HomeClient({ collections, collectionImages }: HomeClientProps) {
+export function HomeClient({ collectionImages }: HomeClientProps) {
   const [isMounted, setIsMounted] = useState(false)
   const isMobile = useMediaQuery("(max-width: 768px)")
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(true)
-
-  // Function to scroll the container
-  const scrollContainer = (direction: "left" | "right") => {
-    if (!scrollContainerRef.current) return
-
-    const container = scrollContainerRef.current
-    const scrollAmount = direction === "left" ? -280 : 280 // Approximate width of a frame
-
-    container.scrollBy({
-      left: scrollAmount,
-      behavior: "smooth",
-    })
-  }
 
   // Update scroll buttons state
   const updateScrollButtonsState = () => {
     if (!scrollContainerRef.current) return
-
-    const container = scrollContainerRef.current
-    setCanScrollLeft(container.scrollLeft > 0)
-    setCanScrollRight(container.scrollLeft < container.scrollWidth - container.clientWidth - 10) // 10px buffer
   }
 
   // Set up scroll event listener

@@ -127,7 +127,7 @@ export function CollectionBanner({
         try {
           video.pause()
         } catch (e) {
-          // Ignore errors on pause
+          console.error("Error pausing video:", e)
         }
       }
     }
