@@ -13,8 +13,6 @@ interface VideoHeroProps {
   ctaText?: string
   ctaLink?: string
   logoSrc?: string
-  logoWidth?: number
-  logoHeight?: number
   featuredCollection?: Collection
   secondaryCollection?: Collection
   tertiaryCollection?: Collection
@@ -26,9 +24,8 @@ export function VideoHero({
   title = "434 SHOP",
   subtitle = "", // Removed default subtitle
   ctaText = "Shop Collections",
+  ctaLink,
   logoSrc,
-  logoWidth = 180,
-  logoHeight = 90,
   featuredCollection,
   secondaryCollection,
   tertiaryCollection,
@@ -438,7 +435,7 @@ export function VideoHero({
 
       {/* Skip to main content for accessibility */}
       <a
-        href="#products-section"
+        href={ctaLink || "#products-section"}
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-black focus:text-white focus:rounded"
       >
         Skip to main content
