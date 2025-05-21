@@ -13,7 +13,7 @@ import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
 import { AIMLogo } from "./AIMLogo"
 
-type CombinedNavbarProps = {}
+type CombinedNavbarProps = Record<string, never>
 
 // Custom hook to check if component has mounted
 function useHasMounted() {

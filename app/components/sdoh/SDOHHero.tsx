@@ -12,9 +12,6 @@ import { Fragment } from "react"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
-// Removed dynamic import of ReactPlayer in favor of native HTML video elements
-// const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false })
-
 // Update the SessionCard component for better accessibility and UX
 const SessionCard = ({
   title,
@@ -1081,38 +1078,6 @@ const SpeakerCard = ({
   )
 }
 
-const TechPattern = ({ className }: { className: string }) => (
-  <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
-    <svg
-      width="200"
-      height="200"
-      viewBox="0 0 200 200"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="opacity-5"
-    >
-      <path d="M0 0H200V200H0V0Z" fill="url(#techPattern)" />
-      <defs>
-        <pattern id="techPattern" patternContentUnits="userSpaceOnUse" width="20" height="20" viewBox="0 0 20 20">
-          <rect width="2" height="2" fill="currentColor" />
-          <rect x="8" width="2" height="2" fill="currentColor" />
-          <rect x="4" y="4" width="2" height="2" fill="currentColor" />
-          <rect x="12" y="4" width="2" height="2" fill="currentColor" />
-          <rect x="16" y="4" width="2" height="2" fill="currentColor" />
-          <rect y="8" width="2" height="2" fill="currentColor" />
-          <rect x="8" y="8" width="2" height="2" fill="currentColor" />
-          <rect x="18" y="8" width="2" height="2" fill="currentColor" />
-          <rect x="4" y="12" width="2" height="2" fill="currentColor" />
-          <rect x="12" y="12" width="2" height="2" fill="currentColor" />
-          <rect x="16" y="12" width="2" height="2" fill="currentColor" />
-          <rect y="16" width="2" height="2" fill="currentColor" />
-          <rect x="8" y="16" width="2" height="2" fill="currentColor" />
-        </pattern>
-      </defs>
-    </svg>
-  </div>
-)
-
 const FloatingElements = () => (
   <>
     <div className="absolute top-1/4 left-1/4 w-6 h-6 bg-cyan-400 rounded-full animate-float-slow opacity-20"></div>
@@ -1132,12 +1097,6 @@ export interface SDOHHeroProps {
 export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
   const controls = useAnimation()
   const heroRef = useRef<HTMLElement>(null)
-  // Fix the unused 'detailsRef' variable (around line 1133):
-  const _detailsRef = useRef<HTMLElement>(null)
-  // Fix 5: Remove unused variables
-  // const _isDetailsInView = useInView(detailsRef, { once: true, amount: 0.1 })
-  // const _hasScrolled = useState(false)[0]
-  // const [_isVideoError, _setIsVideoError] = useState(false)
   const [, setHasScrolled] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const isHeroInView = useInView(heroRef, { once: true })
