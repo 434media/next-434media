@@ -127,7 +127,7 @@ export function CombinedNavbar({}: CombinedNavbarProps) {
                       alt="¿Qué es SDOH?"
                       width={100}
                       height={24}
-                      className="w-auto h-full"
+                      className="w-auto h-full grayscale"
                       priority={true}
                     />
                   </motion.div>

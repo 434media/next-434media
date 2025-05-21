@@ -67,7 +67,6 @@ export function HomeClient({ collectionImages }: HomeClientProps) {
         subtitle="Exclusive apparel and merchandise from 434 Media"
         ctaText="Explore Collections"
         ctaLink="#products-section"
-        logoSrc="https://ampd-asset.s3.us-east-2.amazonaws.com/434-logo-white.png"
       />
 
       {/* Main content anchor for skip link */}

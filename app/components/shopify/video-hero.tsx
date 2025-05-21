@@ -12,7 +12,6 @@ interface VideoHeroProps {
   subtitle?: string
   ctaText?: string
   ctaLink?: string
-  logoSrc?: string
   featuredCollection?: Collection
   secondaryCollection?: Collection
   tertiaryCollection?: Collection
@@ -25,7 +24,6 @@ export function VideoHero({
   subtitle = "", // Removed default subtitle
   ctaText = "Shop Collections",
   ctaLink,
-  logoSrc,
   featuredCollection,
   secondaryCollection,
   tertiaryCollection,
@@ -162,12 +160,12 @@ export function VideoHero({
 
   // Collection button variants for animation - optimized for snappier feel
   const collectionButtonVariants = {
-    hidden: (custom: number) => ({
+    hidden: {
       opacity: 0,
       y: 10,
       x: 0,
       scale: 0.9,
-    }),
+    },
     visible: (custom: number) => ({
       opacity: 1,
       y: -70, // All buttons appear above the main button
