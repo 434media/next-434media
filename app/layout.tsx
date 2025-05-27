@@ -12,7 +12,6 @@ import { Toaster } from "sonner"
 import { getCart, getMenu } from "./lib/shopify"
 import { CartProvider } from "./components/shopify/cart/cart-context"
 import { PageTransition } from "./components/shopify/page-transition"
-import { WelcomeToast } from "./components/shopify//welcome-toast"
 import { Suspense } from "react"
 
 const geistSans = Geist({
@@ -156,7 +155,6 @@ export default async function RootLayout({
           <main>
             <PageTransition>{children}</PageTransition>
             <Toaster closeButton />
-            <WelcomeToast />
           </main>
           <Analytics />
           <Footer />
