@@ -10,7 +10,7 @@ export interface Event {
   attendees?: number
   price?: string
   url?: string
-  source?: "meetup" | "eventbrite" | "manual"
+  source?: "meetup" | "eventbrite" | "luma" | "manual"
   image?: string
   created_at?: string
   updated_at?: string
@@ -33,5 +33,5 @@ export interface ParsedEventData {
   attendees?: number
   image: string
   url: string
-  source: "meetup" | "eventbrite" | "manual"
+  source: "meetup" | "eventbrite" | "luma" | "manual"
 }

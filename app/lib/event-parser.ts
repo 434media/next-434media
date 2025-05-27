@@ -16,10 +16,10 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
     const hostname = urlObj.hostname.toLowerCase()
 
     // Check supported platforms
-    if (!hostname.includes("meetup.com") && !hostname.includes("eventbrite.com")) {
+    if (!hostname.includes("meetup.com") && !hostname.includes("eventbrite.com") && !hostname.includes("lu.ma")) {
       return {
         success: false,
-        error: "Unsupported platform. Currently supports Meetup.com and Eventbrite.com",
+        error: "Unsupported platform. Currently supports Meetup.com, Eventbrite.com, and Lu.ma",
       }
     }
 
@@ -63,6 +63,8 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
       result = await parseMeetupEvent($, url)
     } else if (hostname.includes("eventbrite.com")) {
       result = await parseEventbriteEvent($, url)
+    } else if (hostname.includes("lu.ma")) {
+      result = await parseLumaEvent($, url)
     } else {
       throw new Error("Unsupported platform")
     }
@@ -87,6 +89,147 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
       success: false,
       error: error instanceof Error ? error.message : "Failed to parse event URL",
     }
+  }
+}
+
+async function parseLumaEvent($: cheerio.Root, url: string): Promise<ParsedEventData> {
+  console.log("🔍 Parsing Lu.ma event...")
+
+  // Lu.ma has excellent structured data and clean selectors
+  const title =
+    $('h1[data-testid="event-title"]').text().trim() ||
+    $("h1").first().text().trim() ||
+    $('meta[property="og:title"]').attr("content")?.trim() ||
+    $("title").text().replace(" | Luma", "").trim() ||
+    ""
+
+  // Description from multiple sources
+  const description =
+    $('[data-testid="event-description"]').text().trim() ||
+    $(".event-description").text().trim() ||
+    $('meta[property="og:description"]').attr("content")?.trim() ||
+    $('meta[name="description"]').attr("content")?.trim() ||
+    ""
+
+  let date = ""
+  let time = ""
+  let location = ""
+  let attendees: number | undefined
+  let organizer = ""
+
+  // Lu.ma has excellent JSON-LD structured data
+  $('script[type="application/ld+json"]').each((_, element) => {
+    try {
+      const jsonText = $(element).html()
+      if (jsonText) {
+        const data = JSON.parse(jsonText)
+        if (data["@type"] === "Event") {
+          console.log("📅 Found Lu.ma structured data:", data)
+
+          if (data.startDate) {
+            const startDate = new Date(data.startDate)
+            date = startDate.toISOString().split("T")[0]
+            time = startDate.toTimeString().slice(0, 5)
+          }
+
+          if (data.location) {
+            if (typeof data.location === "string") {
+              location = data.location
+            } else if (data.location.name) {
+              location = data.location.name
+            } else if (data.location.address) {
+              location =
+                typeof data.location.address === "string"
+                  ? data.location.address
+                  : `${data.location.address.streetAddress || ""} ${data.location.address.addressLocality || ""}`.trim()
+            }
+          }
+
+          if (data.organizer) {
+            organizer = typeof data.organizer === "string" ? data.organizer : data.organizer.name || ""
+          }
+
+          // Lu.ma sometimes includes attendee info
+          if (data.attendee && Array.isArray(data.attendee)) {
+            attendees = data.attendee.length
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse Lu.ma JSON-LD:", e)
+    }
+  })
+
+  // Fallback parsing for Lu.ma specific selectors
+  if (!date) {
+    // Lu.ma uses specific date selectors
+    const dateElement = $('[data-testid="event-date"], .event-date, time').first()
+    const dateTime = dateElement.attr("datetime") || dateElement.text()
+    if (dateTime) {
+      try {
+        const startDate = new Date(dateTime)
+        if (!isNaN(startDate.getTime())) {
+          date = startDate.toISOString().split("T")[0]
+          time = startDate.toTimeString().slice(0, 5)
+        }
+      } catch (e) {
+        console.warn("Failed to parse Lu.ma date:", dateTime)
+      }
+    }
+  }
+
+  // Location fallback
+  if (!location) {
+    location =
+      $('[data-testid="event-location"]').text().trim() ||
+      $('[data-testid="venue-name"]').text().trim() ||
+      $(".location").text().trim() ||
+      $(".venue").text().trim() ||
+      ""
+  }
+
+  // Organizer fallback
+  if (!organizer) {
+    organizer =
+      $('[data-testid="host-name"]').text().trim() ||
+      $('[data-testid="organizer-name"]').text().trim() ||
+      $(".host-name").text().trim() ||
+      $(".organizer").text().trim() ||
+      ""
+  }
+
+  // Attendees fallback
+  if (!attendees) {
+    const attendeesText =
+      $('[data-testid="attendee-count"]').text() || $(".attendee-count").text() || $(".rsvp-count").text()
+
+    if (attendeesText) {
+      const match = attendeesText.match(/(\d+)/)
+      if (match) {
+        attendees = Number.parseInt(match[1])
+      }
+    }
+  }
+
+  // Image - Lu.ma usually has good og:image
+  const image =
+    $('meta[property="og:image"]').attr("content") ||
+    $('meta[name="twitter:image"]').attr("content") ||
+    $('[data-testid="event-image"] img').attr("src") ||
+    $(".event-image img").attr("src") ||
+    ""
+
+  return {
+    title: title || "Untitled Event",
+    description: description.slice(0, 500),
+    date,
+    time,
+    location,
+    organizer,
+    attendees,
+    image,
+    url,
+    source: "luma",
   }
 }
 

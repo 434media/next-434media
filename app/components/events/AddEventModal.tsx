@@ -75,7 +75,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
         url: eventUrl,
         image: result.image || prev.image,
         attendees: result.attendees || prev.attendees,
-        category: result.source === "meetup" ? "meetup" : "other",
+        category: result.source === "meetup" ? "meetup" : result.source === "luma" ? "networking" : "other",
       }))
 
       setSuccess("Event details parsed successfully! ✨")
@@ -109,7 +109,15 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
       price: eventData.price || undefined,
       image: eventData.image || undefined,
       attendees: eventData.attendees,
-      source: eventUrl ? (eventUrl.includes("meetup") ? "meetup" : "eventbrite") : "manual",
+      source: eventUrl
+        ? eventUrl.includes("meetup")
+          ? "meetup"
+          : eventUrl.includes("eventbrite")
+            ? "eventbrite"
+            : eventUrl.includes("lu.ma")
+              ? "luma"
+              : "manual"
+        : "manual",
     }
 
     startTransition(async () => {
@@ -196,7 +204,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Import from Event Platform</h3>
                 <p className="text-gray-600 text-sm">
-                  Paste a link from Meetup or Eventbrite and we'll automatically extract the event details
+                  Paste a link from Meetup, Eventbrite, or Lu.ma and we'll automatically extract the event details
                 </p>
               </div>
 
@@ -207,7 +215,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
                     <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="url"
-                      placeholder="https://www.meetup.com/your-event or https://www.eventbrite.com/e/your-event"
+                      placeholder="https://www.meetup.com/your-event, https://www.eventbrite.com/e/your-event, or https://lu.ma/your-event"
                       value={eventUrl}
                       onChange={(e) => setEventUrl(e.target.value)}
                       className="pl-10 w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
@@ -253,6 +261,10 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     <span>Eventbrite.com</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span>Lu.ma</span>
                   </div>
                 </div>
               </div>
