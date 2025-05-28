@@ -1,12 +1,11 @@
 "use client"
 
-import type React from "react"
-
-import { X, Calendar, MapPin, Users, ExternalLink, User, Share2, Heart, Bookmark } from "lucide-react"
+import { Fragment, useEffect, useState } from "react"
+import { Dialog, Transition } from "@headlessui/react"
+import { X, Calendar, MapPin, Users, User, ExternalLink, Clock } from "lucide-react"
 import type { Event } from "../../types/event-types"
 import { formatEventDate } from "../../lib/event-utils"
 import { cn } from "../../lib/utils"
-import { useState, useEffect } from "react"
 
 interface EventModalProps {
   event: Event | null
@@ -15,14 +14,10 @@ interface EventModalProps {
 }
 
 export function EventModal({ event, isOpen, onClose }: EventModalProps) {
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [isBookmarked, setIsBookmarked] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
-      setIsAnimating(true)
       document.body.style.overflow = "hidden"
     } else {
       document.body.style.overflow = "unset"
@@ -50,266 +45,244 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
     switch (category) {
       case "conference":
         return {
-          bg: "bg-gradient-to-r from-orange-500 to-red-500",
-          text: "text-white",
-          lightBg: "bg-orange-50",
-          lightText: "text-orange-800",
-        }
-      case "workshop":
-        return {
-          bg: "bg-gradient-to-r from-amber-500 to-yellow-500",
+          bg: "bg-gradient-to-r from-amber-500 to-orange-500",
           text: "text-white",
           lightBg: "bg-amber-50",
           lightText: "text-amber-800",
+          border: "border-amber-200",
+        }
+      case "workshop":
+        return {
+          bg: "bg-gradient-to-r from-amber-400 to-yellow-500",
+          text: "text-white",
+          lightBg: "bg-amber-50",
+          lightText: "text-amber-800",
+          border: "border-amber-200",
         }
       case "meetup":
         return {
-          bg: "bg-gradient-to-r from-yellow-500 to-orange-500",
+          bg: "bg-gradient-to-r from-yellow-500 to-amber-500",
           text: "text-white",
           lightBg: "bg-yellow-50",
-          lightText: "text-yellow-800",
+          lightText: "text-amber-800",
+          border: "border-yellow-200",
         }
       case "networking":
         return {
-          bg: "bg-gradient-to-r from-blue-500 to-indigo-500",
+          bg: "bg-gradient-to-r from-amber-500 to-orange-500",
           text: "text-white",
-          lightBg: "bg-blue-50",
-          lightText: "text-blue-800",
+          lightBg: "bg-amber-50",
+          lightText: "text-amber-800",
+          border: "border-amber-200",
         }
       default:
         return {
-          bg: "bg-gradient-to-r from-gray-500 to-slate-500",
+          bg: "bg-gradient-to-r from-amber-500 to-orange-500",
           text: "text-white",
-          lightBg: "bg-gray-50",
-          lightText: "text-gray-800",
+          lightBg: "bg-amber-50",
+          lightText: "text-amber-800",
+          border: "border-amber-200",
         }
     }
   }
 
   const categoryColors = getCategoryColor(event.category)
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
-  }
-
-  const handleShare = async () => {
-    if (navigator.share && event.url) {
-      try {
-        await navigator.share({
-          title: event.title,
-          text: event.description,
-          url: event.url,
-        })
-      } catch (err) {
-        // Fallback to clipboard
-        navigator.clipboard.writeText(event.url)
-      }
-    } else if (event.url) {
+  const handleCopyUrl = () => {
+    if (event.url) {
       navigator.clipboard.writeText(event.url)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
     }
   }
 
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-500",
-        isAnimating ? "bg-black/60 backdrop-blur-sm" : "bg-black/0",
-      )}
-      onClick={handleBackdropClick}
-    >
-      <div
-        className={cn(
-          "relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden transition-all duration-700 ease-out",
-          isAnimating ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-8",
-        )}
-      >
-        {/* Enhanced Header with Parallax Effect */}
-        <div className="relative h-64 overflow-hidden">
-          {event.image ? (
-            <>
-              <img
-                src={event.image || "/placeholder.svg"}
-                alt={event.title}
-                className={cn(
-                  "w-full h-full object-cover transition-all duration-1000",
-                  imageLoaded ? "scale-100 opacity-100" : "scale-110 opacity-0",
-                )}
-                onLoad={() => setImageLoaded(true)}
-              />
-              {!imageLoaded && (
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400 animate-pulse" />
-              )}
-            </>
-          ) : (
-            <div className={cn("w-full h-full", categoryColors.bg)} />
-          )}
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+        </Transition.Child>
 
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-
-          {/* Action Buttons */}
-          <div className="absolute top-6 right-6 flex gap-3">
-            <button
-              onClick={() => setIsBookmarked(!isBookmarked)}
-              className={cn(
-                "p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110",
-                isBookmarked ? "bg-amber-500 text-white" : "bg-white/20 text-white hover:bg-white/30",
-              )}
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95 translate-y-4"
+              enterTo="opacity-100 scale-100 translate-y-0"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100 translate-y-0"
+              leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              <Bookmark className={cn("h-5 w-5", isBookmarked && "fill-current")} />
-            </button>
+              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-2xl transition-all">
+                {/* Header with Image Background */}
+                <div className="relative">
+                  <div className="h-48 sm:h-64 overflow-hidden">
+                    {event.image ? (
+                      <div className="w-full h-full relative">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10" />
+                        <img
+                          src={event.image || "/placeholder.svg"}
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg"
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className={cn("w-full h-full relative", categoryColors.bg)}>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                      </div>
+                    )}
 
-            <button
-              onClick={() => setIsLiked(!isLiked)}
-              className={cn(
-                "p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110",
-                isLiked ? "bg-red-500 text-white" : "bg-white/20 text-white hover:bg-white/30",
-              )}
-            >
-              <Heart className={cn("h-5 w-5", isLiked && "fill-current")} />
-            </button>
+                    {/* Category Badge */}
+                    {event.category && (
+                      <div className="absolute top-4 left-4 z-20">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
+                            categoryColors.bg,
+                            categoryColors.text,
+                          )}
+                        >
+                          {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
+                        </span>
+                      </div>
+                    )}
 
-            <button
-              onClick={handleShare}
-              className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all duration-300 hover:scale-110"
-            >
-              <Share2 className="h-5 w-5" />
-            </button>
+                    {/* Close Button */}
+                    <button
+                      type="button"
+                      className="absolute top-4 right-4 z-20 rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-white/30 transition-colors duration-200"
+                      onClick={onClose}
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
 
-            <button
-              onClick={onClose}
-              className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all duration-300 hover:scale-110"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* Category Badge */}
-          {event.category && (
-            <div className="absolute bottom-6 left-6">
-              <div
-                className={cn(
-                  "inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold backdrop-blur-md",
-                  categoryColors.bg,
-                  categoryColors.text,
-                  "shadow-lg",
-                )}
-              >
-                <div className="w-2 h-2 rounded-full bg-white/80 mr-2" />
-                {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-16rem)]">
-          <div className="p-8">
-            {/* Title Section */}
-            <div className="mb-8">
-              <h1 className="text-4xl font-bold text-gray-900 mb-4 leading-tight">{event.title}</h1>
-
-              {event.description && <p className="text-lg text-gray-600 leading-relaxed">{event.description}</p>}
-            </div>
-
-            {/* Enhanced Event Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100">
-                  <div className="p-3 rounded-xl bg-amber-500 text-white">
-                    <Calendar className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 mb-1">Date & Time</div>
-                    <div className="text-gray-600">{formatEventDate(event.date, event.time)}</div>
+                    {/* Title on Image */}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
+                      <h3 className="text-2xl sm:text-3xl font-bold text-white drop-shadow-md">{event.title}</h3>
+                    </div>
                   </div>
                 </div>
 
-                {event.location && (
-                  <div className="flex items-start space-x-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
-                    <div className="p-3 rounded-xl bg-blue-500 text-white">
-                      <MapPin className="h-6 w-6" />
-                    </div>
+                {/* Content */}
+                <div className="p-6 pb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Left Column - Event Details */}
                     <div>
-                      <div className="font-semibold text-gray-900 mb-1">Location</div>
-                      <div className="text-gray-600">{event.location}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                      <div className="mb-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                          <Calendar className="h-5 w-5 mr-2 text-amber-500" />
+                          Event Details
+                        </h4>
+                        <div className="space-y-3 pl-7">
+                          <div className="flex items-start">
+                            <Clock className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <span className="text-gray-700">{formatEventDate(event.date, event.time)}</span>
+                          </div>
+                          {event.location && (
+                            <div className="flex items-start">
+                              <MapPin className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-700">{event.location}</span>
+                            </div>
+                          )}
+                          {event.organizer && (
+                            <div className="flex items-start">
+                              <User className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-700">
+                                <span className="font-medium">Organized by:</span> {event.organizer}
+                              </span>
+                            </div>
+                          )}
+                          {event.attendees && (
+                            <div className="flex items-start">
+                              <Users className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-700">
+                                <span className="font-medium">Attendees:</span> {event.attendees}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-              <div className="space-y-6">
-                {event.organizer && (
-                  <div className="flex items-start space-x-4 p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
-                    <div className="p-3 rounded-xl bg-purple-500 text-white">
-                      <User className="h-6 w-6" />
+                      {/* Price Info */}
+                      {event.price && (
+                        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-700 font-medium">Price</span>
+                            <span className="text-amber-600 font-bold">{event.price}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Right Column - Description */}
                     <div>
-                      <div className="font-semibold text-gray-900 mb-1">Organizer</div>
-                      <div className="text-gray-600">{event.organizer}</div>
+                      {event.description && (
+                        <div className="mb-6">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-3">Description</h4>
+                          <div className="text-gray-700 leading-relaxed">{event.description}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {event.attendees && (
-                  <div className="flex items-start space-x-4 p-4 rounded-2xl bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100">
-                    <div className="p-3 rounded-xl bg-green-500 text-white">
-                      <Users className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900 mb-1">Attendees</div>
-                      <div className="text-gray-600">{event.attendees} people attending</div>
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-between">
+                    {event.url ? (
+                      <a
+                        href={event.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02]"
+                      >
+                        <ExternalLink className="h-5 w-5" />
+                        View Original Event
+                      </a>
+                    ) : (
+                      <div className="flex-1" />
+                    )}
+                    <button
+                      onClick={onClose}
+                      className="flex-1 border-2 border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-4 py-3 rounded-xl transition-colors duration-200"
+                    >
+                      Close
+                    </button>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* Price Section */}
-            {event.price && (
-              <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-yellow-50 via-amber-50 to-orange-50 border border-yellow-200">
-                <div className="flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-2">Event Price</div>
-                    <div className="text-3xl font-bold text-amber-600">{event.price}</div>
-                  </div>
+                  {/* Copy URL Feedback */}
+                  {isCopied && (
+                    <div className="mt-4 text-center">
+                      <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm animate-fade-in">
+                        URL copied to clipboard!
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              {event.url && (
-                <button
-                  onClick={() => window.open(event.url, "_blank")}
-                  className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-6 py-4 rounded-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 hover:shadow-lg font-semibold text-lg"
-                >
-                  <ExternalLink className="h-5 w-5 mr-3" />
-                  View Original Event
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="flex-1 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 px-6 py-4 rounded-2xl transition-all duration-300 hover:scale-105 font-semibold text-lg"
-              >
-                Close
-              </button>
-            </div>
-
-            {/* Source Info */}
-            {event.source && (
-              <div className="text-center pt-6 border-t border-gray-100">
-                <span className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-gray-600 text-sm">
-                  <div className="w-2 h-2 rounded-full bg-gray-400 mr-2" />
-                  Imported from {event.source.charAt(0).toUpperCase() + event.source.slice(1)}
-                </span>
-              </div>
-            )}
+                {/* Minimal Footer with Source Info */}
+                {event.source && (
+                  <div className="px-6 pb-4">
+                    <div className="text-center text-xs text-gray-400 border-t border-gray-100 pt-3">
+                      Imported from {event.source.charAt(0).toUpperCase() + event.source.slice(1)}
+                    </div>
+                  </div>
+                )}
+              </Dialog.Panel>
+            </Transition.Child>
           </div>
         </div>
-      </div>
-    </div>
+      </Dialog>
+    </Transition>
   )
 }
