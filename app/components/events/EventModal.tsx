@@ -17,11 +17,11 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
   const getCategoryColor = (category?: string) => {
     switch (category) {
       case "conference":
-        return "bg-purple-100 text-purple-800 border-purple-200"
+        return "bg-orange-100 text-orange-800 border-orange-200"
       case "workshop":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-amber-100 text-amber-800 border-amber-200"
       case "meetup":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
       case "networking":
         return "bg-orange-100 text-orange-800 border-orange-200"
       default:
@@ -69,7 +69,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
           {/* Event Details */}
           <div className="space-y-4 mb-6">
             <div className="flex items-start space-x-3">
-              <Calendar className="h-5 w-5 text-purple-500 mt-0.5" />
+              <Calendar className="h-5 w-5 text-amber-500 mt-0.5" />
               <div>
                 <div className="font-medium text-gray-900">{formatEventDate(event.date, event.time)}</div>
               </div>
@@ -77,7 +77,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
             {event.location && (
               <div className="flex items-start space-x-3">
-                <MapPin className="h-5 w-5 text-purple-500 mt-0.5" />
+                <MapPin className="h-5 w-5 text-amber-500 mt-0.5" />
                 <div>
                   <div className="font-medium text-gray-900">Location</div>
                   <div className="text-gray-600">{event.location}</div>
@@ -87,7 +87,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
             {event.organizer && (
               <div className="flex items-start space-x-3">
-                <User className="h-5 w-5 text-purple-500 mt-0.5" />
+                <User className="h-5 w-5 text-amber-500 mt-0.5" />
                 <div>
                   <div className="font-medium text-gray-900">Organizer</div>
                   <div className="text-gray-600">{event.organizer}</div>
@@ -97,7 +97,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
             {event.attendees && (
               <div className="flex items-start space-x-3">
-                <Users className="h-5 w-5 text-purple-500 mt-0.5" />
+                <Users className="h-5 w-5 text-amber-500 mt-0.5" />
                 <div>
                   <div className="font-medium text-gray-900">Attendees</div>
                   <div className="text-gray-600">{event.attendees} people attending</div>
@@ -107,7 +107,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
             {event.price && (
               <div className="flex items-start space-x-3">
-                <div className="h-5 w-5 text-purple-500 mt-0.5 flex items-center justify-center">
+                <div className="h-5 w-5 text-amber-500 mt-0.5 flex items-center justify-center">
                   <span className="text-sm font-bold">$</span>
                 </div>
                 <div>
@@ -123,7 +123,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
             {event.url && (
               <button
                 onClick={() => window.open(event.url, "_blank")}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center transition-all duration-200"
+                className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-4 py-2 rounded-lg flex items-center justify-center transition-all duration-200"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Original Event

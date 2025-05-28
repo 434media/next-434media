@@ -16,11 +16,11 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
   const getCategoryColor = (category?: string) => {
     switch (category) {
       case "conference":
-        return "bg-purple-100 text-purple-800 border-purple-200"
+        return "bg-orange-100 text-orange-800 border-orange-200"
       case "workshop":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-amber-100 text-amber-800 border-amber-200"
       case "meetup":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
       case "networking":
         return "bg-orange-100 text-orange-800 border-orange-200"
       default:
@@ -45,7 +45,7 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
   return (
     <div
       className={cn(
-        "bg-white rounded-xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-purple-300 group relative",
+        "bg-white rounded-xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:border-amber-300 group relative",
         className,
       )}
     >
@@ -93,7 +93,7 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
           </div>
 
           {/* Event Title */}
-          <h3 className="font-bold text-xl text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
+          <h3 className="font-bold text-xl text-gray-900 mb-2 line-clamp-2 group-hover:text-amber-600 transition-colors">
             {event.title}
           </h3>
 
@@ -105,30 +105,30 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
           {/* Event Details Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center text-gray-600">
-              <Clock className="h-4 w-4 mr-2 text-purple-500 flex-shrink-0" />
+              <Clock className="h-4 w-4 mr-2 text-amber-500 flex-shrink-0" />
               <span className="truncate">{formatTime(event.time)}</span>
             </div>
 
             {event.location && (
               <div className="flex items-center text-gray-600">
-                <MapPin className="h-4 w-4 mr-2 text-purple-500 flex-shrink-0" />
+                <MapPin className="h-4 w-4 mr-2 text-amber-500 flex-shrink-0" />
                 <span className="truncate">{event.location}</span>
               </div>
             )}
 
             {event.attendees && (
               <div className="flex items-center text-gray-600">
-                <Users className="h-4 w-4 mr-2 text-purple-500 flex-shrink-0" />
+                <Users className="h-4 w-4 mr-2 text-amber-500 flex-shrink-0" />
                 <span className="truncate">{event.attendees} attendees</span>
               </div>
             )}
 
             {event.price && (
               <div className="flex items-center">
-                <div className="h-4 w-4 mr-2 text-purple-500 flex items-center justify-center flex-shrink-0">
+                <div className="h-4 w-4 mr-2 text-amber-500 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold">$</span>
                 </div>
-                <span className="font-semibold text-green-600 truncate">{event.price}</span>
+                <span className="font-semibold text-amber-600 truncate">{event.price}</span>
               </div>
             )}
           </div>
@@ -145,7 +145,7 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
 
         {/* Action Indicator */}
         <div className="flex-shrink-0 flex items-center">
-          <ExternalLink className="h-5 w-5 text-gray-400 group-hover:text-purple-500 transition-colors" />
+          <ExternalLink className="h-5 w-5 text-gray-400 group-hover:text-amber-500 transition-colors" />
         </div>
       </div>
     </div>

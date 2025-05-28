@@ -15,11 +15,11 @@ export function EventCard({ event, onClick, className }: EventCardProps) {
   const getCategoryColor = (category?: string) => {
     switch (category) {
       case "conference":
-        return "bg-purple-100 text-purple-800 border-purple-200"
+        return "bg-orange-100 text-orange-800 border-orange-200"
       case "workshop":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-amber-100 text-amber-800 border-amber-200"
       case "meetup":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
       case "networking":
         return "bg-orange-100 text-orange-800 border-orange-200"
       default:
@@ -31,7 +31,7 @@ export function EventCard({ event, onClick, className }: EventCardProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-white rounded-xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105 hover:border-purple-300",
+        "bg-white rounded-xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105 hover:border-amber-300",
         className,
       )}
     >
@@ -63,20 +63,20 @@ export function EventCard({ event, onClick, className }: EventCardProps) {
       {/* Event Details */}
       <div className="space-y-2">
         <div className="flex items-center text-sm text-gray-600">
-          <Calendar className="h-4 w-4 mr-2 text-purple-500" />
+          <Calendar className="h-4 w-4 mr-2 text-amber-500" />
           {formatEventDate(event.date, event.time)}
         </div>
 
         {event.location && (
           <div className="flex items-center text-sm text-gray-600">
-            <MapPin className="h-4 w-4 mr-2 text-purple-500" />
+            <MapPin className="h-4 w-4 mr-2 text-amber-500" />
             {event.location}
           </div>
         )}
 
         {event.attendees && (
           <div className="flex items-center text-sm text-gray-600">
-            <Users className="h-4 w-4 mr-2 text-purple-500" />
+            <Users className="h-4 w-4 mr-2 text-amber-500" />
             {event.attendees} attendees
           </div>
         )}
@@ -101,7 +101,7 @@ export function EventCard({ event, onClick, className }: EventCardProps) {
       {/* Price */}
       {event.price && (
         <div className="mt-2">
-          <span className="text-sm font-semibold text-green-600">{event.price}</span>
+          <span className="text-sm font-semibold text-amber-600">{event.price}</span>
         </div>
       )}
     </div>

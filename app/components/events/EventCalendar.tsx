@@ -68,13 +68,13 @@ export function EventCalendar({ events, onAddEvent, onEventClick }: EventCalenda
           <div className="flex items-center space-x-2 mt-2">
             <button
               onClick={() => navigateMonth("prev")}
-              className="h-7 w-7 p-0 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center justify-center"
+              className="h-7 w-7 p-0 border border-gray-300 rounded-md hover:bg-amber-50 hover:border-amber-300 flex items-center justify-center transition-colors"
             >
               <ChevronLeft className="h-3 w-3" />
             </button>
             <button
               onClick={() => navigateMonth("next")}
-              className="h-7 w-7 p-0 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center justify-center"
+              className="h-7 w-7 p-0 border border-gray-300 rounded-md hover:bg-amber-50 hover:border-amber-300 flex items-center justify-center transition-colors"
             >
               <ChevronRight className="h-3 w-3" />
             </button>
@@ -82,7 +82,7 @@ export function EventCalendar({ events, onAddEvent, onEventClick }: EventCalenda
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-3 py-2 rounded-lg flex items-center transition-all duration-200 text-sm"
+          className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-3 py-2 rounded-lg flex items-center transition-all duration-200 text-sm"
         >
           <Plus className="h-3 w-3 mr-1" />
           Add
@@ -106,19 +106,19 @@ export function EventCalendar({ events, onAddEvent, onEventClick }: EventCalenda
             <div
               key={index}
               className={cn(
-                "min-h-[80px] p-2 border-r border-b border-gray-100 cursor-pointer transition-all duration-200 hover:bg-gray-50",
+                "min-h-[80px] p-2 border-r border-b border-gray-100 cursor-pointer transition-all duration-200 hover:bg-amber-50",
                 !day.isCurrentMonth && "bg-gray-50/50 text-gray-400",
-                day.isToday && "bg-blue-50 border-blue-200",
+                day.isToday && "bg-amber-50 border-amber-200",
                 selectedDate &&
                   day.date.toDateString() === selectedDate.toDateString() &&
-                  "bg-purple-50 border-purple-200",
+                  "bg-orange-50 border-orange-200",
               )}
               onClick={() => setSelectedDate(day.date)}
             >
               <div
                 className={cn(
                   "text-sm font-medium mb-1",
-                  day.isToday && "text-blue-600",
+                  day.isToday && "text-amber-600",
                   !day.isCurrentMonth && "text-gray-400",
                 )}
               >
@@ -136,9 +136,9 @@ export function EventCalendar({ events, onAddEvent, onEventClick }: EventCalenda
                     }}
                     className={cn(
                       "text-xs p-1 rounded truncate cursor-pointer transition-all duration-200 hover:scale-105",
-                      event.category === "conference" && "bg-purple-100 text-purple-800 hover:bg-purple-200",
-                      event.category === "workshop" && "bg-green-100 text-green-800 hover:bg-green-200",
-                      event.category === "meetup" && "bg-blue-100 text-blue-800 hover:bg-blue-200",
+                      event.category === "conference" && "bg-orange-100 text-orange-800 hover:bg-orange-200",
+                      event.category === "workshop" && "bg-amber-100 text-amber-800 hover:bg-amber-200",
+                      event.category === "meetup" && "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
                       event.category === "networking" && "bg-orange-100 text-orange-800 hover:bg-orange-200",
                       (!event.category || event.category === "other") && "bg-gray-100 text-gray-800 hover:bg-gray-200",
                     )}
@@ -159,7 +159,7 @@ export function EventCalendar({ events, onAddEvent, onEventClick }: EventCalenda
       <AddEventModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onAddEvent={onAddEvent}
+        onEventAdded={onAddEvent}
         selectedDate={selectedDate}
       />
     </div>

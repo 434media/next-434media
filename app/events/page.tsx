@@ -190,7 +190,7 @@ export default function EventsPage() {
           <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-8rem)] px-4 sm:px-6">
             <div className="max-w-7xl mx-auto text-center w-full">
               {/* Enhanced Hero Title with Better Contrast */}
-              <div className="mb-8 sm:mb-12 lg:mb-16 space-y-4 sm:space-y-6 lg:space-y-8">
+              <div className="mb-8 sm:mb-12 lg:mb-16 space-y-4 sm:space-y-6 lg:space-y-8 mt-10 md:mt-0">
                 <div className="flex items-center justify-center gap-3 sm:gap-6 lg:gap-8 mb-4 sm:mb-6 lg:mb-8">
                   <Sparkles className="h-10 w-10 sm:h-16 md:h-20 lg:h-24 xl:h-28 text-amber-400 animate-spin-slow drop-shadow-lg flex-shrink-0" />
                   <div className="text-center">
