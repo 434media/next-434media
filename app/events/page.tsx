@@ -140,17 +140,18 @@ export default function EventsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <FadeIn>
-        {/* Viewport-Optimized Hero Section */}
-        <div className="relative h-screen max-h-[900px] min-h-[600px] pt-16 sm:pt-20 bg-gradient-to-br from-purple-600 via-purple-700 to-blue-600 text-white overflow-hidden">
-          {/* Enhanced Background Layers with Depth */}
+        {/* Enhanced Hero Section with Footer-Inspired Dark Gradient */}
+        <div className="relative min-h-screen pt-20 sm:pt-24 lg:pt-28 xl:pt-32 pb-8 sm:pb-12 lg:pb-16 bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+          {/* Enhanced Dark Background Layers with Depth */}
           <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/95 via-blue-600/90 to-purple-600/95"></div>
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-800/20 to-blue-900/30"></div>
-            <div className="absolute inset-0 bg-radial-gradient from-transparent via-purple-500/10 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-900/98 via-gray-800/95 to-black/98"></div>
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-900/30 to-black/40"></div>
+            <div className="absolute inset-0 bg-gradient-to-tr from-gray-800/20 via-transparent to-gray-900/20"></div>
+            <div className="absolute inset-0 bg-radial-gradient from-gray-700/10 via-transparent to-gray-900/20"></div>
           </div>
 
-          {/* Refined 434 Media Logo Pattern */}
-          <div className="absolute inset-0 opacity-[0.04] sm:opacity-[0.06] pointer-events-none" aria-hidden="true">
+          {/* Sophisticated 434 Media Logo Pattern with Enhanced Contrast */}
+          <div className="absolute inset-0 opacity-[0.08] sm:opacity-[0.12] pointer-events-none" aria-hidden="true">
             <div
               className="absolute inset-0 sm:bg-[length:140px_140px]"
               style={{
@@ -159,92 +160,87 @@ export default function EventsPage() {
                 backgroundRepeat: "repeat",
                 backgroundPosition: "0 0",
                 animation: "float 25s ease-in-out infinite",
+                filter: "brightness(1.2) contrast(1.1)",
               }}
             />
           </div>
 
-          {/* Sophisticated Floating Elements */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {/* Primary floating orbs with enhanced gradients */}
-            <div className="absolute top-1/4 left-4 w-24 h-24 sm:w-40 sm:h-40 bg-gradient-to-br from-white/15 to-yellow-300/25 rounded-full blur-xl sm:blur-2xl animate-float-slow opacity-80"></div>
-            <div className="absolute top-1/3 right-4 w-20 h-20 sm:w-32 sm:h-32 bg-gradient-to-br from-purple-300/25 to-blue-300/35 rounded-full blur-lg sm:blur-xl animate-float-slow delay-1000 opacity-70"></div>
-            <div className="absolute bottom-1/3 left-1/4 w-16 h-16 sm:w-28 sm:h-28 bg-gradient-to-br from-yellow-300/20 to-white/15 rounded-full blur-md sm:blur-lg animate-float-slow delay-500 opacity-60"></div>
-            <div className="absolute bottom-1/4 right-1/3 w-14 h-14 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-300/25 to-purple-300/20 rounded-full blur-sm sm:blur-md animate-float-slow delay-2000 opacity-50"></div>
+          {/* Enhanced Floating Elements with Warmer Accents */}
+          <div className="absolute inset-0 pointer-events-none">
+            {/* Primary floating orbs with sophisticated gradients */}
+            <div className="absolute top-1/4 left-4 w-24 h-24 sm:w-40 sm:h-40 lg:w-48 lg:h-48 bg-gradient-to-br from-amber-400/20 to-orange-500/30 rounded-full blur-xl sm:blur-2xl animate-float-slow opacity-70"></div>
+            <div className="absolute top-1/3 right-4 w-20 h-20 sm:w-32 sm:h-32 lg:w-40 lg:h-40 bg-gradient-to-br from-yellow-400/25 to-amber-500/35 rounded-full blur-lg sm:blur-xl animate-float-slow delay-1000 opacity-60"></div>
+            <div className="absolute bottom-1/3 left-1/4 w-16 h-16 sm:w-28 sm:h-28 lg:w-36 lg:h-36 bg-gradient-to-br from-orange-400/20 to-red-500/25 rounded-full blur-md sm:blur-lg animate-float-slow delay-500 opacity-50"></div>
+            <div className="absolute bottom-1/4 right-1/3 w-14 h-14 sm:w-24 sm:h-24 lg:w-32 lg:h-32 bg-gradient-to-br from-amber-500/25 to-yellow-400/20 rounded-full blur-sm sm:blur-md animate-float-slow delay-2000 opacity-40"></div>
 
-            {/* Secondary accent elements with staggered animations */}
-            <div className="hidden xs:block absolute top-20 right-1/4 w-12 h-12 sm:w-16 sm:h-16 bg-yellow-300/30 rounded-full blur-sm animate-pulse delay-300 opacity-40"></div>
-            <div className="hidden xs:block absolute bottom-20 left-1/3 w-8 h-8 sm:w-12 sm:h-12 bg-white/25 rounded-full blur-sm animate-pulse delay-700 opacity-30"></div>
+            {/* Secondary accent elements with warm tones */}
+            <div className="hidden xs:block absolute top-20 right-1/4 w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-yellow-500/30 to-orange-400/25 rounded-full blur-sm animate-pulse delay-300 opacity-35"></div>
+            <div className="hidden xs:block absolute bottom-20 left-1/3 w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-amber-400/25 to-yellow-500/20 rounded-full blur-sm animate-pulse delay-700 opacity-30"></div>
 
-            {/* Additional depth elements */}
-            <div className="hidden sm:block absolute top-1/2 left-1/6 w-6 h-6 bg-purple-200/20 rounded-full blur-sm animate-pulse delay-1500 opacity-25"></div>
-            <div className="hidden sm:block absolute top-3/4 right-1/6 w-4 h-4 bg-yellow-200/15 rounded-full blur-sm animate-pulse delay-2500 opacity-20"></div>
+            {/* Additional sophisticated depth elements */}
+            <div className="hidden sm:block absolute top-1/2 left-1/6 w-6 h-6 lg:w-10 lg:h-10 bg-gradient-to-br from-orange-300/20 to-amber-400/15 rounded-full blur-sm animate-pulse delay-1500 opacity-25"></div>
+            <div className="hidden sm:block absolute top-3/4 right-1/6 w-4 h-4 lg:w-8 lg:h-8 bg-gradient-to-br from-yellow-400/15 to-orange-300/10 rounded-full blur-sm animate-pulse delay-2500 opacity-20"></div>
+
+            {/* Additional sophisticated elements for depth */}
+            <div className="absolute top-1/6 left-1/2 w-10 h-10 sm:w-20 sm:h-20 lg:w-28 lg:h-28 bg-gradient-to-br from-amber-300/15 to-orange-400/20 rounded-full blur-lg animate-float-slow delay-3000 opacity-30"></div>
+            <div className="absolute bottom-1/6 right-1/2 w-8 h-8 sm:w-16 sm:h-16 lg:w-24 lg:h-24 bg-gradient-to-br from-yellow-500/20 to-amber-400/15 rounded-full blur-md animate-float-slow delay-4000 opacity-25"></div>
           </div>
 
           {/* Perfectly Centered Content Container */}
-          <div className="relative z-10 flex items-center justify-center h-full px-4 sm:px-6">
-            <div className="max-w-6xl mx-auto text-center">
-              {/* Refined Hero Title with Better Spacing */}
-              <div className="mt-8 mb-6 sm:mb-8 lg:mb-10 space-y-3 sm:space-y-4 lg:space-y-6">
-                <div className="flex items-center justify-center gap-3 sm:gap-6 mb-4 sm:mb-6 lg:mb-8">
-                  <Sparkles className="h-8 w-8 sm:h-12 md:h-14 text-yellow-300 animate-spin-slow" />
+          <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-8rem)] px-4 sm:px-6">
+            <div className="max-w-7xl mx-auto text-center w-full">
+              {/* Enhanced Hero Title with Better Contrast */}
+              <div className="mb-8 sm:mb-12 lg:mb-16 space-y-4 sm:space-y-6 lg:space-y-8">
+                <div className="flex items-center justify-center gap-3 sm:gap-6 lg:gap-8 mb-4 sm:mb-6 lg:mb-8">
+                  <Sparkles className="h-10 w-10 sm:h-16 md:h-20 lg:h-24 xl:h-28 text-amber-400 animate-spin-slow drop-shadow-lg flex-shrink-0" />
                   <div className="text-center">
-                    <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black leading-[0.9] tracking-tight">
-                      <span className="inline-block animate-fade-in-up bg-gradient-to-r from-white via-yellow-100 to-white bg-clip-text text-transparent drop-shadow-sm">
+                    <h1 className="text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl 2xl:text-[10rem] font-black leading-[0.85] tracking-tight">
+                      <span className="inline-block animate-fade-in-up bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent drop-shadow-lg">
                         Where Networks
                       </span>
                       <br />
-                      <span className="inline-block animate-fade-in-up delay-300 bg-gradient-to-r from-yellow-300 via-yellow-100 to-yellow-300 bg-clip-text text-transparent drop-shadow-sm">
+                      <span className="inline-block animate-fade-in-up delay-300 bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 bg-clip-text text-transparent drop-shadow-lg">
                         Meet Action
                       </span>
                     </h1>
-                    <div className="mt-2 sm:mt-4 lg:mt-6">
-                      <span className="text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-yellow-300 inline-block animate-fade-in-up delay-600 drop-shadow-lg">
-                        Where Events Create Impact
-                      </span>
-                    </div>
                   </div>
-                  <Sparkles className="h-8 w-8 sm:h-12 md:h-14 text-yellow-300 animate-spin-slow delay-1000" />
+                  <Sparkles className="h-10 w-10 sm:h-16 md:h-20 lg:h-24 xl:h-28 text-amber-400 animate-spin-slow delay-1000 drop-shadow-lg flex-shrink-0" />
                 </div>
               </div>
 
-              {/* Optimized Story Section */}
-              <div className="max-w-4xl mx-auto mb-8 animate-fade-in-up delay-900">
-                <p className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl text-purple-100 leading-relaxed font-light px-2 mb-3 sm:mb-4 lg:mb-6">
+              {/* Enhanced Story Section with Better Contrast */}
+              <div className="max-w-5xl mx-auto mb-12 sm:mb-16 lg:mb-20 animate-fade-in-up delay-900">
+                <p className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl text-gray-200 leading-relaxed font-light px-2 mb-3 sm:mb-4 lg:mb-6 drop-shadow-md">
                   Discover meaningful events that bring communities together. Import events from your favorite platforms
                   or create your own with our intelligent event parser.
                 </p>
-                <div className="text-sm xs:text-base sm:text-lg md:text-xl text-yellow-200 font-medium">
+                <div className="text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl text-amber-300 font-medium drop-shadow-md">
                   Build connections that matter.
                 </div>
               </div>
 
-              {/* Enhanced CTA Section with Better Proportions */}
-              <div className="animate-fade-in-up delay-1200 md:mb-16">
+              {/* Enhanced CTA Section with Sophisticated Styling */}
+              <div className="animate-fade-in-up delay-1200 mb-8 sm:mb-12 lg:mb-16">
                 <button
                   onClick={handleAddEventClick}
-                  className="group relative bg-white text-purple-600 px-8 xs:px-10 sm:px-16 py-4 xs:py-5 sm:py-6 lg:py-8 rounded-full font-black text-lg xs:text-xl sm:text-2xl hover:bg-purple-50 transition-all duration-700 hover:scale-105 sm:hover:scale-110 shadow-2xl hover:shadow-purple-500/30 flex items-center gap-3 xs:gap-4 sm:gap-6 mx-auto overflow-hidden transform-gpu"
+                  className="group relative bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-gray-900 px-8 xs:px-10 sm:px-16 lg:px-20 py-4 xs:py-5 sm:py-6 lg:py-8 xl:py-10 rounded-full font-black text-lg xs:text-xl sm:text-2xl lg:text-3xl transition-all duration-700 hover:scale-105 sm:hover:scale-110 shadow-2xl hover:shadow-amber-500/30 flex items-center gap-3 xs:gap-4 sm:gap-6 lg:gap-8 mx-auto transform-gpu"
                 >
                   {/* Enhanced Animated Background */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-purple-600 opacity-0 group-hover:opacity-15 transition-opacity duration-700 rounded-full"></div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-blue-500 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-full scale-110"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-red-500 opacity-0 group-hover:opacity-20 transition-opacity duration-700 rounded-full"></div>
 
-                  <Plus className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 group-hover:rotate-180 transition-transform duration-700 relative z-10" />
-                  <span className="relative z-10">Start Connecting Events</span>
-                  <Sparkles className="h-5 w-5 xs:h-6 xs:w-6 sm:h-7 sm:w-7 text-purple-600 group-hover:text-yellow-500 transition-colors duration-700 relative z-10 animate-pulse" />
-
-                  {/* Enhanced Ripple Effect */}
-                  <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-30 group-hover:scale-150 transition-all duration-1000"></div>
-                  <div className="absolute inset-0 rounded-full bg-yellow-300 opacity-0 group-hover:opacity-20 group-hover:scale-125 transition-all duration-800 delay-100"></div>
+                  <Plus className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 lg:h-10 lg:w-10 group-hover:rotate-180 transition-transform duration-700 relative z-10 drop-shadow-md flex-shrink-0" />
+                  <span className="relative z-10 drop-shadow-md whitespace-nowrap">Start Connecting Events</span>
+                  <Sparkles className="h-5 w-5 xs:h-6 xs:w-6 sm:h-7 sm:w-7 lg:h-9 lg:w-9 text-gray-900 group-hover:text-gray-800 transition-colors duration-700 relative z-10 animate-pulse drop-shadow-md flex-shrink-0" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Seamless Wave Transition with Enhanced Gradient */}
+          {/* Enhanced Wave Transition with Sophisticated Gradient */}
           <div className="absolute bottom-0 left-0 right-0">
-            <svg viewBox="0 0 1440 120" className="w-full h-auto drop-shadow-sm">
+            <svg viewBox="0 0 1440 120" className="w-full h-auto">
               <defs>
-                <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id="sophisticatedWaveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="rgb(249, 250, 251)" />
                   <stop offset="25%" stopColor="rgb(248, 250, 252)" />
                   <stop offset="50%" stopColor="rgb(249, 250, 251)" />
@@ -253,13 +249,12 @@ export default function EventsPage() {
                 </linearGradient>
               </defs>
               <path
-                fill="url(#waveGradient)"
+                fill="url(#sophisticatedWaveGradient)"
                 d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,64C960,75,1056,85,1152,80C1248,75,1344,53,1392,42.7L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"
               ></path>
             </svg>
           </div>
         </div>
-
 
         {/* Refined Main Content with Better Flow */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 bg-gray-50 relative">
@@ -284,7 +279,7 @@ export default function EventsPage() {
               <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
                     Upcoming Events
                     {!isLoading && (
                       <span className="text-sm font-normal text-gray-500 ml-2 animate-fade-in delay-300">
@@ -299,7 +294,7 @@ export default function EventsPage() {
 
                 <button
                   onClick={handleAddEventClick}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 hover:scale-105 shadow-lg w-full sm:w-auto justify-center transform-gpu"
+                  className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 hover:scale-105 shadow-lg w-full sm:w-auto justify-center transform-gpu"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Add Event</span>
@@ -344,7 +339,7 @@ export default function EventsPage() {
                     </p>
                     <button
                       onClick={handleAddEventClick}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 transform-gpu"
+                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 transform-gpu"
                     >
                       Add Your First Event
                     </button>
