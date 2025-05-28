@@ -19,8 +19,8 @@ interface EventPreviewProps {
 }
 
 export function EventPreview({ event, onViewDetails, className }: EventPreviewProps) {
-  const [relativeTime, setRelativeTime] = useState<string>("")
   const [isValidDate, setIsValidDate] = useState<boolean>(true)
+  const [relativeTime, setRelativeTime] = useState<string>("")
 
   // Validate date on component mount
   useEffect(() => {
@@ -46,7 +46,7 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
   if (!isValidDate) {
     return (
       <div
-        className="bg-white rounded-xl shadow-md border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer group"
+        className="bg-white rounded-xl shadow-md border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer group h-[350px]"
         onClick={onViewDetails}
       >
         <div className="flex items-center gap-3 text-amber-600 mb-4">
@@ -54,7 +54,7 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
           <span className="font-medium">Date needs confirmation</span>
         </div>
 
-        <h3 className="font-bold text-lg text-gray-900 mb-3 group-hover:text-amber-600 transition-colors">
+        <h3 className="font-bold text-lg text-gray-900 mb-3 group-hover:text-amber-600 transition-colors line-clamp-2">
           {event.title}
         </h3>
 
@@ -153,7 +153,7 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
   return (
     <div
       className={cn(
-        "mt-6 bg-white rounded-2xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 group relative",
+        "mt-6 bg-white rounded-2xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 group relative h-[350px]",
         urgencyConfig.borderColor,
         className,
       )}
@@ -175,7 +175,7 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
               </span>
               <div className={`w-2 h-2 rounded-full ${sourceInfo.color}`} title={sourceInfo.name}></div>
             </div>
-            <h3 className="font-bold text-lg leading-tight mb-1 group-hover:text-yellow-100 transition-colors">
+            <h3 className="font-bold text-lg leading-tight mb-1 group-hover:text-yellow-100 transition-colors line-clamp-2">
               {event.title}
             </h3>
             {event.category && (
@@ -205,9 +205,9 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
         {event.description && <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{event.description}</p>}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <div className="flex md:flex-col md:items-start md:gap-1 items-center justify-between pt-2 border-t border-gray-100">
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            {event.organizer && <span className="truncate max-w-[120px]">by {event.organizer}</span>}
+            {event.organizer && <span className="md:hidden truncate max-w-[120px]">by {event.organizer}</span>}
             {event.price && <span className="font-medium text-green-600">{event.price}</span>}
           </div>
 

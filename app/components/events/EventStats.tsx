@@ -27,9 +27,6 @@ export function EventStats({ events, className }: EventStatsProps) {
   useEffect(() => {
     setMounted(true)
 
-    // Get the user's local time zone
-    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
     // Filter out any events with invalid dates
     const validEvents = events.filter((event) => {
       try {
@@ -46,15 +43,8 @@ export function EventStats({ events, className }: EventStatsProps) {
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
 
-      // Convert eventDate to user's local time zone
-      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-      // Get today's date in the user's local time zone
       const today = new Date()
-      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-      localToday.setHours(0, 0, 0, 0)
-
-      return localEventDate.toDateString() === localToday.toDateString()
+      return eventDate.toDateString() === today.toDateString()
     })
 
     const thisWeekEvents = validEvents.filter((event) => {
@@ -62,16 +52,11 @@ export function EventStats({ events, className }: EventStatsProps) {
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
 
-      // Convert eventDate to user's local time zone
-      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-      // Get today's date in the user's local time zone
       const today = new Date()
-      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
 
       // Get the start of this week (Sunday)
-      const startOfWeek = new Date(localToday)
-      startOfWeek.setDate(localToday.getDate() - localToday.getDay())
+      const startOfWeek = new Date(today)
+      startOfWeek.setDate(today.getDate() - today.getDay())
       startOfWeek.setHours(0, 0, 0, 0)
 
       // Get the end of this week (Saturday)
@@ -79,7 +64,7 @@ export function EventStats({ events, className }: EventStatsProps) {
       endOfWeek.setDate(startOfWeek.getDate() + 6)
       endOfWeek.setHours(23, 59, 59, 999)
 
-      return localEventDate >= startOfWeek && localEventDate <= endOfWeek
+      return eventDate >= startOfWeek && eventDate <= endOfWeek
     })
 
     const upcoming30DaysEvents = validEvents.filter((event) => {
@@ -87,17 +72,11 @@ export function EventStats({ events, className }: EventStatsProps) {
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
 
-      // Convert eventDate to user's local time zone
-      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-      // Get today's date in the user's local time zone
       const today = new Date()
-      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-      localToday.setHours(0, 0, 0, 0)
+      const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+      today.setHours(0, 0, 0, 0)
 
-      const thirtyDaysFromNow = new Date(localToday.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-      return localEventDate >= localToday && localEventDate <= thirtyDaysFromNow
+      return eventDate >= today && eventDate <= thirtyDaysFromNow
     })
 
     const upcomingEvents = validEvents.filter((event) => {
@@ -105,15 +84,10 @@ export function EventStats({ events, className }: EventStatsProps) {
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
 
-      // Convert eventDate to user's local time zone
-      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-      // Get today's date in the user's local time zone
       const today = new Date()
-      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-      localToday.setHours(0, 0, 0, 0)
+      today.setHours(0, 0, 0, 0)
 
-      return localEventDate >= localToday
+      return eventDate >= today
     })
 
     // Count events by category

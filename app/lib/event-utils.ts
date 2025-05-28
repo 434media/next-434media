@@ -66,56 +66,28 @@ export function formatEventDate(dateStr: string, timeStr?: string): string {
   const eventDate = safeParseDate(dateStr)
   if (!eventDate) return "Invalid Date"
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-  localToday.setHours(0, 0, 0, 0)
 
-  // Get tomorrow's date in the user's local time zone
-  const tomorrow = new Date(localToday)
-  tomorrow.setDate(localToday.getDate() + 1)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
 
-  // Get yesterday's date in the user's local time zone
-  const yesterday = new Date(localToday)
-  yesterday.setDate(localToday.getDate() - 1)
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  // Calculate days difference
-  const diffTime = localEventDate.getTime() - localToday.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
 
   // Format the date part
   let dateDisplay = ""
 
-  if (localEventDate.toDateString() === localToday.toDateString()) {
+  if (eventDate.toDateString() === today.toDateString()) {
     dateDisplay = "Today"
-  } else if (localEventDate.toDateString() === tomorrow.toDateString()) {
+  } else if (eventDate.toDateString() === tomorrow.toDateString()) {
     dateDisplay = "Tomorrow"
-  } else if (localEventDate.toDateString() === yesterday.toDateString()) {
+  } else if (eventDate.toDateString() === yesterday.toDateString()) {
     dateDisplay = "Yesterday"
-  } else if (diffDays > 0 && diffDays <= 7) {
-    // Within a week - show day name
-    dateDisplay = localEventDate.toLocaleDateString("en-US", { weekday: "long", timeZone: userTimeZone })
-  } else if (diffDays > 0 && diffDays <= 30) {
-    // Within a month - show month and day
-    dateDisplay = localEventDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      weekday: "short",
-      timeZone: userTimeZone,
-    })
   } else {
-    // More than a month away or in the past
-    dateDisplay = localEventDate.toLocaleDateString("en-US", {
-      year: localEventDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+    dateDisplay = eventDate.toLocaleDateString("en-US", {
+      year: eventDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
       month: "short",
       day: "numeric",
-      timeZone: userTimeZone,
     })
   }
 
@@ -159,18 +131,9 @@ export function isEventUpcoming(event: Event): boolean {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return false
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-  localToday.setHours(0, 0, 0, 0)
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  return localEventDate >= localToday
+  today.setHours(0, 0, 0, 0)
+  return eventDate >= today
 }
 
 export function isEventPast(event: Event): boolean {
@@ -179,18 +142,9 @@ export function isEventPast(event: Event): boolean {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return true
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-  localToday.setHours(0, 0, 0, 0)
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  return localEventDate < localToday
+  today.setHours(0, 0, 0, 0)
+  return eventDate < today
 }
 
 export function isEventWithin30Days(event: Event): boolean {
@@ -199,20 +153,10 @@ export function isEventWithin30Days(event: Event): boolean {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return false
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-  localToday.setHours(0, 0, 0, 0)
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  const thirtyDaysFromNow = new Date(localToday.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-  return localEventDate >= localToday && localEventDate <= thirtyDaysFromNow
+  const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+  today.setHours(0, 0, 0, 0)
+  return eventDate >= today && eventDate <= thirtyDaysFromNow
 }
 
 export function isEventThisWeek(event: Event): boolean {
@@ -221,16 +165,11 @@ export function isEventThisWeek(event: Event): boolean {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return false
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
 
   // Get the start of this week (Sunday)
-  const startOfWeek = new Date(localToday)
-  startOfWeek.setDate(localToday.getDate() - localToday.getDay())
+  const startOfWeek = new Date(today)
+  startOfWeek.setDate(today.getDate() - today.getDay())
   startOfWeek.setHours(0, 0, 0, 0)
 
   // Get the end of this week (Saturday)
@@ -238,10 +177,7 @@ export function isEventThisWeek(event: Event): boolean {
   endOfWeek.setDate(startOfWeek.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
 
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  return localEventDate >= startOfWeek && localEventDate <= endOfWeek
+  return eventDate >= startOfWeek && eventDate <= endOfWeek
 }
 
 export function isEventToday(event: Event): boolean {
@@ -250,17 +186,8 @@ export function isEventToday(event: Event): boolean {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return false
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  return localEventDate.toDateString() === localToday.toDateString()
+  return eventDate.toDateString() === today.toDateString()
 }
 
 export function getDaysUntilEvent(event: Event): number {
@@ -269,18 +196,9 @@ export function getDaysUntilEvent(event: Event): number {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return 999
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
   const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-  localToday.setHours(0, 0, 0, 0)
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  const diffTime = localEventDate.getTime() - localToday.getTime()
+  today.setHours(0, 0, 0, 0)
+  const diffTime = eventDate.getTime() - today.getTime()
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
@@ -301,18 +219,8 @@ export function formatRelativeTime(dateStr: string): string {
   const eventDate = safeParseDate(dateStr)
   if (!eventDate) return ""
 
-  // Get the user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-
-  // Get today's date in the user's local time zone
-  const today = new Date()
-  const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  // Convert eventDate to user's local time zone
-  const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
-
-  const now = localToday
-  const diffTime = localEventDate.getTime() - now.getTime()
+  const now = new Date()
+  const diffTime = eventDate.getTime() - now.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   const diffHours = Math.ceil(diffTime / (1000 * 60 * 60))
   const diffMinutes = Math.ceil(diffTime / (1000 * 60))
