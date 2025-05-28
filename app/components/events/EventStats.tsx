@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Calendar, Clock, BarChart3, Zap } from "lucide-react"
 import type { Event } from "../../types/event-types"
-import { isEventToday, isEventThisWeek, isEventWithin30Days, isEventUpcoming } from "../../lib/event-utils"
+import { safeParseDate } from "../../lib/event-utils"
 import { cn } from "../../lib/utils"
 
 interface EventStatsProps {
@@ -27,21 +27,94 @@ export function EventStats({ events, className }: EventStatsProps) {
   useEffect(() => {
     setMounted(true)
 
+    // Get the user's local time zone
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
     // Filter out any events with invalid dates
     const validEvents = events.filter((event) => {
       try {
-        const date = new Date(event.date)
-        return !isNaN(date.getTime())
+        const date = safeParseDate(event.date)
+        return !!date && !isNaN(date.getTime())
       } catch (e) {
         return false
       }
     })
 
     // Count events by timeframe
-    const todayEvents = validEvents.filter(isEventToday)
-    const thisWeekEvents = validEvents.filter(isEventThisWeek)
-    const upcoming30DaysEvents = validEvents.filter(isEventWithin30Days)
-    const upcomingEvents = validEvents.filter(isEventUpcoming)
+    const todayEvents = validEvents.filter((event) => {
+      if (!event.date) return false
+      const eventDate = safeParseDate(event.date)
+      if (!eventDate) return false
+
+      // Convert eventDate to user's local time zone
+      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
+
+      // Get today's date in the user's local time zone
+      const today = new Date()
+      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
+      localToday.setHours(0, 0, 0, 0)
+
+      return localEventDate.toDateString() === localToday.toDateString()
+    })
+
+    const thisWeekEvents = validEvents.filter((event) => {
+      if (!event.date) return false
+      const eventDate = safeParseDate(event.date)
+      if (!eventDate) return false
+
+      // Convert eventDate to user's local time zone
+      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
+
+      // Get today's date in the user's local time zone
+      const today = new Date()
+      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
+
+      // Get the start of this week (Sunday)
+      const startOfWeek = new Date(localToday)
+      startOfWeek.setDate(localToday.getDate() - localToday.getDay())
+      startOfWeek.setHours(0, 0, 0, 0)
+
+      // Get the end of this week (Saturday)
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(startOfWeek.getDate() + 6)
+      endOfWeek.setHours(23, 59, 59, 999)
+
+      return localEventDate >= startOfWeek && localEventDate <= endOfWeek
+    })
+
+    const upcoming30DaysEvents = validEvents.filter((event) => {
+      if (!event.date) return false
+      const eventDate = safeParseDate(event.date)
+      if (!eventDate) return false
+
+      // Convert eventDate to user's local time zone
+      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
+
+      // Get today's date in the user's local time zone
+      const today = new Date()
+      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
+      localToday.setHours(0, 0, 0, 0)
+
+      const thirtyDaysFromNow = new Date(localToday.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+      return localEventDate >= localToday && localEventDate <= thirtyDaysFromNow
+    })
+
+    const upcomingEvents = validEvents.filter((event) => {
+      if (!event.date) return false
+      const eventDate = safeParseDate(event.date)
+      if (!eventDate) return false
+
+      // Convert eventDate to user's local time zone
+      const localEventDate = new Date(eventDate.toLocaleString("en-US", { timeZone: userTimeZone }))
+
+      // Get today's date in the user's local time zone
+      const today = new Date()
+      const localToday = new Date(today.toLocaleString("en-US", { timeZone: userTimeZone }))
+      localToday.setHours(0, 0, 0, 0)
+
+      return localEventDate >= localToday
+    })
 
     // Count events by category
     const categories: Record<string, number> = {}

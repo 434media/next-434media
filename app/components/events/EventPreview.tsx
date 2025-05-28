@@ -1,7 +1,6 @@
 "use client"
 
-import { Calendar, Clock, MapPin, ExternalLink, Sparkles, Zap, AlertCircle } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Calendar, MapPin, ExternalLink, Zap, AlertCircle, Clock } from "lucide-react"
 import type { Event } from "../../types/event-types"
 import {
   formatEventDate,
@@ -11,6 +10,7 @@ import {
   safeParseDate,
 } from "../../lib/event-utils"
 import { cn } from "../../lib/utils"
+import { useEffect, useState } from "react"
 
 interface EventPreviewProps {
   event: Event
@@ -46,7 +46,7 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
   if (!isValidDate) {
     return (
       <div
-        className="bg-white rounded-2xl shadow-lg border-2 border-amber-200 p-6 transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer group"
+        className="bg-white rounded-xl shadow-md border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer group"
         onClick={onViewDetails}
       >
         <div className="flex items-center gap-3 text-amber-600 mb-4">
@@ -153,7 +153,7 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
   return (
     <div
       className={cn(
-        "mt-6 bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer group overflow-hidden",
+        "mt-6 bg-white rounded-2xl shadow-md border border-gray-200 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-105 group relative",
         urgencyConfig.borderColor,
         className,
       )}
@@ -163,13 +163,13 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
       <div className={`bg-gradient-to-r ${getCategoryColor(event.category)} p-4 text-white relative overflow-hidden`}>
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fillRule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fillOpacity%3D%220.1%22%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')]"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width%3D%2260%22 height%3D%2260%22 viewBox%3D%220 0 60 60%22 xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg fill%3D%22none%22 fillRule%3D%22evenodd%22%3E%3Cg fill%3D%22%23ffffff%22 fillOpacity%3D%220.1%22%3E%3Ccircle cx%3D%2230%22 cy%3D%2230%22 r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')]"></div>
         </div>
 
         <div className="relative z-10 flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <urgencyConfig.icon className="h-4 w-4" />
+              <urgencyConfig.icon className={`h-4 w-4 ${urgencyConfig.iconColor}`} />
               <span className={`text-xs font-bold px-2 py-1 rounded-full ${urgencyConfig.badgeColor}`}>
                 {urgencyConfig.badge}
               </span>
@@ -179,32 +179,24 @@ export function EventPreview({ event, onViewDetails, className }: EventPreviewPr
               {event.title}
             </h3>
             {event.category && (
-              <span className="text-xs bg-white/20 px-2 py-1 rounded-full font-medium capitalize">
-                {event.category}
-              </span>
+              <span className="text-xs bg-white/20 px-2 py-1 rounded-md font-medium capitalize">{event.category}</span>
             )}
           </div>
-          {urgency === "today" && <Sparkles className="h-6 w-6 text-yellow-300 animate-spin" />}
         </div>
       </div>
 
       {/* Content */}
       <div className="p-4 space-y-3">
         {/* Date and Time with Live Countdown */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-gray-700">
-            <urgencyConfig.icon className={`h-4 w-4 ${urgencyConfig.iconColor}`} />
-            <span className="text-sm font-medium">{formatEventDate(event.date, event.time)}</span>
-          </div>
-
-          {/* Live updating relative time */}
-          {relativeTime && <div className="ml-6 text-xs font-medium text-amber-600 animate-pulse">{relativeTime}</div>}
+        <div className="flex items-center text-gray-600">
+          <Calendar className="h-4 w-4 mr-2 text-amber-500" />
+          <span className="text-sm font-medium">{formatEventDate(event.date, event.time)}</span>
         </div>
 
         {/* Location */}
         {event.location && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <MapPin className="h-4 w-4 text-gray-400" />
+          <div className="flex items-center text-gray-600">
+            <MapPin className="h-4 w-4 mr-2 text-amber-500" />
             <span className="text-sm truncate">{event.location}</span>
           </div>
         )}

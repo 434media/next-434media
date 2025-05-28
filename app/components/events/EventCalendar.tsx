@@ -183,7 +183,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
           <img
             src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
             alt="434 Media Logo"
-            className="h-28 w-auto invert scale-160 drop-shadow-lg drop-shadow-amber-300"
+            className="h-28 w-auto invert scale-160 drop-shadow-lg drop-shadow-amber-200/50"
           />
         </div>
       </div>
