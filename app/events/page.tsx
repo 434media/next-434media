@@ -9,6 +9,7 @@ import { AddEventModal } from "../components/events/AddEventModal"
 import { EventCardSkeleton, CalendarSkeleton } from "../components/events/LoadingSkeleton"
 import { Toast } from "../components/events/Toast"
 import { FadeIn } from "../components/FadeIn"
+import AdminPasswordModal from "../components/AdminPasswordModal"
 import { getEventsAction } from "@/app/actions/events"
 import { Plus, Calendar, Sparkles } from "lucide-react"
 
@@ -17,6 +18,9 @@ export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [showEventModal, setShowEventModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showAdminModal, setShowAdminModal] = useState(false)
+  const [adminAction, setAdminAction] = useState<"add" | "delete">("add")
+  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
   const [mounted, setMounted] = useState(false)
@@ -85,6 +89,47 @@ export default function EventsPage() {
   const handleCloseEventModal = () => {
     setShowEventModal(false)
     setSelectedEvent(null)
+  }
+
+  const handleAddEventClick = () => {
+    setAdminAction("add")
+    setShowAdminModal(true)
+  }
+
+  const handleDeleteEventRequest = (event: Event) => {
+    setPendingDeleteEvent(event)
+    setAdminAction("delete")
+    setShowAdminModal(true)
+  }
+
+  const handleAdminVerified = async (password: string) => {
+    if (adminAction === "add") {
+      setShowAdminModal(false)
+      setShowAddModal(true)
+    } else if (adminAction === "delete" && pendingDeleteEvent) {
+      // Import the delete action here to avoid circular imports
+      const { deleteEventAction } = await import("@/app/actions/events")
+
+      try {
+        const result = await deleteEventAction(pendingDeleteEvent.id, password)
+
+        if (result.success) {
+          handleEventDeleted()
+        } else {
+          showToast(result.error || "Failed to delete event", "error")
+        }
+      } catch (error) {
+        showToast("An error occurred while deleting the event", "error")
+      }
+
+      setShowAdminModal(false)
+      setPendingDeleteEvent(null)
+    }
+  }
+
+  const handleAdminCancelled = () => {
+    setShowAdminModal(false)
+    setPendingDeleteEvent(null)
   }
 
   // Prevent hydration mismatch by not rendering until mounted
@@ -174,9 +219,9 @@ export default function EventsPage() {
               </div>
 
               {/* Enhanced CTA Section with Better Proportions */}
-              <div className="animate-fade-in-up delay-1200 md:mb-12">
+              <div className="animate-fade-in-up delay-1200 md:mb-16">
                 <button
-                  onClick={() => setShowAddModal(true)}
+                  onClick={handleAddEventClick}
                   className="group relative bg-white text-purple-600 px-8 xs:px-10 sm:px-16 py-4 xs:py-5 sm:py-6 lg:py-8 rounded-full font-black text-lg xs:text-xl sm:text-2xl hover:bg-purple-50 transition-all duration-700 hover:scale-105 sm:hover:scale-110 shadow-2xl hover:shadow-purple-500/30 flex items-center gap-3 xs:gap-4 sm:gap-6 mx-auto overflow-hidden transform-gpu"
                 >
                   {/* Enhanced Animated Background */}
@@ -215,6 +260,7 @@ export default function EventsPage() {
           </div>
         </div>
 
+
         {/* Refined Main Content with Better Flow */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 bg-gray-50 relative">
           {/* Subtle top border for visual separation */}
@@ -252,7 +298,7 @@ export default function EventsPage() {
                 </div>
 
                 <button
-                  onClick={() => setShowAddModal(true)}
+                  onClick={handleAddEventClick}
                   className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all duration-200 hover:scale-105 shadow-lg w-full sm:w-auto justify-center transform-gpu"
                 >
                   <Plus className="h-4 w-4" />
@@ -281,7 +327,7 @@ export default function EventsPage() {
                         <EventListCard
                           event={event}
                           onClick={() => handleEventClick(event)}
-                          onEventDeleted={handleEventDeleted}
+                          onDeleteRequest={() => handleDeleteEventRequest(event)}
                         />
                       </div>
                     ))
@@ -297,7 +343,7 @@ export default function EventsPage() {
                       manually.
                     </p>
                     <button
-                      onClick={() => setShowAddModal(true)}
+                      onClick={handleAddEventClick}
                       className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 transform-gpu"
                     >
                       Add Your First Event
@@ -323,6 +369,14 @@ export default function EventsPage() {
         </div>
 
         {/* Enhanced Modals */}
+        <AdminPasswordModal
+          isOpen={showAdminModal}
+          onVerified={handleAdminVerified}
+          onCancel={handleAdminCancelled}
+          action={adminAction === "add" ? "create an event" : "delete this event"}
+          itemName={pendingDeleteEvent?.title}
+        />
+
         <AddEventModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onEventAdded={handleEventAdded} />
         <EventModal event={selectedEvent} isOpen={showEventModal} onClose={handleCloseEventModal} />
 
