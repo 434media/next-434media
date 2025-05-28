@@ -24,7 +24,7 @@ interface EventFormData {
   attendees: number | undefined
 }
 
-export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: AddEventModalProps) {
+export function AddEventModal({ isOpen, onClose, selectedDate }: AddEventModalProps) {
   const [isParsingUrl, setIsParsingUrl] = useState(false)
   const [eventUrl, setEventUrl] = useState("")
   const [manualEntry, setManualEntry] = useState(false)
@@ -35,7 +35,9 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
   const [eventData, setEventData] = useState<EventFormData>({
     title: "",
     description: "",
-    date: selectedDate ? selectedDate.toISOString().split("T")[0] : "",
+    date: selectedDate
+      ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split("T")[0]
+      : "",
     time: "",
     location: "",
     organizer: "",
@@ -350,7 +352,7 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
 
                 <div>
                   <label htmlFor="event-time" className="block text-sm font-medium text-gray-700 mb-2">
-                    Time
+                    Time <span className="text-xs text-gray-500">(Central Time)</span>
                   </label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -362,6 +364,26 @@ export function AddEventModal({ isOpen, onClose, onEventAdded, selectedDate }: A
                       className="pl-10 w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Events will be displayed in Central Time</p>
+                </div>
+
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {["09:00", "12:00", "17:00", "18:00", "19:00"].map((timeOption) => (
+                    <button
+                      key={timeOption}
+                      type="button"
+                      onClick={() => setEventData((prev) => ({ ...prev, time: timeOption }))}
+                      className="text-xs px-2 py-1 bg-gray-100 hover:bg-amber-100 text-gray-600 hover:text-amber-700 rounded transition-colors"
+                    >
+                      {(() => {
+                        const [hours, minutes] = timeOption.split(":")
+                        const hour = Number.parseInt(hours)
+                        const ampm = hour >= 12 ? "PM" : "AM"
+                        const displayHour = hour % 12 || 12
+                        return `${displayHour}:${minutes} ${ampm}`
+                      })()}
+                    </button>
+                  ))}
                 </div>
 
                 <div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import type { Event } from "../types/event-types"
 import { createEvent, updateEvent, deleteEvent, getEvents, initializeDatabase, testConnection } from "../lib/db"
+import { isEventPast } from "../lib/event-utils"
 
 // Rate limiting store (in production, use Redis/KV)
 const deleteAttempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -150,12 +151,28 @@ export async function getEventsAction() {
     }
 
     await initializeDatabase()
-    const events = await getEvents()
+    const allEvents = await getEvents()
+
+    // Filter out past events automatically
+    const upcomingEvents = allEvents.filter((event) => !isEventPast(event))
+
+    // Delete past events from database (cleanup)
+    const pastEvents = allEvents.filter((event) => isEventPast(event))
+    if (pastEvents.length > 0) {
+      console.log(`Cleaning up ${pastEvents.length} past events`)
+      for (const pastEvent of pastEvents) {
+        try {
+          await deleteEvent(pastEvent.id)
+        } catch (error) {
+          console.error(`Failed to delete past event ${pastEvent.id}:`, error)
+        }
+      }
+    }
 
     return {
       success: true,
-      events,
-      message: `Loaded ${events.length} events from Neon database`,
+      events: upcomingEvents,
+      message: `Loaded ${upcomingEvents.length} upcoming events from Neon database`,
     }
   } catch (error) {
     console.error("Error fetching events:", error)
@@ -163,6 +180,43 @@ export async function getEventsAction() {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch events",
       events: [],
+    }
+  }
+}
+
+export async function cleanupPastEventsAction() {
+  try {
+    const isConnected = await testConnection()
+    if (!isConnected) {
+      throw new Error("Database connection failed")
+    }
+
+    const allEvents = await getEvents()
+    const pastEvents = allEvents.filter((event) => isEventPast(event))
+
+    let deletedCount = 0
+    for (const pastEvent of pastEvents) {
+      try {
+        await deleteEvent(pastEvent.id)
+        deletedCount++
+      } catch (error) {
+        console.error(`Failed to delete past event ${pastEvent.id}:`, error)
+      }
+    }
+
+    revalidatePath("/events")
+
+    return {
+      success: true,
+      message: `Cleaned up ${deletedCount} past events`,
+      deletedCount,
+    }
+  } catch (error) {
+    console.error("Error cleaning up past events:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to cleanup past events",
+      deletedCount: 0,
     }
   }
 }

@@ -62,6 +62,11 @@ export async function createEvent(eventData: Omit<Event, "id">): Promise<Event> 
   const client = await pool.connect()
 
   try {
+    // Validate date format
+    if (!eventData.date || !isValidDateFormat(eventData.date)) {
+      throw new Error("Invalid date format. Expected YYYY-MM-DD")
+    }
+
     const query = `
       INSERT INTO events (
         title, description, date, time, location, 
@@ -100,12 +105,16 @@ export async function getEvents(): Promise<Event[]> {
   const client = await pool.connect()
 
   try {
+    // Only get events from today and future
+    const today = new Date().toISOString().split("T")[0]
+
     const query = `
       SELECT * FROM events 
+      WHERE date >= $1
       ORDER BY date ASC, time ASC NULLS LAST
     `
 
-    const result = await client.query(query)
+    const result = await client.query(query, [today])
     return result.rows.map(mapRowToEvent)
   } catch (error) {
     console.error("Error fetching events:", error)
@@ -135,6 +144,11 @@ export async function updateEvent(id: string, updates: Partial<Event>): Promise<
   const client = await pool.connect()
 
   try {
+    // Validate date format if provided
+    if (updates.date && !isValidDateFormat(updates.date)) {
+      throw new Error("Invalid date format. Expected YYYY-MM-DD")
+    }
+
     const query = `
       UPDATE events 
       SET 
@@ -202,10 +216,34 @@ export async function deleteEvent(id: string): Promise<void> {
   }
 }
 
+export async function deleteOldEvents(): Promise<number> {
+  const client = await pool.connect()
+
+  try {
+    const today = new Date().toISOString().split("T")[0]
+    const query = `DELETE FROM events WHERE date < $1 RETURNING id`
+    const result = await client.query(query, [today])
+
+    const deletedCount = result.rowCount || 0
+    console.log(`Deleted ${deletedCount} past events`)
+    return deletedCount
+  } catch (error) {
+    console.error("Error deleting old events:", error)
+    throw new Error("Failed to delete old events")
+  } finally {
+    client.release()
+  }
+}
+
 export async function getEventsByDateRange(startDate: string, endDate: string): Promise<Event[]> {
   const client = await pool.connect()
 
   try {
+    // Validate date formats
+    if (!isValidDateFormat(startDate) || !isValidDateFormat(endDate)) {
+      throw new Error("Invalid date format. Expected YYYY-MM-DD")
+    }
+
     const query = `
       SELECT * FROM events 
       WHERE date BETWEEN $1 AND $2
@@ -255,6 +293,19 @@ function mapRowToEvent(row: any): Event {
     image: row.image || undefined,
     source: row.source,
   }
+}
+
+// Helper function to validate date format (YYYY-MM-DD)
+function isValidDateFormat(dateStr: string): boolean {
+  if (!dateStr) return false
+
+  // Check format using regex
+  const regex = /^\d{4}-\d{2}-\d{2}$/
+  if (!regex.test(dateStr)) return false
+
+  // Check if it's a valid date
+  const date = new Date(dateStr)
+  return !isNaN(date.getTime())
 }
 
 // Graceful shutdown

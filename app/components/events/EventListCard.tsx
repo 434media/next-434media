@@ -30,11 +30,37 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
 
   const formatTime = (time?: string) => {
     if (!time) return ""
+
+    // If time already includes AM/PM, return as is
+    if (time.includes("AM") || time.includes("PM")) {
+      return time
+    }
+
+    // Otherwise, convert from 24-hour format
     const [hours, minutes] = time.split(":")
     const hour = Number.parseInt(hours)
     const ampm = hour >= 12 ? "PM" : "AM"
     const displayHour = hour % 12 || 12
     return `${displayHour}:${minutes} ${ampm}`
+  }
+
+  const formatEventDate = (dateString: string) => {
+    const eventDate = new Date(dateString + "T00:00:00") // Force local timezone
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    if (eventDate.toDateString() === today.toDateString()) {
+      return "Today"
+    } else if (eventDate.toDateString() === tomorrow.toDateString()) {
+      return "Tomorrow"
+    } else {
+      return eventDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: eventDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+      })
+    }
   }
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -84,12 +110,7 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
                 {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
               </div>
             )}
-            <div className="text-sm text-gray-500 font-medium">
-              {new Date(event.date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </div>
+            <div className="text-sm text-gray-500 font-medium">{formatEventDate(event.date)}</div>
           </div>
 
           {/* Event Title */}

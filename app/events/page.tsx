@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import type { Event } from "../types/event-types"
 import { EventCalendar } from "../components/events/EventCalendar"
-import { EventListCard } from "../components/events/EventListCard"
 import { EventModal } from "../components/events/EventModal"
 import { AddEventModal } from "../components/events/AddEventModal"
 import { EventCardSkeleton, CalendarSkeleton } from "../components/events/LoadingSkeleton"
@@ -12,6 +11,8 @@ import { FadeIn } from "../components/FadeIn"
 import AdminPasswordModal from "../components/AdminPasswordModal"
 import { getEventsAction } from "@/app/actions/events"
 import { Plus, Calendar, Sparkles } from "lucide-react"
+import { EventStats } from "../components/events/EventStats"
+import { EventPreview } from "../components/events/EventPreview"
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([])
@@ -190,7 +191,7 @@ export default function EventsPage() {
           <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-8rem)] px-4 sm:px-6">
             <div className="max-w-7xl mx-auto text-center w-full">
               {/* Enhanced Hero Title with Better Contrast */}
-              <div className="mb-8 sm:mb-12 lg:mb-16 space-y-4 sm:space-y-6 lg:space-y-8 mt-10 md:mt-0">
+              <div className="mb-8 sm:mb-12 lg:mb-16 space-y-4 sm:space-y-6 lg:space-y-8">
                 <div className="flex items-center justify-center gap-3 sm:gap-6 lg:gap-8 mb-4 sm:mb-6 lg:mb-8">
                   <Sparkles className="h-10 w-10 sm:h-16 md:h-20 lg:h-24 xl:h-28 text-amber-400 animate-spin-slow drop-shadow-lg flex-shrink-0" />
                   <div className="text-center">
@@ -231,6 +232,7 @@ export default function EventsPage() {
                   <Plus className="h-6 w-6 xs:h-7 xs:w-7 sm:h-8 sm:w-8 lg:h-10 lg:w-10 group-hover:rotate-180 transition-transform duration-700 relative z-10 drop-shadow-md flex-shrink-0" />
                   <span className="relative z-10 drop-shadow-md whitespace-nowrap">Start Connecting Events</span>
                   <Sparkles className="h-5 w-5 xs:h-6 xs:w-6 sm:h-7 sm:w-7 lg:h-9 lg:w-9 text-gray-900 group-hover:text-gray-800 transition-colors duration-700 relative z-10 animate-pulse drop-shadow-md flex-shrink-0" />
+
                 </button>
               </div>
             </div>
@@ -301,11 +303,14 @@ export default function EventsPage() {
                 </button>
               </div>
 
+              {/* Enhanced Event Stats */}
+              <EventStats events={events} />
+
               {/* Enhanced Event Cards with Staggered Animation */}
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {isLoading ? (
                   // Loading skeletons with staggered appearance
-                  Array.from({ length: 3 }).map((_, i) => (
+                  Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="animate-fade-in" style={{ animationDelay: `${i * 150}ms` }}>
                       <EventCardSkeleton />
                     </div>
@@ -319,29 +324,25 @@ export default function EventsPage() {
                         className="animate-in slide-in-from-bottom duration-500 transform-gpu"
                         style={{ animationDelay: `${index * 100}ms` }}
                       >
-                        <EventListCard
-                          event={event}
-                          onClick={() => handleEventClick(event)}
-                          onDeleteRequest={() => handleDeleteEventRequest(event)}
-                        />
+                        <EventPreview event={event} onViewDetails={() => handleEventClick(event)} className="h-full" />
                       </div>
                     ))
                 ) : (
-                  // Enhanced empty state
-                  <div className="text-center py-12 sm:py-16 animate-fade-in">
-                    <div className="text-gray-400 mb-4 animate-bounce-slow">
-                      <Calendar className="mx-auto h-12 w-12 sm:h-16 sm:w-16" />
+                  // Enhanced empty state spans full width
+                  <div className="col-span-full text-center py-16 animate-fade-in">
+                    <div className="text-gray-400 mb-6 animate-bounce-slow">
+                      <Calendar className="mx-auto h-16 w-16" />
                     </div>
-                    <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">No events yet</h3>
-                    <p className="text-sm sm:text-base text-gray-500 mb-6 px-4">
-                      Start by adding your first event. You can import from Meetup or Eventbrite, or create one
-                      manually.
+                    <h3 className="text-2xl font-medium text-gray-900 mb-3">No events yet</h3>
+                    <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                      Start building your event community! Import from popular platforms or create custom events.
                     </p>
                     <button
                       onClick={handleAddEventClick}
-                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 transform-gpu"
+                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white px-8 py-4 rounded-xl font-medium transition-all duration-200 hover:scale-105 transform-gpu flex items-center gap-2 mx-auto"
                     >
-                      Add Your First Event
+                      <Sparkles className="h-5 w-5" />
+                      Create Your First Event
                     </button>
                   </div>
                 )}
@@ -355,7 +356,7 @@ export default function EventsPage() {
                   {isLoading ? (
                     <CalendarSkeleton />
                   ) : (
-                    <EventCalendar events={events} onAddEvent={handleEventAdded} onEventClick={handleEventClick} />
+                    <EventCalendar events={events} onEventClick={handleEventClick} />
                   )}
                 </div>
               </div>

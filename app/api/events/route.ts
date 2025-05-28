@@ -1,8 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getEvents, createEvent } from "../../lib/db"
+import { getEvents, createEvent, deleteOldEvents } from "../../lib/db"
 
 export async function GET() {
   try {
+    // First, clean up old events
+    await deleteOldEvents()
+
+    // Then fetch current events
     const events = await getEvents()
     return NextResponse.json(events)
   } catch (error) {
