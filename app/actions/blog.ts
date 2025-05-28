@@ -22,10 +22,14 @@ async function ensureDbInitialized() {
       dbInitialized = true
     } catch (error) {
       console.error("Database initialization warning:", error)
-      // Continue anyway - tables might already exist
       dbInitialized = true
     }
   }
+}
+
+// Simple admin verification
+function verifyAdminPassword(password: string): boolean {
+  return password === process.env.ADMIN_PASSWORD
 }
 
 // Generate slug from title
@@ -48,6 +52,13 @@ export async function createBlogPostAction(formData: FormData) {
   await ensureDbInitialized()
 
   try {
+    const adminPassword = formData.get("adminPassword") as string
+
+    // Verify admin password
+    if (!verifyAdminPassword(adminPassword)) {
+      return { success: false, error: "Invalid admin password" }
+    }
+
     const title = formData.get("title") as string
     const content = formData.get("content") as string
 
@@ -113,12 +124,12 @@ export async function updateBlogPostAction(formData: FormData) {
   }
 }
 
-export async function deleteBlogPostAction(id: string, adminKey: string) {
+export async function deleteBlogPostAction(id: string, adminPassword: string) {
   await ensureDbInitialized()
 
-  // Verify admin key
-  if (adminKey !== process.env.ADMIN_DELETE_KEY) {
-    return { success: false, error: "Invalid admin key" }
+  // Verify admin password (same as events)
+  if (!verifyAdminPassword(adminPassword)) {
+    return { success: false, error: "Invalid admin password" }
   }
 
   try {

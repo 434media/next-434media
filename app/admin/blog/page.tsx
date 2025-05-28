@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Plus, Edit, Trash2, Eye, Search, Filter, Sparkles, TrendingUp, Users, Calendar } from "lucide-react"
 import { getBlogPostsAction, deleteBlogPostAction } from "@/app/actions/blog"
 import BlogEditor from "../../components/blog/BlogEditor"
+import AdminPasswordModal from "../../components/AdminPasswordModal"
 import type { BlogPost } from "../../types/blog-types"
 
 export default function AdminBlogPage() {
@@ -14,9 +15,9 @@ export default function AdminBlogPage() {
   const [editingPost, setEditingPost] = useState<BlogPost | undefined>()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all")
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingPost, setDeletingPost] = useState<BlogPost | null>(null)
-  const [adminKey, setAdminKey] = useState("")
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null)
 
   useEffect(() => {
     loadPosts()
@@ -55,6 +56,11 @@ export default function AdminBlogPage() {
     setFilteredPosts(filtered)
   }
 
+  const handleCreateClick = () => {
+    setPendingAction("create")
+    setShowPasswordModal(true)
+  }
+
   const handleEdit = (post: BlogPost) => {
     setEditingPost(post)
     setShowEditor(true)
@@ -62,21 +68,31 @@ export default function AdminBlogPage() {
 
   const handleDelete = (post: BlogPost) => {
     setDeletingPost(post)
-    setShowDeleteModal(true)
+    setPendingAction("delete")
+    setShowPasswordModal(true)
   }
 
-  const confirmDelete = async () => {
-    if (!deletingPost || !adminKey) return
-
-    const result = await deleteBlogPostAction(deletingPost.id, adminKey)
-    if (result.success) {
-      setPosts(posts.filter((p) => p.id !== deletingPost.id))
-      setShowDeleteModal(false)
-      setDeletingPost(null)
-      setAdminKey("")
-    } else {
-      alert(result.error || "Failed to delete post")
+  const handlePasswordVerified = async (password: string) => {
+    if (pendingAction === "create") {
+      setShowEditor(true)
+    } else if (pendingAction === "delete" && deletingPost) {
+      const result = await deleteBlogPostAction(deletingPost.id, password)
+      if (result.success) {
+        setPosts(posts.filter((p) => p.id !== deletingPost.id))
+        setDeletingPost(null)
+      } else {
+        alert(result.error || "Failed to delete post")
+      }
     }
+
+    setShowPasswordModal(false)
+    setPendingAction(null)
+  }
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false)
+    setPendingAction(null)
+    setDeletingPost(null)
   }
 
   const handleSave = (post: BlogPost) => {
@@ -142,7 +158,7 @@ export default function AdminBlogPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowEditor(true)}
+            onClick={handleCreateClick}
             className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg shadow-purple-500/25"
           >
             <Plus className="w-5 h-5" />
@@ -249,7 +265,7 @@ export default function AdminBlogPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No articles found</h3>
               <p className="text-gray-600 mb-6">Start creating amazing content for your ecosystem</p>
               <button
-                onClick={() => setShowEditor(true)}
+                onClick={handleCreateClick}
                 className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300"
               >
                 Create Your First Article
@@ -358,52 +374,14 @@ export default function AdminBlogPage() {
         </div>
       </div>
 
-      {/* Enhanced Delete Modal */}
-      {showDeleteModal && deletingPost && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/20">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <Trash2 className="w-5 h-5 text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">Delete Article</h3>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete <span className="font-semibold">"{deletingPost.title}"</span>? This action
-              cannot be undone.
-            </p>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Admin Key</label>
-              <input
-                type="password"
-                value={adminKey}
-                onChange={(e) => setAdminKey(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
-                placeholder="Enter admin key to confirm deletion"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false)
-                  setDeletingPost(null)
-                  setAdminKey("")
-                }}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={!adminKey}
-                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
-                Delete Article
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Admin Password Modal */}
+      <AdminPasswordModal
+        isOpen={showPasswordModal}
+        onVerified={handlePasswordVerified}
+        onCancel={handlePasswordCancel}
+        action={pendingAction === "create" ? "create article" : "delete article"}
+        itemName={deletingPost?.title}
+      />
     </div>
   )
 }

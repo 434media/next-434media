@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Save, Eye, Upload, X, Plus, Sparkles, FileText, Settings } from "lucide-react"
 import { createBlogPostAction, updateBlogPostAction, getBlogCategoriesAction } from "@/app/actions/blog"
+import AdminPasswordModal from "../AdminPasswordModal"
 import type { BlogPost, BlogCategory } from "../../types/blog-types"
 
 interface BlogEditorProps {
@@ -25,6 +26,8 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
   const [categories, setCategories] = useState<BlogCategory[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [pendingSaveStatus, setPendingSaveStatus] = useState<"draft" | "published" | null>(null)
 
   useEffect(() => {
     loadCategories()
@@ -48,12 +51,37 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
     setTags(tags.filter((tag) => tag !== tagToRemove))
   }
 
-  const handleSave = async (saveStatus: "draft" | "published") => {
+  const handleSaveClick = (saveStatus: "draft" | "published") => {
+    if (!post) {
+      // New post - require password
+      setPendingSaveStatus(saveStatus)
+      setShowPasswordModal(true)
+    } else {
+      // Editing existing post - no password needed
+      handleSave(saveStatus)
+    }
+  }
+
+  const handlePasswordVerified = (password: string) => {
+    if (pendingSaveStatus) {
+      handleSave(pendingSaveStatus, password)
+    }
+    setShowPasswordModal(false)
+    setPendingSaveStatus(null)
+  }
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false)
+    setPendingSaveStatus(null)
+  }
+
+  const handleSave = async (saveStatus: "draft" | "published", adminPassword?: string) => {
     setIsLoading(true)
 
     try {
       const formData = new FormData()
       if (post?.id) formData.append("id", post.id)
+      if (adminPassword) formData.append("adminPassword", adminPassword)
       formData.append("title", title)
       formData.append("content", content)
       formData.append("excerpt", excerpt)
@@ -151,7 +179,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 Preview
               </button>
               <button
-                onClick={() => handleSave("draft")}
+                onClick={() => handleSaveClick("draft")}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:transform-none"
               >
@@ -159,7 +187,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 Save Draft
               </button>
               <button
-                onClick={() => handleSave("published")}
+                onClick={() => handleSaveClick("published")}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:transform-none"
               >
@@ -190,7 +218,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                   <span className="text-sm font-medium">Preview</span>
                 </button>
                 <button
-                  onClick={() => handleSave("draft")}
+                  onClick={() => handleSaveClick("draft")}
                   disabled={isLoading}
                   className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg disabled:opacity-50"
                 >
@@ -200,7 +228,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
               </div>
               <div className="grid grid-cols-1 gap-3 mt-3">
                 <button
-                  onClick={() => handleSave("published")}
+                  onClick={() => handleSaveClick("published")}
                   disabled={isLoading}
                   className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg disabled:opacity-50"
                 >
@@ -415,6 +443,14 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
           </div>
         </div>
       </div>
+
+      {/* Admin Password Modal */}
+      <AdminPasswordModal
+        isOpen={showPasswordModal}
+        onVerified={handlePasswordVerified}
+        onCancel={handlePasswordCancel}
+        action="create article"
+      />
     </div>
   )
 }
