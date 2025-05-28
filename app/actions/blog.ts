@@ -29,7 +29,17 @@ async function ensureDbInitialized() {
 
 // Simple admin verification
 function verifyAdminPassword(password: string): boolean {
-  return password === process.env.ADMIN_PASSWORD
+  // Timing-safe comparison to prevent timing attacks
+  if (!process.env.ADMIN_PASSWORD || password.length !== process.env.ADMIN_PASSWORD.length) {
+    return false
+  }
+
+  let result = 0
+  for (let i = 0; i < password.length; i++) {
+    result |= password.charCodeAt(i) ^ process.env.ADMIN_PASSWORD.charCodeAt(i)
+  }
+
+  return result === 0
 }
 
 // Generate slug from title

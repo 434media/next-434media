@@ -65,16 +65,27 @@ export default function AdminPasswordModal({
     setError("")
 
     try {
-      // Simulate verification delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 800))
+      // Verify password on server
+      const response = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      })
 
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Invalid password")
+      }
+
+      // Password verified successfully
       onVerified(password)
-
-      // Success animation
       setPassword("")
     } catch (error) {
       setAttempts((prev) => prev + 1)
-      setError("Invalid admin password")
+      setError(error instanceof Error ? error.message : "Invalid admin password")
       setPassword("")
 
       // Shake animation on error

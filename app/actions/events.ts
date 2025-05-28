@@ -7,7 +7,21 @@ import { createEvent, updateEvent, deleteEvent, getEvents, initializeDatabase, t
 // Rate limiting store (in production, use Redis/KV)
 const deleteAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
-export async function deleteEventAction(id: string, adminKey?: string, turnstileToken?: string) {
+// Timing-safe comparison to prevent timing attacks
+function verifyAdminPassword(password: string): boolean {
+  if (!process.env.ADMIN_PASSWORD || password.length !== process.env.ADMIN_PASSWORD.length) {
+    return false
+  }
+
+  let result = 0
+  for (let i = 0; i < password.length; i++) {
+    result |= password.charCodeAt(i) ^ process.env.ADMIN_PASSWORD.charCodeAt(i)
+  }
+
+  return result === 0
+}
+
+export async function deleteEventAction(id: string, adminPassword: string, turnstileToken?: string) {
   try {
     // Get client IP (in production, use headers)
     const clientIP = "127.0.0.1" // Replace with actual IP detection
@@ -24,15 +38,15 @@ export async function deleteEventAction(id: string, adminKey?: string, turnstile
       }
     }
 
-    // Verify admin key
-    if (!adminKey || adminKey !== process.env.ADMIN_DELETE_KEY) {
+    // Verify admin password
+    if (!verifyAdminPassword(adminPassword)) {
       // Track failed attempt
       const current = deleteAttempts.get(clientIP) || { count: 0, lastAttempt: 0 }
       deleteAttempts.set(clientIP, { count: current.count + 1, lastAttempt: now })
 
       return {
         success: false,
-        error: "Invalid admin key",
+        error: "Invalid admin password",
       }
     }
 
@@ -76,9 +90,16 @@ export async function deleteEventAction(id: string, adminKey?: string, turnstile
   }
 }
 
-// Other existing actions...
-export async function addEventAction(eventData: Omit<Event, "id">) {
+export async function addEventAction(eventData: Omit<Event, "id">, adminPassword: string) {
   try {
+    // Verify admin password
+    if (!verifyAdminPassword(adminPassword)) {
+      return {
+        success: false,
+        error: "Invalid admin password",
+      }
+    }
+
     const isConnected = await testConnection()
     if (!isConnected) {
       throw new Error("Database connection failed")
