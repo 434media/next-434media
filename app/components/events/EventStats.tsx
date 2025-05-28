@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Calendar, Clock, BarChart3, Zap } from "lucide-react"
 import type { Event } from "../../types/event-types"
-import { safeParseDate } from "../../lib/event-utils"
+import { safeParseDate, isEventUpcoming } from "../../lib/event-utils"
 import { cn } from "../../lib/utils"
 
 interface EventStatsProps {
@@ -37,8 +37,11 @@ export function EventStats({ events, className }: EventStatsProps) {
       }
     })
 
+    // Filter for upcoming events based on the user's local time
+    const upcomingEvents = validEvents.filter((event) => isEventUpcoming(event))
+
     // Count events by timeframe
-    const todayEvents = validEvents.filter((event) => {
+    const todayEvents = upcomingEvents.filter((event) => {
       if (!event.date) return false
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
@@ -47,7 +50,7 @@ export function EventStats({ events, className }: EventStatsProps) {
       return eventDate.toDateString() === today.toDateString()
     })
 
-    const thisWeekEvents = validEvents.filter((event) => {
+    const thisWeekEvents = upcomingEvents.filter((event) => {
       if (!event.date) return false
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
@@ -67,7 +70,7 @@ export function EventStats({ events, className }: EventStatsProps) {
       return eventDate >= startOfWeek && eventDate <= endOfWeek
     })
 
-    const upcoming30DaysEvents = validEvents.filter((event) => {
+    const upcoming30DaysEvents = upcomingEvents.filter((event) => {
       if (!event.date) return false
       const eventDate = safeParseDate(event.date)
       if (!eventDate) return false
@@ -79,20 +82,9 @@ export function EventStats({ events, className }: EventStatsProps) {
       return eventDate >= today && eventDate <= thirtyDaysFromNow
     })
 
-    const upcomingEvents = validEvents.filter((event) => {
-      if (!event.date) return false
-      const eventDate = safeParseDate(event.date)
-      if (!eventDate) return false
-
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-
-      return eventDate >= today
-    })
-
     // Count events by category
     const categories: Record<string, number> = {}
-    validEvents.forEach((event) => {
+    upcomingEvents.forEach((event) => {
       const category = event.category || "other"
       categories[category] = (categories[category] || 0) + 1
     })

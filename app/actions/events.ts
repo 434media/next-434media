@@ -6,7 +6,7 @@ import { createEvent, updateEvent, deleteEvent, getEvents, initializeDatabase, t
 import { isEventPast } from "../lib/event-utils"
 
 // Rate limiting store (in production, use Redis/KV)
-const deleteAttempts = new Map<string, { count: number; lastAttempt: number }>()
+const attempts = new Map<string, { count: number; lastAttempt: number }>()
 
 // Timing-safe comparison to prevent timing attacks
 function verifyAdminPassword(password: string): boolean {
@@ -29,9 +29,9 @@ export async function deleteEventAction(id: string, adminPassword: string, turns
 
     // Rate limiting check
     const now = Date.now()
-    const attempts = deleteAttempts.get(clientIP)
+    const clientAttempts = attempts.get(clientIP)
 
-    if (attempts && attempts.count > 5 && now - attempts.lastAttempt < 3600000) {
+    if (clientAttempts && clientAttempts.count > 5 && now - clientAttempts.lastAttempt < 3600000) {
       // 1 hour
       return {
         success: false,
@@ -42,8 +42,8 @@ export async function deleteEventAction(id: string, adminPassword: string, turns
     // Verify admin password
     if (!verifyAdminPassword(adminPassword)) {
       // Track failed attempt
-      const current = deleteAttempts.get(clientIP) || { count: 0, lastAttempt: 0 }
-      deleteAttempts.set(clientIP, { count: current.count + 1, lastAttempt: now })
+      const current = attempts.get(clientIP) || { count: 0, lastAttempt: 0 }
+      attempts.set(clientIP, { count: current.count + 1, lastAttempt: now })
 
       return {
         success: false,
@@ -72,7 +72,7 @@ export async function deleteEventAction(id: string, adminPassword: string, turns
     }
 
     // Reset attempts on successful verification
-    deleteAttempts.delete(clientIP)
+    attempts.delete(clientIP)
 
     // Proceed with deletion
     await deleteEvent(id)
@@ -153,26 +153,10 @@ export async function getEventsAction() {
     await initializeDatabase()
     const allEvents = await getEvents()
 
-    // Filter out past events automatically
-    const upcomingEvents = allEvents.filter((event) => !isEventPast(event))
-
-    // Delete past events from database (cleanup)
-    const pastEvents = allEvents.filter((event) => isEventPast(event))
-    if (pastEvents.length > 0) {
-      console.log(`Cleaning up ${pastEvents.length} past events`)
-      for (const pastEvent of pastEvents) {
-        try {
-          await deleteEvent(pastEvent.id)
-        } catch (error) {
-          console.error(`Failed to delete past event ${pastEvent.id}:`, error)
-        }
-      }
-    }
-
     return {
       success: true,
-      events: upcomingEvents,
-      message: `Loaded ${upcomingEvents.length} upcoming events from Neon database`,
+      events: allEvents,
+      message: `Loaded ${allEvents.length} events from Neon database`,
     }
   } catch (error) {
     console.error("Error fetching events:", error)
