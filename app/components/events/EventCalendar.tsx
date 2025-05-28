@@ -18,19 +18,26 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
   const [showModal, setShowModal] = useState(false)
   const [modalEvents, setModalEvents] = useState<Event[]>([])
   const [modalDate, setModalDate] = useState<Date | null>(null)
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isClient) return
+
     const days = generateCalendarDays(currentDate.getFullYear(), currentDate.getMonth())
 
-    // Populate each day with its events
+    // Populate each day with its events using client-side timezone
     const daysWithEvents = days.map((day) => {
       const dayString = day.date.toISOString().split("T")[0]
 
-      // Filter events for this specific day that are upcoming
+      // Filter events for this specific day that are upcoming (client-side check)
       const dayEvents = events.filter((event) => {
         if (!event.date) return false
 
-        // Normalize the event date to compare with day
+        // Normalize the event date to compare with day (client-side)
         const eventDate = safeParseDate(event.date)
         if (!eventDate) return false
 
@@ -45,7 +52,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
     })
 
     setCalendarDays(daysWithEvents)
-  }, [currentDate, events])
+  }, [currentDate, events, isClient])
 
   const navigateMonth = (direction: "prev" | "next") => {
     setCurrentDate((prev) => {
@@ -109,10 +116,12 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
 
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-  // Count events for current month
-  const currentMonthEvents = calendarDays.reduce((count, day) => {
-    return count + (day.isCurrentMonth ? day.events.length : 0)
-  }, 0)
+  // Count events for current month (client-side)
+  const currentMonthEvents = isClient
+    ? calendarDays.reduce((count, day) => {
+        return count + (day.isCurrentMonth ? day.events.length : 0)
+      }, 0)
+    : 0
 
   const getCategoryBadgeColor = (category?: string) => {
     switch (category) {
@@ -127,6 +136,15 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
       default:
         return "bg-blue-100 text-blue-800 border-blue-200"
     }
+  }
+
+  // Don't render until client-side to avoid hydration issues
+  if (!isClient) {
+    return (
+      <div className="w-full animate-pulse">
+        <div className="h-64 bg-gray-200 rounded-lg"></div>
+      </div>
+    )
   }
 
   return (
@@ -183,7 +201,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
           <img
             src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
             alt="434 Media Logo"
-            className="h-28 w-auto invert scale-160 drop-shadow-lg drop-shadow-amber-200/50"
+            className="h-32 w-auto invert scale-125 down-shadow-lg drop-shadow-lg drop-shadow-amber-200/40"
           />
         </div>
       </div>

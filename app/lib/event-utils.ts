@@ -34,23 +34,34 @@ export function getEventsForDate(events: Event[], date: Date): Event[] {
   return events.filter((event) => event.date === dateString)
 }
 
-// Safely parse a date string with robust error handling
+// Safely parse a date string with robust error handling - ALWAYS use local timezone
 export function safeParseDate(dateStr: string): Date | null {
   if (!dateStr) return null
 
   try {
-    // Try ISO format first (YYYY-MM-DD)
-    const date = new Date(dateStr)
+    // Handle different date formats and ensure local timezone
+    let date: Date
 
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      // If not valid, try with explicit timezone
-      const dateWithTZ = new Date(`${dateStr}T00:00:00`)
-      if (isNaN(dateWithTZ.getTime())) {
+    // If it's already in YYYY-MM-DD format, parse as local date
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      // Split the date and create a local date object
+      const [year, month, day] = dateStr.split("-").map(Number)
+      date = new Date(year, month - 1, day) // month is 0-indexed
+    } else {
+      // For other formats, try to parse normally but convert to local
+      date = new Date(dateStr)
+
+      // If the date is invalid, return null
+      if (isNaN(date.getTime())) {
         return null
       }
-      return dateWithTZ
     }
+
+    // Ensure we have a valid date
+    if (isNaN(date.getTime())) {
+      return null
+    }
+
     return date
   } catch (e) {
     console.error("Error parsing date:", dateStr, e)
@@ -58,23 +69,21 @@ export function safeParseDate(dateStr: string): Date | null {
   }
 }
 
-// Format event date with robust error handling and enhanced display
+// Format event date with robust error handling and enhanced display - CLIENT-SIDE ONLY
 export function formatEventDate(dateStr: string, timeStr?: string): string {
   if (!dateStr) return "Date TBD"
 
-  // Parse the date safely
+  // Parse the date safely in local timezone
   const eventDate = safeParseDate(dateStr)
   if (!eventDate) return "Invalid Date"
 
   const today = new Date()
-
   const tomorrow = new Date(today)
   tomorrow.setDate(today.getDate() + 1)
-
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
 
-  // Format the date part
+  // Format the date part using local timezone
   let dateDisplay = ""
 
   if (eventDate.toDateString() === today.toDateString()) {
@@ -84,10 +93,12 @@ export function formatEventDate(dateStr: string, timeStr?: string): string {
   } else if (eventDate.toDateString() === yesterday.toDateString()) {
     dateDisplay = "Yesterday"
   } else {
+    // Use local date formatting
     dateDisplay = eventDate.toLocaleDateString("en-US", {
       year: eventDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
       month: "short",
       day: "numeric",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Use client's timezone
     })
   }
 
@@ -95,7 +106,6 @@ export function formatEventDate(dateStr: string, timeStr?: string): string {
   if (timeStr) {
     let formattedTime = ""
 
-    // Try to convert to 12-hour format if needed
     try {
       if (!timeStr.includes("AM") && !timeStr.includes("PM")) {
         const [hours, minutes] = timeStr.split(":")
@@ -105,13 +115,13 @@ export function formatEventDate(dateStr: string, timeStr?: string): string {
           const displayHour = hour % 12 || 12
           formattedTime = `${displayHour}:${minutes} ${ampm}`
         } else {
-          formattedTime = timeStr // Fallback to original
+          formattedTime = timeStr
         }
       } else {
         formattedTime = timeStr
       }
     } catch (e) {
-      formattedTime = timeStr // Fallback to original
+      formattedTime = timeStr
     }
 
     return `${dateDisplay} at ${formattedTime}`
@@ -124,16 +134,22 @@ export function generateEventId(): string {
   return Math.random().toString(36).substr(2, 9)
 }
 
-// New utility functions for better event filtering and stats
+// CLIENT-SIDE date comparison functions
 export function isEventUpcoming(event: Event): boolean {
   if (!event.date) return false
 
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return false
 
+  // Compare using local timezone
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  return eventDate >= today
+
+  // Set event date to start of day for comparison
+  const eventDateStart = new Date(eventDate)
+  eventDateStart.setHours(0, 0, 0, 0)
+
+  return eventDateStart >= today
 }
 
 export function isEventPast(event: Event): boolean {
@@ -142,9 +158,15 @@ export function isEventPast(event: Event): boolean {
   const eventDate = safeParseDate(event.date)
   if (!eventDate) return true
 
+  // Compare using local timezone
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  return eventDate < today
+
+  // Set event date to start of day for comparison
+  const eventDateStart = new Date(eventDate)
+  eventDateStart.setHours(0, 0, 0, 0)
+
+  return eventDateStart < today
 }
 
 export function isEventWithin30Days(event: Event): boolean {
@@ -156,7 +178,11 @@ export function isEventWithin30Days(event: Event): boolean {
   const today = new Date()
   const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
   today.setHours(0, 0, 0, 0)
-  return eventDate >= today && eventDate <= thirtyDaysFromNow
+
+  const eventDateStart = new Date(eventDate)
+  eventDateStart.setHours(0, 0, 0, 0)
+
+  return eventDateStart >= today && eventDateStart <= thirtyDaysFromNow
 }
 
 export function isEventThisWeek(event: Event): boolean {
@@ -167,17 +193,20 @@ export function isEventThisWeek(event: Event): boolean {
 
   const today = new Date()
 
-  // Get the start of this week (Sunday)
+  // Get the start of this week (Sunday) in local timezone
   const startOfWeek = new Date(today)
   startOfWeek.setDate(today.getDate() - today.getDay())
   startOfWeek.setHours(0, 0, 0, 0)
 
-  // Get the end of this week (Saturday)
+  // Get the end of this week (Saturday) in local timezone
   const endOfWeek = new Date(startOfWeek)
   endOfWeek.setDate(startOfWeek.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
 
-  return eventDate >= startOfWeek && eventDate <= endOfWeek
+  const eventDateStart = new Date(eventDate)
+  eventDateStart.setHours(0, 0, 0, 0)
+
+  return eventDateStart >= startOfWeek && eventDateStart <= endOfWeek
 }
 
 export function isEventToday(event: Event): boolean {
@@ -198,7 +227,11 @@ export function getDaysUntilEvent(event: Event): number {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const diffTime = eventDate.getTime() - today.getTime()
+
+  const eventDateStart = new Date(eventDate)
+  eventDateStart.setHours(0, 0, 0, 0)
+
+  const diffTime = eventDateStart.getTime() - today.getTime()
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
@@ -212,7 +245,7 @@ export function getEventUrgency(event: Event): "today" | "tomorrow" | "this-week
   return "later"
 }
 
-// Format relative time with natural language
+// Format relative time with natural language - CLIENT-SIDE ONLY
 export function formatRelativeTime(dateStr: string): string {
   if (!dateStr) return ""
 
@@ -273,4 +306,29 @@ export function getTimeRange(startTime?: string, endTime?: string): string {
   }
 
   return `${formattedStart} - ${formattedEnd}`
+}
+
+// Simple date formatter for consistent display - CLIENT-SIDE ONLY
+export function formatSimpleDate(dateStr: string): string {
+  if (!dateStr) return "Date TBD"
+
+  const eventDate = safeParseDate(dateStr)
+  if (!eventDate) return "Date TBD"
+
+  try {
+    const today = new Date()
+    const options: Intl.DateTimeFormatOptions = {
+      month: "short",
+      day: "numeric",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Use client's timezone
+    }
+
+    if (eventDate.getFullYear() !== today.getFullYear()) {
+      options.year = "numeric"
+    }
+
+    return eventDate.toLocaleDateString("en-US", options)
+  } catch {
+    return "Date TBD"
+  }
 }

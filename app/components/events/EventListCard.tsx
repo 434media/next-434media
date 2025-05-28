@@ -4,7 +4,8 @@ import type React from "react"
 import { MapPin, Users, Clock, Trash2, ArrowRight, Calendar, Eye } from "lucide-react"
 import type { Event } from "../../types/event-types"
 import { cn } from "../../lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { formatSimpleDate } from "../../lib/event-utils"
 
 interface EventListCardProps {
   event: Event
@@ -15,6 +16,11 @@ interface EventListCardProps {
 
 export function EventListCard({ event, onClick, className, onDeleteRequest }: EventListCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const getCategoryColor = (category?: string) => {
     switch (category) {
@@ -76,27 +82,6 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
     }
   }
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString)
-      if (isNaN(date.getTime())) return "Date TBD"
-
-      const today = new Date()
-      const options: Intl.DateTimeFormatOptions = {
-        month: "short",
-        day: "numeric",
-      }
-
-      if (date.getFullYear() !== today.getFullYear()) {
-        options.year = "numeric"
-      }
-
-      return date.toLocaleDateString("en-US", options)
-    } catch {
-      return "Date TBD"
-    }
-  }
-
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onDeleteRequest?.()
@@ -108,7 +93,9 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
   }
 
   const categoryColors = getCategoryColor(event.category)
-  const formattedDate = formatDate(event.date)
+
+  // Use client-side date formatting to avoid hydration issues
+  const formattedDate = isClient ? formatSimpleDate(event.date) : "Loading..."
 
   return (
     <article
@@ -177,7 +164,7 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
             </div>
           )}
 
-          {/* Date Badge - Enhanced */}
+          {/* Date Badge - Enhanced with Client-Side Rendering */}
           <div className="flex items-center text-gray-700 font-medium bg-amber-50/50 px-3 py-1.5 rounded-full border border-amber-100 transition-all duration-500 group-hover:bg-amber-100/80 group-hover:border-amber-200">
             <Calendar className="h-4 w-4 mr-1.5 text-amber-600 transition-transform duration-500 group-hover:scale-110" />
             <span className="text-sm">{formattedDate}</span>

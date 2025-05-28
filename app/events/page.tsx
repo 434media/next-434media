@@ -15,6 +15,7 @@ import { Plus, Calendar, Sparkles } from "lucide-react"
 import { isEventUpcoming } from "../lib/event-utils"
 
 export default function EventsPage() {
+  const [allEvents, setAllEvents] = useState<Event[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [showEventModal, setShowEventModal] = useState(false)
@@ -43,6 +44,22 @@ export default function EventsPage() {
     }
   }, [mounted])
 
+  // Filter events on client side when allEvents changes
+  useEffect(() => {
+    if (mounted && allEvents.length > 0) {
+      // Client-side filtering using local timezone
+      const upcomingEvents = allEvents.filter((event) => isEventUpcoming(event))
+      setEvents(upcomingEvents)
+
+      if (allEvents.length !== upcomingEvents.length) {
+        const pastCount = allEvents.length - upcomingEvents.length
+        if (pastCount > 0) {
+          showToast(`Filtered out ${pastCount} past events`, "warning")
+        }
+      }
+    }
+  }, [allEvents, mounted])
+
   const showToast = (message: string, type: "success" | "error" | "warning") => {
     setToast({ message, type, isVisible: true })
   }
@@ -59,13 +76,8 @@ export default function EventsPage() {
       const result = await getEventsAction()
 
       if (result.success) {
-        // Double-check client-side filtering for upcoming events only
-        const upcomingEvents = result.events.filter((event) => isEventUpcoming(event))
-        setEvents(upcomingEvents)
-
-        if (result.events.length !== upcomingEvents.length) {
-          showToast(`Filtered out ${result.events.length - upcomingEvents.length} past events`, "warning")
-        }
+        // Store all events from server, let client-side filtering handle the rest
+        setAllEvents(result.events)
       } else {
         setError(result.error || "Failed to load events")
       }
@@ -78,13 +90,9 @@ export default function EventsPage() {
   }
 
   const handleEventAdded = (newEvent: Event) => {
-    // Only add if it's an upcoming event
-    if (isEventUpcoming(newEvent)) {
-      setEvents((prev) => [...prev, newEvent].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()))
-      showToast("Event added successfully!", "success")
-    } else {
-      showToast("Event date has passed - not added to upcoming events", "warning")
-    }
+    // Add to allEvents and let useEffect handle filtering
+    setAllEvents((prev) => [...prev, newEvent].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()))
+    showToast("Event added successfully!", "success")
   }
 
   const handleEventDeleted = () => {
