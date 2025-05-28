@@ -1,6 +1,13 @@
 import { Pool } from "pg"
 import type { Event } from "../types/event-types"
 
+// Configure pg to return DATE columns as strings instead of Date objects
+// This prevents timezone conversion issues
+import { types } from "pg"
+
+// Set the parser for DATE type (OID 1082) to return raw string
+types.setTypeParser(1082, (value: string) => value)
+
 // Create a connection pool for Neon PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -106,6 +113,7 @@ export async function getEvents(): Promise<Event[]> {
 
   try {
     // Get ALL events - let client handle date filtering based on local timezone
+    // With the type parser configured, row.date will be a "YYYY-MM-DD" string
     const query = `
       SELECT * FROM events 
       ORDER BY date ASC, time ASC NULLS LAST
@@ -278,12 +286,13 @@ export async function testConnection(): Promise<boolean> {
 }
 
 // Helper function to map database row to Event type
+// With the type parser configured, row.date will now be a "YYYY-MM-DD" string
 function mapRowToEvent(row: any): Event {
   return {
     id: row.id.toString(),
     title: row.title,
     description: row.description || undefined,
-    date: row.date,
+    date: row.date, // This is now a "YYYY-MM-DD" string, not a Date object
     time: row.time || undefined,
     location: row.location || undefined,
     organizer: row.organizer || undefined,
@@ -305,8 +314,11 @@ function isValidDateFormat(dateStr: string): boolean {
   if (!regex.test(dateStr)) return false
 
   // Check if it's a valid date
-  const date = new Date(dateStr)
-  return !isNaN(date.getTime())
+  const [year, month, day] = dateStr.split("-").map(Number)
+  const date = new Date(year, month - 1, day) // Create local date
+  return (
+    !isNaN(date.getTime()) && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+  )
 }
 
 // Graceful shutdown

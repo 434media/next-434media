@@ -34,42 +34,37 @@ export function getEventsForDate(events: Event[], date: Date): Event[] {
   return events.filter((event) => event.date === dateString)
 }
 
-// Safely parse a date string with robust error handling - ALWAYS use local timezone
+// Parse YYYY-MM-DD string as local date - this is now the primary path
 export function safeParseDate(dateStr: string): Date | null {
   if (!dateStr) return null
 
   try {
-    // Handle different date formats and ensure local timezone
-    let date: Date
-
-    // If it's already in YYYY-MM-DD format, parse as local date
+    // Since we configured pg to return DATE as strings, we should always get "YYYY-MM-DD"
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       // Split the date and create a local date object
       const [year, month, day] = dateStr.split("-").map(Number)
-      date = new Date(year, month - 1, day) // month is 0-indexed
-    } else {
-      // For other formats, try to parse normally but convert to local
-      date = new Date(dateStr)
+      const date = new Date(year, month - 1, day) // month is 0-indexed, creates local date
 
-      // If the date is invalid, return null
-      if (isNaN(date.getTime())) {
-        return null
+      // Validate the date components
+      if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+        return date
       }
     }
 
-    // Ensure we have a valid date
-    if (isNaN(date.getTime())) {
-      return null
+    // Fallback for any other format (shouldn't happen with our setup)
+    const date = new Date(dateStr)
+    if (!isNaN(date.getTime())) {
+      return date
     }
 
-    return date
+    return null
   } catch (e) {
     console.error("Error parsing date:", dateStr, e)
     return null
   }
 }
 
-// Format event date with robust error handling and enhanced display - CLIENT-SIDE ONLY
+// Format event date with robust error handling - CLIENT-SIDE ONLY
 export function formatEventDate(dateStr: string, timeStr?: string): string {
   if (!dateStr) return "Date TBD"
 
@@ -98,7 +93,6 @@ export function formatEventDate(dateStr: string, timeStr?: string): string {
       year: eventDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
       month: "short",
       day: "numeric",
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Use client's timezone
     })
   }
 
@@ -134,7 +128,7 @@ export function generateEventId(): string {
   return Math.random().toString(36).substr(2, 9)
 }
 
-// CLIENT-SIDE date comparison functions
+// CLIENT-SIDE date comparison functions - now work with YYYY-MM-DD strings
 export function isEventUpcoming(event: Event): boolean {
   if (!event.date) return false
 
@@ -320,7 +314,6 @@ export function formatSimpleDate(dateStr: string): string {
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
       day: "numeric",
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Use client's timezone
     }
 
     if (eventDate.getFullYear() !== today.getFullYear()) {
