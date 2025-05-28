@@ -105,16 +105,13 @@ export async function getEvents(): Promise<Event[]> {
   const client = await pool.connect()
 
   try {
-    // Only get events from today and future
-    const today = new Date().toISOString().split("T")[0]
-
+    // Get ALL events - let client handle date filtering based on local timezone
     const query = `
       SELECT * FROM events 
-      WHERE date >= $1
       ORDER BY date ASC, time ASC NULLS LAST
     `
 
-    const result = await client.query(query, [today])
+    const result = await client.query(query)
     return result.rows.map(mapRowToEvent)
   } catch (error) {
     console.error("Error fetching events:", error)
@@ -220,12 +217,16 @@ export async function deleteOldEvents(): Promise<number> {
   const client = await pool.connect()
 
   try {
-    const today = new Date().toISOString().split("T")[0]
+    // Only delete events that are definitely old (30+ days) to avoid timezone issues
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    const cutoffDate = thirtyDaysAgo.toISOString().split("T")[0]
+
     const query = `DELETE FROM events WHERE date < $1 RETURNING id`
-    const result = await client.query(query, [today])
+    const result = await client.query(query, [cutoffDate])
 
     const deletedCount = result.rowCount || 0
-    console.log(`Deleted ${deletedCount} past events`)
+    console.log(`Deleted ${deletedCount} events older than 30 days`)
     return deletedCount
   } catch (error) {
     console.error("Error deleting old events:", error)

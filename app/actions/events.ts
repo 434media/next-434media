@@ -2,8 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import type { Event } from "../types/event-types"
-import { createEvent, updateEvent, deleteEvent, getEvents, initializeDatabase, testConnection } from "../lib/db"
-import { isEventPast } from "../lib/event-utils"
+import {
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  getEvents,
+  initializeDatabase,
+  testConnection,
+  deleteOldEvents,
+} from "../lib/db"
 
 // Rate limiting store (in production, use Redis/KV)
 const attempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -156,7 +163,7 @@ export async function getEventsAction() {
     return {
       success: true,
       events: allEvents,
-      message: `Loaded ${allEvents.length} events from Neon database`,
+      message: `Loaded ${allEvents.length} events from database`,
     }
   } catch (error) {
     console.error("Error fetching events:", error)
@@ -175,24 +182,14 @@ export async function cleanupPastEventsAction() {
       throw new Error("Database connection failed")
     }
 
-    const allEvents = await getEvents()
-    const pastEvents = allEvents.filter((event) => isEventPast(event))
-
-    let deletedCount = 0
-    for (const pastEvent of pastEvents) {
-      try {
-        await deleteEvent(pastEvent.id)
-        deletedCount++
-      } catch (error) {
-        console.error(`Failed to delete past event ${pastEvent.id}:`, error)
-      }
-    }
+    // Use the database-level cleanup (30+ days old) instead of client-side filtering
+    const deletedCount = await deleteOldEvents()
 
     revalidatePath("/events")
 
     return {
       success: true,
-      message: `Cleaned up ${deletedCount} past events`,
+      message: `Cleaned up ${deletedCount} events older than 30 days`,
       deletedCount,
     }
   } catch (error) {
