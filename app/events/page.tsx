@@ -123,6 +123,9 @@ export default function EventsPage() {
   }
 
   const handleAdminVerified = async (password: string) => {
+    // Store admin password in session storage for the modal to use
+    sessionStorage.setItem("adminPassword", password)
+
     if (adminAction === "add") {
       setShowAdminModal(false)
       setShowAddModal(true)
@@ -374,7 +377,16 @@ export default function EventsPage() {
           itemName={pendingDeleteEvent?.title || ""}
         />
 
-        <AddEventModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onEventAdded={handleEventAdded} />
+        <AddEventModal
+          isOpen={showAddModal}
+          onClose={() => {
+            setShowAddModal(false)
+            // Clear admin password when modal closes
+            sessionStorage.removeItem("adminPassword")
+          }}
+          onEventAdded={handleEventAdded}
+          isAdminVerified={true} // Since we only show this modal after admin verification
+        />
         <EventModal event={selectedEvent} isOpen={showEventModal} onClose={handleCloseEventModal} />
       </FadeIn>
 
