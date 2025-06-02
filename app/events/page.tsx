@@ -221,8 +221,7 @@ export default function EventsPage() {
               {/* Enhanced Story Section */}
               <div className="max-w-5xl mx-auto mb-12 sm:mb-16 lg:mb-20 animate-fade-in-up delay-900">
                 <p className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl text-gray-200 leading-relaxed font-light px-2 mb-3 sm:mb-4 lg:mb-6 drop-shadow-md">
-                  Discover meaningful events that bring communities together. Import events from your favorite platforms
-                  or create your own with our intelligent event parser.
+                  Discover meaningful events that bring communities together.
                 </p>
                 <div className="text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl text-amber-300 font-medium drop-shadow-md">
                   Build connections that matter.
