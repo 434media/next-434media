@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { Monitor, Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, Download, Monitor } from "lucide-react"
 import { fetchAnalyticsData } from "../../lib/analytics-api"
 
 export interface OSChartProps {
@@ -19,12 +20,23 @@ interface OSData {
   name: string
   views: number
   percentage: number
+  color: string
 }
 
+const OS_COLORS = [
+  "#3b82f6", // Windows - Blue
+  "#6b7280", // macOS - Gray
+  "#10b981", // iOS - Green
+  "#f59e0b", // Android - Orange
+  "#8b5cf6", // Linux - Purple
+  "#ef4444", // Chrome OS - Red
+]
+
 export function OSChart({ timeRange, isLoading: parentLoading = false, setError }: OSChartProps) {
-  const [data, setData] = useState<OSData[]>([])
+  const [chartData, setChartData] = useState<OSData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setChartError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -33,11 +45,15 @@ export function OSChart({ timeRange, isLoading: parentLoading = false, setError 
 
       try {
         const result = await fetchAnalyticsData("operating-systems", timeRange)
-        setData(result || [])
+        const formattedData = (result.data || []).map((item: any, index: number) => ({
+          ...item,
+          color: OS_COLORS[index % OS_COLORS.length],
+        }))
+        setChartData(formattedData)
       } catch (error) {
-        console.error("Error loading OS chart data:", error)
-        setChartError("Failed to load OS chart data")
-        setError("Failed to load OS chart data")
+        console.error("Error loading OS data:", error)
+        setChartError("Failed to load operating systems data")
+        setError("Failed to load operating systems data")
       } finally {
         setIsLoading(false)
       }
@@ -46,69 +62,91 @@ export function OSChart({ timeRange, isLoading: parentLoading = false, setError 
     loadData()
   }, [timeRange, setError])
 
-  // Reset when parent triggers reload
   useEffect(() => {
     if (parentLoading) {
       setIsLoading(true)
     }
   }, [parentLoading])
 
-  const getOSColor = (name: string) => {
-    const colors: Record<string, string> = {
-      Windows: "#0078d7",
-      macOS: "#5d5d5d",
-      iOS: "#007aff",
-      Android: "#a4c639",
-      Linux: "#f8c517",
-      "Chrome OS": "#4285f4",
+  const exportToCSV = async () => {
+    if (!chartData.length) return
+
+    setIsExporting(true)
+    try {
+      const csvContent = [
+        ["Operating System", "Views", "Percentage"],
+        ...chartData.map((item) => [item.name, item.views.toString(), `${item.percentage.toFixed(1)}%`]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n")
+
+      const blob = new Blob([csvContent], { type: "text/csv" })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `operating-systems-${timeRange}-${new Date().toISOString().split("T")[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Export failed:", error)
+      setError("Failed to export OS data")
+    } finally {
+      setIsExporting(false)
     }
-    return colors[name] || "#8b5cf6"
   }
-
-  const getOSIcon = (name: string) => {
-    return <span className="text-sm font-semibold">{name.substring(0, 2)}</span>
-  }
-
-  const prepareChartData = () => {
-    if (!data || data.length === 0) return []
-
-    return data.map((os) => ({
-      ...os,
-      color: getOSColor(os.name),
-    }))
-  }
-
-  const chartData = prepareChartData()
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.6 }}
+      transition={{ duration: 0.5, delay: 0.35 }}
     >
       <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-cyan-500/10" />
         <CardHeader className="relative">
-          <CardTitle className="text-white flex items-center gap-2">
-            <Monitor className="h-5 w-5 text-blue-400" />
-            Operating Systems
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-white flex items-center gap-2">
+              <Monitor className="h-5 w-5 text-indigo-400" />
+              Operating Systems
+            </CardTitle>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={exportToCSV}
+              disabled={isExporting || isLoading || parentLoading || !chartData.length}
+              className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+              title="Export OS data to CSV"
+            >
+              {isExporting ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                >
+                  <Loader2 className="h-4 w-4 text-white/60" />
+                </motion.div>
+              ) : (
+                <Download className="h-4 w-4 text-white/60" />
+              )}
+            </motion.button>
+          </div>
         </CardHeader>
         <CardContent className="relative">
           {isLoading || parentLoading ? (
-            <div className="flex items-center justify-center h-[200px]">
+            <div className="flex items-center justify-center h-[300px]">
               <div className="text-center space-y-4">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
                 >
-                  <Loader2 className="h-12 w-12 text-blue-400 mx-auto" />
+                  <Loader2 className="h-12 w-12 text-indigo-400 mx-auto" />
                 </motion.div>
                 <p className="text-white/70">Loading OS data...</p>
               </div>
             </div>
           ) : error ? (
-            <div className="flex items-center justify-center h-[200px]">
+            <div className="flex items-center justify-center h-[300px]">
               <div className="text-center space-y-4">
                 <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
                 <p className="text-red-400">{error}</p>
@@ -121,67 +159,59 @@ export function OSChart({ timeRange, isLoading: parentLoading = false, setError 
               </div>
             </div>
           ) : (
-            <div className="flex flex-col lg:flex-row items-center gap-6">
-              <div className="w-full lg:w-1/2">
-                <ChartContainer
-                  config={Object.fromEntries(
-                    chartData.map((os) => [
-                      os.name.toLowerCase().replace(/\s+/g, "-"),
-                      { label: os.name, color: os.color },
-                    ]),
-                  )}
-                  className="h-[200px]"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="views"
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip
-                        content={<ChartTooltipContent />}
-                        contentStyle={{
-                          backgroundColor: "rgba(0,0,0,0.8)",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ChartContainer
+                config={{
+                  views: {
+                    label: "Views",
+                    color: "hsl(var(--chart-1))",
+                  },
+                }}
+                className="h-[250px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="views"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip
+                      content={<ChartTooltipContent />}
+                      contentStyle={{
+                        backgroundColor: "rgba(0,0,0,0.8)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
 
-              <div className="w-full lg:w-1/2 space-y-3">
-                {chartData.map((os, index) => (
+              <div className="space-y-3">
+                {chartData.map((item, index) => (
                   <motion.div
-                    key={os.name}
+                    key={item.name}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * index, duration: 0.3 }}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center justify-between"
                   >
-                    <div className="flex items-center gap-3">
-                      <motion.div
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        className="w-8 h-8 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${os.color}30` }}
-                      >
-                        {getOSIcon(os.name)}
-                      </motion.div>
-                      <span className="text-white font-medium">{os.name}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-white text-sm">{item.name}</span>
                     </div>
                     <div className="text-right">
-                      <p className="text-white font-bold">{os.percentage.toFixed(1)}%</p>
-                      <p className="text-white/60 text-xs">{os.views.toLocaleString()}</p>
+                      <p className="text-white font-medium">{item.percentage.toFixed(1)}%</p>
+                      <p className="text-white/60 text-xs">{item.views.toLocaleString()}</p>
                     </div>
                   </motion.div>
                 ))}

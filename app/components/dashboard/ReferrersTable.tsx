@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
-import { Badge } from "./ui/badge"
-import { Link, TrendingUp, TrendingDown, Loader2, AlertCircle, RefreshCw } from "lucide-react"
+import { Loader2, AlertCircle, Download, ExternalLink } from "lucide-react"
 import { fetchAnalyticsData } from "../../lib/analytics-api"
 
 export interface ReferrersTableProps {
@@ -17,13 +17,14 @@ export interface ReferrersTableProps {
 interface ReferrerData {
   referrer: string
   views: number
-  change: number
+  change?: number
 }
 
 export function ReferrersTable({ timeRange, isLoading: parentLoading = false, setError }: ReferrersTableProps) {
   const [data, setData] = useState<ReferrerData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setTableError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -32,12 +33,11 @@ export function ReferrersTable({ timeRange, isLoading: parentLoading = false, se
 
       try {
         const result = await fetchAnalyticsData("referrers", timeRange)
-        setData(result || [])
+        setData(result.data || [])
       } catch (error) {
         console.error("Error loading referrers data:", error)
-        const errorMessage = error instanceof Error ? error.message : "Failed to load referrers data"
-        setTableError(errorMessage)
-        setError(errorMessage)
+        setTableError("Failed to load referrers data")
+        setError("Failed to load referrers data")
       } finally {
         setIsLoading(false)
       }
@@ -46,137 +46,143 @@ export function ReferrersTable({ timeRange, isLoading: parentLoading = false, se
     loadData()
   }, [timeRange, setError])
 
-  // Reset when parent triggers reload
   useEffect(() => {
     if (parentLoading) {
       setIsLoading(true)
     }
   }, [parentLoading])
 
-  const getReferrerIcon = (referrer: string) => {
-    const icons: Record<string, React.ReactNode> = {
-      Google: <span className="text-lg">G</span>,
-      Twitter: <span className="text-lg">𝕏</span>,
-      LinkedIn: <span className="text-lg">in</span>,
-      Facebook: <span className="text-lg">f</span>,
-      GitHub: <span className="text-lg">GH</span>,
-      Instagram: <span className="text-lg">IG</span>,
-      YouTube: <span className="text-lg">YT</span>,
-    }
+  const exportToCSV = async () => {
+    if (!data.length) return
 
-    return icons[referrer] || <Link className="h-4 w-4" />
+    setIsExporting(true)
+    try {
+      const csvContent = [
+        ["Referrer", "Views", "Change (%)"],
+        ...data.map((item) => [item.referrer, item.views.toString(), item.change ? item.change.toFixed(2) : "N/A"]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n")
+
+      const blob = new Blob([csvContent], { type: "text/csv" })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `referrers-${timeRange}-${new Date().toISOString().split("T")[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Export failed:", error)
+      setError("Failed to export referrers data")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const getReferrerIcon = (referrer: string) => {
+    if (referrer.includes("Google")) return "🔍"
+    if (referrer.includes("Twitter")) return "🐦"
+    if (referrer.includes("LinkedIn")) return "💼"
+    if (referrer.includes("Facebook")) return "📘"
+    if (referrer.includes("GitHub")) return "🐙"
+    if (referrer.includes("Direct")) return "🔗"
+    return "🌐"
   }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.6 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
     >
       <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 via-transparent to-orange-500/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-pink-500/10" />
         <CardHeader className="relative">
-          <CardTitle className="text-white flex items-center gap-2">
-            <Link className="h-5 w-5 text-pink-400" />
-            Top Referrers
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-white flex items-center gap-2">
+              <ExternalLink className="h-5 w-5 text-purple-400" />
+              Top Referrers
+            </CardTitle>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={exportToCSV}
+              disabled={isExporting || isLoading || parentLoading || !data.length}
+              className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+              title="Export referrers data to CSV"
+            >
+              {isExporting ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                >
+                  <Loader2 className="h-4 w-4 text-white/60" />
+                </motion.div>
+              ) : (
+                <Download className="h-4 w-4 text-white/60" />
+              )}
+            </motion.button>
+          </div>
         </CardHeader>
         <CardContent className="relative">
-          <AnimatePresence mode="wait">
-            {isLoading || parentLoading ? (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center justify-center h-[300px]"
-              >
-                <div className="text-center space-y-4">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                  >
-                    <Loader2 className="h-12 w-12 text-pink-400 mx-auto" />
-                  </motion.div>
-                  <p className="text-white/70">Loading referrers data...</p>
-                </div>
-              </motion.div>
-            ) : error ? (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex items-center justify-center h-[300px]"
-              >
-                <div className="text-center space-y-4">
-                  <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
-                  <p className="text-red-400">{error}</p>
-                  <button
-                    onClick={() => setTableError(null)}
-                    className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 flex items-center gap-2 mx-auto"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Retry
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="data"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-3"
-              >
-                {data.length === 0 ? (
-                  <div className="text-center py-12 text-white/60">
-                    <p>No referrer data available for this time period</p>
+          {isLoading || parentLoading ? (
+            <div className="flex items-center justify-center h-[300px]">
+              <div className="text-center space-y-4">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                >
+                  <Loader2 className="h-12 w-12 text-purple-400 mx-auto" />
+                </motion.div>
+                <p className="text-white/70">Loading referrers...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-[300px]">
+              <div className="text-center space-y-4">
+                <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
+                <p className="text-red-400">{error}</p>
+                <button
+                  onClick={() => setTableError(null)}
+                  className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {data.map((item, index) => (
+                <motion.div
+                  key={item.referrer}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg">{getReferrerIcon(item.referrer)}</span>
+                    <div>
+                      <p className="text-white font-medium">{item.referrer}</p>
+                      <p className="text-white/60 text-sm">{item.views.toLocaleString()} views</p>
+                    </div>
                   </div>
-                ) : (
-                  data.map((referrer, index) => (
-                    <motion.div
-                      key={referrer.referrer}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 * index, duration: 0.3 }}
-                      whileHover={{ scale: 1.02, x: 5 }}
-                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 border border-white/10"
+                  {item.change !== undefined && (
+                    <div
+                      className={`text-sm font-medium ${
+                        item.change > 0 ? "text-emerald-400" : item.change < 0 ? "text-red-400" : "text-gray-400"
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500/20 to-orange-500/20 flex items-center justify-center text-white/80">
-                          {getReferrerIcon(referrer.referrer)}
-                        </div>
-                        <div>
-                          <p className="text-white font-medium text-sm">{referrer.referrer}</p>
-                          <p className="text-white/60 text-xs">{referrer.views.toLocaleString()} visits</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {referrer.change !== 0 && (
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs ${
-                              referrer.change > 0
-                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                                : "bg-red-500/20 text-red-400 border-red-500/30"
-                            }`}
-                          >
-                            {referrer.change > 0 ? (
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                            )}
-                            {Math.abs(referrer.change).toFixed(1)}%
-                          </Badge>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                      {item.change > 0 ? "+" : ""}
+                      {item.change.toFixed(1)}%
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>

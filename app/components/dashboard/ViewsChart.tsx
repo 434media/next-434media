@@ -44,18 +44,12 @@ export function ViewsChart({
       try {
         const result = await fetchAnalyticsData("views-chart", timeRange)
 
-        // Generate proper date range based on selected time range
-        const days = Number.parseInt(timeRange.replace("d", ""))
-        const generatedData = Array.from({ length: days }, (_, i) => {
-          const date = new Date()
-          date.setDate(date.getDate() - (days - 1 - i))
-          return {
-            date: date.toISOString().split("T")[0],
-            views: Math.floor(Math.random() * 2000) + 1000 + Math.sin(i / 7) * 500,
-          }
-        })
-
-        setChartData({ data: generatedData })
+        // Expect the API to return properly formatted chart data
+        if (result && result.data && Array.isArray(result.data)) {
+          setChartData({ data: result.data })
+        } else {
+          throw new Error("Invalid chart data format received from API")
+        }
       } catch (error) {
         console.error("Error loading views chart data:", error)
         setChartError("Failed to load views chart data")

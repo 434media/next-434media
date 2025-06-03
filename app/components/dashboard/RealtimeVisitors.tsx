@@ -1,96 +1,94 @@
 "use client"
+
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
-import { Activity } from "lucide-react"
+import { Users, Loader2, AlertCircle } from "lucide-react"
+import { fetchAnalyticsData } from "../../lib/analytics-api"
 
 export function RealtimeVisitors() {
-  const [count, setCount] = useState(Math.floor(Math.random() * 10) + 5)
-  const [pulses, setPulses] = useState<{ id: number; timestamp: number }[]>([])
+  const [visitors, setVisitors] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Simulate real-time visitor changes
   useEffect(() => {
-    const interval = setInterval(() => {
-      const change = Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0
-      const newCount = Math.max(1, count + change)
-
-      if (change !== 0) {
-        setCount(newCount)
-
-        if (change > 0) {
-          // Add a pulse when a new visitor arrives
-          setPulses((prev) => [...prev, { id: Date.now(), timestamp: Date.now() }])
+    const loadRealtimeData = async () => {
+      try {
+        const result = await fetchAnalyticsData("realtime", "1h")
+        if (result && typeof result.visitors === "number") {
+          setVisitors(result.visitors)
+        } else {
+          setVisitors(0) // Default to 0 if no data
         }
+        setError(null)
+      } catch (error) {
+        console.error("Error loading realtime visitors:", error)
+        setError("Failed to load realtime data")
+        setVisitors(null)
+      } finally {
+        setIsLoading(false)
       }
-    }, 3000)
+    }
+
+    // Load initial data
+    loadRealtimeData()
+
+    // Set up polling for realtime updates every 30 seconds
+    const interval = setInterval(loadRealtimeData, 30000)
 
     return () => clearInterval(interval)
-  }, [count])
-
-  // Remove old pulses
-  useEffect(() => {
-    const cleanup = setInterval(() => {
-      const now = Date.now()
-      setPulses((prev) => prev.filter((pulse) => now - pulse.timestamp < 3000))
-    }, 1000)
-
-    return () => clearInterval(cleanup)
   }, [])
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-teal-500/10" />
-        <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-white/80">Real-time Visitors</CardTitle>
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [1, 0.8, 1],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "easeInOut",
-            }}
-            className="text-emerald-400"
-          >
-            <Activity className="h-5 w-5" />
-          </motion.div>
+      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/15 via-transparent to-blue-500/15" />
+        <CardHeader className="relative">
+          <CardTitle className="text-white flex items-center gap-2">
+            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}>
+              <Users className="h-5 w-5 text-emerald-400" />
+            </motion.div>
+            Realtime Visitors
+          </CardTitle>
         </CardHeader>
         <CardContent className="relative">
-          <div className="relative">
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, duration: 0.3 }}
-              className="text-3xl font-bold text-white mb-1 flex items-center"
-            >
-              {count}
-              <span className="text-white/60 text-sm ml-2">active now</span>
-            </motion.div>
-
-            {/* Pulse animations */}
-            {pulses.map((pulse) => (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-20">
               <motion.div
-                key={pulse.id}
-                initial={{ scale: 0, opacity: 1 }}
-                animate={{ scale: 3, opacity: 0 }}
-                transition={{ duration: 2, ease: "easeOut" }}
-                className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-emerald-500"
-                style={{ zIndex: -1 }}
-              />
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.3 }}
-            className="text-xs text-white/60 mt-2"
-          >
-            Live data from your website visitors
-          </motion.div>
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+              >
+                <Loader2 className="h-8 w-8 text-emerald-400" />
+              </motion.div>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-20">
+              <div className="text-center">
+                <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center">
+              <motion.div
+                key={visitors}
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="text-4xl font-bold text-white mb-2"
+              >
+                {visitors !== null ? visitors.toLocaleString() : "0"}
+              </motion.div>
+              <div className="flex items-center justify-center gap-2">
+                <motion.div
+                  animate={{ scale: [1, 1.5, 1] }}
+                  transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+                  className="w-2 h-2 bg-emerald-400 rounded-full"
+                />
+                <p className="text-white/70 text-sm">Active now</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>

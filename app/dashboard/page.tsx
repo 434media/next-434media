@@ -10,7 +10,7 @@ import { ViewsChart } from "../components/dashboard/ViewsChart"
 import { TopPagesTable } from "../components/dashboard/TopPagesTable"
 import { DeviceChart } from "../components/dashboard/DeviceChart"
 import { CountriesTable } from "../components/dashboard/CountriesTable"
-import { Users, Clock, ExternalLink, AlertTriangle, Database, Gauge, Eye, MousePointer } from "lucide-react"
+import { Users, Clock, ExternalLink, AlertTriangle, Database, Gauge, Eye, CheckCircle, XCircle } from "lucide-react"
 import { ReferrersTable } from "../components/dashboard/ReferrersTable"
 import { OSChart } from "../components/dashboard/OSChart"
 import { BrowsersChart } from "../components/dashboard/BrowsersChart"
@@ -27,6 +27,33 @@ export default function DashboardPage() {
     until: "0d",
   })
   const [error, setError] = useState<string | null>(null)
+  const [configStatus, setConfigStatus] = useState<{
+    hasToken: boolean
+    hasProjectId: boolean
+    isConfigured: boolean
+  } | null>(null)
+
+  // Check configuration status
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const response = await fetch("/api/analytics/config-check")
+        const config = await response.json()
+        setConfigStatus(config)
+      } catch (error) {
+        console.error("Failed to check configuration:", error)
+        setConfigStatus({
+          hasToken: false,
+          hasProjectId: false,
+          isConfigured: false,
+        })
+      }
+    }
+
+    if (isAuthenticated) {
+      checkConfig()
+    }
+  }, [isAuthenticated])
 
   // Check for existing admin session
   useEffect(() => {
@@ -98,6 +125,40 @@ export default function DashboardPage() {
             isLoading={isLoading}
           />
 
+          {/* Configuration Status */}
+          {configStatus && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+              <div
+                className={`p-4 rounded-lg border backdrop-blur-sm ${
+                  configStatus.isConfigured
+                    ? "bg-emerald-500/20 border-emerald-500/30"
+                    : "bg-amber-500/20 border-amber-500/30"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {configStatus.isConfigured ? (
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-amber-400" />
+                  )}
+                  <div>
+                    <p className={`font-medium ${configStatus.isConfigured ? "text-emerald-200" : "text-amber-200"}`}>
+                      {configStatus.isConfigured
+                        ? "Vercel Analytics Configured"
+                        : "Vercel Analytics Configuration Required"}
+                    </p>
+                    {!configStatus.isConfigured && (
+                      <p className="text-sm text-amber-300 mt-1">
+                        Missing: {!configStatus.hasToken && "VERCEL_ANALYTICS_TOKEN"}{" "}
+                        {!configStatus.hasProjectId && "VERCEL_PROJECT_ID"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Data source indicator */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -107,12 +168,12 @@ export default function DashboardPage() {
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2 flex items-center gap-2">
               <Database className="h-4 w-4 text-emerald-400" />
               <span className="text-sm text-white/70">
-                {process.env.NODE_ENV === "production" ? "Live Vercel Analytics" : "Development Mode"}
+                {configStatus?.isConfigured ? "Live Vercel Analytics" : "Configuration Required"}
               </span>
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                className="w-2 h-2 bg-emerald-400 rounded-full"
+                className={`w-2 h-2 rounded-full ${configStatus?.isConfigured ? "bg-emerald-400" : "bg-amber-400"}`}
               />
             </div>
           </motion.div>
@@ -164,7 +225,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Secondary Priority Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnalyticsCard
                 title="Total Visitors"
                 endpoint="visitors"
@@ -191,15 +252,6 @@ export default function DashboardPage() {
                 isLoading={isLoading}
                 setError={setError}
                 formatter={(value: number) => `${Math.floor(value / 60)}m ${value % 60}s`}
-              />
-              <AnalyticsCard
-                title="Click Rate"
-                endpoint="click-rate"
-                timeRange={selectedTimeRange.value}
-                icon={<MousePointer className="h-5 w-5" />}
-                isLoading={isLoading}
-                setError={setError}
-                formatter={(value: number) => `${value.toFixed(1)}%`}
               />
             </div>
           </motion.div>
