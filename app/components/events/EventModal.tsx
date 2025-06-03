@@ -1,8 +1,8 @@
 "use client"
 
 import { Fragment, useEffect, useState } from "react"
-import { Dialog, Transition } from "@headlessui/react"
-import { X, Calendar, MapPin, Users, User, ExternalLink, Clock } from "lucide-react"
+import { Dialog, Transition, DialogPanel, TransitionChild } from "@headlessui/react"
+import { X, Calendar, MapPin, Users, User, ExternalLink, Clock, Edit, Trash2 } from "lucide-react"
 import type { Event } from "../../types/event-types"
 import { formatEventDate } from "../../lib/event-utils"
 import { cn } from "../../lib/utils"
@@ -11,9 +11,11 @@ interface EventModalProps {
   event: Event | null
   isOpen: boolean
   onClose: () => void
+  onEditRequest?: (event: Event) => void
+  onDeleteRequest?: (event: Event) => void
 }
 
-export function EventModal({ event, isOpen, onClose }: EventModalProps) {
+export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequest }: EventModalProps) {
   const [isCopied, setIsCopied] = useState(false)
 
   useEffect(() => {
@@ -96,10 +98,27 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
     }
   }
 
+  const handleEditClick = () => {
+    if (onEditRequest) {
+      onEditRequest(event)
+      onClose()
+    }
+  }
+
+  const handleDeleteClick = () => {
+    if (onDeleteRequest) {
+      onDeleteRequest(event)
+      onClose()
+    }
+  }
+
+  // Check if this is a manual event (no source or source is 'manual')
+  const isManualEvent = !event.source || event.source === "manual"
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
+        <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"
           enterFrom="opacity-0"
@@ -109,11 +128,11 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
           leaveTo="opacity-0"
         >
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
-        </Transition.Child>
+        </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
+            <TransitionChild
               as={Fragment}
               enter="ease-out duration-300"
               enterFrom="opacity-0 scale-95 translate-y-4"
@@ -122,7 +141,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
               leaveFrom="opacity-100 scale-100 translate-y-0"
               leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-2xl transition-all">
+              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-2xl transition-all">
                 {/* Header with Image Background */}
                 <div className="relative">
                   <div className="h-48 sm:h-64 overflow-hidden">
@@ -159,14 +178,41 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                       </div>
                     )}
 
-                    {/* Close Button */}
-                    <button
-                      type="button"
-                      className="absolute top-4 right-4 z-20 rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-white/30 transition-colors duration-200"
-                      onClick={onClose}
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
+                    {/* Action Buttons - Improved positioning */}
+                    <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                      {/* Edit Button */}
+                      {onEditRequest && (
+                        <button
+                          type="button"
+                          className="rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-blue-500/30 transition-all duration-200 hover:scale-110 border border-white/20 hover:border-blue-300/50"
+                          onClick={handleEditClick}
+                          title="Edit event"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </button>
+                      )}
+
+                      {/* Delete Button */}
+                      {onDeleteRequest && (
+                        <button
+                          type="button"
+                          className="rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-red-500/30 transition-all duration-200 hover:scale-110 border border-white/20 hover:border-red-300/50"
+                          onClick={handleDeleteClick}
+                          title="Delete event"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
+
+                      {/* Close Button */}
+                      <button
+                        type="button"
+                        className="rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-white/30 transition-colors duration-200 border border-white/20"
+                        onClick={onClose}
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
 
                     {/* Title on Image */}
                     <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
@@ -231,7 +277,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                       {event.description && (
                         <div className="mb-6">
                           <h4 className="text-lg font-semibold text-gray-900 mb-3">Description</h4>
-                          <div className="text-gray-700 leading-relaxed">{event.description}</div>
+                          <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">{event.description}</div>
                         </div>
                       )}
                     </div>
@@ -270,16 +316,16 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                   )}
                 </div>
 
-                {/* Minimal Footer with Source Info */}
-                {event.source && (
+                {/* Conditional Footer - Only show for imported events */}
+                {!isManualEvent && event.source && (
                   <div className="px-6 pb-4">
                     <div className="text-center text-xs text-gray-400 border-t border-gray-100 pt-3">
                       Imported from {event.source.charAt(0).toUpperCase() + event.source.slice(1)}
                     </div>
                   </div>
                 )}
-              </Dialog.Panel>
-            </Transition.Child>
+              </DialogPanel>
+            </TransitionChild>
           </div>
         </div>
       </Dialog>

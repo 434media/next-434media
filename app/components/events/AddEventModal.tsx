@@ -13,6 +13,7 @@ import {
   Sparkles,
   Send,
   Zap,
+  ImageIcon,
 } from "lucide-react"
 import type { Event } from "../../types/event-types"
 
@@ -241,7 +242,7 @@ export function AddEventModal({
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Where Events Create Impact</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Create Amazing Event</h2>
               <p className="text-sm text-amber-700 font-medium">
                 {isAdminVerified ? "✅ Admin verified - Ready to create!" : "Import or create manually"}
               </p>
@@ -533,6 +534,39 @@ export function AddEventModal({
                     placeholder="Free, $25, etc."
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
                   />
+                </div>
+                <div className="md:col-span-2">
+                  <label htmlFor="event-url" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Event URL
+                  </label>
+                  <div className="relative">
+                    <Link className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      id="event-url"
+                      type="url"
+                      value={eventData.url}
+                      onChange={(e) => setEventData((prev) => ({ ...prev, url: e.target.value }))}
+                      placeholder="https://example.com/event"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                    />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label htmlFor="event-image" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Event Image URL
+                  </label>
+                  <div className="relative">
+                    <ImageIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      id="event-image"
+                      type="url"
+                      value={eventData.image}
+                      onChange={(e) => setEventData((prev) => ({ ...prev, image: e.target.value }))}
+                      placeholder="https://example.com/image.jpg"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { MapPin, Users, Clock, Trash2, ArrowRight, Calendar, Eye } from "lucide-react"
+import { MapPin, Users, Clock, Trash2, ArrowRight, Calendar, Eye, Edit } from "lucide-react"
 import type { Event } from "../../types/event-types"
 import { cn } from "../../lib/utils"
 import { useState, useEffect } from "react"
@@ -12,9 +12,10 @@ interface EventListCardProps {
   onClick: () => void
   className?: string
   onDeleteRequest?: () => void
+  onEditRequest?: () => void
 }
 
-export function EventListCard({ event, onClick, className, onDeleteRequest }: EventListCardProps) {
+export function EventListCard({ event, onClick, className, onDeleteRequest, onEditRequest }: EventListCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
@@ -87,6 +88,11 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
     onDeleteRequest?.()
   }
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onEditRequest?.()
+  }
+
   const handleViewClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onClick()
@@ -123,25 +129,46 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
       {/* Animated Glow Effect */}
       <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 rounded-2xl opacity-0 group-hover:opacity-20 transition-opacity duration-700 blur-sm" />
 
-      {/* Delete Button - Enhanced */}
-      {onDeleteRequest && (
-        <button
-          onClick={handleDeleteClick}
-          className={cn(
-            "absolute top-4 right-4 z-30 p-2.5 text-gray-400 hover:text-red-600 rounded-xl transition-all duration-500 backdrop-blur-sm",
-            "transform scale-0 group-hover:scale-100 hover:scale-110 hover:bg-red-50/90 hover:shadow-lg hover:shadow-red-500/25",
-            "opacity-0 group-hover:opacity-100 hover:rotate-90",
-          )}
-          title="Delete event"
-          aria-label="Delete event"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      )}
+      {/* Action Buttons Container - Fixed positioning to avoid overlap */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {/* Edit Button */}
+        {onEditRequest && (
+          <button
+            onClick={handleEditClick}
+            className={cn(
+              "p-2.5 text-gray-400 hover:text-blue-600 rounded-xl transition-all duration-500 backdrop-blur-sm bg-white/80 hover:bg-blue-50/90",
+              "transform scale-0 group-hover:scale-100 hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25",
+              "opacity-0 group-hover:opacity-100 hover:rotate-12 border border-gray-200 hover:border-blue-300",
+            )}
+            title="Edit event"
+            aria-label="Edit event"
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Delete Button */}
+        {onDeleteRequest && (
+          <button
+            onClick={handleDeleteClick}
+            className={cn(
+              "p-2.5 text-gray-400 hover:text-red-600 rounded-xl transition-all duration-500 backdrop-blur-sm bg-white/80 hover:bg-red-50/90",
+              "transform scale-0 group-hover:scale-100 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25",
+              "opacity-0 group-hover:opacity-100 hover:rotate-90 border border-gray-200 hover:border-red-300",
+            )}
+            title="Delete event"
+            aria-label="Delete event"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       <div className="relative z-20 p-5 sm:p-6">
         {/* Header Section - Category and Date */}
-        <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start justify-between mb-5 pr-20">
+          {" "}
+          {/* Added right padding to avoid button overlap */}
           {/* Category Badge - Enhanced */}
           {event.category && (
             <div
@@ -163,7 +190,6 @@ export function EventListCard({ event, onClick, className, onDeleteRequest }: Ev
               {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
             </div>
           )}
-
           {/* Date Badge - Enhanced with Client-Side Rendering */}
           <div className="flex items-center text-gray-700 font-medium bg-amber-50/50 px-3 py-1.5 rounded-full border border-amber-100 transition-all duration-500 group-hover:bg-amber-100/80 group-hover:border-amber-200">
             <Calendar className="h-4 w-4 mr-1.5 text-amber-600 transition-transform duration-500 group-hover:scale-110" />

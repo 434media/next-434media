@@ -6,6 +6,7 @@ import { EventCalendar } from "../components/events/EventCalendar"
 import { EventModal } from "../components/events/EventModal"
 import { EventListCard } from "../components/events/EventListCard"
 import { AddEventModal } from "../components/events/AddEventModal"
+import { EditEventModal } from "../components/events/EditEventModal"
 import { EventCardSkeleton, CalendarSkeleton } from "../components/events/LoadingSkeleton"
 import { Toast } from "../components/events/Toast"
 import { FadeIn } from "../components/FadeIn"
@@ -20,8 +21,10 @@ export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [showEventModal, setShowEventModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
   const [showAdminModal, setShowAdminModal] = useState(false)
-  const [adminAction, setAdminAction] = useState<"add" | "delete">("add")
+  const [adminAction, setAdminAction] = useState<"add" | "delete" | "edit">("add")
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<Event | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
@@ -122,6 +125,17 @@ export default function EventsPage() {
     setShowAdminModal(true)
   }
 
+  const handleEditEventRequest = (event: Event) => {
+    setEditingEvent(event)
+    setAdminAction("edit")
+    setShowAdminModal(true)
+  }
+
+  const handleEventUpdated = (updatedEvent: Event) => {
+    setAllEvents((prev) => prev.map((event) => (event.id === updatedEvent.id ? updatedEvent : event)))
+    showToast("Event updated successfully!", "success")
+  }
+
   const handleAdminVerified = async (password: string) => {
     // Store admin password in session storage for the modal to use
     sessionStorage.setItem("adminPassword", password)
@@ -129,6 +143,9 @@ export default function EventsPage() {
     if (adminAction === "add") {
       setShowAdminModal(false)
       setShowAddModal(true)
+    } else if (adminAction === "edit" && editingEvent) {
+      setShowAdminModal(false)
+      setShowEditModal(true)
     } else if (adminAction === "delete" && pendingDeleteEvent) {
       // Import the delete action here to avoid circular imports
       const { deleteEventAction } = await import("@/app/actions/events")
@@ -153,6 +170,7 @@ export default function EventsPage() {
   const handleAdminCancelled = () => {
     setShowAdminModal(false)
     setPendingDeleteEvent(null)
+    setEditingEvent(null)
   }
 
   // Prevent hydration mismatch by not rendering until mounted
@@ -330,6 +348,7 @@ export default function EventsPage() {
                           event={event}
                           onClick={() => handleEventClick(event)}
                           onDeleteRequest={() => handleDeleteEventRequest(event)}
+                          onEditRequest={() => handleEditEventRequest(event)}
                           className="w-full"
                         />
                       </div>
@@ -372,21 +391,41 @@ export default function EventsPage() {
           isOpen={showAdminModal}
           onVerified={handleAdminVerified}
           onCancel={handleAdminCancelled}
-          action={adminAction === "add" ? "create an event" : "delete this event"}
-          itemName={pendingDeleteEvent?.title || ""}
+          action={
+            adminAction === "add" ? "create an event" : adminAction === "edit" ? "edit this event" : "delete this event"
+          }
+          itemName={pendingDeleteEvent?.title || editingEvent?.title || ""}
         />
 
         <AddEventModal
           isOpen={showAddModal}
           onClose={() => {
             setShowAddModal(false)
-            // Clear admin password when modal closes
             sessionStorage.removeItem("adminPassword")
           }}
           onEventAdded={handleEventAdded}
-          isAdminVerified={true} // Since we only show this modal after admin verification
+          isAdminVerified={true}
         />
-        <EventModal event={selectedEvent} isOpen={showEventModal} onClose={handleCloseEventModal} />
+
+        <EventModal
+          event={selectedEvent}
+          isOpen={showEventModal}
+          onClose={handleCloseEventModal}
+          onEditRequest={handleEditEventRequest}
+          onDeleteRequest={handleDeleteEventRequest}
+        />
+
+        <EditEventModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false)
+            setEditingEvent(null)
+            sessionStorage.removeItem("adminPassword")
+          }}
+          onEventUpdated={handleEventUpdated}
+          event={editingEvent}
+          isAdminVerified={true}
+        />
       </FadeIn>
 
       {/* Toast Notifications */}
