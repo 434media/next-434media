@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { motion } from "motion/react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart"
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
@@ -18,11 +18,10 @@ export interface ViewsChartProps {
   setError: React.Dispatch<React.SetStateAction<string | null>>
 }
 
-interface ViewsData {
-  data: Array<{
-    date: string
-    views: number
-  }>
+interface ChartDataPoint {
+  date: string
+  views: number
+  fullDate?: string
 }
 
 export function ViewsChart({
@@ -31,7 +30,7 @@ export function ViewsChart({
   isLoading: parentLoading = false,
   setError,
 }: ViewsChartProps) {
-  const [chartData, setChartData] = useState<ViewsData | null>(null)
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setChartError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -43,17 +42,64 @@ export function ViewsChart({
 
       try {
         const result = await fetchAnalyticsData("views-chart", timeRange)
+        console.log("Raw views chart data:", result)
 
-        // Expect the API to return properly formatted chart data
-        if (result && result.data && Array.isArray(result.data)) {
-          setChartData({ data: result.data })
-        } else {
-          throw new Error("Invalid chart data format received from API")
+        let processedData: ChartDataPoint[] = []
+
+        if (result) {
+          // Handle different possible response formats
+          if (result.timeseries && Array.isArray(result.timeseries)) {
+            // Format: {timeseries: [{date: "2024-01-01", value: 100}, ...]}
+            processedData = result.timeseries.map((item: any) => ({
+              date: item.date,
+              views: item.value || item.views || 0,
+              fullDate: item.date,
+            }))
+          } else if (result.data && Array.isArray(result.data)) {
+            // Format: {data: [{date: "2024-01-01", views: 100}, ...]}
+            processedData = result.data.map((item: any) => ({
+              date: item.date,
+              views: item.views || item.value || 0,
+              fullDate: item.date,
+            }))
+          } else if (Array.isArray(result)) {
+            // Direct array format: [{date: "2024-01-01", views: 100}, ...]
+            processedData = result.map((item: any) => ({
+              date: item.date,
+              views: item.views || item.value || 0,
+              fullDate: item.date,
+            }))
+          } else if (result._mock && result.timeseries) {
+            // Mock data format
+            processedData = result.timeseries.map((item: any) => ({
+              date: item.date,
+              views: item.value || item.views || 0,
+              fullDate: item.date,
+            }))
+          }
+
+          // If no timeseries data, generate based on timeRange for mock data
+          if (processedData.length === 0 && result._mock) {
+            const days = Number.parseInt(timeRange.replace("d", "")) || 7
+            const now = new Date()
+            processedData = Array.from({ length: days }, (_, i) => {
+              const date = new Date(now.getTime() - (days - 1 - i) * 24 * 60 * 60 * 1000)
+              return {
+                date: date.toISOString().split("T")[0],
+                views: Math.floor(Math.random() * 500) + 100,
+                fullDate: date.toISOString().split("T")[0],
+              }
+            })
+          }
         }
+
+        console.log("Processed views chart data:", processedData)
+        setChartData(processedData)
       } catch (error) {
         console.error("Error loading views chart data:", error)
-        setChartError("Failed to load views chart data")
-        setError("Failed to load views chart data")
+        const errorMessage = error instanceof Error ? error.message : "Failed to load views chart data"
+        setChartError(errorMessage)
+        setError(errorMessage)
       } finally {
         setIsLoading(false)
       }
@@ -70,11 +116,14 @@ export function ViewsChart({
   }, [parentLoading])
 
   const exportToCSV = async () => {
-    if (!chartData?.data) return
+    if (!chartData || chartData.length === 0) return
 
     setIsExporting(true)
     try {
-      const csvContent = [["Date", "Views"], ...chartData.data.map((item) => [item.date, item.views.toString()])]
+      const csvContent = [
+        ["Date", "Views"],
+        ...chartData.map((item) => [item.fullDate || item.date, item.views.toString()]),
+      ]
         .map((row) => row.join(","))
         .join("\n")
 
@@ -95,15 +144,14 @@ export function ViewsChart({
     }
   }
 
-  const formattedData =
-    chartData?.data?.map((item) => ({
-      date: new Date(item.date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
-      views: item.views,
-      fullDate: item.date,
-    })) || []
+  const formattedData = chartData.map((item) => ({
+    date: new Date(item.date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+    views: item.views,
+    fullDate: item.fullDate || item.date,
+  }))
 
   return (
     <motion.div
@@ -128,7 +176,7 @@ export function ViewsChart({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={exportToCSV}
-              disabled={isExporting || isLoading || parentLoading || !chartData?.data}
+              disabled={isExporting || isLoading || parentLoading || chartData.length === 0}
               className="p-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
               title="Export chart data to CSV"
             >
@@ -170,6 +218,10 @@ export function ViewsChart({
                   Retry
                 </button>
               </div>
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="flex items-center justify-center h-[300px]">
+              <p className="text-white/70">No chart data available</p>
             </div>
           ) : (
             <ChartContainer

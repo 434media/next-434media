@@ -10,7 +10,18 @@ import { ViewsChart } from "../components/dashboard/ViewsChart"
 import { TopPagesTable } from "../components/dashboard/TopPagesTable"
 import { DeviceChart } from "../components/dashboard/DeviceChart"
 import { CountriesTable } from "../components/dashboard/CountriesTable"
-import { Users, Clock, ExternalLink, AlertTriangle, Database, Gauge, Eye, CheckCircle, XCircle } from "lucide-react"
+import {
+  Users,
+  Clock,
+  ExternalLink,
+  AlertTriangle,
+  Database,
+  Gauge,
+  Eye,
+  CheckCircle,
+  XCircle,
+  TestTube,
+} from "lucide-react"
 import { ReferrersTable } from "../components/dashboard/ReferrersTable"
 import { OSChart } from "../components/dashboard/OSChart"
 import { BrowsersChart } from "../components/dashboard/BrowsersChart"
@@ -31,6 +42,7 @@ export default function DashboardPage() {
     hasToken: boolean
     hasProjectId: boolean
     isConfigured: boolean
+    isDevelopment: boolean
   } | null>(null)
 
   // Check configuration status
@@ -46,6 +58,7 @@ export default function DashboardPage() {
           hasToken: false,
           hasProjectId: false,
           isConfigured: false,
+          isDevelopment: process.env.NODE_ENV === "development",
         })
       }
     }
@@ -79,6 +92,35 @@ export default function DashboardPage() {
     setSelectedTimeRange(range)
   }
 
+  const getDataSourceInfo = () => {
+    if (!configStatus) return { text: "Checking configuration...", color: "text-gray-400", icon: Database }
+
+    if (configStatus.isDevelopment && !configStatus.isConfigured) {
+      return {
+        text: "Development Mode (Mock Data)",
+        color: "text-blue-400",
+        icon: TestTube,
+        bgColor: "bg-blue-400",
+      }
+    }
+
+    if (configStatus.isConfigured) {
+      return {
+        text: "Live Vercel Analytics",
+        color: "text-emerald-400",
+        icon: Database,
+        bgColor: "bg-emerald-400",
+      }
+    }
+
+    return {
+      text: "Configuration Required",
+      color: "text-amber-400",
+      icon: XCircle,
+      bgColor: "bg-amber-400",
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -91,6 +133,8 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const dataSource = getDataSourceInfo()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -132,25 +176,44 @@ export default function DashboardPage() {
                 className={`p-4 rounded-lg border backdrop-blur-sm ${
                   configStatus.isConfigured
                     ? "bg-emerald-500/20 border-emerald-500/30"
-                    : "bg-amber-500/20 border-amber-500/30"
+                    : configStatus.isDevelopment
+                      ? "bg-blue-500/20 border-blue-500/30"
+                      : "bg-amber-500/20 border-amber-500/30"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   {configStatus.isConfigured ? (
                     <CheckCircle className="h-5 w-5 text-emerald-400" />
+                  ) : configStatus.isDevelopment ? (
+                    <TestTube className="h-5 w-5 text-blue-400" />
                   ) : (
                     <XCircle className="h-5 w-5 text-amber-400" />
                   )}
                   <div>
-                    <p className={`font-medium ${configStatus.isConfigured ? "text-emerald-200" : "text-amber-200"}`}>
+                    <p
+                      className={`font-medium ${
+                        configStatus.isConfigured
+                          ? "text-emerald-200"
+                          : configStatus.isDevelopment
+                            ? "text-blue-200"
+                            : "text-amber-200"
+                      }`}
+                    >
                       {configStatus.isConfigured
                         ? "Vercel Analytics Configured"
-                        : "Vercel Analytics Configuration Required"}
+                        : configStatus.isDevelopment
+                          ? "Development Mode - Using Mock Data"
+                          : "Vercel Analytics Configuration Required"}
                     </p>
-                    {!configStatus.isConfigured && (
+                    {!configStatus.isConfigured && !configStatus.isDevelopment && (
                       <p className="text-sm text-amber-300 mt-1">
                         Missing: {!configStatus.hasToken && "VERCEL_ANALYTICS_TOKEN"}{" "}
                         {!configStatus.hasProjectId && "VERCEL_PROJECT_ID"}
+                      </p>
+                    )}
+                    {configStatus.isDevelopment && !configStatus.isConfigured && (
+                      <p className="text-sm text-blue-300 mt-1">
+                        Set VERCEL_ANALYTICS_TOKEN and VERCEL_PROJECT_ID to use real data
                       </p>
                     )}
                   </div>
@@ -166,14 +229,12 @@ export default function DashboardPage() {
             className="mb-8 flex items-center justify-center"
           >
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2 flex items-center gap-2">
-              <Database className="h-4 w-4 text-emerald-400" />
-              <span className="text-sm text-white/70">
-                {configStatus?.isConfigured ? "Live Vercel Analytics" : "Configuration Required"}
-              </span>
+              <dataSource.icon className={`h-4 w-4 ${dataSource.color}`} />
+              <span className="text-sm text-white/70">{dataSource.text}</span>
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                className={`w-2 h-2 rounded-full ${configStatus?.isConfigured ? "bg-emerald-400" : "bg-amber-400"}`}
+                className={`w-2 h-2 rounded-full ${dataSource.bgColor}`}
               />
             </div>
           </motion.div>
@@ -198,7 +259,7 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
-          {/* Priority Analytics Cards - Reorganized for better hierarchy */}
+          {/* Priority Analytics Cards */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -276,7 +337,7 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* Priority Tables Section - Referrers first */}
+          {/* Priority Tables Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -326,7 +387,11 @@ export default function DashboardPage() {
             className="text-center"
           >
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-              <p className="text-white/70 mb-2">Powered by Vercel Analytics</p>
+              <p className="text-white/70 mb-2">
+                {configStatus?.isDevelopment && !configStatus?.isConfigured
+                  ? "Development Mode - Mock Data"
+                  : "Powered by Vercel Analytics"}
+              </p>
               <a
                 href="https://vercel.com/analytics"
                 target="_blank"

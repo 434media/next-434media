@@ -7,7 +7,7 @@ import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { Monitor, Smartphone, Loader2, AlertCircle } from "lucide-react"
+import { Monitor, Smartphone, Tablet, Loader2, AlertCircle } from "lucide-react"
 import { fetchAnalyticsData } from "../../lib/analytics-api"
 
 export interface DeviceChartProps {
@@ -17,13 +17,13 @@ export interface DeviceChartProps {
 }
 
 interface DeviceData {
-  desktop: number
-  mobile: number
-  tablet: number
+  device: string
+  visits: number
+  percentage?: number
 }
 
 export function DeviceChart({ timeRange, isLoading: parentLoading = false, setError }: DeviceChartProps) {
-  const [data, setData] = useState<DeviceData | null>(null)
+  const [data, setData] = useState<DeviceData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setChartError] = useState<string | null>(null)
 
@@ -33,8 +33,42 @@ export function DeviceChart({ timeRange, isLoading: parentLoading = false, setEr
       setChartError(null)
 
       try {
-        const result = await fetchAnalyticsData("devices-chart", timeRange)
-        setData(result)
+        const result = await fetchAnalyticsData("devices", timeRange)
+
+        let processedData: DeviceData[] = []
+
+        // Handle different response formats
+        if (Array.isArray(result)) {
+          processedData = result.map((item: any) => ({
+            device: item.device || item.name || "Unknown",
+            visits: item.visits || item.views || item.value || 0,
+          }))
+        } else if (result && typeof result === "object") {
+          // Handle object response with devices array
+          if (result.devices && Array.isArray(result.devices)) {
+            processedData = result.devices.map((item: any) => ({
+              device: item.device || item.name || "Unknown",
+              visits: item.visits || item.views || item.value || 0,
+            }))
+          }
+          // Handle direct object properties (desktop, mobile, tablet)
+          else if (result.desktop !== undefined || result.mobile !== undefined) {
+            processedData = [
+              { device: "desktop", visits: result.desktop || 0 },
+              { device: "mobile", visits: result.mobile || 0 },
+              { device: "tablet", visits: result.tablet || 0 },
+            ].filter((item) => item.visits > 0)
+          }
+        }
+
+        // Calculate percentages
+        const total = processedData.reduce((sum, item) => sum + item.visits, 0)
+        const chartData = processedData.map((item) => ({
+          ...item,
+          percentage: total > 0 ? (item.visits / total) * 100 : 0,
+        }))
+
+        setData(chartData)
       } catch (error) {
         console.error("Error loading device chart data:", error)
         setChartError("Failed to load device chart data")
@@ -54,28 +88,31 @@ export function DeviceChart({ timeRange, isLoading: parentLoading = false, setEr
     }
   }, [parentLoading])
 
-  // Update the prepareChartData function to only include desktop and mobile
+  const getDeviceIcon = (deviceName: string) => {
+    const device = deviceName.toLowerCase()
+    if (device.includes("desktop") || device.includes("computer")) return Monitor
+    if (device.includes("mobile") || device.includes("phone")) return Smartphone
+    if (device.includes("tablet") || device.includes("ipad")) return Tablet
+    return Monitor // default
+  }
+
+  const getDeviceColor = (index: number) => {
+    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
+    return colors[index % colors.length]
+  }
+
   const prepareChartData = () => {
-    if (!data) return []
+    if (!Array.isArray(data) || data.length === 0) {
+      return []
+    }
 
-    const total = data.desktop + data.mobile
-
-    return [
-      {
-        name: "Desktop",
-        value: data.desktop,
-        percentage: ((data.desktop / total) * 100).toFixed(1),
-        color: "#10b981",
-        icon: Monitor,
-      },
-      {
-        name: "Mobile",
-        value: data.mobile,
-        percentage: ((data.mobile / total) * 100).toFixed(1),
-        color: "#3b82f6",
-        icon: Smartphone,
-      },
-    ]
+    return data.map((item, index) => ({
+      name: item.device,
+      value: item.visits,
+      percentage: item.percentage?.toFixed(1) || "0",
+      color: getDeviceColor(index),
+      icon: getDeviceIcon(item.device),
+    }))
   }
 
   const chartData = prepareChartData()
@@ -120,6 +157,10 @@ export function DeviceChart({ timeRange, isLoading: parentLoading = false, setEr
                 </button>
               </div>
             </div>
+          ) : chartData.length === 0 ? (
+            <div className="flex items-center justify-center h-[200px]">
+              <p className="text-white/70">No device data available</p>
+            </div>
           ) : (
             <div className="flex flex-col lg:flex-row items-center gap-6">
               <div className="w-full lg:w-1/2">
@@ -127,6 +168,7 @@ export function DeviceChart({ timeRange, isLoading: parentLoading = false, setEr
                   config={{
                     desktop: { label: "Desktop", color: "#10b981" },
                     mobile: { label: "Mobile", color: "#3b82f6" },
+                    tablet: { label: "Tablet", color: "#f59e0b" },
                   }}
                   className="h-[200px]"
                 >
@@ -173,7 +215,7 @@ export function DeviceChart({ timeRange, isLoading: parentLoading = false, setEr
                         <motion.div whileHover={{ scale: 1.1, rotate: 5 }} style={{ color: device.color }}>
                           <Icon className="h-5 w-5" />
                         </motion.div>
-                        <span className="text-white font-medium">{device.name}</span>
+                        <span className="text-white font-medium capitalize">{device.name}</span>
                       </div>
                       <div className="text-right">
                         <p className="text-white font-bold">{device.percentage}%</p>

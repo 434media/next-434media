@@ -17,9 +17,10 @@ export interface CountriesTableProps {
 
 interface CountryData {
   country: string
-  code: string
+  code?: string
   views: number
-  change: number
+  change?: number
+  visits?: number // Added for Vercel Analytics API compatibility
 }
 
 export function CountriesTable({ timeRange, isLoading: parentLoading = false, setError }: CountriesTableProps) {
@@ -34,11 +35,52 @@ export function CountriesTable({ timeRange, isLoading: parentLoading = false, se
 
       try {
         const result = await fetchAnalyticsData("countries", timeRange)
-        setData(result)
+        console.log("Raw countries data:", result)
+
+        let processedData: CountryData[] = []
+
+        if (result) {
+          // Handle different possible response formats
+          if (Array.isArray(result)) {
+            // Direct array format: [{country: "US", visits: 100}, ...]
+            processedData = result.map((item: any) => ({
+              country: item.country || item.name || "Unknown",
+              code: item.code || item.country,
+              views: item.visits || item.views || item.value || 0,
+              change: item.change || 0,
+            }))
+          } else if (result.countries && Array.isArray(result.countries)) {
+            // Nested format: {countries: [{country: "US", visits: 100}, ...]}
+            processedData = result.countries.map((item: any) => ({
+              country: item.country || item.name || "Unknown",
+              code: item.code || item.country,
+              views: item.visits || item.views || item.value || 0,
+              change: item.change || 0,
+            }))
+          } else if (result.data && Array.isArray(result.data)) {
+            // Data nested format: {data: [{country: "US", visits: 100}, ...]}
+            processedData = result.data.map((item: any) => ({
+              country: item.country || item.name || "Unknown",
+              code: item.code || item.country,
+              views: item.visits || item.views || item.value || 0,
+              change: item.change || 0,
+            }))
+          }
+
+          // Sort by views descending and limit to top 15
+          processedData = processedData
+            .sort((a, b) => b.views - a.views)
+            .slice(0, 15)
+            .filter((item) => item.views > 0)
+        }
+
+        console.log("Processed countries data:", processedData)
+        setData(processedData)
       } catch (error) {
         console.error("Error loading countries data:", error)
-        setTableError("Failed to load countries data")
-        setError("Failed to load countries data")
+        const errorMessage = error instanceof Error ? error.message : "Failed to load countries data"
+        setTableError(errorMessage)
+        setError(errorMessage)
       } finally {
         setIsLoading(false)
       }
@@ -53,6 +95,28 @@ export function CountriesTable({ timeRange, isLoading: parentLoading = false, se
       setIsLoading(true)
     }
   }, [parentLoading])
+
+  const getCountryFlag = (countryCode: string) => {
+    // Simple country code to flag emoji mapping
+    const flagMap: Record<string, string> = {
+      US: "🇺🇸",
+      CA: "🇨🇦",
+      GB: "🇬🇧",
+      DE: "🇩🇪",
+      FR: "🇫🇷",
+      AU: "🇦🇺",
+      JP: "🇯🇵",
+      BR: "🇧🇷",
+      IN: "🇮🇳",
+      NL: "🇳🇱",
+      IT: "🇮🇹",
+      ES: "🇪🇸",
+      RU: "🇷🇺",
+      CN: "🇨🇳",
+      KR: "🇰🇷",
+    }
+    return flagMap[countryCode] || "🌍"
+  }
 
   return (
     <motion.div
@@ -96,14 +160,14 @@ export function CountriesTable({ timeRange, isLoading: parentLoading = false, se
             </div>
           ) : (
             <div className="space-y-3">
-              {data.length === 0 ? (
+              {!Array.isArray(data) || data.length === 0 ? (
                 <div className="text-center py-12 text-white/60">
                   <p>No country data available for this time period</p>
                 </div>
               ) : (
                 data.map((country, index) => (
                   <motion.div
-                    key={country.country}
+                    key={`${country.country}-${index}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 * index, duration: 0.3 }}
@@ -116,7 +180,7 @@ export function CountriesTable({ timeRange, isLoading: parentLoading = false, se
                         transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, delay: index * 0.2 }}
                         className="text-2xl"
                       >
-                        {country.code ? `${country.code}` : "🌍"}
+                        {getCountryFlag(country.code || country.country)}
                       </motion.div>
                       <div>
                         <p className="text-white font-medium text-sm">{country.country}</p>
@@ -124,7 +188,7 @@ export function CountriesTable({ timeRange, isLoading: parentLoading = false, se
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {country.change !== 0 && (
+                      {country.change !== undefined && country.change !== 0 && (
                         <Badge
                           variant="secondary"
                           className={`text-xs ${

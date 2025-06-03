@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { ExternalLink, TrendingUp, TrendingDown, Loader2, AlertCircle, RefreshCw } from "lucide-react"
@@ -17,7 +17,8 @@ export interface TopPagesTableProps {
 interface PageData {
   page: string
   views: number
-  change: number
+  change?: number
+  visits?: number // Added for Vercel Analytics API compatibility
 }
 
 export function TopPagesTable({ timeRange, isLoading: parentLoading = false, setError }: TopPagesTableProps) {
@@ -34,8 +35,30 @@ export function TopPagesTable({ timeRange, isLoading: parentLoading = false, set
       setTableError(null)
 
       try {
-        const result = await fetchAnalyticsData("top-pages", timeRange)
-        setData(result || [])
+        const result = await fetchAnalyticsData("pages", timeRange)
+
+        // Handle different data formats from Vercel Analytics API
+        let processedData: PageData[] = []
+
+        if (Array.isArray(result)) {
+          // Format: [{page: "/", visits: 100}, ...]
+          processedData = result.map((item) => ({
+            page: item.page || "",
+            views: item.visits || item.views || 0,
+            change: item.change || 0,
+          }))
+        } else if (result && typeof result === "object") {
+          // Format: {pages: [{page: "/", visits: 100}, ...]}
+          if (Array.isArray(result.pages)) {
+            processedData = result.pages.map((item: any) => ({
+              page: item.page || "",
+              views: item.visits || item.views || 0,
+              change: item.change || 0,
+            }))
+          }
+        }
+
+        setData(processedData)
         setRetryCount(0) // Reset retry count on success
       } catch (error) {
         console.error("Error loading top pages data:", error)
@@ -153,14 +176,14 @@ export function TopPagesTable({ timeRange, isLoading: parentLoading = false, set
                 exit={{ opacity: 0 }}
                 className="space-y-3"
               >
-                {data.length === 0 ? (
+                {!Array.isArray(data) || data.length === 0 ? (
                   <div className="text-center py-12 text-white/60">
                     <p>No page data available for this time period</p>
                   </div>
                 ) : (
                   data.map((page, index) => (
                     <motion.div
-                      key={page.page}
+                      key={`${page.page}-${index}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.1 * index, duration: 0.3 }}
@@ -181,7 +204,7 @@ export function TopPagesTable({ timeRange, isLoading: parentLoading = false, set
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {page.change !== 0 && (
+                        {page.change !== undefined && page.change !== 0 && (
                           <Badge
                             variant="secondary"
                             className={`text-xs ${

@@ -15,10 +15,10 @@ export interface PerformanceMetricsProps {
 }
 
 interface PerformanceData {
-  avg: number
-  p75: number
-  p90: number
-  p99: number
+  avg?: number
+  p75?: number
+  p90?: number
+  p99?: number
   change?: number
 }
 
@@ -35,11 +35,70 @@ export function PerformanceMetrics({ timeRange, isLoading: parentLoading = false
 
       try {
         const result = await fetchAnalyticsData("performance", timeRange)
-        setData(result)
+
+        // Handle different data formats and ensure we have default values
+        let processedData: PerformanceData = {
+          avg: 0,
+          p75: 0,
+          p90: 0,
+          p99: 0,
+          change: 0,
+        }
+
+        // If we have web vitals data from Vercel Analytics
+        if (result && typeof result === "object") {
+          // Handle direct properties
+          if (typeof result.avg === "number") processedData.avg = result.avg
+          if (typeof result.p75 === "number") processedData.p75 = result.p75
+          if (typeof result.p90 === "number") processedData.p90 = result.p90
+          if (typeof result.p99 === "number") processedData.p99 = result.p99
+          if (typeof result.change === "number") processedData.change = result.change
+
+          // Handle nested web vitals data
+          if (result.webVitals && typeof result.webVitals === "object") {
+            const webVitals = result.webVitals
+
+            // Try to extract LCP (Largest Contentful Paint) as avg if available
+            if (webVitals.lcp && typeof webVitals.lcp.avg === "number") {
+              processedData.avg = webVitals.lcp.avg / 1000 // Convert ms to seconds
+            }
+
+            // Try to extract other metrics if available
+            if (webVitals.lcp) {
+              if (typeof webVitals.lcp.p75 === "number") processedData.p75 = webVitals.lcp.p75 / 1000
+              if (typeof webVitals.lcp.p90 === "number") processedData.p90 = webVitals.lcp.p90 / 1000
+              if (typeof webVitals.lcp.p99 === "number") processedData.p99 = webVitals.lcp.p99 / 1000
+            }
+          }
+
+          // For mock data in development
+          if (result._mock) {
+            processedData = {
+              avg: Math.random() * 2 + 0.5, // 0.5 - 2.5 seconds
+              p75: Math.random() * 3 + 0.8, // 0.8 - 3.8 seconds
+              p90: Math.random() * 4 + 1.2, // 1.2 - 5.2 seconds
+              p99: Math.random() * 6 + 2, // 2 - 8 seconds
+              change: (Math.random() - 0.5) * 20, // -10% to +10%
+            }
+          }
+        }
+
+        setData(processedData)
       } catch (error) {
         console.error("Error loading performance data:", error)
         setMetricsError("Failed to load performance data")
         setError("Failed to load performance data")
+
+        // Set fallback data in development
+        if (process.env.NODE_ENV === "development") {
+          setData({
+            avg: 1.2,
+            p75: 1.8,
+            p90: 2.5,
+            p99: 4.2,
+            change: -5.2,
+          })
+        }
       } finally {
         setIsLoading(false)
       }
@@ -61,10 +120,14 @@ export function PerformanceMetrics({ timeRange, isLoading: parentLoading = false
     try {
       const csvContent = [
         ["Metric", "Value (seconds)", "Change (%)"],
-        ["Average", data.avg.toFixed(3), data.change ? data.change.toFixed(2) : "N/A"],
-        ["75th Percentile", data.p75.toFixed(3), "N/A"],
-        ["90th Percentile", data.p90.toFixed(3), "N/A"],
-        ["99th Percentile", data.p99.toFixed(3), "N/A"],
+        [
+          "Average",
+          data.avg !== undefined ? data.avg.toFixed(3) : "N/A",
+          data.change !== undefined ? data.change.toFixed(2) : "N/A",
+        ],
+        ["75th Percentile", data.p75 !== undefined ? data.p75.toFixed(3) : "N/A", "N/A"],
+        ["90th Percentile", data.p90 !== undefined ? data.p90.toFixed(3) : "N/A", "N/A"],
+        ["99th Percentile", data.p99 !== undefined ? data.p99.toFixed(3) : "N/A", "N/A"],
       ]
         .map((row) => row.join(","))
         .join("\n")
@@ -85,6 +148,13 @@ export function PerformanceMetrics({ timeRange, isLoading: parentLoading = false
       setIsExporting(false)
     }
   }
+
+  // Safe getter functions with default values
+  const getAvg = () => (data?.avg !== undefined ? data.avg : 0)
+  const getP75 = () => (data?.p75 !== undefined ? data.p75 : 0)
+  const getP90 = () => (data?.p90 !== undefined ? data.p90 : 0)
+  const getP99 = () => (data?.p99 !== undefined ? data.p99 : 0)
+  const getChange = () => (data?.change !== undefined ? data.change : 0)
 
   const getPerformanceColor = (value: number) => {
     if (value < 1) return "text-emerald-400"
@@ -167,20 +237,20 @@ export function PerformanceMetrics({ timeRange, isLoading: parentLoading = false
                   initial={{ scale: 0.8 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, duration: 0.3 }}
-                  className={`text-4xl font-bold mb-2 ${getPerformanceColor(data.avg)}`}
+                  className={`text-4xl font-bold mb-2 ${getPerformanceColor(getAvg())}`}
                 >
-                  {data.avg.toFixed(2)}s
+                  {getAvg().toFixed(2)}s
                 </motion.div>
                 <p className="text-white/80 text-lg">Average Load Time</p>
-                <p className={`text-sm ${getPerformanceColor(data.avg)}`}>{getPerformanceLabel(data.avg)}</p>
+                <p className={`text-sm ${getPerformanceColor(getAvg())}`}>{getPerformanceLabel(getAvg())}</p>
                 {data.change !== undefined && (
                   <p
                     className={`text-xs mt-1 ${
-                      data.change < 0 ? "text-emerald-400" : data.change > 0 ? "text-red-400" : "text-gray-400"
+                      getChange() < 0 ? "text-emerald-400" : getChange() > 0 ? "text-red-400" : "text-gray-400"
                     }`}
                   >
-                    {data.change > 0 ? "+" : ""}
-                    {data.change.toFixed(1)}% vs last period
+                    {getChange() > 0 ? "+" : ""}
+                    {getChange().toFixed(1)}% vs last period
                   </p>
                 )}
               </div>
@@ -190,9 +260,9 @@ export function PerformanceMetrics({ timeRange, isLoading: parentLoading = false
                 <h4 className="text-white/80 font-medium">Load Time Percentiles</h4>
                 <div className="space-y-3">
                   {[
-                    { label: "75th Percentile", value: data.p75, description: "75% of users" },
-                    { label: "90th Percentile", value: data.p90, description: "90% of users" },
-                    { label: "99th Percentile", value: data.p99, description: "99% of users" },
+                    { label: "75th Percentile", value: getP75(), description: "75% of users" },
+                    { label: "90th Percentile", value: getP90(), description: "90% of users" },
+                    { label: "99th Percentile", value: getP99(), description: "99% of users" },
                   ].map((metric, index) => (
                     <motion.div
                       key={metric.label}

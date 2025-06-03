@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { motion } from "motion/react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts"
@@ -33,11 +33,83 @@ export function BrowsersChart({ timeRange, isLoading: parentLoading = false, set
 
       try {
         const result = await fetchAnalyticsData("browsers", timeRange)
-        setData(result || [])
+        console.log("Raw browsers data:", result)
+
+        // Handle different possible data structures from Vercel Analytics API
+        let processedData: BrowserData[] = []
+
+        if (result) {
+          // Handle mock data structure (development mode)
+          if (result._mock && result.browsers && Array.isArray(result.browsers)) {
+            processedData = result.browsers.map((item: any) => ({
+              name: item.browser || item.name || "Unknown",
+              views: item.views || item.visits || 0,
+              percentage: item.percentage || 0,
+            }))
+          }
+          // Handle real Vercel Analytics API response
+          else if (Array.isArray(result)) {
+            // Direct array response
+            processedData = result.map((item: any) => ({
+              name: item.browser || item.name || "Unknown",
+              views: item.visits || item.views || item.value || 0,
+              percentage: item.percentage || 0,
+            }))
+          } else if (result.browsers && Array.isArray(result.browsers)) {
+            // Nested browsers array
+            processedData = result.browsers.map((item: any) => ({
+              name: item.browser || item.name || "Unknown",
+              views: item.visits || item.views || item.value || 0,
+              percentage: item.percentage || 0,
+            }))
+          } else if (result.data && Array.isArray(result.data)) {
+            // Data nested in 'data' property
+            processedData = result.data.map((item: any) => ({
+              name: item.browser || item.name || "Unknown",
+              views: item.visits || item.views || item.value || 0,
+              percentage: item.percentage || 0,
+            }))
+          }
+          // Handle single object response
+          else if (typeof result === "object" && !Array.isArray(result)) {
+            // Convert object to array format
+            processedData = Object.entries(result)
+              .filter(([key]) => key !== "_mock" && key !== "_timestamp" && key !== "_fallback")
+              .map(([browser, value]: [string, any]) => ({
+                name: browser,
+                views: typeof value === "number" ? value : value?.visits || value?.views || 0,
+                percentage: 0,
+              }))
+          }
+
+          // Calculate percentages if not provided
+          if (processedData.length > 0) {
+            const total = processedData.reduce((sum, item) => sum + item.views, 0)
+            if (total > 0) {
+              processedData = processedData.map((item) => ({
+                ...item,
+                percentage: (item.views / total) * 100,
+              }))
+            }
+          }
+
+          // Sort by views descending and limit to top 10
+          processedData = processedData
+            .sort((a, b) => b.views - a.views)
+            .slice(0, 10)
+            .filter((item) => item.views > 0)
+        }
+
+        console.log("Processed browsers data:", processedData)
+        setData(processedData)
       } catch (error) {
         console.error("Error loading browsers chart data:", error)
-        setChartError("Failed to load browsers chart data")
-        setError("Failed to load browsers chart data")
+        const errorMessage = error instanceof Error ? error.message : "Failed to load browsers chart data"
+        setChartError(errorMessage)
+        setError(errorMessage)
+
+        // Set empty data on error
+        setData([])
       } finally {
         setIsLoading(false)
       }
@@ -60,13 +132,18 @@ export function BrowsersChart({ timeRange, isLoading: parentLoading = false, set
       Firefox: "#ff9500",
       Edge: "#0078D7",
       Opera: "#ff1b2d",
+      "Internet Explorer": "#1e90ff",
       Other: "#8b5cf6",
+      Unknown: "#6b7280",
     }
     return colors[name] || "#8b5cf6"
   }
 
   const prepareChartData = () => {
-    if (!data || data.length === 0) return []
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log("No valid data array for browsers chart")
+      return []
+    }
 
     return data.map((browser, index) => ({
       ...browser,
@@ -110,11 +187,21 @@ export function BrowsersChart({ timeRange, isLoading: parentLoading = false, set
                 <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
                 <p className="text-red-400">{error}</p>
                 <button
-                  onClick={() => setChartError(null)}
+                  onClick={() => {
+                    setChartError(null)
+                    setError(null)
+                  }}
                   className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30"
                 >
                   Retry
                 </button>
+              </div>
+            </div>
+          ) : chartData.length === 0 ? (
+            <div className="flex items-center justify-center h-[250px]">
+              <div className="text-center space-y-4">
+                <Globe className="h-12 w-12 text-gray-400 mx-auto" />
+                <p className="text-white/70">No browser data available</p>
               </div>
             </div>
           ) : (

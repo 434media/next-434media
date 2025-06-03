@@ -37,7 +37,7 @@ class VercelAnalyticsAPI {
       limit,
     })
 
-    console.log(`Fetching ${endpoint} from Vercel Analytics API...`)
+    console.log(`Fetching ${endpoint} from API...`)
 
     const response = await fetch(`/api/analytics?${params}`, {
       headers: {
@@ -48,10 +48,15 @@ class VercelAnalyticsAPI {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-      throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch ${endpoint}`)
+      throw new Error(errorData.error || `HTTP ${response.status}`)
     }
 
     const result = await response.json()
+
+    // Log if we're using mock data
+    if (result._mock) {
+      console.log(`Using ${result._fallback ? "fallback " : ""}mock data for ${endpoint}`)
+    }
 
     // Only cache successful responses that have data
     if (result && !result.error) {
@@ -120,12 +125,11 @@ class VercelAnalyticsAPI {
 
 export const analyticsAPI = new VercelAnalyticsAPI()
 
-// Simplified function to fetch analytics data with proper error handling
+// Enhanced function to fetch analytics data with proper error handling and development mode support
 export const fetchAnalyticsData = async (endpoint: string, timeRange: string, retryCount = 0): Promise<any> => {
   const MAX_RETRIES = 2
 
   try {
-    // Convert timeRange to since/until format
     const since = timeRange
     const until = "0d"
 
@@ -135,39 +139,53 @@ export const fetchAnalyticsData = async (endpoint: string, timeRange: string, re
       analyticsAPI.setAdminKey(adminKey)
     }
 
+    let result: any
+
     switch (endpoint) {
       case "views":
       case "views-chart":
-        return await analyticsAPI.getPageViews(since, until)
+        result = await analyticsAPI.getPageViews(since, until)
+        break
       case "visitors":
-        return await analyticsAPI.getVisitors(since, until)
+        result = await analyticsAPI.getVisitors(since, until)
+        break
+      case "pages":
       case "top-pages":
-        return await analyticsAPI.getTopPages(since, until)
+        result = await analyticsAPI.getTopPages(since, until)
+        break
       case "countries":
-        return await analyticsAPI.getCountries(since, until)
+        result = await analyticsAPI.getCountries(since, until)
+        break
       case "devices":
       case "devices-chart":
-        return await analyticsAPI.getDevices(since, until)
+        result = await analyticsAPI.getDevices(since, until)
+        break
       case "browsers":
-        return await analyticsAPI.getBrowsers(since, until)
+        result = await analyticsAPI.getBrowsers(since, until)
+        break
       case "operating-systems":
-        return await analyticsAPI.getOperatingSystems(since, until)
+        result = await analyticsAPI.getOperatingSystems(since, until)
+        break
       case "referrers":
-        return await analyticsAPI.getReferrers(since, until)
+        result = await analyticsAPI.getReferrers(since, until)
+        break
       case "bounce-rate":
-        return await analyticsAPI.getBounceRate(since, until)
+        result = await analyticsAPI.getBounceRate(since, until)
+        break
       case "duration":
-        return await analyticsAPI.getSessionDuration(since, until)
+        result = await analyticsAPI.getSessionDuration(since, until)
+        break
       case "performance":
-        return await analyticsAPI.getPerformanceMetrics(since, until)
+        result = await analyticsAPI.getPerformanceMetrics(since, until)
+        break
       case "realtime":
-        return await analyticsAPI.getRealtimeVisitors()
-      case "click-rate":
-        // This would need to be implemented in Vercel Analytics API
-        throw new Error("Click rate endpoint not available in Vercel Analytics")
+        result = await analyticsAPI.getRealtimeVisitors()
+        break
       default:
         throw new Error(`Unknown endpoint: ${endpoint}`)
     }
+
+    return result
   } catch (error) {
     console.error(`Attempt ${retryCount + 1} failed for ${endpoint}:`, error)
 
@@ -177,7 +195,6 @@ export const fetchAnalyticsData = async (endpoint: string, timeRange: string, re
       return fetchAnalyticsData(endpoint, timeRange, retryCount + 1)
     }
 
-    // After all retries failed, throw the error
     throw error
   }
 }
@@ -187,7 +204,7 @@ export const fetchAllAnalyticsData = async (timeRange: TimeRange) => {
   const endpoints = [
     "views",
     "visitors",
-    "top-pages",
+    "pages",
     "countries",
     "devices",
     "browsers",
