@@ -442,10 +442,10 @@ export const portfolioArray: PortfolioItem[] = [
     content: "Culturally connecting brands with a fight fan audience",
     linkedin: "",
     instagram: "https://www.instagram.com/txmxboxing/",
-    website: "",
+    website: "https://www.txmxboxing.com/",
     showLinkedin: false,
     showInstagram: true,
-    showWebsite: false,
+    showWebsite: true,
   },
   {
     company: "MilCityUSA",
