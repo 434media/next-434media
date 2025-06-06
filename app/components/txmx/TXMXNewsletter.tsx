@@ -288,7 +288,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                     <div
                       ref={turnstileRef}
                       data-theme="light"
-                      data-size="compact"
+                      data-size="flexible"
                       className="w-full flex justify-center"
                       aria-label="Security verification"
                     />
