@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 import Image from "next/image"
 
@@ -186,7 +186,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 bg-black text-white hover:bg-gray-800 transition-colors"
+            className="absolute top-4 right-4 z-10 p-2 bg-black text-white hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             aria-label="Close newsletter signup"
           >
             <X className="h-4 w-4" />
@@ -194,47 +194,41 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
 
           <div className="p-8">
             {/* Header with Logo */}
-            <div className="text-center mb-6">
+            <div className="text-center mb-8">
               <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="mb-4"
+                className="mb-6"
               >
-                <div className="flex justify-center mb-4">
+                <div className="flex justify-center">
                   <Image
                     src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
                     alt="TXMX Boxing Logo"
-                    width={120}
-                    height={60}
+                    width={140}
+                    height={70}
                     className="filter invert"
                     priority
                   />
                 </div>
-                <div className="h-1 w-16 bg-black mx-auto mb-4"></div>
               </motion.div>
 
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="space-y-2"
+                className="mb-6"
               >
-                <p className="text-lg font-bold text-black italic">Levantamos Los Puños</p>
+                <p className="text-lg font-bold text-black tracking-wide">Made from Blood, Sweat, and Tears</p>
+              </motion.div>
+
+              {/* Value Proposition */}
+              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Get exclusive drops, insider access, and be first in the ring for limited releases.
+                </p>
               </motion.div>
             </div>
-
-            {/* Value Proposition */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-center mb-6"
-            >
-              <p className="text-sm text-gray-700 leading-relaxed">
-                Get exclusive drops, insider access, and be first in the ring for limited releases.
-              </p>
-            </motion.div>
 
             {/* Form */}
             <AnimatePresence mode="wait">
@@ -262,7 +256,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Enter your email"
-                      className="w-full px-4 py-3 border-2 border-black bg-white text-black placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors"
+                      className="w-full px-4 py-3 border-2 border-black bg-white text-black placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors text-base"
                       aria-describedby={error ? "newsletter-error" : undefined}
                       disabled={isSubmitting}
                       autoComplete="email"
@@ -272,12 +266,12 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-black text-white py-3 px-6 font-bold text-sm tracking-wide hover:bg-gray-800 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                    className="w-full bg-black text-white py-3 px-6 font-bold text-sm tracking-wide hover:bg-gray-800 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 active:scale-[0.98] transform"
                     aria-label="Join TXMX newsletter"
                   >
                     <motion.div
-                      animate={isSubmitting ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-                      transition={isSubmitting ? { duration: 1, repeat: Number.POSITIVE_INFINITY } : {}}
+                      animate={isSubmitting ? { scale: [1, 1.02, 1] } : { scale: 1 }}
+                      transition={isSubmitting ? { duration: 1.5, repeat: Number.POSITIVE_INFINITY } : {}}
                       className="flex items-center justify-center"
                     >
                       {isSubmitting ? "JOINING THE FIGHT..." : "JOIN THE FIGHT"}
@@ -289,15 +283,21 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       ref={turnstileRef}
                       data-theme="light"
                       data-size="flexible"
-                      className="w-full flex justify-center"
+                      className="w-full flex justify-center mt-4"
                       aria-label="Security verification"
                     />
                   )}
 
                   {error && (
-                    <div id="newsletter-error" className="text-red-600 text-sm text-center font-medium" role="alert">
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      id="newsletter-error"
+                      className="text-red-600 text-sm text-center font-medium bg-red-50 border border-red-200 rounded p-2"
+                      role="alert"
+                    >
                       {error}
-                    </div>
+                    </motion.div>
                   )}
                 </motion.form>
               ) : (
@@ -306,7 +306,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className="text-center py-8"
+                  className="text-center py-6"
                   role="status"
                   aria-live="polite"
                 >
@@ -321,7 +321,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       </motion.div>
                     </div>
                     <h3 className="text-xl font-bold text-black mb-2">Welcome to the Fight!</h3>
-                    <p className="text-gray-700 text-sm">
+                    <p className="text-gray-700 text-sm leading-relaxed">
                       You're now part of the TXMX family. Get ready for exclusive drops and insider access.
                     </p>
                   </div>

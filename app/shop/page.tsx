@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { Volume2, VolumeX } from "lucide-react"
 import Image from "next/image"
@@ -9,6 +9,7 @@ export default function ShopPage() {
   const [showNewsletter, setShowNewsletter] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [showSoundButton, setShowSoundButton] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const mobileVideoRef = useRef<HTMLVideoElement>(null)
 
@@ -35,15 +36,20 @@ export default function ShopPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  const handleCloseNewsletter = () => {
+  const handleCloseNewsletter = useCallback(() => {
     setShowNewsletter(false)
-  }
+  }, [])
 
-  const handleJoinFight = () => {
-    setShowNewsletter(true)
-  }
+  const handleJoinFight = useCallback(() => {
+    setIsLoading(true)
+    // Simulate brief loading for better UX feedback
+    setTimeout(() => {
+      setShowNewsletter(true)
+      setIsLoading(false)
+    }, 150)
+  }, [])
 
-  const toggleSound = () => {
+  const toggleSound = useCallback(() => {
     const newMutedState = !isMuted
     setIsMuted(newMutedState)
 
@@ -54,7 +60,7 @@ export default function ShopPage() {
     if (mobileVideoRef.current) {
       mobileVideoRef.current.muted = newMutedState
     }
-  }
+  }, [isMuted])
 
   return (
     <>
@@ -71,6 +77,7 @@ export default function ShopPage() {
               playsInline
               className="w-full h-full object-cover"
               poster="/placeholder.svg?height=1080&width=1920"
+              preload="metadata"
             >
               <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
               Your browser does not support the video tag.
@@ -86,7 +93,7 @@ export default function ShopPage() {
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3 }}
                 onClick={toggleSound}
-                className="absolute top-20 right-6 z-20 p-4 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group"
+                className="absolute top-24 right-6 z-20 p-4 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
                 aria-label={isMuted ? "Unmute video" : "Mute video"}
               >
                 <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
@@ -94,7 +101,7 @@ export default function ShopPage() {
                 </motion.div>
 
                 {/* Tooltip */}
-                <div className="absolute top-full right-0 mt-2 px-3 py-1 bg-black text-white text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none border border-white/20">
+                <div className="absolute top-full right-0 mt-2 px-3 py-1 bg-black text-white text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 pointer-events-none border border-white/20">
                   {isMuted ? "Unmute" : "Mute"}
                 </div>
               </motion.button>
@@ -120,6 +127,7 @@ export default function ShopPage() {
                 playsInline
                 className="w-full h-full object-cover"
                 poster="/placeholder.svg?height=1350&width=1080"
+                preload="metadata"
               >
                 <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
@@ -134,7 +142,7 @@ export default function ShopPage() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ duration: 0.3 }}
                     onClick={toggleSound}
-                    className="absolute top-14 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group"
+                    className="absolute top-20 right-4 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
                     aria-label={isMuted ? "Unmute video" : "Mute video"}
                   >
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
@@ -147,81 +155,139 @@ export default function ShopPage() {
           </div>
         </section>
 
-        {/* Coming Soon Section - Clean and Minimal */}
-        <section className="py-32 px-4 bg-black">
-          <div className="max-w-4xl mx-auto text-center">
+        {/* Enhanced Coming Soon Section */}
+        <section
+          className="py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 bg-black"
+          role="main"
+          aria-labelledby="main-heading"
+        >
+          <div className="max-w-5xl mx-auto text-center">
             <motion.div
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
+              transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
               viewport={{ once: true, margin: "-100px" }}
-              className="space-y-16"
+              className="space-y-8 sm:space-y-10 lg:space-y-12"
             >
-              {/* TXMX Logo - No invert filter since logo is already white */}
+              {/* TXMX Logo with improved accessibility and loading */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
+                transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
                 viewport={{ once: true }}
                 className="flex justify-center"
               >
-                <Image
-                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
-                  alt="TXMX Boxing"
-                  width={400}
-                  height={160}
-                  className="w-80 md:w-96 h-auto"
-                  priority
-                />
+                <div className="relative">
+                  <Image
+                    src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
+                    alt="TXMX Boxing - Premium Boxing Merchandise"
+                    width={400}
+                    height={160}
+                    className="w-72 sm:w-80 md:w-96 h-auto"
+                    priority
+                    sizes="(max-width: 640px) 288px, (max-width: 768px) 320px, 384px"
+                  />
+                  {/* Loading skeleton for better perceived performance */}
+                  <div className="absolute inset-0 bg-gray-800 animate-pulse rounded opacity-0 transition-opacity duration-300" />
+                </div>
               </motion.div>
 
-              {/* Single Boxing Tagline */}
+              {/* Drop Date with enhanced visual hierarchy and accessibility */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.4 }}
+                transition={{ duration: 0.8, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                 viewport={{ once: true }}
-                className="space-y-6"
+                className="space-y-6 sm:space-y-8"
               >
-                <p className="text-2xl md:text-3xl font-bold italic text-white">Levantamos Los Puños</p>
-                <div className="h-px w-32 bg-white mx-auto"></div>
-              </motion.div>
-
-              {/* Drop Date */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.6 }}
-                viewport={{ once: true }}
-                className="space-y-8"
-              >
-                <div className="inline-block px-8 py-4 border-2 border-white">
-                  <span className="text-3xl md:text-4xl font-black tracking-wider">DROPPING 07.19</span>
+                {/* Drop Date Badge with improved interaction */}
+                <div className="inline-flex items-center justify-center">
+                  <div className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-white bg-black relative overflow-hidden group cursor-default focus-within:ring-2 focus-within:ring-white/50 focus-within:ring-offset-2 focus-within:ring-offset-black">
+                    <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+                    <h1
+                      className="text-2xl sm:text-3xl md:text-4xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500"
+                      id="main-heading"
+                    >
+                      DROPPING 07.19
+                    </h1>
+                  </div>
                 </div>
 
-                {/* Clean Description */}
-                <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed font-light">
-                  The ultimate boxing experience is dropping soon. Get exclusive access to limited drops, premium gear,
-                  and insider content from the world of TXMX boxing.
-                </p>
+                {/* Enhanced Description with better typography and spacing */}
+                <div className="space-y-4 sm:space-y-6">
+                  <p className="text-lg sm:text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light">
+                    The ultimate boxing experience is dropping soon.
+                  </p>
+                  <p className="text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+                    Get exclusive access to limited drops, premium gear, and insider content from the world of TXMX
+                    boxing.
+                  </p>
+                </div>
               </motion.div>
 
-              {/* Newsletter CTA - Fixed hover issue */}
+              {/* Enhanced Newsletter CTA with improved UX and loading states */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                viewport={{ once: true }}
+                className="pt-6 sm:pt-8"
+              >
+                <div className="space-y-4">
+                  <motion.button
+                    onClick={handleJoinFight}
+                    disabled={isLoading}
+                    whileHover={!isLoading ? { scale: 1.05 } : {}}
+                    whileTap={!isLoading ? { scale: 0.95 } : {}}
+                    className="group relative px-8 sm:px-12 py-4 sm:py-5 bg-white text-black font-black text-lg sm:text-xl tracking-wide transition-all duration-300 border-2 border-white focus:outline-none focus:ring-4 focus:ring-white/50 focus:ring-offset-4 focus:ring-offset-black disabled:opacity-70 disabled:cursor-not-allowed min-w-[200px] sm:min-w-[240px]"
+                    aria-describedby="cta-description"
+                    aria-live="polite"
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        Loading...
+                      </span>
+                    ) : (
+                      <>
+                        <span className="relative z-10">JOIN THE FIGHT</span>
+                        <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                        <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-black text-lg sm:text-xl tracking-wide">
+                          JOIN THE FIGHT
+                        </span>
+                      </>
+                    )}
+                  </motion.button>
+                  <p id="cta-description" className="text-gray-500 text-xs sm:text-sm sr-only">
+                    Click to join our exclusive newsletter for early access to TXMX boxing merchandise
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* Trust indicators with improved responsive design */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.8 }}
                 viewport={{ once: true }}
-                className="pt-8"
+                className="pt-6 sm:pt-8 border-t border-white/10"
+                role="complementary"
+                aria-label="Benefits"
               >
-                <motion.button
-                  onClick={handleJoinFight}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-12 py-5 bg-white text-black font-black text-xl tracking-wide hover:bg-gray-100 transition-all duration-300 border-2 border-white hover:border-gray-100"
-                >
-                  JOIN THE FIGHT
-                </motion.button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 text-gray-400 text-sm">
+                  <div className="flex items-center gap-2" role="listitem">
+                    <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" aria-hidden="true" />
+                    <span>Exclusive Access</span>
+                  </div>
+                  <div className="flex items-center gap-2" role="listitem">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" aria-hidden="true" />
+                    <span>Limited Edition Drops</span>
+                  </div>
+                  <div className="flex items-center gap-2" role="listitem">
+                    <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" aria-hidden="true" />
+                    <span>Insider Content</span>
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           </div>
