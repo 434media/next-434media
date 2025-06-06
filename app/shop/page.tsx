@@ -1,89 +1,235 @@
-/* import type { Metadata } from "next"
-import { VideoHero } from "../components/shopify/video-hero"
-import { getCollections } from "../lib/shopify"
-
-export const dynamic = "force-static" // Force static generation for faster loads
-export const revalidate = 3600 // Revalidate every hour
-
-export const metadata: Metadata = {
-  title: "434 MEDIA Shop | Exclusive Merchandise",
-  description: "Shop exclusive 434 MEDIA merchandise featuring TXMX Boxing, DEVSA, and Vemos Vamos collections.",
-  openGraph: {
-    title: "434 MEDIA Shop | Exclusive Merchandise",
-    description: "Shop exclusive 434 MEDIA merchandise featuring TXMX Boxing, DEVSA, and Vemos Vamos collections.",
-    images: [
-      {
-        url: "/shop-coming-soon-og.jpg",
-        width: 1200,
-        height: 630,
-        alt: "434 MEDIA Shop",
-      },
-    ],
-  },
-}
-
-export default async function ShopPage() {
-  // Get collections for our interactive hotspots
-  const collections = await getCollections()
-
-  // Fallback: if collections is empty, use a default object
-  const fallbackCollection = {
-    handle: "default",
-    title: "Default Collection",
-    description: "",
-    image: undefined,
-    path: "/search/all",
-    seo: { title: "Default SEO Title", description: "Default SEO Description" },
-    updatedAt: new Date().toISOString(),
-  }
-
-  // Get the specific collections featured in the video
-  const txmxCollection = collections.find((c) => c.handle === "txmx-boxing") ?? collections[0] ?? fallbackCollection
-  const devsaCollection = collections.find((c) => c.handle === "devsa") ?? collections[1] ?? fallbackCollection
-  const vemosVamosCollection =
-    collections.find((c) => c.handle === "vemosvamos") ?? collections[2] ?? fallbackCollection
-
-  return (
-    <main className="flex-1">
-      <VideoHero
-        videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/434_SHOP_1080_V001.mp4"
-        featuredCollection={txmxCollection}
-        secondaryCollection={vemosVamosCollection}
-        tertiaryCollection={devsaCollection}
-        allCollectionsPath="/search"
-        ctaText="Shop Collections"
-      />
-    </main>
-  )
-}
- */
-
-import type { Metadata } from "next"
-import ShopComingSoon from "../components/ShopComingSoon"
-
-export const metadata: Metadata = {
-  title: "Shop Coming Soon | 434 MEDIA",
-  description:
-    "Our exclusive merchandise shop is coming soon. Sign up to be notified when we launch and get early access to limited edition items.",
-  openGraph: {
-    title: "Shop Coming Soon | 434 MEDIA",
-    description:
-      "Our exclusive merchandise shop is coming soon. Sign up to be notified when we launch and get early access to limited edition items.",
-    images: [
-      {
-        url: "/shop-coming-soon-og.jpg",
-        width: 1200,
-        height: 630,
-        alt: "434 MEDIA Shop Coming Soon",
-      },
-    ],
-  },
-}
+"use client"
+import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "motion/react"
+import { Volume2, VolumeX } from "lucide-react"
+import Image from "next/image"
+import TXMXNewsletter from "../components/txmx/TXMXNewsletter"
 
 export default function ShopPage() {
+  const [showNewsletter, setShowNewsletter] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [showSoundButton, setShowSoundButton] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const mobileVideoRef = useRef<HTMLVideoElement>(null)
+
+  // Show newsletter modal after page load (only once per session)
+  useEffect(() => {
+    const hasShown = sessionStorage.getItem("txmx-newsletter-shown")
+
+    if (!hasShown) {
+      const timer = setTimeout(() => {
+        setShowNewsletter(true)
+        sessionStorage.setItem("txmx-newsletter-shown", "true")
+      }, 3000) // Show after 3 seconds to let video play
+
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  // Show sound button after a delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSoundButton(true)
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleCloseNewsletter = () => {
+    setShowNewsletter(false)
+  }
+
+  const handleJoinFight = () => {
+    setShowNewsletter(true)
+  }
+
+  const toggleSound = () => {
+    const newMutedState = !isMuted
+    setIsMuted(newMutedState)
+
+    // Update both videos
+    if (videoRef.current) {
+      videoRef.current.muted = newMutedState
+    }
+    if (mobileVideoRef.current) {
+      mobileVideoRef.current.muted = newMutedState
+    }
+  }
+
   return (
-    <main className="flex-1">
-      <ShopComingSoon />
-    </main>
+    <>
+      <main className="min-h-screen bg-black text-white overflow-hidden">
+        {/* Desktop Hero Section with Video */}
+        <section className="hidden md:block relative h-screen">
+          {/* Background Video */}
+          <div className="absolute inset-0 z-0">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted={isMuted}
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+              poster="/placeholder.svg?height=1080&width=1920"
+            >
+              <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          {/* Sound Control Button - Positioned below navbar */}
+          <AnimatePresence>
+            {showSoundButton && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.3 }}
+                onClick={toggleSound}
+                className="absolute top-20 right-6 z-20 p-4 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group"
+                aria-label={isMuted ? "Unmute video" : "Mute video"}
+              >
+                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+                  {isMuted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+                </motion.div>
+
+                {/* Tooltip */}
+                <div className="absolute top-full right-0 mt-2 px-3 py-1 bg-black text-white text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none border border-white/20">
+                  {isMuted ? "Unmute" : "Mute"}
+                </div>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </section>
+
+        {/* Mobile Video Section (1080x1350 aspect ratio) */}
+        <section className="block md:hidden min-h-screen bg-black">
+          <div className="w-full h-screen flex items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8 }}
+              className="relative w-full max-w-sm mx-auto"
+              style={{ aspectRatio: "1080/1350" }}
+            >
+              <video
+                ref={mobileVideoRef}
+                autoPlay
+                muted={isMuted}
+                loop
+                playsInline
+                className="w-full h-full object-cover"
+                poster="/placeholder.svg?height=1350&width=1080"
+              >
+                <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+
+              {/* Mobile Sound Control Button - Positioned below mobile navbar */}
+              <AnimatePresence>
+                {showSoundButton && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.3 }}
+                    onClick={toggleSound}
+                    className="absolute top-14 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group"
+                    aria-label={isMuted ? "Unmute video" : "Mute video"}
+                  >
+                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+                      {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                    </motion.div>
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Coming Soon Section - Clean and Minimal */}
+        <section className="py-32 px-4 bg-black">
+          <div className="max-w-4xl mx-auto text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true, margin: "-100px" }}
+              className="space-y-16"
+            >
+              {/* TXMX Logo - No invert filter since logo is already white */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                viewport={{ once: true }}
+                className="flex justify-center"
+              >
+                <Image
+                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
+                  alt="TXMX Boxing"
+                  width={400}
+                  height={160}
+                  className="w-80 md:w-96 h-auto"
+                  priority
+                />
+              </motion.div>
+
+              {/* Single Boxing Tagline */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.4 }}
+                viewport={{ once: true }}
+                className="space-y-6"
+              >
+                <p className="text-2xl md:text-3xl font-bold italic text-white">Levantamos Los Puños</p>
+                <div className="h-px w-32 bg-white mx-auto"></div>
+              </motion.div>
+
+              {/* Drop Date */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                viewport={{ once: true }}
+                className="space-y-8"
+              >
+                <div className="inline-block px-8 py-4 border-2 border-white">
+                  <span className="text-3xl md:text-4xl font-black tracking-wider">DROPPING 07.19</span>
+                </div>
+
+                {/* Clean Description */}
+                <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed font-light">
+                  The ultimate boxing experience is dropping soon. Get exclusive access to limited drops, premium gear,
+                  and insider content from the world of TXMX boxing.
+                </p>
+              </motion.div>
+
+              {/* Newsletter CTA - Fixed hover issue */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.8 }}
+                viewport={{ once: true }}
+                className="pt-8"
+              >
+                <motion.button
+                  onClick={handleJoinFight}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-12 py-5 bg-white text-black font-black text-xl tracking-wide hover:bg-gray-100 transition-all duration-300 border-2 border-white hover:border-gray-100"
+                >
+                  JOIN THE FIGHT
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          </div>
+        </section>
+      </main>
+
+      {/* Newsletter Modal */}
+      <TXMXNewsletter showModal={showNewsletter} onClose={handleCloseNewsletter} />
+    </>
   )
 }
