@@ -274,7 +274,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       transition={isSubmitting ? { duration: 1.5, repeat: Number.POSITIVE_INFINITY } : {}}
                       className="flex items-center justify-center"
                     >
-                      {isSubmitting ? "JOINING THE FIGHT..." : "JOIN THE FIGHT"}
+                      {isSubmitting ? "JOINING THE FIGHT..." : "Submit"}
                     </motion.div>
                   </button>
 

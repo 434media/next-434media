@@ -215,78 +215,10 @@ export default function ShopPage() {
 
                 {/* Enhanced Description with better typography and spacing */}
                 <div className="space-y-4 sm:space-y-6">
-                  <p className="text-lg sm:text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed font-light">
-                    The ultimate boxing experience is dropping soon.
-                  </p>
                   <p className="text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
                     Get exclusive access to limited drops, premium gear, and insider content from the world of TXMX
                     boxing.
                   </p>
-                </div>
-              </motion.div>
-
-              {/* Enhanced Newsletter CTA with improved UX and loading states */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-                viewport={{ once: true }}
-                className="pt-6 sm:pt-8"
-              >
-                <div className="space-y-4">
-                  <motion.button
-                    onClick={handleJoinFight}
-                    disabled={isLoading}
-                    whileHover={!isLoading ? { scale: 1.05 } : {}}
-                    whileTap={!isLoading ? { scale: 0.95 } : {}}
-                    className="group relative px-8 sm:px-12 py-4 sm:py-5 bg-white text-black font-black text-lg sm:text-xl tracking-wide transition-all duration-300 border-2 border-white focus:outline-none focus:ring-4 focus:ring-white/50 focus:ring-offset-4 focus:ring-offset-black disabled:opacity-70 disabled:cursor-not-allowed min-w-[200px] sm:min-w-[240px]"
-                    aria-describedby="cta-description"
-                    aria-live="polite"
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        Loading...
-                      </span>
-                    ) : (
-                      <>
-                        <span className="relative z-10">JOIN THE FIGHT</span>
-                        <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                        <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-black text-lg sm:text-xl tracking-wide">
-                          JOIN THE FIGHT
-                        </span>
-                      </>
-                    )}
-                  </motion.button>
-                  <p id="cta-description" className="text-gray-500 text-xs sm:text-sm sr-only">
-                    Click to join our exclusive newsletter for early access to TXMX boxing merchandise
-                  </p>
-                </div>
-              </motion.div>
-
-              {/* Trust indicators with improved responsive design */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.8 }}
-                viewport={{ once: true }}
-                className="pt-6 sm:pt-8 border-t border-white/10"
-                role="complementary"
-                aria-label="Benefits"
-              >
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 text-gray-400 text-sm">
-                  <div className="flex items-center gap-2" role="listitem">
-                    <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" aria-hidden="true" />
-                    <span>Exclusive Access</span>
-                  </div>
-                  <div className="flex items-center gap-2" role="listitem">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" aria-hidden="true" />
-                    <span>Limited Edition Drops</span>
-                  </div>
-                  <div className="flex items-center gap-2" role="listitem">
-                    <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" aria-hidden="true" />
-                    <span>Insider Content</span>
-                  </div>
                 </div>
               </motion.div>
             </motion.div>
