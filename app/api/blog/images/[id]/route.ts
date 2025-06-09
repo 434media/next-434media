@@ -1,9 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getBlogImageData } from "../../../../lib/blog-db"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
   try {
-    const imageId = params.id
+    const { id: imageId } = await params
 
     if (!imageId) {
       return new NextResponse("Image ID is required", { status: 400 })
