@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { ArrowLeft, Upload, Trash2, Search, ImageIcon, Check, Loader2, Plus, RefreshCw, Edit2, X } from "lucide-react"
 import Link from "next/link"
@@ -18,11 +16,17 @@ export default function MediaLibraryPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [pendingAction, setPendingAction] = useState<"delete" | null>(null)
+  const [pendingAction, setPendingAction] = useState<"delete" | "upload" | null>(null)
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState(Date.now())
   const [editingImage, setEditingImage] = useState<BlogImage | null>(null)
+  const [storedPassword, setStoredPassword] = useState<string | null>(null)
+
+  // Allowed file types for upload
+  const ALLOWED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
   const loadImages = useCallback(async () => {
     setIsLoading(true)
@@ -62,8 +66,52 @@ export default function MediaLibraryPage() {
     }
   }, [successMessage])
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
+  const handleFileSelect = () => {
+    // Show password modal first, then file selection
+    setPendingAction("upload")
+    setShowPasswordModal(true)
+  }
+
+  const handleFileSelectAfterAuth = () => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp"
+    input.multiple = true
+    input.onchange = (event) => {
+      const files = (event.target as HTMLInputElement).files
+      if (!files || files.length === 0) return
+
+      // Validate files
+      const invalidFiles = Array.from(files).filter(
+        (file) => !ALLOWED_FILE_TYPES.includes(file.type) || file.size > MAX_FILE_SIZE || file.size === 0,
+      )
+
+      if (invalidFiles.length > 0) {
+        const fileErrors = invalidFiles.map((file) => {
+          if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+            return `"${file.name}" has invalid type: ${file.type}`
+          }
+          if (file.size > MAX_FILE_SIZE) {
+            return `"${file.name}" exceeds maximum size of 10MB`
+          }
+          if (file.size === 0) {
+            return `"${file.name}" is empty`
+          }
+          return `"${file.name}" is invalid`
+        })
+        setError(`Cannot upload: ${fileErrors.join(", ")}`)
+        return
+      }
+
+      // Proceed with upload using stored password
+      if (storedPassword) {
+        handleFileUpload(files, storedPassword)
+      }
+    }
+    input.click()
+  }
+
+  const handleFileUpload = async (files: FileList, password: string) => {
     if (!files || files.length === 0) return
 
     setIsUploading(true)
@@ -75,6 +123,9 @@ export default function MediaLibraryPage() {
     Array.from(files).forEach((file) => {
       formData.append("images", file)
     })
+
+    // Add admin password to form data
+    formData.append("adminPassword", password)
 
     try {
       // Simulate upload progress
@@ -128,8 +179,8 @@ export default function MediaLibraryPage() {
       setUploadProgress(0)
     }
 
-    // Reset file input
-    event.target.value = ""
+    // Reset pending files
+    setPendingFiles(null)
   }
 
   const toggleImageSelection = (id: string) => {
@@ -187,7 +238,17 @@ export default function MediaLibraryPage() {
         console.error("Error deleting images:", error)
         setError(error instanceof Error ? error.message : "Failed to delete images. Please try again.")
       }
+    } else if (pendingAction === "upload") {
+      setStoredPassword(password)
+      setShowPasswordModal(false)
+      setPendingAction(null)
+      // Trigger file selection after password verification
+      setTimeout(() => {
+        handleFileSelectAfterAuth()
+      }, 100)
+      return
     }
+
     setShowPasswordModal(false)
     setPendingAction(null)
   }
@@ -195,6 +256,7 @@ export default function MediaLibraryPage() {
   const handlePasswordCancel = () => {
     setShowPasswordModal(false)
     setPendingAction(null)
+    setPendingFiles(null)
   }
 
   const filteredImages = images.filter(
@@ -246,18 +308,14 @@ export default function MediaLibraryPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300 cursor-pointer">
+            <button
+              onClick={handleFileSelect}
+              disabled={isUploading}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300"
+            >
               <Upload className="w-5 h-5" />
               <span className="font-medium">Upload Images</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-              />
-            </label>
+            </button>
 
             {selectedImages.length > 0 && (
               <button
@@ -347,6 +405,19 @@ export default function MediaLibraryPage() {
           </div>
         </div>
 
+        {/* Allowed File Types Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <h3 className="text-sm font-medium text-blue-800 mb-2">Allowed File Types:</h3>
+          <div className="flex flex-wrap gap-2">
+            {ALLOWED_FILE_TYPES.map((type) => (
+              <span key={type} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs">
+                {type.replace("image/", "").toUpperCase()}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-blue-600 mt-2">Maximum file size: 10MB per image</p>
+        </div>
+
         {/* Images Grid */}
         <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-4 sm:p-6">
           {isLoading ? (
@@ -367,11 +438,13 @@ export default function MediaLibraryPage() {
                 {searchTerm ? "Try a different search term" : "Upload images to get started"}
               </p>
               {!searchTerm && (
-                <label className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 cursor-pointer">
+                <button
+                  onClick={handleFileSelect}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 cursor-pointer"
+                >
                   <Upload className="w-5 h-5" />
                   <span>Upload Your First Image</span>
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
-                </label>
+                </button>
               )}
             </div>
           ) : (
@@ -478,8 +551,14 @@ export default function MediaLibraryPage() {
         isOpen={showPasswordModal}
         onVerified={handlePasswordVerified}
         onCancel={handlePasswordCancel}
-        action="delete images"
-        itemName={`${selectedImages.length} ${selectedImages.length === 1 ? "image" : "images"}`}
+        action={pendingAction === "delete" ? "delete images" : "upload images"}
+        itemName={
+          pendingAction === "delete"
+            ? `${selectedImages.length} ${selectedImages.length === 1 ? "image" : "images"}`
+            : pendingFiles
+              ? `${pendingFiles.length} ${pendingFiles.length === 1 ? "image" : "images"}`
+              : "images"
+        }
       />
     </div>
   )

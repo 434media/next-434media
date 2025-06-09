@@ -11,9 +11,15 @@ interface ImageSelectorProps {
   selectedImage: string
   onImageSelect: (url: string) => void
   onImageClear: () => void
+  isInEditor?: boolean
 }
 
-export default function ImageSelector({ selectedImage, onImageSelect, onImageClear }: ImageSelectorProps) {
+export default function ImageSelector({
+  selectedImage,
+  onImageSelect,
+  onImageClear,
+  isInEditor = true,
+}: ImageSelectorProps) {
   const [activeTab, setActiveTab] = useState<"upload" | "library" | "url">("upload")
   const [images, setImages] = useState<BlogImage[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -70,6 +76,11 @@ export default function ImageSelector({ selectedImage, onImageSelect, onImageCle
     Array.from(files).forEach((file) => {
       formData.append("images", file)
     })
+
+    // Add isInEditor flag to indicate we're already authenticated
+    if (isInEditor) {
+      formData.append("isInEditor", "true")
+    }
 
     try {
       // Simulate upload progress
@@ -373,8 +384,8 @@ export default function ImageSelector({ selectedImage, onImageSelect, onImageCle
                       </button>
                     </div>
                     <div className="p-2 bg-white">
-                      <p className="text-xs font-medium text-gray-900 truncate" title={image.filename}>
-                        {image.filename}
+                      <p className="text-xs font-medium text-gray-900 truncate" title={image.original_name}>
+                        {image.original_name}
                       </p>
                       <div className="flex justify-between items-center mt-1">
                         <p className="text-xs text-gray-500">{formatFileSize(image.file_size)}</p>

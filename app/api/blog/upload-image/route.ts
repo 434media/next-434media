@@ -29,6 +29,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<ImageUplo
 
     const formData = await request.formData()
     const images = formData.getAll("images") as File[]
+    const adminPassword = formData.get("adminPassword") as string
+    const isInEditor = formData.get("isInEditor") === "true"
+
+    // Only verify admin password if not already in the editor
+    if (!isInEditor) {
+      // Verify admin password
+      if (!adminPassword) {
+        return NextResponse.json({ success: false, error: "Admin password is required" }, { status: 401 })
+      }
+    }
 
     // Validation
     if (!images || images.length === 0) {

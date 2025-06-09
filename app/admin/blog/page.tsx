@@ -15,9 +15,12 @@ export default function AdminBlogPage() {
   const [editingPost, setEditingPost] = useState<BlogPost | undefined>()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all")
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingPost, setDeletingPost] = useState<BlogPost | null>(null)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null)
+  const [showEditPasswordModal, setShowEditPasswordModal] = useState(false)
+  const [editingPostId, setEditingPostId] = useState<string | null>(null)
 
   useEffect(() => {
     loadPosts()
@@ -62,8 +65,8 @@ export default function AdminBlogPage() {
   }
 
   const handleEdit = (post: BlogPost) => {
-    setEditingPost(post)
-    setShowEditor(true)
+    setEditingPostId(post.id)
+    setShowEditPasswordModal(true)
   }
 
   const handleDelete = (post: BlogPost) => {
@@ -93,6 +96,21 @@ export default function AdminBlogPage() {
     setShowPasswordModal(false)
     setPendingAction(null)
     setDeletingPost(null)
+  }
+
+  const handleEditPasswordVerified = (password: string) => {
+    const post = posts.find((p) => p.id === editingPostId)
+    if (post) {
+      setEditingPost(post)
+      setShowEditor(true)
+    }
+    setShowEditPasswordModal(false)
+    setEditingPostId(null)
+  }
+
+  const handleEditPasswordCancel = () => {
+    setShowEditPasswordModal(false)
+    setEditingPostId(null)
   }
 
   const handleSave = (post: BlogPost) => {
@@ -394,6 +412,15 @@ export default function AdminBlogPage() {
         onCancel={handlePasswordCancel}
         action={pendingAction === "create" ? "create article" : "delete article"}
         itemName={deletingPost?.title}
+      />
+
+      {/* Edit Password Modal */}
+      <AdminPasswordModal
+        isOpen={showEditPasswordModal}
+        onVerified={handleEditPasswordVerified}
+        onCancel={handleEditPasswordCancel}
+        action="edit article"
+        itemName={posts.find((p) => p.id === editingPostId)?.title}
       />
     </div>
   )

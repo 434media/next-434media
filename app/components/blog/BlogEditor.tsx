@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react"
 import { Save, Eye, Upload, X, Plus, Sparkles, FileText, Settings } from "lucide-react"
 import { createBlogPostAction, updateBlogPostAction, getBlogCategoriesAction } from "@/app/actions/blog"
-import AdminPasswordModal from "../AdminPasswordModal"
-import ImageSelector from "./ImageSelector"
+import AdminPasswordModal from "../../components/AdminPasswordModal"
+import ImageSelector from "../../components/blog/ImageSelector"
 import type { BlogPost, BlogCategory } from "../../types/blog-types"
 
 interface BlogEditorProps {
@@ -58,7 +58,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
       setPendingSaveStatus(saveStatus)
       setShowPasswordModal(true)
     } else {
-      // Editing existing post - no password needed
+      // Editing existing post - no password needed since user already authenticated
       handleSave(saveStatus)
     }
   }
@@ -82,7 +82,8 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
     try {
       const formData = new FormData()
       if (post?.id) formData.append("id", post.id)
-      if (adminPassword) formData.append("adminPassword", adminPassword)
+      // Only add admin password for new posts
+      if (adminPassword && !post?.id) formData.append("adminPassword", adminPassword)
       formData.append("title", title)
       formData.append("content", content)
       formData.append("excerpt", excerpt)
@@ -436,13 +437,15 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
         </div>
       </div>
 
-      {/* Admin Password Modal */}
-      <AdminPasswordModal
-        isOpen={showPasswordModal}
-        onVerified={handlePasswordVerified}
-        onCancel={handlePasswordCancel}
-        action="create article"
-      />
+      {/* Admin Password Modal - Only for new posts */}
+      {!post && (
+        <AdminPasswordModal
+          isOpen={showPasswordModal}
+          onVerified={handlePasswordVerified}
+          onCancel={handlePasswordCancel}
+          action="create article"
+        />
+      )}
     </div>
   )
 }
