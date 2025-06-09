@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ['image/avif', 'image/webp'],
+    domains: ["placehold.co"],
     remotePatterns: [
       {
         protocol: "https",

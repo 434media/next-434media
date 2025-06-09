@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Save, Eye, Upload, X, Plus, Sparkles, FileText, Settings } from "lucide-react"
 import { createBlogPostAction, updateBlogPostAction, getBlogCategoriesAction } from "@/app/actions/blog"
 import AdminPasswordModal from "../AdminPasswordModal"
+import ImageSelector from "./ImageSelector"
 import type { BlogPost, BlogCategory } from "../../types/blog-types"
 
 interface BlogEditorProps {
@@ -18,7 +19,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
   const [excerpt, setExcerpt] = useState(post?.excerpt || "")
   const [featuredImage, setFeaturedImage] = useState(post?.featured_image || "")
   const [metaDescription, setMetaDescription] = useState(post?.meta_description || "")
-  const [category, setCategory] = useState(post?.category || "general")
+  const [category, setCategory] = useState(post?.category || "technology")
   const [tags, setTags] = useState<string[]>(post?.tags || [])
   const [status, setStatus] = useState<"draft" | "published">(post?.status || "draft")
   const [author, setAuthor] = useState(post?.author || "434 Media")
@@ -156,7 +157,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 pt-24 sm:pt-28 mt-10 md:mt-0">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 pt-24 sm:pt-28">
         {/* Header */}
         <div className="flex flex-col gap-4 mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -389,20 +390,11 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 <span className="text-lg">🖼️</span>
                 <h3 className="text-lg font-semibold text-gray-900">Featured Image</h3>
               </div>
-              <input
-                type="url"
-                value={featuredImage}
-                onChange={(e) => setFeaturedImage(e.target.value)}
-                className="w-full px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
-                placeholder="https://example.com/image.jpg"
+              <ImageSelector
+                selectedImage={featuredImage}
+                onImageSelect={setFeaturedImage}
+                onImageClear={() => setFeaturedImage("")}
               />
-              {featuredImage && (
-                <img
-                  src={featuredImage || "/placeholder.svg"}
-                  alt="Preview"
-                  className="w-full h-32 object-cover rounded-xl mt-4 shadow-lg border border-gray-200"
-                />
-              )}
             </div>
 
             {/* SEO */}

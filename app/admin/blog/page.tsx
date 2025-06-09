@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Edit, Trash2, Eye, Search, Filter, Sparkles, TrendingUp, Users, Calendar } from "lucide-react"
+import { Plus, Edit, Trash2, Eye, Search, Filter, Sparkles, TrendingUp, Users, ImageIcon } from "lucide-react"
 import { getBlogPostsAction, deleteBlogPostAction } from "@/app/actions/blog"
 import BlogEditor from "../../components/blog/BlogEditor"
 import AdminPasswordModal from "../../components/AdminPasswordModal"
@@ -207,11 +207,15 @@ export default function AdminBlogPage() {
           <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">
-                <Calendar className="w-5 h-5 text-purple-600" />
+                <ImageIcon className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm text-gray-600 font-medium">Total Articles</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900">{posts.length}</p>
+                <p className="text-xs sm:text-sm text-gray-600 font-medium">Media Library</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                  <a href="/admin/blog/media" className="hover:text-purple-600 transition-colors">
+                    Manage
+                  </a>
+                </p>
               </div>
             </div>
           </div>
@@ -301,6 +305,15 @@ export default function AdminBlogPage() {
                     <tr key={post.id} className="hover:bg-white/80 transition-all duration-200 group">
                       <td className="px-4 sm:px-6 py-4">
                         <div className="flex items-start gap-3">
+                          {post.featured_image && (
+                            <div className="hidden sm:block flex-shrink-0 w-12 h-12 rounded-md overflow-hidden">
+                              <img
+                                src={post.featured_image || "/placeholder.svg"}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-purple-700 transition-colors">
                               {post.title}
