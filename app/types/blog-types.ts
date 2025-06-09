@@ -15,6 +15,7 @@ export interface BlogPost {
   updated_at: string
   read_time?: number
   view_count?: number
+  embedded_media?: EmbeddedMedia[] // New: Track embedded media
 }
 
 export interface BlogCategory {
@@ -43,6 +44,37 @@ export interface BlogImage {
   is_binary?: boolean // Add binary flag
 }
 
+// New: Embedded Media Types
+export interface EmbeddedMedia {
+  id: string
+  type: "image" | "video" | "audio"
+  url: string
+  title?: string
+  description?: string
+  thumbnail?: string
+  duration?: number // For videos/audio
+  file_size?: number
+  mime_type?: string
+  embedded_at: string
+}
+
+export interface VideoEmbed {
+  type: "youtube" | "vimeo" | "direct"
+  video_id?: string
+  url: string
+  title?: string
+  thumbnail?: string
+  duration?: number
+  embed_code: string
+}
+
+export interface MediaUploadContext {
+  context: "editor" | "featured" | "gallery"
+  post_id?: string
+  user_id?: string
+  session_id?: string
+}
+
 export interface CreateBlogPostData {
   title: string
   slug?: string
@@ -56,6 +88,7 @@ export interface CreateBlogPostData {
   author: string
   published_at?: string
   read_time?: number
+  embedded_media?: EmbeddedMedia[] // New: Track embedded media
 }
 
 export interface UpdateBlogPostData extends Partial<CreateBlogPostData> {
@@ -69,6 +102,8 @@ export interface BlogFilters {
   search?: string
   limit?: number
   offset?: number
+  has_media?: boolean // New: Filter by media presence
+  media_type?: "image" | "video" | "audio" // New: Filter by media type
 }
 
 export interface CreateBlogImageData {
@@ -84,6 +119,7 @@ export interface CreateBlogImageData {
   alt_text?: string
   uploaded_by?: string
   image_data?: Buffer // Add binary data support
+  context?: MediaUploadContext // New: Upload context
 }
 
 // Image editing types
@@ -113,6 +149,27 @@ export interface BlogImagesResponse {
   images: BlogImage[]
   error?: string
   total?: number
+}
+
+// New: Video Embed Response
+export interface VideoEmbedResponse {
+  success: boolean
+  video?: VideoEmbed
+  error?: string
+  message?: string
+}
+
+// New: Media Analysis Response
+export interface MediaAnalysisResponse {
+  success: boolean
+  media_count: number
+  total_size: number
+  by_type: {
+    images: number
+    videos: number
+    audio: number
+  }
+  recent_uploads: BlogImage[]
 }
 
 // API Response Types
@@ -157,6 +214,18 @@ export interface ImageEditValidationErrors {
   alt_text?: string
 }
 
+// New: Video Embed Form Types
+export interface VideoEmbedFormData {
+  url: string
+  title?: string
+  description?: string
+}
+
+export interface VideoEmbedValidationErrors {
+  url?: string
+  title?: string
+}
+
 // Helper type for image upload without id (before generation)
 export interface ImageUploadData {
   filename: string
@@ -169,4 +238,42 @@ export interface ImageUploadData {
   height?: number
   alt_text?: string
   uploaded_by?: string
+}
+
+// New: Rich Text Editor Types
+export interface RichTextEditorProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  className?: string
+  uploadContext?: MediaUploadContext
+  onMediaInsert?: (media: EmbeddedMedia) => void
+}
+
+export interface EditorToolbarAction {
+  id: string
+  label: string
+  icon: string
+  command?: string
+  value?: string
+  action?: () => void
+  isActive?: boolean
+  group: "format" | "insert" | "align" | "special"
+}
+
+// New: Content Analysis Types
+export interface ContentAnalysis {
+  word_count: number
+  character_count: number
+  reading_time: number
+  media_count: number
+  link_count: number
+  heading_structure: {
+    h1: number
+    h2: number
+    h3: number
+    h4: number
+  }
+  seo_score: number
+  readability_score: number
 }

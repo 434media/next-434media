@@ -6,6 +6,7 @@ import { createBlogPostAction, updateBlogPostAction, getBlogCategoriesAction } f
 import AdminPasswordModal from "../../components/AdminPasswordModal"
 import ImageSelector from "../../components/blog/ImageSelector"
 import type { BlogPost, BlogCategory } from "../../types/blog-types"
+import RichTextEditor from "./RichTextEditor"
 
 interface BlogEditorProps {
   post?: BlogPost
@@ -271,24 +272,23 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
               />
             </div>
 
-            {/* Content */}
+            {/* Content - Replace the existing textarea with RichTextEditor */}
             <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-4">
                 <FileText className="w-5 h-5 text-purple-600" />
                 <label className="text-lg font-semibold text-gray-900">Content</label>
                 <span className="text-red-500">*</span>
               </div>
-              <textarea
+              <RichTextEditor
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full h-80 sm:h-96 px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all"
-                placeholder="Write your post content here... (HTML supported)"
-                required
+                onChange={setContent}
+                placeholder="Write your amazing content here..."
+                className="min-h-[500px]"
               />
-              <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
                 <p className="text-sm text-purple-700">
-                  <strong>HTML Support:</strong> Use &lt;p&gt;, &lt;h2&gt;, &lt;h3&gt;, &lt;strong&gt;, &lt;em&gt;,
-                  &lt;ul&gt;, &lt;ol&gt;, &lt;a&gt;, etc.
+                  <strong>✨ Rich Editor Features:</strong> Use the toolbar above for formatting, links, images, videos,
+                  and more!
                 </p>
               </div>
             </div>
