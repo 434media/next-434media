@@ -11,8 +11,6 @@ import {
   LinkIcon,
   ImageIcon,
   Video,
-  List,
-  ListOrdered,
   Quote,
   Code,
   Minus,
@@ -86,7 +84,7 @@ export default function RichTextEditor({ value, onChange, placeholder, className
     }
   }
 
-  // Execute formatting commands
+  // Execute formatting commands with proper focus
   const execCommand = (command: string, value?: string) => {
     if (editorRef.current) {
       editorRef.current.focus()
@@ -160,6 +158,48 @@ export default function RichTextEditor({ value, onChange, placeholder, className
         }
       }
     }
+  }
+
+  // Wrap selected text or insert new content
+  const wrapOrInsert = (wrapStart: string, wrapEnd: string, defaultContent: string) => {
+    if (editorRef.current) {
+      editorRef.current.focus()
+
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const selectedText = selection.toString()
+
+        if (selectedText) {
+          // Wrap the selected text
+          const html = `${wrapStart}${selectedText}${wrapEnd}`
+          document.execCommand("insertHTML", false, html)
+        } else {
+          // Insert default content
+          const html = `${wrapStart}${defaultContent}${wrapEnd}`
+          document.execCommand("insertHTML", false, html)
+        }
+      } else {
+        // No selection, insert at end
+        const html = `${wrapStart}${defaultContent}${wrapEnd}`
+        editorRef.current.innerHTML += html
+      }
+
+      handleContentChange()
+    }
+  }
+
+  // Handle quote insertion
+  const handleQuote = () => {
+    wrapOrInsert(
+      '<blockquote class="border-l-4 border-purple-500 pl-4 italic text-gray-700 my-4">',
+      "</blockquote>",
+      "Quote text here",
+    )
+  }
+
+  // Handle code block insertion
+  const handleCodeBlock = () => {
+    wrapOrInsert('<pre class="bg-gray-100 p-4 rounded-lg overflow-x-auto my-4"><code>', "</code></pre>", "Code here")
   }
 
   // Handle link insertion
@@ -397,38 +437,6 @@ export default function RichTextEditor({ value, onChange, placeholder, className
             />
           </div>
 
-          {/* Headings */}
-          <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm">
-            <select
-              onChange={(e) => execCommand("formatBlock", e.target.value)}
-              className="px-3 py-1 text-sm border-0 bg-transparent focus:outline-none cursor-pointer"
-              defaultValue=""
-            >
-              <option value="">Format</option>
-              <option value="h1">Heading 1</option>
-              <option value="h2">Heading 2</option>
-              <option value="h3">Heading 3</option>
-              <option value="h4">Heading 4</option>
-              <option value="p">Paragraph</option>
-            </select>
-          </div>
-
-          {/* Lists */}
-          <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm">
-            <ToolbarButton
-              onClick={() => execCommand("insertUnorderedList")}
-              icon={List}
-              title="Bullet List"
-              isActive={document.queryCommandState("insertUnorderedList")}
-            />
-            <ToolbarButton
-              onClick={() => execCommand("insertOrderedList")}
-              icon={ListOrdered}
-              title="Numbered List"
-              isActive={document.queryCommandState("insertOrderedList")}
-            />
-          </div>
-
           {/* Alignment */}
           <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm">
             <ToolbarButton
@@ -460,26 +468,8 @@ export default function RichTextEditor({ value, onChange, placeholder, className
 
           {/* Special Elements */}
           <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm">
-            <ToolbarButton
-              onClick={() => {
-                saveSelection()
-                insertHTMLAtCursor(
-                  '<blockquote class="border-l-4 border-purple-500 pl-4 italic text-gray-700 my-4">Quote text here</blockquote>',
-                )
-              }}
-              icon={Quote}
-              title="Insert Quote"
-            />
-            <ToolbarButton
-              onClick={() => {
-                saveSelection()
-                insertHTMLAtCursor(
-                  '<pre class="bg-gray-100 p-4 rounded-lg overflow-x-auto my-4"><code>Code here</code></pre>',
-                )
-              }}
-              icon={Code}
-              title="Insert Code Block"
-            />
+            <ToolbarButton onClick={handleQuote} icon={Quote} title="Insert Quote (wraps selected text)" />
+            <ToolbarButton onClick={handleCodeBlock} icon={Code} title="Insert Code Block (wraps selected text)" />
             <ToolbarButton
               onClick={() => {
                 saveSelection()
@@ -542,6 +532,14 @@ export default function RichTextEditor({ value, onChange, placeholder, className
             {placeholder || "Start writing your amazing content..."}
           </div>
         )}
+      </div>
+
+      {/* Usage Instructions */}
+      <div className="border-t border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+        <p>
+          <strong>💡 Tips:</strong> Use Bold, Italic, Underline for text styling • Select text and click Quote/Code to
+          wrap it • Use Preview to see how your content will look
+        </p>
       </div>
 
       {/* Link Dialog */}
