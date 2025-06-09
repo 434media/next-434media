@@ -7,12 +7,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { slug } = await params
 
-    // Extract title from URL params or use default
+    // Extract title from URL params or use slug as fallback
     const { searchParams } = new URL(request.url)
-    const title = searchParams.get("title") || "Blog Post"
+    const title = searchParams.get("title") || `Blog: ${slug}` // Use slug as fallback
     const category = searchParams.get("category") || "Technology"
-    const author = searchParams.get("author") || "434 Media"
+    const author = searchParams.get("author") || "434 MEDIA"
     const date = searchParams.get("date") || new Date().toLocaleDateString()
+
+    // Add slug to console for debugging
+    console.log(`Generating OG image for blog post: ${slug}`)
 
     return new ImageResponse(
       <div
@@ -130,6 +133,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             <span>•</span>
             <span>{date}</span>
           </div>
+
+          {/* URL/Slug (small, at bottom) */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "20px",
+              fontSize: "14px",
+              color: "rgba(255, 255, 255, 0.6)",
+            }}
+          >
+            434media.com/blog/{slug}
+          </div>
         </div>
 
         {/* Bottom Gradient */}
@@ -166,7 +181,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           color: "white",
         }}
       >
-        <div style={{ fontSize: "48px", fontWeight: "bold" }}>434 Media</div>
+        <div style={{ fontSize: "48px", fontWeight: "bold" }}>434 MEDIA</div>
         <div style={{ fontSize: "24px", marginTop: "20px" }}>Blog</div>
       </div>,
       {
