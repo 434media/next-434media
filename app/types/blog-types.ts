@@ -30,7 +30,7 @@ export interface BlogImage {
   id: string
   filename: string
   original_name: string
-  file_path: string
+  file_path?: string // Make optional
   url: string
   file_size: number
   mime_type: string
@@ -40,6 +40,7 @@ export interface BlogImage {
   uploaded_by: string
   created_at: string
   updated_at: string
+  is_binary?: boolean // Add binary flag
 }
 
 export interface CreateBlogPostData {
@@ -74,14 +75,15 @@ export interface CreateBlogImageData {
   id: string
   filename: string
   original_name: string
-  file_path: string
-  url: string
+  file_path?: string // Make optional since we're using binary storage
+  url?: string // Make optional since we're using binary storage
   file_size: number
   mime_type: string
   width?: number
   height?: number
   alt_text?: string
   uploaded_by?: string
+  image_data?: Buffer // Add binary data support
 }
 
 // Image editing types

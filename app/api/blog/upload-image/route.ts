@@ -1,23 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createBlogImage, ensureDbInitialized } from "../../../lib/blog-db"
 import type { ImageUploadResponse, CreateBlogImageData } from "../../../types/blog-types"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
-import { existsSync } from "fs"
+import { getImageDimensions, validateImageBuffer, generateImageId, cleanImageFilename } from "../../../lib/image-utils"
 
 // File validation constants
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"] as const
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const MAX_FILES = 10
-
-// Clean filename for storage
-function cleanFilename(filename: string): string {
-  return filename
-    .toLowerCase()
-    .replace(/[^a-z0-9.-]/g, "-") // Replace special chars with dashes
-    .replace(/-+/g, "-") // Replace multiple dashes with single dash
-    .replace(/^-|-$/g, "") // Remove leading/trailing dashes
-}
 
 // Generate clean display name
 function generateDisplayName(filename: string): string {
@@ -73,75 +62,65 @@ export async function POST(request: NextRequest): Promise<NextResponse<ImageUplo
 
     const uploadedImages = []
 
-    // Ensure upload directory exists
-    const uploadDir = join(process.cwd(), "public", "uploads", "blog")
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
-
     for (const image of images) {
-      const timestamp = Date.now()
-      const randomId = Math.random().toString(36).substr(2, 6)
-      const imageId = `img_${timestamp}_${randomId}`
-
-      // Get file extension
-      const fileExt = image.name.split(".").pop()?.toLowerCase() || "jpg"
-
-      // Clean the original filename for storage
-      const cleanedName = cleanFilename(image.name)
-      const storedFilename = `${timestamp}_${randomId}_${cleanedName}`
-
-      // File path for storage
-      const filePath = join(uploadDir, storedFilename)
-      const publicPath = `/uploads/blog/${storedFilename}`
+      const imageId = generateImageId()
+      const cleanedName = cleanImageFilename(image.name)
 
       try {
-        // Convert File to Buffer and save to filesystem
+        // Convert File to Buffer
         const bytes = await image.arrayBuffer()
         const buffer = Buffer.from(bytes)
 
-        // Write file to public/uploads/blog directory
-        await writeFile(filePath, buffer)
+        // Validate buffer
+        validateImageBuffer(buffer, MAX_FILE_SIZE)
 
-        console.log(`✅ File saved: ${filePath}`)
+        // Get image dimensions
+        const { width, height } = await getImageDimensions(buffer)
 
-        // Get image dimensions (you could use a library like 'sharp' for this)
-        // For now, we'll use default dimensions
-        const width = 800
-        const height = 600
+        console.log(`📤 Storing image in Neon database: ${imageId}`)
 
         const imageData: CreateBlogImageData = {
           id: imageId,
-          filename: storedFilename, // Clean filename for storage
-          original_name: image.name, // Keep original for reference
-          file_path: publicPath, // Public path for serving
-          url: publicPath, // URL to access the image
+          filename: cleanedName,
+          original_name: image.name,
           file_size: image.size,
           mime_type: image.type,
           width: width,
           height: height,
           alt_text: generateDisplayName(image.name),
-          uploaded_by: "434 Media Admin",
+          image_data: buffer, // Store binary data in database
         }
 
-        // Save metadata to database
+        // Save to Neon database
         const dbResult = await createBlogImage(imageData)
         uploadedImages.push(dbResult)
 
-        console.log(`✅ Image metadata saved to database: ${imageId}`)
+        console.log(`✅ Image stored in Neon database: ${imageId}`)
       } catch (fileError) {
         console.error("File processing error:", fileError)
-        return NextResponse.json({ success: false, error: `Failed to process image "${image.name}"` }, { status: 500 })
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Failed to process image "${image.name}": ${fileError instanceof Error ? fileError.message : "Unknown error"}`,
+          },
+          { status: 500 },
+        )
       }
     }
 
     return NextResponse.json({
       success: true,
       images: uploadedImages,
-      message: `Successfully uploaded ${uploadedImages.length} image(s)`,
+      message: `Successfully uploaded ${uploadedImages.length} image(s) to Neon database`,
     })
   } catch (error) {
     console.error("Error uploading images:", error)
-    return NextResponse.json({ success: false, error: "Internal server error during upload" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Internal server error during upload: ${error instanceof Error ? error.message : "Unknown error"}`,
+      },
+      { status: 500 },
+    )
   }
 }

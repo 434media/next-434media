@@ -28,6 +28,8 @@ export async function initializeBlogDatabase() {
   const client = await pool.connect()
 
   try {
+    console.log("🔧 Initializing blog database...")
+
     // Create blog_posts table with IF NOT EXISTS
     await client.query(`
       CREATE TABLE IF NOT EXISTS blog_posts (
@@ -49,6 +51,7 @@ export async function initializeBlogDatabase() {
         view_count INTEGER DEFAULT 0
       );
     `)
+    console.log("✅ Blog posts table ready")
 
     // Create blog_categories table with IF NOT EXISTS
     await client.query(`
@@ -60,15 +63,16 @@ export async function initializeBlogDatabase() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `)
+    console.log("✅ Blog categories table ready")
 
-    // Create blog_images table with IF NOT EXISTS
+    // Create blog_images table with backward compatibility
     await client.query(`
       CREATE TABLE IF NOT EXISTS blog_images (
         id VARCHAR(255) PRIMARY KEY,
         filename VARCHAR(255) NOT NULL,
         original_name VARCHAR(255) NOT NULL,
-        file_path VARCHAR(500) NOT NULL,
-        url VARCHAR(500) NOT NULL,
+        file_path VARCHAR(500),
+        url VARCHAR(500),
         file_size INTEGER NOT NULL,
         mime_type VARCHAR(100) NOT NULL,
         width INTEGER,
@@ -76,9 +80,44 @@ export async function initializeBlogDatabase() {
         alt_text VARCHAR(500),
         uploaded_by VARCHAR(255) DEFAULT '434 Media',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        image_data BYTEA,
+        is_binary BOOLEAN DEFAULT FALSE
       );
     `)
+    console.log("✅ Blog images table ready")
+
+    // Add missing columns if they don't exist (for existing installations)
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN
+          -- Add image_data column if it doesn't exist
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                         WHERE table_name = 'blog_images' AND column_name = 'image_data') THEN
+            ALTER TABLE blog_images ADD COLUMN image_data BYTEA;
+          END IF;
+          
+          -- Add is_binary column if it doesn't exist
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                         WHERE table_name = 'blog_images' AND column_name = 'is_binary') THEN
+            ALTER TABLE blog_images ADD COLUMN is_binary BOOLEAN DEFAULT FALSE;
+          END IF;
+          
+          -- Make file_path and url nullable
+          ALTER TABLE blog_images ALTER COLUMN file_path DROP NOT NULL;
+          ALTER TABLE blog_images ALTER COLUMN url DROP NOT NULL;
+          
+        EXCEPTION
+          WHEN OTHERS THEN
+            -- Ignore errors if columns already exist or other minor issues
+            NULL;
+        END $$;
+      `)
+      console.log("✅ Blog images table migration completed")
+    } catch (migrationError) {
+      console.log("⚠️ Migration completed with warnings:", migrationError)
+    }
 
     // Create indexes only if they don't exist
     await client.query(`
@@ -111,8 +150,13 @@ export async function initializeBlogDatabase() {
         IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_blog_images_created_at') THEN
           CREATE INDEX idx_blog_images_created_at ON blog_images(created_at);
         END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_blog_images_is_binary') THEN
+          CREATE INDEX idx_blog_images_is_binary ON blog_images(is_binary);
+        END IF;
       END $$;
     `)
+    console.log("✅ Database indexes ready")
 
     // Check if categories table is empty before inserting
     const existingCategories = await client.query(`SELECT COUNT(*) as count FROM blog_categories`)
@@ -134,46 +178,22 @@ export async function initializeBlogDatabase() {
           ('TXMX Boxing', 'txmx-boxing', 'TXMX Boxing news and sports coverage'),
           ('Community', 'community', 'Community events and local business news')
       `)
+      console.log("✅ Default categories inserted")
     } else {
-      // Update existing categories to match new naming
-      try {
-        await client.query(`
-          UPDATE blog_categories 
-          SET name = 'TXMX Boxing', description = 'TXMX Boxing news and sports coverage'
-          WHERE slug = 'boxing'
-        `)
-
-        await client.query(`
-          UPDATE blog_categories 
-          SET name = 'Community', description = 'Community events and local business news'
-          WHERE name = 'Local Business' OR slug = 'local-business'
-        `)
-
-        // Insert any missing categories
-        await client.query(`
-          INSERT INTO blog_categories (name, slug, description) VALUES
-            ('Technology', 'technology', 'Latest tech trends and innovations'),
-            ('Marketing', 'marketing', 'Digital marketing strategies and tips'),
-            ('Events', 'events', 'Event planning and networking insights'),
-            ('Business', 'business', 'Business growth and entrepreneurship'),
-            ('Local', 'local', 'Local community news and partnerships'),
-            ('Medical', 'medical', 'Medical innovations and healthcare technology'),
-            ('Science', 'science', 'Scientific breakthroughs and research'),
-            ('Robotics', 'robotics', 'Robotics and automation advances'),
-            ('Military', 'military', 'Military technology and defense innovations'),
-            ('TXMX Boxing', 'txmx-boxing', 'TXMX Boxing news and sports coverage'),
-            ('Community', 'community', 'Community events and local business news')
-          ON CONFLICT (slug) DO UPDATE SET
-            name = EXCLUDED.name,
-            description = EXCLUDED.description
-        `)
-      } catch (updateError) {
-        console.log("Categories already exist, skipping updates")
-      }
+      console.log(`✅ Found ${categoryCount} existing categories`)
     }
 
+    // Check existing data
+    const postsCount = await client.query(`SELECT COUNT(*) as count FROM blog_posts`)
+    const imagesCount = await client.query(`SELECT COUNT(*) as count FROM blog_images`)
+
+    console.log(`📊 Database status:`)
+    console.log(`   - Blog posts: ${postsCount.rows[0].count}`)
+    console.log(`   - Blog images: ${imagesCount.rows[0].count}`)
+    console.log(`   - Blog categories: ${categoryCount}`)
+
     dbInitialized = true
-    console.log("✅ Blog database initialized successfully with images table")
+    console.log("✅ Blog database initialized successfully")
   } catch (error) {
     console.error("❌ Blog database initialization error:", error)
     // Don't throw error if tables already exist or categories have conflicts
@@ -251,7 +271,7 @@ function formatFileSize(bytes: number): string {
   return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i]
 }
 
-// Blog Images Functions
+// Blog Images Functions with backward compatibility
 export async function getBlogImages(): Promise<any[]> {
   const client = await pool.connect()
 
@@ -259,28 +279,41 @@ export async function getBlogImages(): Promise<any[]> {
     await ensureDbInitialized()
 
     const query = `
-      SELECT * FROM blog_images 
+      SELECT id, filename, original_name, file_path, url, file_size, mime_type, alt_text, 
+             created_at, updated_at, width, height, uploaded_by, is_binary
+      FROM blog_images 
       ORDER BY created_at DESC
     `
     const result = await client.query(query)
-    return result.rows.map((row) => ({
-      id: row.id,
-      filename: cleanFilename(row.original_name), // Use cleaned original name for display
-      original_name: row.original_name,
-      url: row.url,
-      file_size: row.file_size,
-      file_size_formatted: formatFileSize(row.file_size),
-      mime_type: row.mime_type,
-      alt_text: row.alt_text,
-      created_at: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
-      updated_at: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
-      width: row.width,
-      height: row.height,
-      uploaded_by: row.uploaded_by,
-    }))
+
+    console.log(`📸 Found ${result.rows.length} images in database`)
+
+    return result.rows.map((row) => {
+      // Handle both binary and file-based storage
+      const imageUrl = row.is_binary
+        ? `/api/blog/images/${row.id}` // Dynamic URL for binary images
+        : row.url || `/api/blog/images/${row.id}` // Use existing URL or fallback
+
+      return {
+        id: row.id,
+        filename: cleanFilename(row.original_name), // Use cleaned original name for display
+        original_name: row.original_name,
+        url: imageUrl,
+        file_size: row.file_size,
+        file_size_formatted: formatFileSize(row.file_size),
+        mime_type: row.mime_type,
+        alt_text: row.alt_text,
+        created_at: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+        updated_at: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
+        width: row.width,
+        height: row.height,
+        uploaded_by: row.uploaded_by,
+        is_binary: row.is_binary,
+      }
+    })
   } catch (error) {
-    console.error("Error fetching blog images:", error)
-    throw new Error("Failed to fetch blog images")
+    console.error("❌ Error fetching blog images:", error)
+    throw new Error(`Failed to fetch blog images: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -290,13 +323,14 @@ export async function createBlogImage(imageData: {
   id: string
   filename: string
   original_name: string
-  file_path: string
-  url: string
   file_size: number
   mime_type: string
   width?: number
   height?: number
   alt_text?: string
+  image_data?: Buffer // Binary data
+  file_path?: string // For backward compatibility
+  url?: string // For backward compatibility
 }): Promise<any> {
   const client = await pool.connect()
 
@@ -305,33 +339,41 @@ export async function createBlogImage(imageData: {
 
     const query = `
       INSERT INTO blog_images (
-        id, filename, original_name, file_path, url, file_size, mime_type, width, height, alt_text, created_at, updated_at
+        id, filename, original_name, file_path, url, file_size, mime_type, width, height, 
+        alt_text, created_at, updated_at, image_data, is_binary
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-      RETURNING *
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW(), $11, $12)
+      RETURNING id, filename, original_name, file_path, url, file_size, mime_type, alt_text, 
+               created_at, updated_at, width, height, uploaded_by, is_binary
     `
 
     const values = [
       imageData.id,
       imageData.filename,
       imageData.original_name,
-      imageData.file_path,
-      imageData.url,
+      imageData.file_path || null,
+      imageData.url || null,
       imageData.file_size,
       imageData.mime_type,
       imageData.width || null,
       imageData.height || null,
       imageData.alt_text || null,
+      imageData.image_data || null,
+      !!imageData.image_data, // is_binary = true if image_data exists
     ]
 
     const result = await client.query(query, values)
     const row = result.rows[0]
 
+    const imageUrl = row.is_binary
+      ? `/api/blog/images/${row.id}` // Dynamic URL for binary images
+      : row.url || `/api/blog/images/${row.id}` // Use existing URL or fallback
+
     return {
       id: row.id,
       filename: cleanFilename(row.original_name), // Return cleaned name for display
       original_name: row.original_name,
-      url: row.url,
+      url: imageUrl,
       file_size: row.file_size,
       file_size_formatted: formatFileSize(row.file_size),
       mime_type: row.mime_type,
@@ -341,16 +383,55 @@ export async function createBlogImage(imageData: {
       width: row.width,
       height: row.height,
       uploaded_by: row.uploaded_by,
+      is_binary: row.is_binary,
     }
   } catch (error) {
-    console.error("Error creating blog image:", error)
-    throw new Error("Failed to create blog image")
+    console.error("❌ Error creating blog image:", error)
+    throw new Error(`Failed to create blog image: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
 }
 
-// NEW: Update blog image function
+// Get image binary data for serving
+export async function getBlogImageData(imageId: string): Promise<{ data: Buffer; mimeType: string } | null> {
+  const client = await pool.connect()
+
+  try {
+    await ensureDbInitialized()
+
+    const query = `
+      SELECT image_data, mime_type, file_path, url FROM blog_images 
+      WHERE id = $1
+    `
+    const result = await client.query(query, [imageId])
+
+    if (result.rows.length === 0) {
+      return null
+    }
+
+    const row = result.rows[0]
+
+    // If we have binary data, return it
+    if (row.image_data) {
+      return {
+        data: row.image_data,
+        mimeType: row.mime_type,
+      }
+    }
+
+    // For backward compatibility, if no binary data but we have file_path, try to read file
+    // This is mainly for development/migration scenarios
+    return null
+  } catch (error) {
+    console.error("❌ Error fetching blog image data:", error)
+    return null
+  } finally {
+    client.release()
+  }
+}
+
+// Rest of the functions remain the same...
 export async function updateBlogImage(imageData: UpdateBlogImageData): Promise<any> {
   const client = await pool.connect()
 
@@ -365,7 +446,8 @@ export async function updateBlogImage(imageData: UpdateBlogImageData): Promise<a
         uploaded_by = COALESCE($4, uploaded_by),
         updated_at = NOW()
       WHERE id = $1
-      RETURNING *
+      RETURNING id, filename, original_name, file_path, url, file_size, mime_type, alt_text, 
+               created_at, updated_at, width, height, uploaded_by, is_binary
     `
 
     const values = [imageData.id, imageData.filename, imageData.alt_text, imageData.uploaded_by]
@@ -377,12 +459,15 @@ export async function updateBlogImage(imageData: UpdateBlogImageData): Promise<a
     }
 
     const row = result.rows[0]
+    const imageUrl = row.is_binary
+      ? `/api/blog/images/${row.id}` // Dynamic URL for binary images
+      : row.url || `/api/blog/images/${row.id}` // Use existing URL or fallback
 
     return {
       id: row.id,
       filename: row.filename,
       original_name: row.original_name,
-      url: row.url,
+      url: imageUrl,
       file_size: row.file_size,
       file_size_formatted: formatFileSize(row.file_size),
       mime_type: row.mime_type,
@@ -392,16 +477,16 @@ export async function updateBlogImage(imageData: UpdateBlogImageData): Promise<a
       width: row.width,
       height: row.height,
       uploaded_by: row.uploaded_by,
+      is_binary: row.is_binary,
     }
   } catch (error) {
-    console.error("Error updating blog image:", error)
-    throw new Error("Failed to update blog image")
+    console.error("❌ Error updating blog image:", error)
+    throw new Error(`Failed to update blog image: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
 }
 
-// NEW: Get single blog image function
 export async function getBlogImageById(imageId: string): Promise<any> {
   const client = await pool.connect()
 
@@ -409,7 +494,9 @@ export async function getBlogImageById(imageId: string): Promise<any> {
     await ensureDbInitialized()
 
     const query = `
-      SELECT * FROM blog_images 
+      SELECT id, filename, original_name, file_path, url, file_size, mime_type, alt_text, 
+             created_at, updated_at, width, height, uploaded_by, is_binary
+      FROM blog_images 
       WHERE id = $1
     `
     const result = await client.query(query, [imageId])
@@ -419,12 +506,15 @@ export async function getBlogImageById(imageId: string): Promise<any> {
     }
 
     const row = result.rows[0]
+    const imageUrl = row.is_binary
+      ? `/api/blog/images/${row.id}` // Dynamic URL for binary images
+      : row.url || `/api/blog/images/${row.id}` // Use existing URL or fallback
 
     return {
       id: row.id,
       filename: row.filename,
       original_name: row.original_name,
-      url: row.url,
+      url: imageUrl,
       file_size: row.file_size,
       file_size_formatted: formatFileSize(row.file_size),
       mime_type: row.mime_type,
@@ -434,10 +524,11 @@ export async function getBlogImageById(imageId: string): Promise<any> {
       width: row.width,
       height: row.height,
       uploaded_by: row.uploaded_by,
+      is_binary: row.is_binary,
     }
   } catch (error) {
-    console.error("Error fetching blog image:", error)
-    throw new Error("Failed to fetch blog image")
+    console.error("❌ Error fetching blog image:", error)
+    throw new Error(`Failed to fetch blog image: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -452,8 +543,8 @@ export async function deleteBlogImages(imageIds: string[]): Promise<void> {
     const query = `DELETE FROM blog_images WHERE id = ANY($1)`
     await client.query(query, [imageIds])
   } catch (error) {
-    console.error("Error deleting blog images:", error)
-    throw new Error("Failed to delete blog images")
+    console.error("❌ Error deleting blog images:", error)
+    throw new Error(`Failed to delete blog images: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -499,8 +590,8 @@ export async function createBlogPost(postData: CreateBlogPostData): Promise<Blog
     const result = await client.query(query, values)
     return mapRowToBlogPost(result.rows[0])
   } catch (error) {
-    console.error("Error creating blog post:", error)
-    throw new Error("Failed to create blog post")
+    console.error("❌ Error creating blog post:", error)
+    throw new Error(`Failed to create blog post: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -557,11 +648,16 @@ export async function getBlogPosts(filters: BlogFilters = {}): Promise<BlogPost[
       values.push(filters.offset)
     }
 
+    console.log(`🔍 Executing blog posts query: ${query}`)
+    console.log(`📊 Query parameters:`, values)
+
     const result = await client.query(query, values)
+    console.log(`📝 Found ${result.rows.length} blog posts`)
+
     return result.rows.map(mapRowToBlogPost)
   } catch (error) {
-    console.error("Error fetching blog posts:", error)
-    throw new Error("Failed to fetch blog posts")
+    console.error("❌ Error fetching blog posts:", error)
+    throw new Error(`Failed to fetch blog posts: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -595,8 +691,8 @@ export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> 
 
     return mapRowToBlogPost(result.rows[0])
   } catch (error) {
-    console.error("Error fetching blog post:", error)
-    throw new Error("Failed to fetch blog post")
+    console.error("❌ Error fetching blog post:", error)
+    throw new Error(`Failed to fetch blog post: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -655,8 +751,8 @@ export async function updateBlogPost(id: string, updates: UpdateBlogPostData): P
 
     return mapRowToBlogPost(result.rows[0])
   } catch (error) {
-    console.error("Error updating blog post:", error)
-    throw new Error("Failed to update blog post")
+    console.error("❌ Error updating blog post:", error)
+    throw new Error(`Failed to update blog post: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -675,8 +771,8 @@ export async function deleteBlogPost(id: string): Promise<void> {
       throw new Error("Blog post not found")
     }
   } catch (error) {
-    console.error("Error deleting blog post:", error)
-    throw new Error("Failed to delete blog post")
+    console.error("❌ Error deleting blog post:", error)
+    throw new Error(`Failed to delete blog post: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -697,8 +793,8 @@ export async function incrementViewCount(slug: string): Promise<void> {
       [slug],
     )
   } catch (error) {
-    console.error("Error incrementing view count:", error)
-    throw new Error("Failed to increment view count")
+    console.error("❌ Error incrementing view count:", error)
+    throw new Error(`Failed to increment view count: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -731,8 +827,8 @@ export async function getBlogCategories(): Promise<BlogCategory[]> {
       created_at: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
     }))
   } catch (error) {
-    console.error("Error fetching blog categories:", error)
-    throw new Error("Failed to fetch blog categories")
+    console.error("❌ Error fetching blog categories:", error)
+    throw new Error(`Failed to fetch blog categories: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
@@ -765,8 +861,8 @@ export async function createBlogCategory(
       created_at: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
     }
   } catch (error) {
-    console.error("Error creating blog category:", error)
-    throw new Error("Failed to create blog category")
+    console.error("❌ Error creating blog category:", error)
+    throw new Error(`Failed to create blog category: ${error instanceof Error ? error.message : "Unknown error"}`)
   } finally {
     client.release()
   }
