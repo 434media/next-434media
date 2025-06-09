@@ -196,7 +196,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
         </div>
 
         {/* Hero Section */}
-        <header className="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+        <header className="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden mt-6 md:mt-0">
           {/* Hero Background Pattern */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width%3D%2260%22 height%3D%2260%22 viewBox%3D%220 0 60 60%22 xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg fill%3D%22none%22 fillRule%3D%22evenodd%22%3E%3Cg fill%3D%22%23ffffff%22 fillOpacity%3D%220.1%22%3E%3Ccircle cx%3D%2230%22 cy%3D%2230%22 r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')]"></div>
@@ -295,7 +295,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
         {post.featured_image && (
           <section className="relative -mt-16 mb-16 z-10">
             <div className="max-w-6xl mx-auto px-6">
-              <div className="relative h-64 sm:h-80 lg:h-[32rem] rounded-2xl overflow-hidden shadow-2xl group mt-2 md:mt-0">
+              <div className="relative h-64 sm:h-80 lg:h-[32rem] rounded-2xl overflow-hidden shadow-2xl group mt-6 md:mt-0">
                 <Image
                   src={post.featured_image || "/placeholder.svg"}
                   alt={post.title}
