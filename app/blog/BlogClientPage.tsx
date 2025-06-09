@@ -214,44 +214,6 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
           )}
         </div>
       </section>
-
-      {/* Enhanced Newsletter CTA */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 relative overflow-hidden">
-        {/* Enhanced Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-8 sm:top-10 left-8 sm:left-10 w-24 h-24 sm:w-32 sm:h-32 bg-white/10 rounded-full blur-2xl animate-pulse" />
-          <div className="absolute bottom-8 sm:bottom-10 right-8 sm:right-10 w-32 h-32 sm:w-40 sm:h-40 bg-emerald-300/20 rounded-full blur-3xl animate-pulse delay-1000" />
-          <div className="absolute top-1/2 left-1/4 w-20 h-20 sm:w-24 sm:h-24 bg-blue-300/20 rounded-full blur-xl animate-pulse delay-500" />
-        </div>
-
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="space-y-6 sm:space-y-8">
-            <div className="space-y-3 sm:space-y-4">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Stay Connected to Our Ecosystem</h2>
-              <p className="text-base sm:text-lg lg:text-xl text-emerald-100 max-w-2xl mx-auto leading-relaxed">
-                Get the latest news, insights, and updates from across our diverse community of innovators, creators,
-                and industry leaders
-              </p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20">
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-md mx-auto">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-4 py-3 rounded-xl border-0 focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-emerald-600 bg-white/90 backdrop-blur-sm text-sm sm:text-base"
-                />
-                <button className="px-6 sm:px-8 py-3 bg-white text-emerald-600 font-semibold rounded-xl hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base">
-                  Subscribe
-                </button>
-              </div>
-              <p className="text-xs sm:text-sm text-emerald-200 mt-4">
-                Join our community and never miss an update from the 434 Media ecosystem
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }

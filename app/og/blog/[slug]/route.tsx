@@ -1,169 +1,173 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
-import { sql } from "@vercel/postgres"
+import { getBlogPostBySlug } from "../../../lib/blog-db"
 
 export const runtime = "edge"
 
-export async function GET(request: NextRequest, { params }: { params: { slug: string } }): Promise<ImageResponse> {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   try {
-    const slug = params.slug
+    const { slug } = await params
 
-    // Fetch blog post data from database
-    const { rows } = await sql`
-      SELECT title, excerpt, author
-      FROM blog_posts
-      WHERE slug = ${slug}
-      LIMIT 1
-    `
-
-    if (rows.length === 0) {
-      return new ImageResponse(
-        <div
-          style={{
-            display: "flex",
-            fontSize: 40,
-            color: "white",
-            background: "#111",
-            width: "100%",
-            height: "100%",
-            padding: "50px 50px",
-            textAlign: "center",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          Blog post not found
-        </div>,
-        {
-          width: 1200,
-          height: 630,
-        },
-      )
+    if (!slug) {
+      return new Response("Slug is required", { status: 400 })
     }
 
-    const post = rows[0]
-    const title = post.title || "434 Media Blog"
-    const excerpt = post.excerpt || "Creative Media and Smart Marketing Solutions"
-    const author = post.author || "434 Media"
+    // Get the blog post
+    const post = await getBlogPostBySlug(slug)
 
+    if (!post) {
+      return new Response("Blog post not found", { status: 404 })
+    }
+
+    // Create the OG image
     return new ImageResponse(
       <div
         style={{
+          height: "100%",
+          width: "100%",
           display: "flex",
           flexDirection: "column",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          width: "100%",
-          height: "100%",
-          backgroundColor: "#111",
-          backgroundImage: "linear-gradient(to bottom right, #4338ca, #6d28d9, #7e22ce)",
-          padding: "40px 50px",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#1f2937",
+          backgroundImage: "linear-gradient(135deg, #1f2937 0%, #111827 100%)",
           position: "relative",
-          overflow: "hidden",
         }}
       >
-        {/* Content container */}
+        {/* Background Pattern */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
+            backgroundSize: "100px 100px",
+            backgroundRepeat: "repeat",
+            opacity: 0.05,
+          }}
+        />
+
+        {/* Content */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
-            width: "100%",
-            height: "100%",
-            zIndex: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "80px",
+            textAlign: "center",
+            zIndex: 1,
           }}
         >
-          {/* Header with logo */}
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <svg width="80" height="80" viewBox="0 0 512 512" fill="none">
-              <path
-                d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 464c-114.7 0-208-93.3-208-208S141.3 48 256 48s208 93.3 208 208-93.3 208-208 208z"
-                fill="#ffffff"
-              />
-              <path
-                d="M256 128c-70.7 0-128 57.3-128 128s57.3 128 128 128 128-57.3 128-128-57.3-128-128-128zm0 208c-44.2 0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z"
-                fill="#ffffff"
-              />
-              <path
-                d="M256 192c-35.3 0-64 28.7-64 64s28.7 64 64 64 64-28.7 64-64-28.7-64-64-64zm0 80c-8.8 0-16-7.2-16-16s7.2-16 16-16 16 7.2 16 16-7.2 16-16 16z"
-                fill="#ffffff"
-              />
-            </svg>
+          {/* Category Badge */}
+          {post.category && (
             <div
               style={{
-                marginLeft: "15px",
-                fontSize: "28px",
-                fontWeight: "bold",
+                backgroundColor: "#10b981",
                 color: "white",
+                padding: "8px 24px",
+                borderRadius: "20px",
+                fontSize: "18px",
+                fontWeight: "600",
+                marginBottom: "24px",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
               }}
             >
-              434 MEDIA
+              {post.category}
             </div>
-          </div>
+          )}
 
-          {/* Main content */}
-          <div style={{ maxWidth: "90%" }}>
-            <h1
-              style={{
-                fontSize: "64px",
-                fontWeight: "bold",
-                color: "white",
-                lineHeight: 1.1,
-                margin: 0,
-                marginBottom: "16px",
-              }}
-            >
-              {title}
-            </h1>
+          {/* Title */}
+          <h1
+            style={{
+              fontSize: "64px",
+              fontWeight: "bold",
+              color: "white",
+              lineHeight: "1.1",
+              marginBottom: "24px",
+              maxWidth: "900px",
+              textAlign: "center",
+            }}
+          >
+            {post.title}
+          </h1>
+
+          {/* Excerpt */}
+          {post.excerpt && (
             <p
               style={{
                 fontSize: "24px",
-                color: "#f8fafc",
-                margin: 0,
-                opacity: 0.9,
+                color: "#d1d5db",
+                lineHeight: "1.4",
+                maxWidth: "800px",
+                textAlign: "center",
+                marginBottom: "32px",
               }}
             >
-              {excerpt.length > 140 ? excerpt.substring(0, 140) + "..." : excerpt}
+              {post.excerpt.length > 120 ? `${post.excerpt.substring(0, 120)}...` : post.excerpt}
             </p>
-          </div>
+          )}
 
-          {/* Footer */}
+          {/* Author and Date */}
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
-              width: "100%",
+              gap: "24px",
+              fontSize: "18px",
+              color: "#9ca3af",
             }}
           >
-            <div
-              style={{
-                fontSize: "18px",
-                color: "#e2e8f0",
-              }}
-            >
-              By {author}
-            </div>
-            <div
-              style={{
-                fontSize: "18px",
-                color: "#e2e8f0",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <div
-                style={{
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "50%",
-                  backgroundColor: "#10b981",
-                  marginRight: "8px",
-                }}
-              />
-              www.434media.com
-            </div>
+            <span>{post.author || "434 MEDIA"}</span>
+            <span>•</span>
+            <span>
+              {new Date(post.created_at).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
+            {post.read_time && (
+              <>
+                <span>•</span>
+                <span>{post.read_time} min read</span>
+              </>
+            )}
           </div>
+        </div>
+
+        {/* 434 MEDIA Logo */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "40px",
+            right: "40px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
+              backgroundSize: "contain",
+              backgroundRepeat: "no-repeat",
+            }}
+          />
+          <span
+            style={{
+              fontSize: "20px",
+              fontWeight: "bold",
+              color: "white",
+            }}
+          >
+            434 MEDIA
+          </span>
         </div>
       </div>,
       {
@@ -172,23 +176,24 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       },
     )
   } catch (error) {
-    console.error("Error generating OpenGraph image:", error)
+    console.error("Error generating OG image:", error)
+
+    // Return a fallback OG image
     return new ImageResponse(
       <div
         style={{
-          display: "flex",
-          fontSize: 40,
-          color: "white",
-          background: "#111",
-          width: "100%",
           height: "100%",
-          padding: "50px 50px",
-          textAlign: "center",
-          justifyContent: "center",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
           alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#1f2937",
+          color: "white",
         }}
       >
-        Error generating image
+        <h1 style={{ fontSize: "48px", fontWeight: "bold" }}>434 MEDIA</h1>
+        <p style={{ fontSize: "24px", color: "#d1d5db" }}>News & Insights</p>
       </div>,
       {
         width: 1200,

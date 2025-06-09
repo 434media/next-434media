@@ -4,21 +4,21 @@ import { getBlogPosts } from "../lib/blog-db"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Blog | 434 MEDIA",
+  title: "News & Insights | 434 MEDIA",
   description:
-    "Explore the latest insights, news, and updates from 434 MEDIA on creative media and smart marketing solutions.",
+    "Your destination for insights from the 434 Media team, our local partners, and our diverse ecosystem covering medical, science, robotics, military, TXMX Boxing, and creative industries.",
   openGraph: {
-    title: "Blog | 434 MEDIA",
+    title: "News & Insights | 434 MEDIA",
     description:
-      "Explore the latest insights, news, and updates from 434 MEDIA on creative media and smart marketing solutions.",
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"}/blog`,
+      "Your destination for insights from the 434 Media team, our local partners, and our diverse ecosystem.",
+    url: "https://www.434media.com/blog",
     siteName: "434 MEDIA",
     images: [
       {
-        url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"}/api/og?title=${encodeURIComponent("434 MEDIA Blog")}&subtitle=${encodeURIComponent("Insights on creative media and smart marketing")}`,
+        url: "https://www.434media.com/api/og?title=News%20%26%20Insights&subtitle=434%20MEDIA%20Blog",
         width: 1200,
         height: 630,
-        alt: "434 MEDIA Blog",
+        alt: "434 MEDIA News & Insights",
       },
     ],
     locale: "en_US",
@@ -26,12 +26,13 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Blog | 434 MEDIA",
+    title: "News & Insights | 434 MEDIA",
     description:
-      "Explore the latest insights, news, and updates from 434 MEDIA on creative media and smart marketing solutions.",
-    images: [
-      `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"}/api/og?title=${encodeURIComponent("434 MEDIA Blog")}&subtitle=${encodeURIComponent("Insights on creative media and smart marketing")}`,
-    ],
+      "Your destination for insights from the 434 Media team, our local partners, and our diverse ecosystem.",
+    images: ["https://www.434media.com/api/og?title=News%20%26%20Insights&subtitle=434%20MEDIA%20Blog"],
+  },
+  alternates: {
+    canonical: "https://www.434media.com/blog",
   },
 }
 
@@ -72,11 +73,15 @@ function BlogSkeleton() {
 
 export default async function BlogPage() {
   try {
-    const posts = await getBlogPosts()
+    // Get all blog posts - the function should handle filtering published posts internally
+    const allPosts = await getBlogPosts()
+
+    // Filter for only published posts on the client side if needed
+    const publishedPosts = allPosts.filter((post) => post.status === "published")
 
     return (
       <Suspense fallback={<BlogSkeleton />}>
-        <BlogContent initialPosts={posts} />
+        <BlogContent initialPosts={publishedPosts} />
       </Suspense>
     )
   } catch (error) {
