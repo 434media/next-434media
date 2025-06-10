@@ -12,8 +12,11 @@ import NavMenu from "./Navmenu"
 import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
 import { AIMLogo } from "./AIMLogo"
+import type { Menu } from "../lib/shopify/types"
 
-type CombinedNavbarProps = Record<string, never>
+type CombinedNavbarProps = {
+  menu?: Menu[]
+}
 
 // Custom hook to check if component has mounted
 function useHasMounted() {
@@ -26,7 +29,7 @@ function useHasMounted() {
   return hasMounted
 }
 
-export function CombinedNavbar({}: CombinedNavbarProps) {
+export function CombinedNavbar(_props: CombinedNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const [hoveredLogo, setHoveredLogo] = useState<string | null>(null)
@@ -127,7 +130,7 @@ export function CombinedNavbar({}: CombinedNavbarProps) {
                       alt="¿Qué es SDOH?"
                       width={100}
                       height={24}
-                      className="w-auto h-full grayscale"
+                      className="w-auto h-full"
                       priority={true}
                     />
                   </motion.div>

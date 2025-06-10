@@ -7,12 +7,12 @@ import "remixicon/fonts/remixicon.css"
 import { CombinedNavbar } from "./components/combined-navbar"
 import Footer from "./components/Footer"
 import { Analytics } from "@vercel/analytics/next"
-import { GoogleTagManager } from "@next/third-parties/google"
 import { Toaster } from "sonner"
 import { getCart, getMenu } from "./lib/shopify"
 import { CartProvider } from "./components/shopify/cart/cart-context"
 import { PageTransition } from "./components/shopify/page-transition"
 import { Suspense } from "react"
+import Script from "next/script"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -144,7 +144,15 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <GoogleTagManager gtmId="G-FTWW298D70" />
+      <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="afterInteractive" />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-FTWW298D70');
+        `}
+      </Script>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
