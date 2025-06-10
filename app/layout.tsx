@@ -115,11 +115,6 @@ export const metadata: Metadata = {
       url: "/apple-touch-icon-precomposed.png",
     },
   },
-  verification: {
-    // Add your verification codes if you have them
-    // google: "your-google-verification-code",
-    // yandex: "your-yandex-verification-code",
-  },
 }
 
 export const viewport = {
@@ -144,6 +139,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
+      {/* Google tag (gtag.js) */}
       <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="afterInteractive" />
       <Script id="google-analytics" strategy="afterInteractive">
         {`
