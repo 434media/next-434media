@@ -3,13 +3,11 @@ import { GoogleAuth } from "google-auth-library"
 import {
   analyticsConfig,
   isVercelOIDCConfigured,
-  isLocalDevelopmentConfigured,
   getWorkloadIdentityAudience,
   getServiceAccountImpersonationUrl,
   getAuthenticationMethod,
 } from "./analytics-config"
 import type {
-  TopPageData,
   SummaryData,
   PageViewsResponse,
   TrafficSourcesResponse,
@@ -25,93 +23,62 @@ let analyticsDataClient: BetaAnalyticsDataClient | null = null
 
 function getAnalyticsClient() {
   if (!analyticsDataClient) {
+    const authMethod = getAuthenticationMethod()
+
+    if (authMethod !== "vercel-oidc") {
+      throw new Error("Google Analytics requires Vercel OIDC Workload Identity Federation configuration")
+    }
+
     try {
-      const authMethod = getAuthenticationMethod()
+      console.log("[Analytics] Initializing with Vercel OIDC Workload Identity Federation")
 
-      if (authMethod === "vercel-oidc") {
-        // Vercel OIDC Workload Identity Federation setup
-        console.log("[Analytics] Initializing with Vercel OIDC Workload Identity Federation")
+      const audience = getWorkloadIdentityAudience()
+      const serviceAccountImpersonationUrl = getServiceAccountImpersonationUrl()
 
-        const audience = getWorkloadIdentityAudience()
-        const serviceAccountImpersonationUrl = getServiceAccountImpersonationUrl()
-
-        if (!audience || !serviceAccountImpersonationUrl) {
-          throw new Error("Invalid Workload Identity Federation configuration")
-        }
-
-        const auth = new GoogleAuth({
-          scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
-          projectId: analyticsConfig.gcpProjectId,
-          credentials: {
-            type: "external_account",
-            audience,
-            subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-            token_url: "https://oauth2.googleapis.com/token",
-            service_account_impersonation_url: serviceAccountImpersonationUrl,
-            credential_source: {
-              environment_id: "vercel",
-              regional_cred_verification_url: "https://vercel.com/oidc",
-            },
-          },
-        })
-
-        analyticsDataClient = new BetaAnalyticsDataClient({
-          auth,
-          projectId: analyticsConfig.gcpProjectId,
-        })
-
-        console.log("[Analytics] Successfully initialized with Vercel OIDC")
-      } else if (authMethod === "service-account-file") {
-        // Local development with service account file
-        console.log("[Analytics] Initializing with service account file for local development")
-
-        const auth = new GoogleAuth({
-          scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
-          projectId: analyticsConfig.gcpProjectId,
-          keyFilename: analyticsConfig.googleApplicationCredentials,
-        })
-
-        analyticsDataClient = new BetaAnalyticsDataClient({
-          auth,
-          projectId: analyticsConfig.gcpProjectId,
-        })
-
-        console.log("[Analytics] Successfully initialized with service account file")
-      } else {
-        throw new Error("No valid authentication method configured")
+      if (!audience || !serviceAccountImpersonationUrl) {
+        throw new Error("Invalid Workload Identity Federation configuration")
       }
+
+      // Log configuration for debugging (without sensitive data)
+      console.log("[Analytics] OIDC Configuration:", {
+        projectId: analyticsConfig.gcpProjectId,
+        propertyId: analyticsConfig.ga4PropertyId,
+        serviceAccount: analyticsConfig.gcpServiceAccountEmail,
+        poolId: analyticsConfig.gcpWorkloadIdentityPoolId,
+        providerId: analyticsConfig.gcpWorkloadIdentityPoolProviderId,
+      })
+
+      const auth = new GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
+        projectId: analyticsConfig.gcpProjectId,
+        credentials: {
+          type: "external_account",
+          audience,
+          subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+          token_url: "https://oauth2.googleapis.com/token",
+          service_account_impersonation_url: serviceAccountImpersonationUrl,
+          credential_source: {
+            environment_id: "vercel",
+            regional_cred_verification_url: "https://vercel.com/oidc",
+          },
+        },
+      })
+
+      analyticsDataClient = new BetaAnalyticsDataClient({
+        auth,
+        projectId: analyticsConfig.gcpProjectId,
+      })
+
+      console.log("[Analytics] Successfully initialized with Vercel OIDC")
     } catch (error) {
       console.error("Failed to initialize Google Analytics client:", error)
-
-      // Provide helpful error messages for common Vercel OIDC issues
-      if (error instanceof Error) {
-        if (error.message.includes("Could not load the default credentials")) {
-          console.error(`
-[Analytics] Vercel OIDC Workload Identity Federation Setup Issue:
-- Ensure all GCP_* environment variables are set in Vercel
-- Verify Workload Identity Pool and Provider are configured in GCP
-- Check that the service account has Analytics Data API permissions
-- For local development: Set GOOGLE_APPLICATION_CREDENTIALS to service account key file path
-          `)
-        }
-
-        if (error.message.includes("Invalid Workload Identity Federation configuration")) {
-          console.error(`
-[Analytics] Missing Vercel OIDC Configuration:
-Required environment variables:
-- GCP_WORKLOAD_IDENTITY_POOL_ID=${analyticsConfig.gcpWorkloadIdentityPoolId || "MISSING"}
-- GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID=${analyticsConfig.gcpWorkloadIdentityPoolProviderId || "MISSING"}
-- GCP_SERVICE_ACCOUNT_EMAIL=${analyticsConfig.gcpServiceAccountEmail || "MISSING"}
-- GCP_PROJECT_NUMBER=${analyticsConfig.gcpProjectNumber || "MISSING"}
-          `)
-        }
-      }
+      throw error
     }
   }
   return analyticsDataClient
 }
 
-// Test the Google Analytics connection with Vercel OIDC
+// Test the Google Analytics connection
 export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStatus> {
   try {
     const client = getAnalyticsClient()
@@ -124,7 +91,6 @@ export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStat
           hasPropertyId: !!analyticsConfig.ga4PropertyId,
           authMethod: getAuthenticationMethod(),
           isVercelOIDC: isVercelOIDCConfigured(),
-          isLocalDev: isLocalDevelopmentConfigured(),
         },
       }
     }
@@ -153,8 +119,6 @@ export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStat
       details: {
         authMethod: getAuthenticationMethod(),
         isVercelOIDC: isVercelOIDCConfigured(),
-        isLocalDev: isLocalDevelopmentConfigured(),
-        hasCredentials: !!analyticsConfig.googleApplicationCredentials,
         audience: getWorkloadIdentityAudience(),
         serviceAccountUrl: getServiceAccountImpersonationUrl(),
       },
@@ -162,27 +126,7 @@ export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStat
   }
 }
 
-export interface AnalyticsDateRange {
-  startDate: string
-  endDate: string
-}
-
-export interface AnalyticsMetric {
-  name: string
-  value: string
-}
-
-export interface AnalyticsDimension {
-  name: string
-  value: string
-}
-
-export interface AnalyticsRow {
-  dimensionValues: AnalyticsDimension[]
-  metricValues: AnalyticsMetric[]
-}
-
-// Enhanced error handling for Vercel OIDC Workload Identity Federation
+// Enhanced error handling
 function handleAnalyticsError(error: any, operation: string) {
   console.error(`Failed to ${operation}:`, error)
 
@@ -205,7 +149,7 @@ function handleAnalyticsError(error: any, operation: string) {
     }
   }
 
-  throw new Error(`Failed to ${operation}`)
+  throw error
 }
 
 // Get daily metrics data
@@ -245,16 +189,11 @@ export async function getDailyMetrics(startDate: string, endDate: string): Promi
     }
   } catch (error) {
     handleAnalyticsError(error, "fetch daily metrics")
-    return {
-      data: [],
-      totalPageViews: 0,
-      totalSessions: 0,
-      totalUsers: 0,
-    }
+    throw error
   }
 }
 
-// Get page views data (returns top pages, not daily data)
+// Get page views data
 export async function getPageViewsData(startDate: string, endDate: string): Promise<PageViewsResponse> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
@@ -283,39 +222,7 @@ export async function getPageViewsData(startDate: string, endDate: string): Prom
     return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch page views data")
-    return { data: [] }
-  }
-}
-
-// Get top pages data
-export async function getTopPagesData(dateRange: AnalyticsDateRange): Promise<TopPageData[]> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
-
-  try {
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [dateRange],
-      dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
-      metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
-      orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-      limit: 20,
-    })
-
-    return (
-      response.rows?.map((row) => ({
-        path: row.dimensionValues?.[0]?.value || "",
-        title: row.dimensionValues?.[1]?.value || "",
-        pageViews: Number.parseInt(row.metricValues?.[0]?.value || "0"),
-        sessions: Number.parseInt(row.metricValues?.[1]?.value || "0"),
-        bounceRate: Number.parseFloat(row.metricValues?.[2]?.value || "0"),
-      })) || []
-    )
-  } catch (error) {
-    handleAnalyticsError(error, "fetch top pages data")
-    return []
+    throw error
   }
 }
 
@@ -348,7 +255,7 @@ export async function getTrafficSourcesData(startDate: string, endDate: string):
     return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch traffic sources data")
-    return { data: [] }
+    throw error
   }
 }
 
@@ -378,7 +285,7 @@ export async function getDeviceData(startDate: string, endDate: string): Promise
     return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch device data")
-    return { data: [] }
+    throw error
   }
 }
 
@@ -411,7 +318,7 @@ export async function getGeographicData(startDate: string, endDate: string): Pro
     return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch geographic data")
-    return { data: [] }
+    throw error
   }
 }
 
@@ -447,10 +354,7 @@ export async function getRealtimeData(): Promise<RealtimeData> {
     }
   } catch (error) {
     handleAnalyticsError(error, "fetch realtime data")
-    return {
-      totalActiveUsers: 0,
-      topCountries: [],
-    }
+    throw error
   }
 }
 
@@ -484,13 +388,7 @@ export async function getAnalyticsSummary(startDate: string, endDate: string): P
     }
   } catch (error) {
     handleAnalyticsError(error, "fetch analytics summary")
-    return {
-      totalPageViews: 0,
-      totalSessions: 0,
-      totalUsers: 0,
-      bounceRate: 0,
-      averageSessionDuration: 0,
-    }
+    throw error
   }
 }
 

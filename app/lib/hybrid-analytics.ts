@@ -14,80 +14,67 @@ import {
   getHistoricalDeviceData,
   getHistoricalGeographicData,
   getHistoricalDailyMetrics,
-  hasHistoricalData,
   getHistoricalDataRange,
 } from "./vercel-analytics-db"
 
 import { testAnalyticsConnection } from "./google-analytics"
-
+import { getGA4StartDate } from "./analytics-config"
 import { validatePageViewsData, validateTrafficSourcesData } from "./analytics-normalizer"
+import { shouldUseHistoricalData, getDataSourceStrategy } from "./analytics-strategy"
 
-import type { AnalyticsSummary } from "../types/analytics"
+import type { AnalyticsSummary, HybridAnalyticsResponse } from "../types/analytics"
 
-// The date when GA4 tracking started
-const GA4_START_DATE = process.env.GA4_START_DATE || "2023-06-01"
-
-// Determine if we should use historical data for a date range
-async function shouldUseHistoricalData(startDate: string, endDate: string): Promise<boolean> {
-  // If the entire date range is before GA4 start date, use historical data
-  if (new Date(endDate) < new Date(GA4_START_DATE)) {
-    return true
-  }
-
-  // If the date range spans both periods, check if we have historical data
-  if (new Date(startDate) < new Date(GA4_START_DATE) && new Date(endDate) >= new Date(GA4_START_DATE)) {
-    return await hasHistoricalData(startDate, endDate)
-  }
-
-  // Otherwise use GA4 data
-  return false
+// Combine historical and GA4 data
+function combineData<T>(historicalData: T[], ga4Data: T[], combineFunction: (hist: T[], ga4: T[]) => T[]): T[] {
+  if (historicalData.length === 0) return ga4Data
+  if (ga4Data.length === 0) return historicalData
+  return combineFunction(historicalData, ga4Data)
 }
 
-// Get daily metrics with hybrid approach and data normalization
-export async function getHybridDailyMetrics(startDate: string, endDate: string) {
+// Get daily metrics with hybrid approach
+export async function getHybridDailyMetrics(startDate: string, endDate: string): Promise<HybridAnalyticsResponse<any>> {
   try {
-    const useHistorical = await shouldUseHistoricalData(startDate, endDate)
+    const strategy = await getDataSourceStrategy(startDate, endDate)
 
-    if (useHistorical) {
-      const historicalData = await getHistoricalDailyMetrics(startDate, endDate)
+    let historicalData: any[] = []
+    let ga4Data: any[] = []
+    let totalPageViews = 0
+    let totalSessions = 0
+    let totalUsers = 0
 
-      // Calculate totals
-      const totalPageViews = historicalData.data.reduce((sum: number, day: any) => sum + day.pageViews, 0)
-      const totalSessions = historicalData.data.reduce((sum: number, day: any) => sum + day.sessions, 0)
-      const totalUsers = historicalData.data.reduce((sum: number, day: any) => sum + day.users, 0)
+    if (strategy.useHistorical && strategy.historicalStart && strategy.historicalEnd) {
+      const historical = await getHistoricalDailyMetrics(strategy.historicalStart, strategy.historicalEnd)
+      historicalData = historical.data
+      totalPageViews += historical.totalPageViews
+      totalSessions += historical.totalSessions
+      totalUsers += historical.totalUsers
+    }
 
-      return {
-        data: historicalData.data.map((day: any) => ({
-          date: day.date,
-          pageViews: day.pageViews,
-          sessions: day.sessions,
-          users: day.users,
-        })),
-        totalPageViews,
-        totalSessions,
-        totalUsers,
-        _hybrid: true,
-        _source: "vercel-historical",
-      }
-    } else {
-      const ga4Data = await getDailyMetrics(startDate, endDate)
-      return {
-        ...ga4Data,
-        _hybrid: true,
-        _source: "google-analytics",
-      }
+    if (strategy.useGA4 && strategy.ga4Start && strategy.ga4End) {
+      const ga4 = await getDailyMetrics(strategy.ga4Start, strategy.ga4End)
+      ga4Data = ga4.data
+      totalPageViews += ga4.totalPageViews
+      totalSessions += ga4.totalSessions
+      totalUsers += ga4.totalUsers
+    }
+
+    const combinedData = combineData(historicalData, ga4Data, (hist, ga4) => [...hist, ...ga4])
+
+    return {
+      data: combinedData,
+      totalPageViews,
+      totalSessions,
+      totalUsers,
+      _hybrid: true,
+      _historicalDays: historicalData.length,
+      _ga4Days: ga4Data.length,
+      _strategy: strategy.strategy,
+      _historicalData: historicalData,
+      _ga4Data: ga4Data,
     }
   } catch (error) {
     console.error("Error in getHybridDailyMetrics:", error)
-    return {
-      data: [],
-      totalPageViews: 0,
-      totalSessions: 0,
-      totalUsers: 0,
-      _hybrid: true,
-      _source: "error",
-      _error: error instanceof Error ? error.message : "Unknown error",
-    }
+    throw new Error(`Failed to fetch daily metrics: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
@@ -135,45 +122,81 @@ export async function getHybridPageViewsData(startDate: string, endDate: string)
 }
 
 // Get top pages with hybrid approach
-export async function getHybridTopPages(startDate: string, endDate: string, limit = 10) {
+export async function getHybridTopPages(
+  startDate: string,
+  endDate: string,
+  limit = 10,
+): Promise<HybridAnalyticsResponse<any>> {
   try {
-    const pagesData = await getHybridPageViewsData(startDate, endDate)
+    const strategy = await getDataSourceStrategy(startDate, endDate)
 
-    // Validate and clean data
-    const { valid: validPages, issues } = validatePageViewsData(pagesData.data)
+    let historicalData: any[] = []
+    let ga4Data: any[] = []
 
-    if (issues.length > 0) {
-      console.warn("Data quality issues in top pages:", issues)
+    if (strategy.useHistorical && strategy.historicalStart && strategy.historicalEnd) {
+      const historical = await getHistoricalPageViews(strategy.historicalStart, strategy.historicalEnd)
+      historicalData = historical.data
     }
 
-    // Sort by page views and take top N
-    return {
-      data: validPages
-        .sort((a: any, b: any) => b.pageViews - a.pageViews)
-        .slice(0, limit)
-        .map((page: any) => ({
+    if (strategy.useGA4 && strategy.ga4Start && strategy.ga4End) {
+      const ga4 = await getPageViewsData(strategy.ga4Start, strategy.ga4End)
+      ga4Data = ga4.data
+    }
+
+    // Combine and aggregate page data
+    const pageMap = new Map<string, any>()
+
+    // Add historical data
+    historicalData.forEach((page) => {
+      pageMap.set(page.path, {
+        path: page.path,
+        title: page.title || page.path,
+        pageViews: page.pageViews,
+        sessions: page.sessions,
+        bounceRate: page.bounceRate || 0,
+      })
+    })
+
+    // Add GA4 data (merge with existing or create new)
+    ga4Data.forEach((page) => {
+      const existing = pageMap.get(page.path)
+      if (existing) {
+        existing.pageViews += page.pageViews
+        existing.sessions += page.sessions
+        existing.bounceRate = (existing.bounceRate + page.bounceRate) / 2 // Average bounce rate
+      } else {
+        pageMap.set(page.path, {
           path: page.path,
           title: page.title || page.path,
           pageViews: page.pageViews,
           sessions: page.sessions,
           bounceRate: page.bounceRate || 0,
-        })),
+        })
+      }
+    })
+
+    const combinedData = Array.from(pageMap.values())
+      .sort((a, b) => b.pageViews - a.pageViews)
+      .slice(0, limit)
+
+    // Validate data
+    const { valid: validPages, issues } = validatePageViewsData(combinedData)
+
+    return {
+      data: validPages,
       _hybrid: true,
-      _source: pagesData._source,
+      _historicalPages: historicalData.length,
+      _ga4Pages: ga4Data.length,
+      _strategy: strategy.strategy,
       _dataQuality: {
         validRecords: validPages.length,
-        totalRecords: pagesData.data.length,
+        totalRecords: combinedData.length,
         issues: issues.length,
       },
     }
   } catch (error) {
     console.error("Error in getHybridTopPages:", error)
-    return {
-      data: [],
-      _hybrid: true,
-      _source: "error",
-      _error: error instanceof Error ? error.message : "Unknown error",
-    }
+    throw new Error(`Failed to fetch top pages: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
@@ -216,8 +239,6 @@ export async function getHybridTrafficSourcesData(startDate: string, endDate: st
     }
   }
 }
-
-// Add this function after getHybridTrafficSourcesData
 
 // Get referrers data with hybrid approach (specifically handling Vercel's referrer format)
 export async function getHybridReferrersData(startDate: string, endDate: string) {
@@ -265,7 +286,273 @@ export async function getHybridReferrersData(startDate: string, endDate: string)
   }
 }
 
-// Add this utility function
+// Get top traffic sources with hybrid approach
+export async function getHybridTopTrafficSources(
+  startDate: string,
+  endDate: string,
+  limit = 10,
+): Promise<HybridAnalyticsResponse<any>> {
+  try {
+    const strategy = await getDataSourceStrategy(startDate, endDate)
+
+    let historicalData: any[] = []
+    let ga4Data: any[] = []
+
+    if (strategy.useHistorical && strategy.historicalStart && strategy.historicalEnd) {
+      const historical = await getHistoricalTrafficSources(strategy.historicalStart, strategy.historicalEnd)
+      historicalData = historical.data
+    }
+
+    if (strategy.useGA4 && strategy.ga4Start && strategy.ga4End) {
+      const ga4 = await getTrafficSourcesData(strategy.ga4Start, strategy.ga4End)
+      ga4Data = ga4.data
+    }
+
+    // Combine and aggregate traffic source data
+    const sourceMap = new Map<string, any>()
+
+    // Add historical data
+    historicalData.forEach((source) => {
+      const key = `${source.source}|${source.medium || "referral"}`
+      sourceMap.set(key, {
+        source: source.source,
+        medium: source.medium || "referral",
+        sessions: source.sessions,
+        users: source.users,
+        newUsers: source.newUsers,
+      })
+    })
+
+    // Add GA4 data
+    ga4Data.forEach((source) => {
+      const key = `${source.source}|${source.medium}`
+      const existing = sourceMap.get(key)
+      if (existing) {
+        existing.sessions += source.sessions
+        existing.users += source.users
+        existing.newUsers += source.newUsers
+      } else {
+        sourceMap.set(key, {
+          source: source.source,
+          medium: source.medium,
+          sessions: source.sessions,
+          users: source.users,
+          newUsers: source.newUsers,
+        })
+      }
+    })
+
+    const combinedData = Array.from(sourceMap.values())
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, limit)
+
+    // Validate data
+    const { valid: validSources, issues } = validateTrafficSourcesData(combinedData)
+
+    return {
+      data: validSources,
+      _hybrid: true,
+      _strategy: strategy.strategy,
+      _dataQuality: {
+        validRecords: validSources.length,
+        totalRecords: combinedData.length,
+        issues: issues.length,
+      },
+    }
+  } catch (error) {
+    console.error("Error in getHybridTopTrafficSources:", error)
+    throw new Error(`Failed to fetch traffic sources: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+// Get device data with hybrid approach
+export async function getHybridDeviceData(startDate: string, endDate: string): Promise<HybridAnalyticsResponse<any>> {
+  try {
+    const strategy = await getDataSourceStrategy(startDate, endDate)
+
+    let historicalData: any[] = []
+    let ga4Data: any[] = []
+
+    if (strategy.useHistorical && strategy.historicalStart && strategy.historicalEnd) {
+      const historical = await getHistoricalDeviceData(strategy.historicalStart, strategy.historicalEnd)
+      historicalData = historical.data
+    }
+
+    if (strategy.useGA4 && strategy.ga4Start && strategy.ga4End) {
+      const ga4 = await getDeviceData(strategy.ga4Start, strategy.ga4End)
+      ga4Data = ga4.data
+    }
+
+    // Combine device data
+    const deviceMap = new Map<string, any>()
+
+    // Add historical data
+    historicalData.forEach((device) => {
+      deviceMap.set(device.deviceCategory, {
+        deviceCategory: device.deviceCategory,
+        sessions: device.sessions,
+        users: device.users,
+      })
+    })
+
+    // Add GA4 data
+    ga4Data.forEach((device) => {
+      const existing = deviceMap.get(device.deviceCategory)
+      if (existing) {
+        existing.sessions += device.sessions
+        existing.users += device.users
+      } else {
+        deviceMap.set(device.deviceCategory, {
+          deviceCategory: device.deviceCategory,
+          sessions: device.sessions,
+          users: device.users,
+        })
+      }
+    })
+
+    const combinedData = Array.from(deviceMap.values()).sort((a, b) => b.sessions - a.sessions)
+
+    return {
+      data: combinedData,
+      _hybrid: true,
+      _strategy: strategy.strategy,
+    }
+  } catch (error) {
+    console.error("Error in getHybridDeviceData:", error)
+    throw new Error(`Failed to fetch device data: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+// Get geographic data with hybrid approach
+export async function getHybridGeographicData(
+  startDate: string,
+  endDate: string,
+): Promise<HybridAnalyticsResponse<any>> {
+  try {
+    const strategy = await getDataSourceStrategy(startDate, endDate)
+
+    let historicalData: any[] = []
+    let ga4Data: any[] = []
+
+    if (strategy.useHistorical && strategy.historicalStart && strategy.historicalEnd) {
+      const historical = await getHistoricalGeographicData(strategy.historicalStart, strategy.historicalEnd)
+      historicalData = historical.data
+    }
+
+    if (strategy.useGA4 && strategy.ga4Start && strategy.ga4End) {
+      const ga4 = await getGeographicData(strategy.ga4Start, strategy.ga4End)
+      ga4Data = ga4.data
+    }
+
+    // Combine geographic data
+    const geoMap = new Map<string, any>()
+
+    // Add historical data
+    historicalData.forEach((geo) => {
+      const key = `${geo.country}|${geo.city || ""}`
+      geoMap.set(key, {
+        country: geo.country,
+        city: geo.city || "",
+        sessions: geo.sessions,
+        users: geo.users,
+        newUsers: geo.newUsers,
+      })
+    })
+
+    // Add GA4 data
+    ga4Data.forEach((geo) => {
+      const key = `${geo.country}|${geo.city || ""}`
+      const existing = geoMap.get(key)
+      if (existing) {
+        existing.sessions += geo.sessions
+        existing.users += geo.users
+        existing.newUsers += geo.newUsers
+      } else {
+        geoMap.set(key, {
+          country: geo.country,
+          city: geo.city || "",
+          sessions: geo.sessions,
+          users: geo.users,
+          newUsers: geo.newUsers,
+        })
+      }
+    })
+
+    const combinedData = Array.from(geoMap.values())
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 20)
+
+    return {
+      data: combinedData,
+      _hybrid: true,
+      _strategy: strategy.strategy,
+    }
+  } catch (error) {
+    console.error("Error in getHybridGeographicData:", error)
+    throw new Error(`Failed to fetch geographic data: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+// Get analytics summary with hybrid approach
+export async function getHybridAnalyticsSummary(
+  startDate: string,
+  endDate: string,
+): Promise<AnalyticsSummary & { _hybrid?: boolean; _strategy?: string }> {
+  try {
+    const strategy = await getDataSourceStrategy(startDate, endDate)
+
+    let totalPageViews = 0
+    let totalSessions = 0
+    let totalUsers = 0
+    let bounceRate = 0
+    let averageSessionDuration = 0
+    let dataPoints = 0
+
+    if (strategy.useHistorical && strategy.historicalStart && strategy.historicalEnd) {
+      const historical = await getHistoricalAnalyticsSummary(strategy.historicalStart, strategy.historicalEnd)
+      totalPageViews += historical.totalPageViews
+      totalSessions += historical.totalSessions
+      totalUsers += historical.totalUsers
+      bounceRate += historical.bounceRate
+      averageSessionDuration += historical.averageSessionDuration
+      dataPoints++
+    }
+
+    if (strategy.useGA4 && strategy.ga4Start && strategy.ga4End) {
+      const ga4 = await getAnalyticsSummary(strategy.ga4Start, strategy.ga4End)
+      totalPageViews += ga4.totalPageViews
+      totalSessions += ga4.totalSessions
+      totalUsers += ga4.totalUsers
+      bounceRate += ga4.bounceRate
+      averageSessionDuration += ga4.averageSessionDuration
+      dataPoints++
+    }
+
+    return {
+      totalPageViews,
+      totalSessions,
+      totalUsers,
+      bounceRate: dataPoints > 0 ? bounceRate / dataPoints : 0,
+      averageSessionDuration: dataPoints > 0 ? averageSessionDuration / dataPoints : 0,
+      _hybrid: true,
+      _strategy: strategy.strategy,
+    }
+  } catch (error) {
+    console.error("Error in getHybridAnalyticsSummary:", error)
+    throw new Error(`Failed to fetch analytics summary: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+// Get top referrers with hybrid approach (alias for top traffic sources)
+export async function getHybridTopReferrers(
+  startDate: string,
+  endDate: string,
+  limit = 10,
+): Promise<HybridAnalyticsResponse<any>> {
+  return getHybridTopTrafficSources(startDate, endDate, limit)
+}
+
+// Utility function to infer medium from referrer
 function inferMediumFromReferrer(referrer: string): string {
   if (!referrer || referrer === "(direct)" || referrer === "direct") {
     return "none"
@@ -313,194 +600,6 @@ function inferMediumFromReferrer(referrer: string): string {
   return "referral"
 }
 
-// Update getHybridTopTrafficSources to handle referrers
-export async function getHybridTopReferrers(startDate: string, endDate: string, limit = 10) {
-  try {
-    // Use the specialized referrers data function
-    const referrersData = await getHybridReferrersData(startDate, endDate)
-
-    // Validate and clean data
-    const { valid: validReferrers, issues } = validateTrafficSourcesData(referrersData.data)
-
-    if (issues.length > 0) {
-      console.warn("Data quality issues in referrers:", issues)
-    }
-
-    // Sort by sessions and take top N
-    return {
-      data: validReferrers
-        .sort((a: any, b: any) => b.sessions - a.sessions)
-        .slice(0, limit)
-        .map((source: any) => ({
-          source: source.source,
-          medium: source.medium || "referral",
-          sessions: source.sessions,
-          users: source.users,
-          newUsers: source.newUsers,
-        })),
-      _hybrid: true,
-      _source: referrersData._source,
-      _dataType: "referrers",
-      _dataQuality: {
-        validRecords: validReferrers.length,
-        totalRecords: referrersData.data.length,
-        issues: issues.length,
-      },
-    }
-  } catch (error) {
-    console.error("Error in getHybridTopReferrers:", error)
-    return {
-      data: [],
-      _hybrid: true,
-      _source: "error",
-      _error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-// Get top traffic sources with hybrid approach
-export async function getHybridTopTrafficSources(startDate: string, endDate: string, limit = 10) {
-  try {
-    const sourcesData = await getHybridTrafficSourcesData(startDate, endDate)
-
-    // Validate and clean data
-    const { valid: validSources, issues } = validateTrafficSourcesData(sourcesData.data)
-
-    if (issues.length > 0) {
-      console.warn("Data quality issues in traffic sources:", issues)
-    }
-
-    // Sort by sessions and take top N
-    return {
-      data: validSources
-        .sort((a: any, b: any) => b.sessions - a.sessions)
-        .slice(0, limit)
-        .map((source: any) => ({
-          source: source.source,
-          medium: source.medium || "referral",
-          sessions: source.sessions,
-          users: source.users,
-          newUsers: source.newUsers,
-        })),
-      _hybrid: true,
-      _source: sourcesData._source,
-      _dataQuality: {
-        validRecords: validSources.length,
-        totalRecords: sourcesData.data.length,
-        issues: issues.length,
-      },
-    }
-  } catch (error) {
-    console.error("Error in getHybridTopTrafficSources:", error)
-    return {
-      data: [],
-      _hybrid: true,
-      _source: "error",
-      _error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-// Get device data with hybrid approach
-export async function getHybridDeviceData(startDate: string, endDate: string) {
-  try {
-    const useHistorical = await shouldUseHistoricalData(startDate, endDate)
-
-    if (useHistorical) {
-      const historicalData = await getHistoricalDeviceData(startDate, endDate)
-
-      return {
-        data: historicalData.data.map((device: any) => ({
-          deviceCategory: device.deviceCategory,
-          sessions: device.sessions,
-          users: device.users,
-        })),
-        _hybrid: true,
-        _source: "vercel-historical",
-        _normalized: true,
-      }
-    } else {
-      const ga4Data = await getDeviceData(startDate, endDate)
-      return {
-        ...ga4Data,
-        _hybrid: true,
-        _source: "google-analytics",
-        _normalized: true,
-      }
-    }
-  } catch (error) {
-    console.error("Error in getHybridDeviceData:", error)
-    return {
-      data: [],
-      _hybrid: true,
-      _source: "error",
-      _error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-// Get geographic data with hybrid approach
-export async function getHybridGeographicData(startDate: string, endDate: string) {
-  try {
-    const useHistorical = await shouldUseHistoricalData(startDate, endDate)
-
-    if (useHistorical) {
-      const historicalData = await getHistoricalGeographicData(startDate, endDate)
-
-      return {
-        data: historicalData.data.map((geo: any) => ({
-          country: geo.country,
-          city: geo.city,
-          sessions: geo.sessions,
-          users: geo.users,
-          newUsers: geo.newUsers,
-        })),
-        _hybrid: true,
-        _source: "vercel-historical",
-        _normalized: true,
-      }
-    } else {
-      const ga4Data = await getGeographicData(startDate, endDate)
-      return {
-        ...ga4Data,
-        _hybrid: true,
-        _source: "google-analytics",
-        _normalized: true,
-      }
-    }
-  } catch (error) {
-    console.error("Error in getHybridGeographicData:", error)
-    return {
-      data: [],
-      _hybrid: true,
-      _source: "error",
-      _error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-// Get analytics summary with hybrid approach
-export async function getHybridAnalyticsSummary(startDate: string, endDate: string): Promise<AnalyticsSummary> {
-  try {
-    const useHistorical = await shouldUseHistoricalData(startDate, endDate)
-
-    if (useHistorical) {
-      return await getHistoricalAnalyticsSummary(startDate, endDate)
-    } else {
-      return await getAnalyticsSummary(startDate, endDate)
-    }
-  } catch (error) {
-    console.error("Error in getHybridAnalyticsSummary:", error)
-    return {
-      totalPageViews: 0,
-      totalSessions: 0,
-      totalUsers: 0,
-      bounceRate: 0,
-      averageSessionDuration: 0,
-    }
-  }
-}
-
 // Data source information function
 export async function getDataSourceInfo(): Promise<{
   vercelAnalytics: {
@@ -511,6 +610,7 @@ export async function getDataSourceInfo(): Promise<{
   googleAnalytics: {
     available: boolean
     configured: boolean
+    ga4StartDate: string
   }
   compatibility: {
     normalizationEnabled: boolean
@@ -519,31 +619,23 @@ export async function getDataSourceInfo(): Promise<{
   }
 }> {
   try {
-    // Check Vercel Analytics data availability using existing functions
+    // Check Vercel Analytics data availability
     const historicalRange = await getHistoricalDataRange()
     const vercelAvailable = !!historicalRange
 
     let recordCount = 0
     if (vercelAvailable && historicalRange) {
-      // Get a sample of historical data to count records
       const sampleData = await getHistoricalPageViews(historicalRange.startDate, historicalRange.endDate)
       recordCount = sampleData.data.length
     }
 
     // Check Google Analytics configuration
-    const gaConfigured = !!(
-      process.env.GOOGLE_ANALYTICS_PROPERTY_ID &&
-      (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_PRIVATE_KEY)
-    )
-
     let gaAvailable = false
-    if (gaConfigured) {
-      try {
-        await testAnalyticsConnection()
-        gaAvailable = true
-      } catch {
-        gaAvailable = false
-      }
+    try {
+      const connectionTest = await testAnalyticsConnection()
+      gaAvailable = connectionTest.success
+    } catch {
+      gaAvailable = false
     }
 
     return {
@@ -559,7 +651,8 @@ export async function getDataSourceInfo(): Promise<{
       },
       googleAnalytics: {
         available: gaAvailable,
-        configured: gaConfigured,
+        configured: true, // We assume it's configured if we reach this point
+        ga4StartDate: getGA4StartDate(),
       },
       compatibility: {
         normalizationEnabled: true,
@@ -576,6 +669,7 @@ export async function getDataSourceInfo(): Promise<{
       googleAnalytics: {
         available: false,
         configured: false,
+        ga4StartDate: getGA4StartDate(),
       },
       compatibility: {
         normalizationEnabled: true,

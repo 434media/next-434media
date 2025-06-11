@@ -72,7 +72,7 @@ export interface DailyMetricsData {
 
 // Response structures for API endpoints
 export interface PageViewsResponse {
-  data: TopPageData[] // Changed from PageViewData to TopPageData since we're dealing with pages, not daily data
+  data: TopPageData[]
 }
 
 export interface TopPagesResponse {
@@ -98,29 +98,69 @@ export interface DailyMetricsResponse {
   totalUsers: number
 }
 
-// Vercel OIDC Workload Identity Federation specific types
-export interface VercelOIDCConfig {
-  gcpProjectId: string
-  gcpProjectNumber: string
-  gcpWorkloadIdentityPoolId: string
-  gcpWorkloadIdentityPoolProviderId: string
-  gcpServiceAccountEmail: string
-  ga4PropertyId: string
+// Enhanced Hybrid analytics response type with all required properties
+export interface HybridAnalyticsResponse<T> {
+  data: T[]
+  // Summary metrics (optional for compatibility)
+  totalPageViews?: number
+  totalSessions?: number
+  totalUsers?: number
+  // Hybrid metadata
+  _hybrid: boolean
+  _strategy?: "historical-only" | "ga4-only" | "hybrid" | "no-data"
+  // Data source counts
+  _historicalDays?: number
+  _ga4Days?: number
+  _historicalPages?: number
+  _ga4Pages?: number
+  // Raw data for debugging
+  _historicalData?: any[]
+  _ga4Data?: any[]
+  // Source information
+  _source?: string
+  _error?: string
+  _normalized?: boolean
+  _dataType?: string
+  // Data quality metrics
+  _dataQuality?: {
+    validRecords: number
+    totalRecords: number
+    issues: number
+  }
 }
 
+// Specific response types for different data types
+export interface HybridDailyMetricsResponse extends HybridAnalyticsResponse<DailyMetricsData> {
+  totalPageViews: number
+  totalSessions: number
+  totalUsers: number
+}
+
+export interface HybridTopPagesResponse extends HybridAnalyticsResponse<TopPageData> {
+  _historicalPages?: number
+  _ga4Pages?: number
+}
+
+export interface HybridTrafficSourcesResponse extends HybridAnalyticsResponse<TrafficSourceData> {
+  _dataType?: "traffic-sources" | "referrers"
+}
+
+export interface HybridDeviceResponse extends HybridAnalyticsResponse<DeviceData> {}
+
+export interface HybridGeographicResponse extends HybridAnalyticsResponse<GeographicData> {}
+
+// Analytics connection status
 export interface AnalyticsConnectionStatus {
   success: boolean
   error?: string
   details?: {
     hasClient?: boolean
     hasPropertyId?: boolean
-    authMethod?: "vercel-oidc" | "service-account-file" | "not-configured"
+    authMethod?: "vercel-oidc" | "not-configured"
     isVercelOIDC?: boolean
-    isLocalDev?: boolean
     propertyId?: string
     dimensionCount?: number
     metricCount?: number
-    hasCredentials?: boolean
     projectId?: string
     serviceAccount?: string
     audience?: string | null
@@ -130,7 +170,7 @@ export interface AnalyticsConnectionStatus {
 
 export interface ConfigurationStatus {
   configured: boolean
-  authenticationMethod: "vercel-oidc" | "service-account-file" | "not-configured"
+  authenticationMethod: "vercel-oidc" | "not-configured"
   isVercelDeployment: boolean
   isProduction: boolean
   missingVariables: string[]
@@ -140,19 +180,6 @@ export interface ConfigurationStatus {
     providerId?: string
     serviceAccountEmail?: string
     projectNumber?: string
-  }
-}
-
-// External account credentials structure for Vercel OIDC
-export interface ExternalAccountCredentials {
-  type: "external_account"
-  audience: string
-  subject_token_type: string
-  token_url: string
-  service_account_impersonation_url: string
-  credential_source: {
-    environment_id: string
-    regional_cred_verification_url: string
   }
 }
 
@@ -178,14 +205,32 @@ export interface CSVUploadResponse {
   error?: string
 }
 
-// Hybrid analytics types
-export interface HybridAnalyticsResponse<T> {
-  data: T
-  _hybrid?: boolean
-  _historicalDays?: number
-  _ga4Days?: number
-  _historicalPages?: number
-  _ga4Pages?: number
-  _historicalData?: any
-  _ga4Data?: any
+// Data source info
+export interface DataSourceInfo {
+  vercelAnalytics: {
+    available: boolean
+    recordCount?: number
+    dateRange?: { start: string; end: string }
+  }
+  googleAnalytics: {
+    available: boolean
+    configured: boolean
+    ga4StartDate: string
+  }
+  compatibility: {
+    normalizationEnabled: boolean
+    dataQualityChecks: boolean
+    supportedFormats: string[]
+  }
+}
+
+// Data source strategy types
+export interface DataSourceStrategy {
+  useHistorical: boolean
+  useGA4: boolean
+  historicalStart?: string
+  historicalEnd?: string
+  ga4Start?: string
+  ga4End?: string
+  strategy: "historical-only" | "ga4-only" | "hybrid" | "no-data"
 }
