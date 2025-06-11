@@ -8,6 +8,7 @@ import {
   getHybridGeographicData,
   getHybridAnalyticsSummary,
   getDataSourceInfo,
+  getHybridTopReferrers, // Import the new function
 } from "../../lib/hybrid-analytics"
 import { getRealtimeData, testAnalyticsConnection } from "../../lib/google-analytics"
 
@@ -158,6 +159,15 @@ function generateMockData(endpoint: string, timeRange: string) {
         averageSessionDuration: Math.floor(Math.random() * 180) + 60,
       }
 
+    case "referrers":
+      return {
+        data: Array.from({ length: 10 }, (_, i) => ({
+          referrer: ["https://example.com", "https://anotherexample.com", "https://yetanotherexample.com"][i % 3],
+          sessions: Math.floor(Math.random() * 200) + 50,
+          users: Math.floor(Math.random() * 150) + 40,
+        })),
+      }
+
     default:
       return { data: [], error: "Unknown endpoint" }
   }
@@ -237,6 +247,10 @@ export async function GET(request: NextRequest) {
             break
           case "summary":
             data = await getHybridAnalyticsSummary(startDate, endDate)
+            break
+          case "referrers":
+            // Use the specialized referrers endpoint
+            data = await getHybridTopReferrers(startDate, endDate, 10)
             break
           default:
             throw new Error(`Unknown endpoint: ${endpoint}`)
