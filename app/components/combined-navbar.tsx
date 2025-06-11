@@ -37,6 +37,11 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
   const { cart } = useCart()
   const isMobile = useMobile()
   const hasMounted = useHasMounted()
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Check if cart has items - only after component has mounted
   const hasCartItems = hasMounted && typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
@@ -130,7 +135,7 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                       alt="¿Qué es SDOH?"
                       width={100}
                       height={24}
-                      className="w-auto h-full"
+                      className="w-auto h-full grayscale"
                       priority={true}
                     />
                   </motion.div>

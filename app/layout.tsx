@@ -160,8 +160,8 @@ export default async function RootLayout({
             <PageTransition>{children}</PageTransition>
             <Toaster closeButton />
           </main>
-          <Analytics />
           <Footer />
+          <Analytics />
         </CartProvider>
       </body>
     </html>
