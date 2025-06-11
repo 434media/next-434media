@@ -1,31 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { analyticsConfig, getConfigurationStatus, getAuthenticationMethod } from "../../lib/analytics-config"
 import {
-  getPageViewsData,
-  getTopPagesData,
-  getTrafficSourcesData,
-  getDeviceData,
-  getGeographicData,
-  getRealtimeData,
-  getSummaryData,
-  testAnalyticsConnection,
-} from "../../lib/google-analytics"
+  getHybridDailyMetrics,
+  getHybridTopPages,
+  getHybridTopTrafficSources,
+  getHybridDeviceData,
+  getHybridGeographicData,
+  getHybridAnalyticsSummary,
+  getDataSourceInfo,
+} from "../../lib/hybrid-analytics"
+import { getRealtimeData, testAnalyticsConnection } from "../../lib/google-analytics"
 
-// Enhanced logging for Vercel OIDC Workload Identity Federation
+// Enhanced logging for hybrid analytics
 function logAccess(message: string, success: boolean, metadata?: any) {
   const timestamp = new Date().toISOString()
   const context = {
     authMethod: getAuthenticationMethod(),
     isVercel: !!process.env.VERCEL,
     environment: process.env.NODE_ENV,
-    hasOIDCConfig: !!(
-      analyticsConfig.gcpWorkloadIdentityPoolId &&
-      analyticsConfig.gcpWorkloadIdentityPoolProviderId &&
-      analyticsConfig.gcpServiceAccountEmail
-    ),
+    hybrid: true,
     ...metadata,
   }
-  console.log(`[Analytics Vercel OIDC] ${timestamp} - ${message} - ${success ? "✓" : "✗"}`, context)
+  console.log(`[Hybrid Analytics] ${timestamp} - ${message} - ${success ? "✓" : "✗"}`, context)
 }
 
 // Enhanced mock data generator for development
@@ -185,22 +181,22 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate") || "30daysAgo"
     const endDate = searchParams.get("endDate") || "today"
 
-    // Special endpoint for configuration status
+    // Special endpoints
     if (endpoint === "config") {
       const connectionTest = await testAnalyticsConnection()
+      const dataSourceInfo = await getDataSourceInfo()
       return NextResponse.json({
         ...configStatus,
         connectionTest,
         authMethod,
-        vercelOIDCVariables: {
-          GCP_WORKLOAD_IDENTITY_POOL_ID: analyticsConfig.gcpWorkloadIdentityPoolId,
-          GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: analyticsConfig.gcpWorkloadIdentityPoolProviderId,
-          GCP_SERVICE_ACCOUNT_EMAIL: analyticsConfig.gcpServiceAccountEmail,
-          GCP_PROJECT_NUMBER: analyticsConfig.gcpProjectNumber,
-          GCP_PROJECT_ID: analyticsConfig.gcpProjectId,
-        },
+        dataSourceInfo,
         timestamp: new Date().toISOString(),
       })
+    }
+
+    if (endpoint === "data-sources") {
+      const dataSourceInfo = await getDataSourceInfo()
+      return NextResponse.json(dataSourceInfo)
     }
 
     if (!endpoint) {
@@ -219,29 +215,28 @@ export async function GET(request: NextRequest) {
       logAccess(`Mock data served for ${endpoint}`, true, { reason: "development_not_configured" })
     } else {
       try {
-        const dateRange = { startDate, endDate }
-
         switch (endpoint) {
           case "pageviews":
-            data = await getPageViewsData(dateRange)
+            data = await getHybridDailyMetrics(startDate, endDate)
             break
           case "toppages":
-            data = await getTopPagesData(dateRange)
+            data = await getHybridTopPages(startDate, endDate)
             break
           case "trafficsources":
-            data = await getTrafficSourcesData(dateRange)
+            data = await getHybridTopTrafficSources(startDate, endDate)
             break
           case "devices":
-            data = await getDeviceData(dateRange)
+            data = await getHybridDeviceData(startDate, endDate)
             break
           case "geographic":
-            data = await getGeographicData(dateRange)
+            data = await getHybridGeographicData(startDate, endDate)
             break
           case "realtime":
+            // Realtime data only comes from GA4
             data = await getRealtimeData()
             break
           case "summary":
-            data = await getSummaryData(dateRange)
+            data = await getHybridAnalyticsSummary(startDate, endDate)
             break
           default:
             throw new Error(`Unknown endpoint: ${endpoint}`)
@@ -249,10 +244,14 @@ export async function GET(request: NextRequest) {
 
         data._timestamp = new Date().toISOString()
         data._authMethod = authMethod
-        data._vercelOIDC = authMethod === "vercel-oidc"
-        logAccess(`Real data served for ${endpoint}`, true, { authMethod })
+        logAccess(`Hybrid data served for ${endpoint}`, true, {
+          authMethod,
+          hybrid: data._hybrid,
+          historicalDays: data._historicalDays,
+          ga4Days: data._ga4Days,
+        })
       } catch (apiError) {
-        console.error("Google Analytics API Error:", apiError)
+        console.error("Hybrid Analytics API Error:", apiError)
 
         // Fallback to mock data if API fails
         data = generateMockData(endpoint, "30d")
@@ -273,14 +272,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, {
       headers: {
         "Cache-Control": "private, max-age=300", // 5 minute cache
-        "X-Data-Source": data._mock ? "mock" : "google-analytics-vercel-oidc",
+        "X-Data-Source": data._mock ? "mock" : "hybrid-analytics",
         "X-Auth-Method": authMethod,
         "X-Timestamp": new Date().toISOString(),
-        "X-Vercel-OIDC": data._vercelOIDC ? "true" : "false",
+        "X-Hybrid": data._hybrid ? "true" : "false",
       },
     })
   } catch (error) {
-    console.error("Analytics API error:", error)
+    console.error("Hybrid Analytics API error:", error)
     logAccess(`API error: ${error instanceof Error ? error.message : "Unknown error"}`, false)
     return NextResponse.json(
       {

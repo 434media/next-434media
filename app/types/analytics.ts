@@ -9,6 +9,7 @@ export interface PageViewData {
   pageViews: number
   sessions: number
   users: number
+  bounceRate?: number
 }
 
 export interface TopPageData {
@@ -55,6 +56,46 @@ export interface SummaryData {
   totalUsers: number
   bounceRate: number
   averageSessionDuration: number
+}
+
+// Alias for backward compatibility
+export interface AnalyticsSummary extends SummaryData {}
+
+// Daily metrics data structure
+export interface DailyMetricsData {
+  date: string
+  pageViews: number
+  sessions: number
+  users: number
+  bounceRate?: number
+}
+
+// Response structures for API endpoints
+export interface PageViewsResponse {
+  data: TopPageData[] // Changed from PageViewData to TopPageData since we're dealing with pages, not daily data
+}
+
+export interface TopPagesResponse {
+  data: TopPageData[]
+}
+
+export interface TrafficSourcesResponse {
+  data: TrafficSourceData[]
+}
+
+export interface DeviceDataResponse {
+  data: DeviceData[]
+}
+
+export interface GeographicDataResponse {
+  data: GeographicData[]
+}
+
+export interface DailyMetricsResponse {
+  data: DailyMetricsData[]
+  totalPageViews: number
+  totalSessions: number
+  totalUsers: number
 }
 
 // Vercel OIDC Workload Identity Federation specific types
@@ -113,4 +154,38 @@ export interface ExternalAccountCredentials {
     environment_id: string
     regional_cred_verification_url: string
   }
+}
+
+// Migration and database types
+export interface MigrationStatus {
+  success: boolean
+  message: string
+  tablesCreated?: string[]
+  error?: string
+}
+
+export interface DatabaseTableInfo {
+  tableName: string
+  exists: boolean
+  rowCount: number
+}
+
+// CSV upload types
+export interface CSVUploadResponse {
+  success: boolean
+  message: string
+  rowsProcessed?: number
+  error?: string
+}
+
+// Hybrid analytics types
+export interface HybridAnalyticsResponse<T> {
+  data: T
+  _hybrid?: boolean
+  _historicalDays?: number
+  _ga4Days?: number
+  _historicalPages?: number
+  _ga4Pages?: number
+  _historicalData?: any
+  _ga4Data?: any
 }

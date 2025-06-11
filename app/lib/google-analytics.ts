@@ -8,6 +8,17 @@ import {
   getServiceAccountImpersonationUrl,
   getAuthenticationMethod,
 } from "./analytics-config"
+import type {
+  TopPageData,
+  SummaryData,
+  PageViewsResponse,
+  TrafficSourcesResponse,
+  DeviceDataResponse,
+  GeographicDataResponse,
+  DailyMetricsResponse,
+  RealtimeData,
+  AnalyticsConnectionStatus,
+} from "../types/analytics"
 
 // Initialize Google Analytics client with Vercel OIDC Workload Identity Federation
 let analyticsDataClient: BetaAnalyticsDataClient | null = null
@@ -101,11 +112,7 @@ Required environment variables:
 }
 
 // Test the Google Analytics connection with Vercel OIDC
-export async function testAnalyticsConnection(): Promise<{
-  success: boolean
-  error?: string
-  details?: any
-}> {
+export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStatus> {
   try {
     const client = getAnalyticsClient()
     if (!client || !analyticsConfig.ga4PropertyId) {
@@ -201,8 +208,8 @@ function handleAnalyticsError(error: any, operation: string) {
   throw new Error(`Failed to ${operation}`)
 }
 
-// Get page views and sessions data
-export async function getPageViewsData(dateRange: AnalyticsDateRange) {
+// Get daily metrics data
+export async function getDailyMetrics(startDate: string, endDate: string): Promise<DailyMetricsResponse> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -211,28 +218,77 @@ export async function getPageViewsData(dateRange: AnalyticsDateRange) {
   try {
     const [response] = await client.runReport({
       property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [dateRange],
+      dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "date" }],
       metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "activeUsers" }, { name: "bounceRate" }],
       orderBys: [{ dimension: { dimensionName: "date" } }],
     })
 
-    return (
+    const data =
       response.rows?.map((row) => ({
         date: row.dimensionValues?.[0]?.value || "",
         pageViews: Number.parseInt(row.metricValues?.[0]?.value || "0"),
         sessions: Number.parseInt(row.metricValues?.[1]?.value || "0"),
-        activeUsers: Number.parseInt(row.metricValues?.[2]?.value || "0"),
+        users: Number.parseInt(row.metricValues?.[2]?.value || "0"),
         bounceRate: Number.parseFloat(row.metricValues?.[3]?.value || "0"),
       })) || []
-    )
+
+    const totalPageViews = data.reduce((sum, day) => sum + day.pageViews, 0)
+    const totalSessions = data.reduce((sum, day) => sum + day.sessions, 0)
+    const totalUsers = data.reduce((sum, day) => sum + day.users, 0)
+
+    return {
+      data,
+      totalPageViews,
+      totalSessions,
+      totalUsers,
+    }
+  } catch (error) {
+    handleAnalyticsError(error, "fetch daily metrics")
+    return {
+      data: [],
+      totalPageViews: 0,
+      totalSessions: 0,
+      totalUsers: 0,
+    }
+  }
+}
+
+// Get page views data (returns top pages, not daily data)
+export async function getPageViewsData(startDate: string, endDate: string): Promise<PageViewsResponse> {
+  const client = getAnalyticsClient()
+  if (!client || !analyticsConfig.ga4PropertyId) {
+    throw new Error("Google Analytics not configured")
+  }
+
+  try {
+    const [response] = await client.runReport({
+      property: `properties/${analyticsConfig.ga4PropertyId}`,
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
+      metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
+      orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+      limit: 100,
+    })
+
+    const data =
+      response.rows?.map((row) => ({
+        path: row.dimensionValues?.[0]?.value || "",
+        title: row.dimensionValues?.[1]?.value || "",
+        pageViews: Number.parseInt(row.metricValues?.[0]?.value || "0"),
+        sessions: Number.parseInt(row.metricValues?.[1]?.value || "0"),
+        bounceRate: Number.parseFloat(row.metricValues?.[2]?.value || "0"),
+      })) || []
+
+    return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch page views data")
+    return { data: [] }
   }
 }
 
 // Get top pages data
-export async function getTopPagesData(dateRange: AnalyticsDateRange) {
+export async function getTopPagesData(dateRange: AnalyticsDateRange): Promise<TopPageData[]> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -259,11 +315,12 @@ export async function getTopPagesData(dateRange: AnalyticsDateRange) {
     )
   } catch (error) {
     handleAnalyticsError(error, "fetch top pages data")
+    return []
   }
 }
 
-// Get traffic sources data (referrers)
-export async function getTrafficSourcesData(dateRange: AnalyticsDateRange) {
+// Get traffic sources data
+export async function getTrafficSourcesData(startDate: string, endDate: string): Promise<TrafficSourcesResponse> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -272,14 +329,14 @@ export async function getTrafficSourcesData(dateRange: AnalyticsDateRange) {
   try {
     const [response] = await client.runReport({
       property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [dateRange],
+      dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "sessionSource" }, { name: "sessionMedium" }],
       metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "newUsers" }],
       orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
       limit: 15,
     })
 
-    return (
+    const data =
       response.rows?.map((row) => ({
         source: row.dimensionValues?.[0]?.value || "",
         medium: row.dimensionValues?.[1]?.value || "",
@@ -287,14 +344,16 @@ export async function getTrafficSourcesData(dateRange: AnalyticsDateRange) {
         users: Number.parseInt(row.metricValues?.[1]?.value || "0"),
         newUsers: Number.parseInt(row.metricValues?.[2]?.value || "0"),
       })) || []
-    )
+
+    return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch traffic sources data")
+    return { data: [] }
   }
 }
 
-// Get device data (desktop vs mobile)
-export async function getDeviceData(dateRange: AnalyticsDateRange) {
+// Get device data
+export async function getDeviceData(startDate: string, endDate: string): Promise<DeviceDataResponse> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -303,26 +362,28 @@ export async function getDeviceData(dateRange: AnalyticsDateRange) {
   try {
     const [response] = await client.runReport({
       property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [dateRange],
+      dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "deviceCategory" }],
       metrics: [{ name: "sessions" }, { name: "activeUsers" }],
       orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
     })
 
-    return (
+    const data =
       response.rows?.map((row) => ({
         deviceCategory: row.dimensionValues?.[0]?.value || "",
         sessions: Number.parseInt(row.metricValues?.[0]?.value || "0"),
         users: Number.parseInt(row.metricValues?.[1]?.value || "0"),
       })) || []
-    )
+
+    return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch device data")
+    return { data: [] }
   }
 }
 
-// Get geographic data (countries and cities)
-export async function getGeographicData(dateRange: AnalyticsDateRange) {
+// Get geographic data
+export async function getGeographicData(startDate: string, endDate: string): Promise<GeographicDataResponse> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -331,14 +392,14 @@ export async function getGeographicData(dateRange: AnalyticsDateRange) {
   try {
     const [response] = await client.runReport({
       property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [dateRange],
+      dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "country" }, { name: "city" }],
       metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "newUsers" }],
       orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
       limit: 20,
     })
 
-    return (
+    const data =
       response.rows?.map((row) => ({
         country: row.dimensionValues?.[0]?.value || "",
         city: row.dimensionValues?.[1]?.value || "",
@@ -346,14 +407,16 @@ export async function getGeographicData(dateRange: AnalyticsDateRange) {
         users: Number.parseInt(row.metricValues?.[1]?.value || "0"),
         newUsers: Number.parseInt(row.metricValues?.[2]?.value || "0"),
       })) || []
-    )
+
+    return { data }
   } catch (error) {
     handleAnalyticsError(error, "fetch geographic data")
+    return { data: [] }
   }
 }
 
 // Get real-time data
-export async function getRealtimeData() {
+export async function getRealtimeData(): Promise<RealtimeData> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -384,11 +447,15 @@ export async function getRealtimeData() {
     }
   } catch (error) {
     handleAnalyticsError(error, "fetch realtime data")
+    return {
+      totalActiveUsers: 0,
+      topCountries: [],
+    }
   }
 }
 
-// Get summary metrics
-export async function getSummaryData(dateRange: AnalyticsDateRange) {
+// Get analytics summary
+export async function getAnalyticsSummary(startDate: string, endDate: string): Promise<SummaryData> {
   const client = getAnalyticsClient()
   if (!client || !analyticsConfig.ga4PropertyId) {
     throw new Error("Google Analytics not configured")
@@ -397,7 +464,7 @@ export async function getSummaryData(dateRange: AnalyticsDateRange) {
   try {
     const [response] = await client.runReport({
       property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [dateRange],
+      dateRanges: [{ startDate, endDate }],
       metrics: [
         { name: "screenPageViews" },
         { name: "sessions" },
@@ -416,6 +483,16 @@ export async function getSummaryData(dateRange: AnalyticsDateRange) {
       averageSessionDuration: Number.parseFloat(row?.metricValues?.[4]?.value || "0"),
     }
   } catch (error) {
-    handleAnalyticsError(error, "fetch summary data")
+    handleAnalyticsError(error, "fetch analytics summary")
+    return {
+      totalPageViews: 0,
+      totalSessions: 0,
+      totalUsers: 0,
+      bounceRate: 0,
+      averageSessionDuration: 0,
+    }
   }
 }
+
+// Alias for backward compatibility
+export const getSummaryData = getAnalyticsSummary
