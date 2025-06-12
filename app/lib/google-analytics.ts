@@ -30,7 +30,7 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
         hasServiceAccountUrl: !!serviceAccountImpersonationUrl,
       })
 
-      // Create the external account credentials for Workload Identity Federation
+      // Create the external account credentials specifically for Vercel OIDC
       const credentials = {
         type: "external_account",
         audience,
@@ -40,10 +40,18 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
         credential_source: {
           environment_id: "vercel",
           regional_cred_verification_url: "https://vercel.com/oidc",
+          url: "https://vercel.com/oidc",
+          format: {
+            type: "json",
+            subject_token_field_name: "token",
+          },
+          headers: {
+            Authorization: "Bearer " + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+          },
         },
       }
 
-      console.log("[Analytics] Creating GoogleAuth with credentials...")
+      console.log("[Analytics] Creating GoogleAuth with Vercel OIDC credentials...")
 
       const auth = new GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
@@ -71,11 +79,57 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
   return analyticsDataClient
 }
 
-// Test the Google Analytics connection
+// Alternative initialization method using service account key (if OIDC fails)
+async function getAnalyticsClientWithServiceAccount(): Promise<BetaAnalyticsDataClient> {
+  if (!validateAnalyticsConfig()) {
+    throw new Error("Google Analytics configuration is incomplete. Check environment variables.")
+  }
+
+  try {
+    console.log("[Analytics] Attempting service account authentication...")
+
+    // Check if we have a service account key
+    const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+    if (!serviceAccountKey) {
+      throw new Error("No service account key provided")
+    }
+
+    const credentials = JSON.parse(serviceAccountKey)
+
+    const auth = new GoogleAuth({
+      scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
+      projectId: analyticsConfig.gcpProjectId,
+      credentials,
+    })
+
+    const client = new BetaAnalyticsDataClient({
+      auth,
+      projectId: analyticsConfig.gcpProjectId,
+    })
+
+    console.log("[Analytics] Successfully initialized with service account key")
+    return client
+  } catch (error) {
+    console.error("[Analytics] Service account authentication failed:", error)
+    throw error
+  }
+}
+
+// Test the Google Analytics connection with fallback
 export async function testAnalyticsConnection() {
   try {
     console.log("[Analytics] Testing connection...")
-    const client = await getAnalyticsClient()
+
+    let client: BetaAnalyticsDataClient
+
+    try {
+      // Try Vercel OIDC first
+      client = await getAnalyticsClient()
+    } catch (oidcError) {
+      console.log("[Analytics] OIDC failed, trying service account key...")
+      // Fallback to service account key
+      client = await getAnalyticsClientWithServiceAccount()
+    }
 
     console.log("[Analytics] Client initialized, testing metadata request...")
 
@@ -103,6 +157,8 @@ export async function testAnalyticsConnection() {
         propertyId: analyticsConfig.ga4PropertyId,
         projectId: analyticsConfig.gcpProjectId,
         serviceAccount: analyticsConfig.gcpServiceAccountEmail,
+        hasOIDCToken: !!process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+        hasServiceAccountKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
       },
     }
   }
@@ -114,8 +170,10 @@ function handleAnalyticsError(error: any, operation: string) {
 
   if (error instanceof Error) {
     // Check for specific error types
-    if (error.message.includes("credential_source")) {
-      throw new Error(`Authentication configuration error: ${error.message}. Check Workload Identity Federation setup.`)
+    if (error.message.includes("credential_source") || error.message.includes("AWS")) {
+      throw new Error(
+        `Authentication configuration error: ${error.message}. Try setting GOOGLE_SERVICE_ACCOUNT_KEY environment variable as fallback.`,
+      )
     }
     if (error.message.includes("permission") || error.message.includes("PERMISSION_DENIED")) {
       throw new Error(
@@ -138,9 +196,19 @@ function handleAnalyticsError(error: any, operation: string) {
   throw error
 }
 
+// Helper function to get client with fallback
+async function getClientWithFallback(): Promise<BetaAnalyticsDataClient> {
+  try {
+    return await getAnalyticsClient()
+  } catch (oidcError) {
+    console.log("[Analytics] OIDC failed, trying service account key fallback...")
+    return await getAnalyticsClientWithServiceAccount()
+  }
+}
+
 // Get analytics summary data
 export async function getAnalyticsSummary(startDate: string, endDate: string) {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log(`[Analytics] Fetching summary for ${startDate} to ${endDate}`)
@@ -176,7 +244,7 @@ export async function getAnalyticsSummary(startDate: string, endDate: string) {
 
 // Get daily metrics data
 export async function getDailyMetrics(startDate: string, endDate: string) {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log(`[Analytics] Fetching daily metrics for ${startDate} to ${endDate}`)
@@ -219,7 +287,7 @@ export async function getDailyMetrics(startDate: string, endDate: string) {
 
 // Get page views data
 export async function getPageViewsData(startDate: string, endDate: string) {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log(`[Analytics] Fetching page views for ${startDate} to ${endDate}`)
@@ -252,7 +320,7 @@ export async function getPageViewsData(startDate: string, endDate: string) {
 
 // Get traffic sources data
 export async function getTrafficSourcesData(startDate: string, endDate: string) {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log(`[Analytics] Fetching traffic sources for ${startDate} to ${endDate}`)
@@ -285,7 +353,7 @@ export async function getTrafficSourcesData(startDate: string, endDate: string) 
 
 // Get device data
 export async function getDeviceData(startDate: string, endDate: string) {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log(`[Analytics] Fetching device data for ${startDate} to ${endDate}`)
@@ -315,7 +383,7 @@ export async function getDeviceData(startDate: string, endDate: string) {
 
 // Get geographic data
 export async function getGeographicData(startDate: string, endDate: string) {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log(`[Analytics] Fetching geographic data for ${startDate} to ${endDate}`)
@@ -348,7 +416,7 @@ export async function getGeographicData(startDate: string, endDate: string) {
 
 // Get real-time data
 export async function getRealtimeData() {
-  const client = await getAnalyticsClient()
+  const client = await getClientWithFallback()
 
   try {
     console.log("[Analytics] Fetching realtime data")
