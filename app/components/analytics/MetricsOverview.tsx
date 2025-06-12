@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent } from "./Card"
-import { Eye, Users, MousePointer, TrendingUp, TrendingDown, Loader2, Activity } from "lucide-react"
+import { Eye, Users, MousePointer, TrendingUp, TrendingDown, Loader2 } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
 
 interface MetricsOverviewProps {
@@ -23,7 +23,6 @@ interface MetricData {
   sessionsChange: number
   usersChange: number
   bounceRateChange: number
-  activeUsers: number
 }
 
 export function MetricsOverview({
@@ -87,12 +86,11 @@ export function MetricsOverview({
           totalPageViews: result.totalPageViews || 0,
           totalSessions: result.totalSessions || 0,
           totalUsers: result.totalUsers || 0,
-          averageBounceRate: result.averageBounceRate || 0,
+          averageBounceRate: result.bounceRate || 0, // Note: API returns 'bounceRate', not 'averageBounceRate'
           pageViewsChange: result.pageViewsChange || 0,
           sessionsChange: result.sessionsChange || 0,
           usersChange: result.usersChange || 0,
           bounceRateChange: result.bounceRateChange || 0,
-          activeUsers: result.activeUsers || 0,
         }
 
         setData(validatedData)
@@ -119,24 +117,15 @@ export function MetricsOverview({
     }
   }, [dateRange, setError, adminKey])
 
-  const activeUsersMetric = {
-    title: "Active Users",
-    value: data?.activeUsers || 0,
-    icon: Activity,
-    color: "from-green-500 to-emerald-500",
-    bgColor: "from-green-500/20 to-emerald-500/20",
-    shadowColor: "shadow-green-500/25",
-  }
-
   const metrics = [
     {
-      title: "Page Views",
-      value: data?.totalPageViews || 0,
-      change: data?.pageViewsChange || 0,
-      icon: Eye,
-      color: "from-blue-500 to-cyan-500",
-      bgColor: "from-blue-500/20 to-cyan-500/20",
-      shadowColor: "shadow-blue-500/25",
+      title: "Users",
+      value: data?.totalUsers || 0,
+      change: data?.usersChange || 0,
+      icon: Users,
+      color: "from-purple-500 to-pink-500",
+      bgColor: "from-purple-500/20 to-pink-500/20",
+      shadowColor: "shadow-purple-500/25",
     },
     {
       title: "Sessions",
@@ -148,13 +137,13 @@ export function MetricsOverview({
       shadowColor: "shadow-emerald-500/25",
     },
     {
-      title: "Users",
-      value: data?.totalUsers || 0,
-      change: data?.usersChange || 0,
-      icon: Users,
-      color: "from-purple-500 to-pink-500",
-      bgColor: "from-purple-500/20 to-pink-500/20",
-      shadowColor: "shadow-purple-500/25",
+      title: "Page Views",
+      value: data?.totalPageViews || 0,
+      change: data?.pageViewsChange || 0,
+      icon: Eye,
+      color: "from-blue-500 to-cyan-500",
+      bgColor: "from-blue-500/20 to-cyan-500/20",
+      shadowColor: "shadow-blue-500/25",
     },
     {
       title: "Bounce Rate",
@@ -169,100 +158,7 @@ export function MetricsOverview({
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-6">
-      {/* Real-time Active Users - 1st card */}
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.9 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{
-          duration: 0.6,
-          delay: 0.4,
-          type: "spring",
-          stiffness: 100,
-        }}
-        className="col-span-1"
-      >
-        <Card
-          className={`
-          relative overflow-hidden border-0 
-          bg-gradient-to-br from-white/10 to-white/5 
-          backdrop-blur-xl shadow-2xl ${activeUsersMetric.shadowColor}
-          hover:shadow-3xl hover:scale-105 
-          transition-all duration-500 ease-out
-          group cursor-pointer h-[120px]
-        `}
-        >
-          <div
-            className={`
-            absolute inset-0 bg-gradient-to-br ${activeUsersMetric.bgColor} 
-            opacity-0 group-hover:opacity-100 transition-opacity duration-500
-          `}
-          />
-
-          <div
-            className={`
-            absolute inset-0 rounded-xl bg-gradient-to-br ${activeUsersMetric.color} 
-            opacity-20 blur-sm group-hover:opacity-40 transition-opacity duration-500
-          `}
-          />
-
-          <CardContent className="relative p-5 h-full flex flex-col justify-between mt-2">
-            {isLoading || parentLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-6 w-6 text-white/60 animate-spin" />
-              </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between mb-3">
-                  <motion.div
-                    className={`
-                      p-2.5 bg-gradient-to-br ${activeUsersMetric.color} 
-                      rounded-xl shadow-lg group-hover:scale-110 
-                      transition-transform duration-300
-                    `}
-                    whileHover={{ rotate: 5 }}
-                  >
-                    <activeUsersMetric.icon className="h-4 w-4 text-white drop-shadow-sm" />
-                  </motion.div>
-
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.3, 1],
-                        opacity: [0.7, 1, 0.7],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Number.POSITIVE_INFINITY,
-                        ease: "easeInOut",
-                      }}
-                      className="w-2 h-2 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50"
-                    />
-                    <span className="text-emerald-300 text-xs font-medium">LIVE</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{
-                      delay: 0.6,
-                      type: "spring",
-                      stiffness: 200,
-                    }}
-                    className="text-2xl font-bold text-white drop-shadow-sm leading-none"
-                  >
-                    {activeUsersMetric.value.toLocaleString()}
-                  </motion.div>
-                  <p className="text-white/70 text-sm font-medium leading-none">{activeUsersMetric.title}</p>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
       {/* Main Metrics - 4 cards */}
       {metrics.map((metric, index) => (
         <motion.div

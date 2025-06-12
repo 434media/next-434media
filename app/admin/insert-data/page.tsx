@@ -20,9 +20,11 @@ import {
   Calendar,
   Trash2,
   BarChart3,
+  Info,
+  ExternalLink,
 } from "lucide-react"
 import { useToast } from "../../hooks/use-toast"
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 
 interface DataStatus {
   trafficSources: number
@@ -57,6 +59,7 @@ interface UploadResult {
 }
 
 type DateRangeOption = "7days" | "30days" | "90days"
+type DataType = "trafficSources" | "pageViews" | "geographic" | "devices" | "dailySummary" | "all"
 
 export default function InsertDataPage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(true)
@@ -81,6 +84,8 @@ export default function InsertDataPage() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [dbInitialized, setDbInitialized] = useState(false)
   const [initializing, setInitializing] = useState(false)
+  const [deletingData, setDeletingData] = useState(false)
+  const [selectedDataTypes, setSelectedDataTypes] = useState<DataType[]>([])
   const { toast } = useToast()
 
   // Check if database is initialized
@@ -384,6 +389,74 @@ export default function InsertDataPage() {
     }
   }
 
+  const toggleDataTypeSelection = (dataType: DataType) => {
+    setSelectedDataTypes((prev) => {
+      if (dataType === "all") {
+        // If "all" is selected, toggle between all selected and none selected
+        return prev.length === 5 ? [] : ["trafficSources", "pageViews", "geographic", "devices", "dailySummary"]
+      } else {
+        // Toggle individual data type
+        return prev.includes(dataType) ? prev.filter((type) => type !== dataType) : [...prev, dataType]
+      }
+    })
+  }
+
+  const deleteSelectedData = async () => {
+    if (selectedDataTypes.length === 0) {
+      toast({
+        title: "No data types selected",
+        description: "Please select at least one data type to delete.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete the selected data types? This cannot be undone.`)) {
+      return
+    }
+
+    setDeletingData(true)
+
+    try {
+      const response = await fetch("/api/analytics/delete-data-types", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminPassword,
+        },
+        body: JSON.stringify({ dataTypes: selectedDataTypes }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Data deleted",
+          description: `Successfully deleted ${result.deletedCount} records from ${selectedDataTypes.length} data types.`,
+          variant: "default",
+        })
+        // Reset selected data types
+        setSelectedDataTypes([])
+        // Refresh data status
+        checkDatabaseStatus()
+      } else {
+        toast({
+          title: "Error deleting data",
+          description: result.error || "Unknown error",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error deleting data",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingData(false)
+    }
+  }
+
   const getStatusBadge = (count: number) => {
     if (count > 0) {
       return (
@@ -397,6 +470,14 @@ export default function InsertDataPage() {
         Empty
       </Badge>
     )
+  }
+
+  const isDataTypeSelected = (dataType: DataType) => {
+    return selectedDataTypes.includes(dataType)
+  }
+
+  const areAllDataTypesSelected = () => {
+    return selectedDataTypes.length === 5
   }
 
   return (
@@ -425,11 +506,63 @@ export default function InsertDataPage() {
               </Button>
             </div>
 
+            {/* Data Source Information */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="mb-8"
+            >
+              <Card className="border-blue-300 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-blue-400 to-blue-500 text-white">
+                  <CardTitle className="flex items-center gap-2">
+                    <Info size={20} />
+                    Data Source Information
+                  </CardTitle>
+                  <CardDescription className="text-blue-100">
+                    Understanding where your analytics data comes from
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <p>The analytics dashboard uses data from two potential sources:</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="border rounded-lg p-4 bg-blue-50">
+                        <h3 className="font-medium text-blue-700 flex items-center gap-2 mb-2">
+                          <Database className="h-4 w-4" /> Local Database
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Data stored in your Neon database. This includes historical data you've uploaded or generated.
+                          To test Google Analytics connection, delete this data.
+                        </p>
+                      </div>
+                      <div className="border rounded-lg p-4 bg-green-50">
+                        <h3 className="font-medium text-green-700 flex items-center gap-2 mb-2">
+                          <ExternalLink className="h-4 w-4" /> Google Analytics API
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Live data fetched directly from Google Analytics. If your GA4 connection is working, you'll
+                          still see data after clearing the local database.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                      <p className="text-sm text-amber-800">
+                        <strong>Tip:</strong> To verify your Google Analytics connection is working, delete all local
+                        data using the tools below, then visit the analytics dashboard. Any data that appears is coming
+                        directly from Google Analytics.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
             {!dbInitialized && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
               >
                 <Card className="mb-8 border-yellow-300 overflow-hidden">
                   <div className="relative">
@@ -470,11 +603,11 @@ export default function InsertDataPage() {
               </motion.div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
               >
                 <Card className="overflow-hidden h-full">
                   <div className="relative">
@@ -546,7 +679,7 @@ export default function InsertDataPage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
               >
                 <Card className="overflow-hidden h-full">
                   <div className="relative">
@@ -659,6 +792,148 @@ export default function InsertDataPage() {
                 </Card>
               </motion.div>
             </div>
+
+            {/* Selective Data Deletion */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+              className="mb-8"
+            >
+              <Card className="overflow-hidden border-red-200">
+                <CardHeader className="bg-gradient-to-r from-red-500 to-red-700 text-white">
+                  <CardTitle className="flex items-center gap-2">
+                    <Trash2 size={20} />
+                    Selective Data Deletion
+                  </CardTitle>
+                  <CardDescription className="text-red-100">
+                    Delete specific types of data from the database
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                      <p className="text-sm text-amber-800">
+                        <strong>Testing Google Analytics Connection:</strong> Delete all local data to verify if your
+                        Google Analytics connection is working. Any data that appears in the dashboard after deletion is
+                        coming directly from Google Analytics.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium">Select Data Types to Delete</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleDataTypeSelection("all")}
+                          className={areAllDataTypesSelected() ? "bg-red-50 text-red-700 border-red-300" : ""}
+                        >
+                          {areAllDataTypesSelected() ? "Deselect All" : "Select All"}
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => toggleDataTypeSelection("trafficSources")}
+                          className={`justify-start ${
+                            isDataTypeSelected("trafficSources") ? "bg-red-50 text-red-700 border-red-300" : ""
+                          }`}
+                          disabled={dataStatus.trafficSources === 0}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>Traffic Sources</span>
+                            {getStatusBadge(dataStatus.trafficSources)}
+                          </div>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => toggleDataTypeSelection("pageViews")}
+                          className={`justify-start ${
+                            isDataTypeSelected("pageViews") ? "bg-red-50 text-red-700 border-red-300" : ""
+                          }`}
+                          disabled={dataStatus.pageViews === 0}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>Page Views</span>
+                            {getStatusBadge(dataStatus.pageViews)}
+                          </div>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => toggleDataTypeSelection("geographic")}
+                          className={`justify-start ${
+                            isDataTypeSelected("geographic") ? "bg-red-50 text-red-700 border-red-300" : ""
+                          }`}
+                          disabled={dataStatus.geographic === 0}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>Geographic Data</span>
+                            {getStatusBadge(dataStatus.geographic)}
+                          </div>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => toggleDataTypeSelection("devices")}
+                          className={`justify-start ${
+                            isDataTypeSelected("devices") ? "bg-red-50 text-red-700 border-red-300" : ""
+                          }`}
+                          disabled={dataStatus.devices === 0}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>Device Data</span>
+                            {getStatusBadge(dataStatus.devices)}
+                          </div>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => toggleDataTypeSelection("dailySummary")}
+                          className={`justify-start ${
+                            isDataTypeSelected("dailySummary") ? "bg-red-50 text-red-700 border-red-300" : ""
+                          }`}
+                          disabled={dataStatus.dailySummary === 0}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>Daily Summary</span>
+                            {getStatusBadge(dataStatus.dailySummary)}
+                          </div>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t">
+                      <Button
+                        variant="destructive"
+                        onClick={deleteSelectedData}
+                        disabled={
+                          deletingData ||
+                          selectedDataTypes.length === 0 ||
+                          !Object.values(dataStatus).some((val) => typeof val === "number" && val > 0)
+                        }
+                        className="w-full"
+                      >
+                        {deletingData ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Selected Data Types
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             {uploading && (
               <motion.div

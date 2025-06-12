@@ -18,6 +18,7 @@ export interface AnalyticsSummary {
   usersChange?: number
   bounceRateChange?: number
   activeUsers?: number
+  _source?: string
 }
 
 export interface DailyMetricsData {
@@ -33,6 +34,7 @@ export interface DailyMetricsResponse {
   totalPageViews: number
   totalSessions: number
   totalUsers: number
+  _source?: string
 }
 
 export interface TopPageData {
@@ -45,6 +47,7 @@ export interface TopPageData {
 
 export interface PageViewsResponse {
   data: TopPageData[]
+  _source?: string
 }
 
 export interface TrafficSourceData {
@@ -57,6 +60,7 @@ export interface TrafficSourceData {
 
 export interface TrafficSourcesResponse {
   data: TrafficSourceData[]
+  _source?: string
 }
 
 export interface DeviceData {
@@ -67,6 +71,7 @@ export interface DeviceData {
 
 export interface DeviceDataResponse {
   data: DeviceData[]
+  _source?: string
 }
 
 export interface GeographicData {
@@ -79,6 +84,7 @@ export interface GeographicData {
 
 export interface GeographicDataResponse {
   data: GeographicData[]
+  _source?: string
 }
 
 export interface RealtimeData {
@@ -87,6 +93,7 @@ export interface RealtimeData {
     country: string
     activeUsers: number
   }>
+  _source?: string
 }
 
 // Connection status - simplified

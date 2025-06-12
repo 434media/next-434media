@@ -19,12 +19,71 @@ interface PageViewsChartProps {
 export function PageViewsChart({ dateRange, isLoading: parentLoading = false, setError }: PageViewsChartProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [dataSource, setDataSource] = useState<string>("loading")
+
+  // Helper function to properly format dates
+  const formatDateString = (dateStr: string): string => {
+    // Check if the date is in YYYYMMDD format (GA4 format)
+    if (/^\d{8}$/.test(dateStr)) {
+      const year = dateStr.substring(0, 4)
+      const month = dateStr.substring(4, 6)
+      const day = dateStr.substring(6, 8)
+      return `${year}-${month}-${day}`
+    }
+
+    // If it's already in YYYY-MM-DD format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr
+    }
+
+    // If it's in another format, try to parse it
+    const parsedDate = new Date(dateStr)
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString().split("T")[0]
+    }
+
+    // If all else fails, return the original string
+    console.warn(`[PageViewsChart] Could not parse date: ${dateStr}`)
+    return dateStr
+  }
+
+  // Helper function to format date for display
+  const formatDateForDisplay = (dateStr: string): string => {
+    try {
+      // First ensure we have a properly formatted date string
+      const formattedDateStr = formatDateString(dateStr)
+
+      // Create a date object and format it
+      const date = new Date(formattedDateStr)
+
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.warn(`[PageViewsChart] Invalid date after formatting: ${formattedDateStr}`)
+        return dateStr // Return original if still invalid
+      }
+
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    } catch (error) {
+      console.error(`[PageViewsChart] Error formatting date ${dateStr}:`, error)
+      return dateStr // Return original on error
+    }
+  }
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
       try {
         const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+
+        // Log the request details for debugging
+        console.log("[PageViewsChart] Fetching data with:", {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          hasAdminKey: !!adminKey,
+        })
 
         const response = await fetch(
           `/api/analytics?endpoint=daily-metrics&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
@@ -37,28 +96,55 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
 
         if (!response.ok) {
           const errorText = await response.text()
-          console.error("API Error Response:", errorText)
+          console.error("[PageViewsChart] API Error Response:", errorText)
           throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
         }
 
         const result = await response.json()
+        console.log("[PageViewsChart] API Response:", result)
 
-        if (result && result.dailyMetrics) {
-          const formattedData = result.dailyMetrics.map((item: any) => ({
-            date: new Date(item.date).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            }),
-            pageViews: item.pageViews,
-            originalDate: item.date,
-          }))
+        // Check if we have the expected data structure
+        if (result && result.data && Array.isArray(result.data)) {
+          setDataSource(result._source || "google-analytics")
+
+          const formattedData = result.data.map((item: any) => {
+            // Log the raw date for debugging
+            console.log(`[PageViewsChart] Processing date: ${item.date}`)
+
+            return {
+              date: formatDateForDisplay(item.date),
+              pageViews: item.pageViews || 0,
+              originalDate: item.date,
+            }
+          })
+
+          console.log("[PageViewsChart] Formatted data:", formattedData)
+          setData(formattedData)
+        } else if (result && result.dailyMetrics && Array.isArray(result.dailyMetrics)) {
+          // Alternative data structure
+          setDataSource(result._source || "historical")
+
+          const formattedData = result.dailyMetrics.map((item: any) => {
+            // Log the raw date for debugging
+            console.log(`[PageViewsChart] Processing date (alt): ${item.date}`)
+
+            return {
+              date: formatDateForDisplay(item.date),
+              pageViews: item.pageViews || 0,
+              originalDate: item.date,
+            }
+          })
+
+          console.log("[PageViewsChart] Formatted data (alternative):", formattedData)
           setData(formattedData)
         } else {
+          console.error("[PageViewsChart] Unexpected data structure:", result)
           setData([])
+          setError("Unexpected data structure received from API")
         }
       } catch (error: any) {
-        console.error("Error loading page views:", error)
-        setError("Failed to load page views data")
+        console.error("[PageViewsChart] Error loading page views:", error)
+        setError(`Failed to load page views data: ${error.message}`)
         setData([])
       } finally {
         setIsLoading(false)
@@ -98,6 +184,14 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
               >
                 <Loader2 className="h-8 w-8 text-blue-400" />
               </motion.div>
+            </div>
+          ) : data.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 md:h-96 text-white/60">
+              <p className="text-lg mb-2">No data available</p>
+              <p className="text-sm text-center max-w-md">
+                No page view data was found for the selected date range. Try selecting a different date range or check
+                your Google Analytics configuration.
+              </p>
             </div>
           ) : (
             <div className="w-full overflow-hidden">
@@ -210,7 +304,7 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
-                  <span>Live data</span>
+                  <span>Data source: {dataSource}</span>
                 </div>
               </div>
             </motion.div>

@@ -153,7 +153,10 @@ export async function GET(request: NextRequest) {
       case "pageviews":
         console.log("[Analytics API] Fetching daily metrics...")
         const dailyMetrics = await getDailyMetrics(startDate, endDate)
-        console.log("[Analytics API] Daily metrics result:", { dataLength: dailyMetrics.data.length })
+        console.log("[Analytics API] Daily metrics result:", {
+          dataLength: dailyMetrics.data.length,
+          source: dailyMetrics._source || "unknown",
+        })
         return NextResponse.json(dailyMetrics)
 
       case "pages":

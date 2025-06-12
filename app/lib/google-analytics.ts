@@ -147,6 +147,7 @@ export async function getAnalyticsSummary(startDate: string, endDate: string): P
       totalUsers: Number(row.metricValues[2]?.value || 0),
       bounceRate: Number(row.metricValues[3]?.value || 0),
       averageSessionDuration: Number(row.metricValues[4]?.value || 0),
+      _source: "google-analytics",
     }
   } catch (error) {
     console.error("[GA4] Error in getAnalyticsSummary:", error)
@@ -186,24 +187,54 @@ export async function getDailyMetrics(startDate: string, endDate: string): Promi
       orderBys: [{ dimension: { dimensionName: "date" } }],
     })
 
+    console.log("[GA4] Daily metrics raw response:", JSON.stringify(response, null, 2))
+
     const data =
-      response.rows?.map((row) => ({
-        date: row.dimensionValues?.[0]?.value || "",
-        pageViews: Number(row.metricValues?.[0]?.value || 0),
-        sessions: Number(row.metricValues?.[1]?.value || 0),
-        users: Number(row.metricValues?.[2]?.value || 0),
-        bounceRate: Number(row.metricValues?.[3]?.value || 0),
-      })) || []
+      response.rows?.map((row) => {
+        // Get the date string from the dimension value
+        const dateStr = row.dimensionValues?.[0]?.value || ""
+
+        // Log the raw date format from GA4
+        console.log(`[GA4] Raw date from GA4: ${dateStr}`)
+
+        // Format the date if it's in YYYYMMDD format (GA4 format)
+        let formattedDate = dateStr
+        if (/^\d{8}$/.test(dateStr)) {
+          const year = dateStr.substring(0, 4)
+          const month = dateStr.substring(4, 6)
+          const day = dateStr.substring(6, 8)
+          formattedDate = `${year}-${month}-${day}`
+          console.log(`[GA4] Formatted date: ${formattedDate}`)
+        }
+
+        return {
+          date: formattedDate,
+          pageViews: Number(row.metricValues?.[0]?.value || 0),
+          sessions: Number(row.metricValues?.[1]?.value || 0),
+          users: Number(row.metricValues?.[2]?.value || 0),
+          bounceRate: Number(row.metricValues?.[3]?.value || 0),
+        }
+      }) || []
 
     const totalPageViews = data.reduce((sum, day) => sum + day.pageViews, 0)
     const totalSessions = data.reduce((sum, day) => sum + day.sessions, 0)
     const totalUsers = data.reduce((sum, day) => sum + day.users, 0)
+
+    console.log("[GA4] Processed daily metrics:", {
+      dataLength: data.length,
+      totalPageViews,
+      totalSessions,
+      totalUsers,
+      firstDay: data[0],
+      lastDay: data[data.length - 1],
+    })
 
     return {
       data,
       totalPageViews,
       totalSessions,
       totalUsers,
+      _source: "google-analytics",
     }
   } catch (error) {
     console.error("[GA4] Error in getDailyMetrics:", error)
@@ -253,7 +284,10 @@ export async function getPageViewsData(startDate: string, endDate: string): Prom
         bounceRate: Number(row.metricValues?.[2]?.value || 0),
       })) || []
 
-    return { data }
+    return {
+      data,
+      _source: "google-analytics",
+    }
   } catch (error) {
     console.error("[GA4] Error in getPageViewsData:", error)
     throw error
@@ -302,7 +336,10 @@ export async function getTrafficSourcesData(startDate: string, endDate: string):
         newUsers: Number(row.metricValues?.[2]?.value || 0),
       })) || []
 
-    return { data }
+    return {
+      data,
+      _source: "google-analytics",
+    }
   } catch (error) {
     console.error("[GA4] Error in getTrafficSourcesData:", error)
     throw error
@@ -348,7 +385,10 @@ export async function getDeviceData(startDate: string, endDate: string): Promise
         users: Number(row.metricValues?.[1]?.value || 0),
       })) || []
 
-    return { data }
+    return {
+      data,
+      _source: "google-analytics",
+    }
   } catch (error) {
     console.error("[GA4] Error in getDeviceData:", error)
     throw error
@@ -397,7 +437,10 @@ export async function getGeographicData(startDate: string, endDate: string): Pro
         newUsers: Number(row.metricValues?.[2]?.value || 0),
       })) || []
 
-    return { data }
+    return {
+      data,
+      _source: "google-analytics",
+    }
   } catch (error) {
     console.error("[GA4] Error in getGeographicData:", error)
     throw error
@@ -441,6 +484,7 @@ export async function getRealtimeData(): Promise<RealtimeData> {
     return {
       totalActiveUsers,
       topCountries,
+      _source: "google-analytics",
     }
   } catch (error) {
     console.error("[GA4] Error in getRealtimeData:", error)
