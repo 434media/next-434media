@@ -7,7 +7,7 @@ import {
   validateAnalyticsConfig,
 } from "./analytics-config"
 
-// Initialize Google Analytics client with proper Vercel OIDC
+// Initialize Google Analytics client
 let analyticsDataClient: BetaAnalyticsDataClient | null = null
 
 async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
@@ -17,12 +17,7 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
 
   if (!analyticsDataClient) {
     try {
-      console.log("[Analytics] Initializing Google Analytics client with Vercel OIDC")
-
-      // Check if we're in Vercel environment
-      if (!process.env.VERCEL) {
-        throw new Error("Google Analytics client can only be initialized in Vercel environment")
-      }
+      console.log("[Analytics] Initializing Google Analytics client")
 
       const audience = getWorkloadIdentityAudience()
       const serviceAccountImpersonationUrl = getServiceAccountImpersonationUrl()
@@ -35,7 +30,7 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
         hasServiceAccountUrl: !!serviceAccountImpersonationUrl,
       })
 
-      // Create the external account credentials for Vercel OIDC
+      // Create the external account credentials for Workload Identity Federation
       const credentials = {
         type: "external_account",
         audience,
@@ -120,9 +115,7 @@ function handleAnalyticsError(error: any, operation: string) {
   if (error instanceof Error) {
     // Check for specific error types
     if (error.message.includes("credential_source")) {
-      throw new Error(
-        `Authentication configuration error: ${error.message}. Check Vercel OIDC Workload Identity Federation setup.`,
-      )
+      throw new Error(`Authentication configuration error: ${error.message}. Check Workload Identity Federation setup.`)
     }
     if (error.message.includes("permission") || error.message.includes("PERMISSION_DENIED")) {
       throw new Error(

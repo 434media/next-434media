@@ -1,4 +1,4 @@
-// Google Analytics 4 Configuration for Vercel OIDC
+// Google Analytics 4 Configuration
 export const analyticsConfig = {
   // Google Analytics
   ga4PropertyId: process.env.GA4_PROPERTY_ID,
@@ -7,7 +7,7 @@ export const analyticsConfig = {
   gcpProjectId: process.env.GCP_PROJECT_ID,
   gcpProjectNumber: process.env.GCP_PROJECT_NUMBER,
 
-  // Vercel OIDC Workload Identity Federation
+  // Workload Identity Federation
   gcpWorkloadIdentityPoolId: process.env.GCP_WORKLOAD_IDENTITY_POOL_ID,
   gcpWorkloadIdentityPoolProviderId: process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID,
   gcpServiceAccountEmail: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
@@ -16,28 +16,43 @@ export const analyticsConfig = {
   adminPassword: process.env.ADMIN_PASSWORD,
 } as const
 
+// Get missing environment variables
+export function getMissingEnvironmentVariables(): string[] {
+  const missing = []
+
+  if (!analyticsConfig.ga4PropertyId) missing.push("GA4_PROPERTY_ID")
+  if (!analyticsConfig.gcpProjectId) missing.push("GCP_PROJECT_ID")
+  if (!analyticsConfig.gcpProjectNumber) missing.push("GCP_PROJECT_NUMBER")
+  if (!analyticsConfig.gcpWorkloadIdentityPoolId) missing.push("GCP_WORKLOAD_IDENTITY_POOL_ID")
+  if (!analyticsConfig.gcpWorkloadIdentityPoolProviderId) missing.push("GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID")
+  if (!analyticsConfig.gcpServiceAccountEmail) missing.push("GCP_SERVICE_ACCOUNT_EMAIL")
+  if (!analyticsConfig.adminPassword) missing.push("ADMIN_PASSWORD")
+
+  return missing
+}
+
 // Validation function for required environment variables
 export function validateAnalyticsConfig(): boolean {
-  const required = [
-    analyticsConfig.ga4PropertyId,
-    analyticsConfig.gcpProjectId,
-    analyticsConfig.gcpProjectNumber,
-    analyticsConfig.gcpWorkloadIdentityPoolId,
-    analyticsConfig.gcpWorkloadIdentityPoolProviderId,
-    analyticsConfig.gcpServiceAccountEmail,
-    analyticsConfig.adminPassword,
-  ]
-
-  const missing = required.filter((value) => !value || value.trim() === "")
+  const missing = getMissingEnvironmentVariables()
 
   if (missing.length > 0) {
-    console.error("[Analytics Config] Missing required environment variables")
+    console.error("[Analytics Config] Missing required environment variables:", missing)
     return false
   }
 
-  // Ensure we're in Vercel environment for OIDC
-  if (!process.env.VERCEL) {
-    console.error("[Analytics Config] Vercel OIDC requires deployment to Vercel")
+  // Additional validation for format
+  if (analyticsConfig.ga4PropertyId && !analyticsConfig.ga4PropertyId.match(/^\d+$/)) {
+    console.error("[Analytics Config] GA4_PROPERTY_ID should be numeric")
+    return false
+  }
+
+  if (analyticsConfig.gcpProjectNumber && !analyticsConfig.gcpProjectNumber.match(/^\d+$/)) {
+    console.error("[Analytics Config] GCP_PROJECT_NUMBER should be numeric")
+    return false
+  }
+
+  if (analyticsConfig.gcpServiceAccountEmail && !analyticsConfig.gcpServiceAccountEmail.includes("@")) {
+    console.error("[Analytics Config] GCP_SERVICE_ACCOUNT_EMAIL should be a valid email")
     return false
   }
 
@@ -49,7 +64,7 @@ export function isAnalyticsConfigured(): boolean {
   return validateAnalyticsConfig()
 }
 
-// Generate the Workload Identity Federation audience for Vercel OIDC
+// Generate the Workload Identity Federation audience
 export function getWorkloadIdentityAudience(): string {
   if (
     !analyticsConfig.gcpProjectNumber ||
@@ -73,15 +88,26 @@ export function getServiceAccountImpersonationUrl(): string {
 
 // Get configuration status for debugging
 export function getConfigurationStatus() {
+  const missing = getMissingEnvironmentVariables()
+
   return {
     configured: validateAnalyticsConfig(),
+    missingVariables: missing,
     propertyId: analyticsConfig.ga4PropertyId,
     projectId: analyticsConfig.gcpProjectId,
     projectNumber: analyticsConfig.gcpProjectNumber,
     serviceAccount: analyticsConfig.gcpServiceAccountEmail,
     workloadIdentityPool: analyticsConfig.gcpWorkloadIdentityPoolId,
     workloadIdentityProvider: analyticsConfig.gcpWorkloadIdentityPoolProviderId,
-    isVercelDeployment: !!process.env.VERCEL,
     hasAdminPassword: !!analyticsConfig.adminPassword,
+    environmentVariables: {
+      GA4_PROPERTY_ID: !!process.env.GA4_PROPERTY_ID,
+      GCP_PROJECT_ID: !!process.env.GCP_PROJECT_ID,
+      GCP_PROJECT_NUMBER: !!process.env.GCP_PROJECT_NUMBER,
+      GCP_WORKLOAD_IDENTITY_POOL_ID: !!process.env.GCP_WORKLOAD_IDENTITY_POOL_ID,
+      GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: !!process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID,
+      GCP_SERVICE_ACCOUNT_EMAIL: !!process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+      ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+    },
   }
 }

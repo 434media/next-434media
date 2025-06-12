@@ -47,19 +47,41 @@ function formatDateForGA(dateString: string): string {
 export async function GET(request: NextRequest) {
   console.log("[Analytics API] Request received:", request.url)
 
-  // Check configuration first
+  // Get detailed configuration status
   const configStatus = getConfigurationStatus()
-  console.log("[Analytics API] Configuration status:", configStatus)
+  console.log("[Analytics API] Detailed configuration:", configStatus)
+
+  // Check which specific variables are missing
+  const missingVars = []
+  if (!process.env.GA4_PROPERTY_ID) missingVars.push("GA4_PROPERTY_ID")
+  if (!process.env.GCP_PROJECT_ID) missingVars.push("GCP_PROJECT_ID")
+  if (!process.env.GCP_PROJECT_NUMBER) missingVars.push("GCP_PROJECT_NUMBER")
+  if (!process.env.GCP_WORKLOAD_IDENTITY_POOL_ID) missingVars.push("GCP_WORKLOAD_IDENTITY_POOL_ID")
+  if (!process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID) missingVars.push("GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID")
+  if (!process.env.GCP_SERVICE_ACCOUNT_EMAIL) missingVars.push("GCP_SERVICE_ACCOUNT_EMAIL")
+  if (!process.env.ADMIN_PASSWORD) missingVars.push("ADMIN_PASSWORD")
+
+  console.log("[Analytics API] Missing environment variables:", missingVars)
 
   if (!validateAnalyticsConfig()) {
     console.error("[Analytics API] Configuration validation failed")
     return NextResponse.json(
       {
-        error: "Google Analytics not configured. Check environment variables.",
+        error: "Google Analytics not configured. Missing required environment variables.",
+        missingVariables: missingVars,
         config: configStatus,
-        missingVars: Object.entries(configStatus)
-          .filter(([key, value]) => !value)
-          .map(([key]) => key),
+        help: {
+          message: "Set these environment variables in your deployment platform:",
+          required: [
+            "GA4_PROPERTY_ID - Your Google Analytics 4 property ID",
+            "GCP_PROJECT_ID - Your Google Cloud project ID",
+            "GCP_PROJECT_NUMBER - Your Google Cloud project number",
+            "GCP_WORKLOAD_IDENTITY_POOL_ID - Workload Identity pool ID",
+            "GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID - Workload Identity provider ID",
+            "GCP_SERVICE_ACCOUNT_EMAIL - Service account email with Analytics access",
+            "ADMIN_PASSWORD - Password for analytics dashboard access",
+          ],
+        },
       },
       { status: 400 },
     )
@@ -107,7 +129,6 @@ export async function GET(request: NextRequest) {
           totalUsers: summary.totalUsers,
         })
 
-        // Add percentage changes (mock for now, you can implement comparison logic)
         const enhancedSummary = {
           ...summary,
           pageViewsChange: 0,
@@ -125,6 +146,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(dailyMetrics)
 
       case "pages":
+      case "toppages": // Handle both endpoint names
         console.log("[Analytics API] Fetching page views...")
         const pageViews = await getPageViewsData(startDate, endDate)
         console.log("[Analytics API] Page views fetched:", pageViews.data.length, "pages")
@@ -162,26 +184,27 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Analytics API] Error:", error)
 
-    // Provide more specific error information
     let errorMessage = "Unknown error occurred"
     let statusCode = 500
 
     if (error instanceof Error) {
       errorMessage = error.message
 
-      // Check for specific Google Analytics errors
-      if (error.message.includes("permission")) {
+      if (error.message.includes("permission") || error.message.includes("PERMISSION_DENIED")) {
         statusCode = 403
         errorMessage = "Permission denied. Check Google Analytics permissions for the service account."
-      } else if (error.message.includes("quota")) {
+      } else if (error.message.includes("quota") || error.message.includes("QUOTA_EXCEEDED")) {
         statusCode = 429
         errorMessage = "Google Analytics API quota exceeded. Try again later."
       } else if (error.message.includes("authentication") || error.message.includes("credentials")) {
         statusCode = 401
-        errorMessage = "Authentication failed. Check Vercel OIDC Workload Identity Federation setup."
+        errorMessage = "Authentication failed. Check Google Analytics authentication setup."
       } else if (error.message.includes("INVALID_ARGUMENT")) {
         statusCode = 400
         errorMessage = "Invalid request parameters. Check GA4 Property ID and date formats."
+      } else if (error.message.includes("NOT_FOUND")) {
+        statusCode = 404
+        errorMessage = "GA4 Property not found. Verify the property ID is correct."
       }
     }
 
@@ -192,7 +215,6 @@ export async function GET(request: NextRequest) {
         startDate,
         endDate,
         timestamp: new Date().toISOString(),
-        config: configStatus,
       },
       { status: statusCode },
     )
