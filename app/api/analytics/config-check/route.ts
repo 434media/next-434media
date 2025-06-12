@@ -1,41 +1,33 @@
 import { NextResponse } from "next/server"
-import { getConfigurationStatus, getAuthenticationMethod } from "../../../lib/analytics-config"
-import { testAnalyticsConnection } from "../../../lib/google-analytics"
+import { validateAnalyticsConfig, getConfigurationStatus, analyticsConfig } from "../../../lib/analytics-config"
 
 export async function GET() {
-  try {
-    const configStatus = getConfigurationStatus()
-    const authMethod = getAuthenticationMethod()
-    const connectionTest = await testAnalyticsConnection()
+  const configStatus = getConfigurationStatus()
+  const isValid = validateAnalyticsConfig()
 
-    return NextResponse.json({
-      ...configStatus,
-      authMethod,
-      connectionTest,
-      environment: process.env.NODE_ENV,
-      isVercelDeployment: !!process.env.VERCEL,
-      timestamp: new Date().toISOString(),
-      vercelOIDCSetup: {
-        hasPoolId: !!process.env.GCP_WORKLOAD_IDENTITY_POOL_ID,
-        hasProviderId: !!process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID,
-        hasServiceAccountEmail: !!process.env.GCP_SERVICE_ACCOUNT_EMAIL,
-        hasProjectNumber: !!process.env.GCP_PROJECT_NUMBER,
-        hasProjectId: !!process.env.GCP_PROJECT_ID,
-        poolId: process.env.GCP_WORKLOAD_IDENTITY_POOL_ID,
-        providerId: process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID,
-        serviceAccountEmail: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
-        projectNumber: process.env.GCP_PROJECT_NUMBER,
-        projectId: process.env.GCP_PROJECT_ID,
-      },
-    })
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to check configuration",
-        details: error instanceof Error ? error.message : "Unknown error",
-        authMethod: getAuthenticationMethod(),
-      },
-      { status: 500 },
-    )
-  }
+  return NextResponse.json({
+    isValid,
+    config: configStatus,
+    environment: {
+      isVercel: !!process.env.VERCEL,
+      nodeEnv: process.env.NODE_ENV,
+    },
+    recommendations: [
+      !configStatus.ga4PropertyId && "Set GA4_PROPERTY_ID environment variable",
+      !configStatus.gcpProjectId && "Set GCP_PROJECT_ID environment variable",
+      !configStatus.gcpServiceAccountEmail && "Set GCP_SERVICE_ACCOUNT_EMAIL environment variable",
+      !configStatus.gcpWorkloadIdentityPoolId && "Set GCP_WORKLOAD_IDENTITY_POOL_ID environment variable",
+      !configStatus.gcpWorkloadIdentityPoolProviderId &&
+        "Set GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID environment variable",
+      !configStatus.gcpProjectNumber && "Set GCP_PROJECT_NUMBER environment variable",
+      !configStatus.hasAdminPassword && "Set ADMIN_PASSWORD environment variable",
+    ].filter(Boolean),
+    debugInfo: {
+      ga4PropertyId: analyticsConfig.ga4PropertyId ? `${analyticsConfig.ga4PropertyId.substring(0, 8)}...` : "missing",
+      gcpProjectId: analyticsConfig.gcpProjectId || "missing",
+      serviceAccount: analyticsConfig.gcpServiceAccountEmail
+        ? `${analyticsConfig.gcpServiceAccountEmail.split("@")[0]}@...`
+        : "missing",
+    },
+  })
 }
