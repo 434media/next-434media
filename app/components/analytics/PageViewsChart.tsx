@@ -24,7 +24,7 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const adminKey = localStorage.getItem("adminKey")
+        const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
 
         const response = await fetch(
           `/api/analytics?endpoint=daily-metrics&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
@@ -36,7 +36,9 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
         )
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+          const errorText = await response.text()
+          console.error("API Error Response:", errorText)
+          throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
         }
 
         const result = await response.json()
@@ -64,7 +66,7 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
     }
 
     loadData()
-  }, [dateRange, setError])
+  }, [dateRange.startDate, dateRange.endDate, dateRange.label, setError])
 
   return (
     <motion.div

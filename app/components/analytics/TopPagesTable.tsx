@@ -22,7 +22,7 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const adminKey = sessionStorage.getItem("adminKey")
+        const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
         const response = await fetch(
           `/api/analytics?endpoint=toppages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
           {
@@ -92,11 +92,13 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {data.slice(0, 10).map((page, index) => {
+                // Create a unique key using path and index
+                const uniqueKey = `page-${page.path.replace(/[^a-zA-Z0-9]/g, "-")}-${index}`
                 const percentage = totalViews > 0 ? (page.pageViews / totalViews) * 100 : 0
 
                 return (
                   <motion.div
-                    key={page.path}
+                    key={uniqueKey}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}

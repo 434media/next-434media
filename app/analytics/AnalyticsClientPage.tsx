@@ -33,16 +33,37 @@ export default function AnalyticsClientPage() {
     }
   }, [])
 
+  // Refresh data when date range changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      forceRefreshData()
+    }
+  }, [selectedDateRange, isAuthenticated])
+
   const handleVerified = (password: string) => {
     sessionStorage.setItem("adminKey", password)
     setIsAuthenticated(true)
   }
 
-  const handleRefresh = () => {
+  // Force refresh data when needed
+  const forceRefreshData = () => {
     setIsLoading(true)
+    // Create a custom event to trigger data refresh in child components
+    window.dispatchEvent(
+      new CustomEvent("analytics-refresh", {
+        detail: { timestamp: Date.now() },
+      }),
+    )
+
+    // Set a timeout to ensure loading state is visible
+    setTimeout(() => {
+      setIsLoading(false)
+    }, 1000)
+  }
+
+  const handleRefresh = () => {
     testConnection()
-    window.dispatchEvent(new CustomEvent("analytics-refresh"))
-    setTimeout(() => setIsLoading(false), 1000)
+    forceRefreshData()
   }
 
   const handleDateRangeChange = (range: DateRange) => {
@@ -243,7 +264,7 @@ export default function AnalyticsClientPage() {
             </motion.div>
           </>
 
-          {/* Footer */}
+           {/* Footer */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
