@@ -89,7 +89,7 @@ export interface RealtimeData {
   }>
 }
 
-// Connection status
+// Connection status - simplified
 export interface AnalyticsConnectionStatus {
   success: boolean
   error?: string
@@ -97,16 +97,14 @@ export interface AnalyticsConnectionStatus {
   dimensionCount?: number
   metricCount?: number
   projectId?: string
-  serviceAccount?: string
 }
 
-// Configuration status
+// Configuration status - simplified
 export interface ConfigurationStatus {
-  ga4PropertyId: boolean
-  gcpProjectId: boolean
-  gcpServiceAccountEmail: boolean
-  gcpWorkloadIdentityProvider: boolean
-  gcpServiceAccountImpersonationUrl: boolean
-  isVercelDeployment: boolean
+  configured: boolean
+  missingVariables: string[]
+  propertyId?: string
+  projectId?: string
+  hasServiceAccountKey: boolean
   hasAdminPassword: boolean
 }

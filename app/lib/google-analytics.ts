@@ -1,57 +1,56 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data"
 import { GoogleAuth } from "google-auth-library"
-import {
-  analyticsConfig,
-  getWorkloadIdentityAudience,
-  getServiceAccountImpersonationUrl,
-  validateAnalyticsConfig,
-} from "./analytics-config"
+import { analyticsConfig, validateAnalyticsConfig } from "./analytics-config"
 
 // Initialize Google Analytics client
 let analyticsDataClient: BetaAnalyticsDataClient | null = null
 
+// Create service account credentials from environment variable
+function createServiceAccountCredentials() {
+  console.log("[Analytics] Creating service account credentials...")
+
+  if (!analyticsConfig.googleServiceAccountKey) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY environment variable is required")
+  }
+
+  try {
+    console.log("[Analytics] Parsing service account key...")
+    const credentials = JSON.parse(analyticsConfig.googleServiceAccountKey)
+
+    // Validate required fields
+    if (!credentials.client_email || !credentials.private_key) {
+      throw new Error("Service account key missing required fields (client_email, private_key)")
+    }
+
+    console.log("[Analytics] Service account credentials parsed successfully")
+    console.log("[Analytics] Using service account:", credentials.client_email)
+    console.log("[Analytics] Project ID from credentials:", credentials.project_id)
+
+    return credentials
+  } catch (error) {
+    console.error("[Analytics] Failed to parse service account key:", error)
+    console.error("[Analytics] Service account key length:", analyticsConfig.googleServiceAccountKey?.length)
+    console.error(
+      "[Analytics] Service account key preview:",
+      analyticsConfig.googleServiceAccountKey?.substring(0, 100) + "...",
+    )
+    throw new Error("Invalid GOOGLE_SERVICE_ACCOUNT_KEY format - must be valid JSON")
+  }
+}
+
 async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
+  console.log("[Analytics] Getting analytics client...")
+
   if (!validateAnalyticsConfig()) {
     throw new Error("Google Analytics configuration is incomplete. Check environment variables.")
   }
 
   if (!analyticsDataClient) {
     try {
-      console.log("[Analytics] Initializing Google Analytics client")
+      console.log("[Analytics] Initializing Google Analytics client with service account key")
 
-      const audience = getWorkloadIdentityAudience()
-      const serviceAccountImpersonationUrl = getServiceAccountImpersonationUrl()
-
-      console.log("[Analytics] Auth configuration:", {
-        audience: audience.substring(0, 50) + "...",
-        serviceAccountEmail: analyticsConfig.gcpServiceAccountEmail,
-        projectId: analyticsConfig.gcpProjectId,
-        hasAudience: !!audience,
-        hasServiceAccountUrl: !!serviceAccountImpersonationUrl,
-      })
-
-      // Create the external account credentials specifically for Vercel OIDC
-      const credentials = {
-        type: "external_account",
-        audience,
-        subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-        token_url: "https://oauth2.googleapis.com/token",
-        service_account_impersonation_url: serviceAccountImpersonationUrl,
-        credential_source: {
-          environment_id: "vercel",
-          regional_cred_verification_url: "https://vercel.com/oidc",
-          url: "https://vercel.com/oidc",
-          format: {
-            type: "json",
-            subject_token_field_name: "token",
-          },
-          headers: {
-            Authorization: "Bearer " + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
-          },
-        },
-      }
-
-      console.log("[Analytics] Creating GoogleAuth with Vercel OIDC credentials...")
+      const credentials = createServiceAccountCredentials()
+      console.log("[Analytics] Credentials created, initializing GoogleAuth...")
 
       const auth = new GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
@@ -59,16 +58,23 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
         credentials,
       })
 
-      console.log("[Analytics] Creating BetaAnalyticsDataClient...")
+      console.log("[Analytics] GoogleAuth initialized, creating BetaAnalyticsDataClient...")
 
+      // Use the correct Analytics Data API service endpoint
       analyticsDataClient = new BetaAnalyticsDataClient({
         auth,
         projectId: analyticsConfig.gcpProjectId,
+        apiEndpoint: "https://analyticsdata.googleapis.com",
+        timeout: 30000, // 30 seconds
       })
 
       console.log("[Analytics] Successfully initialized Google Analytics client")
     } catch (error) {
       console.error("[Analytics] Failed to initialize client:", error)
+      console.error("[Analytics] Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : "No stack trace",
+      })
       analyticsDataClient = null
       throw new Error(
         `Failed to initialize Google Analytics: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -79,63 +85,61 @@ async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
   return analyticsDataClient
 }
 
-// Alternative initialization method using service account key (if OIDC fails)
-async function getAnalyticsClientWithServiceAccount(): Promise<BetaAnalyticsDataClient> {
-  if (!validateAnalyticsConfig()) {
-    throw new Error("Google Analytics configuration is incomplete. Check environment variables.")
-  }
+// Helper function to retry API calls
+async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> {
+  let lastError: any
 
-  try {
-    console.log("[Analytics] Attempting service account authentication...")
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Analytics] Attempt ${attempt}/${maxRetries}`)
+      return await operation()
+    } catch (error) {
+      lastError = error
+      console.error(`[Analytics] Attempt ${attempt} failed:`, error instanceof Error ? error.message : String(error))
 
-    // Check if we have a service account key
-    const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-    if (!serviceAccountKey) {
-      throw new Error("No service account key provided")
+      // Check if it's a network error that might be transient
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.includes("ETIMEDOUT") ||
+          error.message.includes("ECONNREFUSED") ||
+          error.message.includes("ENOTFOUND") ||
+          error.message.includes("UNAVAILABLE") ||
+          error.message.includes("network") ||
+          error.message.includes("connection"))
+
+      if (!isNetworkError || attempt === maxRetries) {
+        throw error
+      }
+
+      console.log(`[Analytics] Network error, retrying (${attempt}/${maxRetries}): ${error.message}`)
+      await new Promise((resolve) => setTimeout(resolve, delay * attempt))
     }
-
-    const credentials = JSON.parse(serviceAccountKey)
-
-    const auth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
-      projectId: analyticsConfig.gcpProjectId,
-      credentials,
-    })
-
-    const client = new BetaAnalyticsDataClient({
-      auth,
-      projectId: analyticsConfig.gcpProjectId,
-    })
-
-    console.log("[Analytics] Successfully initialized with service account key")
-    return client
-  } catch (error) {
-    console.error("[Analytics] Service account authentication failed:", error)
-    throw error
   }
+
+  throw lastError
 }
 
-// Test the Google Analytics connection with fallback
+// Test the Google Analytics connection
 export async function testAnalyticsConnection() {
   try {
     console.log("[Analytics] Testing connection...")
+    console.log("[Analytics] Configuration check:", {
+      propertyId: analyticsConfig.ga4PropertyId,
+      projectId: analyticsConfig.gcpProjectId,
+      hasServiceAccountKey: !!analyticsConfig.googleServiceAccountKey,
+    })
 
-    let client: BetaAnalyticsDataClient
-
-    try {
-      // Try Vercel OIDC first
-      client = await getAnalyticsClient()
-    } catch (oidcError) {
-      console.log("[Analytics] OIDC failed, trying service account key...")
-      // Fallback to service account key
-      client = await getAnalyticsClientWithServiceAccount()
-    }
-
+    const client = await getAnalyticsClient()
     console.log("[Analytics] Client initialized, testing metadata request...")
 
-    // Test with a simple metadata request
-    const [response] = await client.getMetadata({
-      name: `properties/${analyticsConfig.ga4PropertyId}/metadata`,
+    // Test with a simple metadata request with retry
+    const response = await retryOperation(async () => {
+      console.log("[Analytics] Making metadata request...")
+      const [resp] = await client.getMetadata({
+        name: `properties/${analyticsConfig.ga4PropertyId}/metadata`,
+      })
+      console.log("[Analytics] Metadata request completed successfully")
+      return resp
     })
 
     console.log("[Analytics] Metadata request successful")
@@ -146,20 +150,37 @@ export async function testAnalyticsConnection() {
       dimensionCount: response.dimensions?.length || 0,
       metricCount: response.metrics?.length || 0,
       projectId: analyticsConfig.gcpProjectId,
-      serviceAccount: analyticsConfig.gcpServiceAccountEmail,
     }
   } catch (error) {
     console.error("[Analytics] Connection test failed:", error)
+
+    let errorMessage = "Unknown error"
+    if (error instanceof Error) {
+      errorMessage = error.message
+
+      // Network connectivity errors
+      if (
+        error.message.includes("ETIMEDOUT") ||
+        error.message.includes("ECONNREFUSED") ||
+        error.message.includes("ENOTFOUND") ||
+        error.message.includes("UNAVAILABLE")
+      ) {
+        errorMessage = `Network connectivity issue: ${error.message}. The server cannot reach Google Analytics API. This may be due to network restrictions, firewall settings, or DNS issues.`
+      }
+      // Permission errors
+      else if (error.message.includes("permission") || error.message.includes("PERMISSION_DENIED")) {
+        errorMessage = `Permission denied. Please ensure:
+1. Analytics Data API is enabled in Google Cloud Console
+2. Service account has 'Viewer' role on GA4 property ${analyticsConfig.ga4PropertyId}
+3. Service account email is added as a user in Google Analytics`
+      }
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      details: {
-        propertyId: analyticsConfig.ga4PropertyId,
-        projectId: analyticsConfig.gcpProjectId,
-        serviceAccount: analyticsConfig.gcpServiceAccountEmail,
-        hasOIDCToken: !!process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
-        hasServiceAccountKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-      },
+      error: errorMessage,
+      propertyId: analyticsConfig.ga4PropertyId,
+      projectId: analyticsConfig.gcpProjectId,
     }
   }
 }
@@ -167,63 +188,74 @@ export async function testAnalyticsConnection() {
 // Enhanced error handling for Google Analytics API calls
 function handleAnalyticsError(error: any, operation: string) {
   console.error(`[Analytics] ${operation} failed:`, error)
+  console.error(`[Analytics] Error type:`, typeof error)
+  console.error(`[Analytics] Error constructor:`, error?.constructor?.name)
+  console.error(`[Analytics] Error message:`, error instanceof Error ? error.message : String(error))
 
   if (error instanceof Error) {
-    // Check for specific error types
-    if (error.message.includes("credential_source") || error.message.includes("AWS")) {
+    // Network connectivity errors
+    if (
+      error.message.includes("ETIMEDOUT") ||
+      error.message.includes("ECONNREFUSED") ||
+      error.message.includes("ENOTFOUND") ||
+      error.message.includes("UNAVAILABLE") ||
+      error.message.includes("No connection established")
+    ) {
       throw new Error(
-        `Authentication configuration error: ${error.message}. Try setting GOOGLE_SERVICE_ACCOUNT_KEY environment variable as fallback.`,
+        `Network connectivity issue: Cannot connect to Google Analytics API. This may be due to network restrictions on your hosting provider. Error: ${error.message}`,
       )
     }
-    if (error.message.includes("permission") || error.message.includes("PERMISSION_DENIED")) {
+    // Permission errors
+    else if (error.message.includes("permission") || error.message.includes("PERMISSION_DENIED")) {
       throw new Error(
-        `Permission denied: Service account ${analyticsConfig.gcpServiceAccountEmail} needs Analytics Data API access.`,
+        `Permission denied: Service account needs Analytics Data API access for property ${analyticsConfig.ga4PropertyId}. Please ensure:
+1. Analytics Data API is enabled in Google Cloud Console
+2. Service account has 'Viewer' role on the GA4 property
+3. Service account email is added as a user in Google Analytics`,
       )
-    }
-    if (error.message.includes("quota") || error.message.includes("QUOTA_EXCEEDED")) {
+    } else if (error.message.includes("quota") || error.message.includes("QUOTA_EXCEEDED")) {
       throw new Error(
         `API quota exceeded. Check Google Analytics API quotas for project: ${analyticsConfig.gcpProjectId}`,
       )
-    }
-    if (error.message.includes("INVALID_ARGUMENT")) {
+    } else if (error.message.includes("INVALID_ARGUMENT")) {
       throw new Error(`Invalid request parameters. Check GA4 Property ID: ${analyticsConfig.ga4PropertyId}`)
-    }
-    if (error.message.includes("NOT_FOUND")) {
+    } else if (error.message.includes("NOT_FOUND")) {
       throw new Error(`GA4 Property not found: ${analyticsConfig.ga4PropertyId}. Verify the property ID is correct.`)
+    } else if (error.message.includes("authentication") || error.message.includes("credentials")) {
+      throw new Error("Authentication failed. Check GOOGLE_SERVICE_ACCOUNT_KEY format and permissions.")
     }
   }
 
   throw error
 }
 
-// Helper function to get client with fallback
-async function getClientWithFallback(): Promise<BetaAnalyticsDataClient> {
-  try {
-    return await getAnalyticsClient()
-  } catch (oidcError) {
-    console.log("[Analytics] OIDC failed, trying service account key fallback...")
-    return await getAnalyticsClientWithServiceAccount()
-  }
-}
-
 // Get analytics summary data
 export async function getAnalyticsSummary(startDate: string, endDate: string) {
-  const client = await getClientWithFallback()
+  console.log(`[Analytics] getAnalyticsSummary called with dates: ${startDate} to ${endDate}`)
+
+  const client = await getAnalyticsClient()
+  console.log("[Analytics] Client obtained, making runReport request...")
 
   try {
-    console.log(`[Analytics] Fetching summary for ${startDate} to ${endDate}`)
-
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      metrics: [
-        { name: "screenPageViews" },
-        { name: "sessions" },
-        { name: "activeUsers" },
-        { name: "bounceRate" },
-        { name: "averageSessionDuration" },
-      ],
+    const response = await retryOperation(async () => {
+      console.log("[Analytics] Making runReport request for summary...")
+      const [resp] = await client.runReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        metrics: [
+          { name: "screenPageViews" },
+          { name: "sessions" },
+          { name: "activeUsers" },
+          { name: "bounceRate" },
+          { name: "averageSessionDuration" },
+        ],
+      })
+      console.log("[Analytics] runReport request completed successfully")
+      return resp
     })
+
+    console.log("[Analytics] Processing response...")
+    console.log("[Analytics] Response rows count:", response.rows?.length || 0)
 
     const row = response.rows?.[0]
     const result = {
@@ -234,9 +266,10 @@ export async function getAnalyticsSummary(startDate: string, endDate: string) {
       averageSessionDuration: Number.parseFloat(row?.metricValues?.[4]?.value || "0"),
     }
 
-    console.log("[Analytics] Summary fetched:", result)
+    console.log("[Analytics] Summary processed successfully:", result)
     return result
   } catch (error) {
+    console.error("[Analytics] Error in getAnalyticsSummary:", error)
     handleAnalyticsError(error, "fetch analytics summary")
     throw error
   }
@@ -244,17 +277,20 @@ export async function getAnalyticsSummary(startDate: string, endDate: string) {
 
 // Get daily metrics data
 export async function getDailyMetrics(startDate: string, endDate: string) {
-  const client = await getClientWithFallback()
+  const client = await getAnalyticsClient()
 
   try {
     console.log(`[Analytics] Fetching daily metrics for ${startDate} to ${endDate}`)
 
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "date" }],
-      metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "activeUsers" }, { name: "bounceRate" }],
-      orderBys: [{ dimension: { dimensionName: "date" } }],
+    const response = await retryOperation(async () => {
+      const [resp] = await client.runReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "date" }],
+        metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "activeUsers" }, { name: "bounceRate" }],
+        orderBys: [{ dimension: { dimensionName: "date" } }],
+      })
+      return resp
     })
 
     const data =
@@ -287,18 +323,21 @@ export async function getDailyMetrics(startDate: string, endDate: string) {
 
 // Get page views data
 export async function getPageViewsData(startDate: string, endDate: string) {
-  const client = await getClientWithFallback()
+  const client = await getAnalyticsClient()
 
   try {
     console.log(`[Analytics] Fetching page views for ${startDate} to ${endDate}`)
 
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
-      metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
-      orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-      limit: 100,
+    const response = await retryOperation(async () => {
+      const [resp] = await client.runReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
+        metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
+        orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+        limit: 100,
+      })
+      return resp
     })
 
     const data =
@@ -320,18 +359,21 @@ export async function getPageViewsData(startDate: string, endDate: string) {
 
 // Get traffic sources data
 export async function getTrafficSourcesData(startDate: string, endDate: string) {
-  const client = await getClientWithFallback()
+  const client = await getAnalyticsClient()
 
   try {
     console.log(`[Analytics] Fetching traffic sources for ${startDate} to ${endDate}`)
 
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "sessionSource" }, { name: "sessionMedium" }],
-      metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "newUsers" }],
-      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-      limit: 15,
+    const response = await retryOperation(async () => {
+      const [resp] = await client.runReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "sessionSource" }, { name: "sessionMedium" }],
+        metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "newUsers" }],
+        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+        limit: 15,
+      })
+      return resp
     })
 
     const data =
@@ -353,17 +395,20 @@ export async function getTrafficSourcesData(startDate: string, endDate: string) 
 
 // Get device data
 export async function getDeviceData(startDate: string, endDate: string) {
-  const client = await getClientWithFallback()
+  const client = await getAnalyticsClient()
 
   try {
     console.log(`[Analytics] Fetching device data for ${startDate} to ${endDate}`)
 
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "deviceCategory" }],
-      metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    const response = await retryOperation(async () => {
+      const [resp] = await client.runReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "deviceCategory" }],
+        metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      })
+      return resp
     })
 
     const data =
@@ -383,18 +428,21 @@ export async function getDeviceData(startDate: string, endDate: string) {
 
 // Get geographic data
 export async function getGeographicData(startDate: string, endDate: string) {
-  const client = await getClientWithFallback()
+  const client = await getAnalyticsClient()
 
   try {
     console.log(`[Analytics] Fetching geographic data for ${startDate} to ${endDate}`)
 
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "country" }, { name: "city" }],
-      metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "newUsers" }],
-      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-      limit: 20,
+    const response = await retryOperation(async () => {
+      const [resp] = await client.runReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "country" }, { name: "city" }],
+        metrics: [{ name: "sessions" }, { name: "activeUsers" }, { name: "newUsers" }],
+        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+        limit: 20,
+      })
+      return resp
     })
 
     const data =
@@ -416,16 +464,19 @@ export async function getGeographicData(startDate: string, endDate: string) {
 
 // Get real-time data
 export async function getRealtimeData() {
-  const client = await getClientWithFallback()
+  const client = await getAnalyticsClient()
 
   try {
     console.log("[Analytics] Fetching realtime data")
 
-    const [response] = await client.runRealtimeReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      metrics: [{ name: "activeUsers" }],
-      dimensions: [{ name: "country" }],
-      limit: 10,
+    const response = await retryOperation(async () => {
+      const [resp] = await client.runRealtimeReport({
+        property: `properties/${analyticsConfig.ga4PropertyId}`,
+        metrics: [{ name: "activeUsers" }],
+        dimensions: [{ name: "country" }],
+        limit: 10,
+      })
+      return resp
     })
 
     const totalActiveUsers =

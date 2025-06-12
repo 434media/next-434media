@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent } from "./Card"
@@ -11,7 +10,8 @@ import type { DateRange } from "../../types/analytics"
 interface MetricsOverviewProps {
   dateRange: DateRange
   isLoading?: boolean
-  setError: React.Dispatch<React.SetStateAction<string | null>>
+  setError?: React.Dispatch<React.SetStateAction<string | null>>
+  adminKey?: string
 }
 
 interface MetricData {
@@ -26,40 +26,98 @@ interface MetricData {
   activeUsers: number
 }
 
-export function MetricsOverview({ dateRange, isLoading: parentLoading = false, setError }: MetricsOverviewProps) {
+export function MetricsOverview({
+  dateRange,
+  isLoading: parentLoading = false,
+  setError,
+  adminKey,
+}: MetricsOverviewProps) {
   const [data, setData] = useState<MetricData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const loadData = async () => {
+      console.log("[MetricsOverview] Starting loadData...")
       setIsLoading(true)
+
       try {
-        const adminKey = sessionStorage.getItem("adminKey")
-        const response = await fetch(
-          `/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-          {
-            headers: {
-              "x-admin-key": adminKey || "",
-            },
+        // Get admin key from props or session storage
+        const authKey = adminKey || sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+
+        console.log("[MetricsOverview] Auth key found:", !!authKey)
+        console.log("[MetricsOverview] Date range:", dateRange)
+
+        if (!authKey) {
+          throw new Error("No admin key found - please log in again")
+        }
+
+        const url = `/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        console.log("[MetricsOverview] Making request to:", url)
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-key": authKey,
           },
-        )
+        })
+
+        console.log("[MetricsOverview] Response status:", response.status)
+        console.log("[MetricsOverview] Response headers:", Object.fromEntries(response.headers.entries()))
 
         if (!response.ok) {
-          throw new Error("Failed to fetch metrics data")
+          const errorText = await response.text()
+          console.error("[MetricsOverview] Error response text:", errorText)
+
+          let errorData
+          try {
+            errorData = JSON.parse(errorText)
+          } catch {
+            errorData = { error: errorText }
+          }
+
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
         }
 
         const result = await response.json()
-        setData(result)
+        console.log("[MetricsOverview] Success response:", result)
+
+        // Ensure we have valid data structure
+        const validatedData: MetricData = {
+          totalPageViews: result.totalPageViews || 0,
+          totalSessions: result.totalSessions || 0,
+          totalUsers: result.totalUsers || 0,
+          averageBounceRate: result.averageBounceRate || 0,
+          pageViewsChange: result.pageViewsChange || 0,
+          sessionsChange: result.sessionsChange || 0,
+          usersChange: result.usersChange || 0,
+          bounceRateChange: result.bounceRateChange || 0,
+          activeUsers: result.activeUsers || 0,
+        }
+
+        setData(validatedData)
       } catch (error) {
-        console.error("Error loading metrics:", error)
-        setError("Failed to load metrics data")
+        console.error("[MetricsOverview] Error in loadData:", error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+
+        if (setError) {
+          setError(`Failed to load metrics: ${errorMessage}`)
+        } else {
+          console.error("No setError function provided to handle error:", errorMessage)
+        }
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadData()
-  }, [dateRange, setError])
+    // Only load data if we have a valid date range
+    if (dateRange && dateRange.startDate && dateRange.endDate) {
+      loadData()
+    } else {
+      console.warn("[MetricsOverview] Invalid date range:", dateRange)
+      setIsLoading(false)
+    }
+  }, [dateRange, setError, adminKey])
 
   const activeUsersMetric = {
     title: "Active Users",
@@ -134,7 +192,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
           group cursor-pointer h-[120px]
         `}
         >
-          {/* Animated background gradient */}
           <div
             className={`
             absolute inset-0 bg-gradient-to-br ${activeUsersMetric.bgColor} 
@@ -142,7 +199,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
           `}
           />
 
-          {/* Subtle border glow */}
           <div
             className={`
             absolute inset-0 rounded-xl bg-gradient-to-br ${activeUsersMetric.color} 
@@ -150,14 +206,13 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
           `}
           />
 
-          <CardContent className="relative p-5 h-full flex flex-col justify-between mt-2">
+          <CardContent className="relative p-5 h-full flex flex-col justify-between">
             {isLoading || parentLoading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-6 w-6 text-white/60 animate-spin" />
               </div>
             ) : (
               <>
-                {/* Header with icon and live indicator */}
                 <div className="flex items-start justify-between mb-3">
                   <motion.div
                     className={`
@@ -170,7 +225,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
                     <activeUsersMetric.icon className="h-4 w-4 text-white drop-shadow-sm" />
                   </motion.div>
 
-                  {/* Live indicator */}
                   <div className="flex items-center gap-2">
                     <motion.div
                       animate={{
@@ -188,7 +242,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
                   </div>
                 </div>
 
-                {/* Value and title */}
                 <div className="space-y-1">
                   <motion.div
                     initial={{ scale: 0, opacity: 0 }}
@@ -234,7 +287,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
             group cursor-pointer h-[120px]
           `}
           >
-            {/* Animated background gradient */}
             <div
               className={`
               absolute inset-0 bg-gradient-to-br ${metric.bgColor} 
@@ -242,7 +294,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
             `}
             />
 
-            {/* Subtle border glow */}
             <div
               className={`
               absolute inset-0 rounded-xl bg-gradient-to-br ${metric.color} 
@@ -250,14 +301,13 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
             `}
             />
 
-            <CardContent className="relative p-5 h-full flex flex-col justify-between mt-2">
+            <CardContent className="relative p-5 h-full flex flex-col justify-between">
               {isLoading || parentLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-6 w-6 text-white/60 animate-spin" />
                 </div>
               ) : (
                 <>
-                  {/* Header with icon and trend */}
                   <div className="flex items-start justify-between mb-3">
                     <motion.div
                       className={`
@@ -290,7 +340,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
                     )}
                   </div>
 
-                  {/* Value and title */}
                   <div className="space-y-1">
                     <motion.div
                       initial={{ scale: 0, opacity: 0 }}
@@ -312,7 +361,6 @@ export function MetricsOverview({ dateRange, isLoading: parentLoading = false, s
           </Card>
         </motion.div>
       ))}
-
     </div>
   )
 }

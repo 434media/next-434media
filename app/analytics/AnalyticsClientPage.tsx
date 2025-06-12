@@ -26,9 +26,10 @@ export default function AnalyticsClientPage() {
 
   // Check for existing admin session
   useEffect(() => {
-    const adminKey = sessionStorage.getItem("adminKey")
+    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
     if (adminKey) {
       setIsAuthenticated(true)
+      testConnection()
     }
   }, [])
 
@@ -51,12 +52,13 @@ export default function AnalyticsClientPage() {
 
   const handleLogout = () => {
     sessionStorage.removeItem("adminKey")
+    localStorage.removeItem("adminKey")
     setIsAuthenticated(false)
   }
 
   const testConnection = async () => {
     try {
-      const adminKey = sessionStorage.getItem("adminKey")
+      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
       if (!adminKey) {
         return
       }
@@ -74,12 +76,6 @@ export default function AnalyticsClientPage() {
       // Don't set error - just continue with zero data
     }
   }
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      testConnection()
-    }
-  }, [isAuthenticated])
 
   if (!isAuthenticated) {
     return (
@@ -164,6 +160,27 @@ export default function AnalyticsClientPage() {
             </motion.div>
           )}
 
+          {/* Error Display */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="mb-4"
+            >
+              <div className="p-4 rounded-xl backdrop-blur-sm bg-red-500/10 border border-red-500/20">
+                <p className="text-sm font-medium text-red-400">Error</p>
+                <p className="text-xs text-white/60 mt-1">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md transition-colors mt-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {/* Analytics Dashboard - Always show components */}
           <>
             {/* Metrics Overview */}
@@ -234,9 +251,9 @@ export default function AnalyticsClientPage() {
             className="text-center text-white/60 text-sm"
           >
             <p>
-              Powered by Google Analytics 4 <span className="hidden md:inline">•</span>
-              {connectionStatus?.propertyId && ` Property: ${connectionStatus.propertyId} • `} {' '}
-              <span className="block md:inline">Last updated: {new Date().toLocaleString()} </span>
+              Powered by Google Analytics 4 •
+              {connectionStatus?.propertyId && ` Property: ${connectionStatus.propertyId} • `}
+              Last updated: {new Date().toLocaleString()}
             </p>
           </motion.div>
         </div>
