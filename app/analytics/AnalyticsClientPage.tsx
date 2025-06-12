@@ -58,29 +58,20 @@ export default function AnalyticsClientPage() {
     try {
       const adminKey = sessionStorage.getItem("adminKey")
       if (!adminKey) {
-        setError("No admin key found")
         return
       }
 
-      const response = await fetch("/api/analytics?action=test-connection", {
+      const response = await fetch("/api/analytics?endpoint=test-connection", {
         headers: { "x-admin-key": adminKey },
       })
 
-      if (!response.ok) {
-        throw new Error(`Connection test failed: ${response.status}`)
-      }
-
-      const status = await response.json()
-      setConnectionStatus(status)
-
-      if (status.success) {
-        setError(null)
-      } else {
-        setError(`Google Analytics connection failed: ${status.error}`)
+      if (response.ok) {
+        const status = await response.json()
+        setConnectionStatus(status)
       }
     } catch (err) {
       console.error("Connection test error:", err)
-      setError(err instanceof Error ? err.message : "Connection test failed")
+      // Don't set error - just continue with zero data
     }
   }
 
@@ -144,34 +135,22 @@ export default function AnalyticsClientPage() {
             <DateRangeSelector selectedRange={selectedDateRange} onRangeChange={handleDateRangeChange} />
           </motion.div>
 
-          {/* Connection Status */}
-          {connectionStatus && (
+          {/* Connection Status - Only show if connected */}
+          {connectionStatus?.success && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
               className="mb-4"
             >
-              <div
-                className={`p-4 rounded-xl backdrop-blur-sm ${
-                  connectionStatus.success
-                    ? "bg-green-500/10 border border-green-500/20"
-                    : "bg-red-500/10 border border-red-500/20"
-                }`}
-              >
+              <div className="p-4 rounded-xl backdrop-blur-sm bg-green-500/10 border border-green-500/20">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p
-                      className={`text-sm font-medium ${connectionStatus.success ? "text-green-400" : "text-red-400"}`}
-                    >
-                      Google Analytics: {connectionStatus.success ? "Connected" : "Connection Failed"}
+                    <p className="text-sm font-medium text-green-400">Google Analytics: Connected</p>
+                    <p className="text-xs text-white/60 mt-1">
+                      Property: {connectionStatus.propertyId} | Dimensions: {connectionStatus.dimensionCount} | Metrics:{" "}
+                      {connectionStatus.metricCount}
                     </p>
-                    {connectionStatus.success && (
-                      <p className="text-xs text-white/60 mt-1">
-                        Property: {connectionStatus.propertyId} | Dimensions: {connectionStatus.dimensionCount} |
-                        Metrics: {connectionStatus.metricCount}
-                      </p>
-                    )}
                   </div>
                   <button
                     onClick={testConnection}
@@ -185,116 +164,67 @@ export default function AnalyticsClientPage() {
             </motion.div>
           )}
 
-          {/* Error Display */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl backdrop-blur-sm"
-            >
-              <p className="text-red-400 text-center font-medium">{error}</p>
-            </motion.div>
-          )}
-
-          {/* Analytics Dashboard */}
-          {connectionStatus?.success ? (
-            <>
-              {/* Metrics Overview */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="mb-8"
-              >
-                <MetricsOverview dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
-              </motion.div>
-
-              {/* Page Views Chart */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="mb-8"
-              >
-                <PageViewsChart dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
-              </motion.div>
-
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.5 }}
-                >
-                  <TrafficSourcesChart dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.6 }}
-                >
-                  <DeviceBreakdown dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
-                </motion.div>
-              </div>
-
-              {/* Geographic Map */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.7 }}
-                className="mb-8"
-              >
-                <GeographicMap dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
-              </motion.div>
-
-              {/* Top Pages Table */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.8 }}
-                className="mb-8"
-              >
-                <TopPagesTable dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
-              </motion.div>
-            </>
-          ) : (
+          {/* Analytics Dashboard - Always show components */}
+          <>
+            {/* Metrics Overview */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-center py-16"
+              className="mb-8"
             >
-              <div className="max-w-2xl mx-auto">
-                <div className="p-8 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold text-white mb-4">Google Analytics Setup Required</h3>
-                  <p className="text-white/70 mb-6">
-                    Configure your Google Analytics 4 property and Vercel OIDC Workload Identity Federation.
-                  </p>
-                  <div className="text-left space-y-4">
-                    <div>
-                      <h4 className="text-lg font-semibold text-white mb-2">Required Environment Variables:</h4>
-                      <ul className="text-sm text-white/60 space-y-1">
-                        <li>• GA4_PROPERTY_ID</li>
-                        <li>• GCP_PROJECT_ID</li>
-                        <li>• GCP_PROJECT_NUMBER</li>
-                        <li>• GCP_WORKLOAD_IDENTITY_POOL_ID</li>
-                        <li>• GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID</li>
-                        <li>• GCP_SERVICE_ACCOUNT_EMAIL</li>
-                      </ul>
-                    </div>
-                  </div>
-                  <button
-                    onClick={testConnection}
-                    disabled={isLoading}
-                    className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
-                  >
-                    {isLoading ? "Testing..." : "Test Connection"}
-                  </button>
-                </div>
-              </div>
+              <MetricsOverview dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
             </motion.div>
-          )}
+
+            {/* Page Views Chart */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mb-8"
+            >
+              <PageViewsChart dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+            </motion.div>
+
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+              >
+                <TrafficSourcesChart dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+              >
+                <DeviceBreakdown dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+              </motion.div>
+            </div>
+
+            {/* Geographic Map */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.7 }}
+              className="mb-8"
+            >
+              <GeographicMap dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+            </motion.div>
+
+            {/* Top Pages Table */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.8 }}
+              className="mb-8"
+            >
+              <TopPagesTable dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+            </motion.div>
+          </>
 
           {/* Footer */}
           <motion.div
