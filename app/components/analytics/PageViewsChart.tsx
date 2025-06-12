@@ -20,112 +20,44 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Generate realistic mock data based on selected date range
-  const generateMockData = (startDate: string, endDate: string) => {
-    const data = []
-    const today = new Date()
-    let currentDate = new Date()
-    let days = 30
-
-    // Determine the number of days and start date based on range
-    switch (startDate) {
-      case "today":
-        days = 1
-        currentDate = new Date(today)
-        break
-      case "yesterday":
-        days = 1
-        currentDate = new Date(today.getTime() - 24 * 60 * 60 * 1000)
-        break
-      case "7daysAgo":
-        days = 7
-        currentDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
-      case "30daysAgo":
-        days = 30
-        currentDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
-        break
-      case "90daysAgo":
-        days = 90
-        currentDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000)
-        break
-      default:
-        // Handle custom date ranges
-        if (startDate.includes("-")) {
-          currentDate = new Date(startDate)
-          const end = new Date(endDate === "today" ? today : endDate)
-          days = Math.ceil((end.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000))
-        }
-    }
-
-    // Generate data points
-    for (let i = 0; i < days; i++) {
-      const date = new Date(currentDate.getTime() + i * 24 * 60 * 60 * 1000)
-      let formattedDate = ""
-
-      // Format date based on the selected range
-      if (days === 1) {
-        // For single day, show hours
-        const hours = Array.from({ length: 24 }, (_, hour) => {
-          const hourDate = new Date(date)
-          hourDate.setHours(hour, 0, 0, 0)
-          return {
-            date: hourDate.toLocaleTimeString("en-US", {
-              hour: "numeric",
-              hour12: true,
-            }),
-            pageViews: Math.floor(Math.random() * 50) + 10,
-            originalDate: hourDate.toISOString(),
-          }
-        })
-        return hours
-      } else if (days <= 7) {
-        formattedDate = date.toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        })
-      } else if (days <= 30) {
-        formattedDate = date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        })
-      } else {
-        formattedDate = date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        })
-      }
-
-      // Generate realistic page view numbers with some variation
-      const baseViews = 100 + Math.floor(Math.random() * 200)
-      const weekendMultiplier = date.getDay() === 0 || date.getDay() === 6 ? 0.7 : 1
-      const pageViews = Math.floor(baseViews * weekendMultiplier)
-
-      data.push({
-        date: formattedDate,
-        pageViews,
-        originalDate: date.toISOString(),
-      })
-    }
-
-    return data
-  }
-
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
       try {
-        // For now, use mock data that properly reflects the selected date range
-        const mockData = generateMockData(dateRange.startDate, dateRange.endDate)
+        const adminKey = localStorage.getItem("adminKey")
 
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        const response = await fetch(
+          `/api/analytics?endpoint=daily-metrics&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
+          {
+            headers: {
+              "x-admin-key": adminKey || "",
+            },
+          },
+        )
 
-        setData(mockData)
-      } catch (error) {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const result = await response.json()
+
+        if (result && result.dailyMetrics) {
+          const formattedData = result.dailyMetrics.map((item: any) => ({
+            date: new Date(item.date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            }),
+            pageViews: item.pageViews,
+            originalDate: item.date,
+          }))
+          setData(formattedData)
+        } else {
+          setData([])
+        }
+      } catch (error: any) {
         console.error("Error loading page views:", error)
         setError("Failed to load page views data")
+        setData([])
       } finally {
         setIsLoading(false)
       }

@@ -1,173 +1,91 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { analyticsConfig, getConfigurationStatus, getAuthenticationMethod } from "../../lib/analytics-config"
 import {
-  getHybridDailyMetrics,
-  getHybridTopPages,
-  getHybridTopTrafficSources,
-  getHybridDeviceData,
-  getHybridGeographicData,
-  getHybridAnalyticsSummary,
-  getDataSourceInfo,
-  getHybridTopReferrers,
-} from "../../lib/hybrid-analytics"
-import { getRealtimeData, testAnalyticsConnection } from "../../lib/google-analytics"
-
-// Enhanced logging for analytics
-function logAccess(message: string, success: boolean, metadata?: any) {
-  const timestamp = new Date().toISOString()
-  const context = {
-    authMethod: getAuthenticationMethod(),
-    isVercel: !!process.env.VERCEL,
-    environment: process.env.NODE_ENV,
-    ...metadata,
-  }
-  console.log(`[Analytics] ${timestamp} - ${message} - ${success ? "✓" : "✗"}`, context)
-}
+  testAnalyticsConnection,
+  getAnalyticsSummary,
+  getDailyMetrics,
+  getPageViewsData,
+  getTrafficSourcesData,
+  getDeviceData,
+  getGeographicData,
+  getRealtimeData,
+} from "../../lib/google-analytics"
+import { validateAnalyticsConfig, getConfigurationStatus } from "../../lib/analytics-config"
 
 export async function GET(request: NextRequest) {
-  try {
-    const configStatus = getConfigurationStatus()
-    const authMethod = getAuthenticationMethod()
-
-    // Admin authentication
-    const adminKey = request.headers.get("x-admin-key")
-    if (!adminKey || adminKey !== analyticsConfig.adminPassword) {
-      logAccess("Unauthorized access attempt", false, { configStatus, authMethod })
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const endpoint = searchParams.get("endpoint")
-    const startDate = searchParams.get("startDate") || "30daysAgo"
-    const endDate = searchParams.get("endDate") || "today"
-
-    // Configuration endpoint
-    if (endpoint === "config") {
-      const connectionTest = await testAnalyticsConnection()
-      const dataSourceInfo = await getDataSourceInfo()
-
-      return NextResponse.json({
-        ...configStatus,
-        connectionTest,
-        authMethod,
-        dataSourceInfo,
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV,
-        isVercel: !!process.env.VERCEL,
-        ga4PropertyId: analyticsConfig.ga4PropertyId,
-      })
-    }
-
-    // Data sources endpoint
-    if (endpoint === "data-sources") {
-      const dataSourceInfo = await getDataSourceInfo()
-      return NextResponse.json(dataSourceInfo)
-    }
-
-    if (!endpoint) {
-      return NextResponse.json({ error: "Endpoint parameter required" }, { status: 400 })
-    }
-
-    // Check if analytics is properly configured
-    if (!configStatus.configured) {
-      return NextResponse.json(
-        {
-          error: "Analytics not configured",
-          details: "Google Analytics OIDC configuration is incomplete",
-          missingVariables: configStatus.missingVariables,
-          recommendations: configStatus.recommendations,
-        },
-        { status: 503 },
-      )
-    }
-
-    let data: any
-
-    try {
-      switch (endpoint) {
-        case "pageviews":
-          data = await getHybridDailyMetrics(startDate, endDate)
-          break
-        case "toppages":
-          data = await getHybridTopPages(startDate, endDate)
-          break
-        case "trafficsources":
-          data = await getHybridTopTrafficSources(startDate, endDate)
-          break
-        case "devices":
-          data = await getHybridDeviceData(startDate, endDate)
-          break
-        case "geographic":
-          data = await getHybridGeographicData(startDate, endDate)
-          break
-        case "realtime":
-          // Realtime data only comes from GA4
-          data = await getRealtimeData()
-          data._source = "google-analytics"
-          break
-        case "summary":
-          data = await getHybridAnalyticsSummary(startDate, endDate)
-          break
-        case "referrers":
-          data = await getHybridTopReferrers(startDate, endDate, 10)
-          break
-        default:
-          return NextResponse.json({ error: `Unknown endpoint: ${endpoint}` }, { status: 400 })
-      }
-
-      data._timestamp = new Date().toISOString()
-      data._authMethod = authMethod
-
-      logAccess(`Data served for ${endpoint}`, true, {
-        authMethod,
-        hybrid: data._hybrid,
-        strategy: data._strategy,
-        historicalDays: data._historicalDays,
-        ga4Days: data._ga4Days,
-      })
-    } catch (apiError) {
-      console.error("Analytics API Error:", apiError)
-
-      const errorDetails = {
-        message: apiError instanceof Error ? apiError.message : "Unknown error",
-        endpoint,
-        dateRange: { startDate, endDate },
-        authMethod,
-        configStatus: configStatus.configured,
-        timestamp: new Date().toISOString(),
-      }
-
-      logAccess(`API error for ${endpoint}`, false, errorDetails)
-
-      return NextResponse.json(
-        {
-          error: "Failed to fetch analytics data",
-          details: errorDetails.message,
-          endpoint,
-          dateRange: { startDate, endDate },
-          timestamp: errorDetails.timestamp,
-        },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json(data, {
-      headers: {
-        "Cache-Control": "private, max-age=300", // 5 minute cache
-        "X-Data-Source": data._hybrid ? "hybrid-analytics" : "google-analytics",
-        "X-Auth-Method": authMethod,
-        "X-Timestamp": new Date().toISOString(),
-        "X-Strategy": data._strategy || "unknown",
-      },
-    })
-  } catch (error) {
-    console.error("Analytics API error:", error)
-    logAccess(`Unexpected API error: ${error instanceof Error ? error.message : "Unknown error"}`, false)
-
+  // Validate configuration
+  if (!validateAnalyticsConfig()) {
     return NextResponse.json(
       {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
+        error: "Google Analytics not configured. Check environment variables.",
+        config: getConfigurationStatus(),
+      },
+      { status: 400 },
+    )
+  }
+
+  const searchParams = request.nextUrl.searchParams
+  const endpoint = searchParams.get("endpoint")
+  const startDate = searchParams.get("startDate") || "30daysAgo"
+  const endDate = searchParams.get("endDate") || "today"
+  const adminKey = request.headers.get("x-admin-key")
+
+  // Validate admin key
+  if (!adminKey || adminKey !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  try {
+    switch (endpoint) {
+      case "test-connection":
+        const connectionStatus = await testAnalyticsConnection()
+        return NextResponse.json(connectionStatus)
+
+      case "summary":
+        const summary = await getAnalyticsSummary(startDate, endDate)
+        // Add percentage changes (mock for now, you can implement comparison logic)
+        return NextResponse.json({
+          ...summary,
+          pageViewsChange: 0,
+          sessionsChange: 0,
+          usersChange: 0,
+          bounceRateChange: 0,
+          activeUsers: summary.totalUsers, // Use current users as active users approximation
+        })
+
+      case "daily-metrics":
+        const dailyMetrics = await getDailyMetrics(startDate, endDate)
+        return NextResponse.json(dailyMetrics)
+
+      case "pages":
+        const pageViews = await getPageViewsData(startDate, endDate)
+        return NextResponse.json(pageViews)
+
+      case "referrers":
+      case "traffic-sources":
+        const trafficSources = await getTrafficSourcesData(startDate, endDate)
+        return NextResponse.json(trafficSources)
+
+      case "devices":
+        const deviceData = await getDeviceData(startDate, endDate)
+        return NextResponse.json(deviceData)
+
+      case "geographic":
+        const geoData = await getGeographicData(startDate, endDate)
+        return NextResponse.json(geoData)
+
+      case "realtime":
+        const realtimeData = await getRealtimeData()
+        return NextResponse.json(realtimeData)
+
+      default:
+        return NextResponse.json({ error: "Invalid endpoint parameter" }, { status: 400 })
+    }
+  } catch (error) {
+    console.error("[Analytics API] Error:", error)
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+        endpoint,
         timestamp: new Date().toISOString(),
       },
       { status: 500 },

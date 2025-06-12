@@ -1,12 +1,21 @@
+import { Suspense } from "react"
 import AnalyticsClientPage from "./AnalyticsClientPage"
 
 export const metadata = {
   title: "Analytics Dashboard | 434 Media",
-  description: "Track website performance and user engagement",
+  description: "Google Analytics dashboard for 434 Media website performance and insights",
 }
 
-type Props = {}
-
-export default function AnalyticsPage({}: Props) {
-  return <AnalyticsClientPage />
+export default function AnalyticsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+          <div className="text-white">Loading Analytics Dashboard...</div>
+        </div>
+      }
+    >
+      <AnalyticsClientPage />
+    </Suspense>
+  )
 }

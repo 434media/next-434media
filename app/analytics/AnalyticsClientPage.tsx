@@ -11,61 +11,7 @@ import { TopPagesTable } from "../components/analytics/TopPagesTable"
 import { TrafficSourcesChart } from "../components/analytics/TrafficSourcesChart"
 import { DeviceBreakdown } from "../components/analytics/DeviceBreakdown"
 import { GeographicMap } from "../components/analytics/GeographicMap"
-import type { DateRange } from "../types/analytics"
-
-interface ConnectionTestDetails {
-  hasClient?: boolean
-  hasPropertyId?: boolean
-  authMethod?: string
-  isVercelOIDC?: boolean
-  propertyId?: string
-  dimensionCount?: number
-  metricCount?: number
-  projectId?: string
-  serviceAccount?: string
-  audience?: string | null
-  serviceAccountUrl?: string | null
-}
-
-interface ConnectionTest {
-  success: boolean
-  error?: string
-  details?: ConnectionTestDetails
-}
-
-interface ConfigurationStatus {
-  configured: boolean
-  authenticationMethod: string
-  isVercelDeployment: boolean
-  isProduction: boolean
-  missingVariables: string[]
-  recommendations: string[]
-  connectionTest?: ConnectionTest
-  oidcSetup: {
-    poolId?: string
-    providerId?: string
-    serviceAccountEmail?: string
-    projectNumber?: string
-  }
-}
-
-interface DataSourceInfo {
-  vercelAnalytics: {
-    available: boolean
-    recordCount?: number
-    dateRange?: { start: string; end: string }
-  }
-  googleAnalytics: {
-    available: boolean
-    configured: boolean
-    ga4StartDate: string
-  }
-  compatibility: {
-    normalizationEnabled: boolean
-    dataQualityChecks: boolean
-    supportedFormats: string[]
-  }
-}
+import type { DateRange, AnalyticsConnectionStatus } from "../types/analytics"
 
 export default function AnalyticsClientPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -76,8 +22,7 @@ export default function AnalyticsClientPage() {
     label: "Last 30 days",
   })
   const [error, setError] = useState<string | null>(null)
-  const [configStatus, setConfigStatus] = useState<ConfigurationStatus | null>(null)
-  const [dataSourceInfo, setDataSourceInfo] = useState<DataSourceInfo | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<AnalyticsConnectionStatus | null>(null)
 
   // Check for existing admin session
   useEffect(() => {
@@ -94,11 +39,9 @@ export default function AnalyticsClientPage() {
 
   const handleRefresh = () => {
     setIsLoading(true)
-    checkAnalyticsConfig()
+    testConnection()
     window.dispatchEvent(new CustomEvent("analytics-refresh"))
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 1000)
+    setTimeout(() => setIsLoading(false), 1000)
   }
 
   const handleDateRangeChange = (range: DateRange) => {
@@ -111,7 +54,7 @@ export default function AnalyticsClientPage() {
     setIsAuthenticated(false)
   }
 
-  const checkAnalyticsConfig = async () => {
+  const testConnection = async () => {
     try {
       const adminKey = sessionStorage.getItem("adminKey")
       if (!adminKey) {
@@ -119,49 +62,33 @@ export default function AnalyticsClientPage() {
         return
       }
 
-      const response = await fetch("/api/analytics?endpoint=config", {
-        headers: {
-          "x-admin-key": adminKey,
-        },
+      const response = await fetch("/api/analytics?action=test-connection", {
+        headers: { "x-admin-key": adminKey },
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to check analytics configuration: ${response.status} ${errorText}`)
+        throw new Error(`Connection test failed: ${response.status}`)
       }
 
-      const config: ConfigurationStatus & { dataSourceInfo?: DataSourceInfo } = await response.json()
-      setConfigStatus(config)
+      const status = await response.json()
+      setConnectionStatus(status)
 
-      if (config.dataSourceInfo) {
-        setDataSourceInfo(config.dataSourceInfo)
-      }
-
-      if (!config.configured || (config.connectionTest && !config.connectionTest.success)) {
-        const errorMessage = config.connectionTest?.error || "Configuration incomplete"
-        const missingVars =
-          config.missingVariables?.length > 0 ? config.missingVariables.join(", ") : "Unknown variables"
-        setError(`Google Analytics configuration issue: ${errorMessage}. Missing: ${missingVars}`)
-      } else {
+      if (status.success) {
         setError(null)
+      } else {
+        setError(`Google Analytics connection failed: ${status.error}`)
       }
     } catch (err) {
-      console.error("Error checking analytics config:", err)
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred"
-      setError(`Failed to check analytics configuration: ${errorMessage}`)
+      console.error("Connection test error:", err)
+      setError(err instanceof Error ? err.message : "Connection test failed")
     }
   }
 
   useEffect(() => {
     if (isAuthenticated) {
-      checkAnalyticsConfig()
+      testConnection()
     }
   }, [isAuthenticated])
-
-  // Helper function to check if analytics is ready
-  const isAnalyticsReady = () => {
-    return configStatus?.configured === true && configStatus?.connectionTest?.success === true
-  }
 
   if (!isAuthenticated) {
     return (
@@ -217,8 +144,8 @@ export default function AnalyticsClientPage() {
             <DateRangeSelector selectedRange={selectedDateRange} onRangeChange={handleDateRangeChange} />
           </motion.div>
 
-          {/* Configuration Status */}
-          {configStatus && (
+          {/* Connection Status */}
+          {connectionStatus && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -227,55 +154,33 @@ export default function AnalyticsClientPage() {
             >
               <div
                 className={`p-4 rounded-xl backdrop-blur-sm ${
-                  isAnalyticsReady()
+                  connectionStatus.success
                     ? "bg-green-500/10 border border-green-500/20"
                     : "bg-red-500/10 border border-red-500/20"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className={`text-sm font-medium ${isAnalyticsReady() ? "text-green-400" : "text-red-400"}`}>
-                      Analytics Status: {isAnalyticsReady() ? "Connected & Operational" : "Configuration Error"}
+                    <p
+                      className={`text-sm font-medium ${connectionStatus.success ? "text-green-400" : "text-red-400"}`}
+                    >
+                      Google Analytics: {connectionStatus.success ? "Connected" : "Connection Failed"}
                     </p>
-                    <p className="text-xs text-white/60 mt-1">
-                      Auth Method: {configStatus.authenticationMethod} |
-                      {configStatus.connectionTest?.details?.propertyId
-                        ? ` Property ID: ${configStatus.connectionTest.details.propertyId}`
-                        : " No Property ID"}
-                    </p>
-                    {dataSourceInfo && (
+                    {connectionStatus.success && (
                       <p className="text-xs text-white/60 mt-1">
-                        Data Sources: GA4 ({dataSourceInfo.googleAnalytics.available ? "✓" : "✗"}) | Historical DB (
-                        {dataSourceInfo.vercelAnalytics.available ? "✓" : "✗"})
-                        {dataSourceInfo.vercelAnalytics.recordCount &&
-                          ` - ${dataSourceInfo.vercelAnalytics.recordCount} records`}
+                        Property: {connectionStatus.propertyId} | Dimensions: {connectionStatus.dimensionCount} |
+                        Metrics: {connectionStatus.metricCount}
                       </p>
                     )}
                   </div>
                   <button
-                    onClick={checkAnalyticsConfig}
+                    onClick={testConnection}
                     disabled={isLoading}
                     className="text-xs bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1 rounded-md transition-colors"
                   >
-                    {isLoading ? "Checking..." : "Refresh Status"}
+                    {isLoading ? "Testing..." : "Test Connection"}
                   </button>
                 </div>
-                {configStatus.missingVariables && configStatus.missingVariables.length > 0 && (
-                  <div className="mt-3 p-3 bg-black/20 rounded-lg">
-                    <p className="text-xs text-red-300 font-medium mb-1">Missing Environment Variables:</p>
-                    <p className="text-xs text-red-200">{configStatus.missingVariables.join(", ")}</p>
-                  </div>
-                )}
-                {configStatus.recommendations && configStatus.recommendations.length > 0 && (
-                  <div className="mt-3 p-3 bg-black/20 rounded-lg">
-                    <p className="text-xs text-amber-300 font-medium mb-1">Recommendations:</p>
-                    <ul className="text-xs text-amber-200 space-y-1">
-                      {configStatus.recommendations.map((rec, index) => (
-                        <li key={index}>• {rec}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             </motion.div>
           )}
@@ -291,8 +196,8 @@ export default function AnalyticsClientPage() {
             </motion.div>
           )}
 
-          {/* Only show analytics components if properly configured */}
-          {isAnalyticsReady() ? (
+          {/* Analytics Dashboard */}
+          {connectionStatus?.success ? (
             <>
               {/* Metrics Overview */}
               <motion.div
@@ -354,7 +259,6 @@ export default function AnalyticsClientPage() {
               </motion.div>
             </>
           ) : (
-            /* Configuration Required Message */
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -363,9 +267,9 @@ export default function AnalyticsClientPage() {
             >
               <div className="max-w-2xl mx-auto">
                 <div className="p-8 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold text-white mb-4">Analytics Configuration Required</h3>
+                  <h3 className="text-2xl font-bold text-white mb-4">Google Analytics Setup Required</h3>
                   <p className="text-white/70 mb-6">
-                    Google Analytics integration requires proper OIDC Workload Identity Federation setup.
+                    Configure your Google Analytics 4 property and Vercel OIDC Workload Identity Federation.
                   </p>
                   <div className="text-left space-y-4">
                     <div>
@@ -379,22 +283,13 @@ export default function AnalyticsClientPage() {
                         <li>• GCP_SERVICE_ACCOUNT_EMAIL</li>
                       </ul>
                     </div>
-                    <div>
-                      <h4 className="text-lg font-semibold text-white mb-2">Setup Steps:</h4>
-                      <ol className="text-sm text-white/60 space-y-1">
-                        <li>1. Create a Google Cloud service account with Analytics Data API access</li>
-                        <li>2. Set up Workload Identity Federation for Vercel</li>
-                        <li>3. Configure the required environment variables in Vercel</li>
-                        <li>4. Upload historical data via CSV to the Neon database</li>
-                      </ol>
-                    </div>
                   </div>
                   <button
-                    onClick={checkAnalyticsConfig}
+                    onClick={testConnection}
                     disabled={isLoading}
                     className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors"
                   >
-                    {isLoading ? "Checking..." : "Check Configuration Again"}
+                    {isLoading ? "Testing..." : "Test Connection"}
                   </button>
                 </div>
               </div>
@@ -409,14 +304,9 @@ export default function AnalyticsClientPage() {
             className="text-center text-white/60 text-sm"
           >
             <p>
-              Powered by Google Analytics 4 & Neon Database •
-              {configStatus?.connectionTest?.details?.propertyId &&
-                ` Property ID: ${configStatus.connectionTest.details.propertyId} • `}
+              Powered by Google Analytics 4 •
+              {connectionStatus?.propertyId && ` Property: ${connectionStatus.propertyId} • `}
               Last updated: {new Date().toLocaleString()}
-            </p>
-            <p className="mt-2">
-              Hybrid data system: Historical data from database + Live data from GA4 • Real-time updates every 30
-              seconds
             </p>
           </motion.div>
         </div>

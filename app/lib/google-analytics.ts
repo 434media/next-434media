@@ -2,51 +2,25 @@ import { BetaAnalyticsDataClient } from "@google-analytics/data"
 import { GoogleAuth } from "google-auth-library"
 import {
   analyticsConfig,
-  isVercelOIDCConfigured,
   getWorkloadIdentityAudience,
   getServiceAccountImpersonationUrl,
-  getAuthenticationMethod,
+  validateAnalyticsConfig,
 } from "./analytics-config"
-import type {
-  SummaryData,
-  PageViewsResponse,
-  TrafficSourcesResponse,
-  DeviceDataResponse,
-  GeographicDataResponse,
-  DailyMetricsResponse,
-  RealtimeData,
-  AnalyticsConnectionStatus,
-} from "../types/analytics"
 
-// Initialize Google Analytics client with Vercel OIDC Workload Identity Federation
+// Initialize Google Analytics client with Vercel OIDC
 let analyticsDataClient: BetaAnalyticsDataClient | null = null
 
-function getAnalyticsClient() {
+async function getAnalyticsClient(): Promise<BetaAnalyticsDataClient> {
+  if (!validateAnalyticsConfig()) {
+    throw new Error("Google Analytics configuration is incomplete. Check environment variables.")
+  }
+
   if (!analyticsDataClient) {
-    const authMethod = getAuthenticationMethod()
-
-    if (authMethod !== "vercel-oidc") {
-      throw new Error("Google Analytics requires Vercel OIDC Workload Identity Federation configuration")
-    }
-
     try {
-      console.log("[Analytics] Initializing with Vercel OIDC Workload Identity Federation")
+      console.log("[Analytics] Initializing Google Analytics client with Vercel OIDC")
 
       const audience = getWorkloadIdentityAudience()
       const serviceAccountImpersonationUrl = getServiceAccountImpersonationUrl()
-
-      if (!audience || !serviceAccountImpersonationUrl) {
-        throw new Error("Invalid Workload Identity Federation configuration")
-      }
-
-      // Log configuration for debugging (without sensitive data)
-      console.log("[Analytics] OIDC Configuration:", {
-        projectId: analyticsConfig.gcpProjectId,
-        propertyId: analyticsConfig.ga4PropertyId,
-        serviceAccount: analyticsConfig.gcpServiceAccountEmail,
-        poolId: analyticsConfig.gcpWorkloadIdentityPoolId,
-        providerId: analyticsConfig.gcpWorkloadIdentityPoolProviderId,
-      })
 
       const auth = new GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/analytics.readonly"],
@@ -69,31 +43,22 @@ function getAnalyticsClient() {
         projectId: analyticsConfig.gcpProjectId,
       })
 
-      console.log("[Analytics] Successfully initialized with Vercel OIDC")
+      console.log("[Analytics] Successfully initialized Google Analytics client")
     } catch (error) {
-      console.error("Failed to initialize Google Analytics client:", error)
-      throw error
+      console.error("[Analytics] Failed to initialize client:", error)
+      throw new Error(
+        `Failed to initialize Google Analytics: ${error instanceof Error ? error.message : "Unknown error"}`,
+      )
     }
   }
+
   return analyticsDataClient
 }
 
 // Test the Google Analytics connection
-export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStatus> {
+export async function testAnalyticsConnection() {
   try {
-    const client = getAnalyticsClient()
-    if (!client || !analyticsConfig.ga4PropertyId) {
-      return {
-        success: false,
-        error: "Google Analytics client not configured",
-        details: {
-          hasClient: !!client,
-          hasPropertyId: !!analyticsConfig.ga4PropertyId,
-          authMethod: getAuthenticationMethod(),
-          isVercelOIDC: isVercelOIDCConfigured(),
-        },
-      }
-    }
+    const client = await getAnalyticsClient()
 
     // Test with a simple metadata request
     const [response] = await client.getMetadata({
@@ -102,62 +67,55 @@ export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStat
 
     return {
       success: true,
-      details: {
-        propertyId: analyticsConfig.ga4PropertyId,
-        dimensionCount: response.dimensions?.length || 0,
-        metricCount: response.metrics?.length || 0,
-        authMethod: getAuthenticationMethod(),
-        isVercelOIDC: isVercelOIDCConfigured(),
-        projectId: analyticsConfig.gcpProjectId,
-        serviceAccount: analyticsConfig.gcpServiceAccountEmail,
-      },
+      propertyId: analyticsConfig.ga4PropertyId,
+      dimensionCount: response.dimensions?.length || 0,
+      metricCount: response.metrics?.length || 0,
+      projectId: analyticsConfig.gcpProjectId,
+      serviceAccount: analyticsConfig.gcpServiceAccountEmail,
     }
   } catch (error) {
+    console.error("[Analytics] Connection test failed:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
-      details: {
-        authMethod: getAuthenticationMethod(),
-        isVercelOIDC: isVercelOIDCConfigured(),
-        audience: getWorkloadIdentityAudience(),
-        serviceAccountUrl: getServiceAccountImpersonationUrl(),
-      },
     }
   }
 }
 
-// Enhanced error handling
-function handleAnalyticsError(error: any, operation: string) {
-  console.error(`Failed to ${operation}:`, error)
+// Get analytics summary data
+export async function getAnalyticsSummary(startDate: string, endDate: string) {
+  const client = await getAnalyticsClient()
 
-  if (error instanceof Error) {
-    if (error.message.includes("permission")) {
-      throw new Error(
-        `Permission denied for ${operation}. Check Google Analytics permissions for service account: ${analyticsConfig.gcpServiceAccountEmail}`,
-      )
+  try {
+    const [response] = await client.runReport({
+      property: `properties/${analyticsConfig.ga4PropertyId}`,
+      dateRanges: [{ startDate, endDate }],
+      metrics: [
+        { name: "screenPageViews" },
+        { name: "sessions" },
+        { name: "activeUsers" },
+        { name: "bounceRate" },
+        { name: "averageSessionDuration" },
+      ],
+    })
+
+    const row = response.rows?.[0]
+    return {
+      totalPageViews: Number.parseInt(row?.metricValues?.[0]?.value || "0"),
+      totalSessions: Number.parseInt(row?.metricValues?.[1]?.value || "0"),
+      totalUsers: Number.parseInt(row?.metricValues?.[2]?.value || "0"),
+      bounceRate: Number.parseFloat(row?.metricValues?.[3]?.value || "0"),
+      averageSessionDuration: Number.parseFloat(row?.metricValues?.[4]?.value || "0"),
     }
-    if (error.message.includes("quota")) {
-      throw new Error(
-        `Quota exceeded for ${operation}. Check Google Analytics API quotas for project: ${analyticsConfig.gcpProjectId}`,
-      )
-    }
-    if (error.message.includes("credentials") || error.message.includes("authentication")) {
-      throw new Error(`Authentication error for ${operation}. Check Vercel OIDC Workload Identity Federation setup.`)
-    }
-    if (error.message.includes("INVALID_ARGUMENT")) {
-      throw new Error(`Invalid request for ${operation}. Check GA4 Property ID: ${analyticsConfig.ga4PropertyId}`)
-    }
+  } catch (error) {
+    console.error("[Analytics] Failed to fetch summary:", error)
+    throw new Error(`Failed to fetch analytics summary: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
-
-  throw error
 }
 
 // Get daily metrics data
-export async function getDailyMetrics(startDate: string, endDate: string): Promise<DailyMetricsResponse> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
+export async function getDailyMetrics(startDate: string, endDate: string) {
+  const client = await getAnalyticsClient()
 
   try {
     const [response] = await client.runReport({
@@ -188,17 +146,14 @@ export async function getDailyMetrics(startDate: string, endDate: string): Promi
       totalUsers,
     }
   } catch (error) {
-    handleAnalyticsError(error, "fetch daily metrics")
-    throw error
+    console.error("[Analytics] Failed to fetch daily metrics:", error)
+    throw new Error(`Failed to fetch daily metrics: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
 // Get page views data
-export async function getPageViewsData(startDate: string, endDate: string): Promise<PageViewsResponse> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
+export async function getPageViewsData(startDate: string, endDate: string) {
+  const client = await getAnalyticsClient()
 
   try {
     const [response] = await client.runReport({
@@ -221,17 +176,14 @@ export async function getPageViewsData(startDate: string, endDate: string): Prom
 
     return { data }
   } catch (error) {
-    handleAnalyticsError(error, "fetch page views data")
-    throw error
+    console.error("[Analytics] Failed to fetch page views:", error)
+    throw new Error(`Failed to fetch page views: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
 // Get traffic sources data
-export async function getTrafficSourcesData(startDate: string, endDate: string): Promise<TrafficSourcesResponse> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
+export async function getTrafficSourcesData(startDate: string, endDate: string) {
+  const client = await getAnalyticsClient()
 
   try {
     const [response] = await client.runReport({
@@ -254,17 +206,14 @@ export async function getTrafficSourcesData(startDate: string, endDate: string):
 
     return { data }
   } catch (error) {
-    handleAnalyticsError(error, "fetch traffic sources data")
-    throw error
+    console.error("[Analytics] Failed to fetch traffic sources:", error)
+    throw new Error(`Failed to fetch traffic sources: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
 // Get device data
-export async function getDeviceData(startDate: string, endDate: string): Promise<DeviceDataResponse> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
+export async function getDeviceData(startDate: string, endDate: string) {
+  const client = await getAnalyticsClient()
 
   try {
     const [response] = await client.runReport({
@@ -284,17 +233,14 @@ export async function getDeviceData(startDate: string, endDate: string): Promise
 
     return { data }
   } catch (error) {
-    handleAnalyticsError(error, "fetch device data")
-    throw error
+    console.error("[Analytics] Failed to fetch device data:", error)
+    throw new Error(`Failed to fetch device data: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
 // Get geographic data
-export async function getGeographicData(startDate: string, endDate: string): Promise<GeographicDataResponse> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
+export async function getGeographicData(startDate: string, endDate: string) {
+  const client = await getAnalyticsClient()
 
   try {
     const [response] = await client.runReport({
@@ -317,17 +263,14 @@ export async function getGeographicData(startDate: string, endDate: string): Pro
 
     return { data }
   } catch (error) {
-    handleAnalyticsError(error, "fetch geographic data")
-    throw error
+    console.error("[Analytics] Failed to fetch geographic data:", error)
+    throw new Error(`Failed to fetch geographic data: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
 // Get real-time data
-export async function getRealtimeData(): Promise<RealtimeData> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
+export async function getRealtimeData() {
+  const client = await getAnalyticsClient()
 
   try {
     const [response] = await client.runRealtimeReport({
@@ -353,44 +296,7 @@ export async function getRealtimeData(): Promise<RealtimeData> {
       topCountries,
     }
   } catch (error) {
-    handleAnalyticsError(error, "fetch realtime data")
-    throw error
+    console.error("[Analytics] Failed to fetch realtime data:", error)
+    throw new Error(`Failed to fetch realtime data: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
-
-// Get analytics summary
-export async function getAnalyticsSummary(startDate: string, endDate: string): Promise<SummaryData> {
-  const client = getAnalyticsClient()
-  if (!client || !analyticsConfig.ga4PropertyId) {
-    throw new Error("Google Analytics not configured")
-  }
-
-  try {
-    const [response] = await client.runReport({
-      property: `properties/${analyticsConfig.ga4PropertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      metrics: [
-        { name: "screenPageViews" },
-        { name: "sessions" },
-        { name: "activeUsers" },
-        { name: "bounceRate" },
-        { name: "averageSessionDuration" },
-      ],
-    })
-
-    const row = response.rows?.[0]
-    return {
-      totalPageViews: Number.parseInt(row?.metricValues?.[0]?.value || "0"),
-      totalSessions: Number.parseInt(row?.metricValues?.[1]?.value || "0"),
-      totalUsers: Number.parseInt(row?.metricValues?.[2]?.value || "0"),
-      bounceRate: Number.parseFloat(row?.metricValues?.[3]?.value || "0"),
-      averageSessionDuration: Number.parseFloat(row?.metricValues?.[4]?.value || "0"),
-    }
-  } catch (error) {
-    handleAnalyticsError(error, "fetch analytics summary")
-    throw error
-  }
-}
-
-// Alias for backward compatibility
-export const getSummaryData = getAnalyticsSummary

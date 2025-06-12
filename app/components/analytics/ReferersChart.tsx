@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { Globe, Loader2, Users, MousePointer, Link } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
@@ -99,7 +99,7 @@ export function ReferrersChart({ dateRange, isLoading: parentLoading = false, se
       try {
         const adminKey = sessionStorage.getItem("adminKey")
         const response = await fetch(
-          `/api/analytics?endpoint=referrers&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
+          `/api/analytics?endpoint=traffic-sources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
           {
             headers: {
               "x-admin-key": adminKey || "",
