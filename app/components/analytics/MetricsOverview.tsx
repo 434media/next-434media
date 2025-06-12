@@ -206,7 +206,7 @@ export function MetricsOverview({
           `}
           />
 
-          <CardContent className="relative p-5 h-full flex flex-col justify-between">
+          <CardContent className="relative p-5 h-full flex flex-col justify-between mt-2">
             {isLoading || parentLoading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-6 w-6 text-white/60 animate-spin" />
@@ -301,7 +301,7 @@ export function MetricsOverview({
             `}
             />
 
-            <CardContent className="relative p-5 h-full flex flex-col justify-between">
+            <CardContent className="relative p-5 h-full flex flex-col justify-between mt-2">
               {isLoading || parentLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-6 w-6 text-white/60 animate-spin" />

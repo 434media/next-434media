@@ -251,9 +251,8 @@ export default function AnalyticsClientPage() {
             className="text-center text-white/60 text-sm"
           >
             <p>
-              Powered by Google Analytics 4 •
-              {connectionStatus?.propertyId && ` Property: ${connectionStatus.propertyId} • `}
-              Last updated: {new Date().toLocaleString()}
+              Powered by Google Analytics 4 <span className="hidden md:inline">•</span> {' '}
+              <span className="block md:inline">Last updated: {new Date().toLocaleString()}</span>
             </p>
           </motion.div>
         </div>
