@@ -1,90 +1,87 @@
-// Analytics configuration and validation
+// Google Analytics 4 Configuration for Vercel OIDC
 export const analyticsConfig = {
+  // Google Analytics
   ga4PropertyId: process.env.GA4_PROPERTY_ID,
+
+  // Google Cloud Project Configuration
   gcpProjectId: process.env.GCP_PROJECT_ID,
   gcpProjectNumber: process.env.GCP_PROJECT_NUMBER,
-  gcpServiceAccountEmail: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+
+  // Vercel OIDC Workload Identity Federation
   gcpWorkloadIdentityPoolId: process.env.GCP_WORKLOAD_IDENTITY_POOL_ID,
   gcpWorkloadIdentityPoolProviderId: process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID,
-  gcpWorkloadIdentityProvider: process.env.GCP_WORKLOAD_IDENTITY_PROVIDER,
-  gcpServiceAccountImpersonationUrl: process.env.GCP_SERVICE_ACCOUNT_IMPERSONATION_URL,
-}
+  gcpServiceAccountEmail: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
 
+  // Admin authentication
+  adminPassword: process.env.ADMIN_PASSWORD,
+} as const
+
+// Validation function for required environment variables
 export function validateAnalyticsConfig(): boolean {
-  const required = [analyticsConfig.ga4PropertyId, analyticsConfig.gcpProjectId, analyticsConfig.gcpServiceAccountEmail]
+  const required = [
+    analyticsConfig.ga4PropertyId,
+    analyticsConfig.gcpProjectId,
+    analyticsConfig.gcpProjectNumber,
+    analyticsConfig.gcpWorkloadIdentityPoolId,
+    analyticsConfig.gcpWorkloadIdentityPoolProviderId,
+    analyticsConfig.gcpServiceAccountEmail,
+    analyticsConfig.adminPassword,
+  ]
 
-  // Check for Vercel OIDC configuration
-  const hasVercelOIDC = !!(
-    analyticsConfig.gcpWorkloadIdentityPoolId &&
-    analyticsConfig.gcpWorkloadIdentityPoolProviderId &&
-    analyticsConfig.gcpProjectNumber
-  )
+  const missing = required.filter((value) => !value || value.trim() === "")
 
-  // Check for alternative configuration
-  const hasAlternativeConfig = !!(
-    analyticsConfig.gcpWorkloadIdentityProvider && analyticsConfig.gcpServiceAccountImpersonationUrl
-  )
+  if (missing.length > 0) {
+    console.error("[Analytics Config] Missing required environment variables")
+    return false
+  }
 
-  const hasBasicConfig = required.every(Boolean)
-  const hasAuthConfig = hasVercelOIDC || hasAlternativeConfig
+  // Ensure we're in Vercel environment for OIDC
+  if (!process.env.VERCEL) {
+    console.error("[Analytics Config] Vercel OIDC requires deployment to Vercel")
+    return false
+  }
 
-  console.log("[Analytics Config] Validation:", {
-    hasBasicConfig,
-    hasVercelOIDC,
-    hasAlternativeConfig,
-    hasAuthConfig,
-    ga4PropertyId: !!analyticsConfig.ga4PropertyId,
-    gcpProjectId: !!analyticsConfig.gcpProjectId,
-    gcpServiceAccountEmail: !!analyticsConfig.gcpServiceAccountEmail,
-  })
-
-  return hasBasicConfig && hasAuthConfig
+  return true
 }
 
+// Check if analytics is properly configured
+export function isAnalyticsConfigured(): boolean {
+  return validateAnalyticsConfig()
+}
+
+// Generate the Workload Identity Federation audience for Vercel OIDC
+export function getWorkloadIdentityAudience(): string {
+  if (
+    !analyticsConfig.gcpProjectNumber ||
+    !analyticsConfig.gcpWorkloadIdentityPoolId ||
+    !analyticsConfig.gcpWorkloadIdentityPoolProviderId
+  ) {
+    throw new Error("Missing Workload Identity Federation configuration")
+  }
+
+  return `//iam.googleapis.com/projects/${analyticsConfig.gcpProjectNumber}/locations/global/workloadIdentityPools/${analyticsConfig.gcpWorkloadIdentityPoolId}/providers/${analyticsConfig.gcpWorkloadIdentityPoolProviderId}`
+}
+
+// Generate the service account impersonation URL
+export function getServiceAccountImpersonationUrl(): string {
+  if (!analyticsConfig.gcpServiceAccountEmail) {
+    throw new Error("Missing service account email")
+  }
+
+  return `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${analyticsConfig.gcpServiceAccountEmail}:generateAccessToken`
+}
+
+// Get configuration status for debugging
 export function getConfigurationStatus() {
   return {
-    ga4PropertyId: !!analyticsConfig.ga4PropertyId,
-    gcpProjectId: !!analyticsConfig.gcpProjectId,
-    gcpServiceAccountEmail: !!analyticsConfig.gcpServiceAccountEmail,
-    gcpWorkloadIdentityPoolId: !!analyticsConfig.gcpWorkloadIdentityPoolId,
-    gcpWorkloadIdentityPoolProviderId: !!analyticsConfig.gcpWorkloadIdentityPoolProviderId,
-    gcpProjectNumber: !!analyticsConfig.gcpProjectNumber,
-    gcpWorkloadIdentityProvider: !!analyticsConfig.gcpWorkloadIdentityProvider,
-    gcpServiceAccountImpersonationUrl: !!analyticsConfig.gcpServiceAccountImpersonationUrl,
+    configured: validateAnalyticsConfig(),
+    propertyId: analyticsConfig.ga4PropertyId,
+    projectId: analyticsConfig.gcpProjectId,
+    projectNumber: analyticsConfig.gcpProjectNumber,
+    serviceAccount: analyticsConfig.gcpServiceAccountEmail,
+    workloadIdentityPool: analyticsConfig.gcpWorkloadIdentityPoolId,
+    workloadIdentityProvider: analyticsConfig.gcpWorkloadIdentityPoolProviderId,
     isVercelDeployment: !!process.env.VERCEL,
-    hasAdminPassword: !!process.env.ADMIN_PASSWORD,
+    hasAdminPassword: !!analyticsConfig.adminPassword,
   }
-}
-
-export function getWorkloadIdentityAudience(): string {
-  if (analyticsConfig.gcpWorkloadIdentityPoolId && analyticsConfig.gcpWorkloadIdentityPoolProviderId) {
-    return `//iam.googleapis.com/projects/${analyticsConfig.gcpProjectNumber}/locations/global/workloadIdentityPools/${analyticsConfig.gcpWorkloadIdentityPoolId}/providers/${analyticsConfig.gcpWorkloadIdentityPoolProviderId}`
-  }
-  return analyticsConfig.gcpWorkloadIdentityProvider || ""
-}
-
-export function getServiceAccountImpersonationUrl(): string {
-  if (analyticsConfig.gcpServiceAccountEmail) {
-    return `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${analyticsConfig.gcpServiceAccountEmail}:generateAccessToken`
-  }
-  return analyticsConfig.gcpServiceAccountImpersonationUrl || ""
-}
-
-export function isVercelOIDCConfigured(): boolean {
-  return !!(
-    analyticsConfig.gcpWorkloadIdentityPoolId &&
-    analyticsConfig.gcpWorkloadIdentityPoolProviderId &&
-    analyticsConfig.gcpProjectNumber &&
-    process.env.VERCEL
-  )
-}
-
-export function getAuthenticationMethod(): string {
-  if (isVercelOIDCConfigured()) {
-    return "vercel-oidc"
-  }
-  if (analyticsConfig.gcpWorkloadIdentityProvider && analyticsConfig.gcpServiceAccountImpersonationUrl) {
-    return "workload-identity"
-  }
-  return "not-configured"
 }
