@@ -115,6 +115,11 @@ export const metadata: Metadata = {
       url: "/apple-touch-icon-precomposed.png",
     },
   },
+  verification: {
+    // Add your verification codes if you have them
+    // google: "your-google-verification-code",
+    // yandex: "your-yandex-verification-code",
+  },
 }
 
 export const viewport = {
@@ -138,17 +143,47 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      </head>
-      {/* Google tag (gtag.js) */}
-      <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="afterInteractive" />
-      <Script id="google-analytics" strategy="afterInteractive">
-        {`
+        {/* Google tag (gtag.js) */}
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
           gtag('config', 'G-FTWW298D70');
         `}
-      </Script>
+        </Script>
+        {/* LinkedIn Pixel */}
+        <Script id="linkedin-pixel-init" strategy="afterInteractive">
+          {`
+            _linkedin_partner_id = "7445314";
+            window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+            window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+          `}
+        </Script>
+        <Script id="linkedin-pixel" strategy="afterInteractive">
+          {`
+            (function(l) {
+              if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+              window.lintrk.q=[]}
+              var s = document.getElementsByTagName("script")[0];
+              var b = document.createElement("script");
+              b.type = "text/javascript";b.async = true;
+              b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+              s.parentNode.insertBefore(b, s);
+            })(window.lintrk);
+          `}
+        </Script>
+        <noscript>
+          <img
+            height="1"
+            width="1"
+            style={{ display: "none" }}
+            alt=""
+            src="https://px.ads.linkedin.com/collect/?pid=7445314&fmt=gif"
+          />
+        </noscript>
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
@@ -160,8 +195,8 @@ export default async function RootLayout({
             <PageTransition>{children}</PageTransition>
             <Toaster closeButton />
           </main>
-          <Footer />
           <Analytics />
+          <Footer />
         </CartProvider>
       </body>
     </html>
