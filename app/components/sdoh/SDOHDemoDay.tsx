@@ -1,320 +1,362 @@
 "use client"
-import { useState, useRef } from "react"
-import { FadeIn } from "../FadeIn"
+import { useState, useRef, useEffect } from "react"
+import type React from "react"
+import { motion, AnimatePresence } from "motion/react"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "../../types/dictionary"
-import { motion, AnimatePresence } from "motion/react"
-import { VideoModal } from "./VideoModal"
 
 interface SDOHDemoDayProps {
   locale: Locale
   dict: Partial<Dictionary>
 }
 
-export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+// Helper function to safely get string values from dictionary
+const getStringValue = (value: any): string => {
+  if (typeof value === "string") return value
+  return ""
+}
 
-  // Use type guards to safely access dictionary values
+export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
+  const modalVideoRef = useRef<HTMLVideoElement>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalIsPlaying, setModalIsPlaying] = useState(false)
+  const [modalCurrentTime, setModalCurrentTime] = useState(0)
+  const [modalDuration, setModalDuration] = useState(0)
+  const [modalVolume, setModalVolume] = useState(1)
+  const [modalIsMuted, setModalIsMuted] = useState(false)
+  const [showModalControls, setShowModalControls] = useState(true)
+
+  // Modal keyboard controls
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isModalOpen) {
+        setIsModalOpen(false)
+      }
+    }
+
+    const handleSpacebar = (e: KeyboardEvent) => {
+      if (e.code === "Space" && isModalOpen) {
+        e.preventDefault()
+        toggleModalPlayPause()
+      }
+    }
+
+    if (isModalOpen) {
+      document.addEventListener("keydown", handleEscape)
+      document.addEventListener("keydown", handleSpacebar)
+      document.body.style.overflow = "hidden"
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape)
+      document.removeEventListener("keydown", handleSpacebar)
+      document.body.style.overflow = "unset"
+    }
+  }, [isModalOpen])
+
+  // Auto-hide modal controls
+  useEffect(() => {
+    let timeout: NodeJS.Timeout
+    if (modalIsPlaying && showModalControls) {
+      timeout = setTimeout(() => {
+        setShowModalControls(false)
+      }, 3000)
+    }
+    return () => clearTimeout(timeout)
+  }, [modalIsPlaying, showModalControls])
+
+  // Get localized text from dictionary
   const sdohDict = dict?.sdoh
   const demoDayDict = sdohDict?.demoDay
-
-  // Default text with proper type guards
-  const title = demoDayDict?.title || "Demo Day Highlights"
+  const title = getStringValue(demoDayDict?.title) || "Demo Day Recap"
   const description =
-    demoDayDict?.description ||
-    "Watch how our accelerator cohort companies are transforming healthcare through innovation."
+    getStringValue(demoDayDict?.description) || "Cohort companies will participate in a public Demo Day pitch event"
 
   const handlePlayClick = () => {
     setIsModalOpen(true)
   }
 
-  const handleVideoLoad = () => {
-    setIsLoading(false)
+  // Modal video handlers
+  const toggleModalPlayPause = () => {
+    if (modalVideoRef.current) {
+      if (modalIsPlaying) {
+        modalVideoRef.current.pause()
+        setModalIsPlaying(false)
+      } else {
+        modalVideoRef.current.play()
+        setModalIsPlaying(true)
+      }
+    }
   }
 
+  const handleModalTimeUpdate = () => {
+    if (modalVideoRef.current) {
+      setModalCurrentTime(modalVideoRef.current.currentTime)
+    }
+  }
+
+  const handleModalDurationChange = () => {
+    if (modalVideoRef.current) {
+      setModalDuration(modalVideoRef.current.duration)
+    }
+  }
+
+  const handleModalSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (modalVideoRef.current) {
+      const time = (Number.parseFloat(e.target.value) / 100) * modalDuration
+      modalVideoRef.current.currentTime = time
+      setModalCurrentTime(time)
+    }
+  }
+
+  const handleModalVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = Number.parseFloat(e.target.value) / 100
+    setModalVolume(newVolume)
+    if (modalVideoRef.current) {
+      modalVideoRef.current.volume = newVolume
+    }
+    setModalIsMuted(newVolume === 0)
+  }
+
+  const toggleModalMute = () => {
+    if (modalVideoRef.current) {
+      if (modalIsMuted) {
+        modalVideoRef.current.volume = modalVolume
+        setModalIsMuted(false)
+      } else {
+        modalVideoRef.current.volume = 0
+        setModalIsMuted(true)
+      }
+    }
+  }
+
+  const formatTime = (time: number) => {
+    if (!isFinite(time)) return "0:00"
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  const handleModalMouseMove = () => {
+    setShowModalControls(true)
+  }
+
+  const videoSrc = "https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mov"
+  const posterImage = "https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png"
+
   return (
-    <FadeIn>
-      <div className="max-w-4xl mx-auto px-4">
-        <motion.div
-          className="bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-2xl overflow-hidden shadow-xl border border-cyan-500/30 relative group"
-          whileHover={{
-            scale: 1.02,
-            boxShadow: "0 25px 50px -12px rgba(6, 182, 212, 0.25)",
-          }}
-          transition={{ duration: 0.3 }}
-          onHoverStart={() => setIsHovered(true)}
-          onHoverEnd={() => setIsHovered(false)}
+    <>
+      <div className="w-full h-full">
+        {/* Simple image with play button overlay */}
+        <div
+          className="relative w-full h-full aspect-[4/5] rounded-2xl overflow-hidden group cursor-pointer"
+          onClick={handlePlayClick}
         >
-          {/* Video container with Instagram aspect ratio (1080x1350 = 4:5) */}
-          <div className="aspect-[4/5] relative overflow-hidden">
-            {/* Loading skeleton */}
-            <AnimatePresence>
-              {isLoading && (
-                <motion.div
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center z-10"
-                >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full"
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+          {/* Background image */}
+          <img
+            src={posterImage || "/placeholder.svg"}
+            alt={title}
+            className="w-full h-full object-cover transition-all duration-300 group-hover:brightness-75"
+          />
 
-            {/* Enhanced video element */}
-            <motion.video
-              ref={videoRef}
-              className="w-full h-full object-cover transition-all duration-500"
-              src="https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mov"
-              poster="https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png"
-              playsInline
-              webkit-playsinline="true"
-              x5-playsinline="true"
-              preload="metadata"
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => setIsPlaying(false)}
-              onLoadedData={handleVideoLoad}
-              style={{
-                filter: isHovered && !isPlaying ? "brightness(0.8)" : "brightness(1)",
-              }}
-            />
+          {/* Play button overlay */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 hover:scale-110 transition-transform duration-200">
+              <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
 
-            {/* Enhanced Play Button Overlay */}
-            <AnimatePresence>
-              {(isHovered || !isPlaying) && !isLoading && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                  className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
-                  onClick={handlePlayClick}
-                >
-                  {/* Background overlay */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.4 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black"
-                  />
+          {/* Text overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+            <h3 className="text-2xl font-bold text-white mb-2">DEMO DAY RECAP</h3>
+            <p className="text-white/90 text-sm leading-relaxed">
+              Cohort companies will participate in a public Demo Day pitch event at the conclusion of the accelerator and receive the opportunity to run a pilot program of their technology in the Methodist system.
+            </p>
+          </div>
+        </div>
+      </div>
 
-                  {/* Play button container */}
-                  <motion.div className="relative z-10" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-                    {/* Outer glow ring */}
-                    <motion.div
-                      className="absolute inset-0 w-20 h-20 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 blur-xl opacity-60"
-                      animate={{
-                        scale: [1, 1.2, 1],
-                        opacity: [0.6, 0.8, 0.6],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Number.POSITIVE_INFINITY,
-                        ease: "easeInOut",
-                      }}
-                    />
-
-                    {/* Main play button */}
-                    <motion.div
-                      className="relative w-20 h-20 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center shadow-2xl border-2 border-white/20"
-                      animate={{
-                        boxShadow: [
-                          "0 10px 30px rgba(6, 182, 212, 0.3)",
-                          "0 15px 40px rgba(6, 182, 212, 0.5)",
-                          "0 10px 30px rgba(6, 182, 212, 0.3)",
-                        ],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Number.POSITIVE_INFINITY,
-                        ease: "easeInOut",
-                      }}
-                    >
-                      {/* Inner highlight */}
-                      <div className="absolute inset-1 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
-
-                      {/* Play icon */}
-                      <motion.svg
-                        className="w-8 h-8 text-white ml-1"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        animate={isPlaying ? { opacity: 0 } : { opacity: 1 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </motion.svg>
-
-                      {/* Pause icon */}
-                      <motion.svg
-                        className="absolute w-8 h-8 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        animate={isPlaying ? { opacity: 1 } : { opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                      </motion.svg>
-                    </motion.div>
-
-                    {/* Ripple effect */}
-                    <motion.div
-                      className="absolute inset-0 w-20 h-20 rounded-full border-2 border-white/30"
-                      animate={{
-                        scale: [1, 1.5, 2],
-                        opacity: [0.5, 0.2, 0],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Number.POSITIVE_INFINITY,
-                        ease: "easeOut",
-                      }}
-                    />
-                  </motion.div>
-
-                  {/* Play text */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-16 left-1/2 transform -translate-x-1/2"
-                  >
-                    <span className="text-white font-medium text-sm bg-black/50 px-3 py-1 rounded-full backdrop-blur-sm">
-                      {isPlaying ? "Pause" : "Demo Day Recap"}
-                    </span>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Enhanced video title overlay */}
+      {/* Video Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm"
+            onClick={() => setIsModalOpen(false)}
+            onMouseMove={handleModalMouseMove}
+          >
             <motion.div
-              className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none z-5"
-              animate={{
-                opacity: isHovered && isPlaying ? 0.7 : 1,
-              }}
-              transition={{ duration: 0.3 }}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-4xl bg-black rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              <motion.h3
-                className="text-xl sm:text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-300 mb-2"
-                animate={{
-                  backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                }}
-                style={{
-                  backgroundSize: "200% 100%",
-                }}
+              {/* Close button */}
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: showModalControls ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors duration-200 flex items-center justify-center"
+                aria-label="Close video"
               >
-                Demo Day Recap
-              </motion.h3>
-              <motion.p
-                className="text-sm sm:text-base md:text-lg text-white/90 max-w-md leading-relaxed"
-                initial={{ opacity: 0.9 }}
-                animate={{ opacity: [0.9, 1, 0.9] }}
-                transition={{
-                  duration: 3,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                }}
-              >
-                Cohort companies will participate in a public Demo Day pitch event 
-              </motion.p>
-            </motion.div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </motion.button>
 
-            {/* Enhanced corner accents */}
-            <motion.div
-              className="absolute top-4 left-4 w-8 h-8 border-l-2 border-t-2 border-cyan-400/60 rounded-tl-lg"
-              animate={{
-                opacity: [0.6, 1, 0.6],
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-              }}
-            />
-            <motion.div
-              className="absolute top-4 right-4 w-8 h-8 border-r-2 border-t-2 border-cyan-400/60 rounded-tr-lg"
-              animate={{
-                opacity: [0.6, 1, 0.6],
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 1,
-              }}
-            />
-            <motion.div
-              className="absolute bottom-4 left-4 w-8 h-8 border-l-2 border-b-2 border-yellow-400/60 rounded-bl-lg"
-              animate={{
-                opacity: [0.6, 1, 0.6],
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 2,
-              }}
-            />
-            <motion.div
-              className="absolute bottom-4 right-4 w-8 h-8 border-r-2 border-b-2 border-yellow-400/60 rounded-br-lg"
-              animate={{
-                opacity: [0.6, 1, 0.6],
-                scale: [1, 1.1, 1],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 3,
-              }}
-            />
+              {/* Video container */}
+              <div className="relative" style={{ aspectRatio: "16/9" }}>
+                <video
+                  ref={modalVideoRef}
+                  className="w-full h-full object-cover"
+                  src={videoSrc}
+                  controls={false}
+                  playsInline
+                  webkit-playsinline="true"
+                  x5-playsinline="true"
+                  autoPlay
+                  onTimeUpdate={handleModalTimeUpdate}
+                  onDurationChange={handleModalDurationChange}
+                  onPlay={() => setModalIsPlaying(true)}
+                  onPause={() => setModalIsPlaying(false)}
+                  onClick={toggleModalPlayPause}
+                >
+                  <source src={videoSrc} type="video/quicktime" />
+                  <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
 
-            {/* Progress indicator when playing */}
-            <AnimatePresence>
-              {isPlaying && (
+                {/* Play/Pause overlay when paused */}
+                <AnimatePresence>
+                  {!modalIsPlaying && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer z-10"
+                      onClick={toggleModalPlayPause}
+                    >
+                      <motion.div
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+                      >
+                        <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Custom controls */}
                 <motion.div
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-500 z-10"
+                  animate={{ opacity: showModalControls ? 1 : 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 z-10"
                 >
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-yellow-400 to-orange-400"
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 60, ease: "linear" }} // Adjust based on video length
-                  />
+                  {/* Progress bar */}
+                  <div className="mb-4">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={modalDuration ? (modalCurrentTime / modalDuration) * 100 : 0}
+                      onChange={handleModalSeek}
+                      className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${
+                          modalDuration ? (modalCurrentTime / modalDuration) * 100 : 0
+                        }%, rgba(255,255,255,0.3) ${modalDuration ? (modalCurrentTime / modalDuration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Control buttons */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={toggleModalPlayPause}
+                        className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors duration-200"
+                        aria-label={modalIsPlaying ? "Pause video" : "Play video"}
+                      >
+                        {modalIsPlaying ? (
+                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={toggleModalMute}
+                        className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors duration-200"
+                        aria-label={modalIsMuted ? "Unmute video" : "Mute video"}
+                      >
+                        {modalIsMuted ? (
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                          </svg>
+                        )}
+                      </button>
+
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={modalIsMuted ? 0 : modalVolume * 100}
+                          onChange={handleModalVolumeChange}
+                          className="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="text-white text-sm">
+                        {formatTime(modalCurrentTime)} / {formatTime(modalDuration)}
+                      </div>
+                    </div>
+
+                    <div className="text-white text-right">
+                      <h3 className="font-semibold text-lg">DEMO DAY RECAP</h3>
+                    </div>
+                  </div>
                 </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      </div>
-      {/* Video Modal */}
-      <VideoModal
-        isOpen={isModalOpen}
-        closeModal={() => setIsModalOpen(false)}
-        videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mov"
-        title={title}
-        videoId="demo-day-v3"
-        image="https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png"
-      />
-    </FadeIn>
+              </div>
+
+              {/* Video info */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: showModalControls ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+                className="p-6 bg-gradient-to-t from-black to-transparent"
+              >
+                <p className="text-neutral-300 leading-relaxed text-center">{description}</p>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

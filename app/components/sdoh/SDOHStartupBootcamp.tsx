@@ -466,7 +466,7 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
               2
             </motion.span>
 
-            {/* Animated border */}
+            {/* Static border - removed spinning animation */}
             <motion.div
               initial={{ pathLength: 0 }}
               animate={titleInView ? { pathLength: 1 } : {}}
@@ -485,9 +485,9 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
                   stroke="url(#gradient2)"
                   strokeWidth="2"
                   strokeDasharray="8 4"
-                  initial={{ pathLength: 0, rotate: 0 }}
-                  animate={titleInView ? { pathLength: 1, rotate: 360 } : {}}
-                  transition={{ delay: 1, duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "loop" }}
+                  initial={{ pathLength: 0 }}
+                  animate={titleInView ? { pathLength: 1 } : {}}
+                  transition={{ delay: 1, duration: 2 }}
                 />
                 <defs>
                   <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">

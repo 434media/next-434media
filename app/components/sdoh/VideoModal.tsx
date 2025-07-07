@@ -1,518 +1,493 @@
 "use client"
-
+import { useEffect, useRef, useState } from "react"
 import type React from "react"
 
-import { useState, useRef, useCallback, useEffect, Fragment } from "react"
-import { Dialog, DialogPanel, Transition, TransitionChild, DialogTitle } from "@headlessui/react"
+import { motion, AnimatePresence } from "motion/react"
 
 interface VideoModalProps {
   isOpen: boolean
-  closeModal: () => void
+  onClose: () => void
+  videoSrc: string
   title: string
-  videoId: string
-  videoUrl?: string
-  href?: string
-  image: string
-  comingSoonText?: string
-  comingSoonDescriptionText?: string
-  visitWebsiteText?: string
-  closeText?: string
-  sessionIdText?: string
+  description: string
 }
 
-export function VideoModal({
-  isOpen,
-  closeModal,
-  title,
-  videoId,
-  videoUrl,
-  href,
-  image,
-  comingSoonText = "Coming Soon",
-  comingSoonDescriptionText = "This video will be available after the event. Check back later to watch the full session.",
-  visitWebsiteText = "Visit Website",
-  closeText = "Close",
-  sessionIdText = "Session ID",
-}: VideoModalProps) {
-  const videoRef = useRef<HTMLDivElement>(null)
+export function VideoModal({ isOpen, onClose, videoSrc, title, description }: VideoModalProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [volume, setVolume] = useState(0.8)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(1)
   const [isMuted, setIsMuted] = useState(false)
   const [showControls, setShowControls] = useState(true)
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const [duration, setDuration] = useState(0)
+  const [loadingTimeout, setLoadingTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string>("")
 
-  const togglePlayback = useCallback(() => {
-    setIsPlaying(!isPlaying)
-    setShowControls(true)
+  // Auto-hide controls after 3 seconds of inactivity
+  useEffect(() => {
+    let timeout: NodeJS.Timeout
+    if (isPlaying && showControls) {
+      timeout = setTimeout(() => {
+        setShowControls(false)
+      }, 3000)
+    }
+    return () => clearTimeout(timeout)
+  }, [isPlaying, showControls])
 
-    const videoElement = videoRef.current?.querySelector("video")
-    if (videoElement) {
-      if (isPlaying) {
-        videoElement.pause()
-      } else {
-        videoElement.play().catch((e) => console.log("Playback prevented:", e))
+  // Reset states when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoading(true)
+      setHasError(false)
+      setErrorMessage("")
+      setIsPlaying(false)
+      setCurrentTime(0)
+      setDuration(0)
+      setShowControls(true)
+
+      // Set loading timeout
+      const timeout = setTimeout(() => {
+        if (isLoading) {
+          console.log("Modal video loading timeout")
+          setIsLoading(false)
+          setHasError(true)
+          setErrorMessage("Video loading timed out. Please check your connection and try again.")
+        }
+      }, 10000) // 10 second timeout
+
+      setLoadingTimeout(timeout)
+
+      return () => {
+        if (timeout) clearTimeout(timeout)
+      }
+    } else {
+      // Reset when modal closes
+      setIsLoading(true)
+      setHasError(false)
+      setErrorMessage("")
+      setIsPlaying(false)
+      setCurrentTime(0)
+      setDuration(0)
+      if (videoRef.current) {
+        videoRef.current.pause()
+        videoRef.current.currentTime = 0
       }
     }
-  }, [isPlaying])
+  }, [isOpen])
 
   // Handle keyboard events
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeModal()
+      if (e.key === "Escape") {
+        onClose()
+      }
     }
 
-    const handleSpaceBar = (e: KeyboardEvent) => {
-      if (
-        e.key === " " &&
-        document.activeElement?.tagName !== "BUTTON" &&
-        document.activeElement?.tagName !== "INPUT"
-      ) {
+    const handleSpacebar = (e: KeyboardEvent) => {
+      if (e.code === "Space" && isOpen) {
         e.preventDefault()
-        togglePlayback()
+        togglePlayPause()
       }
     }
 
     if (isOpen) {
       document.addEventListener("keydown", handleEscape)
-      document.addEventListener("keydown", handleSpaceBar)
+      document.addEventListener("keydown", handleSpacebar)
+      document.body.style.overflow = "hidden"
     }
 
     return () => {
       document.removeEventListener("keydown", handleEscape)
-      document.removeEventListener("keydown", handleSpaceBar)
+      document.removeEventListener("keydown", handleSpacebar)
+      document.body.style.overflow = "unset"
     }
-  }, [isOpen, closeModal, togglePlayback])
+  }, [isOpen, onClose])
 
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setIsPlaying(false)
-      setProgress(0)
-      setShowControls(true)
+  const handleVideoLoad = () => {
+    console.log("Modal video loaded successfully")
+    setIsLoading(false)
+    setHasError(false)
+    setErrorMessage("")
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout)
     }
-  }, [isOpen])
+  }
 
-  // Auto-hide controls after inactivity
-  useEffect(() => {
-    if (isPlaying) {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current)
+  const handleVideoError = (e: any) => {
+    console.error("Modal video loading error:", e)
+    setIsLoading(false)
+    setHasError(true)
+
+    // Determine error message based on error type
+    const video = e.target as HTMLVideoElement
+    const error = video.error
+
+    let message = "Unable to load video. Please try again later."
+
+    if (error) {
+      switch (error.code) {
+        case MediaError.MEDIA_ERR_ABORTED:
+          message = "Video loading was aborted. Please try again."
+          break
+        case MediaError.MEDIA_ERR_NETWORK:
+          message = "Network error occurred while loading video. Please check your connection."
+          break
+        case MediaError.MEDIA_ERR_DECODE:
+          message = "Video format is not supported or corrupted."
+          break
+        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          message = "Video format is not supported by your browser."
+          break
+        default:
+          message = "An unknown error occurred while loading the video."
       }
-
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false)
-      }, 3000)
     }
 
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current)
+    setErrorMessage(message)
+
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout)
+    }
+  }
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime)
+    }
+  }
+
+  const handleDurationChange = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration)
+    }
+  }
+
+  const togglePlayPause = () => {
+    if (videoRef.current && !hasError) {
+      if (isPlaying) {
+        videoRef.current.pause()
+        setIsPlaying(false)
+      } else {
+        const playPromise = videoRef.current.play()
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true)
+            })
+            .catch((error) => {
+              console.error("Video play failed:", error)
+              // Don't set error state for play failures, just keep paused
+            })
+        }
       }
     }
-  }, [isPlaying, showControls])
+  }
 
-  const handleReady = () => setIsLoading(false)
-  const handleDuration = (duration: number) => setDuration(duration)
-  const handleProgress = (state: { played: number }) => setProgress(state.played)
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (videoRef.current && !hasError) {
+      const time = (Number.parseFloat(e.target.value) / 100) * duration
+      videoRef.current.currentTime = time
+      setCurrentTime(time)
+    }
+  }
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = Number.parseFloat(e.target.value)
+    const newVolume = Number.parseFloat(e.target.value) / 100
     setVolume(newVolume)
-    setIsMuted(newVolume === 0)
-
-    const videoElement = videoRef.current?.querySelector("video")
-    if (videoElement) {
-      videoElement.volume = newVolume
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume
     }
+    setIsMuted(newVolume === 0)
   }
 
   const toggleMute = () => {
-    setIsMuted(!isMuted)
-    const videoElement = videoRef.current?.querySelector("video")
-    if (videoElement) {
-      videoElement.muted = !isMuted
+    if (videoRef.current) {
+      if (isMuted) {
+        videoRef.current.volume = volume
+        setIsMuted(false)
+      } else {
+        videoRef.current.volume = 0
+        setIsMuted(true)
+      }
     }
   }
 
-  const handleVideoContainerMouseMove = () => {
+  const formatTime = (time: number) => {
+    if (!isFinite(time)) return "0:00"
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+  const handleMouseMove = () => {
     setShowControls(true)
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current)
-    }
-    if (isPlaying) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false)
-      }, 3000)
+  }
+
+  const retryLoad = () => {
+    setHasError(false)
+    setErrorMessage("")
+    setIsLoading(true)
+    if (videoRef.current) {
+      // Reset video element
+      videoRef.current.load()
     }
   }
 
-  const formatTime = (seconds: number) => {
-    const date = new Date(seconds * 1000)
-    const hh = date.getUTCHours()
-    const mm = date.getUTCMinutes()
-    const ss = date.getUTCSeconds().toString().padStart(2, "0")
-    if (hh) {
-      return `${hh}:${mm.toString().padStart(2, "0")}:${ss}`
-    }
-    return `${mm}:${ss}`
-  }
+  // Check if video source is valid
+  const isValidVideoSrc = videoSrc && videoSrc.trim() !== ""
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={closeModal}>
-        <TransitionChild
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm"
+          onClick={onClose}
+          onMouseMove={handleMouseMove}
         >
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
-        </TransitionChild>
-
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <TransitionChild
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="relative w-full max-w-4xl bg-black rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: showControls ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
+              onClick={onClose}
+              className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors duration-200 flex items-center justify-center"
+              aria-label="Close video"
             >
-              <DialogPanel className="w-full max-w-5xl transform overflow-hidden rounded-2xl bg-neutral-900 p-6 text-left align-middle shadow-2xl transition-all border border-cyan-500/20">
-                <DialogTitle as="h3" className="text-xl font-bold text-white mb-4 pr-8">
-                  {title}
-                </DialogTitle>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </motion.button>
 
-                <button
-                  type="button"
-                  className="absolute top-4 right-4 rounded-full bg-neutral-800 p-2 text-white hover:bg-neutral-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 hover:scale-110"
-                  onClick={closeModal}
-                  aria-label="Close"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+            {/* Video container */}
+            <div className="relative" style={{ aspectRatio: "16/9" }}>
+              {/* Loading state */}
+              <AnimatePresence>
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 z-10"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                      className="w-12 h-12 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full mb-4"
+                    />
+                    <p className="text-white/80 text-sm">Loading video...</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                <div
-                  ref={videoRef}
-                  className="aspect-video bg-black rounded-lg overflow-hidden relative"
-                  onMouseMove={handleVideoContainerMouseMove}
-                  onTouchStart={handleVideoContainerMouseMove}
-                  onClick={() => {
-                    if (!isLoading) togglePlayback()
-                  }}
-                >
-                  {videoUrl ? (
-                    <>
-                      {/* Enhanced loading overlay */}
-                      {isLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-cyan-900/50 to-neutral-900/50 z-10">
-                          <div className="flex flex-col items-center">
-                            <div className="relative w-20 h-20">
-                              <div className="absolute inset-0 w-20 h-20 border-4 border-cyan-500/30 rounded-full"></div>
-                              <div className="absolute inset-0 w-20 h-20 border-4 border-t-cyan-400 border-r-yellow-400 border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-10 w-10 text-cyan-400 animate-pulse"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
-                              </div>
-                            </div>
-                            <p className="text-white text-sm mt-4 font-medium animate-pulse">Preparing your video...</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Enhanced video player */}
-                      <video
-                        ref={(el) => {
-                          if (el) {
-                            el.addEventListener("loadedmetadata", () => {
-                              handleReady()
-                              handleDuration(el.duration)
-                            })
-                            el.addEventListener("timeupdate", () => {
-                              handleProgress({ played: el.currentTime / (el.duration || 1) })
-                            })
-                            el.volume = isMuted ? 0 : volume
-                            if (isPlaying) {
-                              el.play().catch((e) => console.log("Autoplay prevented:", e))
-                            } else {
-                              el.pause()
-                            }
-                          }
-                        }}
-                        src={videoUrl}
-                        poster={image}
-                        preload="auto"
-                        playsInline
-                        className="w-full h-full object-cover"
-                        onError={(e) => console.error("Video error:", e)}
-                      />
-
-                      {/* Enhanced play/pause buttons with better animations */}
-                      {!isPlaying && !isLoading && (
+              {/* Error state */}
+              <AnimatePresence>
+                {hasError && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-white p-8 z-10"
+                  >
+                    <div className="text-center max-w-md">
+                      <div className="w-16 h-16 mx-auto mb-4 text-red-400">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">Video Unavailable</h3>
+                      <p className="text-neutral-400 mb-4 text-sm leading-relaxed">
+                        {errorMessage || "Sorry, this video could not be loaded."}
+                      </p>
+                      {isValidVideoSrc && (
                         <button
-                          onClick={togglePlayback}
-                          className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/30 z-20 group focus:outline-none"
-                          aria-label="Play video"
+                          onClick={retryLoad}
+                          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
                         >
-                          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500/80 to-yellow-500/80 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transition-all duration-500 group-hover:scale-125 group-hover:from-cyan-400 group-hover:to-yellow-400 group-focus:scale-125 group-focus:from-cyan-400 group-focus:to-yellow-400 shadow-2xl">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-12 w-12 text-white transition-all duration-300 group-hover:scale-110"
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                              aria-hidden="true"
-                            >
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </div>
+                          Try Again
                         </button>
                       )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                      {/* Enhanced custom controls */}
-                      <div
-                        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-all duration-500 ${
-                          showControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-                        }`}
-                      >
-                        {/* Enhanced progress bar */}
-                        <div
-                          className="w-full h-3 bg-neutral-700 rounded-full mb-4 cursor-pointer group"
-                          onClick={(e) => {
-                            if (videoRef.current) {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              const pos = (e.clientX - rect.left) / rect.width
-                              const videoElement = videoRef.current.querySelector("video")
-                              if (videoElement) {
-                                videoElement.currentTime = pos * duration
-                              }
-                            }
-                          }}
-                        >
-                          <div className="relative h-full">
-                            <div
-                              className="h-full bg-gradient-to-r from-cyan-500 to-yellow-500 rounded-full transition-all duration-300 group-hover:h-4"
-                              style={{ width: `${progress * 100}%` }}
-                            ></div>
-                            <div
-                              className="absolute top-1/2 w-4 h-4 bg-white rounded-full shadow-lg transform -translate-y-1/2 transition-all duration-300 group-hover:scale-125"
-                              style={{ left: `${progress * 100}%`, marginLeft: "-8px" }}
-                            ></div>
-                          </div>
-                        </div>
+              {/* Video element */}
+              {isValidVideoSrc && (
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  src={videoSrc}
+                  controls={false}
+                  playsInline
+                  webkit-playsinline="true"
+                  x5-playsinline="true"
+                  crossOrigin="anonymous"
+                  preload="metadata"
+                  onLoadedData={handleVideoLoad}
+                  onLoadedMetadata={handleVideoLoad}
+                  onCanPlay={handleVideoLoad}
+                  onError={handleVideoError}
+                  onTimeUpdate={handleTimeUpdate}
+                  onDurationChange={handleDurationChange}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onClick={togglePlayPause}
+                />
+              )}
 
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            {/* Enhanced play/pause button */}
-                            <button
-                              onClick={togglePlayback}
-                              className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 transition-all duration-300 hover:scale-110"
-                              aria-label={isPlaying ? "Pause" : "Play"}
-                            >
-                              {isPlaying ? (
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-8 w-8"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path fillRule="evenodd" d="M10 18V6h-4v12h4zm8 0V6h-4v12h4z" clipRule="evenodd" />
-                                </svg>
-                              ) : (
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-8 w-8"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
-                              )}
-                            </button>
+              {/* Fallback for invalid video source */}
+              {!isValidVideoSrc && (
+                <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-white p-8">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 text-neutral-400">
+                      <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h6l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">No Video Source</h3>
+                    <p className="text-neutral-400">No video source provided.</p>
+                  </div>
+                </div>
+              )}
 
-                            {/* Enhanced time display */}
-                            <div className="text-white text-sm font-mono bg-black/30 px-2 py-1 rounded">
-                              {formatTime(progress * duration)} / {formatTime(duration)}
-                            </div>
-                          </div>
+              {/* Play/Pause overlay when paused */}
+              <AnimatePresence>
+                {!isPlaying && !isLoading && !hasError && isValidVideoSrc && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer z-10"
+                    onClick={togglePlayPause}
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                          <div className="flex items-center space-x-4">
-                            {/* Enhanced volume controls */}
-                            <div className="flex items-center">
-                              <button
-                                onClick={toggleMute}
-                                className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 mr-2 transition-all duration-300 hover:scale-110"
-                                aria-label={isMuted ? "Unmute" : "Mute"}
-                              >
-                                {isMuted ? (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-6 w-6"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                                      clipRule="evenodd"
-                                    />
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-6 w-6"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={volume}
-                                onChange={handleVolumeChange}
-                                className="w-24 accent-cyan-500 hover:accent-yellow-500 transition-colors duration-300"
-                                aria-label="Volume"
-                              />
-                            </div>
+              {/* Custom controls */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: showControls && !isLoading && !hasError && isValidVideoSrc ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 z-10"
+              >
+                {/* Progress bar */}
+                <div className="mb-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={duration ? (currentTime / duration) * 100 : 0}
+                    onChange={handleSeek}
+                    className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${
+                        duration ? (currentTime / duration) * 100 : 0
+                      }%, rgba(255,255,255,0.3) ${duration ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.3) 100%)`,
+                    }}
+                  />
+                </div>
 
-                            {/* Enhanced fullscreen button */}
-                            <button
-                              onClick={() => {
-                                if (videoRef.current) {
-                                  if (document.fullscreenElement) {
-                                    document.exitFullscreen()
-                                  } else {
-                                    videoRef.current.requestFullscreen()
-                                  }
-                                }
-                              }}
-                              className="text-white hover:text-cyan-400 focus:outline-none focus:text-cyan-400 transition-all duration-300 hover:scale-110"
-                              aria-label="Toggle fullscreen"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    // Enhanced coming soon placeholder
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-br from-cyan-900/30 to-neutral-900/30">
-                      <div className="bg-gradient-to-br from-cyan-500/30 to-yellow-500/30 backdrop-blur-sm rounded-full p-8 border-2 border-yellow-300/50 mb-6 animate-pulse">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-20 w-20 text-white"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
+                {/* Control buttons */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={togglePlayPause}
+                      className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors duration-200"
+                      aria-label={isPlaying ? "Pause video" : "Play video"}
+                    >
+                      {isPlaying ? (
+                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M8 5v14l11-7z" />
                         </svg>
-                      </div>
-                      <h4 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-yellow-400 mb-4">
-                        {comingSoonText}
-                      </h4>
-                      <p className="text-white/90 max-w-md text-lg leading-relaxed">{comingSoonDescriptionText}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 flex flex-wrap justify-between items-center gap-4">
-                  <div className="text-sm text-white/60 font-mono bg-neutral-800/50 px-3 py-1 rounded">
-                    {sessionIdText}: {videoId}
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {href && (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center rounded-md bg-gradient-to-r from-neutral-800 to-neutral-700 px-4 py-2 text-sm font-medium text-white hover:from-neutral-700 hover:to-neutral-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-300 hover:scale-105"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 mr-2"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                          <polyline points="15 3 21 3 21 9"></polyline>
-                          <line x1="10" y1="14" x2="21" y2="3"></line>
-                        </svg>
-                        {visitWebsiteText}
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      className="inline-flex items-center rounded-md bg-gradient-to-r from-cyan-600 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-cyan-500 hover:to-yellow-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all duration-300 hover:scale-105"
-                      onClick={closeModal}
-                    >
-                      {closeText}
+                      )}
                     </button>
+
+                    <button
+                      onClick={toggleMute}
+                      className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors duration-200"
+                      aria-label={isMuted ? "Unmute video" : "Mute video"}
+                    >
+                      {isMuted ? (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                        </svg>
+                      )}
+                    </button>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={isMuted ? 0 : volume * 100}
+                        onChange={handleVolumeChange}
+                        className="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="text-white text-sm">
+                      {formatTime(currentTime)} / {formatTime(duration)}
+                    </div>
+                  </div>
+
+                  <div className="text-white text-right">
+                    <h3 className="font-semibold text-lg">{title}</h3>
                   </div>
                 </div>
-              </DialogPanel>
-            </TransitionChild>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+              </motion.div>
+            </div>
+
+            {/* Video info */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: showControls && !hasError ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
+              className="p-6 bg-gradient-to-t from-black to-transparent"
+            >
+              <p className="text-neutral-300 leading-relaxed text-center">{description}</p>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

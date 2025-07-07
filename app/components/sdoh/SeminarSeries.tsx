@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef } from "react"
-import { motion, useInView } from "motion/react"
+import { motion, useInView } from "framer-motion"
 import Image from "next/image"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
@@ -70,7 +70,7 @@ export default function SeminarSeries({ locale, dict }: SeminarSeriesProps) {
               1
             </motion.span>
 
-            {/* Animated border */}
+            {/* Static border - removed spinning animation */}
             <motion.div
               initial={{ pathLength: 0 }}
               animate={titleInView ? { pathLength: 1 } : {}}
@@ -89,9 +89,9 @@ export default function SeminarSeries({ locale, dict }: SeminarSeriesProps) {
                   stroke="url(#gradient)"
                   strokeWidth="2"
                   strokeDasharray="8 4"
-                  initial={{ pathLength: 0, rotate: 0 }}
-                  animate={titleInView ? { pathLength: 1, rotate: 360 } : {}}
-                  transition={{ delay: 1, duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "loop" }}
+                  initial={{ pathLength: 0 }}
+                  animate={titleInView ? { pathLength: 1 } : {}}
+                  transition={{ delay: 1, duration: 2 }}
                 />
                 <defs>
                   <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -355,7 +355,7 @@ export default function SeminarSeries({ locale, dict }: SeminarSeriesProps) {
                 />
               </div>
 
-              {/* Animated border frame */}
+              {/* Static border frame - removed spinning animation */}
               <motion.div
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={imageInView ? { pathLength: 1, opacity: 1 } : {}}
@@ -376,7 +376,7 @@ export default function SeminarSeries({ locale, dict }: SeminarSeriesProps) {
                     strokeDasharray="12 8"
                     initial={{ pathLength: 0 }}
                     animate={imageInView ? { pathLength: 1 } : {}}
-                    transition={{ duration: 3, delay: 1.5 }}
+                    transition={{ duration: 2, delay: 1.2 }}
                   />
                   <defs>
                     <linearGradient id="imageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
