@@ -31,7 +31,9 @@
       "date": "25-27 de abril, 2025",
       "where": "Dónde",
       "location": "TSTC - Harlingen, Centro de Bienvenida",
-      "cta": "Reserva tu Lugar"
+      "cta": "Reserva tu Lugar",
+      "keyFocus": "Enfoque Clave:",
+      "keyFocusDescription": "Los participantes recibieron mentoría práctica, oportunidades de networking y herramientas prácticas para construir soluciones que aborden las necesidades reales de salud comunitaria."
     },
     "accelerator": {
       "title": "Acelerador de Salud Comunitaria",

@@ -1,9 +1,11 @@
 "use client"
 import { FadeIn } from "../FadeIn"
 import type { Locale } from "../../../i18n-config"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import SDOHDemoDay from "./SDOHDemoDay"
 import type { Dictionary } from "../../types/dictionary"
+import { useLanguage } from "../../context/language-context"
+import { motion, useInView } from "motion/react"
 
 // Define the structure of the accelerator dictionary
 interface AcceleratorDictionary {
@@ -19,9 +21,33 @@ interface SDOHHealthAcceleratorProps {
   dict: Partial<Dictionary>
 }
 
+// Helper function to safely get string values from dictionary
+const getStringValue = (value: any): string => {
+  if (typeof value === "string") return value
+  return String(value || "")
+}
+
 export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAcceleratorProps) {
+  // Get dictionary from language context
+  const { dictionary } = useLanguage()
+
   // Track when dictionary or locale changes
   const [key, setKey] = useState(0)
+
+  // Refs for intersection observer
+  const titleRef = useRef<HTMLDivElement>(null)
+  const titleInView = useInView(titleRef, { once: true, amount: 0.1 })
+
+  const [forceVisible, setForceVisible] = useState(false)
+
+  useEffect(() => {
+    // Fallback to show content after 2 seconds if intersection observer doesn't trigger
+    const timer = setTimeout(() => {
+      setForceVisible(true)
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [])
 
   // Force re-render when locale or dictionary changes
   useEffect(() => {
@@ -30,7 +56,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
     console.log(`SDOHHealthAccelerator: Dictionary available:`, !!dict)
   }, [locale, dict])
 
-  // Default English text
+  // Default English text - ORIGINAL APPROVED TEXT
   const defaultDictionary: AcceleratorDictionary = {
     title: "Community Health Accelerator",
     subtitle: "Growth-Stage Program",
@@ -41,73 +67,525 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
   }
 
   // Use the dictionary if provided, otherwise use default English text
-  const sdohDict = dict?.sdoh
+  const currentDict = dictionary || dict
+  const sdohDict = currentDict?.sdoh
   const d = (sdohDict?.accelerator as AcceleratorDictionary) || defaultDictionary
 
   // Get the "Learn More" text from the dictionary
   const demoDayDict = sdohDict?.demoDay
-  const learnMore = demoDayDict?.learnMore || "Learn More About the Accelerator"
+  const learnMore = getStringValue(demoDayDict?.learnMore) || "Learn More About the Accelerator"
 
   return (
     <FadeIn key={key}>
-      <div className="max-w-5xl mx-auto mb-16 sm:mb-20">
+      {/* Added proper spacing from component above */}
+      <div className="max-w-7xl mx-auto pt-24 sm:pt-32 md:pt-40 mb-16 sm:mb-20 relative">
+        {/* Enhanced Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {/* Floating geometric shapes with enhanced animations */}
+          <motion.div
+            className="absolute top-20 left-10 w-20 h-20 bg-gradient-to-br from-cyan-200/30 to-blue-300/30 rounded-full blur-xl"
+            animate={{
+              y: [0, -20, 0],
+              x: [0, 10, 0],
+              scale: [1, 1.1, 1],
+              rotate: [0, 180, 360],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute top-40 right-20 w-16 h-16 bg-gradient-to-br from-blue-200/30 to-cyan-300/30 rounded-lg blur-xl rotate-45"
+            animate={{
+              y: [0, 15, 0],
+              x: [0, -15, 0],
+              rotate: [45, 135, 225],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{
+              duration: 10,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute bottom-20 left-1/4 w-12 h-12 bg-gradient-to-br from-cyan-300/30 to-blue-200/30 rounded-full blur-lg"
+            animate={{
+              y: [0, -25, 0],
+              scale: [1, 1.3, 1],
+              opacity: [0.6, 1, 0.6],
+            }}
+            transition={{
+              duration: 6,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
+          />
+
+          {/* Additional floating elements for more wow */}
+          <motion.div
+            className="absolute top-1/3 right-1/3 w-8 h-8 bg-gradient-to-br from-yellow-300/40 to-orange-300/40 rounded-full blur-md"
+            animate={{
+              y: [0, -30, 0],
+              x: [0, 20, 0],
+              scale: [1, 1.4, 1],
+            }}
+            transition={{
+              duration: 12,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: 2,
+            }}
+          />
+          <motion.div
+            className="absolute bottom-1/3 right-10 w-6 h-6 bg-gradient-to-br from-purple-300/30 to-pink-300/30 rounded-full blur-sm"
+            animate={{
+              y: [0, 20, 0],
+              x: [0, -10, 0],
+              rotate: [0, 360, 720],
+            }}
+            transition={{
+              duration: 15,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: 4,
+            }}
+          />
+        </div>
+
+        {/* Header Section - Matching SeminarSeries Layout */}
+        <div className="text-center mb-16 relative" ref={titleRef}>
+          {/* Enhanced background glow effects */}
+          <div className="absolute inset-0 -z-10">
+            <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-cyan-200/50 via-cyan-100/30 to-transparent rounded-full blur-3xl"
+              animate={{
+                scale: [1, 1.1, 1],
+                opacity: [0.4, 0.6, 0.4],
+              }}
+              transition={{
+                duration: 8,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+              }}
+            />
+            <motion.div
+              className="absolute top-1/2 left-1/4 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-radial from-blue-200/40 to-transparent rounded-full blur-2xl"
+              animate={{
+                scale: [1, 1.2, 1],
+                x: [0, 20, 0],
+              }}
+              transition={{
+                duration: 10,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+                delay: 1,
+              }}
+            />
+            <motion.div
+              className="absolute top-1/2 right-1/4 transform translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-radial from-yellow-200/35 to-transparent rounded-full blur-2xl"
+              animate={{
+                scale: [1, 1.15, 1],
+                x: [0, -20, 0],
+              }}
+              transition={{
+                duration: 12,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+                delay: 2,
+              }}
+            />
+          </div>
+
+          {/* Component Number - Enhanced with dramatic entrance - MATCHING CLIENT'S REQUESTED STYLE */}
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={titleInView || forceVisible ? { scale: 1, rotate: 0 } : {}}
+            transition={{
+              type: "spring",
+              stiffness: 200,
+              damping: 15,
+              delay: 0.3,
+            }}
+            className="relative inline-block mb-8"
+          >
+            {/* Enhanced outer glow ring with pulsing */}
+            <motion.div
+              className="absolute inset-0 w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-400 to-cyan-600 blur-xl opacity-60"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.6, 0.8, 0.6],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+              }}
+            />
+
+            {/* Main number container with enhanced effects */}
+            <motion.div
+              className="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-600 via-cyan-500 to-cyan-700 text-white flex items-center justify-center shadow-2xl transform hover:scale-110 transition-all duration-500 group"
+              whileHover={{
+                scale: 1.15,
+                boxShadow: "0 25px 50px -12px rgba(6, 182, 212, 0.5)",
+              }}
+            >
+              {/* Inner highlight with animation */}
+              <motion.div
+                className="absolute inset-1 rounded-2xl bg-gradient-to-br from-white/20 to-transparent"
+                animate={{
+                  opacity: [0.2, 0.4, 0.2],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                }}
+              />
+
+              {/* Number with enhanced styling */}
+              <motion.span
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={titleInView || forceVisible ? { opacity: 1, scale: 1 } : {}}
+                transition={{ delay: 0.8, duration: 0.6 }}
+                className="relative text-4xl font-black tracking-tight z-10"
+                style={{
+                  textShadow: "0 2px 8px rgba(0,0,0,0.3), 0 0 20px rgba(255,255,255,0.3)",
+                }}
+              >
+                3
+              </motion.span>
+
+              {/* Enhanced animated border */}
+              <motion.div
+                initial={{ pathLength: 0 }}
+                animate={titleInView || forceVisible ? { pathLength: 1 } : {}}
+                transition={{ delay: 1, duration: 2 }}
+                className="absolute inset-0 rounded-3xl"
+              >
+                <svg className="w-full h-full" viewBox="0 0 96 96">
+                  <motion.rect
+                    x="2"
+                    y="2"
+                    width="92"
+                    height="92"
+                    rx="20"
+                    ry="20"
+                    fill="none"
+                    stroke="url(#gradient3)"
+                    strokeWidth="3"
+                    strokeDasharray="8 4"
+                    initial={{ pathLength: 0, rotate: 0 }}
+                    animate={titleInView || forceVisible ? { pathLength: 1, rotate: 360 } : {}}
+                    transition={{
+                      delay: 1,
+                      duration: 3,
+                      repeat: Number.POSITIVE_INFINITY,
+                      repeatType: "loop",
+                    }}
+                  />
+                  <defs>
+                    <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#06b6d4" />
+                      <stop offset="25%" stopColor="#3b82f6" />
+                      <stop offset="50%" stopColor="#8b5cf6" />
+                      <stop offset="75%" stopColor="#06b6d4" />
+                      <stop offset="100%" stopColor="#0891b2" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+
+          {/* Title with enhanced typography and animations */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={titleInView || forceVisible ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1, delay: 0.6, ease: "easeOut" }}
+            className="relative max-w-4xl mx-auto"
+          >
+            {/* Main title with enhanced effects */}
+            <motion.h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none mb-6">
+              {/* Animated gradient text with enhanced effects */}
+              <motion.span
+                initial={{ backgroundPosition: "0% 50%" }}
+                animate={titleInView || forceVisible ? { backgroundPosition: "100% 50%" } : {}}
+                transition={{
+                  duration: 4,
+                  repeat: Number.POSITIVE_INFINITY,
+                  repeatType: "reverse",
+                  delay: 1.2,
+                }}
+                className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-purple-500 to-cyan-600 bg-[length:300%_100%]"
+                style={{
+                  textShadow: "0 4px 20px rgba(6, 182, 212, 0.4)",
+                  filter:
+                    "drop-shadow(0 4px 20px rgba(6, 182, 212, 0.3)) drop-shadow(0 0 40px rgba(139, 92, 246, 0.2))",
+                }}
+              >
+                {getStringValue(d.title)}
+              </motion.span>
+            </motion.h2>
+
+            {/* Enhanced decorative underline with animation */}
+            <motion.div
+              initial={{ scaleX: 0, opacity: 0 }}
+              animate={titleInView || forceVisible ? { scaleX: 1, opacity: 1 } : {}}
+              transition={{ duration: 1.5, delay: 1.4, ease: "easeOut" }}
+              className="relative mx-auto mb-8"
+              style={{ width: "min(500px, 90%)" }}
+            >
+              {/* Main underline with enhanced gradient */}
+              <div className="h-3 bg-gradient-to-r from-transparent via-cyan-400 to-blue-500 rounded-full" />
+
+              {/* Secondary underline for depth */}
+              <motion.div
+                initial={{ scaleX: 0 }}
+                animate={titleInView || forceVisible ? { scaleX: 1 } : {}}
+                transition={{ duration: 2, delay: 1.6, ease: "easeOut" }}
+                className="absolute top-1 left-1/2 transform -translate-x-1/2 h-1 w-3/4 bg-gradient-to-r from-transparent via-white/60 to-transparent rounded-full"
+              />
+
+              {/* Enhanced animated accent dots */}
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={titleInView || forceVisible ? { x: "100%" } : {}}
+                transition={{
+                  duration: 3,
+                  delay: 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                  repeatType: "loop",
+                  ease: "easeInOut",
+                }}
+                className="absolute top-0 left-0 w-6 h-3 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full blur-sm"
+              />
+
+              {/* Additional sparkle effects */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={
+                  titleInView || forceVisible
+                    ? {
+                        scale: [0, 1, 0],
+                        opacity: [0, 1, 0],
+                      }
+                    : {}
+                }
+                transition={{
+                  duration: 2,
+                  delay: 2.5,
+                  repeat: Number.POSITIVE_INFINITY,
+                  repeatDelay: 3,
+                }}
+                className="absolute top-1/2 left-1/4 transform -translate-y-1/2 w-2 h-2 bg-white rounded-full"
+              />
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={
+                  titleInView || forceVisible
+                    ? {
+                        scale: [0, 1, 0],
+                        opacity: [0, 1, 0],
+                      }
+                    : {}
+                }
+                transition={{
+                  duration: 2,
+                  delay: 3,
+                  repeat: Number.POSITIVE_INFINITY,
+                  repeatDelay: 3,
+                }}
+                className="absolute top-1/2 right-1/3 transform -translate-y-1/2 w-1.5 h-1.5 bg-cyan-300 rounded-full"
+              />
+            </motion.div>
+
+            {/* Enhanced section introduction text */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={titleInView || forceVisible ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, delay: 1.6 }}
+              className="relative"
+            >
+              <motion.p
+                className="text-lg sm:text-xl md:text-2xl text-neutral-600 font-medium leading-relaxed max-w-3xl mx-auto"
+                animate={{
+                  textShadow: [
+                    "0 0 0px rgba(6, 182, 212, 0)",
+                    "0 0 10px rgba(6, 182, 212, 0.3)",
+                    "0 0 0px rgba(6, 182, 212, 0)",
+                  ],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Number.POSITIVE_INFINITY,
+                  delay: 3,
+                }}
+              >
+                {locale === "es"
+                  ? "Descubre el tercer componente de nuestro programa integral"
+                  : "Discover the third component of our comprehensive program"}
+              </motion.p>
+
+              {/* Enhanced decorative side elements */}
+              <motion.div
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-8 w-1 h-16 bg-gradient-to-b from-transparent via-cyan-400 to-transparent rounded-full opacity-60"
+                animate={{
+                  height: [64, 80, 64],
+                  opacity: [0.6, 0.8, 0.6],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                }}
+              />
+              <motion.div
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-8 w-1 h-16 bg-gradient-to-b from-transparent via-cyan-400 to-transparent rounded-full opacity-60"
+                animate={{
+                  height: [64, 80, 64],
+                  opacity: [0.6, 0.8, 0.6],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                  delay: 1.5,
+                }}
+              />
+            </motion.div>
+          </motion.div>
+        </div>
+
         {/* Main Content - Updated with component number and grid layout */}
         <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-center mb-16">
-          <div className="order-2 md:order-1">
-            <div className="flex items-center mb-8">
-              <div className="flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-5 shadow-lg">
-                3
-              </div>
-              <h2 className="font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700">
-                {d.title}
-              </h2>
-            </div>
-
-            <div className="inline-block p-2 px-4 mb-6 rounded-full bg-yellow-100/90 backdrop-blur-sm text-yellow-800 text-sm font-medium shadow-sm border border-yellow-200/50">
-              {d.subtitle}
+          <motion.div
+            className="order-2 md:order-1"
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1.0, duration: 0.8 }}
+          >
+            <div className="mb-8">
+              <motion.div
+                className="inline-block p-3 px-6 mb-6 rounded-full bg-gradient-to-r from-yellow-100 to-orange-100 backdrop-blur-sm text-yellow-800 text-sm font-medium shadow-lg border border-yellow-200/50 relative overflow-hidden"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                {/* Animated dot */}
+                <motion.div
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-yellow-500 rounded-full"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.7, 1, 0.7],
+                  }}
+                  transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+                />
+                <span className="ml-4">{getStringValue(d.subtitle)}</span>
+              </motion.div>
             </div>
 
             <div className="relative">
-              <div className="absolute -top-10 -left-10 w-40 h-40 bg-cyan-200/20 rounded-full blur-3xl -z-10"></div>
-              <div className="p-8 border border-cyan-200/40 rounded-xl bg-gradient-to-br from-white to-cyan-50/50 shadow-sm hover:shadow-md transition-all duration-300">
-                <p className="text-lg md:text-xl text-neutral-700 leading-relaxed font-light">{d.description1}</p>
-                <p className="text-lg md:text-xl text-neutral-700 leading-relaxed font-light mt-6">{d.description2}</p>
+              <div className="absolute -top-10 -left-10 w-60 h-60 bg-cyan-200/20 rounded-full blur-3xl -z-10"></div>
+              <motion.div
+                className="p-8 border border-cyan-200/40 rounded-xl bg-gradient-to-br from-white to-cyan-50/50 shadow-lg hover:shadow-xl transition-all duration-500 relative overflow-hidden"
+                whileHover={{ y: -5 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                {/* Subtle animated background pattern */}
+                <div className="absolute inset-0 opacity-5">
+                  <div
+                    className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-500"
+                    style={{
+                      backgroundImage: `radial-gradient(circle at 25% 25%, rgba(34, 211, 238, 0.1) 0%, transparent 50%), 
+                                          radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.1) 0%, transparent 50%)`,
+                    }}
+                  />
+                </div>
 
-                {/* Learn more link - moved from SDOHDemoDay */}
-                <div className="mt-8">
-                  <a
+                <motion.p
+                  className="text-lg md:text-xl text-neutral-700 leading-relaxed font-light relative z-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.2, duration: 0.8 }}
+                >
+                  {getStringValue(d.description1)}
+                </motion.p>
+
+                <motion.p
+                  className="text-lg md:text-xl text-neutral-700 leading-relaxed font-light mt-6 relative z-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.4, duration: 0.8 }}
+                >
+                  {getStringValue(d.description2)}
+                </motion.p>
+
+                {/* Learn more link */}
+                <motion.div
+                  className="mt-8 relative z-10"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.6, duration: 0.8 }}
+                >
+                  <motion.a
                     href="https://velocitytx.org/startup-programs/support/accelerator/"
-                    className="inline-flex items-center text-cyan-700 hover:text-cyan-800 font-medium transition-colors duration-200"
+                    className="inline-flex items-center text-cyan-700 hover:text-cyan-800 font-medium transition-colors duration-200 group"
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Learn more about the Community Health Accelerator"
+                    whileHover={{ x: 5 }}
+                    transition={{ type: "spring", stiffness: 300 }}
                   >
                     {learnMore}
-                    <svg
+                    <motion.svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 ml-1 group-hover:translate-x-1 transition-transform duration-200"
+                      className="h-5 w-5 ml-2"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
                     >
                       <line x1="5" y1="12" x2="19" y2="12"></line>
                       <polyline points="12 5 19 12 12 19"></polyline>
-                    </svg>
-                  </a>
-                </div>
-              </div>
+                    </motion.svg>
+                  </motion.a>
+                </motion.div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
 
-          {/* Demo Day Video - Right side on desktop */}
-          <div className="order-1 md:order-2 relative">
-            <div className="absolute -top-20 -right-20 w-80 h-80 bg-yellow-200/10 rounded-full blur-3xl -z-10"></div>
-            <SDOHDemoDay dict={dict} locale={locale} />
-          </div>
+          {/* Demo Day Video - Right side on desktop with 1080x1350 aspect ratio */}
+          <motion.div
+            className="order-1 md:order-2 relative"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1.2, duration: 0.8 }}
+          >
+            <div className="absolute -top-20 -right-20 w-80 h-80 bg-gradient-to-br from-yellow-200/10 to-orange-200/10 rounded-full blur-3xl -z-10"></div>
+            <div style={{ aspectRatio: "1080/1350" }} className="w-full">
+              <SDOHDemoDay dict={currentDict} locale={locale} />
+            </div>
+          </motion.div>
         </div>
+
+        {/* Enhanced CSS for gradient animation */}
+        <style jsx>{`
+          @keyframes gradient-x {
+            0%, 100% {
+              background-position: 0% 50%;
+            }
+            50% {
+              background-position: 100% 50%;
+            }
+          }
+        `}</style>
       </div>
     </FadeIn>
   )

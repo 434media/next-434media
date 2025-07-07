@@ -3,7 +3,7 @@
     "hero": {
       "title": "¿Qué es SDOH?",
       "subtitle": "(Or in plain terms: What the Heck is Social Determinants of Health?)",
-      "date": "April 25-27, 2025",
+      "date": "October 17, 2023",
       "time": "10:00 AM - 11:30 AM",
       "location": "VelocityTX, 1422 E Houston St, San Antonio, TX 78205",
       "register": "Register Now"
@@ -34,7 +34,9 @@
       "date": "April 25-27, 2025",
       "where": "Where",
       "location": "TSTC - Harlingen, Welcome Center",
-      "cta": "Reserve Your Spot"
+      "cta": "Reserve Your Spot",
+      "keyFocus": "Key Focus:",
+      "keyFocusDescription": "Participants received hands-on mentorship, networking opportunities, and practical tools to build solutions addressing real community health needs."
     },
     "accelerator": {
       "title": "Community Health Accelerator",
