@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useState } from "react"
-import { motion, useInView, useScroll, useTransform } from "framer-motion"
+import { motion, useInView, useScroll, useTransform } from "motion/react"
 import Image from "next/image"
 import Link from "next/link"
 import { FadeIn } from "../FadeIn"
@@ -297,7 +297,7 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
                               src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
                               alt={partnershipDict.velocityAlt ?? "VelocityTX Logo"}
                               fill
-                              className="object-contain filter brightness-0 invert group-hover:brightness-110 transition-all duration-300"
+                              className="object-contain filter invert group-hover:brightness-110 transition-all duration-300"
                             />
                           </div>
                           {/* Enhanced glow effect on hover */}
