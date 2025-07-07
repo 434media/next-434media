@@ -225,19 +225,13 @@ export function EventCarousel() {
         `}</style>
       </div>
 
-      {/* Enhanced Video Modal */}
+      {/* Fixed Video Modal with correct props */}
       <VideoModal
         isOpen={isVideoModalOpen}
-        closeModal={closeVideoModal}
+        onClose={closeVideoModal}
+        videoSrc={videoContent.videoUrl}
         title={videoContent.title}
-        videoId={videoContent.id}
-        videoUrl={videoContent.videoUrl}
-        image={videoContent.videoThumbnail}
-        comingSoonText="Coming Soon"
-        comingSoonDescriptionText="This video will be available after the event. Check back later to watch the full session."
-        visitWebsiteText="Visit Website"
-        closeText="Close"
-        sessionIdText="Session ID"
+        description={videoContent.description}
       />
     </>
   )
