@@ -40,15 +40,18 @@
       "description2": "Este programa existe para responder grandes preguntas de manera práctica—y para asegurar que las personas más cercanas a los problemas tengan las herramientas, recursos y apoyo para resolverlos."
     },
     "demoDay": {
-      "title": "Destacados del Demo Day",
-      "description": "Mira cómo las empresas de nuestra cohorte del acelerador están transformando la atención médica a través de la innovación.",
+      "title": "¿Qué es SDOH? Sesión del Panel",
+      "subtitle": "Ver la Discusión Completa",
+      "description": "Experimenta la discusión completa del panel de RGV Startup Week 2025.",
+      "highlight": "Sesión de Video Destacada",
+      "watchNow": "VER AHORA",
       "loadingText": "Cargando video...",
       "errorTitle": "Error de Video",
       "errorMessage": "Hubo un problema al cargar el video. Por favor, inténtalo de nuevo más tarde.",
       "learnMore": "Más Información Sobre el Acelerador"
     },
     "impact": {
-      "question": "¿Qué puedo hacer para causar un impacto significativo?",
+      "question": "¿Qué puedo hacer para marcar la diferencia?",
       "message": "Si alguna vez te has preguntado, ",
       "conclusion": " — aquí es donde comienzas."
     },
@@ -94,6 +97,14 @@
         "title": "El Pitch Perfecto",
         "description": "Cautivando a Inversionistas y Cerrando Acuerdos presentado por Luis Martinez, PhD, Sr. Asociado de Venture, Capital Factory"
       }
+    },
+    "speakers": {
+      "title": "Panelistas",
+      "subtitle": "Innovadores de la salud dando forma al futuro",
+      "featuredSession": "Sesión Destacada",
+      "moderator": "MODERADOR",
+      "founder": "Fundador",
+      "visitWebsite": "Visitar Sitio Web"
     }
   }
 }

@@ -1,9 +1,11 @@
 "use client"
 
 import { useRef, useEffect, useState } from "react"
-import { motion, useInView } from "motion/react"
+import { motion, useInView, useScroll, useTransform } from "framer-motion"
 import Image from "next/image"
+import Link from "next/link"
 import { FadeIn } from "../FadeIn"
+import SeminarSeries from "./SeminarSeries"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
@@ -12,12 +14,31 @@ interface SDOHMissionProps {
   dict: Dictionary
 }
 
-export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
+export function SDOHMission({ locale, dict }: SDOHMissionProps) {
   const missionRef = useRef<HTMLDivElement>(null)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _isInView = useInView(missionRef, { once: true, amount: 0.2 })
-  const introRef = useRef<HTMLDivElement>(null)
-  const introInView = useInView(introRef, { once: true, amount: 0.2 })
+  const heroRef = useRef<HTMLDivElement>(null)
+  const definitionRef = useRef<HTMLDivElement>(null)
+  const partnershipRef = useRef<HTMLDivElement>(null)
+
+  const heroInView = useInView(heroRef, { once: true, amount: 0.3 })
+  const definitionInView = useInView(definitionRef, { once: true, amount: 0.2 })
+  const partnershipInView = useInView(partnershipRef, { once: true, amount: 0.2 })
+
+  // Scroll-driven animations for performance (removed from partnership section)
+  const { scrollYProgress } = useScroll({
+    target: missionRef,
+    offset: ["start end", "end start"],
+  })
+
+  const { scrollYProgress: heroScrollProgress } = useScroll({
+    target: heroRef,
+    offset: ["start end", "end start"],
+  })
+
+  // Performance-optimized transforms (removed partnership parallax)
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"])
+  const heroScale = useTransform(heroScrollProgress, [0, 0.5, 1], [0.95, 1, 1.05])
+  const heroOpacity = useTransform(heroScrollProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0.8])
 
   // Track when dictionary or locale changes
   const [, setKey] = useState(0)
@@ -42,244 +63,371 @@ export default function SDOHMission({ locale, dict }: SDOHMissionProps) {
   }
 
   return (
-    <section ref={missionRef} className="py-16 sm:py-24 bg-gradient-to-b from-white to-neutral-50 overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 max-w-5xl">
+    <section ref={missionRef} className="relative py-16 sm:py-24 overflow-hidden">
+      {/* Optimized background with scroll-driven parallax */}
+      <motion.div
+        style={{ y: backgroundY }}
+        className="absolute inset-0 bg-gradient-to-br from-white via-cyan-50/30 to-yellow-50/20"
+      >
+        {/* Static background elements for performance */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-cyan-200/20 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-l from-yellow-200/20 to-transparent rounded-full blur-3xl" />
+      </motion.div>
+
+      <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
         <FadeIn>
-          {/* SDOH Introduction Section - Typography focused */}
-          <div ref={introRef} className="relative mb-20 sm:mb-28">
-            {/* Title with animated reveal and gradient */}
+          {/* Hero SDOH Introduction - Enhanced Impact */}
+          <motion.div
+            ref={heroRef}
+            style={{
+              scale: heroScale,
+              opacity: heroOpacity,
+            }}
+            className="relative mb-20 sm:mb-24 text-center"
+          >
+            {/* Dramatic title with enhanced gradient and effects */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={introInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.7 }}
-              className="mb-12 sm:mb-16 max-w-5xl mx-auto"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={heroInView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="relative mb-8 sm:mb-12"
             >
-              {/* Main heading with gradient */}
-              <motion.h2
-                initial={{ opacity: 0 }}
-                animate={introInView ? { opacity: 1 } : {}}
-                transition={{ duration: 1.2, ease: "easeOut" }}
-                className="text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-cyan-500 to-cyan-700"
+              {/* Background glow effect */}
+              <div className="absolute inset-0 blur-3xl opacity-30">
+                <h1 className="text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-black tracking-tight leading-none text-cyan-400">
+                  {dict?.sdoh?.title || "¿Qué es SDOH?"}
+                </h1>
+              </div>
+
+              {/* Main title with enhanced gradient */}
+              <motion.h1
+                initial={{ backgroundPosition: "0% 50%" }}
+                animate={heroInView ? { backgroundPosition: "100% 50%" } : {}}
+                transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                className="relative text-4xl sm:text-6xl md:text-7xl xl:text-8xl font-black tracking-tight leading-none text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 bg-[length:200%_100%]"
+                style={{
+                  textShadow: "0 0 40px rgba(6, 182, 212, 0.3)",
+                  filter: "drop-shadow(0 4px 20px rgba(6, 182, 212, 0.2))",
+                }}
               >
                 {dict?.sdoh?.title || "¿Qué es SDOH?"}
-              </motion.h2>
+              </motion.h1>
 
-              {/* Subtitle with reveal animation - fixed to prevent wrapping */}
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={introInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, delay: 0.3 }}
-                className="text-lg sm:text-xl md:text-2xl text-neutral-600 font-medium leading-snug tracking-tight whitespace-nowrap overflow-hidden text-ellipsis px-4"
-              >
-                {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
-              </motion.p>
+              {/* Animated underline */}
+              <motion.div
+                initial={{ scaleX: 0 }}
+                animate={heroInView ? { scaleX: 1 } : {}}
+                transition={{ duration: 1.5, delay: 0.5 }}
+                className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 h-2 bg-gradient-to-r from-transparent via-cyan-400 to-transparent rounded-full"
+                style={{ width: "60%" }}
+              />
             </motion.div>
 
-            {/* Main text with staggered reveal */}
-            <div className="space-y-8 max-w-5xl mx-auto">
+            {/* Enhanced subtitle with better typography */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={heroInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.8, delay: 0.7 }}
+              className="relative max-w-4xl mx-auto"
+            >
+              <p className="text-lg sm:text-xl md:text-2xl text-neutral-600 font-medium leading-relaxed tracking-wide px-4">
+                {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
+              </p>
+
+              {/* Decorative elements */}
+              <div className="absolute -left-8 top-1/2 transform -translate-y-1/2 w-1 h-16 bg-gradient-to-b from-transparent via-cyan-400 to-transparent rounded-full opacity-60" />
+              <div className="absolute -right-8 top-1/2 transform -translate-y-1/2 w-1 h-16 bg-gradient-to-b from-transparent via-cyan-400 to-transparent rounded-full opacity-60" />
+            </motion.div>
+          </motion.div>
+
+          {/* SDOH Definition Content - Moved directly after hero */}
+          <div ref={definitionRef} className="relative mb-24 sm:mb-32">
+            {/* Main text with enhanced presentation */}
+            <div className="space-y-12 max-w-5xl mx-auto">
               <motion.p
-                initial={{ opacity: 0, y: 15 }}
-                animate={introInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, delay: 0.5 }}
-                className="text-lg sm:text-xl leading-relaxed text-neutral-700"
+                initial={{ opacity: 0, y: 30 }}
+                animate={definitionInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="text-xl sm:text-2xl md:text-3xl leading-relaxed text-neutral-700 font-light text-center"
               >
                 {dict?.sdoh?.intro1 ||
                   "Most of what affects our health doesn't happen in a hospital—it happens in our everyday lives. Where we live, what we eat, how we get to work or school, whether we feel safe, supported, and seen... these things shape our health long before a doctor ever gets involved."}
               </motion.p>
 
               <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={introInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, delay: 0.7 }}
-                className="pl-4 border-l-4 border-cyan-500"
+                initial={{ opacity: 0, y: 30 }}
+                animate={definitionInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.8, delay: 0.4 }}
+                className="relative"
               >
-                <p className="text-lg sm:text-xl leading-relaxed text-neutral-700">
-                  {locale === "es" ? (
-                    <>
-                      {dict?.sdoh?.intro2Part1 || "Eso es lo que son los"}{" "}
-                      <motion.span
-                        initial={{ color: "#0891b2" }} // cyan-600
-                        animate={introInView ? { color: ["#0891b2", "#0e7490", "#0891b2"] } : {}}
-                        transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
-                        className="font-bold"
-                      >
-                        {dict?.sdoh?.sdohFull || "Determinantes Sociales de la Salud (SDOH)"}
-                      </motion.span>{" "}
-                      {dict?.sdoh?.intro2Part2 ||
-                        ": las condiciones del mundo real que impactan cuánto tiempo y qué tan bien vivimos."}
-                    </>
-                  ) : (
-                    <>
-                      {dict?.sdoh?.intro2Part1 || "That's what"}{" "}
-                      <motion.span
-                        initial={{ color: "#0891b2" }} // cyan-600
-                        animate={introInView ? { color: ["#0891b2", "#0e7490", "#0891b2"] } : {}}
-                        transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
-                        className="font-bold"
-                      >
-                        {dict?.sdoh?.sdohFull || "Social Determinants of Health (SDOH)"}
-                      </motion.span>{" "}
-                      {dict?.sdoh?.intro2Part2 ||
-                        "are: the real-world conditions that impact how long—and how well—we live."}
-                    </>
-                  )}
-                </p>
+                {/* Enhanced background with gradient border */}
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-500 rounded-3xl p-1">
+                  <div className="w-full h-full bg-gradient-to-r from-cyan-50/80 via-white to-cyan-50/80 rounded-3xl" />
+                </div>
+
+                <div className="relative p-10 sm:p-12 md:p-16 rounded-3xl">
+                  <p className="text-xl sm:text-2xl md:text-3xl leading-relaxed text-neutral-700 font-light text-center">
+                    {locale === "es" ? (
+                      <>
+                        {dict?.sdoh?.intro2Part1 || "Eso es lo que son los"}{" "}
+                        <motion.span
+                          initial={{ backgroundPosition: "0% 50%" }}
+                          animate={definitionInView ? { backgroundPosition: "100% 50%" } : {}}
+                          transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                          className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 bg-[length:200%_100%]"
+                          style={{
+                            textShadow: "0 2px 10px rgba(6, 182, 212, 0.2)",
+                          }}
+                        >
+                          {dict?.sdoh?.sdohFull || "Determinantes Sociales de la Salud (SDOH)"}
+                        </motion.span>{" "}
+                        {dict?.sdoh?.intro2Part2 ||
+                          ": las condiciones del mundo real que impactan cuánto tiempo y qué tan bien vivimos."}
+                      </>
+                    ) : (
+                      <>
+                        {dict?.sdoh?.intro2Part1 || "That's what"}{" "}
+                        <motion.span
+                          initial={{ backgroundPosition: "0% 50%" }}
+                          animate={definitionInView ? { backgroundPosition: "100% 50%" } : {}}
+                          transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                          className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 bg-[length:200%_100%]"
+                          style={{
+                            textShadow: "0 2px 10px rgba(6, 182, 212, 0.2)",
+                          }}
+                        >
+                          {dict?.sdoh?.sdohFull || "Social Determinants of Health (SDOH)"}
+                        </motion.span>{" "}
+                        {dict?.sdoh?.intro2Part2 ||
+                          "are: the real-world conditions that impact how long—and how well—we live."}
+                      </>
+                    )}
+                  </p>
+
+                  {/* Decorative corner elements */}
+                  <div className="absolute top-4 left-4 w-12 h-12 border-l-2 border-t-2 border-cyan-400/40 rounded-tl-2xl" />
+                  <div className="absolute bottom-4 right-4 w-12 h-12 border-r-2 border-b-2 border-cyan-400/40 rounded-br-2xl" />
+                </div>
               </motion.div>
             </div>
           </div>
 
-          {/* Partnership Banner */}
-          <div className="relative mb-16 sm:mb-24 rounded-2xl overflow-hidden shadow-2xl transform hover:scale-[1.01] transition-transform duration-500">
-            {/* Background gradient with subtle pattern */}
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-700 to-cyan-600 opacity-95">
-              <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
-            </div>
+          {/* STRATEGIC PARTNERSHIP - Enhanced Spotlight (Reduced Height) */}
+          <motion.div
+            ref={partnershipRef}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={partnershipInView ? { opacity: 1, scale: 1 } : {}}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            className="relative mb-24 sm:mb-32"
+          >
+            {/* Partnership spotlight container */}
+            <div className="relative">
+              {/* Dramatic background with enhanced effects */}
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-900 via-cyan-800 to-cyan-900 rounded-3xl transform rotate-1 shadow-2xl" />
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-800 via-cyan-700 to-cyan-800 rounded-3xl shadow-2xl" />
 
-            {/* Main content */}
-            <div className="relative py-10 sm:py-12 px-6 sm:px-12">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                {/* Text content */}
-                <div className="text-white max-w-2xl">
-                  <div className="mb-6">
-                    <div className="inline-block px-4 py-1 bg-white/10 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-3 border border-white/20">
+              {/* Glowing border effect */}
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 p-1">
+                <div className="w-full h-full bg-gradient-to-r from-cyan-800 via-cyan-700 to-cyan-800 rounded-3xl" />
+              </div>
+
+              {/* Main content container - Reduced padding for better viewport fit */}
+              <div className="relative py-12 sm:py-16 px-8 sm:px-12 rounded-3xl overflow-hidden">
+                {/* Enhanced background pattern */}
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[length:20px_20px]" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[length:40px_40px]" />
+                </div>
+
+                {/* Redesigned layout for better logo spotlight - matching max-w-5xl */}
+                <div className="relative max-w-5xl mx-auto">
+                  {/* Strategic Partnership badge - centered */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={partnershipInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                    className="text-center mb-8"
+                  >
+                    <div className="inline-flex items-center px-6 py-3 bg-white/15 backdrop-blur-sm rounded-full text-white/95 text-base font-bold tracking-wider border border-white/20 shadow-lg">
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full mr-3 animate-pulse" />
                       {partnershipDict.label}
                     </div>
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-white">
-                      {partnershipDict.title}
-                    </h2>
-                    <p className="text-white/90 text-base sm:text-lg">{partnershipDict.description}</p>
-                  </div>
+                  </motion.div>
+
+                  {/* Simplified title - "Powered by" with proper Spanish translation */}
+                  <motion.h2
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={partnershipInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.8, delay: 0.4 }}
+                    className="text-3xl sm:text-4xl md:text-5xl font-bold mb-10 text-white leading-tight text-center"
+                    style={{
+                      textShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    {locale === "es" ? "Impulsado por" : "Powered by"}
+                  </motion.h2>
+
+                  {/* LOGO SHOWCASE - Reduced size for better viewport fit */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={partnershipInView ? { opacity: 1, scale: 1 } : {}}
+                    transition={{ duration: 1, delay: 0.6 }}
+                    className="relative mb-10"
+                  >
+                    {/* Spotlight effect behind logos */}
+                    <div className="absolute inset-0 bg-gradient-radial from-white/30 via-white/15 to-transparent rounded-3xl blur-2xl scale-110" />
+
+                    {/* Logo container with clean presentation - reduced sizes */}
+                    <div className="relative flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-16">
+                      {/* VelocityTX logo - Reduced size */}
+                      <motion.div
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={partnershipInView ? { opacity: 1, x: 0 } : {}}
+                        transition={{ duration: 1, delay: 0.8 }}
+                        className="relative group"
+                      >
+                        <Link
+                          href="https://velocitytx.org"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block transform hover:scale-105 transition-transform duration-300"
+                        >
+                          <div className="relative h-28 sm:h-32 lg:h-36 w-72 sm:w-80 lg:w-96">
+                            <Image
+                              src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
+                              alt={partnershipDict.velocityAlt ?? "VelocityTX Logo"}
+                              fill
+                              className="object-contain filter brightness-0 invert group-hover:brightness-110 transition-all duration-300"
+                            />
+                          </div>
+                          {/* Enhanced glow effect on hover */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-cyan-400/0 to-blue-400/0 group-hover:from-cyan-400/20 group-hover:to-blue-400/20 rounded-2xl blur-xl transition-all duration-300" />
+                        </Link>
+                      </motion.div>
+
+                      {/* Enhanced connector - reduced size */}
+                      <div className="relative flex lg:flex-col items-center justify-center">
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={partnershipInView ? { scale: 1 } : {}}
+                          transition={{ duration: 0.8, delay: 1 }}
+                          className="flex lg:flex-col items-center gap-4"
+                        >
+                          {/* Connection line */}
+                          <div className="w-16 lg:w-1 h-1 lg:h-16 bg-gradient-to-r lg:bg-gradient-to-b from-white/80 via-yellow-400 to-white/80 rounded-full" />
+
+                          {/* Center connector badge */}
+                          <div className="relative w-16 h-16 border-4 border-white/60 rounded-full bg-yellow-400/20 backdrop-blur-sm flex items-center justify-center">
+                            <div className="w-6 h-6 bg-yellow-400 rounded-full animate-pulse" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-full blur-lg" />
+                          </div>
+
+                          {/* Connection line */}
+                          <div className="w-16 lg:w-1 h-1 lg:h-16 bg-gradient-to-r lg:bg-gradient-to-b from-white/80 via-yellow-400 to-white/80 rounded-full" />
+                        </motion.div>
+                      </div>
+
+                      {/* Methodist Healthcare logo - Reduced size */}
+                      <motion.div
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={partnershipInView ? { opacity: 1, x: 0 } : {}}
+                        transition={{ duration: 1, delay: 1 }}
+                        className="relative group"
+                      >
+                        <Link
+                          href="https://mhm.org"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block transform hover:scale-105 transition-transform duration-300"
+                        >
+                          <div className="relative h-28 sm:h-32 lg:h-36 w-72 sm:w-80 lg:w-96">
+                            <Image
+                              src="https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png"
+                              alt={partnershipDict.methodistAlt ?? "Methodist Healthcare Ministries Logo"}
+                              fill
+                              className="object-contain filter brightness-0 invert group-hover:brightness-110 transition-all duration-300"
+                            />
+                          </div>
+                          {/* Enhanced glow effect on hover */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 to-cyan-400/0 group-hover:from-blue-400/20 group-hover:to-cyan-400/20 rounded-2xl blur-xl transition-all duration-300" />
+                        </Link>
+                      </motion.div>
+                    </div>
+                  </motion.div>
+
+                  {/* Enhanced description with highlighted "three core components" - Using proper locale switching */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={partnershipInView ? { opacity: 1, y: 0 } : {}}
+                    transition={{ duration: 0.8, delay: 1.2 }}
+                    className="text-center"
+                  >
+                    <p className="text-lg sm:text-xl leading-relaxed text-white/90 mb-6">
+                      {locale === "es" ? (
+                        <>
+                          En asociación con VelocityTX y Methodist Healthcare Ministries, el programa Community Health
+                          Accelerator conecta educación, emprendimiento e innovación a través de{" "}
+                          <motion.span
+                            initial={{ backgroundPosition: "0% 50%" }}
+                            animate={partnershipInView ? { backgroundPosition: "100% 50%" } : {}}
+                            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                            className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-300 bg-[length:200%_100%] px-2 py-1 rounded-lg"
+                            style={{
+                              textShadow: "0 2px 10px rgba(255, 255, 0, 0.3)",
+                              filter: "drop-shadow(0 2px 8px rgba(255, 255, 0, 0.2))",
+                            }}
+                          >
+                            tres componentes principales
+                          </motion.span>
+                          .
+                        </>
+                      ) : (
+                        <>
+                          In partnership with VelocityTX and Methodist Healthcare Ministries, the Community Health
+                          Accelerator program connects education, entrepreneurship, and innovation through{" "}
+                          <motion.span
+                            initial={{ backgroundPosition: "0% 50%" }}
+                            animate={partnershipInView ? { backgroundPosition: "100% 50%" } : {}}
+                            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, repeatType: "reverse" }}
+                            className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-300 bg-[length:200%_100%] px-2 py-1 rounded-lg"
+                            style={{
+                              textShadow: "0 2px 10px rgba(255, 255, 0, 0.3)",
+                              filter: "drop-shadow(0 2px 8px rgba(255, 255, 0, 0.2))",
+                            }}
+                          >
+                            three core components
+                          </motion.span>
+                          .
+                        </>
+                      )}
+                    </p>
+
+                    {/* Call-to-action for the components - with proper Spanish translation */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={partnershipInView ? { opacity: 1, scale: 1 } : {}}
+                      transition={{ duration: 0.8, delay: 1.4 }}
+                      className="inline-flex items-center px-5 py-2 bg-yellow-400/20 backdrop-blur-sm rounded-full text-yellow-200 text-base font-medium border border-yellow-400/30 shadow-lg"
+                    >
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full mr-2 animate-pulse" />
+                      {locale === "es" ? "Descubre cada componente a continuación" : "Discover each component below"}
+                    </motion.div>
+                  </motion.div>
                 </div>
 
-                {/* Partner logos section */}
-                <div className="flex flex-col items-center space-y-6 bg-white/10 backdrop-blur-sm p-6 rounded-xl border border-white/20">
-                  {/* VelocityTX logo */}
-                  <div className="relative h-16 w-48 bg-white rounded-lg p-3 shadow-lg transform hover:scale-105 transition-transform">
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
-                      alt={partnershipDict.velocityAlt ?? "VelocityTX Logo"}
-                      fill
-                      className="object-contain p-2"
-                    />
-                  </div>
+                {/* Enhanced decorative elements */}
+                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-radial from-cyan-400/20 to-transparent rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-radial from-yellow-400/20 to-transparent rounded-full blur-3xl" />
 
-                  {/* Connector line */}
-                  <div className="h-8 w-0.5 bg-gradient-to-b from-white/80 to-white/30"></div>
-
-                  {/* Methodist Healthcare logo */}
-                  <div className="relative h-16 w-48 bg-white rounded-lg p-3 shadow-lg transform hover:scale-105 transition-transform">
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png"
-                      alt={partnershipDict.methodistAlt ?? "Methodist Healthcare Ministries Logo"}
-                      fill
-                      className="object-contain p-2"
-                    />
-                  </div>
-                </div>
+                {/* Animated corner accents */}
+                <div className="absolute top-4 left-4 w-16 h-16 border-l-2 border-t-2 border-white/30 rounded-tl-3xl" />
+                <div className="absolute bottom-4 right-4 w-16 h-16 border-r-2 border-b-2 border-white/30 rounded-br-3xl" />
               </div>
             </div>
+          </motion.div>
 
-            {/* Decorative elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500 rounded-full filter blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-400 rounded-full filter blur-[100px] opacity-20 translate-y-1/2 -translate-x-1/2"></div>
-
-            {/* Animated dots */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div
-                className="absolute top-1/4 left-1/4 w-2 h-2 bg-white rounded-full animate-ping"
-                style={{ animationDuration: "3s" }}
-              ></div>
-              <div
-                className="absolute top-3/4 right-1/4 w-2 h-2 bg-white rounded-full animate-ping"
-                style={{ animationDuration: "4s" }}
-              ></div>
-              <div
-                className="absolute top-1/2 right-1/3 w-2 h-2 bg-white rounded-full animate-ping"
-                style={{ animationDuration: "5s" }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Main Content - Updated with component number */}
-          <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center mb-16 sm:mb-24">
-            <div className="order-2 md:order-1">
-              {/* Updated heading with component number */}
-              <div className="flex items-center mb-6">
-                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mr-4 shadow-lg">
-                  1
-                </div>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-cyan-600">
-                  {dict?.sdoh?.seminar?.title || "Seminar + Speaker Series"}
-                </h2>
-              </div>
-
-              <div className="space-y-6 text-neutral-700">
-                <p className="text-lg sm:text-xl leading-relaxed">
-                  {locale === "es" ? (
-                    <>
-                      <span className="font-bold text-cyan-600">{dict?.sdoh?.title || "¿Qué es SDOH?"}</span>{" "}
-                      {dict?.sdoh?.seminar?.description1 ||
-                        "es un programa diseñado para desglosar este tema grande y a menudo mal entendido en un lenguaje cotidiano, y mostrar cómo los líderes locales, innovadores y emprendedores pueden convertir la conciencia en acción."}
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-cyan-600">¿Qué es SDOH?</span>{" "}
-                      {dict?.sdoh?.seminar?.description1 ||
-                        "is a program designed to break down this big, often misunderstood topic into everyday language—and show how local leaders, innovators, and entrepreneurs can turn awareness into action."}
-                    </>
-                  )}
-                </p>
-
-                <p className="text-lg sm:text-xl leading-relaxed">
-                  {locale === "es" ? (
-                    <>
-                      {dict?.sdoh?.seminar?.description2 ||
-                        "Creemos que al comprender las causas fundamentales de los resultados de salud"}{" "}
-                      <span className="italic font-medium">{dict?.sdoh?.seminar?.causa || "la causa principal"}</span>
-                      {dict?.sdoh?.seminar?.description2End ||
-                        "—podemos inspirar a más personas a construir el futuro de la salud aquí mismo en nuestras comunidades."}
-                    </>
-                  ) : (
-                    <>
-                      {dict?.sdoh?.seminar?.description2 ||
-                        "We believe that by understanding the root causes of health outcomes"}
-                      —<span className="italic font-medium">{dict?.sdoh?.seminar?.causa || "la causa principal"}</span>
-                      {dict?.sdoh?.seminar?.description2End ||
-                        "—we can inspire more people to build the future of health right here in our communities."}
-                    </>
-                  )}
-                </p>
-
-                <div className="bg-gradient-to-r from-yellow-50 to-white p-6 rounded-xl border-l-4 border-yellow-400 shadow-sm">
-                  <p className="text-lg leading-relaxed">
-                    {dict?.sdoh?.seminar?.highlight ||
-                      "The series features live events and panels designed to spark conversation, raise awareness, and make complex health topics feel approachable and relevant—especially for aspiring founders, healthcare workers, educators, and community changemakers."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="order-1 md:order-2 relative">
-              {/* Decorative elements */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-cyan-100 rounded-full opacity-20 animate-pulse"></div>
-              <div
-                className="absolute -bottom-10 -left-10 w-32 h-32 bg-yellow-100 rounded-full opacity-20 animate-pulse"
-                style={{ animationDelay: "1s" }}
-              ></div>
-
-              {/* Main illustration */}
-              <div className="relative z-10 shadow-xl overflow-hidden rounded-2xl">
-                <div className="aspect-square relative">
-                  <Image
-                    src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
-                    alt={(dict?.sdoh?.seminar?.imageAlt as string) ?? "SDOH Illustration"}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Seminar Series Content - Component 1 */}
+          <SeminarSeries locale={locale} dict={dict} />
         </FadeIn>
       </div>
     </section>

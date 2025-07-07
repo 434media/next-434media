@@ -124,9 +124,21 @@ export interface Dictionary {
       description2?: string
       [key: string]: DictionaryValue
     }
+    speakers?: {
+      title?: string
+      subtitle?: string
+      featuredSession?: string
+      moderator?: string
+      founder?: string
+      visitWebsite?: string
+      [key: string]: DictionaryValue
+    }
     demoDay?: {
       title?: string
+      subtitle?: string
       description?: string
+      highlight?: string
+      watchNow?: string
       loadingText?: string
       errorTitle?: string
       errorMessage?: string

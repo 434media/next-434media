@@ -3,7 +3,7 @@
     "hero": {
       "title": "¿Qué es SDOH?",
       "subtitle": "(Or in plain terms: What the Heck is Social Determinants of Health?)",
-      "date": "October 17, 2023",
+      "date": "April 25-27, 2025",
       "time": "10:00 AM - 11:30 AM",
       "location": "VelocityTX, 1422 E Houston St, San Antonio, TX 78205",
       "register": "Register Now"
@@ -42,9 +42,20 @@
       "description1": "For startups ready to scale, this accelerator provides deeper support—from mentoring and expert workshops to connections with healthcare systems, investors, and ecosystem partners focused on sustainable health innovation.",
       "description2": "This program exists to answer big questions in a practical way—and to make sure the people closest to the issues have the tools, resources, and support to solve them."
     },
+    "speakers": {
+      "title": "Panel Speakers",
+      "subtitle": "Healthcare innovators shaping the future",
+      "featuredSession": "Featured Event",
+      "moderator": "MODERATOR",
+      "founder": "Founder",
+      "visitWebsite": "Visit Website"
+    },
     "demoDay": {
-      "title": "Demo Day Highlights",
-      "description": "Watch how our accelerator cohort companies are transforming healthcare through innovation.",
+      "title": "¿Que es SDOH? Panel Session",
+      "subtitle": "Watch the Full Discussion",
+      "description": "Experience the complete panel discussion from RGV Startup Week 2025.",
+      "highlight": "Featured Video Session",
+      "watchNow": "WATCH NOW",
       "loadingText": "Loading video...",
       "errorTitle": "Video Error",
       "errorMessage": "There was a problem loading the video. Please try again later.",

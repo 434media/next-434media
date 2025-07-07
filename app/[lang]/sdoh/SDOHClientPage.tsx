@@ -8,7 +8,6 @@ import SDOHStartupBootcamp from "../../components/sdoh/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/sdoh/SDOHHealthAccelerator"
 import SDOHNewsletter from "../../components/sdoh/SDOHNewsletter"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
-import { PartnerLogos } from "../../components/sdoh/PartnerLogos"
 import { BackToTop } from "../../components/BackToTop"
 import Script from "next/script"
 import { AnimatePresence, motion } from "motion/react"
@@ -90,9 +89,6 @@ export default function SDOHClientPage() {
 
                   {/* Wow Impact Message Section */}
                   <SDOHImpactMessage locale={currentLocale} dict={dictionary} />
-
-                  {/* Partner Logos Section */}
-                  <PartnerLogos />
 
                   <div className="container mx-auto px-4 sm:px-6 max-w-5xl mb-16 sm:mb-24">
                     {/* Newsletter Section - Enhanced with better visibility */}
