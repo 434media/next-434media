@@ -62,6 +62,11 @@ export function ContactPageClient() {
     setMounted(true)
   }, [])
 
+  // Ensure page starts at top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-black text-white overflow-hidden">
       {/* Hero Section with Enhanced Visual Effects */}

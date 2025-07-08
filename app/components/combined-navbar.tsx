@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
-import { motion, AnimatePresence } from "motion/react"
+import { motion } from "motion/react"
 import { usePathname } from "next/navigation"
 import CartModal from "./shopify/cart/modal"
 import { useCart } from "./shopify/cart/cart-context"
@@ -11,7 +10,6 @@ import { ScrambleText } from "./ScrambleText"
 import NavMenu from "./Navmenu"
 import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
-import { AIMLogo } from "./AIMLogo"
 import type { Menu } from "../lib/shopify/types"
 
 type CombinedNavbarProps = {
@@ -32,7 +30,6 @@ function useHasMounted() {
 export function CombinedNavbar(_props: CombinedNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
-  const [hoveredLogo, setHoveredLogo] = useState<string | null>(null)
   const pathname = usePathname()
   const { cart } = useCart()
   const isMobile = useMobile()
@@ -111,84 +108,52 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
 
             {/* Actions */}
             <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
-              {/* SDOH Logo - Fixed hover state */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
-                className="relative"
-              >
-                <Link
-                  href="/sdoh"
-                  className="group relative flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-black"
-                  aria-label="Learn about SDOH"
-                  onMouseEnter={() => setHoveredLogo("sdoh")}
-                  onMouseLeave={() => setHoveredLogo(null)}
+              {/* Mobile Menu Icon - Only on mobile */}
+              {hasMounted && isMobile && (
+                <motion.button
+                  onClick={toggleActionMenu}
+                  className="relative text-white p-2 rounded-md flex items-center justify-center transition-all duration-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  aria-expanded={isActionMenuOpen}
+                  aria-haspopup="true"
+                  aria-controls="nav-menu"
+                  aria-label="Open navigation menu"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2, duration: 0.3 }}
                 >
                   <motion.div
-                    className="relative z-10 h-6 w-auto"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    className="relative w-6 h-6 flex flex-col justify-center items-center"
+                    animate={isActionMenuOpen ? "open" : "closed"}
                   >
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
-                      alt="¿Qué es SDOH?"
-                      width={100}
-                      height={24}
-                      className="w-auto h-full grayscale"
-                      priority={true}
+                    <motion.span
+                      className="absolute w-5 h-0.5 bg-white rounded-full"
+                      variants={{
+                        closed: { rotate: 0, y: -4 },
+                        open: { rotate: 45, y: 0 },
+                      }}
+                      transition={{ duration: 0.3 }}
+                    />
+                    <motion.span
+                      className="absolute w-5 h-0.5 bg-white rounded-full"
+                      variants={{
+                        closed: { opacity: 1 },
+                        open: { opacity: 0 },
+                      }}
+                      transition={{ duration: 0.3 }}
+                    />
+                    <motion.span
+                      className="absolute w-5 h-0.5 bg-white rounded-full"
+                      variants={{
+                        closed: { rotate: 0, y: 4 },
+                        open: { rotate: -45, y: 0 },
+                      }}
+                      transition={{ duration: 0.3 }}
                     />
                   </motion.div>
-                  <AnimatePresence>
-                    {hoveredLogo === "sdoh" && (
-                      <motion.span
-                        className="absolute inset-0 z-0 bg-gradient-to-r from-emerald-400/20 via-sky-400/20 to-purple-500/20 rounded-full"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      ></motion.span>
-                    )}
-                  </AnimatePresence>
-                </Link>
-              </motion.div>
-
-              {/* AIM Logo - Fixed hover state */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3, duration: 0.3 }}
-                className="relative"
-              >
-                <Link
-                  href="https://www.aimsatx.com/"
-                  className="group relative flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-black"
-                  aria-label="Visit AIM page"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onMouseEnter={() => setHoveredLogo("aim")}
-                  onMouseLeave={() => setHoveredLogo(null)}
-                >
-                  <motion.div
-                    className="w-6 h-6 relative flex items-center justify-center"
-                    whileHover={{ scale: 1.05, rotate: 5 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <AIMLogo variant="white" className="w-full h-full" />
-                  </motion.div>
-                  <AnimatePresence>
-                    {hoveredLogo === "aim" && (
-                      <motion.span
-                        className="absolute inset-0 z-0 bg-gradient-to-r from-emerald-400/20 via-sky-400/20 to-purple-500/20 rounded-full"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      ></motion.span>
-                    )}
-                  </AnimatePresence>
-                </Link>
-              </motion.div>
+                </motion.button>
+              )}
 
               {hasMounted && isInShop ? (
                 <>
@@ -199,43 +164,7 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                 </>
               ) : (
                 <>
-                  {/* Shopify Store Link - Fixed hover state */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.4, duration: 0.3 }}
-                    className="relative"
-                  >
-                    <Link
-                      href="/shop"
-                      className="group relative flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                      aria-label="Shopify Store"
-                      onMouseEnter={() => setHoveredLogo("shop")}
-                      onMouseLeave={() => setHoveredLogo(null)}
-                    >
-                      <motion.div className="w-5 h-5 relative" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-                        <Image
-                          src="https://ampd-asset.s3.us-east-2.amazonaws.com/shopify_glyph_white.svg"
-                          alt="Shopify Store"
-                          fill
-                          priority={true}
-                        />
-                      </motion.div>
-                      <AnimatePresence>
-                        {hoveredLogo === "shop" && (
-                          <motion.span
-                            className="absolute inset-0 z-0 bg-white/10 rounded-full"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                          ></motion.span>
-                        )}
-                      </AnimatePresence>
-                    </Link>
-                  </motion.div>
-
-                  {/* Action Speaks Louder Button - Only on desktop outside shop, now fourth */}
+                  {/* Action Speaks Louder Button - Only on desktop outside shop */}
                   {hasMounted && !isMobile && (
                     <motion.button
                       onClick={toggleActionMenu}

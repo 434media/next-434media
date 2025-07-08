@@ -335,7 +335,7 @@ export const portfolioArray: PortfolioItem[] = [
     showWebsite: true,
   },
   {
-    company: "AIM",
+    company: "AIM Health R&D Summit",
     title: "A Catalyst for Life Sciences Innovation & Commercialization",
     description: "Accelerating innovation in military medicine through collaboration between academia, industry, and the military.",
     video: "https://ampd-asset.s3.us-east-2.amazonaws.com/AIM2025_V3.mp4",

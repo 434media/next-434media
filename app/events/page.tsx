@@ -54,12 +54,13 @@ export default function EventsPage() {
       const upcomingEvents = allEvents.filter((event) => isEventUpcoming(event))
       setEvents(upcomingEvents)
 
-      if (allEvents.length !== upcomingEvents.length) {
-        const pastCount = allEvents.length - upcomingEvents.length
-        if (pastCount > 0) {
-          showToast(`Filtered out ${pastCount} past events`, "warning")
-        }
-      }
+      // Remove this entire block that shows the toast message:
+      // if (allEvents.length !== upcomingEvents.length) {
+      //   const pastCount = allEvents.length - upcomingEvents.length
+      //   if (pastCount > 0) {
+      //     showToast(`Filtered out ${pastCount} past events`, "warning")
+      //   }
+      // }
     }
   }, [allEvents, mounted])
 

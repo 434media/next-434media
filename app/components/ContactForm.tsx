@@ -143,7 +143,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     if (isVisible && firstNameRef.current && !hasSubmitted) {
       // Small delay to ensure the form is visible
       const timeoutId = setTimeout(() => {
-        firstNameRef.current?.focus()
+        firstNameRef.current?.focus({ preventScroll: true })
       }, 500)
 
       return () => clearTimeout(timeoutId)
@@ -415,11 +415,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               </div>
 
               {!isDevelopment && (
-                <div className="mt-4 w-full">
+                <div className="mt-4">
                   <div
                     ref={turnstileRef}
                     data-size="flexible"
-                    className="w-full flex justify-center items-center"
+                    className="w-full flex justify-center items-center min-h-[70px]"
                     aria-label="Security challenge"
                   >
                     {!turnstileLoaded && (
@@ -465,7 +465,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               <div className="space-y-6">
                 <motion.button
                   type="submit"
-                  className="w-full rounded-md bg-emerald-600 py-3 lg:py-4 px-6 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-full bg-emerald-600 py-3 lg:py-4 px-6 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   disabled={isLoading}
@@ -506,4 +506,3 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     </div>
   )
 }
-

@@ -88,7 +88,7 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
               </h1>
 
               <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-gray-200 leading-relaxed font-medium drop-shadow-lg max-w-3xl mx-auto">
-                Your destination for insights from the <span className="text-white font-semibold">434 Media team</span>,
+                Your destination for insights from the <span className="text-white font-menda-black">434 MEDIA</span> team,
                 our <span className="text-emerald-300 font-semibold">local partners</span>, and our diverse ecosystem.
               </p>
             </div>
