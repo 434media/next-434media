@@ -9,26 +9,26 @@ import ImageEditor from "../../../components/blog/ImageEditor"
 import type { BlogImage } from "../../../types/blog-types"
 
 export default function MediaLibraryPage() {
+  const [authenticated, setAuthenticated] = useState(false)
+  const [adminPassword, setAdminPassword] = useState("")
   const [images, setImages] = useState<BlogImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [pendingAction, setPendingAction] = useState<"delete" | "upload" | null>(null)
-  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState(Date.now())
   const [editingImage, setEditingImage] = useState<BlogImage | null>(null)
-  const [storedPassword, setStoredPassword] = useState<string | null>(null)
 
   // Allowed file types for upload
   const ALLOWED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
   const loadImages = useCallback(async () => {
+    if (!authenticated) return
+
     setIsLoading(true)
     setError(null)
     try {
@@ -50,7 +50,7 @@ export default function MediaLibraryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [lastRefresh])
+  }, [authenticated, lastRefresh])
 
   useEffect(() => {
     loadImages()
@@ -66,13 +66,16 @@ export default function MediaLibraryPage() {
     }
   }, [successMessage])
 
-  const handleFileSelect = () => {
-    // Show password modal first, then file selection
-    setPendingAction("upload")
-    setShowPasswordModal(true)
+  const handlePasswordVerified = (password: string) => {
+    setAdminPassword(password)
+    setAuthenticated(true)
   }
 
-  const handleFileSelectAfterAuth = () => {
+  const handlePasswordCancel = () => {
+    window.history.back()
+  }
+
+  const handleFileSelect = () => {
     const input = document.createElement("input")
     input.type = "file"
     input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp"
@@ -103,15 +106,12 @@ export default function MediaLibraryPage() {
         return
       }
 
-      // Proceed with upload using stored password
-      if (storedPassword) {
-        handleFileUpload(files, storedPassword)
-      }
+      handleFileUpload(files)
     }
     input.click()
   }
 
-  const handleFileUpload = async (files: FileList, password: string) => {
+  const handleFileUpload = async (files: FileList) => {
     if (!files || files.length === 0) return
 
     setIsUploading(true)
@@ -125,7 +125,7 @@ export default function MediaLibraryPage() {
     })
 
     // Add admin password to form data
-    formData.append("adminPassword", password)
+    formData.append("adminPassword", adminPassword)
 
     try {
       // Simulate upload progress
@@ -178,19 +178,48 @@ export default function MediaLibraryPage() {
       setIsUploading(false)
       setUploadProgress(0)
     }
-
-    // Reset pending files
-    setPendingFiles(null)
   }
 
   const toggleImageSelection = (id: string) => {
     setSelectedImages((prev) => (prev.includes(id) ? prev.filter((imageId) => imageId !== id) : [...prev, id]))
   }
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (selectedImages.length === 0) return
-    setPendingAction("delete")
-    setShowPasswordModal(true)
+
+    try {
+      setError(null)
+
+      const response = await fetch("/api/blog/delete-images", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageIds: selectedImages,
+          adminPassword: adminPassword,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Delete failed with status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Remove deleted images from state immediately
+        setImages((prev) => prev.filter((image) => !selectedImages.includes(image.id)))
+        setSelectedImages([])
+        setSuccessMessage(`Successfully deleted ${selectedImages.length} image(s)!`)
+      } else {
+        throw new Error(result.error || "Delete failed")
+      }
+    } catch (error) {
+      console.error("Error deleting images:", error)
+      setError(error instanceof Error ? error.message : "Failed to delete images. Please try again.")
+    }
   }
 
   const handleRefresh = () => {
@@ -201,62 +230,6 @@ export default function MediaLibraryPage() {
     setImages((prev) => prev.map((img) => (img.id === updatedImage.id ? updatedImage : img)))
     setEditingImage(null)
     setSuccessMessage("Image updated successfully!")
-  }
-
-  const handlePasswordVerified = async (password: string) => {
-    if (pendingAction === "delete") {
-      try {
-        setError(null)
-
-        const response = await fetch("/api/blog/delete-images", {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            imageIds: selectedImages,
-            adminPassword: password,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || `Delete failed with status: ${response.status}`)
-        }
-
-        const result = await response.json()
-
-        if (result.success) {
-          // Remove deleted images from state immediately
-          setImages((prev) => prev.filter((image) => !selectedImages.includes(image.id)))
-          setSelectedImages([])
-          setSuccessMessage(`Successfully deleted ${selectedImages.length} image(s)!`)
-        } else {
-          throw new Error(result.error || "Delete failed")
-        }
-      } catch (error) {
-        console.error("Error deleting images:", error)
-        setError(error instanceof Error ? error.message : "Failed to delete images. Please try again.")
-      }
-    } else if (pendingAction === "upload") {
-      setStoredPassword(password)
-      setShowPasswordModal(false)
-      setPendingAction(null)
-      // Trigger file selection after password verification
-      setTimeout(() => {
-        handleFileSelectAfterAuth()
-      }, 100)
-      return
-    }
-
-    setShowPasswordModal(false)
-    setPendingAction(null)
-  }
-
-  const handlePasswordCancel = () => {
-    setShowPasswordModal(false)
-    setPendingAction(null)
-    setPendingFiles(null)
   }
 
   const filteredImages = images.filter(
@@ -282,6 +255,18 @@ export default function MediaLibraryPage() {
     } catch (e) {
       return "Unknown date"
     }
+  }
+
+  // Show authentication modal if not authenticated
+  if (!authenticated) {
+    return (
+      <AdminPasswordModal
+        isOpen={true}
+        onVerified={handlePasswordVerified}
+        onCancel={handlePasswordCancel}
+        action="access media library"
+      />
+    )
   }
 
   return (
@@ -545,21 +530,6 @@ export default function MediaLibraryPage() {
           </div>
         </div>
       )}
-
-      {/* Admin Password Modal */}
-      <AdminPasswordModal
-        isOpen={showPasswordModal}
-        onVerified={handlePasswordVerified}
-        onCancel={handlePasswordCancel}
-        action={pendingAction === "delete" ? "delete images" : "upload images"}
-        itemName={
-          pendingAction === "delete"
-            ? `${selectedImages.length} ${selectedImages.length === 1 ? "image" : "images"}`
-            : pendingFiles
-              ? `${pendingFiles.length} ${pendingFiles.length === 1 ? "image" : "images"}`
-              : "images"
-        }
-      />
     </div>
   )
 }

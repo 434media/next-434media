@@ -8,6 +8,8 @@ import AdminPasswordModal from "../../components/AdminPasswordModal"
 import type { BlogPost } from "../../types/blog-types"
 
 export default function AdminBlogPage() {
+  const [authenticated, setAuthenticated] = useState(false)
+  const [adminPassword, setAdminPassword] = useState("")
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -15,20 +17,25 @@ export default function AdminBlogPage() {
   const [editingPost, setEditingPost] = useState<BlogPost | undefined>()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all")
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deletingPost, setDeletingPost] = useState<BlogPost | null>(null)
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [pendingAction, setPendingAction] = useState<"create" | "delete" | null>(null)
-  const [showEditPasswordModal, setShowEditPasswordModal] = useState(false)
-  const [editingPostId, setEditingPostId] = useState<string | null>(null)
 
   useEffect(() => {
-    loadPosts()
-  }, [])
+    if (authenticated) {
+      loadPosts()
+    }
+  }, [authenticated])
 
   useEffect(() => {
     filterPosts()
   }, [posts, searchTerm, statusFilter])
+
+  const handlePasswordVerified = (password: string) => {
+    setAdminPassword(password)
+    setAuthenticated(true)
+  }
+
+  const handlePasswordCancel = () => {
+    window.history.back()
+  }
 
   const loadPosts = async () => {
     setIsLoading(true)
@@ -60,57 +67,25 @@ export default function AdminBlogPage() {
   }
 
   const handleCreateClick = () => {
-    setPendingAction("create")
-    setShowPasswordModal(true)
+    setShowEditor(true)
   }
 
   const handleEdit = (post: BlogPost) => {
-    setEditingPostId(post.id)
-    setShowEditPasswordModal(true)
+    setEditingPost(post)
+    setShowEditor(true)
   }
 
-  const handleDelete = (post: BlogPost) => {
-    setDeletingPost(post)
-    setPendingAction("delete")
-    setShowPasswordModal(true)
-  }
-
-  const handlePasswordVerified = async (password: string) => {
-    if (pendingAction === "create") {
-      setShowEditor(true)
-    } else if (pendingAction === "delete" && deletingPost) {
-      const result = await deleteBlogPostAction(deletingPost.id, password)
-      if (result.success) {
-        setPosts(posts.filter((p) => p.id !== deletingPost.id))
-        setDeletingPost(null)
-      } else {
-        alert(result.error || "Failed to delete post")
-      }
+  const handleDelete = async (post: BlogPost) => {
+    if (!confirm(`Are you sure you want to delete "${post.title}"? This cannot be undone.`)) {
+      return
     }
 
-    setShowPasswordModal(false)
-    setPendingAction(null)
-  }
-
-  const handlePasswordCancel = () => {
-    setShowPasswordModal(false)
-    setPendingAction(null)
-    setDeletingPost(null)
-  }
-
-  const handleEditPasswordVerified = (password: string) => {
-    const post = posts.find((p) => p.id === editingPostId)
-    if (post) {
-      setEditingPost(post)
-      setShowEditor(true)
+    const result = await deleteBlogPostAction(post.id, adminPassword)
+    if (result.success) {
+      setPosts(posts.filter((p) => p.id !== post.id))
+    } else {
+      alert(result.error || "Failed to delete post")
     }
-    setShowEditPasswordModal(false)
-    setEditingPostId(null)
-  }
-
-  const handleEditPasswordCancel = () => {
-    setShowEditPasswordModal(false)
-    setEditingPostId(null)
   }
 
   const handleSave = (post: BlogPost) => {
@@ -135,6 +110,18 @@ export default function AdminBlogPage() {
   const publishedPosts = (posts || []).filter((p) => p.status === "published")
   const draftPosts = (posts || []).filter((p) => p.status === "draft")
   const totalViews = (posts || []).reduce((sum, post) => sum + (post.view_count || 0), 0)
+
+  // Show authentication modal if not authenticated
+  if (!authenticated) {
+    return (
+      <AdminPasswordModal
+        isOpen={true}
+        onVerified={handlePasswordVerified}
+        onCancel={handlePasswordCancel}
+        action="access blog management"
+      />
+    )
+  }
 
   if (showEditor) {
     return (
@@ -404,24 +391,6 @@ export default function AdminBlogPage() {
           )}
         </div>
       </div>
-
-      {/* Admin Password Modal */}
-      <AdminPasswordModal
-        isOpen={showPasswordModal}
-        onVerified={handlePasswordVerified}
-        onCancel={handlePasswordCancel}
-        action={pendingAction === "create" ? "create article" : "delete article"}
-        itemName={deletingPost?.title}
-      />
-
-      {/* Edit Password Modal */}
-      <AdminPasswordModal
-        isOpen={showEditPasswordModal}
-        onVerified={handleEditPasswordVerified}
-        onCancel={handleEditPasswordCancel}
-        action="edit article"
-        itemName={posts.find((p) => p.id === editingPostId)?.title}
-      />
     </div>
   )
 }
