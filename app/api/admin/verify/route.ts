@@ -5,8 +5,10 @@ const attempts = new Map<string, { count: number; lastAttempt: number }>()
 
 export async function POST(request: Request) {
   try {
-    // Get client IP (in production, use headers)
-    const clientIP = "127.0.0.1" // Replace with actual IP detection in production
+    // Get client IP properly for production (Vercel)
+    const forwardedFor = request.headers.get("x-forwarded-for")
+    const realIP = request.headers.get("x-real-ip")
+    const clientIP = forwardedFor?.split(",")[0]?.trim() || realIP || "127.0.0.1"
 
     // Rate limiting check
     const now = Date.now()
@@ -37,8 +39,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify against environment variable
+    // Get passwords from environment variables
     const adminPassword = process.env.ADMIN_PASSWORD
+    const internPassword = process.env.INTERN_PASSWORD
 
     if (!adminPassword) {
       console.error("ADMIN_PASSWORD environment variable is not set")
@@ -52,7 +55,9 @@ export async function POST(request: Request) {
     }
 
     // Timing-safe comparison to prevent timing attacks
-    const isValid = timingSafeEqual(password, adminPassword)
+    const isAdminValid = timingSafeEqual(password, adminPassword)
+    const isInternValid = internPassword ? timingSafeEqual(password, internPassword) : false
+    const isValid = isAdminValid || isInternValid
 
     if (!isValid) {
       // Track failed attempt
@@ -60,12 +65,12 @@ export async function POST(request: Request) {
       attempts.set(clientIP, { count: current.count + 1, lastAttempt: now })
 
       // Log failed attempt (in production, use secure logging)
-      console.warn(`Failed admin login attempt from ${clientIP}`)
+      console.warn(`Failed admin/intern login attempt from ${clientIP}`)
 
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid admin password",
+          error: "Invalid admin or intern password",
         },
         { status: 401 },
       )
@@ -74,9 +79,14 @@ export async function POST(request: Request) {
     // Reset attempts on successful verification
     attempts.delete(clientIP)
 
-    // Return success
+    // Log successful verification with user type
+    const userType = isAdminValid ? "admin" : "intern"
+    console.log(`Successful ${userType} verification from ${clientIP}`)
+
+    // Return success with user type
     return NextResponse.json({
       success: true,
+      userType: userType,
     })
   } catch (error) {
     console.error("Error verifying admin password:", error)

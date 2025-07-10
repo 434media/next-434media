@@ -65,7 +65,7 @@ export default function AdminPasswordModal({
     setError("")
 
     try {
-      // Verify password on server
+      // Verify password on server (now checks both admin and intern passwords)
       const response = await fetch("/api/admin/verify", {
         method: "POST",
         headers: {
@@ -80,12 +80,12 @@ export default function AdminPasswordModal({
         throw new Error(result.error || "Invalid password")
       }
 
-      // Password verified successfully
+      // Password verified successfully (either admin or intern)
       onVerified(password)
       setPassword("")
     } catch (error) {
       setAttempts((prev) => prev + 1)
-      setError(error instanceof Error ? error.message : "Invalid admin password")
+      setError(error instanceof Error ? error.message : "Invalid admin or intern password")
       setPassword("")
 
       // Shake animation on error
@@ -149,7 +149,7 @@ export default function AdminPasswordModal({
                   <span className="text-sm font-medium text-gray-700">Action Required</span>
                 </div>
                 <p className="text-gray-600">
-                  Enter your admin password to <span className="font-semibold text-gray-900">{action}</span>
+                  Enter your admin or intern password to <span className="font-semibold text-gray-900">{action}</span>
                   {itemName && (
                     <>
                       {" "}
@@ -163,7 +163,7 @@ export default function AdminPasswordModal({
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Password Input */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Admin Password</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Admin/Intern Password</label>
                   <div className="relative">
                     <input
                       ref={inputRef}
@@ -173,7 +173,7 @@ export default function AdminPasswordModal({
                       className={`w-full px-4 py-3 pr-12 border-2 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                         error ? "border-red-300 bg-red-50" : "border-gray-300 bg-white hover:border-gray-400"
                       }`}
-                      placeholder="Enter admin password..."
+                      placeholder="Enter admin or intern password..."
                       disabled={isVerifying}
                       autoComplete="current-password"
                     />
@@ -213,7 +213,7 @@ export default function AdminPasswordModal({
                     <Shield className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div className="text-xs text-blue-700">
                       <p className="font-medium mb-1">Security Notice</p>
-                      <p>This action requires admin privileges to prevent unauthorized access.</p>
+                      <p>This action requires admin or intern privileges to prevent unauthorized access.</p>
                     </div>
                   </div>
                 </div>
