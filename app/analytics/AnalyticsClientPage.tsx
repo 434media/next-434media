@@ -31,10 +31,18 @@ export default function AnalyticsClientPage() {
     const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
     if (adminKey) {
       setIsAuthenticated(true)
+      // Load properties immediately when authenticated
       loadAvailableProperties()
       testConnection()
     }
   }, [])
+
+  // Add a separate useEffect to load properties when authentication changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadAvailableProperties()
+    }
+  }, [isAuthenticated])
 
   // Refresh data when date range or property changes
   useEffect(() => {
@@ -52,6 +60,8 @@ export default function AnalyticsClientPage() {
     try {
       const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
       if (!adminKey) return
+
+      console.log("Loading available properties...")
 
       const response = await fetch("/api/analytics?endpoint=properties", {
         headers: { "x-admin-key": adminKey },
@@ -77,15 +87,19 @@ export default function AnalyticsClientPage() {
           properties = []
         }
 
+        console.log("Setting available properties:", properties)
         setAvailableProperties(properties)
 
         // Set default property (first configured property or first property)
-        if (properties.length > 0) {
+        if (properties.length > 0 && !selectedPropertyId) {
           const defaultProperty = properties.find((p: AnalyticsProperty) => p.isDefault) || properties[0]
-          if (defaultProperty && !selectedPropertyId) {
+          if (defaultProperty) {
+            console.log("Setting default property:", defaultProperty)
             setSelectedPropertyId(defaultProperty.id)
           }
         }
+      } else {
+        console.error("Failed to load properties:", response.status, response.statusText)
       }
     } catch (err) {
       console.error("Failed to load properties:", err)
