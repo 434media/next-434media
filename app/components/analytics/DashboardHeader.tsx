@@ -55,8 +55,121 @@ export function DashboardHeader({
       <div className="absolute bottom-1/3 right-12 w-14 h-14 sm:w-18 sm:h-18 bg-indigo-400/25 rounded-full blur-lg animate-pulse delay-900" />
       <div className="absolute top-3/4 left-1/3 w-10 h-10 sm:w-14 sm:h-14 bg-green-400/20 rounded-full blur-lg animate-pulse delay-1200" />
 
-      {/* Main Header Content */}
-      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 sm:p-8">
+      {/* Mobile Layout (< sm) */}
+      <div className="relative z-10 flex flex-col gap-6 p-4 sm:hidden">
+        {/* Title Section */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center gap-4"
+        >
+          <motion.div
+            className="p-3 bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+            whileHover={{ scale: 1.05, rotate: 5 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          >
+            <BarChart3 className="h-6 w-6 text-blue-400" />
+          </motion.div>
+          <div>
+            <motion.h1
+              className="text-lg font-bold text-white mb-1"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              Analytics Dashboard
+            </motion.h1>
+            <motion.p
+              className="text-white/60 text-xs"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              Real-time insights and performance metrics
+            </motion.p>
+          </div>
+        </motion.div>
+
+        {/* Controls Section - Stacked on mobile */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex flex-col gap-3"
+        >
+          {/* Property Selector Dropdown - Full width on mobile */}
+          {onPropertyChange && (
+            <div className="relative w-full">
+              {isPropertiesLoading ? (
+                <div className="bg-white/10 border border-white/20 text-white rounded-lg px-4 py-2 pr-8 text-sm backdrop-blur-sm flex items-center w-full">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin flex-shrink-0" />
+                  <span className="text-white/60">Loading...</span>
+                </div>
+              ) : availableProperties.length > 0 ? (
+                <div className="relative w-full">
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-400 pointer-events-none z-10 flex-shrink-0" />
+                  <select
+                    value={selectedPropertyId}
+                    onChange={(e) => onPropertyChange(e.target.value)}
+                    className="bg-white/10 border border-white/20 text-white rounded-lg pl-10 pr-8 py-2 text-sm backdrop-blur-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none cursor-pointer w-full"
+                  >
+                    {!selectedPropertyId && (
+                      <option value="" className="bg-slate-800 text-white/60">
+                        Select Property
+                      </option>
+                    )}
+                    {availableProperties.map((property) => (
+                      <option key={property.id} value={property.id} className="bg-slate-800 text-white">
+                        {property.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/60 pointer-events-none flex-shrink-0" />
+                </div>
+              ) : (
+                <div className="bg-white/10 border border-white/20 text-white/60 rounded-lg px-4 py-2 text-sm backdrop-blur-sm flex items-center w-full">
+                  <Globe className="h-4 w-4 mr-2 text-white/40 flex-shrink-0" />
+                  <span>No properties</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Button Group - Full width on mobile */}
+          <div className="flex gap-2 w-full">
+            <Button
+              onClick={onRefresh}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 transition-all duration-200 backdrop-blur-sm flex-1"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin flex-shrink-0" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2 flex-shrink-0" />
+              )}
+              <span className="hidden xs:inline">Refresh</span>
+              <span className="xs:hidden">Refresh</span>
+            </Button>
+
+            <Button
+              onClick={onLogout}
+              variant="outline"
+              size="sm"
+              className="bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all duration-200 backdrop-blur-sm flex-1"
+            >
+              <LogOut className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span className="hidden xs:inline">Logout</span>
+              <span className="xs:hidden">Exit</span>
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Desktop Layout (>= sm) - Original Layout Preserved */}
+      <div className="relative z-10 hidden sm:flex sm:flex-row sm:items-center sm:justify-between gap-4 p-6 sm:p-8">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
