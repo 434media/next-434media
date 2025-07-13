@@ -12,9 +12,15 @@ interface GeographicMapProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
+  propertyId?: string
 }
 
-export function GeographicMap({ dateRange, isLoading: parentLoading = false, setError }: GeographicMapProps) {
+export function GeographicMap({
+  dateRange,
+  isLoading: parentLoading = false,
+  setError,
+  propertyId,
+}: GeographicMapProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -23,14 +29,17 @@ export function GeographicMap({ dateRange, isLoading: parentLoading = false, set
       setIsLoading(true)
       try {
         const adminKey = sessionStorage.getItem("adminKey")
-        const response = await fetch(
-          `/api/analytics?endpoint=geographic&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-          {
-            headers: {
-              "x-admin-key": adminKey || "",
-            },
+
+        let url = `/api/analytics?endpoint=geographic&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        if (propertyId) {
+          url += `&propertyId=${propertyId}`
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            "x-admin-key": adminKey || "",
           },
-        )
+        })
 
         if (!response.ok) {
           throw new Error("Failed to fetch geographic data")
@@ -47,7 +56,7 @@ export function GeographicMap({ dateRange, isLoading: parentLoading = false, set
     }
 
     loadData()
-  }, [dateRange, setError])
+  }, [dateRange, setError, propertyId])
 
   const totalSessions = data.reduce((sum, item) => sum + item.sessions, 0)
   const uniqueCities = data.filter((item) => item.city && item.city !== "(not set)").length
@@ -198,12 +207,12 @@ export function GeographicMap({ dateRange, isLoading: parentLoading = false, set
   )
 }
 
-// Helper function to get country flags (basic implementation)
+// Helper function to get country flags
 function getCountryFlag(country: string): string {
   const flagMap: { [key: string]: string } = {
     "United States": "🇺🇸",
-    Canada: "🇨🇦",
     "United Kingdom": "🇬🇧",
+    Canada: "🇨🇦",
     Germany: "🇩🇪",
     France: "🇫🇷",
     Japan: "🇯🇵",
@@ -219,8 +228,72 @@ function getCountryFlag(country: string): string {
     Norway: "🇳🇴",
     Denmark: "🇩🇰",
     Finland: "🇫🇮",
+    Switzerland: "🇨🇭",
+    Austria: "🇦🇹",
+    Belgium: "🇧🇪",
+    Portugal: "🇵🇹",
+    Ireland: "🇮🇪",
+    "New Zealand": "🇳🇿",
     "South Korea": "🇰🇷",
     Singapore: "🇸🇬",
+    "Hong Kong": "🇭🇰",
+    Taiwan: "🇹🇼",
+    Thailand: "🇹🇭",
+    Malaysia: "🇲🇾",
+    Philippines: "🇵🇭",
+    Indonesia: "🇮🇩",
+    Vietnam: "🇻🇳",
+    "South Africa": "🇿🇦",
+    Egypt: "🇪🇬",
+    Nigeria: "🇳🇬",
+    Kenya: "🇰🇪",
+    Morocco: "🇲🇦",
+    Israel: "🇮🇱",
+    "United Arab Emirates": "🇦🇪",
+    "Saudi Arabia": "🇸🇦",
+    Turkey: "🇹🇷",
+    Russia: "🇷🇺",
+    Ukraine: "🇺🇦",
+    Poland: "🇵🇱",
+    "Czech Republic": "🇨🇿",
+    Hungary: "🇭🇺",
+    Romania: "🇷🇴",
+    Bulgaria: "🇧🇬",
+    Croatia: "🇭🇷",
+    Serbia: "🇷🇸",
+    Slovenia: "🇸🇮",
+    Slovakia: "🇸🇰",
+    Lithuania: "🇱🇹",
+    Latvia: "🇱🇻",
+    Estonia: "🇪🇪",
+    Greece: "🇬🇷",
+    Cyprus: "🇨🇾",
+    Malta: "🇲🇹",
+    Iceland: "🇮🇸",
+    Luxembourg: "🇱🇺",
+    Chile: "🇨🇱",
+    Argentina: "🇦🇷",
+    Colombia: "🇨🇴",
+    Peru: "🇵🇪",
+    Venezuela: "🇻🇪",
+    Ecuador: "🇪🇨",
+    Uruguay: "🇺🇾",
+    Paraguay: "🇵🇾",
+    Bolivia: "🇧🇴",
+    "Costa Rica": "🇨🇷",
+    Panama: "🇵🇦",
+    Guatemala: "🇬🇹",
+    Honduras: "🇭🇳",
+    "El Salvador": "🇸🇻",
+    Nicaragua: "🇳🇮",
+    "Dominican Republic": "🇩🇴",
+    Jamaica: "🇯🇲",
+    "Puerto Rico": "🇵🇷",
+    Cuba: "🇨🇺",
+    Haiti: "🇭🇹",
+    "Trinidad and Tobago": "🇹🇹",
+    Barbados: "🇧🇧",
+    Bahamas: "🇧🇸",
   }
 
   return flagMap[country] || "🌍"

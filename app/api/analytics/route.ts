@@ -8,6 +8,7 @@ import {
   getDeviceData,
   getGeographicData,
   getRealtimeData,
+  getAvailableProperties,
 } from "../../lib/google-analytics"
 import { validateAnalyticsConfig, getConfigurationStatus } from "../../lib/analytics-config"
 
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
       missingVariables: configStatus.missingVariables,
       hasServiceAccountKey: configStatus.hasServiceAccountKey,
       hasAdminPassword: configStatus.hasAdminPassword,
+      configuredProperties: configStatus.configuredProperties?.length || 0,
     })
 
     if (!validateAnalyticsConfig()) {
@@ -69,10 +71,11 @@ export async function GET(request: NextRequest) {
         {
           error: "Google Analytics not configured properly.",
           missingVariables: configStatus.missingVariables,
+          configuredProperties: configStatus.configuredProperties || [],
           help: {
             message: "Required environment variables:",
             required: [
-              "GA4_PROPERTY_ID - Your Google Analytics 4 property ID (numeric)",
+              "At least one GA4_PROPERTY_ID or GA4_PROPERTY_ID_* - Your Google Analytics 4 property ID(s)",
               "GCP_PROJECT_ID - Your Google Cloud project ID",
               "GOOGLE_SERVICE_ACCOUNT_KEY - Complete JSON service account key",
               "ADMIN_PASSWORD - Password for analytics dashboard access",
@@ -87,12 +90,15 @@ export async function GET(request: NextRequest) {
     const endpoint = searchParams.get("endpoint")
     const startDateParam = searchParams.get("startDate") || "7daysAgo"
     const endDateParam = searchParams.get("endDate") || "today"
+    const propertyIdParam = searchParams.get("propertyId") // Get as string | null
+    const propertyId = propertyIdParam || undefined // Convert null to undefined
     const adminKey = request.headers.get("x-admin-key")
 
     console.log("[Analytics API] Request parameters:", {
       endpoint,
       startDateParam,
       endDateParam,
+      propertyId,
       hasAdminKey: !!adminKey,
       adminKeyLength: adminKey?.length || 0,
     })
@@ -125,16 +131,26 @@ export async function GET(request: NextRequest) {
     switch (endpoint) {
       case "test-connection":
         console.log("[Analytics API] Testing connection...")
-        const connectionStatus = await testAnalyticsConnection()
+        const connectionStatus = await testAnalyticsConnection(propertyId)
         console.log("[Analytics API] Connection result:", connectionStatus)
         return NextResponse.json(connectionStatus)
+
+      case "properties":
+        console.log("[Analytics API] Fetching available properties...")
+        const availableProperties = getAvailableProperties()
+        console.log("[Analytics API] Available properties:", availableProperties)
+        return NextResponse.json({
+          success: true,
+          properties: availableProperties,
+          defaultPropertyId: availableProperties.find((p) => p.isDefault)?.id || availableProperties[0]?.id,
+        })
 
       case "summary":
       case "overview":
         console.log("[Analytics API] Fetching summary data...")
-        console.log("[Analytics API] About to call getAnalyticsSummary with:", { startDate, endDate })
+        console.log("[Analytics API] About to call getAnalyticsSummary with:", { startDate, endDate, propertyId })
 
-        const summary = await getAnalyticsSummary(startDate, endDate)
+        const summary = await getAnalyticsSummary(startDate, endDate, propertyId)
         console.log("[Analytics API] Raw summary result:", summary)
 
         const enhancedSummary = {
@@ -152,10 +168,10 @@ export async function GET(request: NextRequest) {
       case "chart":
       case "pageviews":
         console.log("[Analytics API] Fetching daily metrics...")
-        const dailyMetrics = await getDailyMetrics(startDate, endDate)
+        const dailyMetrics = await getDailyMetrics(startDate, endDate, propertyId)
         console.log("[Analytics API] Daily metrics result:", {
           dataLength: dailyMetrics.data.length,
-          source: dailyMetrics._source || "unknown",
+          propertyId: dailyMetrics.propertyId,
         })
         return NextResponse.json(dailyMetrics)
 
@@ -163,8 +179,11 @@ export async function GET(request: NextRequest) {
       case "toppages":
       case "top-pages":
         console.log("[Analytics API] Fetching page views...")
-        const pageViews = await getPageViewsData(startDate, endDate)
-        console.log("[Analytics API] Page views result:", { dataLength: pageViews.data.length })
+        const pageViews = await getPageViewsData(startDate, endDate, propertyId)
+        console.log("[Analytics API] Page views result:", {
+          dataLength: pageViews.data.length,
+          propertyId: pageViews.propertyId,
+        })
         return NextResponse.json(pageViews)
 
       case "referrers":
@@ -172,15 +191,21 @@ export async function GET(request: NextRequest) {
       case "trafficsources":
       case "sources":
         console.log("[Analytics API] Fetching traffic sources...")
-        const trafficSources = await getTrafficSourcesData(startDate, endDate)
-        console.log("[Analytics API] Traffic sources result:", { dataLength: trafficSources.data.length })
+        const trafficSources = await getTrafficSourcesData(startDate, endDate, propertyId)
+        console.log("[Analytics API] Traffic sources result:", {
+          dataLength: trafficSources.data.length,
+          propertyId: trafficSources.propertyId,
+        })
         return NextResponse.json(trafficSources)
 
       case "devices":
       case "device-breakdown":
         console.log("[Analytics API] Fetching device data...")
-        const deviceData = await getDeviceData(startDate, endDate)
-        console.log("[Analytics API] Device data result:", { dataLength: deviceData.data.length })
+        const deviceData = await getDeviceData(startDate, endDate, propertyId)
+        console.log("[Analytics API] Device data result:", {
+          dataLength: deviceData.data.length,
+          propertyId: deviceData.propertyId,
+        })
         return NextResponse.json(deviceData)
 
       case "geographic":
@@ -188,14 +213,17 @@ export async function GET(request: NextRequest) {
       case "geo":
       case "countries":
         console.log("[Analytics API] Fetching geographic data...")
-        const geoData = await getGeographicData(startDate, endDate)
-        console.log("[Analytics API] Geographic data result:", { dataLength: geoData.data.length })
+        const geoData = await getGeographicData(startDate, endDate, propertyId)
+        console.log("[Analytics API] Geographic data result:", {
+          dataLength: geoData.data.length,
+          propertyId: geoData.propertyId,
+        })
         return NextResponse.json(geoData)
 
       case "realtime":
       case "real-time":
         console.log("[Analytics API] Fetching realtime data...")
-        const realtimeData = await getRealtimeData()
+        const realtimeData = await getRealtimeData(propertyId)
         console.log("[Analytics API] Realtime data result:", realtimeData)
         return NextResponse.json(realtimeData)
 
@@ -207,6 +235,7 @@ export async function GET(request: NextRequest) {
             endpoint: endpoint,
             availableEndpoints: [
               "test-connection",
+              "properties",
               "summary",
               "daily-metrics",
               "pages",

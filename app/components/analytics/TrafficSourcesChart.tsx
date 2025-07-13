@@ -12,6 +12,7 @@ interface TrafficSourcesChartProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
+  propertyId?: string
 }
 
 interface SourceIconConfig {
@@ -91,6 +92,7 @@ export function TrafficSourcesChart({
   dateRange,
   isLoading: parentLoading = false,
   setError,
+  propertyId,
 }: TrafficSourcesChartProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -100,14 +102,17 @@ export function TrafficSourcesChart({
       setIsLoading(true)
       try {
         const adminKey = sessionStorage.getItem("adminKey")
-        const response = await fetch(
-          `/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-          {
-            headers: {
-              "x-admin-key": adminKey || "",
-            },
+
+        let url = `/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        if (propertyId) {
+          url += `&propertyId=${propertyId}`
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            "x-admin-key": adminKey || "",
           },
-        )
+        })
 
         if (!response.ok) {
           throw new Error("Failed to fetch traffic sources data")
@@ -124,7 +129,7 @@ export function TrafficSourcesChart({
     }
 
     loadData()
-  }, [dateRange, setError])
+  }, [dateRange, setError, propertyId])
 
   const totalSessions = data.reduce((sum, item) => sum + item.sessions, 0)
 

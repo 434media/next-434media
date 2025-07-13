@@ -12,6 +12,7 @@ interface MetricsOverviewProps {
   isLoading?: boolean
   setError?: React.Dispatch<React.SetStateAction<string | null>>
   adminKey?: string
+  propertyId?: string
 }
 
 interface MetricData {
@@ -30,6 +31,7 @@ export function MetricsOverview({
   isLoading: parentLoading = false,
   setError,
   adminKey,
+  propertyId,
 }: MetricsOverviewProps) {
   const [data, setData] = useState<MetricData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -45,12 +47,17 @@ export function MetricsOverview({
 
         console.log("[MetricsOverview] Auth key found:", !!authKey)
         console.log("[MetricsOverview] Date range:", dateRange)
+        console.log("[MetricsOverview] Property ID:", propertyId)
 
         if (!authKey) {
           throw new Error("No admin key found - please log in again")
         }
 
-        const url = `/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        let url = `/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        if (propertyId) {
+          url += `&propertyId=${propertyId}`
+        }
+
         console.log("[MetricsOverview] Making request to:", url)
 
         const response = await fetch(url, {
@@ -115,7 +122,7 @@ export function MetricsOverview({
       console.warn("[MetricsOverview] Invalid date range:", dateRange)
       setIsLoading(false)
     }
-  }, [dateRange, setError, adminKey])
+  }, [dateRange, setError, adminKey, propertyId])
 
   const metrics = [
     {

@@ -14,9 +14,15 @@ interface PageViewsChartProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
+  propertyId?: string
 }
 
-export function PageViewsChart({ dateRange, isLoading: parentLoading = false, setError }: PageViewsChartProps) {
+export function PageViewsChart({
+  dateRange,
+  isLoading: parentLoading = false,
+  setError,
+  propertyId,
+}: PageViewsChartProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [dataSource, setDataSource] = useState<string>("loading")
@@ -83,16 +89,19 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
           hasAdminKey: !!adminKey,
+          propertyId,
         })
 
-        const response = await fetch(
-          `/api/analytics?endpoint=daily-metrics&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-          {
-            headers: {
-              "x-admin-key": adminKey || "",
-            },
+        let url = `/api/analytics?endpoint=daily-metrics&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        if (propertyId) {
+          url += `&propertyId=${propertyId}`
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            "x-admin-key": adminKey || "",
           },
-        )
+        })
 
         if (!response.ok) {
           const errorText = await response.text()
@@ -152,7 +161,7 @@ export function PageViewsChart({ dateRange, isLoading: parentLoading = false, se
     }
 
     loadData()
-  }, [dateRange.startDate, dateRange.endDate, dateRange.label, setError])
+  }, [dateRange.startDate, dateRange.endDate, dateRange.label, setError, propertyId])
 
   return (
     <motion.div

@@ -1,3 +1,17 @@
+// Property configuration interface
+export interface AnalyticsProperty {
+  id: string
+  name: string
+  key: string
+  isConfigured?: boolean
+  isDefault?: boolean
+}
+
+export interface PropertyConfig {
+  properties: AnalyticsProperty[]
+  defaultPropertyId: string
+}
+
 // Date range interface
 export interface DateRange {
   startDate: string
@@ -18,6 +32,7 @@ export interface AnalyticsSummary {
   usersChange?: number
   bounceRateChange?: number
   activeUsers?: number
+  propertyId?: string
   _source?: string
 }
 
@@ -34,6 +49,7 @@ export interface DailyMetricsResponse {
   totalPageViews: number
   totalSessions: number
   totalUsers: number
+  propertyId?: string
   _source?: string
 }
 
@@ -47,6 +63,7 @@ export interface TopPageData {
 
 export interface PageViewsResponse {
   data: TopPageData[]
+  propertyId?: string
   _source?: string
 }
 
@@ -60,6 +77,7 @@ export interface TrafficSourceData {
 
 export interface TrafficSourcesResponse {
   data: TrafficSourceData[]
+  propertyId?: string
   _source?: string
 }
 
@@ -71,6 +89,7 @@ export interface DeviceData {
 
 export interface DeviceDataResponse {
   data: DeviceData[]
+  propertyId?: string
   _source?: string
 }
 
@@ -84,6 +103,7 @@ export interface GeographicData {
 
 export interface GeographicDataResponse {
   data: GeographicData[]
+  propertyId?: string
   _source?: string
 }
 
@@ -93,6 +113,7 @@ export interface RealtimeData {
     country: string
     activeUsers: number
   }>
+  propertyId?: string
   _source?: string
 }
 
@@ -104,6 +125,8 @@ export interface AnalyticsConnectionStatus {
   dimensionCount?: number
   metricCount?: number
   projectId?: string
+  availableProperties?: AnalyticsProperty[]
+  defaultPropertyId?: string
 }
 
 // Configuration status - simplified
@@ -114,4 +137,7 @@ export interface ConfigurationStatus {
   projectId?: string
   hasServiceAccountKey: boolean
   hasAdminPassword: boolean
+  availableProperties?: AnalyticsProperty[]
+  defaultPropertyId?: string
+  configuredProperties?: AnalyticsProperty[]
 }

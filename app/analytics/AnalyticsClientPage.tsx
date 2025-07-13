@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion } from "motion/react"
 import AdminPasswordModal from "../components/AdminPasswordModal"
 import { DashboardHeader } from "../components/analytics/DashboardHeader"
@@ -11,7 +11,7 @@ import { TopPagesTable } from "../components/analytics/TopPagesTable"
 import { TrafficSourcesChart } from "../components/analytics/TrafficSourcesChart"
 import { DeviceBreakdown } from "../components/analytics/DeviceBreakdown"
 import { GeographicMap } from "../components/analytics/GeographicMap"
-import type { DateRange, AnalyticsConnectionStatus } from "../types/analytics"
+import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "../types/analytics"
 
 export default function AnalyticsClientPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -21,6 +21,8 @@ export default function AnalyticsClientPage() {
     endDate: "today",
     label: "Last 30 days",
   })
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
+  const [availableProperties, setAvailableProperties] = useState<AnalyticsProperty[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<AnalyticsConnectionStatus | null>(null)
 
@@ -29,29 +31,78 @@ export default function AnalyticsClientPage() {
     const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
     if (adminKey) {
       setIsAuthenticated(true)
+      loadAvailableProperties()
       testConnection()
     }
   }, [])
 
-  // Refresh data when date range changes
+  // Refresh data when date range or property changes
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && selectedPropertyId) {
       forceRefreshData()
     }
-  }, [selectedDateRange, isAuthenticated])
+  }, [selectedDateRange, selectedPropertyId, isAuthenticated])
 
   const handleVerified = (password: string) => {
     sessionStorage.setItem("adminKey", password)
     setIsAuthenticated(true)
   }
 
+  const loadAvailableProperties = async () => {
+    try {
+      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+      if (!adminKey) return
+
+      const response = await fetch("/api/analytics?endpoint=properties", {
+        headers: { "x-admin-key": adminKey },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log("Properties API response:", result)
+
+        // Handle different possible response formats
+        let properties: AnalyticsProperty[] = []
+
+        if (Array.isArray(result)) {
+          properties = result
+        } else if (result.properties && Array.isArray(result.properties)) {
+          properties = result.properties
+        } else if (result.data && Array.isArray(result.data)) {
+          properties = result.data
+        } else if (result.availableProperties && Array.isArray(result.availableProperties)) {
+          properties = result.availableProperties
+        } else {
+          console.warn("Unexpected properties response format:", result)
+          properties = []
+        }
+
+        setAvailableProperties(properties)
+
+        // Set default property (first configured property or first property)
+        if (properties.length > 0) {
+          const defaultProperty = properties.find((p: AnalyticsProperty) => p.isDefault) || properties[0]
+          if (defaultProperty && !selectedPropertyId) {
+            setSelectedPropertyId(defaultProperty.id)
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load properties:", err)
+    }
+  }
+
   // Force refresh data when needed
-  const forceRefreshData = () => {
+  const forceRefreshData = useCallback(() => {
     setIsLoading(true)
     // Create a custom event to trigger data refresh in child components
     window.dispatchEvent(
       new CustomEvent("analytics-refresh", {
-        detail: { timestamp: Date.now() },
+        detail: {
+          timestamp: Date.now(),
+          propertyId: selectedPropertyId,
+          dateRange: selectedDateRange,
+        },
       }),
     )
 
@@ -59,7 +110,7 @@ export default function AnalyticsClientPage() {
     setTimeout(() => {
       setIsLoading(false)
     }, 1000)
-  }
+  }, [selectedPropertyId, selectedDateRange])
 
   const handleRefresh = () => {
     testConnection()
@@ -68,6 +119,11 @@ export default function AnalyticsClientPage() {
 
   const handleDateRangeChange = (range: DateRange) => {
     setSelectedDateRange(range)
+    setError(null)
+  }
+
+  const handlePropertyChange = (propertyId: string) => {
+    setSelectedPropertyId(propertyId)
     setError(null)
   }
 
@@ -84,7 +140,11 @@ export default function AnalyticsClientPage() {
         return
       }
 
-      const response = await fetch("/api/analytics?endpoint=test-connection", {
+      const url = selectedPropertyId
+        ? `/api/analytics?endpoint=test-connection&propertyId=${selectedPropertyId}`
+        : "/api/analytics?endpoint=test-connection"
+
+      const response = await fetch(url, {
         headers: { "x-admin-key": adminKey },
       })
 
@@ -139,7 +199,14 @@ export default function AnalyticsClientPage() {
         <div className="container mx-auto px-4 max-w-7xl">
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <DashboardHeader onRefresh={handleRefresh} onLogout={handleLogout} isLoading={isLoading} />
+            <DashboardHeader
+              onRefresh={handleRefresh}
+              onLogout={handleLogout}
+              isLoading={isLoading}
+              availableProperties={availableProperties}
+              selectedPropertyId={selectedPropertyId}
+              onPropertyChange={handlePropertyChange}
+            />
           </motion.div>
 
           {/* Date Range Selector */}
@@ -211,7 +278,12 @@ export default function AnalyticsClientPage() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="mb-8"
             >
-              <MetricsOverview dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+              <MetricsOverview
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+              />
             </motion.div>
 
             {/* Page Views Chart */}
@@ -221,7 +293,12 @@ export default function AnalyticsClientPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mb-8"
             >
-              <PageViewsChart dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+              <PageViewsChart
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+              />
             </motion.div>
 
             {/* Charts Grid */}
@@ -231,7 +308,12 @@ export default function AnalyticsClientPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.5 }}
               >
-                <TrafficSourcesChart dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+                <TrafficSourcesChart
+                  dateRange={selectedDateRange}
+                  isLoading={isLoading}
+                  setError={setError}
+                  propertyId={selectedPropertyId}
+                />
               </motion.div>
 
               <motion.div
@@ -239,7 +321,12 @@ export default function AnalyticsClientPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
               >
-                <DeviceBreakdown dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+                <DeviceBreakdown
+                  dateRange={selectedDateRange}
+                  isLoading={isLoading}
+                  setError={setError}
+                  propertyId={selectedPropertyId}
+                />
               </motion.div>
             </div>
 
@@ -250,7 +337,12 @@ export default function AnalyticsClientPage() {
               transition={{ duration: 0.6, delay: 0.7 }}
               className="mb-8"
             >
-              <GeographicMap dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+              <GeographicMap
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+              />
             </motion.div>
 
             {/* Top Pages Table */}
@@ -260,11 +352,16 @@ export default function AnalyticsClientPage() {
               transition={{ duration: 0.6, delay: 0.8 }}
               className="mb-8"
             >
-              <TopPagesTable dateRange={selectedDateRange} isLoading={isLoading} setError={setError} />
+              <TopPagesTable
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+              />
             </motion.div>
           </>
 
-           {/* Footer */}
+          {/* Footer */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -272,7 +369,7 @@ export default function AnalyticsClientPage() {
             className="text-center text-white/60 text-sm"
           >
             <p>
-              Powered by Google Analytics 4 <span className="hidden md:inline">•</span> {' '}
+              Powered by Google Analytics 4 <span className="hidden md:inline">•</span>{" "}
               <span className="block md:inline">Last updated: {new Date().toLocaleString()}</span>
             </p>
           </motion.div>

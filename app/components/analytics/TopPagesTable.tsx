@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
@@ -12,9 +11,15 @@ interface TopPagesTableProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
+  propertyId?: string
 }
 
-export function TopPagesTable({ dateRange, isLoading: parentLoading = false, setError }: TopPagesTableProps) {
+export function TopPagesTable({
+  dateRange,
+  isLoading: parentLoading = false,
+  setError,
+  propertyId,
+}: TopPagesTableProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -23,14 +28,17 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
       setIsLoading(true)
       try {
         const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-        const response = await fetch(
-          `/api/analytics?endpoint=toppages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-          {
-            headers: {
-              "x-admin-key": adminKey || "",
-            },
+
+        let url = `/api/analytics?endpoint=toppages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        if (propertyId) {
+          url += `&propertyId=${propertyId}`
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            "x-admin-key": adminKey || "",
           },
-        )
+        })
 
         if (!response.ok) {
           throw new Error("Failed to fetch top pages data")
@@ -47,7 +55,7 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
     }
 
     loadData()
-  }, [dateRange, setError])
+  }, [dateRange, setError, propertyId])
 
   const totalViews = data.reduce((sum, page) => sum + page.pageViews, 0)
 
@@ -92,8 +100,8 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {data.slice(0, 10).map((page, index) => {
-                // Create a unique key using path and index
-                const uniqueKey = `page-${page.path.replace(/[^a-zA-Z0-9]/g, "-")}-${index}`
+                // Create a unique key using path, index, and pageViews to ensure uniqueness
+                const uniqueKey = `page-${index}-${(page.path || "unknown").replace(/[^a-zA-Z0-9]/g, "-")}-${page.pageViews || 0}`
                 const percentage = totalViews > 0 ? (page.pageViews / totalViews) * 100 : 0
 
                 return (
@@ -108,14 +116,12 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
                       <div className="p-2 rounded-lg bg-white/10 text-emerald-400 flex-shrink-0">
                         <Eye className="h-4 w-4" />
                       </div>
-
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-white font-medium text-sm truncate">{page.title || page.path}</h3>
                           <ExternalLink className="h-3 w-3 text-white/40 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                         </div>
                         <p className="text-white/60 text-xs truncate mb-2">{page.path}</p>
-
                         <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
@@ -124,7 +130,6 @@ export function TopPagesTable({ dateRange, isLoading: parentLoading = false, set
                             className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full"
                           />
                         </div>
-
                         <div className="flex items-center justify-between mt-2">
                           <p className="text-white/60 text-xs font-medium">{percentage.toFixed(1)}% of views</p>
                           <div className="flex items-center gap-1.5">

@@ -8,18 +8,22 @@ import type {
   DailyMetricsResponse,
   RealtimeData,
   AnalyticsConnectionStatus,
+  AnalyticsProperty,
 } from "../types/analytics"
-import {
-  getHistoricalAnalyticsSummary,
-  getHistoricalPageViews,
-  getHistoricalTrafficSources,
-  getHistoricalDeviceData,
-  getHistoricalGeographicData,
-  getHistoricalDailyMetrics,
-} from "./vercel-analytics-db"
 
 // Initialize the client
 let analyticsDataClient: BetaAnalyticsDataClient | null = null
+
+// Property configurations
+const ANALYTICS_PROPERTIES: AnalyticsProperty[] = [
+  { id: "488543948", name: "434 MEDIA", key: "GA4_PROPERTY_ID" },
+  { id: "492867424", name: "TXMX Boxing", key: "GA4_PROPERTY_ID_TXMX" },
+  { id: "492895637", name: "Vemos Vamos", key: "GA4_PROPERTY_ID_VEMOSVAMOS" },
+  { id: "492925168", name: "AIM Health R&D Summit", key: "GA4_PROPERTY_ID_AIM" },
+  { id: "492857375", name: "Salute to Troops", key: "GA4_PROPERTY_ID_SALUTE" },
+  { id: "488563710", name: "The AMPD Project", key: "GA4_PROPERTY_ID_AMPD" },
+  { id: "492925088", name: "Digital Canvas", key: "GA4_PROPERTY_ID_DIGITALCANVAS" },
+]
 
 function getAnalyticsClient(): BetaAnalyticsDataClient {
   if (!analyticsDataClient) {
@@ -51,75 +55,78 @@ function getAnalyticsClient(): BetaAnalyticsDataClient {
   return analyticsDataClient
 }
 
-// Helper function to check if we should use historical data
-function shouldUseHistoricalData(startDate: string, endDate: string): boolean {
-  return startDate === "30daysAgo" || startDate === "2024-05-13"
+// Get property ID from environment variable or use provided propertyId
+function getPropertyId(propertyId?: string): string {
+  if (propertyId) {
+    return propertyId
+  }
+
+  // Default to main property
+  const defaultPropertyId = process.env.GA4_PROPERTY_ID
+  if (!defaultPropertyId) {
+    throw new Error("GA4_PROPERTY_ID not configured")
+  }
+
+  return defaultPropertyId
+}
+
+// Get all available properties with their configuration status
+export function getAvailableProperties(): AnalyticsProperty[] {
+  return ANALYTICS_PROPERTIES.map((property) => ({
+    ...property,
+    isConfigured: !!process.env[property.key],
+  }))
 }
 
 // Test connection to Google Analytics
-export async function testAnalyticsConnection(): Promise<AnalyticsConnectionStatus> {
+export async function testAnalyticsConnection(propertyId?: string): Promise<AnalyticsConnectionStatus> {
   try {
     console.log("[GA4] Testing connection...")
 
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      return {
-        success: false,
-        error: "GA4_PROPERTY_ID not configured",
-      }
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     // Test with a simple metadata request
     const [response] = await client.getMetadata({
-      name: `properties/${propertyId}/metadata`,
+      name: `properties/${targetPropertyId}/metadata`,
     })
 
     console.log("[GA4] Connection test successful")
 
     return {
       success: true,
-      propertyId,
+      propertyId: targetPropertyId,
       dimensionCount: response.dimensions?.length || 0,
       metricCount: response.metrics?.length || 0,
       projectId: process.env.GCP_PROJECT_ID,
+      availableProperties: getAvailableProperties(),
+      defaultPropertyId: process.env.GA4_PROPERTY_ID,
     }
   } catch (error) {
     console.error("[GA4] Connection test failed:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
+      availableProperties: getAvailableProperties(),
+      defaultPropertyId: process.env.GA4_PROPERTY_ID,
     }
   }
 }
 
 // Get analytics summary
-export async function getAnalyticsSummary(startDate: string, endDate: string): Promise<AnalyticsSummary> {
-  console.log("[GA4] getAnalyticsSummary called with:", { startDate, endDate })
+export async function getAnalyticsSummary(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<AnalyticsSummary> {
+  console.log("[GA4] getAnalyticsSummary called with:", { startDate, endDate, propertyId })
 
   try {
-    // Check if we should use historical data
-    if (shouldUseHistoricalData(startDate, endDate)) {
-      console.log("[GA4] Using historical data for summary")
-      const historicalData = await getHistoricalAnalyticsSummary(startDate, endDate)
-      return {
-        ...historicalData,
-        _source: "vercel-historical",
-      } as AnalyticsSummary & { _source: string }
-    }
-
-    // Fall back to live GA4 data
-    console.log("[GA4] Using live GA4 data for summary")
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       metrics: [
         { name: "screenPageViews" },
@@ -138,6 +145,7 @@ export async function getAnalyticsSummary(startDate: string, endDate: string): P
         totalUsers: 0,
         bounceRate: 0,
         averageSessionDuration: 0,
+        propertyId: targetPropertyId,
       }
     }
 
@@ -147,6 +155,7 @@ export async function getAnalyticsSummary(startDate: string, endDate: string): P
       totalUsers: Number(row.metricValues[2]?.value || 0),
       bounceRate: Number(row.metricValues[3]?.value || 0),
       averageSessionDuration: Number(row.metricValues[4]?.value || 0),
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -156,31 +165,19 @@ export async function getAnalyticsSummary(startDate: string, endDate: string): P
 }
 
 // Get daily metrics
-export async function getDailyMetrics(startDate: string, endDate: string): Promise<DailyMetricsResponse> {
-  console.log("[GA4] getDailyMetrics called with:", { startDate, endDate })
+export async function getDailyMetrics(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<DailyMetricsResponse> {
+  console.log("[GA4] getDailyMetrics called with:", { startDate, endDate, propertyId })
 
   try {
-    // Check if we should use historical data
-    if (shouldUseHistoricalData(startDate, endDate)) {
-      console.log("[GA4] Using historical data for daily metrics")
-      const historicalData = await getHistoricalDailyMetrics(startDate, endDate)
-      return {
-        ...historicalData,
-        _source: "vercel-historical",
-      } as DailyMetricsResponse & { _source: string }
-    }
-
-    // Fall back to live GA4 data
-    console.log("[GA4] Using live GA4 data for daily metrics")
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "date" }],
       metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "totalUsers" }, { name: "bounceRate" }],
@@ -234,6 +231,7 @@ export async function getDailyMetrics(startDate: string, endDate: string): Promi
       totalPageViews,
       totalSessions,
       totalUsers,
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -243,31 +241,19 @@ export async function getDailyMetrics(startDate: string, endDate: string): Promi
 }
 
 // Get page views data
-export async function getPageViewsData(startDate: string, endDate: string): Promise<PageViewsResponse> {
-  console.log("[GA4] getPageViewsData called with:", { startDate, endDate })
+export async function getPageViewsData(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<PageViewsResponse> {
+  console.log("[GA4] getPageViewsData called with:", { startDate, endDate, propertyId })
 
   try {
-    // Check if we should use historical data
-    if (shouldUseHistoricalData(startDate, endDate)) {
-      console.log("[GA4] Using historical data for page views")
-      const historicalData = await getHistoricalPageViews(startDate, endDate)
-      return {
-        ...historicalData,
-        _source: "vercel-historical",
-      } as PageViewsResponse & { _source: string }
-    }
-
-    // Fall back to live GA4 data
-    console.log("[GA4] Using live GA4 data for page views")
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
       metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
@@ -286,6 +272,7 @@ export async function getPageViewsData(startDate: string, endDate: string): Prom
 
     return {
       data,
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -295,31 +282,19 @@ export async function getPageViewsData(startDate: string, endDate: string): Prom
 }
 
 // Get traffic sources data
-export async function getTrafficSourcesData(startDate: string, endDate: string): Promise<TrafficSourcesResponse> {
-  console.log("[GA4] getTrafficSourcesData called with:", { startDate, endDate })
+export async function getTrafficSourcesData(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<TrafficSourcesResponse> {
+  console.log("[GA4] getTrafficSourcesData called with:", { startDate, endDate, propertyId })
 
   try {
-    // Check if we should use historical data
-    if (shouldUseHistoricalData(startDate, endDate)) {
-      console.log("[GA4] Using historical data for traffic sources")
-      const historicalData = await getHistoricalTrafficSources(startDate, endDate)
-      return {
-        ...historicalData,
-        _source: "vercel-historical",
-      } as TrafficSourcesResponse & { _source: string }
-    }
-
-    // Fall back to live GA4 data
-    console.log("[GA4] Using live GA4 data for traffic sources")
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "sessionSource" }, { name: "sessionMedium" }],
       metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "newUsers" }],
@@ -338,6 +313,7 @@ export async function getTrafficSourcesData(startDate: string, endDate: string):
 
     return {
       data,
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -347,31 +323,19 @@ export async function getTrafficSourcesData(startDate: string, endDate: string):
 }
 
 // Get device data
-export async function getDeviceData(startDate: string, endDate: string): Promise<DeviceDataResponse> {
-  console.log("[GA4] getDeviceData called with:", { startDate, endDate })
+export async function getDeviceData(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<DeviceDataResponse> {
+  console.log("[GA4] getDeviceData called with:", { startDate, endDate, propertyId })
 
   try {
-    // Check if we should use historical data
-    if (shouldUseHistoricalData(startDate, endDate)) {
-      console.log("[GA4] Using historical data for device data")
-      const historicalData = await getHistoricalDeviceData(startDate, endDate)
-      return {
-        ...historicalData,
-        _source: "vercel-historical",
-      } as DeviceDataResponse & { _source: string }
-    }
-
-    // Fall back to live GA4 data
-    console.log("[GA4] Using live GA4 data for device data")
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "deviceCategory" }],
       metrics: [{ name: "sessions" }, { name: "totalUsers" }],
@@ -387,6 +351,7 @@ export async function getDeviceData(startDate: string, endDate: string): Promise
 
     return {
       data,
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -396,31 +361,19 @@ export async function getDeviceData(startDate: string, endDate: string): Promise
 }
 
 // Get geographic data
-export async function getGeographicData(startDate: string, endDate: string): Promise<GeographicDataResponse> {
-  console.log("[GA4] getGeographicData called with:", { startDate, endDate })
+export async function getGeographicData(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<GeographicDataResponse> {
+  console.log("[GA4] getGeographicData called with:", { startDate, endDate, propertyId })
 
   try {
-    // Check if we should use historical data
-    if (shouldUseHistoricalData(startDate, endDate)) {
-      console.log("[GA4] Using historical data for geographic data")
-      const historicalData = await getHistoricalGeographicData(startDate, endDate)
-      return {
-        ...historicalData,
-        _source: "vercel-historical",
-      } as GeographicDataResponse & { _source: string }
-    }
-
-    // Fall back to live GA4 data
-    console.log("[GA4] Using live GA4 data for geographic data")
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "country" }, { name: "city" }],
       metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "newUsers" }],
@@ -439,6 +392,7 @@ export async function getGeographicData(startDate: string, endDate: string): Pro
 
     return {
       data,
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -448,19 +402,15 @@ export async function getGeographicData(startDate: string, endDate: string): Pro
 }
 
 // Get realtime data
-export async function getRealtimeData(): Promise<RealtimeData> {
-  console.log("[GA4] getRealtimeData called")
+export async function getRealtimeData(propertyId?: string): Promise<RealtimeData> {
+  console.log("[GA4] getRealtimeData called with propertyId:", propertyId)
 
   try {
-    const propertyId = process.env.GA4_PROPERTY_ID
-    if (!propertyId) {
-      throw new Error("GA4_PROPERTY_ID not configured")
-    }
-
+    const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
     const [response] = await client.runRealtimeReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       metrics: [{ name: "activeUsers" }],
     })
 
@@ -468,7 +418,7 @@ export async function getRealtimeData(): Promise<RealtimeData> {
 
     // Get top countries for realtime
     const [countriesResponse] = await client.runRealtimeReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${targetPropertyId}`,
       dimensions: [{ name: "country" }],
       metrics: [{ name: "activeUsers" }],
       orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
@@ -484,6 +434,7 @@ export async function getRealtimeData(): Promise<RealtimeData> {
     return {
       totalActiveUsers,
       topCountries,
+      propertyId: targetPropertyId,
       _source: "google-analytics",
     }
   } catch (error) {

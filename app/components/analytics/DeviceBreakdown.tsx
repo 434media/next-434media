@@ -12,6 +12,7 @@ interface DeviceBreakdownProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
+  propertyId?: string
 }
 
 const getDeviceIcon = (device: string) => {
@@ -47,7 +48,12 @@ const getDeviceColor = (device: string) => {
   }
 }
 
-export function DeviceBreakdown({ dateRange, isLoading: parentLoading = false, setError }: DeviceBreakdownProps) {
+export function DeviceBreakdown({
+  dateRange,
+  isLoading: parentLoading = false,
+  setError,
+  propertyId,
+}: DeviceBreakdownProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -56,14 +62,17 @@ export function DeviceBreakdown({ dateRange, isLoading: parentLoading = false, s
       setIsLoading(true)
       try {
         const adminKey = sessionStorage.getItem("adminKey")
-        const response = await fetch(
-          `/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`,
-          {
-            headers: {
-              "x-admin-key": adminKey || "",
-            },
+
+        let url = `/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        if (propertyId) {
+          url += `&propertyId=${propertyId}`
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            "x-admin-key": adminKey || "",
           },
-        )
+        })
 
         if (!response.ok) {
           throw new Error("Failed to fetch device data")
@@ -85,7 +94,7 @@ export function DeviceBreakdown({ dateRange, isLoading: parentLoading = false, s
     }
 
     loadData()
-  }, [dateRange, setError])
+  }, [dateRange, setError, propertyId])
 
   const totalSessions = data.reduce((sum, item) => sum + item.sessions, 0)
 
