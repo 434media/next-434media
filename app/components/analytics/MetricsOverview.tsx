@@ -165,8 +165,8 @@ export function MetricsOverview({
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-      {/* Main Metrics - 4 cards */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      {/* Main Metrics - 2x2 grid on mobile, 4 columns on desktop */}
       {metrics.map((metric, index) => (
         <motion.div
           key={metric.title}
@@ -187,7 +187,8 @@ export function MetricsOverview({
             backdrop-blur-xl shadow-2xl ${metric.shadowColor}
             hover:shadow-3xl hover:scale-105 
             transition-all duration-500 ease-out
-            group cursor-pointer h-[120px]
+            group cursor-pointer 
+            h-[140px] sm:h-[120px] lg:h-[120px]
           `}
           >
             <div
@@ -204,23 +205,23 @@ export function MetricsOverview({
             `}
             />
 
-            <CardContent className="relative p-5 h-full flex flex-col justify-between mt-2">
+            <CardContent className="relative p-4 sm:p-5 lg:p-5 h-full flex flex-col justify-between mt-1 sm:mt-2">
               {isLoading || parentLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <Loader2 className="h-6 w-6 text-white/60 animate-spin" />
+                  <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-white/60 animate-spin" />
                 </div>
               ) : (
                 <>
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-3 sm:mb-3">
                     <motion.div
                       className={`
-                        p-2.5 bg-gradient-to-br ${metric.color} 
-                        rounded-xl shadow-lg group-hover:scale-110 
-                        transition-transform duration-300
+                        p-2 sm:p-2.5 bg-gradient-to-br ${metric.color} 
+                        rounded-lg sm:rounded-xl shadow-lg group-hover:scale-110 
+                        transition-transform duration-300 mt-4 md:mt-0
                       `}
                       whileHover={{ rotate: 5 }}
                     >
-                      <metric.icon className="h-4 w-4 text-white drop-shadow-sm" />
+                      <metric.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white drop-shadow-sm" />
                     </motion.div>
 
                     {metric.change !== 0 && (
@@ -229,7 +230,8 @@ export function MetricsOverview({
                         animate={{ opacity: 1, scale: 1, x: 0 }}
                         transition={{ delay: index * 0.1 + 0.4, type: "spring" }}
                         className={`
-                          flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
+                          flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 
+                          rounded-full text-[10px] sm:text-xs font-medium
                           ${
                             metric.change > 0
                               ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
@@ -237,13 +239,18 @@ export function MetricsOverview({
                           }
                         `}
                       >
-                        {metric.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {Math.abs(metric.change).toFixed(1)}%
+                        {metric.change > 0 ? (
+                          <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                        ) : (
+                          <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                        )}
+                        <span className="hidden xs:inline">{Math.abs(metric.change).toFixed(1)}%</span>
+                        <span className="xs:hidden">{Math.abs(metric.change).toFixed(0)}%</span>
                       </motion.div>
                     )}
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-0.5 sm:space-y-1">
                     <motion.div
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -252,11 +259,11 @@ export function MetricsOverview({
                         type: "spring",
                         stiffness: 200,
                       }}
-                      className="text-2xl font-bold text-white drop-shadow-sm leading-none"
+                      className="text-xl sm:text-2xl font-bold text-white drop-shadow-sm leading-none"
                     >
                       {metric.isPercentage ? `${(metric.value * 100).toFixed(1)}%` : metric.value.toLocaleString()}
                     </motion.div>
-                    <p className="text-white/70 text-sm font-medium leading-none">{metric.title}</p>
+                    <p className="text-white/70 text-xs sm:text-sm font-medium leading-none">{metric.title}</p>
                   </div>
                 </>
               )}
