@@ -42,23 +42,23 @@ export default function DigitalCanvasPage() {
   const volumes: VolumeNavItem[] = [
     {
       id: "vol1",
-      title: "ORIGIN STORY",
+      title: "The Road to RGVSW",
       subtitle: "Volume 001",
-      description: "The beginning of Digital Canvas",
+      description: "Welcome to RGV Startup Week",
       isActive: currentVolume === 0,
     },
     {
       id: "vol2",
-      title: "HERO'S JOURNEY",
+      title: "Coming Soon",
       subtitle: "Volume 002",
-      description: "Our mission and quest",
+      description: "July 2025",
       isActive: currentVolume === 1,
     },
     {
       id: "vol3",
-      title: "FINAL BATTLE",
+      title: "Coming Soon",
       subtitle: "Volume 003",
-      description: "The digital revolution",
+      description: "August 2025",
       isActive: currentVolume === 2,
     },
   ]
@@ -74,7 +74,7 @@ export default function DigitalCanvasPage() {
 
       {/* Magazine Section */}
       <div ref={magazineRef} className="relative min-h-screen bg-white overflow-hidden">
-        {/* Left Sidebar Navigation - Comic Book Style */}
+        {/* Left Sidebar Navigation - Desktop Only */}
         {!isMobile && (
           <div className="absolute left-4 top-4 z-30 space-y-3 w-64 max-h-[calc(100vh-2rem)] overflow-y-auto">
             {/* Navigation Header */}
