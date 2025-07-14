@@ -4,7 +4,11 @@ import { useEffect, useState } from "react"
 import { ScrambleText } from "../ScrambleText"
 import { useMobile } from "../../hooks/use-mobile"
 
-export function MagazineHero() {
+interface MagazineHeroProps {
+  onEnterCanvas?: () => void
+}
+
+export function MagazineHero({ onEnterCanvas }: MagazineHeroProps) {
   const [mounted, setMounted] = useState(false)
   const isMobile = useMobile()
 
@@ -15,7 +19,7 @@ export function MagazineHero() {
   if (!mounted) return null
 
   return (
-    <div className="absolute inset-0 z-0">
+    <div className="w-full h-full">
       {/* Comic Book Background Effects */}
       <div className="absolute inset-0 bg-white">
         {/* Dynamic Halftone Pattern */}
@@ -71,9 +75,9 @@ export function MagazineHero() {
         </div>
       </div>
 
-      {/* Full Width Hero Layout - Extended padding for proper border coverage */}
-      <div className={`absolute z-10 ${isMobile ? "top-24 left-4 right-4 pb-40" : "top-20 left-8 right-8 pb-24"}`}>
-        <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-12"} gap-6`}>
+      {/* Full Width Hero Layout - Fixed height and scrolling issues */}
+      <div className={`relative z-10 w-full ${isMobile ? "px-4 py-24" : "px-8 py-20"}`}>
+        <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-12"} gap-6 w-full`}>
           {/* Main Content Panel - Takes up most space */}
           <div className={`${isMobile ? "col-span-1" : "col-span-8"} relative`}>
             {/* Primary Comic Book Panel */}
@@ -86,12 +90,12 @@ export function MagazineHero() {
               <div className="absolute -right-3 top-12 w-0 h-0 border-l-6 border-t-6 border-b-6 border-l-black border-t-transparent border-b-transparent"></div>
               <div className="absolute -right-2 top-13 w-0 h-0 border-l-4 border-t-4 border-b-4 border-l-white border-t-transparent border-b-transparent"></div>
 
-              <div className={`space-y-${isMobile ? "5" : "6"}`}>
+              <div className={`space-y-${isMobile ? "3" : "6"}`}>
                 {/* Explosive Title with Comic Book Effects */}
                 <div className="relative">
                   <h1
                     className={`${
-                      isMobile ? "text-4xl leading-tight" : "text-7xl md:text-8xl leading-tight"
+                      isMobile ? "text-3xl leading-tight" : "text-7xl md:text-8xl leading-tight"
                     } font-black text-black uppercase tracking-wider relative z-10`}
                     style={{
                       fontFamily: "Impact, Arial Black, sans-serif",
@@ -100,12 +104,12 @@ export function MagazineHero() {
                     }}
                   >
                     <ScrambleText text="DIGITAL" className="block" />
-                    <ScrambleText text="CANVAS" className={`block ${isMobile ? "text-3xl" : "text-6xl md:text-7xl"}`} />
+                    <ScrambleText text="CANVAS" className={`block ${isMobile ? "text-2xl" : "text-6xl md:text-7xl"}`} />
                   </h1>
 
                   {/* Comic Book "POW!" effect */}
                   <div
-                    className={`absolute ${isMobile ? "-top-2 -right-2" : "-top-4 -right-8"} bg-yellow-300 border-4 border-black px-3 py-1 transform rotate-12 shadow-lg`}
+                    className={`absolute ${isMobile ? "-top-1 -right-1" : "-top-4 -right-8"} bg-yellow-300 border-4 border-black px-2 py-1 transform rotate-12 shadow-lg`}
                     style={{
                       fontFamily: "Impact, Arial Black, sans-serif",
                       animation: "pow-pulse 2s ease-in-out infinite",
@@ -115,13 +119,21 @@ export function MagazineHero() {
                   </div>
                 </div>
 
-                {/* Enhanced Subtitle with Action Lines */}
-                <div className="relative bg-black text-white p-4 transform rotate-1">
+                {/* Enhanced Subtitle with Action Lines - Modified for mobile block layout */}
+                <div className="relative bg-black text-white p-3 transform rotate-1">
                   <p
-                    className={`${isMobile ? "text-lg" : "text-2xl"} font-bold uppercase tracking-wide text-center`}
+                    className={`${isMobile ? "text-base" : "text-2xl"} font-bold uppercase tracking-wide text-center`}
                     style={{ fontFamily: "Arial Black, sans-serif" }}
                   >
-                    The Creative Layer of <span className="bg-white text-black px-2 py-1 font-menda-black">434 MEDIA</span>
+                    The Creative Layer of{" "}
+                    {isMobile ? (
+                      <>
+                        <br />
+                        <span className="bg-white text-black px-2 py-1 font-menda-black">434 MEDIA</span>
+                      </>
+                    ) : (
+                      <span className="bg-white text-black px-2 py-1 font-menda-black">434 MEDIA</span>
+                    )}
                   </p>
 
                   {/* Action lines around subtitle */}
@@ -130,9 +142,9 @@ export function MagazineHero() {
                 </div>
 
                 {/* Description in Comic Speech Bubble Style */}
-                <div className="relative bg-gray-100 border-4 border-black p-4 rounded-lg">
+                <div className="relative bg-gray-100 border-4 border-black p-3 rounded-lg">
                   <p
-                    className={`${isMobile ? "text-sm" : "text-lg"} text-black leading-relaxed font-semibold`}
+                    className={`${isMobile ? "text-xs" : "text-lg"} text-black leading-relaxed font-semibold`}
                     style={{ fontFamily: "Arial, sans-serif" }}
                   >
                     {isMobile
@@ -154,8 +166,8 @@ export function MagazineHero() {
                   </div>
                 </div>
 
-                {/* Enhanced Features Grid with Comic Styling - Updated content with better spacing */}
-                <div className={`grid ${isMobile ? "grid-cols-1 gap-4" : "grid-cols-2 gap-4"} text-black`}>
+                {/* Enhanced Features Grid with Comic Styling - Compact for mobile */}
+                <div className={`grid ${isMobile ? "grid-cols-1 gap-2" : "grid-cols-2 gap-4"} text-black`}>
                   {[
                     { icon: "📝", text: "Founder's Note", color: "bg-purple-400" },
                     { icon: "🎬", text: "Month in Motion", color: "bg-blue-400" },
@@ -164,14 +176,14 @@ export function MagazineHero() {
                   ].map((feature, index) => (
                     <div
                       key={index}
-                      className={`flex items-center space-x-3 ${feature.color} text-black p-4 border-2 border-black transform hover:scale-105 transition-transform shadow-lg`}
+                      className={`flex items-center space-x-2 ${feature.color} text-black ${isMobile ? "p-2" : "p-3"} border-2 border-black shadow-lg`}
                       style={{
                         transform: `rotate(${index % 2 === 0 ? -1 : 1}deg)`,
                       }}
                     >
-                      <div className="text-xl">{feature.icon}</div>
+                      <div className={`${isMobile ? "text-base" : "text-xl"}`}>{feature.icon}</div>
                       <span
-                        className={`${isMobile ? "text-sm" : "text-base"} font-black uppercase tracking-wide`}
+                        className={`${isMobile ? "text-xs" : "text-base"} font-black uppercase tracking-wide`}
                         style={{ fontFamily: "Arial Black, sans-serif" }}
                       >
                         {feature.text}
@@ -179,28 +191,13 @@ export function MagazineHero() {
                     </div>
                   ))}
                 </div>
-
-                {/* Enhanced Call to Action - Mobile Only with extra spacing */}
-                {isMobile && (
-                  <div className="pt-8 pb-12 text-center">
-                    <button
-                      className="bg-black text-white px-6 py-3 text-base font-black uppercase tracking-wider border-4 border-black hover:bg-white hover:text-black transition-all transform hover:scale-110 shadow-xl relative overflow-hidden"
-                      style={{ fontFamily: "Impact, Arial Black, sans-serif" }}
-                    >
-                      <span className="relative z-10">ENTER THE CANVAS</span>
-
-                      {/* Button explosion effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-red-400 to-blue-400 opacity-0 hover:opacity-20 transition-opacity"></div>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Right Side Panels - Desktop Only - Extended with proper spacing */}
+          {/* Right Side Panels - Desktop Only */}
           {!isMobile && (
-            <div className="col-span-4 space-y-4 pb-8">
+            <div className="col-span-4 space-y-4">
               {/* Issue Info Panel */}
               <div className="bg-white border-4 border-black p-4 transform rotate-2 shadow-xl">
                 <div className="space-y-3 text-center">
@@ -251,21 +248,32 @@ export function MagazineHero() {
                 </div>
               </div>
 
-              {/* Enhanced Call to Action - Desktop Only - Below Network Panel */}
+              {/* Enhanced Call to Action - Desktop Only with hover animation */}
               <div className="text-center pt-2">
                 <button
-                  className="bg-black text-white px-8 py-4 text-xl font-black uppercase tracking-wider border-4 border-black hover:bg-white hover:text-black transition-all transform hover:scale-110 shadow-xl relative overflow-hidden w-full"
+                  onClick={onEnterCanvas}
+                  className="bg-black text-white px-8 py-4 text-xl font-black uppercase tracking-wider border-4 border-black shadow-xl w-full hover:bg-white hover:text-black transition-colors duration-300"
                   style={{ fontFamily: "Impact, Arial Black, sans-serif" }}
                 >
-                  <span className="relative z-10">ENTER THE CANVAS</span>
-
-                  {/* Button explosion effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-red-400 to-blue-400 opacity-0 hover:opacity-20 transition-opacity"></div>
+                  ENTER THE CANVAS
                 </button>
               </div>
             </div>
           )}
         </div>
+
+        {/* Enhanced Call to Action - Mobile Only - Positioned at bottom with proper spacing */}
+        {isMobile && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={onEnterCanvas}
+              className="bg-black text-white px-6 py-3 text-base font-black uppercase tracking-wider border-4 border-black shadow-xl hover:bg-white hover:text-black transition-colors duration-300"
+              style={{ fontFamily: "Impact, Arial Black, sans-serif" }}
+            >
+              ENTER THE CANVAS
+            </button>
+          </div>
+        )}
       </div>
 
       {/* CSS for enhanced comic book animations */}

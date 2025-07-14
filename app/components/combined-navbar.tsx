@@ -83,7 +83,7 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
         </div>
       )}
       <motion.header
-        className={`fixed ${hasMounted && isMobile ? "top-[40px]" : "top-0"} left-0 right-0 z-40 transition-all duration-300 backdrop-blur-md ${
+        className={`fixed ${hasMounted && isMobile ? "top-[40px]" : "top-0"} left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
           isScrolled ? "bg-black/80 shadow-lg py-2" : "bg-gradient-to-b from-black/70 to-black/10 py-4"
         }`}
         initial={{ y: -100 }}
