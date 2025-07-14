@@ -15,6 +15,7 @@
     "@neondatabase/serverless": "^1.0.0",
     "@next/bundle-analyzer": "^15.3.1",
     "@next/third-parties": "^15.2.4",
+    "@react-spring/three": "^10.0.1",
     "@react-three/drei": "^10.4.4",
     "@react-three/fiber": "^9.2.0",
     "@sentry/nextjs": "^9.14.0",

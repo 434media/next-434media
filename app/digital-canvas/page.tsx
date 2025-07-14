@@ -1,8 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useRef } from "react"
-import { Canvas } from "@react-three/fiber"
-import { Environment } from "@react-three/drei"
+import { useState, useEffect, useRef } from "react"
 import { DigitalMagazineBook } from "../components/magazine/DigitalMagazineBook"
 import { MagazineHero } from "../components/magazine/MagazineHero"
 import { LoadingSpinner } from "../components/magazine/LoadingSpinner"
@@ -67,62 +65,16 @@ export default function DigitalCanvasPage() {
 
   return (
     <div className="bg-white">
-      {/* Hero Section - Fixed to allow proper scrolling and height */}
+      {/* Hero Section */}
       <div className="w-full overflow-y-auto">
         <div className="relative w-full min-h-screen">
           <MagazineHero onEnterCanvas={scrollToMagazine} />
         </div>
       </div>
 
-      {/* Magazine Section - Increased height to accommodate sidebar */}
-      <div ref={magazineRef} className="relative min-h-[120vh] bg-white overflow-hidden">
-        {/* Comic Book Style Background Pattern */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-white">
-            {/* Enhanced Halftone Pattern */}
-            <div
-              className="absolute inset-0 opacity-8"
-              style={{
-                backgroundImage: `radial-gradient(circle, black 1px, transparent 1px)`,
-                backgroundSize: "25px 25px",
-                backgroundPosition: "0 0, 12.5px 12.5px",
-              }}
-            />
-
-            {/* Comic Book Grid Lines */}
-            <div
-              className="absolute inset-0 opacity-15"
-              style={{
-                backgroundImage: `
-                  linear-gradient(black 1px, transparent 1px),
-                  linear-gradient(90deg, black 1px, transparent 1px)
-                `,
-                backgroundSize: "50px 50px",
-              }}
-            />
-
-            {/* Speed lines for dynamic effect */}
-            <div className="absolute inset-0 overflow-hidden">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute bg-black opacity-5"
-                  style={{
-                    width: "2px",
-                    height: "100vh",
-                    left: `${10 + i * 12}%`,
-                    top: "0%",
-                    transformOrigin: "center bottom",
-                    transform: `rotate(${i * 15 - 60}deg)`,
-                    animation: `speed-line ${3 + i * 0.2}s linear infinite`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Left Sidebar Navigation - Comic Book Style - Fixed z-index to be below navbar */}
+      {/* Magazine Section */}
+      <div ref={magazineRef} className="relative min-h-screen bg-white overflow-hidden">
+        {/* Left Sidebar Navigation - Comic Book Style */}
         {!isMobile && (
           <div className="absolute left-4 top-4 z-30 space-y-3 w-64 max-h-[calc(100vh-2rem)] overflow-y-auto">
             {/* Navigation Header */}
@@ -216,14 +168,14 @@ export default function DigitalCanvasPage() {
               </div>
             ))}
 
-            {/* Instructions Panel - Reduced padding and font sizes */}
+            {/* Instructions Panel */}
             <div className="bg-gray-100 border-4 border-black p-3 transform rotate-1 shadow-lg">
               <h4 className="text-sm font-black uppercase tracking-wide mb-2 text-black">HOW TO READ</h4>
               <div className="space-y-1 text-xs text-black font-bold">
-                <div>• Scroll to open book</div>
-                <div>• Click & drag to turn pages</div>
+                <div>• Drag cards around</div>
+                <div>• Click to open details</div>
+                <div>• Explore interactive content</div>
                 <div>• Select volumes on left</div>
-                <div>• Experience in 3D</div>
               </div>
             </div>
           </div>
@@ -231,7 +183,7 @@ export default function DigitalCanvasPage() {
 
         {/* Mobile Volume Selector */}
         {isMobile && (
-          <div className="absolute top-20 left-2 right-2 z-30">
+          <div className="absolute top-4 left-2 right-2 z-30">
             <div className="flex space-x-2 overflow-x-auto pb-2">
               {volumes.map((volume, index) => (
                 <div
@@ -255,79 +207,13 @@ export default function DigitalCanvasPage() {
           </div>
         )}
 
-        {/* 3D Canvas - Positioned to the right of sidebar with better camera positioning */}
-        <div className={`absolute inset-0 z-20 pointer-events-auto ${!isMobile ? "left-72" : ""}`}>
-          <Canvas
-            camera={{
-              position: isMobile ? [0, 0, 6] : [0, 0, 7],
-              fov: isMobile ? 60 : 45,
-              near: 0.1,
-              far: 100,
-            }}
-            gl={{
-              antialias: true,
-              alpha: true,
-              powerPreference: "high-performance",
-            }}
-            style={{
-              background: "transparent",
-              width: "100%",
-              height: "100%",
-            }}
-            dpr={isMobile ? [1, 2] : [1, 2]}
-          >
-            <Suspense fallback={null}>
-              {/* Enhanced Lighting for comic book effect */}
-              <ambientLight intensity={isMobile ? 2.5 : 2.2} />
-              <directionalLight
-                position={[5, 5, 5]}
-                intensity={isMobile ? 3.5 : 3.2}
-                castShadow={!isMobile}
-                shadow-mapSize-width={isMobile ? 512 : 1024}
-                shadow-mapSize-height={isMobile ? 512 : 1024}
-              />
-              {/* High contrast lighting for comic book effect */}
-              <directionalLight position={[-5, 2, 3]} intensity={2} color="#ffffff" />
-              <pointLight position={[0, 0, 10]} intensity={isMobile ? 2 : 1.8} color="#ffffff" />
-
-              {/* 3D Magazine Book */}
-              <DigitalMagazineBook />
-
-              {/* Environment for reflections */}
-              <Environment preset="studio" />
-            </Suspense>
-          </Canvas>
+        {/* Magazine Cards Container */}
+        <div className={`absolute inset-0 z-20 ${!isMobile ? "left-72" : ""}`}>
+          <DigitalMagazineBook />
         </div>
-
-        {/* Comic Book Style Border Frame - Adjusted for new height */}
-        <div
-          className={`absolute z-10 pointer-events-none border-4 border-black ${
-            isMobile ? "top-32 left-2 right-2" : "top-16 left-2 right-2"
-          }`}
-          style={{
-            borderStyle: "solid",
-            borderImage: "repeating-linear-gradient(45deg, black 0, black 10px, white 10px, white 20px) 4",
-            height: isMobile ? "calc(100vh - 100px)" : "calc(120vh - 64px)",
-          }}
-        />
 
         {/* CSS for comic book animations */}
         <style jsx>{`
-          @keyframes speed-line {
-            0% { 
-              opacity: 0; 
-              transform: rotate(var(--rotation, 0deg)) scaleY(0);
-            }
-            50% { 
-              opacity: 0.1; 
-              transform: rotate(var(--rotation, 0deg)) scaleY(1);
-            }
-            100% { 
-              opacity: 0; 
-              transform: rotate(var(--rotation, 0deg)) scaleY(0);
-            }
-          }
-
           @keyframes active-pulse {
             0%, 100% { 
               transform: rotate(0deg) scale(1);
