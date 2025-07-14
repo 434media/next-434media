@@ -16,176 +16,304 @@ export function MagazineHero() {
 
   return (
     <div className="absolute inset-0 z-0">
-      {/* Background Effects - Very low opacity to not interfere with 3D */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-purple-900/70 to-slate-900/80" />
-
-      {/* Animated Grid - Very subtle */}
-      <div className="absolute inset-0 opacity-3">
+      {/* Comic Book Background Effects */}
+      <div className="absolute inset-0 bg-white">
+        {/* Dynamic Halftone Pattern */}
         <div
-          className={`absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.2)_1px,transparent_1px)] ${
-            isMobile ? "bg-[size:40px_40px]" : "bg-[size:60px_60px]"
-          }`}
+          className="absolute inset-0 opacity-8"
           style={{
-            animation: "grid-move 20s linear infinite",
+            backgroundImage: `radial-gradient(circle, black 2px, transparent 2px)`,
+            backgroundSize: "30px 30px",
+            animation: "halftone-pulse 4s ease-in-out infinite",
           }}
         />
+
+        {/* Comic Book Action Lines - More dramatic */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Speed lines radiating from multiple points */}
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute bg-black opacity-15"
+              style={{
+                width: "2px",
+                height: "80vh",
+                left: i < 6 ? "30%" : "70%",
+                top: "10%",
+                transformOrigin: "center bottom",
+                transform: `rotate(${i * 30 + (i < 6 ? -45 : 45)}deg) translateX(-50%)`,
+                animation: `speed-line ${2 + i * 0.1}s linear infinite`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Comic Book Explosion Effects */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Starburst patterns */}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={`star-${i}`}
+              className="absolute"
+              style={{
+                left: `${20 + i * 15}%`,
+                top: `${30 + i * 10}%`,
+                width: "4px",
+                height: "4px",
+                background: "black",
+                clipPath:
+                  "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+                animation: `star-twinkle ${3 + i * 0.5}s ease-in-out infinite`,
+                opacity: 0.3,
+              }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Static Floating Particles - No Math.random() to fix hydration */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Predefined particle positions to avoid hydration mismatch */}
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "10%", top: "20%", animation: "pulse 2s infinite" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "25%", top: "60%", animation: "pulse 2.5s infinite 0.5s" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "70%", top: "30%", animation: "pulse 3s infinite 1s" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "85%", top: "70%", animation: "pulse 2.2s infinite 1.5s" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "40%", top: "80%", animation: "pulse 2.8s infinite 0.8s" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "60%", top: "15%", animation: "pulse 2.3s infinite 1.2s" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "15%", top: "75%", animation: "pulse 2.7s infinite 0.3s" }}
-        />
-        <div
-          className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-          style={{ left: "90%", top: "45%", animation: "pulse 2.1s infinite 1.8s" }}
-        />
-        {isMobile ? null : (
-          <>
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "35%", top: "25%", animation: "pulse 2.4s infinite 0.7s" }}
-            />
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "55%", top: "85%", animation: "pulse 2.6s infinite 1.3s" }}
-            />
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "80%", top: "10%", animation: "pulse 2.9s infinite 0.2s" }}
-            />
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "20%", top: "50%", animation: "pulse 2.2s infinite 1.6s" }}
-            />
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "75%", top: "65%", animation: "pulse 2.5s infinite 0.9s" }}
-            />
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "45%", top: "35%", animation: "pulse 2.8s infinite 1.1s" }}
-            />
-            <div
-              className="absolute w-1 h-1 bg-purple-400/20 rounded-full"
-              style={{ left: "65%", top: "90%", animation: "pulse 2.3s infinite 0.4s" }}
-            />
-          </>
-        )}
-      </div>
+      {/* Full Width Hero Layout - Extended padding for proper border coverage */}
+      <div className={`absolute z-10 ${isMobile ? "top-24 left-4 right-4 pb-40" : "top-20 left-8 right-8 pb-24"}`}>
+        <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-12"} gap-6`}>
+          {/* Main Content Panel - Takes up most space */}
+          <div className={`${isMobile ? "col-span-1" : "col-span-8"} relative`}>
+            {/* Primary Comic Book Panel */}
+            <div className="relative bg-white border-4 border-black p-6 shadow-2xl transform -rotate-1">
+              {/* Multiple Speech Bubble Tails for dynamic effect */}
+              <div className="absolute -bottom-4 left-8 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-black"></div>
+              <div className="absolute -bottom-3 left-9 w-0 h-0 border-l-6 border-r-6 border-t-6 border-l-transparent border-r-transparent border-t-white"></div>
 
-      {/* Hero Content - Much more spacing to avoid card overlap */}
-      <div
-        className={`absolute z-10 ${
-          isMobile
-            ? "top-36 left-4 right-4 pb-80" // Massive bottom padding to avoid card overlap
-            : "top-32 left-8 max-w-lg"
-        }`}
-      >
-        <div className={`space-y-${isMobile ? "4" : "6"}`}>
-          {/* Main Title - Mobile Responsive with better sizing */}
-          <h1
-            className={`${
-              isMobile ? "text-3xl leading-tight" : "text-5xl md:text-6xl leading-tight"
-            } font-bold text-white`}
-          >
-            <ScrambleText
-              text="DIGITAL CANVAS"
-              className="block bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent"
-            />
-            <ScrambleText
-              text="MAGAZINE"
-              className={`block bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent ${
-                isMobile ? "text-2xl" : "text-4xl md:text-5xl"
-              }`}
-            />
-          </h1>
+              {/* Secondary bubble tail */}
+              <div className="absolute -right-3 top-12 w-0 h-0 border-l-6 border-t-6 border-b-6 border-l-black border-t-transparent border-b-transparent"></div>
+              <div className="absolute -right-2 top-13 w-0 h-0 border-l-4 border-t-4 border-b-4 border-l-white border-t-transparent border-b-transparent"></div>
 
-          {/* Subtitle - Mobile Responsive */}
-          <p className={`${isMobile ? "text-base" : "text-2xl"} text-slate-300 leading-relaxed font-light`}>
-            The creative layer of <span className="text-purple-400 font-semibold">434 Media</span>
-          </p>
+              <div className={`space-y-${isMobile ? "5" : "6"}`}>
+                {/* Explosive Title with Comic Book Effects */}
+                <div className="relative">
+                  <h1
+                    className={`${
+                      isMobile ? "text-4xl leading-tight" : "text-7xl md:text-8xl leading-tight"
+                    } font-black text-black uppercase tracking-wider relative z-10`}
+                    style={{
+                      fontFamily: "Impact, Arial Black, sans-serif",
+                      textShadow: "4px 4px 0px white, 8px 8px 0px black",
+                      WebkitTextStroke: "2px black",
+                    }}
+                  >
+                    <ScrambleText text="DIGITAL" className="block" />
+                    <ScrambleText text="CANVAS" className={`block ${isMobile ? "text-3xl" : "text-6xl md:text-7xl"}`} />
+                  </h1>
 
-          {/* Description - Mobile Responsive */}
-          <p
-            className={`${isMobile ? "text-sm" : "text-lg"} text-slate-400 leading-relaxed ${
-              isMobile ? "max-w-none" : "max-w-md"
-            }`}
-          >
-            {isMobile
-              ? "Experience the future of digital publishing with interactive storytelling."
-              : "Experience the future of digital publishing with our interactive magazine platform that blends cutting-edge technology with compelling storytelling."}
-          </p>
+                  {/* Comic Book "POW!" effect */}
+                  <div
+                    className={`absolute ${isMobile ? "-top-2 -right-2" : "-top-4 -right-8"} bg-yellow-300 border-4 border-black px-3 py-1 transform rotate-12 shadow-lg`}
+                    style={{
+                      fontFamily: "Impact, Arial Black, sans-serif",
+                      animation: "pow-pulse 2s ease-in-out infinite",
+                    }}
+                  >
+                    <span className={`${isMobile ? "text-xs" : "text-sm"} font-black`}>Learn2AI</span>
+                  </div>
+                </div>
 
-          {/* Features List - Mobile Optimized */}
-          <div className={`space-y-${isMobile ? "2" : "3"} text-slate-300`}>
-            {[
-              "Interactive 3D Reading Experience",
-              "Immersive Visual Storytelling",
-              "Revolutionary Digital Publishing",
-            ].map((feature, index) => (
-              <div key={index} className="flex items-center space-x-3">
-                <div
-                  className="w-1.5 h-1.5 bg-purple-400 rounded-full"
-                  style={{ animation: `pulse 2s infinite ${index * 0.2}s` }}
-                />
-                <span className={isMobile ? "text-xs" : "text-sm"}>{feature}</span>
+                {/* Enhanced Subtitle with Action Lines */}
+                <div className="relative bg-black text-white p-4 transform rotate-1">
+                  <p
+                    className={`${isMobile ? "text-lg" : "text-2xl"} font-bold uppercase tracking-wide text-center`}
+                    style={{ fontFamily: "Arial Black, sans-serif" }}
+                  >
+                    The Creative Layer of <span className="bg-white text-black px-2 py-1 font-menda-black">434 MEDIA</span>
+                  </p>
+
+                  {/* Action lines around subtitle */}
+                  <div className="absolute -inset-2 border-2 border-black opacity-50 transform -rotate-1"></div>
+                  <div className="absolute -inset-1 border-2 border-black opacity-30 transform rotate-1"></div>
+                </div>
+
+                {/* Description in Comic Speech Bubble Style */}
+                <div className="relative bg-gray-100 border-4 border-black p-4 rounded-lg">
+                  <p
+                    className={`${isMobile ? "text-sm" : "text-lg"} text-black leading-relaxed font-semibold`}
+                    style={{ fontFamily: "Arial, sans-serif" }}
+                  >
+                    {isMobile
+                      ? "We connect IP & client work, showcasing stories, brands, and campaigns that define the Digital Canvas network."
+                      : "We connect our IP & client work, showcasing the stories, brands, and campaigns shaping the Digital Canvas network."}
+                  </p>
+
+                  {/* Enhanced thought bubble chain */}
+                  <div className="absolute -right-3 -top-3 flex space-x-1">
+                    <div className="w-2 h-2 bg-black rounded-full animate-bounce"></div>
+                    <div
+                      className="w-3 h-3 bg-black rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    ></div>
+                    <div
+                      className="w-4 h-4 bg-black rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Enhanced Features Grid with Comic Styling - Updated content with better spacing */}
+                <div className={`grid ${isMobile ? "grid-cols-1 gap-4" : "grid-cols-2 gap-4"} text-black`}>
+                  {[
+                    { icon: "📝", text: "Founder's Note", color: "bg-purple-400" },
+                    { icon: "🎬", text: "Month in Motion", color: "bg-blue-400" },
+                    { icon: "📚", text: "Interactive Stories", color: "bg-green-400" },
+                    { icon: "💧", text: "The Drop", color: "bg-red-400" },
+                  ].map((feature, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-center space-x-3 ${feature.color} text-black p-4 border-2 border-black transform hover:scale-105 transition-transform shadow-lg`}
+                      style={{
+                        transform: `rotate(${index % 2 === 0 ? -1 : 1}deg)`,
+                      }}
+                    >
+                      <div className="text-xl">{feature.icon}</div>
+                      <span
+                        className={`${isMobile ? "text-sm" : "text-base"} font-black uppercase tracking-wide`}
+                        style={{ fontFamily: "Arial Black, sans-serif" }}
+                      >
+                        {feature.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Enhanced Call to Action - Mobile Only with extra spacing */}
+                {isMobile && (
+                  <div className="pt-8 pb-12 text-center">
+                    <button
+                      className="bg-black text-white px-6 py-3 text-base font-black uppercase tracking-wider border-4 border-black hover:bg-white hover:text-black transition-all transform hover:scale-110 shadow-xl relative overflow-hidden"
+                      style={{ fontFamily: "Impact, Arial Black, sans-serif" }}
+                    >
+                      <span className="relative z-10">ENTER THE CANVAS</span>
+
+                      {/* Button explosion effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-red-400 to-blue-400 opacity-0 hover:opacity-20 transition-opacity"></div>
+                    </button>
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
           </div>
+
+          {/* Right Side Panels - Desktop Only - Extended with proper spacing */}
+          {!isMobile && (
+            <div className="col-span-4 space-y-4 pb-8">
+              {/* Issue Info Panel */}
+              <div className="bg-white border-4 border-black p-4 transform rotate-2 shadow-xl">
+                <div className="space-y-3 text-center">
+                  <div className="text-black">
+                    <div className="text-sm uppercase tracking-widest font-black mb-2 bg-black text-white px-3 py-2">
+                      ISSUE #001
+                    </div>
+                    <div className="text-4xl font-black" style={{ fontFamily: "Impact, Arial Black, sans-serif" }}>
+                      2025
+                    </div>
+                  </div>
+
+                  <div className="w-full h-2 bg-black"></div>
+
+                  <div className="text-sm uppercase font-bold tracking-wide">
+                    POWERED BY
+                    <br />
+                    <span className="text-xl font-black">WEBGL + GSAP</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tech Specs Panel */}
+              <div className="bg-black text-white border-4 border-black p-4 transform -rotate-1 shadow-xl">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-black uppercase tracking-wide border-b-2 border-white pb-2">
+                    TECH SPECS
+                  </h3>
+                  <div className="space-y-1 text-sm">
+                    <div>• React Three Fiber</div>
+                    <div>• GSAP Animations</div>
+                    <div>• WebGL Shaders</div>
+                    <div>• Interactive 3D</div>
+                    <div>• Responsive Design</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Network Panel */}
+              <div className="bg-gradient-to-br from-yellow-300 to-red-300 border-4 border-black p-4 transform rotate-1 shadow-xl">
+                <div className="text-center">
+                  <h3 className="text-lg font-black uppercase tracking-wide text-black mb-2">NETWORK</h3>
+                  <div className="text-sm font-bold text-black">
+                    Stories • Brands • Campaigns
+                    <br />
+                    <span className="text-xs">Shaping Digital Canvas</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Enhanced Call to Action - Desktop Only - Below Network Panel */}
+              <div className="text-center pt-2">
+                <button
+                  className="bg-black text-white px-8 py-4 text-xl font-black uppercase tracking-wider border-4 border-black hover:bg-white hover:text-black transition-all transform hover:scale-110 shadow-xl relative overflow-hidden w-full"
+                  style={{ fontFamily: "Impact, Arial Black, sans-serif" }}
+                >
+                  <span className="relative z-10">ENTER THE CANVAS</span>
+
+                  {/* Button explosion effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-red-400 to-blue-400 opacity-0 hover:opacity-20 transition-opacity"></div>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Right Side Info - Desktop Only with proper spacing */}
-      {!isMobile && (
-        <div className="absolute top-1/2 right-8 transform -translate-y-1/2 z-10 text-right max-w-xs">
-          <div className="space-y-4">
-            <div className="text-white/80">
-              <div className="text-sm uppercase tracking-widest text-purple-300 mb-2">Issue #001</div>
-              <div className="text-2xl font-bold">July 2025</div>
-            </div>
-
-            <div className="w-px h-16 bg-gradient-to-b from-transparent via-purple-400/60 to-transparent ml-auto" />
-          </div>
-        </div>
-      )}
-
-      {/* CSS for animations */}
+      {/* CSS for enhanced comic book animations */}
       <style jsx>{`
-        @keyframes grid-move {
-          0% { transform: translate(0, 0); }
-          100% { transform: translate(${isMobile ? "40px, 40px" : "60px, 60px"}); }
+        @keyframes halftone-pulse {
+          0%, 100% { 
+            opacity: 0.08; 
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 0.15; 
+            transform: scale(1.02);
+          }
         }
         
-        @keyframes pulse {
-          0%, 100% { opacity: 0.3; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.1); }
+        @keyframes speed-line {
+          0% { 
+            opacity: 0; 
+            transform: rotate(var(--rotation, 0deg)) translateX(-50%) scaleY(0);
+          }
+          50% { 
+            opacity: 0.2; 
+            transform: rotate(var(--rotation, 0deg)) translateX(-50%) scaleY(1);
+          }
+          100% { 
+            opacity: 0; 
+            transform: rotate(var(--rotation, 0deg)) translateX(-50%) scaleY(0);
+          }
+        }
+
+        @keyframes pow-pulse {
+          0%, 100% { 
+            transform: rotate(12deg) scale(1);
+          }
+          50% { 
+            transform: rotate(15deg) scale(1.1);
+          }
+        }
+
+        @keyframes star-twinkle {
+          0%, 100% { 
+            opacity: 0.3; 
+            transform: scale(1) rotate(0deg);
+          }
+          50% { 
+            opacity: 0.8; 
+            transform: scale(1.2) rotate(180deg);
+          }
         }
       `}</style>
     </div>
