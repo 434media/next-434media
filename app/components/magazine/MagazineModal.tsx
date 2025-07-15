@@ -30,7 +30,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
       >
         {/* Header - Fixed at top with logo background */}
         <div
-          className={`${section.color} mt-6 p-6 border-b-4 border-black relative`}
+          className={`${section.color} pt-6 p-6 border-b-4 border-black relative`}
           style={{
             backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
             backgroundSize: "80px 80px",
