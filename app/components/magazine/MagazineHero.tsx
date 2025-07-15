@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { ScrambleText } from "../ScrambleText"
 import { useMobile } from "../../hooks/use-mobile"
 
 interface MagazineHeroProps {
@@ -39,19 +38,18 @@ export function MagazineHero({ onEnterCanvas }: MagazineHeroProps) {
                 <div className="absolute -bottom-4 left-8 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-black"></div>
                 <div className="absolute -bottom-3 left-9 w-0 h-0 border-l-6 border-r-6 border-t-6 border-l-transparent border-r-transparent border-t-white"></div>
                 <div className="space-y-6">
+                  {/* In the loading state section, replace the h1 with: */}
                   <div className="relative">
-                    <h1
-                      className="text-7xl md:text-8xl leading-tight font-black text-black uppercase tracking-wider relative z-10"
-                      style={{
-                        fontFamily: "Impact, Arial Black, sans-serif",
-                        textShadow: "4px 4px 0px white, 8px 8px 0px black",
-                        WebkitTextStroke: "2px black",
-                      }}
-                    >
-                      DIGITAL
-                      <br />
-                      CANVAS
-                    </h1>
+                    <div className="relative z-10">
+                      <img
+                        src="/images/digital-canvas-dark.svg"
+                        alt="Digital Canvas"
+                        className={`${isMobile ? "w-64 h-auto" : "w-96 h-auto"} mx-auto`}
+                        style={{
+                          filter: "drop-shadow(4px 4px 0px white) drop-shadow(8px 8px 0px black)",
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -135,41 +133,37 @@ export function MagazineHero({ onEnterCanvas }: MagazineHeroProps) {
         <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-12"} gap-6 w-full`}>
           {/* Main Content Panel */}
           <div className={`${isMobile ? "col-span-1" : "col-span-8"} relative`}>
-            <div className="relative bg-white border-4 border-black p-6 shadow-2xl transform -rotate-1">
+            <div className="relative bg-white border-4 border-black p-6 shadow-2xl transform -rotate-1"
+            /* style={{
+            backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONGREEN.png')`,
+            backgroundSize: "60px 60px",
+            backgroundRepeat: "repeat",
+            backgroundPosition: "0 0",
+            animation: "float 25s ease-in-out infinite",
+            filter: "brightness(1.2) contrast(1.1)",
+          }} */
+            >
               {/* Speech Bubble Tails */}
               <div className="absolute -bottom-4 left-8 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-black"></div>
               <div className="absolute -bottom-3 left-9 w-0 h-0 border-l-6 border-r-6 border-t-6 border-l-transparent border-r-transparent border-t-white"></div>
 
               <div className={`space-y-${isMobile ? "3" : "6"}`}>
-                {/* Title */}
+                {/* Title - Replace with Logo */}
                 <div className="relative">
-                  <h1
-                    className={`${
-                      isMobile ? "text-3xl leading-tight" : "text-7xl md:text-8xl leading-tight"
-                    } font-black text-black uppercase tracking-wider relative z-10`}
-                    style={{
-                      fontFamily: "Impact, Arial Black, sans-serif",
-                      textShadow: "4px 4px 0px white, 8px 8px 0px black",
-                      WebkitTextStroke: "2px black",
-                    }}
-                  >
-                    <ScrambleText text="DIGITAL" className="block" />
-                    <ScrambleText text="CANVAS" className={`block ${isMobile ? "text-2xl" : "text-6xl md:text-7xl"}`} />
-                  </h1>
-
-                  {/* Static Badge - No animation */}
-                  <div
-                    className={`absolute ${isMobile ? "-top-1 -right-1" : "-top-4 -right-8"} bg-yellow-300 border-4 border-black px-2 py-1 transform rotate-12 shadow-lg`}
-                    style={{
-                      fontFamily: "Impact, Arial Black, sans-serif",
-                    }}
-                  >
-                    <span className={`${isMobile ? "text-xs" : "text-sm"} font-black`}>Learn2AI</span>
+                  <div className="relative z-10">
+                    <img
+                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/digital-canvas-dark.svg"
+                      alt="Digital Canvas"
+                      className={`${isMobile ? "w-64 h-auto" : "w-96 h-auto"} mx-auto`}
+                      style={{
+                        filter: "drop-shadow(4px 4px 0px white) drop-shadow(8px 8px 0px black)",
+                      }}
+                    />
                   </div>
                 </div>
 
                 {/* Subtitle */}
-                <div className="relative bg-black text-white p-3 transform rotate-1">
+                <div className="relative bg-black text-white p-3 transform rotate-1 mt-6 md:mt-0">
                   <p
                     className={`${isMobile ? "text-base" : "text-2xl"} font-bold uppercase tracking-wide text-center`}
                     style={{ fontFamily: "Arial Black, sans-serif" }}
