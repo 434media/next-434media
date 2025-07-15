@@ -20,19 +20,10 @@ interface NavigationSquare {
   textColor: string
   delay: number
   size: "large" | "medium" | "small"
+  logo?: string // Add optional logo URL
 }
 
 const navigationSquares: NavigationSquare[] = [
-    {
-    id: "events",
-    title: "COMMUNITY EVENTS",
-    subtitle: "Where Networks Meet Action",
-    href: "/events",
-    gradient: "from-orange-500 via-red-500 to-pink-500",
-    textColor: "text-white",
-    delay: 0.3,
-    size: "large",
-  },
   {
     id: "digital-canvas",
     title: "DIGITAL CANVAS",
@@ -42,16 +33,7 @@ const navigationSquares: NavigationSquare[] = [
     textColor: "text-white",
     delay: 0.1,
     size: "large",
-  },
-    {
-    id: "shop",
-    title: "SHOP",
-    subtitle: "Launching July 19th",
-    href: "/shop",
-    gradient: "from-emerald-500 via-teal-500 to-cyan-500",
-    textColor: "text-white",
-    delay: 0.2,
-    size: "large",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/digital-canvas-ymas.svg",
   },
   {
     id: "sdoh",
@@ -62,8 +44,28 @@ const navigationSquares: NavigationSquare[] = [
     textColor: "text-white",
     delay: 0.15,
     size: "large",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg",
   },
-
+  {
+    id: "events",
+    title: "COMMUNITY EVENTS",
+    subtitle: "Where Networks Meet Action",
+    href: "/events",
+    gradient: "from-orange-500 via-red-500 to-pink-500",
+    textColor: "text-white",
+    delay: 0.3,
+    size: "large",
+  },
+  {
+    id: "shop",
+    title: "SHOP",
+    subtitle: "Launching July 19th",
+    href: "/shop",
+    gradient: "from-emerald-500 via-teal-500 to-cyan-500",
+    textColor: "text-white",
+    delay: 0.2,
+    size: "large",
+  },
   {
     id: "blog",
     title: "BLOG",
@@ -159,28 +161,62 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
 
           {/* Content Container */}
           <div className="relative h-full flex flex-col justify-center items-center p-6 md:p-8 z-10 text-center">
-            {/* Text Content */}
+            {/* Logo or Text Content */}
             <div className="flex flex-col justify-center items-center">
-              <motion.h3
-                className={`font-ggx88 text-xl md:text-2xl lg:text-3xl ${square.textColor} leading-tight mb-2 drop-shadow-md relative z-20`}
-                animate={{
-                  y: hoveredSquare === square.id ? -4 : 0,
-                }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              >
-                {square.title}
-              </motion.h3>
-              <motion.p
-                className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
-                initial={{ opacity: 0.8 }}
-                animate={{
-                  opacity: hoveredSquare === square.id ? 1 : 0.8,
-                  y: hoveredSquare === square.id ? -2 : 0,
-                }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              >
-                {square.subtitle}
-              </motion.p>
+              {square.logo ? (
+                // Logo version
+                <div className="flex flex-col items-center justify-center space-y-3">
+                  <motion.div
+                    className="relative"
+                    animate={{
+                      y: hoveredSquare === square.id ? -4 : 0,
+                      scale: hoveredSquare === square.id ? 1.05 : 1,
+                    }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  >
+                    <img
+                      src={square.logo || "/placeholder.svg"}
+                      alt={square.title}
+                      className="h-16 md:h-20 lg:h-32 w-auto object-contain drop-shadow-lg"
+                    />
+                  </motion.div>
+                  <motion.p
+                    className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    initial={{ opacity: 0.8 }}
+                    animate={{
+                      opacity: hoveredSquare === square.id ? 1 : 0.8,
+                      y: hoveredSquare === square.id ? -2 : 0,
+                    }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  >
+                    {square.subtitle}
+                  </motion.p>
+                </div>
+              ) : (
+                // Text version (existing)
+                <>
+                  <motion.h3
+                    className={`font-ggx88 text-xl md:text-2xl lg:text-3xl ${square.textColor} leading-tight mb-2 drop-shadow-md relative z-20`}
+                    animate={{
+                      y: hoveredSquare === square.id ? -4 : 0,
+                    }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  >
+                    {square.title}
+                  </motion.h3>
+                  <motion.p
+                    className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    initial={{ opacity: 0.8 }}
+                    animate={{
+                      opacity: hoveredSquare === square.id ? 1 : 0.8,
+                      y: hoveredSquare === square.id ? -2 : 0,
+                    }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  >
+                    {square.subtitle}
+                  </motion.p>
+                </>
+              )}
             </div>
           </div>
 
