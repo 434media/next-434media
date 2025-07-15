@@ -59,46 +59,20 @@ Whether it’s SDOH work in the Valley, closing the digital gap with TechBloc, s
     color: "bg-gradient-to-br from-blue-500 to-cyan-600",
     preview: "A visual journey through the most impactful moments of June 2025",
     content: {
-      fullText: `June 2025: The Month That Changed Everything
-
-This month marked a pivotal moment for the Rio Grande Valley's entrepreneurial landscape. From groundbreaking startup launches to major investment announcements, June set the tone for what promises to be an extraordinary year.
+      fullText: `At 434 MEDIA, we believe storytelling is a team sport
 
 Key Highlights:
-• RGV Startup Week 2025 announcement and preparation
-• Three major Series A funding rounds closed by local startups
-• Launch of the RGV Innovation District
-• First-ever RGV Tech Summit planning begins
-• Digital Canvas Volume #001 production and launch
-
-Video Content Includes:
-• Exclusive interviews with startup founders
-• Behind-the-scenes footage from RGV Startup Week prep
-• Time-lapse of the Innovation District construction
-• Founder spotlight series featuring 10 local entrepreneurs
-• Interactive product demos from emerging RGV companies
+• Emerge and Rise Open House
+• Cine Las Americas
+• Closing the Digital Gap
+• The Road to RGVSW: Proximity Matters
 
 This visual narrative captures not just the events, but the energy, passion, and determination that defines our community. Each frame tells a story of innovation, collaboration, and the relentless pursuit of turning ideas into reality.
 
 The momentum built in June 2025 will ripple through the entire year, setting new standards for what's possible in the Rio Grande Valley.`,
-      videos: [
-        "/placeholder.svg?height=300&width=500&text=June+Highlights+Reel",
-        "/placeholder.svg?height=300&width=500&text=Founder+Interviews",
-        "/placeholder.svg?height=300&width=500&text=Innovation+District+Tour",
-      ],
-      events: [
-        {
-          title: "RGV Startup Week 2025",
-          date: "June 20-26, 2025",
-          location: "McAllen Convention Center",
-          description:
-            "The premier entrepreneurship event in South Texas, featuring workshops, pitch competitions, and networking opportunities.",
-        },
-        {
-          title: "Innovation District Grand Opening",
-          date: "June 15, 2025",
-          location: "Downtown McAllen",
-          description: "Official launch of the RGV Innovation District, a 50-acre hub for startups and tech companies.",
-        },
+      images: ["https://ampd-asset.s3.us-east-2.amazonaws.com/Marcos+Headshot+3.jpg"],
+      links: [
+        { title: "434 MEDIA Website", url: "https://434media.com" },
       ],
     },
   },

@@ -43,7 +43,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
           {/* Semi-transparent overlay to blend logo with section color */}
           <div className={`absolute inset-0 ${section.color} opacity-75`} style={{ mixBlendMode: "multiply" }} />
 
-          <div className="relative z-10">
+          <div className="relative z-10 mt-10 md:mt-0 -mb-6 md:mb-0">
             <button
               onClick={onClose}
               className="absolute top-4 right-4 bg-black text-white p-2 hover:bg-white hover:text-black transition-colors duration-300 border-2 border-black z-10"
