@@ -17,6 +17,7 @@ interface VolumeNavItem {
 export default function DigitalCanvasPage() {
   const [mounted, setMounted] = useState(false)
   const [currentVolume, setCurrentVolume] = useState(0)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const magazineRef = useRef<HTMLDivElement>(null)
   const isMobile = useMobile()
 
@@ -42,16 +43,16 @@ export default function DigitalCanvasPage() {
   const volumes: VolumeNavItem[] = [
     {
       id: "vol1",
-      title: "The Road to RGVSW",
+      title: "Road to RGVSW",
       subtitle: "Volume 001",
       description: "Welcome to RGV Startup Week",
       isActive: currentVolume === 0,
     },
     {
       id: "vol2",
-      title: "Coming Soon",
+      title: "TXMX Boxing",
       subtitle: "Volume 002",
-      description: "July 2025",
+      description: "On the road to Fight Night",
       isActive: currentVolume === 1,
     },
     {
@@ -73,7 +74,11 @@ export default function DigitalCanvasPage() {
       </div>
 
       {/* Magazine Section */}
-      <div ref={magazineRef} className="relative min-h-screen bg-white overflow-hidden">
+      <div
+        ref={magazineRef}
+        className="relative bg-white overflow-hidden"
+        style={{ minHeight: isMobile ? "100vh" : "100vh" }}
+      >
         {/* Left Sidebar Navigation - Desktop Only */}
         {!isMobile && (
           <div className="absolute left-4 top-4 z-30 space-y-3 w-64 max-h-[calc(100vh-2rem)] overflow-y-auto">
@@ -181,9 +186,13 @@ export default function DigitalCanvasPage() {
           </div>
         )}
 
-        {/* Mobile Volume Selector */}
+        {/* Mobile Volume Selector - Hidden when modal is open */}
         {isMobile && (
-          <div className="absolute top-4 left-2 right-2 z-30">
+          <div
+            className={`absolute top-4 left-2 right-2 transition-opacity duration-300 ${
+              isModalOpen ? "opacity-0 pointer-events-none" : "opacity-100 z-30"
+            }`}
+          >
             <div className="flex space-x-2 overflow-x-auto pb-2">
               {volumes.map((volume, index) => (
                 <div
@@ -196,7 +205,7 @@ export default function DigitalCanvasPage() {
                         ? "bg-black text-white border-2 border-black"
                         : "bg-white text-black border-2 border-black"
                     }
-                    p-3 min-w-[120px] text-center
+                    p-3 min-w-[120px] text-center shadow-lg
                   `}
                 >
                   <div className="text-xs font-black uppercase">{volume.subtitle}</div>
@@ -208,8 +217,13 @@ export default function DigitalCanvasPage() {
         )}
 
         {/* Magazine Cards Container */}
-        <div className={`absolute inset-0 z-20 ${!isMobile ? "left-72" : ""}`}>
-          <DigitalMagazineBook />
+        <div
+          className={`absolute inset-0 z-20 ${!isMobile ? "left-72" : "top-20"}`}
+          style={{
+            height: isMobile ? "calc(100vh - 5rem)" : "100vh",
+          }}
+        >
+          <DigitalMagazineBook currentVolume={currentVolume} onModalStateChange={setIsModalOpen} />
         </div>
 
         {/* CSS for comic book animations */}

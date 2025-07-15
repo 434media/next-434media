@@ -1,230 +1,228 @@
-import type React from "react"
-import { Calendar, Zap, Sparkles, Rocket } from "lucide-react"
-
 export interface MagazineSection {
   id: string
   title: string
   subtitle: string
-  description: string
-  content: string
-  image: string
-  bgColor: string
-  textColor: string
-  category: string
-  className: string
-  mobileClassName: string
-  icon: React.ReactNode
-  date?: string
-  author?: string
-  gallery?: string[]
-  events?: Array<{
-    title: string
-    date: string
-    location: string
-    description: string
-    image: string
-  }>
+  color: string
+  preview: string
+  content: {
+    fullText: string
+    images?: string[]
+    videos?: string[]
+    links?: Array<{
+      title: string
+      url: string
+    }>
+    events?: Array<{
+      title: string
+      date: string
+      location: string
+      description: string
+    }>
+    gallery?: Array<{
+      src: string
+      alt: string
+      caption: string
+    }>
+  }
 }
 
-export const magazineSections: MagazineSection[] = [
+// Volume 1:
+const volume1Content: MagazineSection[] = [
   {
-    id: "founders-note",
-    title: "Founder's Note",
-    subtitle: "Actions Speak Louder",
-    description:"This month, we focus on the actions that define our community.",
-    content: `Whether it's SDOH work in the Valley, closing the digital gap with Tech Bloc, supporting ecosystem builders at Emerge and Rise, or sharing a message with a connected community - it all comes back to one thing: access.
-    
-    Access to health, tech, capital, or simply a seat at the table. The stories we tell are about real people building real things. Actions Speak Louder!`,
-    image: "https://ampd-asset.s3.us-east-2.amazonaws.com/Marcos+Headshot+3.jpg",
-    bgColor: "#1a1a2e",
-    textColor: "#ffffff",
-    category: "Leadership",
-    className: "absolute top-10 left-[15%] rotate-[-8deg]",
-    mobileClassName: "relative",
-    icon: <Rocket className="h-6 w-6" />,
-    author: "Marcos Resendez",
-    date: "June 2025",
-    gallery: [
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-    ],
+    id: "founders-note-v1",
+    title: "FOUNDER'S NOTE",
+    subtitle: "Proximity Matters",
+    color: "bg-gradient-to-br from-purple-500 to-pink-600",
+    preview:
+      "The Road to RGV Startup Week",
+    content: {
+      fullText: `Welcome to Digital Canvas Volume #001 - The Road to RGVSW.
+
+You can’t tell meaningful stories from a distance which is why our team headed to Brownsville for RGV Startup Week 2025. This wasn’t a one-off trip. We’ve been building relationships in the Rio Grande Valley for months.
+
+At 434 Media, we believe storytelling is a team sport. It takes care, consistency, and cultural awareness to bring someone else’s vision to life, especially when those stories are shaping the future of public health, economic opportunity, and innovation.
+
+Whether it’s SDOH work in the Valley, closing the digital gap with TechBloc, supporting ecosystem builders at Emerge and Rise, or sharing a message with a connected community — it all comes back to one thing: access. Access to health, tech, capital, or simply a seat at the table. The stories we tell are about real people building real things. Actions Speak Louder!
+
+- Marcos Resendez, Founder
+434 MEDIA`,
+      images: ["https://ampd-asset.s3.us-east-2.amazonaws.com/Marcos+Headshot+3.jpg"],
+      links: [
+        { title: "434 MEDIA Website", url: "https://434media.com" },
+      ],
+    },
   },
   {
-    id: "month-in-motion",
-    title: "Month in Motion",
-    subtitle: "AI & Creative Revolution",
-    description:
-      "This month's deep dive into how artificial intelligence is transforming creative industries and empowering artists worldwide.",
-    content: `Month in Motion captures the pulse of our rapidly evolving creative landscape, where artificial intelligence isn't replacing human creativity - it's amplifying it.
+    id: "month-in-motion-v1",
+    title: "MONTH IN MOTION",
+    subtitle: "June 2025 Highlights",
+    color: "bg-gradient-to-br from-blue-500 to-cyan-600",
+    preview: "A visual journey through the most impactful moments of June 2025",
+    content: {
+      fullText: `June 2025: The Month That Changed Everything
 
-This month, we're witnessing unprecedented developments in AI-powered creative tools. From generative art platforms that respond to emotional input to AI writing assistants that help authors overcome creative blocks, technology is becoming an extension of human imagination rather than a replacement for it.
+This month marked a pivotal moment for the Rio Grande Valley's entrepreneurial landscape. From groundbreaking startup launches to major investment announcements, June set the tone for what promises to be an extraordinary year.
 
-Featured Developments:
-• New AI art generation models that understand artistic style and emotion
-• Music composition tools that collaborate with human musicians
-• Video editing AI that can understand narrative structure
-• Writing assistants that maintain authentic voice while enhancing creativity
+Key Highlights:
+• RGV Startup Week 2025 announcement and preparation
+• Three major Series A funding rounds closed by local startups
+• Launch of the RGV Innovation District
+• First-ever RGV Tech Summit planning begins
+• Digital Canvas Volume #001 production and launch
 
-We've interviewed leading artists, musicians, writers, and designers who are pioneering the integration of AI into their creative processes. Their stories reveal not just technical innovation, but a fundamental shift in how we think about creativity itself.
+Video Content Includes:
+• Exclusive interviews with startup founders
+• Behind-the-scenes footage from RGV Startup Week prep
+• Time-lapse of the Innovation District construction
+• Founder spotlight series featuring 10 local entrepreneurs
+• Interactive product demos from emerging RGV companies
 
-The Creative AI Revolution includes:
-- Real-time collaboration between human and artificial intelligence
-- Democratization of professional-grade creative tools
-- New forms of interactive and responsive art
-- Ethical considerations in AI-generated content
+This visual narrative captures not just the events, but the energy, passion, and determination that defines our community. Each frame tells a story of innovation, collaboration, and the relentless pursuit of turning ideas into reality.
 
-This isn't about technology taking over creativity - it's about expanding the boundaries of what's possible when human imagination meets artificial intelligence.`,
-    image: "/placeholder.svg?height=1350&width=1080",
-    bgColor: "#6366f1",
-    textColor: "#ffffff",
-    category: "Technology",
-    className: "absolute top-32 left-[35%] rotate-[5deg]",
-    mobileClassName: "relative",
-    icon: <Sparkles className="h-6 w-6" />,
-    author: "Tech Innovation Team",
-    date: "June 2025",
-    gallery: [
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-    ],
+The momentum built in June 2025 will ripple through the entire year, setting new standards for what's possible in the Rio Grande Valley.`,
+      videos: [
+        "/placeholder.svg?height=300&width=500&text=June+Highlights+Reel",
+        "/placeholder.svg?height=300&width=500&text=Founder+Interviews",
+        "/placeholder.svg?height=300&width=500&text=Innovation+District+Tour",
+      ],
+      events: [
+        {
+          title: "RGV Startup Week 2025",
+          date: "June 20-26, 2025",
+          location: "McAllen Convention Center",
+          description:
+            "The premier entrepreneurship event in South Texas, featuring workshops, pitch competitions, and networking opportunities.",
+        },
+        {
+          title: "Innovation District Grand Opening",
+          date: "June 15, 2025",
+          location: "Downtown McAllen",
+          description: "Official launch of the RGV Innovation District, a 50-acre hub for startups and tech companies.",
+        },
+      ],
+    },
   },
   {
-    id: "the-drop",
-    title: "The Drop",
-    subtitle: "Latest Releases & Updates",
-    description:
-      "Your curated guide to the newest tools, platforms, and creative resources that are reshaping the digital landscape.",
-    content: `The Drop is your essential guide to the latest releases, updates, and launches that matter in the creative and tech world.
+    id: "the-drop-v1",
+    title: "THE DROP",
+    subtitle: "Exclusive Releases",
+    color: "bg-gradient-to-br from-red-500 to-orange-600",
+    preview: "Get first access to exclusive content, products, and experiences from the Digital Canvas network.",
+    content: {
+      fullText: `THE DROP - Exclusive Access to What's Next
 
-This month's highlights include groundbreaking new platforms, major updates to existing tools, and emerging technologies that are just hitting the market. We don't just list what's new - we analyze what it means for creators, entrepreneurs, and innovators.
+Welcome to The Drop, your gateway to exclusive releases, limited-time offers, and first access to groundbreaking content from the Digital Canvas network.
 
-Featured Releases:
+This Month's Exclusive Drops:
 
-New Platform Launches:
-• CreativeFlow 3.0 - The next generation of collaborative design tools
-• AIStudio Pro - Professional-grade AI content creation suite
-• StreamCraft - Revolutionary live streaming and content creation platform
-• CodeCanvas - Visual programming environment for creative coding
+🎯 Digital Canvas Founding Member NFTs
+Limited edition collectibles for our first 1,000 readers. Each NFT grants special access to future content and exclusive events.
 
-Major Updates:
-• Adobe Creative Cloud's new AI integration features
-• Figma's enhanced real-time collaboration tools
-• Notion's advanced database and automation capabilities
-• Shopify's new creator economy features
+📱 Interactive Story Builder Beta
+Be among the first to try our revolutionary story creation tool. Build your own interactive narratives with our intuitive drag-and-drop interface.
 
-Emerging Technologies:
-• WebXR development tools for immersive experiences
-• Blockchain-based creator monetization platforms
-• Advanced motion capture for content creators
-• Real-time language translation for global collaboration
+🎪 RGV Startup Week VIP Experience
+Exclusive access to private founder dinners, behind-the-scenes content, and networking opportunities during RGV Startup Week.
 
-Each release is evaluated on innovation, usability, and potential impact on creative workflows. We provide hands-on reviews, use case scenarios, and integration tips to help you make informed decisions about adopting new tools.
+📚 Digital Canvas Archive Access
+Unlock our complete content library, including unreleased stories, extended interviews, and bonus materials.
 
-The Drop also features exclusive previews of upcoming releases and beta access opportunities for our community.`,
-    image: "/placeholder.svg?height=1350&width=1080",
-    bgColor: "#10b981",
-    textColor: "#ffffff",
-    category: "Releases",
-    className: "absolute top-8 left-[55%] rotate-[-3deg]",
-    mobileClassName: "relative",
-    icon: <Zap className="h-6 w-6" />,
-    author: "Product Review Team",
-    date: "June 2025",
-    gallery: [
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-      "/placeholder.svg?height=1350&width=1080",
-    ],
-  },
-  {
-    id: "featured-events",
-    title: "Featured Events",
-    subtitle: "Connect & Create",
-    description:
-      "Discover upcoming conferences, workshops, and networking events where the creative and tech communities converge.",
-    content: `Featured Events brings you the most important gatherings, conferences, and workshops where innovation happens and communities connect.
+🎨 Custom Digital Canvas Merchandise
+Limited edition apparel and accessories designed by local RGV artists, available only to Drop subscribers.
 
-From intimate workshops with industry leaders to massive conferences that shape the future of technology and creativity, we curate events that offer real value for professionals, creators, and entrepreneurs.
+How The Drop Works:
+• New exclusive releases every month
+• Limited quantities and time-sensitive offers
+• Member-only pricing and early access
+• Exclusive community features and events
+• Direct connection with creators and founders
 
-This month's event highlights span across multiple disciplines and formats - from virtual reality showcases to AI ethics symposiums, from startup pitch competitions to creative coding bootcamps.
+Join The Drop community and be part of the Digital Canvas inner circle. These exclusive experiences are designed for our most engaged readers who want to go deeper into the stories and connect with the creators behind them.
 
-Upcoming Highlights:
-
-Major Conferences:
-• CreativeTech Summit 2025 - San Francisco, March 15-17
-• AI & Design Conference - Virtual, February 28
-• Startup Founders Retreat - Austin, April 5-7
-• Digital Art & NFT Expo - New York, March 22-24
-
-Workshops & Masterclasses:
-• Advanced Prompt Engineering for Creatives
-• Building Sustainable Creator Businesses
-• Web3 Development for Beginners
-• Motion Design with AI Tools
-
-Networking Events:
-• Monthly Creator Meetups in 15+ cities
-• Virtual Coffee Chats with Industry Leaders
-• Startup Founder Speed Networking
-• Designer & Developer Collaboration Sessions
-
-Community Initiatives:
-• Open Source Project Collaborations
-• Mentorship Program Launches
-• Creative Challenge Competitions
-• Knowledge Sharing Sessions
-
-Each event listing includes detailed information about speakers, agenda, networking opportunities, and how to maximize your experience. We also provide post-event coverage and key takeaways for those who couldn't attend.`,
-    image: "/placeholder.svg?height=1350&width=1080",
-    bgColor: "#f59e0b",
-    textColor: "#ffffff",
-    category: "Events",
-    className: "absolute top-24 right-[25%] rotate-[7deg]",
-    mobileClassName: "relative",
-    icon: <Calendar className="h-6 w-6" />,
-    author: "Events Team",
-    date: "June 2025",
-    events: [
-      {
-        title: "CreativeTech Summit 2025",
-        date: "March 15-17, 2025",
-        location: "San Francisco, CA",
-        description:
-          "The premier conference for creative technologists, featuring the latest in AI, design, and innovation.",
-        image: "/placeholder.svg?height=1350&width=1080",
-      },
-      {
-        title: "AI & Design Workshop",
-        date: "February 28, 2025",
-        location: "Virtual Event",
-        description: "Hands-on workshop exploring the intersection of artificial intelligence and creative design.",
-        image: "/placeholder.svg?height=1350&width=1080",
-      },
-      {
-        title: "Startup Founders Retreat",
-        date: "April 5-7, 2025",
-        location: "Austin, TX",
-        description: "Intensive retreat for early-stage founders focusing on product development and team building.",
-        image: "/placeholder.svg?height=1350&width=1080",
-      },
-      {
-        title: "Digital Art & NFT Expo",
-        date: "March 22-24, 2025",
-        location: "New York, NY",
-        description: "Showcase of digital art, NFT innovations, and blockchain technology for creators.",
-        image: "/placeholder.svg?height=1350&width=1080",
-      },
-    ],
+Don't miss out - these drops are limited and won't be available anywhere else.`,
+      gallery: [
+        {
+          src: "/placeholder.svg?height=300&width=400&text=NFT+Collection",
+          alt: "Digital Canvas NFT Collection",
+          caption: "Founding Member NFT Collection - Limited to 1,000 pieces",
+        },
+        {
+          src: "/placeholder.svg?height=300&width=400&text=Story+Builder+Interface",
+          alt: "Interactive Story Builder",
+          caption: "Beta version of our story creation tool",
+        },
+        {
+          src: "/placeholder.svg?height=300&width=400&text=VIP+Event+Access",
+          alt: "VIP Event Experience",
+          caption: "Exclusive access to founder events and networking",
+        },
+      ],
+      links: [
+        { title: "Join The Drop", url: "#join-drop" },
+        { title: "View Current Drops", url: "#current-drops" },
+        { title: "Drop Calendar", url: "#drop-calendar" },
+      ],
+    },
   },
 ]
+
+// Volume 2: Hero's Journey - On the Road to Fight Night
+const volume2Content: MagazineSection[] = [
+  {
+    id: "founders-note-v2",
+    title: "FOUNDER'S NOTE",
+    subtitle: "The Journey Continues",
+    color: "bg-gradient-to-br from-red-600 to-orange-700",
+    preview:
+      "Progress moves at the speed of trust",
+    content: {
+      fullText: `The more rooms we step into, the clearer the pattern becomes: progress moves at the speed of trust. 
+      
+      We felt that at AIM 2025, where collaboration wasn’t a buzzword it was the agenda. 
+      At TechBloc’s Conclave, we saw what consistency really does for a community. 
+      And at Nucleate Demo Day, we witnessed bold ideas backed by serious science. 
+
+- Marcos Resendez, Founder
+434 MEDIA`,
+      images: ["https://ampd-asset.s3.us-east-2.amazonaws.com/Marcos+Headshot+2.jpg"],
+      links: [
+        { title: "TXMX Boxing", url: "https://www.txmxboxing.com/" },
+      ],
+    },
+  },
+]
+
+// Volume 3: Coming Soon
+const volume3Content: MagazineSection[] = [
+  {
+    id: "coming-soon-v3",
+    title: "COMING SOON",
+    subtitle: "Volume 3 in Development",
+    color: "bg-gradient-to-br from-slate-600 to-gray-700",
+    preview: "Volume 3 is currently in development. Stay tuned for the next chapter in our entrepreneurial journey.",
+    content: {
+      fullText: `Volume #003 - Coming Soon
+
+- The Digital Canvas Team`,
+      images: ["/placeholder.svg?height=400&width=600&text=Coming+Soon+Volume+3"],
+      links: [
+        { title: "Subscribe for Updates", url: "#subscribe" },
+        { title: "Explore Volume 1", url: "#volume-1" },
+        { title: "Explore Volume 2", url: "#volume-2" },
+      ],
+    },
+  },
+]
+
+export function getVolumeContent(volume: number): MagazineSection[] {
+  switch (volume) {
+    case 0:
+      return volume1Content
+    case 1:
+      return volume2Content
+    case 2:
+      return volume3Content
+    default:
+      return volume1Content
+  }
+}
