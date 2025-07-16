@@ -141,7 +141,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
       aria-labelledby="modal-title"
     >
       <motion.div
-        className="bg-white border-4 border-black shadow-2xl w-full max-w-4xl relative flex flex-col mt-28 md:mt-10"
+        className="bg-white border-4 border-black shadow-2xl w-full max-w-4xl relative flex flex-col md:mt-10"
         style={{
           maxHeight: "90vh",
           height: "90vh",
@@ -168,10 +168,10 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
           {/* Semi-transparent overlay to blend logo with section color */}
           <div className={`absolute inset-0 ${section.color} opacity-75`} style={{ mixBlendMode: "multiply" }} />
 
-          <div className="relative z-10 pt-8 md:pt-0">
+          <div className="relative z-10 pt-20 md:pt-0">
             <button
               onClick={handleCloseClick}
-              className="mt-6 md:mt-0 absolute top-2 right-2 md:top-4 md:right-4 bg-black text-white p-2 hover:bg-white hover:text-black transition-colors duration-300 border-2 border-black z-10 touch-manipulation"
+              className="mt-20 md:mt-0 absolute top-2 right-2 md:top-4 md:right-4 bg-black text-white p-2 hover:bg-white hover:text-black transition-colors duration-300 border-2 border-black z-10 touch-manipulation"
               aria-label="Close modal"
               type="button"
             >
