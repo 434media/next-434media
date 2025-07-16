@@ -141,7 +141,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
       aria-labelledby="modal-title"
     >
       <motion.div
-        className="bg-white border-4 border-black shadow-2xl w-full max-w-4xl relative flex flex-col mt-20 md:mt-10"
+        className="bg-white border-4 border-black shadow-2xl w-full max-w-4xl relative flex flex-col mt-28 md:mt-10"
         style={{
           maxHeight: "90vh",
           height: "90vh",
