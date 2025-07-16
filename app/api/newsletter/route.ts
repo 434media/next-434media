@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     // Create record in Airtable
-    await base("434Newsletter").create([
+    await base("Email Sign Up (All Sites)").create([
       {
         fields: {
           Email: email,
