@@ -55,9 +55,9 @@ Whether it’s SDOH work in the Valley, closing the digital gap with TechBloc, s
   {
     id: "month-in-motion-v1",
     title: "MONTH IN MOTION",
-    subtitle: "June 2025 Highlights",
+    subtitle: "May 2025 Highlights",
     color: "bg-gradient-to-br from-blue-500 to-cyan-600",
-    preview: "A visual journey through the most impactful moments of June 2025",
+    preview: "A visual journey through the most impactful moments of May 2025",
     content: {
       fullText: `At 434 MEDIA, we believe storytelling is a team sport
 
@@ -67,74 +67,37 @@ Key Highlights:
 • Closing the Digital Gap
 • The Road to RGVSW: Proximity Matters
 
-This visual narrative captures not just the events, but the energy, passion, and determination that defines our community. Each frame tells a story of innovation, collaboration, and the relentless pursuit of turning ideas into reality.
-
-The momentum built in June 2025 will ripple through the entire year, setting new standards for what's possible in the Rio Grande Valley.`,
-      images: ["https://ampd-asset.s3.us-east-2.amazonaws.com/Marcos+Headshot+3.jpg"],
+This visual narrative captures not just the events, but the energy, passion, and determination that defines our community. Each frame tells a story of innovation, collaboration, and the relentless pursuit of turning ideas into reality.`,
+      images: [
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/IMG_5473.jpg",
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/IMG_1623.jpg",
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/IMG_5508.jpg",
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/56.JPG"
+      ],
       links: [
-        { title: "434 MEDIA Website", url: "https://434media.com" },
+        { title: "Emerge & Rise", url: "https://emergeandrise.org/" },
+        { title: "Cine Las Americas", url: "https://cinelasamericas.org/" },
+        { title: "Tech Bloc", url: "https://satechbloc.com/" },
       ],
     },
   },
   {
     id: "the-drop-v1",
     title: "THE DROP",
-    subtitle: "Exclusive Releases",
+    subtitle: "Featured Event",
     color: "bg-gradient-to-br from-red-500 to-orange-600",
-    preview: "Get first access to exclusive content, products, and experiences from the Digital Canvas network.",
+    preview: "AIM Health R&D Summit 2025",
     content: {
-      fullText: `THE DROP - Exclusive Access to What's Next
-
-Welcome to The Drop, your gateway to exclusive releases, limited-time offers, and first access to groundbreaking content from the Digital Canvas network.
-
-This Month's Exclusive Drops:
-
-🎯 Digital Canvas Founding Member NFTs
-Limited edition collectibles for our first 1,000 readers. Each NFT grants special access to future content and exclusive events.
-
-📱 Interactive Story Builder Beta
-Be among the first to try our revolutionary story creation tool. Build your own interactive narratives with our intuitive drag-and-drop interface.
-
-🎪 RGV Startup Week VIP Experience
-Exclusive access to private founder dinners, behind-the-scenes content, and networking opportunities during RGV Startup Week.
-
-📚 Digital Canvas Archive Access
-Unlock our complete content library, including unreleased stories, extended interviews, and bonus materials.
-
-🎨 Custom Digital Canvas Merchandise
-Limited edition apparel and accessories designed by local RGV artists, available only to Drop subscribers.
-
-How The Drop Works:
-• New exclusive releases every month
-• Limited quantities and time-sensitive offers
-• Member-only pricing and early access
-• Exclusive community features and events
-• Direct connection with creators and founders
-
-Join The Drop community and be part of the Digital Canvas inner circle. These exclusive experiences are designed for our most engaged readers who want to go deeper into the stories and connect with the creators behind them.
-
-Don't miss out - these drops are limited and won't be available anywhere else.`,
-      gallery: [
-        {
-          src: "/placeholder.svg?height=300&width=400&text=NFT+Collection",
-          alt: "Digital Canvas NFT Collection",
-          caption: "Founding Member NFT Collection - Limited to 1,000 pieces",
-        },
-        {
-          src: "/placeholder.svg?height=300&width=400&text=Story+Builder+Interface",
-          alt: "Interactive Story Builder",
-          caption: "Beta version of our story creation tool",
-        },
-        {
-          src: "/placeholder.svg?height=300&width=400&text=VIP+Event+Access",
-          alt: "VIP Event Experience",
-          caption: "Exclusive access to founder events and networking",
-        },
+      fullText: `The AIM Health R&D Summit brings together top innovators from academia, industry, and the military to accelerate the research, development, and commercialization of transformative medical technologies.
+      
+This unique convergence of thought leaders creates pathways to discovery and commercialization while addressing critical challenges in military and civilian healthcare.
+      
+Join us in shaping the future of healthcare innovation through collaboration, breakthrough research, and transformative partnerships that save lives.`,
+      images: [
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/keynote.jpeg",
       ],
       links: [
-        { title: "Join The Drop", url: "#join-drop" },
-        { title: "View Current Drops", url: "#current-drops" },
-        { title: "Drop Calendar", url: "#drop-calendar" },
+        { title: "AIM Health R&D Summit 2025", url: "https://www.aimsatx.com/" },
       ],
     },
   },
@@ -164,6 +127,50 @@ const volume2Content: MagazineSection[] = [
       ],
     },
   },
+  {
+    id: "month-in-motion-v2",
+    title: "MONTH IN MOTION",
+    subtitle: "June 2025 Highlights",
+    color: "bg-gradient-to-br from-indigo-500 to-rose-600",
+    preview: "A visual journey through the most impactful moments of June 2025",
+    content: {
+      fullText: `At 434 MEDIA, we believe storytelling is a team sport
+
+Key Highlights:
+• AIM Health R&D Summit
+• Nucleate Demo Day
+• Tech Bloc Conclave
+
+This visual narrative captures not just the events, but the energy, passion, and determination that defines our community. Each frame tells a story of innovation, collaboration, and the relentless pursuit of turning ideas into reality.`,
+      images: [
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/pham.jpeg",
+      ],
+      links: [
+        { title: "Nucleate", url: "https://nucleate.org/" },
+      ],
+    },
+  },
+  {
+    id: "the-drop-v2",
+    title: "THE DROP",
+    subtitle: "Featured Event",
+    color: "bg-gradient-to-br from-emerald-500 to-orange-600",
+    preview: "Velocity TX - Committed to Commnunity",
+    content: {
+      fullText: `Curious how AI is changing the job market—and how you can stay ahead by building valuable skills?
+
+Learn how to leverage these powerful tools at “AI & the Job Market," a free community workshop led by The AI Cowboys. This hands-on session will show you how to craft a strong resume, prepare for interviews, and research job opportunities, all with the power of AI.
+
+Brought to you in partnership with LISC San Antonio and San Antonio for Growth on the Eastside (SAGE), this beginner-friendly workshop is designed to help you utilize AI to empower your job search, whether you're a student, job seeker, entrepreneur, or simply curious. No tech experience needed—just bring your laptop and your curiosity!
+      `,
+      images: [
+        "https://ampd-asset.s3.us-east-2.amazonaws.com/cowboys.jpeg",
+      ],
+      links: [
+        { title: "AI & The Job Market", url: "https://www.eventbrite.com/e/ai-the-job-market-eastside-education-series-tickets-1304156670709" },
+      ],
+    },
+  },
 ]
 
 // Volume 3: Coming Soon
@@ -178,11 +185,9 @@ const volume3Content: MagazineSection[] = [
       fullText: `Volume #003 - Coming Soon
 
 - The Digital Canvas Team`,
-      images: ["/placeholder.svg?height=400&width=600&text=Coming+Soon+Volume+3"],
+      images: ["https://ampd-asset.s3.us-east-2.amazonaws.com/flyers-35-bsides.PNG"],
       links: [
-        { title: "Subscribe for Updates", url: "#subscribe" },
-        { title: "Explore Volume 1", url: "#volume-1" },
-        { title: "Explore Volume 2", url: "#volume-2" },
+        { title: "434 MEDIA", url: "https://www.434media.com/" },
       ],
     },
   },

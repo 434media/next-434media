@@ -246,7 +246,7 @@ export function MagazineHero({ onEnterCanvas }: MagazineHeroProps) {
                   <div className="text-sm uppercase font-bold tracking-wide">
                     RGV STARTUP WEEK
                     <br />
-                    <span className="text-xl font-black">SPECIAL EDITION</span>
+                    <span className="text-xl font-black">PROXIMITY MATTERS</span>
                   </div>
                 </div>
               </div>

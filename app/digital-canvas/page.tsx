@@ -43,14 +43,14 @@ export default function DigitalCanvasPage() {
   const volumes: VolumeNavItem[] = [
     {
       id: "vol1",
-      title: "Road to RGVSW",
+      title: "Proximity Matters",
       subtitle: "Volume 001",
       description: "Welcome to RGV Startup Week",
       isActive: currentVolume === 0,
     },
     {
       id: "vol2",
-      title: "TXMX Boxing",
+      title: "The Journey Continues",
       subtitle: "Volume 002",
       description: "On the road to Fight Night",
       isActive: currentVolume === 1,
