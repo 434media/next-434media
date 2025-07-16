@@ -122,7 +122,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
   return (
     <motion.div
       ref={modalRef}
-      className="fixed inset-0 bg-black/95 mt-16 md:mt-0 flex items-center justify-center p-4 z-[9999]"
+      className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-[9999]"
       style={{
         position: "fixed",
         top: 0,
@@ -141,7 +141,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
       aria-labelledby="modal-title"
     >
       <motion.div
-        className="bg-white border-4 border-black shadow-2xl w-full max-w-4xl relative flex flex-col md:mt-10"
+        className="bg-white border-4 border-black shadow-2xl w-full max-w-4xl relative flex flex-col mt-20 md:mt-10"
         style={{
           maxHeight: "90vh",
           height: "90vh",
@@ -331,7 +331,7 @@ export function MagazineModal({ section, onClose, isModalOpen = false }: Magazin
 
         {/* Footer - Fixed at bottom */}
         <div className="border-t-4 border-black p-4 bg-gray-100 flex-shrink-0">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
+          <div className="hidden md:flex md:items-center md:justify-between">
             <div className="text-xs md:text-sm text-gray-600 text-center md:text-left">
               Digital Canvas • Volume #{section.id.includes("v1") ? "001" : section.id.includes("v2") ? "002" : "003"}
             </div>
