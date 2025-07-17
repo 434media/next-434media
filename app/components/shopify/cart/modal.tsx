@@ -14,7 +14,6 @@ import LoadingDots from "../loading-dots"
 import Price from "../price"
 import { CheckCircle, ExternalLink, ShoppingBag } from "lucide-react"
 
-
 type MerchandiseSearchParams = {
   [key: string]: string
 }
@@ -196,20 +195,22 @@ export default function CartModal() {
   const renderCartContent = () => {
     if (checkoutState === CHECKOUT_STATES.COMPLETED) {
       return (
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <div className="w-16 h-16 mb-4 rounded-full bg-emerald-100 flex items-center justify-center">
-            <CheckCircle className="h-10 w-10 text-emerald-600" />
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-black">
+          <div className="w-16 h-16 mb-4 rounded-sm bg-black border-2 border-white flex items-center justify-center group relative overflow-hidden">
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <CheckCircle className="h-10 w-10 text-white group-hover:text-black relative z-10 transition-colors duration-500" />
           </div>
-          <h3 className="text-xl font-medium mb-2">Thank you for your order!</h3>
-          <p className="text-neutral-400 mb-6">Your order has been placed successfully.</p>
+          <h3 className="text-xl font-black tracking-wider uppercase mb-2 text-white">Thank you for your order!</h3>
+          <p className="text-white/70 mb-6 font-medium">Your order has been placed successfully.</p>
           <button
             onClick={() => {
               resetCart()
               closeCart()
             }}
-            className="px-6 py-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"
+            className="group relative overflow-hidden bg-black border-2 border-white px-8 py-3 font-black tracking-wider uppercase text-white transition-all duration-500 hover:text-black"
           >
-            Continue Shopping
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <span className="relative z-10">Continue Shopping</span>
           </button>
         </div>
       )
@@ -217,21 +218,23 @@ export default function CartModal() {
 
     if (checkoutState === CHECKOUT_STATES.IN_PROGRESS) {
       return (
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <div className="w-16 h-16 mb-4 rounded-full bg-blue-100 flex items-center justify-center">
-            <ShoppingBag className="h-10 w-10 text-blue-600" />
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-black">
+          <div className="w-16 h-16 mb-4 rounded-sm bg-black border-2 border-white flex items-center justify-center group relative overflow-hidden">
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <ShoppingBag className="h-10 w-10 text-white group-hover:text-black relative z-10 transition-colors duration-500" />
           </div>
-          <h3 className="text-xl font-medium mb-2">Checkout in Progress</h3>
-          <p className="text-neutral-400 mb-2">Please complete your purchase in the checkout window.</p>
-          <p className="text-neutral-400 mb-6">
+          <h3 className="text-xl font-black tracking-wider uppercase mb-2 text-white">Checkout in Progress</h3>
+          <p className="text-white/70 mb-2 font-medium">Please complete your purchase in the checkout window.</p>
+          <p className="text-white/70 mb-6 font-medium flex items-center justify-center">
             <ExternalLink className="inline h-4 w-4 mr-1" />
             Your checkout is continuing in a new tab
           </p>
           <button
             onClick={closeCart}
-            className="px-6 py-2 bg-neutral-800 text-white rounded-full hover:bg-neutral-700 transition-colors"
+            className="group relative overflow-hidden bg-black border-2 border-white px-8 py-3 font-black tracking-wider uppercase text-white transition-all duration-500 hover:text-black"
           >
-            Continue Shopping
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <span className="relative z-10">Continue Shopping</span>
           </button>
         </div>
       )
@@ -239,24 +242,29 @@ export default function CartModal() {
 
     if (!cart || cart.lines.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <div className="w-16 h-16 mb-4 rounded-full bg-neutral-800 flex items-center justify-center">
-            <i className="ri-shopping-cart-line text-3xl text-neutral-400" aria-hidden="true"></i>
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-black">
+          <div className="w-16 h-16 mb-4 rounded-sm bg-black border-2 border-white flex items-center justify-center group relative overflow-hidden">
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <i
+              className="ri-shopping-cart-line text-3xl text-white group-hover:text-black relative z-10 transition-colors duration-500"
+              aria-hidden="true"
+            ></i>
           </div>
-          <p className="text-xl font-medium mb-2">Your cart is empty</p>
-          <p className="text-neutral-400 mb-6">Looks like you haven&apos;t added anything to your cart yet.</p>
+          <p className="text-xl font-black tracking-wider uppercase mb-2 text-white">Your cart is empty</p>
+          <p className="text-white/70 mb-6 font-medium">Looks like you haven't added anything to your cart yet.</p>
           <button
             onClick={closeCart}
-            className="px-6 py-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"
+            className="group relative overflow-hidden bg-black border-2 border-white px-8 py-3 font-black tracking-wider uppercase text-white transition-all duration-500 hover:text-black"
           >
-            Continue Shopping
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <span className="relative z-10">Continue Shopping</span>
           </button>
         </div>
       )
     }
 
     return (
-      <div className="flex h-full flex-col justify-between overflow-hidden">
+      <div className="flex h-full flex-col justify-between overflow-hidden bg-black">
         <ul className="grow overflow-auto py-4 px-4 space-y-4">
           {cart.lines
             .sort((a, b) => a.merchandise.product.title.localeCompare(b.merchandise.product.title))
@@ -277,52 +285,57 @@ export default function CartModal() {
               return (
                 <li
                   key={i}
-                  className="flex w-full flex-row items-start gap-4 rounded-lg bg-neutral-900/50 p-4 hover:bg-neutral-900 transition-colors"
+                  className="group relative overflow-hidden bg-black border-2 border-white p-4 transition-all duration-500 hover:text-black"
                 >
-                  <div className="relative flex-shrink-0">
-                    <Link
-                      href={merchandiseUrl}
-                      onClick={closeCart}
-                      className="block relative h-20 w-20 overflow-hidden rounded-md bg-neutral-800"
-                    >
-                      <Image
-                        className="h-full w-full object-cover"
-                        width={80}
-                        height={80}
-                        alt={item.merchandise.product.featuredImage.altText || item.merchandise.product.title}
-                        src={item.merchandise.product.featuredImage.url || "/placeholder.svg"}
-                      />
-                    </Link>
-                    <div className="absolute -top-2 -left-2">
-                      <DeleteItemButton item={item} optimisticUpdate={updateCartItem} />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <Link
-                      href={merchandiseUrl}
-                      onClick={closeCart}
-                      className="text-base font-medium line-clamp-2 hover:text-emerald-400 transition-colors"
-                    >
-                      {item.merchandise.product.title}
-                    </Link>
-
-                    {item.merchandise.title !== DEFAULT_OPTION && (
-                      <p className="text-sm text-neutral-400 mt-1">{item.merchandise.title}</p>
-                    )}
-
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center rounded-full border border-neutral-700 bg-black/50">
-                        <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                        <p className="w-8 text-center text-sm">{item.quantity}</p>
-                        <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
+                  <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+                  <div className="relative z-10 flex w-full flex-row items-start gap-4">
+                    <div className="relative flex-shrink-0">
+                      <Link
+                        href={merchandiseUrl}
+                        onClick={closeCart}
+                        className="block relative h-20 w-20 overflow-hidden bg-black border border-white"
+                      >
+                        <Image
+                          className="h-full w-full object-cover"
+                          width={80}
+                          height={80}
+                          alt={item.merchandise.product.featuredImage.altText || item.merchandise.product.title}
+                          src={item.merchandise.product.featuredImage.url || "/placeholder.svg"}
+                        />
+                      </Link>
+                      <div className="absolute -top-2 -left-2">
+                        <DeleteItemButton item={item} optimisticUpdate={updateCartItem} />
                       </div>
+                    </div>
 
-                      <Price
-                        className="text-sm font-medium"
-                        amount={item.cost.totalAmount.amount}
-                        currencyCode={item.cost.totalAmount.currencyCode}
-                      />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <Link
+                        href={merchandiseUrl}
+                        onClick={closeCart}
+                        className="text-base font-black tracking-wider uppercase line-clamp-2 text-white group-hover:text-black transition-colors duration-500"
+                      >
+                        {item.merchandise.product.title}
+                      </Link>
+
+                      {item.merchandise.title !== DEFAULT_OPTION && (
+                        <p className="text-sm text-white/70 group-hover:text-black/70 mt-1 font-medium transition-colors duration-500">
+                          {item.merchandise.title}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center bg-black border border-white">
+                          <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1.5">{item.quantity}</p>
+                          <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
+                        </div>
+
+                        <Price
+                          className="text-sm font-black tracking-wider text-white group-hover:text-black transition-colors duration-500"
+                          amount={item.cost.totalAmount.amount}
+                          currencyCode={item.cost.totalAmount.currencyCode}
+                        />
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -330,34 +343,34 @@ export default function CartModal() {
             })}
         </ul>
 
-        <div className="border-t border-neutral-700 p-4 space-y-4">
+        <div className="border-t-2 border-white p-4 space-y-4 bg-black">
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <p className="text-neutral-400">Subtotal</p>
+              <p className="text-white/70 font-medium tracking-wider uppercase">Subtotal</p>
               <Price
-                className="font-medium"
+                className="font-black tracking-wider text-white"
                 amount={cart.cost.subtotalAmount.amount}
                 currencyCode={cart.cost.subtotalAmount.currencyCode}
               />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-neutral-400">Taxes</p>
+              <p className="text-white/70 font-medium tracking-wider uppercase">Taxes</p>
               <Price
-                className="font-medium"
+                className="font-black tracking-wider text-white"
                 amount={cart.cost.totalTaxAmount.amount}
                 currencyCode={cart.cost.totalTaxAmount.currencyCode}
               />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-neutral-400">Shipping</p>
-              <p className="font-medium">Calculated at checkout</p>
+              <p className="text-white/70 font-medium tracking-wider uppercase">Shipping</p>
+              <p className="font-black tracking-wider text-white">Calculated at checkout</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-neutral-700 pt-4">
-            <p className="text-base font-medium">Total</p>
+          <div className="flex items-center justify-between border-t-2 border-white pt-4">
+            <p className="text-base font-black tracking-wider uppercase text-white">Total</p>
             <Price
-              className="text-lg font-semibold"
+              className="text-lg font-black tracking-wider text-white"
               amount={cart.cost.totalAmount.amount}
               currencyCode={cart.cost.totalAmount.currencyCode}
             />
@@ -367,12 +380,15 @@ export default function CartModal() {
             <button
               onClick={handleCheckout}
               disabled={isCheckingOut || !cart || cart.lines.length === 0 || isCheckoutInProgress()}
-              className="w-full rounded-full bg-emerald-600 py-3 text-base font-medium text-white transition-all hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-70"
+              className="group relative overflow-hidden w-full bg-black border-2 border-white py-4 text-lg font-black tracking-wider uppercase text-white transition-all duration-500 hover:text-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black disabled:opacity-70"
             >
-              {isCheckingOut ? <LoadingDots className="bg-white" /> : "Proceed to Checkout"}
+              <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+              <span className="relative z-10">
+                {isCheckingOut ? <LoadingDots className="bg-white group-hover:bg-black" /> : "Proceed to Checkout"}
+              </span>
             </button>
             {checkoutError && (
-              <p className="mt-2 text-sm text-red-500 text-center" role="alert">
+              <p className="mt-2 text-sm text-red-400 text-center font-medium" role="alert">
                 {checkoutError}
               </p>
             )}
@@ -398,7 +414,7 @@ export default function CartModal() {
             leaveFrom="opacity-100 backdrop-blur-[.5px]"
             leaveTo="opacity-0 backdrop-blur-none"
           >
-            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+            <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
           </TransitionChild>
           <TransitionChild
             as={Fragment}
@@ -409,9 +425,9 @@ export default function CartModal() {
             leaveFrom="translate-x-0"
             leaveTo="translate-x-full"
           >
-            <DialogPanel className="fixed bottom-0 right-0 top-0 flex h-full w-full flex-col border-l backdrop-blur-xl md:w-[420px] border-neutral-700 bg-black/80 text-white">
-              <div className="flex items-center justify-between px-4 py-4 border-b border-neutral-700">
-                <h2 className="text-lg font-semibold">
+            <DialogPanel className="fixed bottom-0 right-0 top-0 flex h-full w-full flex-col border-l-2 backdrop-blur-xl md:w-[420px] border-white bg-black text-white">
+              <div className="flex items-center justify-between px-4 py-4 border-b-2 border-white bg-black">
+                <h2 className="text-lg font-black tracking-wider uppercase">
                   {checkoutState === CHECKOUT_STATES.COMPLETED
                     ? "Order Confirmation"
                     : checkoutState === CHECKOUT_STATES.IN_PROGRESS
@@ -421,9 +437,13 @@ export default function CartModal() {
                 <button
                   aria-label="Close cart"
                   onClick={closeCart}
-                  className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+                  className="group relative overflow-hidden bg-black border-2 border-white p-2 transition-all duration-500 hover:text-black"
                 >
-                  <i className="ri-close-line text-xl" aria-hidden="true"></i>
+                  <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+                  <i
+                    className="ri-close-line text-xl text-white group-hover:text-black relative z-10 transition-colors duration-500"
+                    aria-hidden="true"
+                  ></i>
                 </button>
               </div>
 

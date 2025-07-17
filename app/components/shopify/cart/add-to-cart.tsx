@@ -12,11 +12,55 @@ function SubmitButton({
   availableForSale,
   selectedVariantId,
   isPending,
+  isTXMXStyle = false,
 }: {
   availableForSale: boolean
   selectedVariantId: string | undefined
   isPending: boolean
+  isTXMXStyle?: boolean
 }) {
+  if (isTXMXStyle) {
+    // TXMX Style - matching the drop date badge
+    const buttonClasses =
+      "w-full px-6 sm:px-8 py-3 sm:py-4 border-2 border-black bg-white relative overflow-hidden group cursor-pointer focus-within:ring-2 focus-within:ring-black/50 focus-within:ring-offset-2 focus-within:ring-offset-white transition-all duration-300"
+    const disabledClasses = "cursor-not-allowed opacity-60 hover:opacity-60"
+
+    if (!availableForSale) {
+      return (
+        <button disabled className={clsx(buttonClasses, disabledClasses)}>
+          <span className="text-xl sm:text-2xl font-black tracking-wider text-black">OUT OF STOCK</span>
+        </button>
+      )
+    }
+
+    if (!selectedVariantId) {
+      return (
+        <button aria-label="Please select an option" disabled className={clsx(buttonClasses, disabledClasses)}>
+          <span className="text-xl sm:text-2xl font-black tracking-wider text-black">ADD TO CART</span>
+        </button>
+      )
+    }
+
+    return (
+      <motion.button
+        type="submit"
+        aria-label="Add to cart"
+        className={clsx(buttonClasses, {
+          "cursor-wait": isPending,
+        })}
+        whileHover={{ scale: isPending ? 1 : 1.02 }}
+        whileTap={{ scale: isPending ? 1 : 0.98 }}
+        disabled={isPending}
+      >
+        <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+        <span className="text-xl sm:text-2xl font-black tracking-wider relative z-10 text-black group-hover:text-white transition-colors duration-500">
+          {isPending ? "ADDING..." : "ADD TO CART"}
+        </span>
+      </motion.button>
+    )
+  }
+
+  // Default style for non-TXMX products
   const buttonClasses =
     "relative flex w-full items-center justify-center rounded-full bg-emerald-600 p-4 tracking-wide text-white transition-all duration-300"
   const disabledClasses = "cursor-not-allowed opacity-60 hover:opacity-60"
@@ -71,7 +115,7 @@ function SubmitButton({
   )
 }
 
-export function AddToCart({ product }: { product: Product }) {
+export function AddToCart({ product, isTXMXStyle = false }: { product: Product; isTXMXStyle?: boolean }) {
   const { variants, availableForSale } = product
   const { addCartItem } = useCart()
   const { state } = useProduct()
@@ -100,6 +144,7 @@ export function AddToCart({ product }: { product: Product }) {
         availableForSale={availableForSale}
         selectedVariantId={selectedVariantId}
         isPending={isPending || false}
+        isTXMXStyle={isTXMXStyle}
       />
       <p aria-live="polite" className="sr-only" role="status">
         {message}

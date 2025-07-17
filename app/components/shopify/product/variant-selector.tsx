@@ -55,23 +55,21 @@ export function VariantSelector({ options, variants, hasSizeBasedPricing = false
     return (
       <form key={option.id}>
         <dl className="mb-8">
-          <dt className="mb-4 flex items-center gap-2">
-            <span
-              className={`text-sm uppercase tracking-wide font-medium ${isSelected ? "text-white" : "text-amber-400"}`}
-            >
-              {option.name}
-            </span>
+          <dt className="mb-6 flex items-center gap-3">
+            <span className="text-xl md:text-2xl uppercase tracking-wider font-black text-white">{option.name}</span>
             {!isSelected && (
-              <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-400">Required</span>
+              <span className="border-2 border-white bg-black px-3 py-1 text-sm font-black tracking-wide uppercase text-white">
+                Required
+              </span>
             )}
             {isSizeOption && hasSizeBasedPricing && (
-              <div className="flex items-center gap-1 text-xs text-amber-300/80">
-                <Info className="h-3 w-3" />
-                <span>Price varies by size</span>
+              <div className="flex items-center gap-2 border border-white/50 bg-black px-2 py-1">
+                <Info className="h-4 w-4 text-white" />
+                <span className="text-xs font-medium text-white uppercase tracking-wide">Price varies by size</span>
               </div>
             )}
           </dt>
-          <dd className="flex flex-wrap gap-3">
+          <dd className="flex flex-wrap gap-4">
             {option.values.map((value) => {
               const optionNameLowerCase = option.name.toLowerCase()
 
@@ -100,17 +98,20 @@ export function VariantSelector({ options, variants, hasSizeBasedPricing = false
                   disabled={!isAvailableForSale}
                   title={`${option.name} ${value}${!isAvailableForSale ? " (Out of Stock)" : ""}`}
                   className={clsx(
-                    "flex min-w-[48px] items-center justify-center rounded-full border px-3 py-2 text-sm font-medium",
+                    "flex min-w-[60px] items-center justify-center border-2 px-4 py-3 text-base font-black tracking-wide uppercase transition-all duration-300 relative overflow-hidden group",
                     {
-                      "cursor-default bg-emerald-600 text-white border-emerald-600": isActive,
-                      "border-neutral-600 bg-neutral-800 text-white hover:border-neutral-400":
+                      "border-white bg-white text-black": isActive,
+                      "border-white bg-black text-white hover:bg-white hover:text-black":
                         !isActive && isAvailableForSale,
-                      "relative z-10 cursor-not-allowed overflow-hidden bg-neutral-800 text-neutral-500 ring-1 ring-neutral-600 before:absolute before:inset-x-0 before:-z-10 before:h-px before:-rotate-45 before:bg-neutral-600 before:transition-transform":
+                      "border-white/30 bg-black text-white/30 cursor-not-allowed relative before:absolute before:inset-0 before:bg-gradient-to-br before:from-transparent before:via-white/10 before:to-transparent before:rotate-45":
                         !isAvailableForSale,
                     },
                   )}
                 >
-                  {value}
+                  {!isActive && isAvailableForSale && (
+                    <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                  )}
+                  <span className="relative z-10 transition-colors duration-300">{value}</span>
                 </button>
               )
             })}

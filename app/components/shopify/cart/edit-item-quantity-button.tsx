@@ -11,14 +11,25 @@ function SubmitButton({ type }: { type: "plus" | "minus" }) {
     <button
       type="submit"
       aria-label={type === "plus" ? "Increase item quantity" : "Reduce item quantity"}
-      className={clsx("flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-800", {
-        "ml-auto": type === "minus",
-      })}
+      className={clsx(
+        "group relative overflow-hidden flex h-8 w-8 items-center justify-center bg-black border-white text-white transition-all duration-500 hover:text-black",
+        {
+          "ml-auto border-l": type === "minus",
+          "border-r": type === "plus",
+        },
+      )}
     >
+      <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
       {type === "plus" ? (
-        <i className="ri-add-line h-4 w-4 text-neutral-300" aria-hidden="true"></i>
+        <i
+          className="ri-add-line h-4 w-4 text-white group-hover:text-black relative z-10 transition-colors duration-500"
+          aria-hidden="true"
+        ></i>
       ) : (
-        <i className="ri-subtract-line h-4 w-4 text-neutral-300" aria-hidden="true"></i>
+        <i
+          className="ri-subtract-line h-4 w-4 text-white group-hover:text-black relative z-10 transition-colors duration-500"
+          aria-hidden="true"
+        ></i>
       )}
     </button>
   )

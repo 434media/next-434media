@@ -25,9 +25,14 @@ export function DeleteItemButton({
       <button
         type="submit"
         aria-label="Remove cart item"
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-800 text-white hover:bg-neutral-700 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1"
+        className="group relative overflow-hidden flex h-6 w-6 items-center justify-center bg-black border-2 border-white text-white transition-all duration-500 hover:text-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
       >
-        <i className="ri-close-line text-sm" style={{ lineHeight: 0 }} aria-hidden="true"></i>
+        <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+        <i
+          className="ri-close-line text-sm text-white group-hover:text-black relative z-10 transition-colors duration-500"
+          style={{ lineHeight: 0 }}
+          aria-hidden="true"
+        ></i>
       </button>
       <p aria-live="polite" className="sr-only" role="status">
         {message}

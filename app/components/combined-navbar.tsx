@@ -10,7 +10,7 @@ import { ScrambleText } from "./ScrambleText"
 import NavMenu from "./Navmenu"
 import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
-import type { Menu } from "../lib/shopify/types"
+import type { Menu } from "../../app/lib/shopify/types"
 
 type CombinedNavbarProps = {
   menu?: Menu[]
@@ -155,53 +155,42 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                 </motion.button>
               )}
 
-              {hasMounted && isInShop ? (
-                <>
-                  {/* Cart - Always shown in shop */}
-                  <div className="flex items-center">
-                    <CartModal />
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Action Speaks Louder Button - Only on desktop outside shop */}
-                  {hasMounted && !isMobile && (
-                    <motion.button
-                      onClick={toggleActionMenu}
-                      className="relative text-white px-4 py-2 text-sm font-geist-sans rounded-md flex items-center transition-all duration-300 shadow-md hover:shadow-lg border border-white/20 hover:border-white/40"
-                      aria-expanded={isActionMenuOpen}
-                      aria-haspopup="true"
-                      aria-controls="nav-menu"
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.98 }}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.5, duration: 0.3 }}
+              {/* Action Speaks Louder Button - Always shown on desktop */}
+              {hasMounted && !isMobile && (
+                <motion.button
+                  onClick={toggleActionMenu}
+                  className="relative text-white px-4 py-2 text-sm font-geist-sans rounded-md flex items-center transition-all duration-300 shadow-md hover:shadow-lg border border-white/20 hover:border-white/40"
+                  aria-expanded={isActionMenuOpen}
+                  aria-haspopup="true"
+                  aria-controls="nav-menu"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5, duration: 0.3 }}
+                >
+                  <span className="relative z-10 flex items-center">
+                    <span className="mr-2">Action Speaks Louder</span>
+                    <motion.svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      animate={{ rotate: isActionMenuOpen ? 180 : 0 }}
+                      transition={{ duration: 0.3 }}
                     >
-                      <span className="relative z-10 flex items-center">
-                        <span className="mr-2">Action Speaks Louder</span>
-                        <motion.svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          animate={{ rotate: isActionMenuOpen ? 180 : 0 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </motion.svg>
-                      </span>
-                    </motion.button>
-                  )}
-                </>
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </motion.svg>
+                  </span>
+                </motion.button>
               )}
 
-              {/* Cart - Show on all pages when items exist */}
-              {hasMounted && !isInShop && hasCartItems && (
+              {/* Cart - Show when in shop or when items exist */}
+              {hasMounted && (isInShop || hasCartItems) && (
                 <div className="flex items-center">
                   <CartModal />
                 </div>

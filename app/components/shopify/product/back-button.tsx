@@ -115,32 +115,35 @@ export function BackButton({
         setIsHovered(false)
       }}
       className={clsx(
-        "flex items-center justify-center rounded-md px-3 text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white",
+        "border-2 border-white bg-black text-white px-4 py-2 font-black tracking-wider uppercase text-sm hover:bg-white hover:text-black transition-all duration-300 relative overflow-hidden group",
         sizeClasses[size],
         variantClasses[variant],
         className,
       )}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      aria-label="Go back"
+      aria-label="Go back to previous page"
     >
-      {showArrow && (
-        <motion.svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={clsx("h-4 w-4", showLabel && "mr-2")}
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          animate={{ x: isHovered ? -2 : 0 }}
-          transition={{ type: "spring", stiffness: 400, damping: 10 }}
-        >
-          <path
-            fillRule="evenodd"
-            d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
-            clipRule="evenodd"
-          />
-        </motion.svg>
-      )}
-      {showLabel && <span>{label}</span>}
+      <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+      <div className="flex items-center gap-2 relative z-10">
+        {showArrow && (
+          <motion.svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={clsx("h-4 w-4", showLabel && "mr-2")}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            animate={{ x: isHovered ? -2 : 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+          >
+            <path
+              fillRule="evenodd"
+              d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+              clipRule="evenodd"
+            />
+          </motion.svg>
+        )}
+        {showLabel && <span>{label}</span>}
+      </div>
     </motion.button>
   )
 }

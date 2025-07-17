@@ -49,6 +49,14 @@ export default function ShopPage() {
     }, 150)
   }, [])
 
+  const handleShopNow = useCallback(() => {
+    setIsLoading(true)
+    // Brief loading state for better UX
+    setTimeout(() => {
+      window.location.href = "/search/txmx-boxing"
+    }, 150)
+  }, [])
+
   const toggleSound = useCallback(() => {
     const newMutedState = !isMuted
     setIsMuted(newMutedState)
@@ -77,12 +85,31 @@ export default function ShopPage() {
               playsInline
               className="w-full h-full object-cover"
               poster="/placeholder.svg?height=1080&width=1920"
-              preload="metadata"
             >
               <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           </div>
+
+          {/* Shop Now Button Overlay - Desktop */}
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10"
+          >
+            <button
+              onClick={handleShopNow}
+              disabled={isLoading}
+              className="px-8 py-4 border-2 border-white bg-black/80 backdrop-blur-sm relative overflow-hidden group hover:shadow-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Shop TXMX Boxing Collection"
+            >
+              <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+              <span className="text-2xl md:text-3xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
+                {isLoading ? "LOADING..." : "SHOP NOW"}
+              </span>
+            </button>
+          </motion.div>
 
           {/* Sound Control Button - Positioned below navbar */}
           <AnimatePresence>
@@ -111,7 +138,7 @@ export default function ShopPage() {
 
         {/* Mobile Video Section (1080x1350 aspect ratio) */}
         <section className="block md:hidden min-h-screen bg-black">
-          <div className="w-full h-screen flex items-center justify-center">
+          <div className="w-full h-screen flex items-center justify-center relative">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -127,7 +154,6 @@ export default function ShopPage() {
                 playsInline
                 className="w-full h-full object-cover"
                 poster="/placeholder.svg?height=1350&width=1080"
-                preload="metadata"
               >
                 <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
@@ -142,7 +168,7 @@ export default function ShopPage() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ duration: 0.3 }}
                     onClick={toggleSound}
-                    className="absolute top-20 right-4 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
+                    className="absolute top-16 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
                     aria-label={isMuted ? "Unmute video" : "Mute video"}
                   >
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
@@ -151,6 +177,26 @@ export default function ShopPage() {
                   </motion.button>
                 )}
               </AnimatePresence>
+            </motion.div>
+
+            {/* Shop Now Button Overlay - Mobile */}
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 1.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10"
+            >
+              <button
+                onClick={handleShopNow}
+                disabled={isLoading}
+                className="px-6 py-3 border-2 border-white bg-black/80 backdrop-blur-sm relative overflow-hidden group hover:shadow-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Shop TXMX Boxing Collection"
+              >
+                <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+                <span className="text-xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
+                  {isLoading ? "LOADING..." : "SHOP NOW"}
+                </span>
+              </button>
             </motion.div>
           </div>
         </section>
@@ -170,13 +216,7 @@ export default function ShopPage() {
               className="space-y-8 sm:space-y-10 lg:space-y-12"
             >
               {/* TXMX Logo with improved accessibility and loading */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-                viewport={{ once: true }}
-                className="flex justify-center"
-              >
+              <div className="flex justify-center">
                 <div className="relative">
                   <Image
                     src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
@@ -187,10 +227,8 @@ export default function ShopPage() {
                     priority
                     sizes="(max-width: 640px) 288px, (max-width: 768px) 320px, 384px"
                   />
-                  {/* Loading skeleton for better perceived performance */}
-                  <div className="absolute inset-0 bg-gray-800 animate-pulse rounded opacity-0 transition-opacity duration-300" />
                 </div>
-              </motion.div>
+              </div>
 
               {/* Drop Date with enhanced visual hierarchy and accessibility */}
               <motion.div

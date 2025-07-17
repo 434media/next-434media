@@ -180,154 +180,199 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-md bg-white border-4 border-black shadow-2xl"
+          className="relative w-full max-w-4xl bg-black border-2 border-white shadow-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 bg-black text-white hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="absolute top-4 right-4 z-20 p-2 bg-black border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-500 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
             aria-label="Close newsletter signup"
           >
             <X className="h-4 w-4" />
           </button>
 
-          <div className="p-8">
-            {/* Header with Logo */}
-            <div className="text-center mb-8">
-              <motion.div
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="mb-6"
-              >
-                <div className="flex justify-center">
-                  <Image
-                    src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
-                    alt="TXMX Boxing Logo"
-                    width={140}
-                    height={70}
-                    className="filter invert"
-                    priority
-                  />
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="mb-6"
-              >
-                <p className="text-lg font-bold text-black tracking-wide">Made from Blood, Sweat, and Tears</p>
-              </motion.div>
-
-              {/* Value Proposition */}
-              <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  Get exclusive drops, insider access, and be first in the ring for limited releases.
-                </p>
-              </motion.div>
+          <div className="flex flex-col lg:flex-row min-h-[600px]">
+            {/* Left Side - Image */}
+            <div className="lg:w-1/2 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/20 z-10" />
+              <Image
+                src="https://ampd-asset.s3.us-east-2.amazonaws.com/bam3.jpg"
+                alt="TXMX Boxing Fighter"
+                fill
+                className="object-cover"
+                priority
+              />
             </div>
 
-            {/* Form */}
-            <AnimatePresence mode="wait">
-              {!isSuccess ? (
-                <motion.form
-                  ref={formRef}
-                  key="subscribe-form"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  onSubmit={handleSubmit}
-                  className="space-y-4"
-                  aria-label="TXMX Newsletter subscription form"
-                >
-                  <div className="relative">
-                    <label htmlFor="txmx-email" className="sr-only">
-                      Email address
-                    </label>
-                    <input
-                      id="txmx-email"
-                      ref={inputRef}
-                      name="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      className="w-full px-4 py-3 border-2 border-black bg-white text-black placeholder-gray-500 focus:outline-none focus:border-gray-600 transition-colors text-base"
-                      aria-describedby={error ? "newsletter-error" : undefined}
-                      disabled={isSubmitting}
-                      autoComplete="email"
-                    />
-                  </div>
+            {/* Right Side - Newsletter Form */}
+            <div className="lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center relative overflow-hidden group">
+              {/* Background Animation */}
+              <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out" />
 
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-black text-white py-3 px-6 font-bold text-sm tracking-wide hover:bg-gray-800 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 active:scale-[0.98] transform"
-                    aria-label="Join TXMX newsletter"
+              <div className="relative z-10">
+                {/* Header with Logo */}
+                <div className="text-center mb-8">
+                  <motion.div
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="mb-6"
                   >
-                    <motion.div
-                      animate={isSubmitting ? { scale: [1, 1.02, 1] } : { scale: 1 }}
-                      transition={isSubmitting ? { duration: 1.5, repeat: Number.POSITIVE_INFINITY } : {}}
-                      className="flex items-center justify-center"
-                    >
-                      {isSubmitting ? "JOINING THE FIGHT..." : "Submit"}
-                    </motion.div>
-                  </button>
-
-                  {!isDevelopment && (
-                    <div
-                      ref={turnstileRef}
-                      data-theme="light"
-                      data-size="flexible"
-                      className="w-full flex justify-center mt-4"
-                      aria-label="Security verification"
-                    />
-                  )}
-
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      id="newsletter-error"
-                      className="text-red-600 text-sm text-center font-medium bg-red-50 border border-red-200 rounded p-2"
-                      role="alert"
-                    >
-                      {error}
-                    </motion.div>
-                  )}
-                </motion.form>
-              ) : (
-                <motion.div
-                  key="success-message"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="text-center py-6"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <div className="mb-4">
-                    <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center mx-auto mb-4">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.2, type: "spring", damping: 15 }}
-                      >
-                        <CheckIcon className="h-8 w-8 text-white" />
-                      </motion.div>
+                    <div className="flex justify-center">
+                      {/* TXMX Logo - Using text fallback if SVG doesn't load */}
+                      <div className="relative">
+                        <Image
+                          src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
+                          alt="TXMX Boxing Logo"
+                          width={160}
+                          height={80}
+                          className="filter brightness-0 invert group-hover:brightness-100 group-hover:invert transition-all duration-500"
+                          priority
+                          onError={(e) => {
+                            // Fallback if image fails to load
+                            const target = e.target as HTMLImageElement
+                            target.style.display = "none"
+                            const fallback = target.nextElementSibling as HTMLElement
+                            if (fallback) fallback.style.display = "block"
+                          }}
+                        />
+                        {/* Text fallback */}
+                        <div className="hidden text-4xl lg:text-5xl font-black text-white group-hover:text-black tracking-wider uppercase transition-colors duration-500">
+                          TXMX BOXING
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold text-black mb-2">Welcome to the Fight!</h3>
-                    <p className="text-gray-700 text-sm leading-relaxed">
-                      You're now part of the TXMX family. Get ready for exclusive drops and insider access.
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="mb-6"
+                  >
+                    <h2 className="text-2xl lg:text-3xl font-black text-white group-hover:text-black tracking-wider uppercase transition-colors duration-500">
+                      Made from Blood, Sweat, and Tears
+                    </h2>
+                  </motion.div>
+
+                  {/* Value Proposition */}
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <p className="text-lg text-white group-hover:text-black leading-relaxed font-bold tracking-wide transition-colors duration-500">
+                      Get exclusive drops, insider access, and be first in the ring for limited releases.
                     </p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </motion.div>
+                </div>
+
+                {/* Form */}
+                <AnimatePresence mode="wait">
+                  {!isSuccess ? (
+                    <motion.form
+                      ref={formRef}
+                      key="subscribe-form"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      onSubmit={handleSubmit}
+                      className="space-y-6"
+                      aria-label="TXMX Newsletter subscription form"
+                    >
+                      <div className="relative">
+                        <label htmlFor="txmx-email" className="sr-only">
+                          Email address
+                        </label>
+                        <input
+                          id="txmx-email"
+                          ref={inputRef}
+                          name="email"
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="ENTER YOUR EMAIL"
+                          className="w-full px-6 py-4 border-2 border-white bg-transparent text-white placeholder-white/70 focus:outline-none focus:border-white transition-all duration-500 text-lg font-bold tracking-wider uppercase group-hover:border-black group-hover:text-black group-hover:placeholder-black/70"
+                          aria-describedby={error ? "newsletter-error" : undefined}
+                          disabled={isSubmitting}
+                          autoComplete="email"
+                        />
+                      </div>
+
+                      <div className="relative overflow-hidden group/button">
+                        <div className="absolute inset-0 bg-white transform -translate-x-full group-hover/button:translate-x-0 transition-transform duration-500 ease-out" />
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="relative w-full bg-transparent border-2 border-white text-white py-4 px-8 font-black text-xl tracking-wider uppercase transition-colors duration-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black active:scale-[0.98] transform group-hover:border-black group-hover:text-black group-hover/button:border-black group-hover/button:text-black"
+                          aria-label="Join TXMX newsletter"
+                        >
+                          <motion.div
+                            animate={isSubmitting ? { scale: [1, 1.02, 1] } : { scale: 1 }}
+                            transition={isSubmitting ? { duration: 1.5, repeat: Number.POSITIVE_INFINITY } : {}}
+                            className="flex items-center justify-center"
+                          >
+                            {isSubmitting ? "JOINING THE FIGHT..." : "JOIN THE FIGHT"}
+                          </motion.div>
+                        </button>
+                      </div>
+
+                      {!isDevelopment && (
+                        <div
+                          ref={turnstileRef}
+                          data-theme="dark"
+                          data-size="flexible"
+                          className="w-full flex justify-center mt-6"
+                          aria-label="Security verification"
+                        />
+                      )}
+
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          id="newsletter-error"
+                          className="text-red-400 text-sm text-center font-bold bg-red-900/20 border border-red-400 p-3 tracking-wide uppercase"
+                          role="alert"
+                        >
+                          {error}
+                        </motion.div>
+                      )}
+                    </motion.form>
+                  ) : (
+                    <motion.div
+                      key="success-message"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="text-center py-8"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div className="mb-6">
+                        <div className="w-20 h-20 bg-transparent border-2 border-white flex items-center justify-center mx-auto mb-6 group-hover:bg-white group-hover:border-black transition-all duration-500">
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: 0.2, type: "spring", damping: 15 }}
+                          >
+                            <CheckIcon className="h-10 w-10 text-white group-hover:text-black transition-colors duration-500" />
+                          </motion.div>
+                        </div>
+                        <h3 className="text-2xl lg:text-3xl font-black text-white group-hover:text-black mb-4 tracking-wider uppercase transition-colors duration-500">
+                          Welcome to the Fight!
+                        </h3>
+                        <p className="text-white group-hover:text-black text-lg leading-relaxed font-bold tracking-wide transition-colors duration-500">
+                          Get ready for exclusive drops and insider access.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
           </div>
         </motion.div>
       </motion.div>

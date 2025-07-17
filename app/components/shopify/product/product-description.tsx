@@ -66,44 +66,101 @@ export function ProductDescription({ product }: { product: Product }) {
 
   return (
     <motion.div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full text-white"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="mb-6 flex flex-col border-b border-neutral-700 pb-6">
-        <h1 className="mb-2 text-2xl md:text-3xl font-medium text-white">{product.title}</h1>
-        <div className="mr-auto rounded-full bg-emerald-600 p-2 text-sm text-white">
-          <Price amount={selectedPrice.amount} currencyCode={selectedPrice.currencyCode} />
-        </div>
+      {/* Product Title and Price - TXMX Style */}
+      <div className="mb-8 pb-6 border-b-2 border-white">
+        <motion.h1
+          className="mb-4 text-3xl md:text-4xl lg:text-5xl font-black tracking-wider text-white uppercase leading-tight"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+        >
+          {product.title}
+        </motion.h1>
+
+        <motion.div
+          className="inline-block border-2 border-white bg-black px-4 py-2 relative overflow-hidden group"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+          <div className="relative z-10 group-hover:text-black transition-colors duration-300">
+            <Price
+              amount={selectedPrice.amount}
+              currencyCode={selectedPrice.currencyCode}
+              className="text-2xl md:text-3xl font-black tracking-wider"
+            />
+          </div>
+        </motion.div>
       </div>
 
-      {/* Selection guidance */}
+      {/* Selection guidance with TXMX styling */}
       {!selectionComplete && (
-        <div className="mb-4 flex items-start gap-2 rounded-md bg-neutral-800/50 p-3 text-sm text-neutral-200">
-          <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-400" />
-          <div>
-            <p className="font-medium">
-              Please select {missingOptions.map((o) => o.charAt(0).toUpperCase() + o.slice(1)).join(" & ")} to continue
-            </p>
-            <p className="mt-1 text-neutral-400">You must choose all options before adding to cart</p>
+        <motion.div
+          className="mb-6 border-2 border-white bg-black p-4 relative overflow-hidden group"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+          <div className="relative z-10 flex items-start gap-3 group-hover:text-black transition-colors duration-500">
+            <AlertCircle className="h-6 w-6 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-lg tracking-wide uppercase">
+                Select {missingOptions.map((o) => o.charAt(0).toUpperCase() + o.slice(1)).join(" & ")}
+              </p>
+              <p className="mt-1 text-sm opacity-80 font-medium">Choose all options before adding to cart</p>
+            </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      <VariantSelector
-        options={product.options}
-        variants={product.variants}
-        hasSizeBasedPricing={hasSizeBasedPricing}
-      />
+      {/* Variant Selector */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+      >
+        <VariantSelector
+          options={product.options}
+          variants={product.variants}
+          hasSizeBasedPricing={hasSizeBasedPricing}
+        />
+      </motion.div>
 
-      <div className="mb-6 flex-grow overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+      {/* Product Description */}
+      <motion.div
+        className="mb-8 flex-grow overflow-y-auto max-h-[300px] pr-2 custom-scrollbar"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+      >
         {product.descriptionHtml ? (
-          <Prose className="text-sm md:text-base leading-relaxed text-neutral-300" html={product.descriptionHtml} />
+          <div className="border-2 border-white bg-black p-4 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+            <div className="relative z-10 group-hover:text-black transition-colors duration-500">
+              <Prose
+                className="text-base md:text-lg leading-relaxed font-medium group-hover:text-black transition-colors duration-500"
+                html={product.descriptionHtml}
+              />
+            </div>
+          </div>
         ) : null}
-      </div>
+      </motion.div>
 
-      <AddToCart product={product} />
+      {/* Add to Cart Button - TXMX Style */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+      >
+        <AddToCart product={product} isTXMXStyle={true} />
+      </motion.div>
     </motion.div>
   )
 }
