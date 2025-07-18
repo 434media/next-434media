@@ -38,7 +38,7 @@ const navigationSquares: NavigationSquare[] = [
   {
     id: "shop",
     title: "SHOP",
-    subtitle: "434 SHOP NOW OPEN",
+    subtitle: "Shop Dropping 07/19",
     href: "/shop",
     gradient: "from-emerald-500 via-teal-500 to-cyan-500",
     textColor: "text-white",
