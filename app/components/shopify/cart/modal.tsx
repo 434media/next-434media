@@ -1,4 +1,5 @@
 "use client"
+
 import { DialogPanel, Dialog, Transition, TransitionChild } from "@headlessui/react"
 import { DEFAULT_OPTION } from "../../../lib/constants"
 import { createUrl } from "../../../lib/utils"
@@ -38,6 +39,7 @@ export default function CartModal() {
   const [checkoutWindow, setCheckoutWindow] = useState<Window | null>(null)
   const quantityRef = useRef(cart?.totalQuantity)
   const checkoutIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
   const openCart = () => setIsOpen(true)
   const closeCart = () => {
     if (checkoutState !== CHECKOUT_STATES.IN_PROGRESS) {
@@ -87,7 +89,6 @@ export default function CartModal() {
             setCheckoutState(CHECKOUT_STATES.COMPLETED)
             // Clear the checkout status after processing
             localStorage.removeItem("shopify_checkout_status")
-
             // Refresh the cart after a short delay
             setTimeout(() => {
               createCartAndSetCookie()
@@ -115,7 +116,6 @@ export default function CartModal() {
           clearInterval(checkoutIntervalRef.current!)
           checkoutIntervalRef.current = null
           setCheckoutWindow(null)
-
           // Check if the cart is empty (indicating a successful purchase)
           if (cart && cart.lines.length === 0) {
             setCheckoutState(CHECKOUT_STATES.COMPLETED)
@@ -147,26 +147,41 @@ export default function CartModal() {
       }
 
       const checkoutUrl = await getCheckoutUrl()
-
       if (checkoutUrl) {
         // Store the cart ID in localStorage to track this checkout
         localStorage.setItem("shopify_checkout_cart_id", cart?.id || "")
 
-        // Open checkout in new window
+        // Open checkout in new window - Fixed for mobile
         try {
-          const newWindow = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
+          // Use a more mobile-friendly approach
+          const newWindow = window.open(
+            checkoutUrl,
+            "_blank",
+            "noopener,noreferrer,width=800,height=600,scrollbars=yes,resizable=yes",
+          )
 
-          // Always assume the window opened successfully
-          // This avoids false error messages when the window actually opens
+          // Check if window was blocked
+          if (!newWindow || newWindow.closed || typeof newWindow.closed == "undefined") {
+            // Fallback: try to navigate in the same window on mobile
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+              window.location.href = checkoutUrl
+              return
+            } else {
+              throw new Error("Popup blocked")
+            }
+          }
+
           setCheckoutWindow(newWindow)
           setCheckoutState(CHECKOUT_STATES.IN_PROGRESS)
-
-          // We'll rely on our interval check to detect if the window was actually blocked
-          // This is more reliable than trying to detect it immediately
         } catch (error) {
           console.error("Error opening checkout window:", error)
-          setCheckoutState(CHECKOUT_STATES.ERROR)
-          setCheckoutError("Could not open checkout window. Please check your popup blocker settings.")
+          // Fallback for mobile devices - navigate in same window
+          if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            window.location.href = checkoutUrl
+          } else {
+            setCheckoutState(CHECKOUT_STATES.ERROR)
+            setCheckoutError("Could not open checkout window. Please check your popup blocker settings.")
+          }
         }
       } else {
         setCheckoutState(CHECKOUT_STATES.ERROR)
@@ -312,7 +327,6 @@ export default function CartModal() {
                       >
                         {item.merchandise.product.title}
                       </Link>
-
                       {item.merchandise.title !== DEFAULT_OPTION && (
                         <p className="text-sm text-white/70 mt-1 font-medium">{item.merchandise.title}</p>
                       )}
@@ -320,10 +334,11 @@ export default function CartModal() {
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center bg-black border border-white">
                           <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">{item.quantity}</p>
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">
+                            {item.quantity}
+                          </p>
                           <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
                         </div>
-
                         <Price
                           className="text-sm font-black tracking-wider text-white"
                           amount={item.cost.totalAmount.amount}
@@ -451,7 +466,6 @@ export default function CartModal() {
                   ></i>
                 </button>
               </div>
-
               {renderCartContent()}
             </DialogPanel>
           </TransitionChild>

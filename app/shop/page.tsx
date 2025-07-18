@@ -168,7 +168,7 @@ export default function ShopPage() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ duration: 0.3 }}
                     onClick={toggleSound}
-                    className="absolute top-10 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
+                    className="absolute top-6 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
                     aria-label={isMuted ? "Unmute video" : "Mute video"}
                   >
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
