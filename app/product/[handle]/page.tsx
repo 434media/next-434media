@@ -122,104 +122,102 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
         }}
       />
 
-      {/* TXMX-styled product page with black background */}
+      {/* TXMX-styled product page with black background - removed fixed height to prevent footer overlap */}
       <div className="bg-black min-h-screen">
-        {/* Fixed height container to fit everything in viewport */}
-        <div className="h-screen flex flex-col">
-          {/* Main product container - takes remaining space */}
-          <div className="flex-1 flex flex-col px-4 pt-20 pb-4">
-            <div className="relative border-2 border-white bg-black p-4 md:p-6 lg:p-8 flex-1 flex flex-col max-w-7xl mx-auto w-full">
-              {/* Back button with TXMX styling */}
-              <div className="absolute top-4 left-4 z-20">
-                <BackButton />
-              </div>
+        {/* Changed from fixed height container to flexible container with proper bottom margin */}
+        <div className="mx-auto max-w-7xl px-4 pt-28 md:pt-32 pb-32 min-h-screen">
+          {/* Main product container with proper spacing */}
+          <div className="relative border-2 border-white bg-black p-4 md:p-6 lg:p-8 mb-16">
+            {/* Back button with TXMX styling */}
+            <div className="absolute top-4 left-4 z-20">
+              <BackButton />
+            </div>
 
-              {/* Desktop Layout (lg and up) */}
-              <div className="hidden lg:flex flex-1 min-h-0">
-                <div className="grid grid-cols-12 gap-8 w-full min-h-0">
-                  {/* Left Column - Product Gallery (7 columns) */}
-                  <div className="col-span-7 min-h-0">
-                    <div className="border-2 border-white bg-black relative overflow-hidden h-full">
-                      <Suspense
-                        fallback={
-                          <div className="relative w-full h-full overflow-hidden bg-black border border-white/20">
-                            <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
-                          </div>
-                        }
-                      >
-                        <Gallery
-                          images={product.images.slice(0, 5).map((image: Image) => ({
-                            src: image.url,
-                            altText: image.altText,
-                          }))}
-                        />
-                      </Suspense>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Product Info with Description at Top (5 columns) */}
-                  <div className="col-span-5 flex flex-col min-h-0">
+            {/* Desktop Layout (lg and up) */}
+            <div className="hidden lg:block">
+              <div className="grid grid-cols-12 gap-8 min-h-[80vh]">
+                {/* Left Column - Product Gallery (7 columns) */}
+                <div className="col-span-7">
+                  <div className="border-2 border-white bg-black relative overflow-hidden h-full min-h-[600px]">
                     <Suspense
                       fallback={
-                        <div className="space-y-6 flex-1">
-                          <div className="h-12 bg-white/10 animate-pulse"></div>
-                          <div className="h-16 bg-white/5 animate-pulse"></div>
-                          <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
-                          <div className="h-16 bg-white/10 animate-pulse"></div>
+                        <div className="relative w-full h-full overflow-hidden bg-black border border-white/20">
+                          <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
                         </div>
                       }
                     >
-                      <ProductDescription product={product} isDesktop={true} />
+                      <Gallery
+                        images={product.images.slice(0, 5).map((image: Image) => ({
+                          src: image.url,
+                          altText: image.altText,
+                        }))}
+                      />
                     </Suspense>
                   </div>
                 </div>
+
+                {/* Right Column - Product Info with Description at Top (5 columns) */}
+                <div className="col-span-5 flex flex-col min-h-[600px]">
+                  <Suspense
+                    fallback={
+                      <div className="space-y-6 flex-1">
+                        <div className="h-12 bg-white/10 animate-pulse"></div>
+                        <div className="h-16 bg-white/5 animate-pulse"></div>
+                        <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
+                        <div className="h-16 bg-white/10 animate-pulse"></div>
+                      </div>
+                    }
+                  >
+                    <ProductDescription product={product} isDesktop={true} />
+                  </Suspense>
+                </div>
               </div>
+            </div>
 
-              {/* Mobile/Tablet Layout (below lg) */}
-              <div className="lg:hidden flex-1 flex flex-col min-h-0">
-                <div className="flex flex-col gap-6 h-full">
-                  {/* Product Gallery - Fixed height on mobile */}
-                  <div className="w-full flex-shrink-0">
-                    <div className="border-2 border-white bg-black relative overflow-hidden aspect-square max-h-[50vh]">
-                      <Suspense
-                        fallback={
-                          <div className="relative aspect-square w-full overflow-hidden bg-black border border-white/20">
-                            <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
-                          </div>
-                        }
-                      >
-                        <Gallery
-                          images={product.images.slice(0, 5).map((image: Image) => ({
-                            src: image.url,
-                            altText: image.altText,
-                          }))}
-                        />
-                      </Suspense>
-                    </div>
-                  </div>
-
-                  {/* Product Information - Scrollable if needed */}
-                  <div className="w-full flex-1 min-h-0 overflow-y-auto">
+            {/* Mobile/Tablet Layout (below lg) */}
+            <div className="lg:hidden">
+              <div className="flex flex-col gap-6">
+                {/* Product Gallery */}
+                <div className="w-full">
+                  <div className="border-2 border-white bg-black relative overflow-hidden aspect-square">
                     <Suspense
                       fallback={
-                        <div className="space-y-6">
-                          <div className="h-12 bg-white/10 animate-pulse"></div>
-                          <div className="h-16 bg-white/5 animate-pulse"></div>
-                          <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
-                          <div className="h-16 bg-white/10 animate-pulse"></div>
+                        <div className="relative aspect-square w-full overflow-hidden bg-black border border-white/20">
+                          <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
                         </div>
                       }
                     >
-                      <ProductDescription product={product} />
+                      <Gallery
+                        images={product.images.slice(0, 5).map((image: Image) => ({
+                          src: image.url,
+                          altText: image.altText,
+                        }))}
+                      />
                     </Suspense>
                   </div>
+                </div>
+
+                {/* Product Information */}
+                <div className="w-full">
+                  <Suspense
+                    fallback={
+                      <div className="space-y-6">
+                        <div className="h-12 bg-white/10 animate-pulse"></div>
+                        <div className="h-16 bg-white/5 animate-pulse"></div>
+                        <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
+                        <div className="h-16 bg-white/10 animate-pulse"></div>
+                      </div>
+                    }
+                  >
+                    <ProductDescription product={product} />
+                  </Suspense>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Related Products - Hidden on main product view to save space */}
-          <div className="hidden">
+          {/* Related Products with proper spacing */}
+          <div className="mb-16">
             <RelatedProducts id={product.id} />
           </div>
         </div>

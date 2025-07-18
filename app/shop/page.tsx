@@ -229,36 +229,6 @@ export default function ShopPage() {
                   />
                 </div>
               </div>
-
-              {/* Drop Date with enhanced visual hierarchy and accessibility */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                viewport={{ once: true }}
-                className="space-y-6 sm:space-y-8"
-              >
-                {/* Drop Date Badge with improved interaction */}
-                <div className="inline-flex items-center justify-center">
-                  <div className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-white bg-black relative overflow-hidden group cursor-default focus-within:ring-2 focus-within:ring-white/50 focus-within:ring-offset-2 focus-within:ring-offset-black">
-                    <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-                    <h1
-                      className="text-2xl sm:text-3xl md:text-4xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500"
-                      id="main-heading"
-                    >
-                      DROPPING 07.19
-                    </h1>
-                  </div>
-                </div>
-
-                {/* Enhanced Description with better typography and spacing */}
-                <div className="space-y-4 sm:space-y-6">
-                  <p className="text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-                    Get exclusive access to limited drops, premium gear, and insider content from the world of TXMX
-                    boxing.
-                  </p>
-                </div>
-              </motion.div>
             </motion.div>
           </div>
         </section>

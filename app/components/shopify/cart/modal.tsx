@@ -283,12 +283,8 @@ export default function CartModal() {
               )
 
               return (
-                <li
-                  key={i}
-                  className="group relative overflow-hidden bg-black border-2 border-white p-4 transition-all duration-500 hover:text-black"
-                >
-                  <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
-                  <div className="relative z-10 flex w-full flex-row items-start gap-4">
+                <li key={i} className="bg-black border-2 border-white p-4">
+                  <div className="flex w-full flex-row items-start gap-4">
                     <div className="relative flex-shrink-0">
                       <Link
                         href={merchandiseUrl}
@@ -312,26 +308,24 @@ export default function CartModal() {
                       <Link
                         href={merchandiseUrl}
                         onClick={closeCart}
-                        className="text-base font-black tracking-wider uppercase line-clamp-2 text-white group-hover:text-black transition-colors duration-500"
+                        className="text-base font-black tracking-wider uppercase line-clamp-2 text-white"
                       >
                         {item.merchandise.product.title}
                       </Link>
 
                       {item.merchandise.title !== DEFAULT_OPTION && (
-                        <p className="text-sm text-white/70 group-hover:text-black/70 mt-1 font-medium transition-colors duration-500">
-                          {item.merchandise.title}
-                        </p>
+                        <p className="text-sm text-white/70 mt-1 font-medium">{item.merchandise.title}</p>
                       )}
 
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center bg-black border border-white">
                           <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1.5">{item.quantity}</p>
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">{item.quantity}</p>
                           <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
                         </div>
 
                         <Price
-                          className="text-sm font-black tracking-wider text-white group-hover:text-black transition-colors duration-500"
+                          className="text-sm font-black tracking-wider text-white"
                           amount={item.cost.totalAmount.amount}
                           currencyCode={item.cost.totalAmount.currencyCode}
                         />
@@ -342,6 +336,17 @@ export default function CartModal() {
               )
             })}
         </ul>
+
+        {/* Continue Shopping Button */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={closeCart}
+            className="group relative overflow-hidden w-full bg-black border-2 border-white py-3 text-base font-black tracking-wider uppercase text-white transition-all duration-500 hover:text-black"
+          >
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <span className="relative z-10">Continue Shopping</span>
+          </button>
+        </div>
 
         <div className="border-t-2 border-white p-4 space-y-4 bg-black">
           <div className="space-y-2 text-sm">

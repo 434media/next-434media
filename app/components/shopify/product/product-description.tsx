@@ -179,36 +179,37 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
           </motion.div>
         )}
 
-        {/* Scrollable content area for remaining elements */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {/* Variant Selector - Compact */}
-          <motion.div
-            className="mb-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-          >
-            <VariantSelector options={product.options} variants={product.variants} hideColorOption={true} />
-          </motion.div>
+        {/* Scrollable content area for remaining elements with much more bottom padding */}
+        <div className="flex-1 overflow-y-auto min-h-0 pb-16">
+          <div className="space-y-4">
+            {/* Variant Selector - Compact */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+            >
+              <VariantSelector options={product.options} variants={product.variants} hideColorOption={true} />
+            </motion.div>
 
-          {/* Quantity Selector - Compact */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.5 }}
-          >
-            <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
-          </motion.div>
+            {/* Quantity Selector - Compact */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.5 }}
+            >
+              <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
+            </motion.div>
 
-          {/* Add to Cart Button - Compact */}
-          <motion.div
-            className="mb-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
-          >
-            <AddToCart product={product} isTXMXStyle={true} quantity={quantity} />
-          </motion.div>
+            {/* Add to Cart Button - Compact with much more bottom margin */}
+            <motion.div
+              className="mb-16"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.5 }}
+            >
+              <AddToCart product={product} isTXMXStyle={true} quantity={quantity} />
+            </motion.div>
+          </div>
         </div>
       </motion.div>
     )
@@ -273,9 +274,9 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
         <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
       </motion.div>
 
-      {/* Add to Cart Button - TXMX Style */}
+      {/* Add to Cart Button - TXMX Style with much more bottom margin */}
       <motion.div
-        className="mb-6"
+        className="mb-16"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.5 }}
