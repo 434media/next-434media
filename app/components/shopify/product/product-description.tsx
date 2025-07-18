@@ -16,24 +16,24 @@ interface QuantitySelectorProps {
 
 function QuantitySelector({ quantity, onQuantityChange }: QuantitySelectorProps) {
   return (
-    <div className="mb-6">
-      <dt className="mb-3">
-        <span className="text-lg md:text-xl uppercase tracking-wider font-black text-white">Quantity</span>
+    <div className="mb-8">
+      <dt className="mb-4">
+        <span className="text-xl md:text-2xl uppercase tracking-wider font-black text-white">Quantity</span>
       </dt>
       <div className="flex items-center gap-4">
         <button
           type="button"
           onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
-          className="border-2 border-white bg-black text-white hover:bg-white hover:text-black transition-all duration-300 w-10 h-10 flex items-center justify-center font-black text-lg"
+          className="border-2 border-white bg-black text-white hover:bg-white hover:text-black transition-all duration-300 w-12 h-12 flex items-center justify-center font-black text-xl"
           disabled={quantity <= 1}
         >
           -
         </button>
-        <span className="text-xl font-black text-white min-w-[2.5rem] text-center">{quantity}</span>
+        <span className="text-2xl font-black text-white min-w-[3rem] text-center">{quantity}</span>
         <button
           type="button"
           onClick={() => onQuantityChange(quantity + 1)}
-          className="border-2 border-white bg-black text-white hover:bg-white hover:text-black transition-all duration-300 w-10 h-10 flex items-center justify-center font-black text-lg"
+          className="border-2 border-white bg-black text-white hover:bg-white hover:text-black transition-all duration-300 w-12 h-12 flex items-center justify-center font-black text-xl"
         >
           +
         </button>
@@ -67,8 +67,8 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
     setSelectionComplete(missing.length === 0)
   }, [state, product.options])
 
-  // Create a truncated version of the description (first 100 characters for desktop)
-  const createTruncatedText = (html: string, maxLength = isDesktop ? 100 : 150) => {
+  // Create a truncated version of the description (first 150 characters)
+  const createTruncatedText = (html: string, maxLength = 150) => {
     // Strip HTML tags for character counting
     const textOnly = html.replace(/<[^>]*>/g, "")
     if (textOnly.length <= maxLength) return html
@@ -85,23 +85,21 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
   }
 
   const truncatedText = product.descriptionHtml ? createTruncatedText(product.descriptionHtml) : ""
-  const needsTruncation = product.descriptionHtml
-    ? product.descriptionHtml.replace(/<[^>]*>/g, "").length > (isDesktop ? 100 : 150)
-    : false
+  const needsTruncation = product.descriptionHtml ? product.descriptionHtml.replace(/<[^>]*>/g, "").length > 150 : false
 
   if (isDesktop) {
-    // Desktop layout - compact version to fit in viewport
+    // Desktop layout - return the product selection controls
     return (
       <motion.div
-        className="flex flex-col h-full text-white overflow-hidden"
+        className="flex flex-col h-full text-white"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        {/* Product Title - Compact */}
-        <div className="mb-4 pb-3 border-b-2 border-white flex-shrink-0">
+        {/* Product Title Only - TXMX Style (Price Removed) */}
+        <div className="mb-6 pb-4 border-b-2 border-white">
           <motion.h1
-            className="text-xl md:text-2xl lg:text-3xl font-black tracking-wider text-white uppercase leading-tight"
+            className="text-2xl md:text-3xl lg:text-4xl font-black tracking-wider text-white uppercase leading-tight"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1, duration: 0.5 }}
@@ -110,34 +108,34 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
           </motion.h1>
         </div>
 
-        {/* Product Description - Compact */}
+        {/* Product Description - Desktop with Dropdown (Replaces Size Selection) */}
         <motion.div
-          className="mb-4 flex-shrink-0"
+          className="mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.5 }}
         >
           {product.descriptionHtml ? (
             <div className="border-2 border-white bg-black">
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-black tracking-wider uppercase text-white">Product Details</h3>
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xl font-black tracking-wider uppercase text-white">Product Details</h3>
                   {needsTruncation && (
                     <button
                       onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
-                      className="text-white transition-colors duration-300 flex items-center gap-1"
+                      className="text-white transition-colors duration-300 flex items-center gap-2"
                       aria-expanded={isDescriptionOpen}
                       aria-controls="desktop-product-description-content"
                     >
-                      <span className="text-xs font-medium">{isDescriptionOpen ? "Less" : "More"}</span>
-                      {isDescriptionOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      <span className="text-sm font-medium">{isDescriptionOpen ? "Show Less" : "Show More"}</span>
+                      {isDescriptionOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </button>
                   )}
                 </div>
 
                 <div id="desktop-product-description-content">
                   {!isDescriptionOpen && needsTruncation ? (
-                    <div className="text-sm leading-relaxed font-medium text-white">{truncatedText}</div>
+                    <div className="text-base leading-relaxed font-medium text-white">{truncatedText}</div>
                   ) : (
                     <motion.div
                       initial={needsTruncation ? { height: 0, opacity: 0 } : { opacity: 1 }}
@@ -147,7 +145,7 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
                       className="overflow-hidden"
                     >
                       <Prose
-                        className="text-sm leading-relaxed font-medium text-white"
+                        className="text-base leading-relaxed font-medium text-white"
                         html={product.descriptionHtml}
                       />
                     </motion.div>
@@ -158,59 +156,55 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
           ) : null}
         </motion.div>
 
-        {/* Selection guidance - Compact */}
-        {!selectionComplete && (
-          <motion.div
-            className="mb-4 border-2 border-white bg-black p-3 relative overflow-hidden group flex-shrink-0"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-          >
-            <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-            <div className="relative z-10 flex items-start gap-2 group-hover:text-black transition-colors duration-500">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-black text-base tracking-wide uppercase">
-                  Select {missingOptions.map((o) => o.charAt(0).toUpperCase() + o.slice(1)).join(" & ")}
-                </p>
-                <p className="mt-1 text-xs opacity-80 font-medium">Choose all options before adding to cart</p>
-              </div>
+        {/* Selection guidance with TXMX styling - ALWAYS VISIBLE */}
+        <motion.div
+          className="mb-6 border-2 border-white bg-black p-4 relative overflow-hidden"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+        >
+          <div className="relative z-10 flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 flex-shrink-0 mt-0.5 text-white" />
+            <div>
+              <p className="font-black text-lg tracking-wide uppercase text-white">
+                {selectionComplete
+                  ? "Size & Quantity Selected"
+                  : `Select ${missingOptions.map((o) => o.charAt(0).toUpperCase() + o.slice(1)).join(" & ")}`}
+              </p>
+              <p className="mt-1 text-sm opacity-80 font-medium text-white">
+                {selectionComplete ? "Ready to add to cart" : "Choose all options before adding to cart"}
+              </p>
             </div>
-          </motion.div>
-        )}
-
-        {/* Scrollable content area for remaining elements with much more bottom padding */}
-        <div className="flex-1 overflow-y-auto min-h-0 pb-16">
-          <div className="space-y-4">
-            {/* Variant Selector - Compact */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-            >
-              <VariantSelector options={product.options} variants={product.variants} hideColorOption={true} />
-            </motion.div>
-
-            {/* Quantity Selector - Compact */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.5 }}
-            >
-              <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
-            </motion.div>
-
-            {/* Add to Cart Button - Compact with much more bottom margin */}
-            <motion.div
-              className="mb-16"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7, duration: 0.5 }}
-            >
-              <AddToCart product={product} isTXMXStyle={true} quantity={quantity} />
-            </motion.div>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Variant Selector (Size only, Color hidden) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          <VariantSelector options={product.options} variants={product.variants} hideColorOption={true} />
+        </motion.div>
+
+        {/* Quantity Selector */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
+          <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
+        </motion.div>
+
+        {/* Add to Cart Button - TXMX Style with extra bottom margin */}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.5 }}
+        >
+          <AddToCart product={product} isTXMXStyle={true} quantity={quantity} />
+        </motion.div>
       </motion.div>
     )
   }
@@ -218,7 +212,7 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
   // Mobile/tablet layout - full product info with dropdown description
   return (
     <motion.div
-      className="flex flex-col h-full text-white"
+      className="flex flex-col text-white"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
@@ -235,61 +229,12 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
         </motion.h1>
       </div>
 
-      {/* Selection guidance with TXMX styling */}
-      {!selectionComplete && (
-        <motion.div
-          className="mb-6 border-2 border-white bg-black p-4 relative overflow-hidden group"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
-          <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-          <div className="relative z-10 flex items-start gap-3 group-hover:text-black transition-colors duration-500">
-            <AlertCircle className="h-6 w-6 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-black text-lg tracking-wide uppercase">
-                Select {missingOptions.map((o) => o.charAt(0).toUpperCase() + o.slice(1)).join(" & ")}
-              </p>
-              <p className="mt-1 text-sm opacity-80 font-medium">Choose all options before adding to cart</p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Variant Selector (Size only, Color hidden) */}
+      {/* Product Description - Mobile with Dropdown - MOVED UP */}
       <motion.div
+        className="mb-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
-      >
-        <VariantSelector options={product.options} variants={product.variants} hideColorOption={true} />
-      </motion.div>
-
-      {/* Quantity Selector */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.5 }}
-      >
-        <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
-      </motion.div>
-
-      {/* Add to Cart Button - TXMX Style with much more bottom margin */}
-      <motion.div
-        className="mb-16"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.5 }}
-      >
-        <AddToCart product={product} isTXMXStyle={true} quantity={quantity} />
-      </motion.div>
-
-      {/* Product Description - Mobile with Dropdown */}
-      <motion.div
-        className="flex-grow"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7, duration: 0.5 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
       >
         {product.descriptionHtml ? (
           <div className="border-2 border-white bg-black">
@@ -330,6 +275,56 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
             </div>
           </div>
         ) : null}
+      </motion.div>
+
+      {/* Selection guidance with TXMX styling - ALWAYS VISIBLE */}
+      <motion.div
+        className="mb-6 border-2 border-white bg-black p-4 relative overflow-hidden"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+      >
+        <div className="relative z-10 flex items-start gap-3">
+          <AlertCircle className="h-6 w-6 flex-shrink-0 mt-0.5 text-white" />
+          <div>
+            <p className="font-black text-lg tracking-wide uppercase text-white">
+              {selectionComplete
+                ? "Size & Quantity Selected"
+                : `Select ${missingOptions.map((o) => o.charAt(0).toUpperCase() + o.slice(1)).join(" & ")}`}
+            </p>
+            <p className="mt-1 text-sm opacity-80 font-medium text-white">
+              {selectionComplete ? "Ready to add to cart" : "Choose all options before adding to cart"}
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Variant Selector (Size only, Color hidden) */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+      >
+        <VariantSelector options={product.options} variants={product.variants} hideColorOption={true} />
+      </motion.div>
+
+      {/* Quantity Selector */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+      >
+        <QuantitySelector quantity={quantity} onQuantityChange={setQuantity} />
+      </motion.div>
+
+      {/* Add to Cart Button - TXMX Style with extra bottom margin */}
+      <motion.div
+        className="mb-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+      >
+        <AddToCart product={product} isTXMXStyle={true} quantity={quantity} />
       </motion.div>
     </motion.div>
   )
