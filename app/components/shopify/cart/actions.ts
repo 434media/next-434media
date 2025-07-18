@@ -128,14 +128,18 @@ export async function createCartAndSetCookie() {
   cookieStore.set("cartId", cart.id!)
 }
 
-export async function addItem(_prevState: unknown, selectedVariantId: string | undefined) {
+export async function addItem(_prevState: unknown, formData: FormData) {
+  const selectedVariantId = formData.get("selectedVariantId") as string
+  const quantity = Number.parseInt(formData.get("quantity") as string) || 1
+
   if (!selectedVariantId) {
-    return "Error adding item to cart"
+    return "Error adding item to cart - no variant selected"
   }
 
   try {
-    await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }])
+    await addToCart([{ merchandiseId: selectedVariantId, quantity }])
     revalidateTag(TAGS.cart)
+    return `Successfully added ${quantity} item${quantity > 1 ? "s" : ""} to cart`
   } catch (error) {
     console.error("Error adding item to cart:", error)
     return "Error adding item to cart"

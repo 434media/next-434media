@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import type React from "react"
-import { createContext, useContext, useMemo, useOptimistic, useCallback } from "react"
+import { createContext, useContext, useMemo, useCallback, useEffect, useState } from "react"
 
 type ProductState = {
   [key: string]: string
@@ -20,39 +20,57 @@ const ProductContext = createContext<ProductContextType | undefined>(undefined)
 
 export function ProductProvider({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams()
+  const router = useRouter()
 
-  const getInitialState = () => {
+  // Memoize the initial state to prevent recreation on every render
+  const initialState = useMemo(() => {
     const params: ProductState = {}
     for (const [key, value] of searchParams.entries()) {
       params[key] = value
     }
     return params
-  }
+  }, [searchParams])
 
-  const [state, setOptimisticState] = useOptimistic(
-    getInitialState(),
-    (prevState: ProductState, update: ProductState) => ({
-      ...prevState,
-      ...update,
-    }),
-  )
+  // Use regular state instead of useOptimistic
+  const [state, setState] = useState<ProductState>(initialState)
+
+  // Update state when search params change (only if different)
+  useEffect(() => {
+    const newParams: ProductState = {}
+    for (const [key, value] of searchParams.entries()) {
+      newParams[key] = value
+    }
+
+    // Check if state actually changed to prevent unnecessary updates
+    const stateKeys = Object.keys(state)
+    const newParamsKeys = Object.keys(newParams)
+
+    const hasChanged =
+      stateKeys.length !== newParamsKeys.length ||
+      stateKeys.some((key) => state[key] !== newParams[key]) ||
+      newParamsKeys.some((key) => newParams[key] !== state[key])
+
+    if (hasChanged) {
+      setState(newParams)
+    }
+  }, [searchParams, state])
 
   const updateOption = useCallback(
     (name: string, value: string) => {
-      const newState = { [name]: value }
-      setOptimisticState(newState)
-      return { ...state, ...newState }
+      const newState = { ...state, [name]: value }
+      setState(newState)
+      return newState
     },
-    [state, setOptimisticState],
+    [state],
   )
 
   const updateImage = useCallback(
     (index: string) => {
-      const newState = { image: index }
-      setOptimisticState(newState)
-      return { ...state, ...newState }
+      const newState = { ...state, image: index }
+      setState(newState)
+      return newState
     },
-    [state, setOptimisticState],
+    [state],
   )
 
   const value = useMemo(
@@ -78,11 +96,25 @@ export function useProduct() {
 export function useUpdateURL() {
   const router = useRouter()
 
-  return (state: ProductState) => {
-    const newParams = new URLSearchParams(window.location.search)
-    Object.entries(state).forEach(([key, value]) => {
-      newParams.set(key, value)
-    })
-    router.push(`?${newParams.toString()}`, { scroll: false })
-  }
+  return useCallback(
+    (state: ProductState) => {
+      const newParams = new URLSearchParams(window.location.search)
+      Object.entries(state).forEach(([key, value]) => {
+        if (value) {
+          newParams.set(key, value)
+        } else {
+          newParams.delete(key)
+        }
+      })
+
+      const newUrl = `?${newParams.toString()}`
+      const currentUrl = window.location.search
+
+      // Only update URL if it actually changed
+      if (newUrl !== currentUrl) {
+        router.push(newUrl, { scroll: false })
+      }
+    },
+    [router],
+  )
 }
