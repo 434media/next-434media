@@ -122,23 +122,23 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
         }}
       />
 
-      {/* TXMX-styled product page with black background - improved mobile scrolling */}
+      {/* TXMX-styled product page with black background - Fixed desktop layout */}
       <div className="bg-black">
-        {/* Flexible container with proper spacing for mobile */}
-        <div className="mx-auto max-w-7xl px-4 pt-28 md:pt-32 pb-16">
-          {/* Main product container with proper spacing */}
-          <div className="relative border-2 border-white bg-black p-4 md:p-6 lg:p-8 mb-8">
+        {/* Desktop: Full viewport height container, Mobile: normal flow */}
+        <div className="mx-auto max-w-7xl px-4 pt-28 md:pt-32 pb-16 lg:pt-32 lg:pb-0 lg:min-h-screen lg:flex lg:flex-col">
+          {/* Main product container - desktop uses remaining viewport space */}
+          <div className="relative border-2 border-white bg-black p-4 md:p-6 lg:p-8 mb-8 lg:mb-0 lg:flex-1 lg:min-h-0">
             {/* Back button with TXMX styling */}
             <div className="absolute top-4 left-4 z-20">
               <BackButton />
             </div>
 
-            {/* Desktop Layout (lg and up) */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-12 gap-8">
+            {/* Desktop Layout (lg and up) - uses full available height */}
+            <div className="hidden lg:block h-full">
+              <div className="grid grid-cols-12 gap-8 h-full">
                 {/* Left Column - Product Gallery (7 columns) */}
-                <div className="col-span-7">
-                  <div className="border-2 border-white bg-black relative overflow-hidden aspect-square">
+                <div className="col-span-7 h-full min-h-0">
+                  <div className="border-2 border-white bg-black relative overflow-hidden h-full">
                     <Suspense
                       fallback={
                         <div className="relative w-full h-full overflow-hidden bg-black border border-white/20">
@@ -157,10 +157,10 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
                 </div>
 
                 {/* Right Column - Product Info (5 columns) */}
-                <div className="col-span-5">
+                <div className="col-span-5 h-full min-h-0">
                   <Suspense
                     fallback={
-                      <div className="space-y-6">
+                      <div className="space-y-6 h-full">
                         <div className="h-12 bg-white/10 animate-pulse"></div>
                         <div className="h-16 bg-white/5 animate-pulse"></div>
                         <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
@@ -216,8 +216,15 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
             </div>
           </div>
 
-          {/* Related Products with proper spacing */}
-          <div className="mb-8">
+          {/* Related Products - only show on mobile, desktop gets separate section */}
+          <div className="mb-8 lg:hidden">
+            <RelatedProducts id={product.id} />
+          </div>
+        </div>
+
+        {/* Related Products for Desktop - completely separate section below viewport */}
+        <div className="hidden lg:block bg-black">
+          <div className="mx-auto max-w-7xl px-4 py-16">
             <RelatedProducts id={product.id} />
           </div>
         </div>

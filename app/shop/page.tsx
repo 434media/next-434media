@@ -53,7 +53,7 @@ export default function ShopPage() {
     setIsLoading(true)
     // Brief loading state for better UX
     setTimeout(() => {
-      window.location.href = "/search/txmx-boxing"
+      window.location.href = "product/txmx-boxing-founders-tee?color=Black"
     }, 150)
   }, [])
 
@@ -106,7 +106,7 @@ export default function ShopPage() {
             >
               <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
               <span className="text-2xl md:text-3xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
-                {isLoading ? "LOADING..." : "SHOP NOW"}
+                {isLoading ? "LOADING..." : "BUY NOW"}
               </span>
             </button>
           </motion.div>
@@ -168,7 +168,7 @@ export default function ShopPage() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ duration: 0.3 }}
                     onClick={toggleSound}
-                    className="absolute top-16 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
+                    className="absolute top-10 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
                     aria-label={isMuted ? "Unmute video" : "Mute video"}
                   >
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
@@ -194,7 +194,7 @@ export default function ShopPage() {
               >
                 <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
                 <span className="text-xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
-                  {isLoading ? "LOADING..." : "SHOP NOW"}
+                  {isLoading ? "LOADING..." : "BUY NOW"}
                 </span>
               </button>
             </motion.div>
