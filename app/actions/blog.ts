@@ -27,19 +27,30 @@ async function ensureDbInitialized() {
   }
 }
 
-// Simple admin verification
+// Simple admin verification - accepts both admin and intern passwords
 function verifyAdminPassword(password: string): boolean {
-  // Timing-safe comparison to prevent timing attacks
-  if (!process.env.ADMIN_PASSWORD || password.length !== process.env.ADMIN_PASSWORD.length) {
-    return false
+  const adminPassword = process.env.ADMIN_PASSWORD
+  const internPassword = process.env.INTERN_PASSWORD
+
+  // Check admin password
+  if (adminPassword && password.length === adminPassword.length) {
+    let result = 0
+    for (let i = 0; i < password.length; i++) {
+      result |= password.charCodeAt(i) ^ adminPassword.charCodeAt(i)
+    }
+    if (result === 0) return true
   }
 
-  let result = 0
-  for (let i = 0; i < password.length; i++) {
-    result |= password.charCodeAt(i) ^ process.env.ADMIN_PASSWORD.charCodeAt(i)
+  // Check intern password
+  if (internPassword && password.length === internPassword.length) {
+    let result = 0
+    for (let i = 0; i < password.length; i++) {
+      result |= password.charCodeAt(i) ^ internPassword.charCodeAt(i)
+    }
+    if (result === 0) return true
   }
 
-  return result === 0
+  return false
 }
 
 // Generate slug from title
