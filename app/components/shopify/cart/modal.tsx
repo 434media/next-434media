@@ -151,47 +151,25 @@ export default function CartModal() {
         // Store the cart ID in localStorage to track this checkout
         localStorage.setItem("shopify_checkout_cart_id", cart?.id || "")
 
-        // Open checkout in new window/tab - Updated for better desktop experience
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        // Open checkout in new tab for both mobile and desktop
+        try {
+          const newTab = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
 
-        if (isMobile) {
-          // Mobile: try popup first, fallback to same window navigation
-          const newWindow = window.open(
-            checkoutUrl,
-            "_blank",
-            "noopener,noreferrer,width=800,height=600,scrollbars=yes,resizable=yes",
-          )
-
-          // Check if window was blocked
-          if (!newWindow || newWindow.closed || typeof newWindow.closed == "undefined") {
-            // Fallback: navigate in the same window on mobile
-            window.location.href = checkoutUrl
-            return
-          }
-
-          setCheckoutWindow(newWindow)
+          // Set checkout state regardless of newTab return value
+          // window.open() can return null even when successful due to browser security policies
           setCheckoutState(CHECKOUT_STATES.IN_PROGRESS)
-        } else {
-          // Desktop: open in new tab (more reliable than popup)
-          try {
-            const newTab = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
 
-            // Set checkout state regardless of newTab return value
-            // window.open() can return null even when successful due to browser security policies
-            setCheckoutState(CHECKOUT_STATES.IN_PROGRESS)
-
-            // Only set the window reference if we got one back
-            if (newTab) {
-              setCheckoutWindow(newTab)
-            }
-
-            // If we didn't get a window reference, we can't track it, but the tab likely opened
-            // The user will need to manually return to complete the flow
-          } catch (error) {
-            console.error("Error opening checkout tab:", error)
-            setCheckoutState(CHECKOUT_STATES.ERROR)
-            setCheckoutError("Could not open checkout. Please check your browser settings and try again.")
+          // Only set the window reference if we got one back
+          if (newTab) {
+            setCheckoutWindow(newTab)
           }
+
+          // If we didn't get a window reference, we can't track it, but the tab likely opened
+          // The user will need to manually return to complete the flow
+        } catch (error) {
+          console.error("Error opening checkout tab:", error)
+          setCheckoutState(CHECKOUT_STATES.ERROR)
+          setCheckoutError("Could not open checkout. Please check your browser settings and try again.")
         }
       } else {
         setCheckoutState(CHECKOUT_STATES.ERROR)
