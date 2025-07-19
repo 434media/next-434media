@@ -168,7 +168,7 @@ export default function ShopPage() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     transition={{ duration: 0.3 }}
                     onClick={toggleSound}
-                    className="absolute top-6 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
+                    className="absolute top-2 right-1 z-20 p-3 bg-black/70 backdrop-blur-sm border border-white/30 text-white hover:bg-black/90 transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-white/50"
                     aria-label={isMuted ? "Unmute video" : "Mute video"}
                   >
                     <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
@@ -185,7 +185,7 @@ export default function ShopPage() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 px-4 w-full max-w-sm"
+            className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-30 px-4 w-full max-w-sm"
           >
             <button
               onClick={handleShopNow}
