@@ -185,7 +185,7 @@ export default function ShopPage() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-30 px-4 w-full max-w-sm"
+            className="absolute bottom-32 left-1/2 transform -translate-x-1/2 z-30 px-4 w-full max-w-sm"
           >
             <button
               onClick={handleShopNow}
