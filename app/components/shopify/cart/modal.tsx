@@ -135,6 +135,16 @@ export default function CartModal() {
     }
   }, [checkoutState, checkoutWindow, cart])
 
+  // Add this helper function at the top of the component, after the imports
+  const isMobile = () => {
+    if (typeof window === "undefined") return false
+    return (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      window.innerWidth <= 768
+    )
+  }
+
+  // Improved handleCheckout function with better desktop popup detection:
   const handleCheckout = async () => {
     try {
       setIsCheckingOut(true)
@@ -151,25 +161,19 @@ export default function CartModal() {
         // Store the cart ID in localStorage to track this checkout
         localStorage.setItem("shopify_checkout_cart_id", cart?.id || "")
 
-        // Open checkout in new tab for both mobile and desktop
-        try {
+        // Different behavior for mobile vs desktop
+        if (isMobile()) {
+          // On mobile, redirect in the same window to avoid popup blockers
+          window.location.href = checkoutUrl
+          return
+        } else {
+          // On desktop, always open in new tab - no popup detection
           const newTab = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
 
-          // Set checkout state regardless of newTab return value
-          // window.open() can return null even when successful due to browser security policies
+          // Set state to in progress regardless of newTab return value
+          // Modern browsers may return null even when tab opens successfully
+          setCheckoutWindow(newTab)
           setCheckoutState(CHECKOUT_STATES.IN_PROGRESS)
-
-          // Only set the window reference if we got one back
-          if (newTab) {
-            setCheckoutWindow(newTab)
-          }
-
-          // If we didn't get a window reference, we can't track it, but the tab likely opened
-          // The user will need to manually return to complete the flow
-        } catch (error) {
-          console.error("Error opening checkout tab:", error)
-          setCheckoutState(CHECKOUT_STATES.ERROR)
-          setCheckoutError("Could not open checkout. Please check your browser settings and try again.")
         }
       } else {
         setCheckoutState(CHECKOUT_STATES.ERROR)
@@ -392,7 +396,13 @@ export default function CartModal() {
             >
               <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
               <span className="relative z-10">
-                {isCheckingOut ? <LoadingDots className="bg-white group-hover:bg-black" /> : "Proceed to Checkout"}
+                {isCheckingOut ? (
+                  <LoadingDots className="bg-white group-hover:bg-black" />
+                ) : isMobile() ? (
+                  "Continue to Checkout"
+                ) : (
+                  "Proceed to Checkout"
+                )}
               </span>
             </button>
             {checkoutError && (
