@@ -1,4 +1,5 @@
 "use client"
+
 import { DialogPanel, Dialog, Transition, TransitionChild } from "@headlessui/react"
 import { DEFAULT_OPTION } from "../../../lib/constants"
 import { createUrl } from "../../../lib/utils"
@@ -38,6 +39,7 @@ export default function CartModal() {
   const [checkoutWindow, setCheckoutWindow] = useState<Window | null>(null)
   const quantityRef = useRef(cart?.totalQuantity)
   const checkoutIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
   const openCart = () => setIsOpen(true)
   const closeCart = () => {
     if (checkoutState !== CHECKOUT_STATES.IN_PROGRESS) {
@@ -87,7 +89,6 @@ export default function CartModal() {
             setCheckoutState(CHECKOUT_STATES.COMPLETED)
             // Clear the checkout status after processing
             localStorage.removeItem("shopify_checkout_status")
-
             // Refresh the cart after a short delay
             setTimeout(() => {
               createCartAndSetCookie()
@@ -115,7 +116,6 @@ export default function CartModal() {
           clearInterval(checkoutIntervalRef.current!)
           checkoutIntervalRef.current = null
           setCheckoutWindow(null)
-
           // Check if the cart is empty (indicating a successful purchase)
           if (cart && cart.lines.length === 0) {
             setCheckoutState(CHECKOUT_STATES.COMPLETED)
@@ -135,6 +135,16 @@ export default function CartModal() {
     }
   }, [checkoutState, checkoutWindow, cart])
 
+  // Add this helper function at the top of the component, after the imports
+  const isMobile = () => {
+    if (typeof window === "undefined") return false
+    return (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      window.innerWidth <= 768
+    )
+  }
+
+  // Improved handleCheckout function with better desktop popup detection:
   const handleCheckout = async () => {
     try {
       setIsCheckingOut(true)
@@ -147,26 +157,23 @@ export default function CartModal() {
       }
 
       const checkoutUrl = await getCheckoutUrl()
-
       if (checkoutUrl) {
         // Store the cart ID in localStorage to track this checkout
         localStorage.setItem("shopify_checkout_cart_id", cart?.id || "")
 
-        // Open checkout in new window
-        try {
-          const newWindow = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
+        // Different behavior for mobile vs desktop
+        if (isMobile()) {
+          // On mobile, redirect in the same window to avoid popup blockers
+          window.location.href = checkoutUrl
+          return
+        } else {
+          // On desktop, always open in new tab - no popup detection
+          const newTab = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
 
-          // Always assume the window opened successfully
-          // This avoids false error messages when the window actually opens
-          setCheckoutWindow(newWindow)
+          // Set state to in progress regardless of newTab return value
+          // Modern browsers may return null even when tab opens successfully
+          setCheckoutWindow(newTab)
           setCheckoutState(CHECKOUT_STATES.IN_PROGRESS)
-
-          // We'll rely on our interval check to detect if the window was actually blocked
-          // This is more reliable than trying to detect it immediately
-        } catch (error) {
-          console.error("Error opening checkout window:", error)
-          setCheckoutState(CHECKOUT_STATES.ERROR)
-          setCheckoutError("Could not open checkout window. Please check your popup blocker settings.")
         }
       } else {
         setCheckoutState(CHECKOUT_STATES.ERROR)
@@ -283,12 +290,8 @@ export default function CartModal() {
               )
 
               return (
-                <li
-                  key={i}
-                  className="group relative overflow-hidden bg-black border-2 border-white p-4 transition-all duration-500 hover:text-black"
-                >
-                  <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
-                  <div className="relative z-10 flex w-full flex-row items-start gap-4">
+                <li key={i} className="bg-black border-2 border-white p-4">
+                  <div className="flex w-full flex-row items-start gap-4">
                     <div className="relative flex-shrink-0">
                       <Link
                         href={merchandiseUrl}
@@ -312,26 +315,24 @@ export default function CartModal() {
                       <Link
                         href={merchandiseUrl}
                         onClick={closeCart}
-                        className="text-base font-black tracking-wider uppercase line-clamp-2 text-white group-hover:text-black transition-colors duration-500"
+                        className="text-base font-black tracking-wider uppercase line-clamp-2 text-white"
                       >
                         {item.merchandise.product.title}
                       </Link>
-
                       {item.merchandise.title !== DEFAULT_OPTION && (
-                        <p className="text-sm text-white/70 group-hover:text-black/70 mt-1 font-medium transition-colors duration-500">
-                          {item.merchandise.title}
-                        </p>
+                        <p className="text-sm text-white/70 mt-1 font-medium">{item.merchandise.title}</p>
                       )}
 
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center bg-black border border-white">
                           <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1.5">{item.quantity}</p>
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">
+                            {item.quantity}
+                          </p>
                           <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
                         </div>
-
                         <Price
-                          className="text-sm font-black tracking-wider text-white group-hover:text-black transition-colors duration-500"
+                          className="text-sm font-black tracking-wider text-white"
                           amount={item.cost.totalAmount.amount}
                           currencyCode={item.cost.totalAmount.currencyCode}
                         />
@@ -342,6 +343,17 @@ export default function CartModal() {
               )
             })}
         </ul>
+
+        {/* Continue Shopping Button */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={closeCart}
+            className="group relative overflow-hidden w-full bg-black border-2 border-white py-3 text-base font-black tracking-wider uppercase text-white transition-all duration-500 hover:text-black"
+          >
+            <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
+            <span className="relative z-10">Continue Shopping</span>
+          </button>
+        </div>
 
         <div className="border-t-2 border-white p-4 space-y-4 bg-black">
           <div className="space-y-2 text-sm">
@@ -384,7 +396,13 @@ export default function CartModal() {
             >
               <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
               <span className="relative z-10">
-                {isCheckingOut ? <LoadingDots className="bg-white group-hover:bg-black" /> : "Proceed to Checkout"}
+                {isCheckingOut ? (
+                  <LoadingDots className="bg-white group-hover:bg-black" />
+                ) : isMobile() ? (
+                  "Continue to Checkout"
+                ) : (
+                  "Proceed to Checkout"
+                )}
               </span>
             </button>
             {checkoutError && (
@@ -446,7 +464,6 @@ export default function CartModal() {
                   ></i>
                 </button>
               </div>
-
               {renderCartContent()}
             </DialogPanel>
           </TransitionChild>

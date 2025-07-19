@@ -181,7 +181,7 @@ export default async function RootLayout({
           />
         </noscript>
         {/* End Meta Pixel Code */}
-        
+
         {/* LinkedIn Pixel */}
         <Script id="linkedin-pixel-init" strategy="afterInteractive">
           {`
@@ -212,6 +212,12 @@ export default async function RootLayout({
             src="https://px.ads.linkedin.com/collect/?pid=7445314&fmt=gif"
           />
         </noscript>
+        {/* Simpli.fi Retargeting Script */}
+        <Script
+          src="https://tag.simpli.fi/sifitag/5ea76a26-ff7f-46cf-b7d3-47031c857acb"
+          strategy="afterInteractive"
+          async
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}

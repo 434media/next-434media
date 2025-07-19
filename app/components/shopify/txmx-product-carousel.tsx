@@ -67,7 +67,7 @@ export function ProductImageCarousel({ products }: ProductImageCarouselProps) {
             src={allImages[currentIndex]?.url || "/placeholder.svg?height=400&width=400"}
             alt={allImages[currentIndex]?.altText || "Product image"}
             fill
-            className="object-cover group-hover:invert transition-all duration-500"
+            className="object-cover"
             sizes="(max-width: 768px) 100vw, 400px"
             priority={currentIndex === 0}
           />
@@ -236,11 +236,11 @@ export function ProductInfoSidebar({ products }: ProductInfoSidebarProps) {
       >
         {/* Mobile description - shorter */}
         <p className="text-sm sm:text-base lg:text-lg text-white/80 leading-relaxed max-w-full lg:max-w-lg mx-auto lg:mx-0 block sm:hidden">
-          {truncateDescription(currentProduct.description, 85)}
+          {truncateDescription(currentProduct.description, 186)}
         </p>
         {/* Desktop description - longer */}
         <p className="text-sm sm:text-base lg:text-lg text-white/80 leading-relaxed max-w-full lg:max-w-lg mx-auto lg:mx-0 hidden sm:block">
-          {truncateDescription(currentProduct.description, 162)}
+          {truncateDescription(currentProduct.description, 186)}
         </p>
       </motion.div>
 
@@ -264,7 +264,7 @@ export function ProductInfoSidebar({ products }: ProductInfoSidebarProps) {
         </div>
       </motion.div>
 
-      {/* Add to Cart Button - Mobile Optimized */}
+      {/* VIEW PRODUCT Button - Mobile Optimized */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -281,7 +281,7 @@ export function ProductInfoSidebar({ products }: ProductInfoSidebarProps) {
             <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
 
             <motion.span className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500 block text-center text-white">
-              ADD TO CART
+              VIEW PRODUCT
             </motion.span>
           </motion.div>
         </Link>

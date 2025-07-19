@@ -3,7 +3,7 @@
 import clsx from "clsx"
 import { useProduct, useUpdateURL } from "./product-context"
 import type { ProductOption, ProductVariant } from "../../../lib/shopify/types"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Info } from "lucide-react"
 
 type Combination = {
@@ -16,23 +16,60 @@ interface VariantSelectorProps {
   options: ProductOption[]
   variants: ProductVariant[]
   hasSizeBasedPricing?: boolean
+  hideColorOption?: boolean
 }
 
-export function VariantSelector({ options, variants, hasSizeBasedPricing = false }: VariantSelectorProps) {
+export function VariantSelector({
+  options,
+  variants,
+  hasSizeBasedPricing = false,
+  hideColorOption = false,
+}: VariantSelectorProps) {
   const { state, updateOption } = useProduct()
   const updateURL = useUpdateURL()
-  const hasNoOptionsOrJustOneOption = !options.length || (options.length === 1 && options[0]?.values.length === 1)
   const [selectedOptions, setSelectedOptions] = useState<Record<string, boolean>>({})
+  const hasAutoSelectedColor = useRef(false)
 
-  // Track which options have been selected
+  // Filter out color option if hideColorOption is true
+  const filteredOptions = hideColorOption ? options.filter((option) => option.name.toLowerCase() !== "color") : options
+
+  // Auto-select color option if it's hidden and there's only one color (only run once)
+  useEffect(() => {
+    if (hideColorOption && !hasAutoSelectedColor.current) {
+      const colorOption = options.find((option) => option.name.toLowerCase() === "color")
+      if (colorOption && colorOption.values.length === 1) {
+        const colorValue = colorOption.values[0]
+        if (!state.color) {
+          hasAutoSelectedColor.current = true
+          const newState = updateOption("color", colorValue)
+          updateURL(newState)
+        }
+      }
+    }
+  }, [hideColorOption, options, state.color, updateOption, updateURL])
+
+  const hasNoOptionsOrJustOneOption =
+    !filteredOptions.length || (filteredOptions.length === 1 && filteredOptions[0]?.values.length === 1)
+
+  // Track which options have been selected - only update when actually changed
   useEffect(() => {
     const newSelectedOptions: Record<string, boolean> = {}
-    options.forEach((option) => {
+    let hasChanges = false
+
+    filteredOptions.forEach((option) => {
       const optionName = option.name.toLowerCase()
-      newSelectedOptions[optionName] = !!state[optionName]
+      const isSelected = !!state[optionName]
+      newSelectedOptions[optionName] = isSelected
+
+      if (selectedOptions[optionName] !== isSelected) {
+        hasChanges = true
+      }
     })
-    setSelectedOptions(newSelectedOptions)
-  }, [state, options])
+
+    if (hasChanges) {
+      setSelectedOptions(newSelectedOptions)
+    }
+  }, [state, filteredOptions])
 
   if (hasNoOptionsOrJustOneOption) {
     return null
@@ -47,7 +84,7 @@ export function VariantSelector({ options, variants, hasSizeBasedPricing = false
     ),
   }))
 
-  return options.map((option) => {
+  return filteredOptions.map((option) => {
     const optionName = option.name.toLowerCase()
     const isSelected = !!selectedOptions[optionName]
     const isSizeOption = optionName === "size"

@@ -91,7 +91,7 @@ async function RelatedProducts({ id }: { id: string }) {
   )
 }
 
-// Main ProductPage component with TXMX styling
+// Main ProductPage component with updated TXMX styling and responsive layout
 export default async function ProductPage(props: { params: Promise<{ handle: string }> }) {
   const params = await props.params
   const product = await getProduct(params.handle)
@@ -122,57 +122,111 @@ export default async function ProductPage(props: { params: Promise<{ handle: str
         }}
       />
 
-      {/* TXMX-styled product page with black background */}
-      <div className="bg-black min-h-screen">
-        <div className="mx-auto max-w-7xl px-4 pt-28 md:pt-32 pb-16">
-          {/* Main product container with TXMX border styling */}
-          <div className="relative border-2 border-white bg-black p-6 md:p-8 lg:p-12">
+      {/* TXMX-styled product page with black background - Fixed desktop layout */}
+      <div className="bg-black">
+        {/* Desktop: Full viewport height container, Mobile: normal flow */}
+        <div className="mx-auto max-w-7xl px-4 pt-28 md:pt-32 pb-16 lg:pt-32 lg:pb-0 lg:min-h-screen lg:flex lg:flex-col">
+          {/* Main product container - desktop uses remaining viewport space */}
+          <div className="relative border-2 border-white bg-black p-4 md:p-6 lg:p-8 mb-8 lg:mb-0 lg:flex-1 lg:min-h-0">
             {/* Back button with TXMX styling */}
             <div className="absolute top-4 left-4 z-20">
               <BackButton />
             </div>
 
-            <div className="flex flex-col lg:flex-row lg:gap-12 xl:gap-16">
-              {/* Product Gallery - Left side */}
-              <div className="w-full lg:w-3/5 mb-8 lg:mb-0">
-                <div className="border-2 border-white bg-black relative overflow-hidden">
+            {/* Desktop Layout (lg and up) - uses full available height */}
+            <div className="hidden lg:block h-full">
+              <div className="grid grid-cols-12 gap-8 h-full">
+                {/* Left Column - Product Gallery (7 columns) */}
+                <div className="col-span-7 h-full min-h-0">
+                  <div className="border-2 border-white bg-black relative overflow-hidden h-full">
+                    <Suspense
+                      fallback={
+                        <div className="relative w-full h-full overflow-hidden bg-black border border-white/20">
+                          <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
+                        </div>
+                      }
+                    >
+                      <Gallery
+                        images={product.images.slice(0, 5).map((image: Image) => ({
+                          src: image.url,
+                          altText: image.altText,
+                        }))}
+                      />
+                    </Suspense>
+                  </div>
+                </div>
+
+                {/* Right Column - Product Info (5 columns) */}
+                <div className="col-span-5 h-full min-h-0">
                   <Suspense
                     fallback={
-                      <div className="relative aspect-square w-full overflow-hidden bg-black border border-white/20">
-                        <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
+                      <div className="space-y-6 h-full">
+                        <div className="h-12 bg-white/10 animate-pulse"></div>
+                        <div className="h-16 bg-white/5 animate-pulse"></div>
+                        <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
+                        <div className="h-16 bg-white/10 animate-pulse"></div>
                       </div>
                     }
                   >
-                    <Gallery
-                      images={product.images.slice(0, 5).map((image: Image) => ({
-                        src: image.url,
-                        altText: image.altText,
-                      }))}
-                    />
+                    <ProductDescription product={product} isDesktop={true} />
                   </Suspense>
                 </div>
               </div>
+            </div>
 
-              {/* Product Information - Right side */}
-              <div className="w-full lg:w-2/5">
-                <Suspense
-                  fallback={
-                    <div className="space-y-6">
-                      <div className="h-12 bg-white/10 animate-pulse"></div>
-                      <div className="h-16 bg-white/5 animate-pulse"></div>
-                      <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
-                      <div className="h-16 bg-white/10 animate-pulse"></div>
-                    </div>
-                  }
-                >
-                  <ProductDescription product={product} />
-                </Suspense>
+            {/* Mobile/Tablet Layout (below lg) - improved scrolling */}
+            <div className="lg:hidden">
+              <div className="flex flex-col gap-6">
+                {/* Product Gallery */}
+                <div className="w-full">
+                  <div className="border-2 border-white bg-black relative overflow-hidden aspect-square">
+                    <Suspense
+                      fallback={
+                        <div className="relative aspect-square w-full overflow-hidden bg-black border border-white/20">
+                          <div className="absolute inset-0 bg-white/5 animate-pulse"></div>
+                        </div>
+                      }
+                    >
+                      <Gallery
+                        images={product.images.slice(0, 5).map((image: Image) => ({
+                          src: image.url,
+                          altText: image.altText,
+                        }))}
+                      />
+                    </Suspense>
+                  </div>
+                </div>
+
+                {/* Product Information - no height constraints */}
+                <div className="w-full">
+                  <Suspense
+                    fallback={
+                      <div className="space-y-6">
+                        <div className="h-12 bg-white/10 animate-pulse"></div>
+                        <div className="h-16 bg-white/5 animate-pulse"></div>
+                        <div className="h-10 bg-white/10 animate-pulse w-1/3"></div>
+                        <div className="h-16 bg-white/10 animate-pulse"></div>
+                      </div>
+                    }
+                  >
+                    <ProductDescription product={product} />
+                  </Suspense>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Related Products with TXMX styling */}
-          <RelatedProducts id={product.id} />
+          {/* Related Products - only show on mobile, desktop gets separate section */}
+          <div className="mb-8 lg:hidden">
+            <RelatedProducts id={product.id} />
+          </div>
+        </div>
+
+        {/* Related Products for Desktop - completely separate section below viewport */}
+        <div className="hidden lg:block bg-black">
+          <div className="mx-auto max-w-7xl px-4 py-16">
+            <RelatedProducts id={product.id} />
+          </div>
         </div>
       </div>
     </ProductProvider>

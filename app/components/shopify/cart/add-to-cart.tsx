@@ -13,22 +13,24 @@ function SubmitButton({
   selectedVariantId,
   isPending,
   isTXMXStyle = false,
+  quantity = 1,
 }: {
   availableForSale: boolean
   selectedVariantId: string | undefined
   isPending: boolean
   isTXMXStyle?: boolean
+  quantity?: number
 }) {
   if (isTXMXStyle) {
     // TXMX Style - matching the drop date badge
     const buttonClasses =
-      "w-full px-6 sm:px-8 py-3 sm:py-4 border-2 border-black bg-white relative overflow-hidden group cursor-pointer focus-within:ring-2 focus-within:ring-black/50 focus-within:ring-offset-2 focus-within:ring-offset-white transition-all duration-300"
+      "w-full px-4 sm:px-6 py-2 sm:py-3 border-2 border-white bg-black relative overflow-hidden group cursor-pointer focus-within:ring-2 focus-within:ring-white/50 focus-within:ring-offset-2 focus-within:ring-offset-black transition-all duration-300"
     const disabledClasses = "cursor-not-allowed opacity-60 hover:opacity-60"
 
     if (!availableForSale) {
       return (
         <button disabled className={clsx(buttonClasses, disabledClasses)}>
-          <span className="text-xl sm:text-2xl font-black tracking-wider text-black">OUT OF STOCK</span>
+          <span className="text-lg sm:text-xl font-black tracking-wider text-white">OUT OF STOCK</span>
         </button>
       )
     }
@@ -36,15 +38,19 @@ function SubmitButton({
     if (!selectedVariantId) {
       return (
         <button aria-label="Please select an option" disabled className={clsx(buttonClasses, disabledClasses)}>
-          <span className="text-xl sm:text-2xl font-black tracking-wider text-black">ADD TO CART</span>
+          <span className="text-lg sm:text-xl font-black tracking-wider text-white">ADD TO CART</span>
         </button>
       )
     }
 
+    const buttonText = isPending ? "ADDING..." : quantity > 1 ? `ADD ${quantity} TO CART` : "ADD TO CART"
+
+    const ariaLabel = quantity > 1 ? `Add ${quantity} items to cart` : "Add to cart"
+
     return (
       <motion.button
         type="submit"
-        aria-label="Add to cart"
+        aria-label={ariaLabel}
         className={clsx(buttonClasses, {
           "cursor-wait": isPending,
         })}
@@ -52,9 +58,9 @@ function SubmitButton({
         whileTap={{ scale: isPending ? 1 : 0.98 }}
         disabled={isPending}
       >
-        <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-        <span className="text-xl sm:text-2xl font-black tracking-wider relative z-10 text-black group-hover:text-white transition-colors duration-500">
-          {isPending ? "ADDING..." : "ADD TO CART"}
+        <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+        <span className="text-lg sm:text-xl font-black tracking-wider relative z-10 text-white group-hover:text-black transition-colors duration-500">
+          {buttonText}
         </span>
       </motion.button>
     )
@@ -84,10 +90,14 @@ function SubmitButton({
     )
   }
 
+  const buttonText = isPending ? "Adding..." : quantity > 1 ? `Add ${quantity} To Cart` : "Add To Cart"
+
+  const ariaLabel = quantity > 1 ? `Add ${quantity} items to cart` : "Add to cart"
+
   return (
     <motion.button
       type="submit"
-      aria-label="Add to cart"
+      aria-label={ariaLabel}
       className={clsx(buttonClasses, {
         "hover:bg-emerald-500": !isPending,
         "cursor-wait": isPending,
@@ -110,12 +120,20 @@ function SubmitButton({
           <i className="ri-add-line h-5 w-5" aria-hidden="true"></i>
         )}
       </div>
-      {isPending ? "Adding..." : "Add To Cart"}
+      {buttonText}
     </motion.button>
   )
 }
 
-export function AddToCart({ product, isTXMXStyle = false }: { product: Product; isTXMXStyle?: boolean }) {
+export function AddToCart({
+  product,
+  isTXMXStyle = false,
+  quantity = 1,
+}: {
+  product: Product
+  isTXMXStyle?: boolean
+  quantity?: number
+}) {
   const { variants, availableForSale } = product
   const { addCartItem } = useCart()
   const { state } = useProduct()
@@ -126,25 +144,33 @@ export function AddToCart({ product, isTXMXStyle = false }: { product: Product; 
   )
   const defaultVariantId = variants.length === 1 ? variants[0]?.id : undefined
   const selectedVariantId = variant?.id || defaultVariantId
-  const addItemAction = formAction.bind(null, selectedVariantId)
 
   // Find the final variant that will be added to the cart
   const finalVariant = variants.find((v) => v.id === selectedVariantId)
 
   return (
     <form
-      action={async () => {
+      action={async (formData: FormData) => {
         if (finalVariant && selectedVariantId) {
-          addCartItem(finalVariant, product)
-          addItemAction()
+          // Add multiple items based on quantity to local cart context
+          for (let i = 0; i < quantity; i++) {
+            addCartItem(finalVariant, product)
+          }
+          // Call the server action with form data
+          formAction(formData)
         }
       }}
     >
+      {/* Hidden inputs for server action */}
+      <input type="hidden" name="selectedVariantId" value={selectedVariantId || ""} />
+      <input type="hidden" name="quantity" value={quantity.toString()} />
+
       <SubmitButton
         availableForSale={availableForSale}
         selectedVariantId={selectedVariantId}
         isPending={isPending || false}
         isTXMXStyle={isTXMXStyle}
+        quantity={quantity}
       />
       <p aria-live="polite" className="sr-only" role="status">
         {message}

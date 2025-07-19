@@ -83,8 +83,8 @@ export default async function CategoryPage(props: {
   if (isTXMXCollection) {
     return (
       <section className="bg-black">
-        {/* TXMX Hero Section - Mobile Optimized */}
-        <div className="min-h-screen bg-black text-white pt-16 md:pt-20 relative overflow-hidden">
+        {/* TXMX Hero Section - Properly Centered */}
+        <div className="min-h-screen bg-black text-white relative overflow-hidden flex items-center justify-center">
           {/* Subtle Animated Background Elements */}
           <div className="absolute inset-0 opacity-5">
             <div className="absolute top-1/4 left-1/4 w-96 h-96 border border-white/10 rotate-45 animate-pulse"></div>
@@ -95,9 +95,10 @@ export default async function CategoryPage(props: {
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900/30 to-black"></div>
 
-          <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8 relative z-10 min-h-screen">
+          {/* Hero Content - Centered */}
+          <div className="container mx-auto px-4 relative z-10 w-full">
             {/* Mobile-First Layout: Stack vertically on mobile, side-by-side on desktop */}
-            <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-16 lg:items-center min-h-screen">
+            <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-12 lg:items-center">
               {/* Product Carousel - Full width on mobile, left side on desktop */}
               <div className="flex items-center justify-center lg:justify-end order-1 lg:order-1">
                 <Suspense
@@ -114,7 +115,7 @@ export default async function CategoryPage(props: {
               </div>
 
               {/* Product Information - Full width on mobile, right side on desktop */}
-              <div className="flex items-start justify-center lg:justify-start order-2 lg:order-2 pb-8 lg:pb-0">
+              <div className="flex items-center justify-center lg:justify-start order-2 lg:order-2">
                 <Suspense
                   fallback={
                     <div className="w-full max-w-lg space-y-6">
@@ -133,7 +134,7 @@ export default async function CategoryPage(props: {
         </div>
 
         {/* TXMX Logo Section Below Hero - Clean Logo Only */}
-        <div className="bg-black py-16 sm:py-20 lg:py-24">
+        <div className="bg-black py-8 sm:py-12 lg:py-16">
           <div className="container mx-auto px-4">
             <div className="flex justify-center">
               <Image

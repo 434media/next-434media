@@ -362,10 +362,10 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                           </motion.div>
                         </div>
                         <h3 className="text-2xl lg:text-3xl font-black text-white group-hover:text-black mb-4 tracking-wider uppercase transition-colors duration-500">
-                          Welcome to the Fight!
+                          SOMOS BOXEO
                         </h3>
                         <p className="text-white group-hover:text-black text-lg leading-relaxed font-bold tracking-wide transition-colors duration-500">
-                          Get ready for exclusive drops and insider access.
+                          Exclusive drops and insider access.
                         </p>
                       </div>
                     </motion.div>
