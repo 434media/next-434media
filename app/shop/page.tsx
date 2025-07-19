@@ -137,7 +137,7 @@ export default function ShopPage() {
         </section>
 
         {/* Mobile Video Section (1080x1350 aspect ratio) */}
-        <section className="block md:hidden min-h-screen bg-black">
+        <section className="block md:hidden min-h-screen bg-black relative">
           <div className="w-full h-screen flex items-center justify-center relative">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -178,28 +178,28 @@ export default function ShopPage() {
                 )}
               </AnimatePresence>
             </motion.div>
-
-            {/* Shop Now Button Overlay - Mobile */}
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 1.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-10"
-            >
-              <button
-                onClick={handleShopNow}
-                disabled={isLoading}
-                className="px-6 py-3 border-2 border-white bg-black/80 backdrop-blur-sm relative overflow-hidden group hover:shadow-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Shop TXMX Boxing Collection"
-              >
-                <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-                <span className="text-xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
-                  {isLoading ? "LOADING..." : "BUY NOW"}
-                </span>
-              </button>
-            </motion.div>
           </div>
-        </section> 
+
+          {/* Mobile Buy Now Button Overlay - Positioned at bottom of hero video */}
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 px-4 w-full max-w-sm"
+          >
+            <button
+              onClick={handleShopNow}
+              disabled={isLoading}
+              className="w-full px-6 py-4 border-2 border-white bg-black/80 backdrop-blur-sm relative overflow-hidden group hover:shadow-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Shop TXMX Boxing Collection"
+            >
+              <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+              <span className="text-xl font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
+                {isLoading ? "LOADING..." : "BUY NOW"}
+              </span>
+            </button>
+          </motion.div>
+        </section>
 
         {/* Enhanced Coming Soon Section */}
         <section
@@ -239,4 +239,3 @@ export default function ShopPage() {
     </>
   )
 }
-
