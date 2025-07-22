@@ -14,6 +14,7 @@ import OpenCart from "./open-cart"
 import LoadingDots from "../loading-dots"
 import Price from "../price"
 import { CheckCircle, ExternalLink, ShoppingBag } from "lucide-react"
+import type { MetaPixelInitiateCheckoutData, MetaPixelEvent } from "../../../types/meta-pixel"
 
 type MerchandiseSearchParams = {
   [key: string]: string
@@ -29,6 +30,11 @@ const CHECKOUT_STATES = {
 }
 
 type CheckoutState = (typeof CHECKOUT_STATES)[keyof typeof CHECKOUT_STATES]
+
+// Generate a unique event ID for deduplication
+function generateEventId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+}
 
 export default function CartModal() {
   const { cart, updateCartItem, hasValidCheckout } = useCart()
@@ -144,6 +150,14 @@ export default function CartModal() {
     )
   }
 
+  // Check if cart contains TXMX products
+  const hasTXMXProducts = cart?.lines.some(
+    (item) =>
+      item.merchandise.product.tags?.some(
+        (tag) => tag.toLowerCase().includes("txmx") || tag.toLowerCase().includes("boxing"),
+      ) || item.merchandise.product.productType?.toLowerCase().includes("boxing"),
+  )
+
   // Improved handleCheckout function with better desktop popup detection:
   const handleCheckout = async () => {
     try {
@@ -154,6 +168,54 @@ export default function CartModal() {
       if (!hasValidCheckout) {
         // If there's no valid checkout URL, create a new cart
         await createCartAndSetCookie()
+      }
+
+      // Track initiate checkout for TXMX products
+      if (hasTXMXProducts && cart) {
+        const eventId = generateEventId()
+        const cartValue = Number.parseFloat(cart.cost.totalAmount.amount)
+
+        // Client-side Meta Pixel event
+        if (typeof window !== "undefined" && window.fbq) {
+          const eventData: MetaPixelInitiateCheckoutData = {
+            content_ids: cart.lines.map((item) => item.merchandise.product.id),
+            content_type: "product",
+            content_category: "txmx-boxing",
+            value: cartValue,
+            currency: cart.cost.totalAmount.currencyCode,
+            num_items: cart.totalQuantity,
+          }
+
+          const eventOptions: MetaPixelEvent = { eventID: eventId }
+
+          window.fbq("track", "InitiateCheckout", eventData, eventOptions)
+        }
+
+        // Server-side Conversions API event
+        fetch("/api/meta/txmx/initiate-checkout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            eventId,
+            cartId: cart.id,
+            value: cartValue,
+            currency: cart.cost.totalAmount.currencyCode,
+            numItems: cart.totalQuantity,
+            products: cart.lines.map((item) => ({
+              productId: item.merchandise.product.id,
+              productTitle: item.merchandise.product.title,
+              productHandle: item.merchandise.product.handle,
+              variantId: item.merchandise.id,
+              variantTitle: item.merchandise.title,
+              quantity: item.quantity,
+              price: Number.parseFloat(item.cost.totalAmount.amount),
+            })),
+          }),
+        }).catch((error) => {
+          console.error("Failed to track initiate checkout event:", error)
+        })
       }
 
       const checkoutUrl = await getCheckoutUrl()
@@ -326,7 +388,7 @@ export default function CartModal() {
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center bg-black border border-white">
                           <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-2">
                             {item.quantity}
                           </p>
                           <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />

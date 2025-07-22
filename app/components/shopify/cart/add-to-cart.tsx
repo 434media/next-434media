@@ -3,10 +3,16 @@
 import { useActionState } from "react"
 import { motion } from "motion/react"
 import type { Product, ProductVariant } from "../../../lib/shopify/types"
+import type { MetaPixelAddToCartData, MetaPixelEvent } from "../../../types/meta-pixel"
 import clsx from "clsx"
 import { addItem } from "./actions"
 import { useProduct } from "../product/product-context"
 import { useCart } from "./cart-context"
+
+// Generate a unique event ID for deduplication
+function generateEventId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+}
 
 function SubmitButton({
   availableForSale,
@@ -14,17 +20,73 @@ function SubmitButton({
   isPending,
   isTXMXStyle = false,
   quantity = 1,
+  product,
+  variant,
 }: {
   availableForSale: boolean
   selectedVariantId: string | undefined
   isPending: boolean
   isTXMXStyle?: boolean
   quantity?: number
+  product: Product
+  variant?: ProductVariant
 }) {
+  const handleAddToCart = () => {
+    if (!variant || !selectedVariantId) return
+
+    // Check if this is a TXMX product
+    const isTXMXProduct =
+      product.tags?.some((tag) => tag.toLowerCase().includes("txmx") || tag.toLowerCase().includes("boxing")) ||
+      product.productType?.toLowerCase().includes("boxing")
+
+    if (isTXMXProduct) {
+      // Track add to cart event for TXMX products
+      const eventId = generateEventId()
+
+      // Client-side Meta Pixel event
+      if (typeof window !== "undefined" && window.fbq) {
+        const eventData: MetaPixelAddToCartData = {
+          content_ids: [product.id],
+          content_type: "product",
+          content_name: product.title,
+          content_category: "txmx-boxing",
+          value: Number.parseFloat(variant.price.amount) * quantity,
+          currency: variant.price.currencyCode,
+          num_items: quantity,
+        }
+
+        const eventOptions: MetaPixelEvent = { eventID: eventId }
+
+        window.fbq("track", "AddToCart", eventData, eventOptions)
+      }
+
+      // Server-side Conversions API event
+      fetch("/api/meta/txmx/add-to-cart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId,
+          productId: product.id,
+          productTitle: product.title,
+          productHandle: product.handle,
+          variantId: selectedVariantId,
+          variantTitle: variant.title,
+          quantity,
+          value: Number.parseFloat(variant.price.amount) * quantity,
+          currency: variant.price.currencyCode,
+        }),
+      }).catch((error) => {
+        console.error("Failed to track add to cart event:", error)
+      })
+    }
+  }
+
   if (isTXMXStyle) {
     // TXMX Style - matching the drop date badge
     const buttonClasses =
-      "w-full px-4 sm:px-6 py-2 sm:py-3 border-2 border-white bg-black relative overflow-hidden group cursor-pointer focus-within:ring-2 focus-within:ring-white/50 focus-within:ring-offset-2 focus-within:ring-offset-black transition-all duration-300"
+      "w-full px-4 sm:px-6 py-3 sm:py-4 border-2 border-white bg-black relative overflow-hidden group cursor-pointer focus-within:ring-2 focus-within:ring-white/50 focus-within:ring-offset-2 focus-within:ring-offset-black transition-all duration-300"
     const disabledClasses = "cursor-not-allowed opacity-60 hover:opacity-60"
 
     if (!availableForSale) {
@@ -57,6 +119,7 @@ function SubmitButton({
         whileHover={{ scale: isPending ? 1 : 1.02 }}
         whileTap={{ scale: isPending ? 1 : 0.98 }}
         disabled={isPending}
+        onClick={handleAddToCart}
       >
         <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
         <span className="text-lg sm:text-xl font-black tracking-wider relative z-10 text-white group-hover:text-black transition-colors duration-500">
@@ -105,6 +168,7 @@ function SubmitButton({
       whileHover={{ scale: isPending ? 1 : 1.02 }}
       whileTap={{ scale: isPending ? 1 : 0.98 }}
       disabled={isPending}
+      onClick={handleAddToCart}
     >
       <div className="absolute left-0 ml-4">
         {isPending ? (
@@ -171,6 +235,8 @@ export function AddToCart({
         isPending={isPending || false}
         isTXMXStyle={isTXMXStyle}
         quantity={quantity}
+        product={product}
+        variant={finalVariant}
       />
       <p aria-live="polite" className="sr-only" role="status">
         {message}

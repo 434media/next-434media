@@ -4,10 +4,16 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import Image from "next/image"
 import Link from "next/link"
-import type { Product } from "../../../app/lib/shopify/types"
+import type { Product } from "../../lib/shopify/types"
+import type { MetaPixelViewContentData, MetaPixelEvent } from "../../types/meta-pixel"
 
 interface ProductImageCarouselProps {
   products: Product[]
+}
+
+// Generate a unique event ID for deduplication
+function generateEventId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
 export function ProductImageCarousel({ products }: ProductImageCarouselProps) {
@@ -32,6 +38,52 @@ export function ProductImageCarousel({ products }: ProductImageCarouselProps) {
 
     return () => clearInterval(interval)
   }, [allImages.length])
+
+  // Track view content when image changes
+  useEffect(() => {
+    const currentImage = allImages[currentIndex]
+    if (currentImage) {
+      const product = products.find((p) => p.handle === currentImage.productHandle)
+      if (product) {
+        // Track view content event
+        const eventId = generateEventId()
+
+        // Client-side Meta Pixel event
+        if (typeof window !== "undefined" && window.fbq) {
+          const eventData: MetaPixelViewContentData = {
+            content_ids: [product.id],
+            content_type: "product",
+            content_name: product.title,
+            content_category: "txmx-boxing",
+            value: Number.parseFloat(product.priceRange.minVariantPrice.amount),
+            currency: product.priceRange.minVariantPrice.currencyCode,
+          }
+
+          const eventOptions: MetaPixelEvent = { eventID: eventId }
+
+          window.fbq("track", "ViewContent", eventData, eventOptions)
+        }
+
+        // Server-side Conversions API event
+        fetch("/api/meta/txmx/view-content", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            eventId,
+            productId: product.id,
+            productTitle: product.title,
+            productHandle: product.handle,
+            value: Number.parseFloat(product.priceRange.minVariantPrice.amount),
+            currency: product.priceRange.minVariantPrice.currencyCode,
+          }),
+        }).catch((error) => {
+          console.error("Failed to track view content event:", error)
+        })
+      }
+    }
+  }, [currentIndex, allImages, products])
 
   const nextImage = () => {
     setCurrentIndex((prev) => (prev + 1) % allImages.length)
@@ -276,6 +328,44 @@ export function ProductInfoSidebar({ products }: ProductInfoSidebarProps) {
             className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4 border-2 border-white bg-black relative overflow-hidden group cursor-pointer focus-within:ring-2 focus-within:ring-white/50 focus-within:ring-offset-2 focus-within:ring-offset-black w-full"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              // Track view product click
+              const eventId = generateEventId()
+
+              // Client-side Meta Pixel event
+              if (typeof window !== "undefined" && window.fbq) {
+                const eventData: MetaPixelViewContentData = {
+                  content_ids: [currentProduct.id],
+                  content_type: "product",
+                  content_name: currentProduct.title,
+                  content_category: "txmx-boxing",
+                  value: Number.parseFloat(currentProduct.priceRange.minVariantPrice.amount),
+                  currency: currentProduct.priceRange.minVariantPrice.currencyCode,
+                }
+
+                const eventOptions: MetaPixelEvent = { eventID: eventId }
+
+                window.fbq("track", "ViewContent", eventData, eventOptions)
+              }
+
+              // Server-side Conversions API event
+              fetch("/api/meta/txmx/view-content", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  eventId,
+                  productId: currentProduct.id,
+                  productTitle: currentProduct.title,
+                  productHandle: currentProduct.handle,
+                  value: Number.parseFloat(currentProduct.priceRange.minVariantPrice.amount),
+                  currency: currentProduct.priceRange.minVariantPrice.currencyCode,
+                }),
+              }).catch((error) => {
+                console.error("Failed to track view content event:", error)
+              })
+            }}
           >
             {/* Sliding Background Effect - Exact same as drop badge */}
             <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
