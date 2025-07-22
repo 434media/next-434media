@@ -112,4 +112,5 @@ We follow a standard feature-branch workflow.
     git push origin feature/your-feature-name
     ```
 4.  **Create a Pull Request (PR)**: Open a Pull Request on GitHub from your feature branch to the `main` branch.
-5.  **Review and Merge**: Once the PR is reviewed, approved, and all automated checks have passed, it will be merged into `main`. The `main` branch is automatically deployed to production by
+5.  **Review and Merge**: Once the PR is reviewed, approved, and all automated checks have passed, it will be merged into `main`.
+
