@@ -4,10 +4,21 @@ import type { TXMXProductData } from "../../../../types/meta-pixel"
 
 export async function POST(request: NextRequest) {
   try {
-    const { eventId, product }: { eventId?: string; product: TXMXProductData } = await request.json()
+    const {
+      eventId,
+      product,
+    }: {
+      eventId?: string
+      product: TXMXProductData
+    } = await request.json()
 
     if (!product || !product.productId || !product.productTitle) {
-      return NextResponse.json({ error: "Product data with productId and productTitle is required" }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: "Product data with productId and productTitle is required",
+        },
+        { status: 400 },
+      )
     }
 
     // Get the current URL for event source
@@ -22,7 +33,10 @@ export async function POST(request: NextRequest) {
         product: {
           id: product.productId,
           title: product.productTitle,
+          value: product.value,
         },
+        eventId,
+        timestamp: new Date().toISOString(),
       })
     } else {
       return NextResponse.json({ error: "Failed to track TXMX ViewContent event" }, { status: 500 })
@@ -33,7 +47,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Health check endpoint
 export async function GET() {
   return NextResponse.json({
     status: "ok",

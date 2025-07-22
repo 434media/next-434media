@@ -4,18 +4,25 @@ import type { TXMXCartData } from "../../../../types/meta-pixel"
 
 export async function POST(request: NextRequest) {
   try {
-    const { eventId, cart }: { eventId?: string; cart: TXMXCartData } = await request.json()
+    const {
+      eventId,
+      cart,
+    }: {
+      eventId?: string
+      cart: TXMXCartData
+    } = await request.json()
 
-    if (!cart || !cart.cartId) {
-      return NextResponse.json({ error: "Cart data with cartId is required" }, { status: 400 })
+    if (!cart || !cart.cartId || cart.value <= 0 || cart.numItems <= 0) {
+      return NextResponse.json(
+        {
+          error: "Cart data with cartId, positive value, and positive numItems is required",
+        },
+        { status: 400 },
+      )
     }
 
     if (!cart.products || cart.products.length === 0) {
       return NextResponse.json({ error: "Cart must contain at least one product" }, { status: 400 })
-    }
-
-    if (!cart.value || cart.value <= 0) {
-      return NextResponse.json({ error: "Cart value must be greater than 0" }, { status: 400 })
     }
 
     // Get the current URL for event source
@@ -30,10 +37,11 @@ export async function POST(request: NextRequest) {
         cart: {
           id: cart.cartId,
           value: cart.value,
-          currency: cart.currency,
           numItems: cart.numItems,
           productCount: cart.products.length,
         },
+        eventId,
+        timestamp: new Date().toISOString(),
       })
     } else {
       return NextResponse.json({ error: "Failed to track TXMX InitiateCheckout event" }, { status: 500 })
@@ -44,7 +52,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Health check endpoint
 export async function GET() {
   return NextResponse.json({
     status: "ok",

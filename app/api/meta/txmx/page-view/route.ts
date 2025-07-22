@@ -3,7 +3,7 @@ import { trackTXMXPageView } from "../../../../lib/meta-server-tracking"
 
 export async function POST(request: NextRequest) {
   try {
-    const { eventId, page } = await request.json()
+    const { eventId }: { eventId?: string } = await request.json()
 
     // Get the current URL for event source
     const eventSourceUrl = request.headers.get("referer") || request.url
@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: "TXMX PageView event tracked successfully",
+        eventId,
+        timestamp: new Date().toISOString(),
       })
     } else {
       return NextResponse.json({ error: "Failed to track TXMX PageView event" }, { status: 500 })
@@ -24,7 +26,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Health check endpoint
 export async function GET() {
   return NextResponse.json({
     status: "ok",

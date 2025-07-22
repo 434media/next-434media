@@ -4,18 +4,25 @@ import type { TXMXOrderData } from "../../../../types/meta-pixel"
 
 export async function POST(request: NextRequest) {
   try {
-    const { eventId, order }: { eventId?: string; order: TXMXOrderData } = await request.json()
+    const {
+      eventId,
+      order,
+    }: {
+      eventId?: string
+      order: TXMXOrderData
+    } = await request.json()
 
-    if (!order || !order.orderId) {
-      return NextResponse.json({ error: "Order data with orderId is required" }, { status: 400 })
+    if (!order || !order.orderId || order.value <= 0 || order.numItems <= 0) {
+      return NextResponse.json(
+        {
+          error: "Order data with orderId, positive value, and positive numItems is required",
+        },
+        { status: 400 },
+      )
     }
 
     if (!order.products || order.products.length === 0) {
       return NextResponse.json({ error: "Order must contain at least one product" }, { status: 400 })
-    }
-
-    if (!order.value || order.value <= 0) {
-      return NextResponse.json({ error: "Order value must be greater than 0" }, { status: 400 })
     }
 
     // Get the current URL for event source
@@ -30,11 +37,12 @@ export async function POST(request: NextRequest) {
         order: {
           id: order.orderId,
           value: order.value,
-          currency: order.currency,
           numItems: order.numItems,
           productCount: order.products.length,
-          hasEmail: !!order.email,
+          email: order.email ? "provided" : "not provided",
         },
+        eventId,
+        timestamp: new Date().toISOString(),
       })
     } else {
       return NextResponse.json({ error: "Failed to track TXMX Purchase event" }, { status: 500 })
@@ -45,7 +53,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Health check endpoint
 export async function GET() {
   return NextResponse.json({
     status: "ok",
