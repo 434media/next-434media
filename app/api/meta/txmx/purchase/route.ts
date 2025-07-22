@@ -1,44 +1,55 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { MetaConversionsAPI } from "../../../../lib/meta-conversions-api"
-import { extractUserDataFromRequest } from "../../../../lib/meta-user-data"
-
-const metaAPI = new MetaConversionsAPI()
+import { trackTXMXPurchase } from "../../../../lib/meta-server-tracking"
+import type { TXMXOrderData } from "../../../../types/meta-pixel"
 
 export async function POST(request: NextRequest) {
   try {
-    const { eventId, order, email } = await request.json()
+    const { eventId, order }: { eventId?: string; order: TXMXOrderData } = await request.json()
 
-    if (!order) {
-      return NextResponse.json({ error: "Order data required" }, { status: 400 })
+    if (!order || !order.orderId) {
+      return NextResponse.json({ error: "Order data with orderId is required" }, { status: 400 })
     }
 
-    const userData = extractUserDataFromRequest(request)
-
-    // Add email if provided
-    if (email) {
-      userData.em = [email]
+    if (!order.products || order.products.length === 0) {
+      return NextResponse.json({ error: "Order must contain at least one product" }, { status: 400 })
     }
 
-    const customData = {
-      currency: order.currency || "USD",
-      value: Number.parseFloat(order.totalPrice || "0"),
-      content_ids: order.lineItems?.map((item: any) => item.variant.product.id) || [],
-      content_type: "product",
-      content_category: "txmx-boxing",
-      num_items: order.lineItems?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0,
+    if (!order.value || order.value <= 0) {
+      return NextResponse.json({ error: "Order value must be greater than 0" }, { status: 400 })
     }
 
-    const event = metaAPI.createEvent("Purchase", userData, customData, eventId)
+    // Get the current URL for event source
+    const eventSourceUrl = request.headers.get("referer") || request.url
 
-    const success = await metaAPI.sendEvent(event)
+    const success = await trackTXMXPurchase(order, eventId, eventSourceUrl)
 
     if (success) {
-      return NextResponse.json({ success: true })
+      return NextResponse.json({
+        success: true,
+        message: "TXMX Purchase event tracked successfully",
+        order: {
+          id: order.orderId,
+          value: order.value,
+          currency: order.currency,
+          numItems: order.numItems,
+          productCount: order.products.length,
+          hasEmail: !!order.email,
+        },
+      })
     } else {
-      return NextResponse.json({ error: "Failed to send event" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to track TXMX Purchase event" }, { status: 500 })
     }
   } catch (error) {
     console.error("TXMX Purchase API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+// Health check endpoint
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    endpoint: "TXMX Purchase Tracking",
+    timestamp: new Date().toISOString(),
+  })
 }

@@ -1,60 +1,67 @@
-// Meta Pixel types
+// Meta Pixel Types
 export interface MetaPixelEvent {
-  eventID?: string
+  eventName: string
+  eventId?: string
+  eventData?: {
+    content_ids?: string[]
+    content_type?: string
+    content_name?: string
+    content_category?: string
+    value?: number
+    currency?: string
+    num_items?: number
+    product_catalog_id?: string
+  }
 }
 
-export interface MetaPixelViewContentData {
-  content_ids: string[]
-  content_type: string
-  content_name: string
-  content_category: string
+export interface TXMXProductData {
+  productId: string
+  productTitle: string
+  productHandle: string
+  variantId?: string
+  variantTitle?: string
+  quantity?: number
   value: number
   currency: string
 }
 
-export interface MetaPixelAddToCartData {
-  content_ids: string[]
-  content_type: string
-  content_name: string
-  content_category: string
+export interface TXMXCartData {
+  cartId: string
   value: number
   currency: string
-  num_items: number
+  numItems: number
+  products: Array<{
+    productId: string
+    productTitle: string
+    productHandle: string
+    variantId: string
+    variantTitle: string
+    quantity: number
+    price: number
+  }>
 }
 
-export interface MetaPixelInitiateCheckoutData {
-  content_ids: string[]
-  content_type: string
-  content_category: string
+export interface TXMXOrderData {
+  orderId: string
   value: number
   currency: string
-  num_items: number
+  numItems: number
+  email?: string
+  products: Array<{
+    productId: string
+    productTitle: string
+    quantity: number
+    price: number
+  }>
 }
 
-export interface MetaPixelPurchaseData {
-  content_ids: string[]
-  content_type: string
-  content_category: string
-  value: number
-  currency: string
-  num_items: number
-}
-
-export type MetaPixelEventData =
-  | MetaPixelViewContentData
-  | MetaPixelAddToCartData
-  | MetaPixelInitiateCheckoutData
-  | MetaPixelPurchaseData
-
-export interface FacebookPixel {
-  (action: "track", eventName: string, data: MetaPixelEventData, options?: MetaPixelEvent): void
-  (action: "trackCustom", eventName: string, data?: Record<string, any>, options?: MetaPixelEvent): void
-  (action: "init", pixelId: string, options?: Record<string, any>): void
-}
-
-// Extend the Window interface to include fbq
+// Extend Window interface to include fbq
 declare global {
   interface Window {
-    fbq?: FacebookPixel
+    fbq: (
+      action: "track" | "trackCustom" | "init" | "consent",
+      eventName: string,
+      parameters?: Record<string, any>,
+    ) => void
   }
 }

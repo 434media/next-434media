@@ -1,34 +1,65 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { MetaConversionsAPI } from "../../../../lib/meta-conversions-api"
-import { extractUserDataFromRequest, extractProductData } from "../../../../lib/meta-user-data"
-
-const metaAPI = new MetaConversionsAPI()
+import { trackTXMXAddToCart } from "../../../../lib/meta-server-tracking"
+import type { TXMXProductData } from "../../../../types/meta-pixel"
 
 export async function POST(request: NextRequest) {
   try {
-    const { eventId, product, quantity = 1 } = await request.json()
+    const {
+      eventId,
+      product,
+    }: {
+      eventId?: string
+      product: TXMXProductData & {
+        variantId: string
+        variantTitle: string
+        quantity: number
+      }
+    } = await request.json()
 
-    if (!product) {
-      return NextResponse.json({ error: "Product data required" }, { status: 400 })
+    if (!product || !product.productId || !product.productTitle || !product.variantId) {
+      return NextResponse.json(
+        {
+          error: "Product data with productId, productTitle, and variantId is required",
+        },
+        { status: 400 },
+      )
     }
 
-    const userData = extractUserDataFromRequest(request)
-    const customData = {
-      ...extractProductData(product),
-      num_items: quantity,
+    if (!product.quantity || product.quantity < 1) {
+      return NextResponse.json({ error: "Valid quantity (>= 1) is required" }, { status: 400 })
     }
 
-    const event = metaAPI.createEvent("AddToCart", userData, customData, eventId)
+    // Get the current URL for event source
+    const eventSourceUrl = request.headers.get("referer") || request.url
 
-    const success = await metaAPI.sendEvent(event)
+    const success = await trackTXMXAddToCart(product, eventId, eventSourceUrl)
 
     if (success) {
-      return NextResponse.json({ success: true })
+      return NextResponse.json({
+        success: true,
+        message: "TXMX AddToCart event tracked successfully",
+        product: {
+          id: product.productId,
+          title: product.productTitle,
+          variant: product.variantId,
+          quantity: product.quantity,
+          value: product.value,
+        },
+      })
     } else {
-      return NextResponse.json({ error: "Failed to send event" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to track TXMX AddToCart event" }, { status: 500 })
     }
   } catch (error) {
     console.error("TXMX AddToCart API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+// Health check endpoint
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    endpoint: "TXMX AddToCart Tracking",
+    timestamp: new Date().toISOString(),
+  })
 }
