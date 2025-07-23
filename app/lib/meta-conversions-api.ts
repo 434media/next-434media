@@ -72,8 +72,17 @@ export class MetaConversionsAPI {
     customData?: CustomData,
     eventId?: string,
     eventSourceUrl?: string,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; response?: any }> {
     try {
+      // Validate required parameters
+      if (!eventName) {
+        throw new Error("Event name is required")
+      }
+
+      if (!this.pixelId || !this.accessToken) {
+        throw new Error("Pixel ID and Access Token are required")
+      }
+
       const hashedUserData: UserData = {
         client_ip_address: userData.clientIpAddress,
         client_user_agent: userData.clientUserAgent,
@@ -94,7 +103,7 @@ export class MetaConversionsAPI {
       const serverEvent: ServerEvent = {
         event_name: eventName,
         event_time: Math.floor(Date.now() / 1000),
-        event_id: eventId,
+        event_id: eventId || `${eventName.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         user_data: hashedUserData,
         custom_data: customData,
         action_source: "website",
@@ -105,10 +114,19 @@ export class MetaConversionsAPI {
         data: [serverEvent],
       }
 
-      // Add test event code if in development
+      // Add test event code if available
       if (this.testEventCode) {
         payload.test_event_code = this.testEventCode
       }
+
+      console.log("Sending Meta Conversions API event:", {
+        eventName,
+        eventId: serverEvent.event_id,
+        pixelId: this.pixelId,
+        hasTestCode: !!this.testEventCode,
+        userDataKeys: Object.keys(hashedUserData).filter((key) => hashedUserData[key as keyof UserData]),
+        customDataKeys: customData ? Object.keys(customData) : [],
+      })
 
       const response = await fetch(`https://graph.facebook.com/v18.0/${this.pixelId}/events`, {
         method: "POST",
@@ -119,22 +137,45 @@ export class MetaConversionsAPI {
         body: JSON.stringify(payload),
       })
 
+      const responseText = await response.text()
+      let responseData
+
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("Failed to parse Meta API response:", responseText)
+        return {
+          success: false,
+          error: `Invalid JSON response: ${responseText}`,
+        }
+      }
+
       if (!response.ok) {
-        const errorData = await response.text()
         console.error("Meta Conversions API Error:", {
           status: response.status,
           statusText: response.statusText,
-          body: errorData,
+          body: responseData,
+          headers: Object.fromEntries(response.headers.entries()),
         })
-        return false
+
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${responseData?.error?.message || responseText}`,
+          response: responseData,
+        }
       }
 
-      const result = await response.json()
-      console.log("Meta Conversions API Success:", result)
-      return true
+      console.log("Meta Conversions API Success:", responseData)
+      return {
+        success: true,
+        response: responseData,
+      }
     } catch (error) {
       console.error("Meta Conversions API Error:", error)
-      return false
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      }
     }
   }
 
@@ -149,7 +190,7 @@ export class MetaConversionsAPI {
     },
     eventId?: string,
     eventSourceUrl?: string,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; response?: any }> {
     return this.sendEvent("PageView", userData, undefined, eventId, eventSourceUrl)
   }
 
@@ -172,7 +213,7 @@ export class MetaConversionsAPI {
     },
     eventId?: string,
     eventSourceUrl?: string,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; response?: any }> {
     return this.sendEvent("ViewContent", userData, customData, eventId, eventSourceUrl)
   }
 
@@ -196,7 +237,7 @@ export class MetaConversionsAPI {
     },
     eventId?: string,
     eventSourceUrl?: string,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; response?: any }> {
     return this.sendEvent("AddToCart", userData, customData, eventId, eventSourceUrl)
   }
 
@@ -219,7 +260,7 @@ export class MetaConversionsAPI {
     },
     eventId?: string,
     eventSourceUrl?: string,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; response?: any }> {
     return this.sendEvent("InitiateCheckout", userData, customData, eventId, eventSourceUrl)
   }
 
@@ -242,7 +283,7 @@ export class MetaConversionsAPI {
     },
     eventId?: string,
     eventSourceUrl?: string,
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; response?: any }> {
     return this.sendEvent("Purchase", userData, customData, eventId, eventSourceUrl)
   }
 }

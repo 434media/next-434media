@@ -3,7 +3,7 @@
 import { useActionState } from "react"
 import { motion } from "motion/react"
 import type { Product, ProductVariant } from "../../../lib/shopify/types"
-import type { MetaPixelAddToCartData, MetaPixelEvent } from "../../../types/meta-pixel"
+import type { MetaPixelAddToCartData } from "../../../types/meta-pixel"
 import clsx from "clsx"
 import { addItem } from "./actions"
 import { useProduct } from "../product/product-context"
@@ -55,9 +55,8 @@ function SubmitButton({
           num_items: quantity,
         }
 
-        const eventOptions: MetaPixelEvent = { eventID: eventId }
-
-        window.fbq("track", "AddToCart", eventData, eventOptions)
+        // Fixed: Use options object for eventID
+        window.fbq("track", "AddToCart", eventData, { eventID: eventId })
       }
 
       // Server-side Conversions API event

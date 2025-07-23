@@ -13,12 +13,52 @@ interface TestResult {
   timestamp: string
   error?: string
   responseData?: any
+  duration?: number
+}
+
+interface TestSummary {
+  total: number
+  passed: number
+  failed: number
+  passRate: string
+  totalDuration: number
+  environment: {
+    hasPixelId: boolean
+    hasAccessToken: boolean
+    hasTestCode: boolean
+    nodeEnv?: string
+    vercel?: boolean
+  }
+  userData: {
+    hasIp: boolean
+    hasUserAgent: boolean
+    hasFbc: boolean
+    hasFbp: boolean
+  }
 }
 
 export default function MetaTestRunner() {
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<TestResult[]>([])
-  const [summary, setSummary] = useState<any>(null)
+  const [summary, setSummary] = useState<TestSummary | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<any>(null)
+
+  const testConnection = async () => {
+    setIsRunning(true)
+    try {
+      const response = await fetch("/api/meta/txmx/test-connection")
+      const data = await response.json()
+      setConnectionStatus(data)
+    } catch (error) {
+      setConnectionStatus({
+        success: false,
+        error: "Failed to test connection",
+        details: error instanceof Error ? error.message : "Unknown error",
+      })
+    } finally {
+      setIsRunning(false)
+    }
+  }
 
   const runAllTests = async () => {
     setIsRunning(true)
@@ -29,10 +69,23 @@ export default function MetaTestRunner() {
       const response = await fetch("/api/meta/txmx/run-tests")
       const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`)
+      }
+
       setResults(data.results || [])
       setSummary(data.summary)
     } catch (error) {
       console.error("Failed to run tests:", error)
+      setResults([
+        {
+          testName: "Test Suite",
+          success: false,
+          eventId: `error-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+      ])
     } finally {
       setIsRunning(false)
     }
@@ -130,7 +183,7 @@ export default function MetaTestRunner() {
         success: data.success || false,
         eventId: data.eventId || `manual-${testType}-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        error: data.error,
+        error: data.error || (!data.success ? "Request failed" : undefined),
         responseData: data,
       }
 
@@ -162,6 +215,9 @@ export default function MetaTestRunner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
+            <Button onClick={testConnection} disabled={isRunning} variant="secondary">
+              {isRunning ? "Testing..." : "Test Connection"}
+            </Button>
             <Button onClick={runAllTests} disabled={isRunning} variant="default">
               {isRunning ? "Running Tests..." : "Run All Tests"}
             </Button>
@@ -179,14 +235,56 @@ export default function MetaTestRunner() {
             </Button>
           </div>
 
+          {connectionStatus && (
+            <div
+              className={`p-4 rounded-lg ${connectionStatus.success ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}
+            >
+              <h3 className="font-semibold mb-2">Connection Test</h3>
+              <div className="text-sm space-y-1">
+                <div>
+                  Status:{" "}
+                  <Badge variant={connectionStatus.success ? "default" : "destructive"}>
+                    {connectionStatus.success ? "SUCCESS" : "FAILED"}
+                  </Badge>
+                </div>
+                {connectionStatus.error && <div className="text-red-600">Error: {connectionStatus.error}</div>}
+                {connectionStatus.details && <div className="text-red-600">Details: {connectionStatus.details}</div>}
+                {connectionStatus.testEventId && <div>Event ID: {connectionStatus.testEventId}</div>}
+                {connectionStatus.userDataSent && (
+                  <div>
+                    User Data: IP={connectionStatus.userDataSent.hasIp ? "✓" : "✗"}, UA=
+                    {connectionStatus.userDataSent.hasUserAgent ? "✓" : "✗"}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {summary && (
             <div className="p-4 bg-gray-50 rounded-lg">
               <h3 className="font-semibold mb-2">Test Summary</h3>
-              <div className="flex gap-4 text-sm">
-                <span>Total: {summary.total}</span>
-                <span className="text-green-600">Passed: {summary.passed}</span>
-                <span className="text-red-600">Failed: {summary.failed}</span>
-                <span>Pass Rate: {summary.passRate}</span>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="flex gap-4">
+                    <span>Total: {summary.total}</span>
+                    <span className="text-green-600">Passed: {summary.passed}</span>
+                    <span className="text-red-600">Failed: {summary.failed}</span>
+                    <span>Pass Rate: {summary.passRate}</span>
+                  </div>
+                  <div className="mt-2">Duration: {summary.totalDuration}ms</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-600">Environment:</div>
+                  <div className="text-xs">
+                    Pixel: {summary.environment.hasPixelId ? "✓" : "✗"} | Token:{" "}
+                    {summary.environment.hasAccessToken ? "✓" : "✗"} | Test Code:{" "}
+                    {summary.environment.hasTestCode ? "✓" : "✗"}
+                  </div>
+                  <div className="text-xs">
+                    IP: {summary.userData.hasIp ? "✓" : "✗"} | UA: {summary.userData.hasUserAgent ? "✓" : "✗"} | FBC:{" "}
+                    {summary.userData.hasFbc ? "✓" : "✗"} | FBP: {summary.userData.hasFbp ? "✓" : "✗"}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -201,15 +299,26 @@ export default function MetaTestRunner() {
           <CardContent>
             <div className="space-y-3">
               {results.map((result, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Badge variant={result.success ? "default" : "destructive"}>
-                      {result.success ? "PASS" : "FAIL"}
-                    </Badge>
-                    <span className="font-medium">{result.testName}</span>
-                    <span className="text-sm text-gray-500">ID: {result.eventId}</span>
+                <div key={index} className="p-3 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <Badge variant={result.success ? "default" : "destructive"}>
+                        {result.success ? "PASS" : "FAIL"}
+                      </Badge>
+                      <span className="font-medium">{result.testName}</span>
+                      <span className="text-sm text-gray-500">ID: {result.eventId}</span>
+                      {result.duration && <span className="text-xs text-gray-400">{result.duration}ms</span>}
+                    </div>
+                    <div className="text-sm text-gray-500">{new Date(result.timestamp).toLocaleTimeString()}</div>
                   </div>
-                  <div className="text-sm text-gray-500">{new Date(result.timestamp).toLocaleTimeString()}</div>
+                  {result.error && (
+                    <div className="text-sm text-red-600 bg-red-50 p-2 rounded">Error: {result.error}</div>
+                  )}
+                  {result.responseData && result.success && (
+                    <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded mt-2">
+                      Response: {JSON.stringify(result.responseData, null, 2)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

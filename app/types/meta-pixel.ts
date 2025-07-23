@@ -1,6 +1,6 @@
 // Meta Pixel Types
 export interface MetaPixelEvent {
-  eventName: string
+  eventName?: string
   eventId?: string
   eventData?: {
     content_ids?: string[]
@@ -12,6 +12,25 @@ export interface MetaPixelEvent {
     num_items?: number
     product_catalog_id?: string
   }
+}
+
+export interface MetaPixelAddToCartData {
+  content_ids: string[]
+  content_type: string
+  content_name: string
+  content_category: string
+  value: number
+  currency: string
+  num_items: number
+}
+
+export interface MetaPixelInitiateCheckoutData {
+  content_ids: string[]
+  content_type: string
+  content_category: string
+  value: number
+  currency: string
+  num_items: number
 }
 
 export interface TXMXProductData {
@@ -62,6 +81,7 @@ declare global {
       action: "track" | "trackCustom" | "init" | "consent",
       eventName: string,
       parameters?: Record<string, any>,
+      options?: { eventID?: string },
     ) => void
   }
 }

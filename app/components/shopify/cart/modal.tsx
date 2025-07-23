@@ -14,7 +14,7 @@ import OpenCart from "./open-cart"
 import LoadingDots from "../loading-dots"
 import Price from "../price"
 import { CheckCircle, ExternalLink, ShoppingBag } from "lucide-react"
-import type { MetaPixelInitiateCheckoutData, MetaPixelEvent } from "../../../types/meta-pixel"
+import type { MetaPixelInitiateCheckoutData } from "../../../types/meta-pixel"
 
 type MerchandiseSearchParams = {
   [key: string]: string
@@ -186,9 +186,7 @@ export default function CartModal() {
             num_items: cart.totalQuantity,
           }
 
-          const eventOptions: MetaPixelEvent = { eventID: eventId }
-
-          window.fbq("track", "InitiateCheckout", eventData, eventOptions)
+          window.fbq("track", "InitiateCheckout", eventData, { eventID: eventId })
         }
 
         // Server-side Conversions API event
@@ -388,7 +386,7 @@ export default function CartModal() {
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center bg-black border border-white">
                           <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-2">
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">
                             {item.quantity}
                           </p>
                           <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
