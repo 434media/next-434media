@@ -1,17 +1,6 @@
 // Meta Pixel Types
 export interface MetaPixelEvent {
-  eventName?: string
   eventId?: string
-  eventData?: {
-    content_ids?: string[]
-    content_type?: string
-    content_name?: string
-    content_category?: string
-    value?: number
-    currency?: string
-    num_items?: number
-    product_catalog_id?: string
-  }
 }
 
 export interface MetaPixelAddToCartData {
