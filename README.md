@@ -1,6 +1,7 @@
 # 434 Media Website (next-434media)
 
-This repository contains the source code for the official 434 Media website. It is a modern, full-stack application built with Next.js 15 (App Router), TypeScript, and a PostgreSQL database.
+This repository contains the source code for the official 434 Media website. 
+It is a modern, full-stack application built with Next.js, TypeScript, and a PostgreSQL database.
 
 ## Key Features
 
