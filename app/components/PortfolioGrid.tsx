@@ -435,7 +435,7 @@ export const portfolioArray: PortfolioItem[] = [
       "TXMX Boxing is a dynamic media platform designed to connect brands with a passionate fight fan audience. By celebrating the rich cultural heritage of Texas and Mexico, TXMX Boxing offers unique opportunities for brands to authentically engage with a community that is deeply rooted in both sport and culture.",
     video: "https://ampd-asset.s3.us-east-2.amazonaws.com/Copy+of+TXMX+Teaser+1.mp4",
     poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/txmx-poster.png",
-    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/txmx-poster.png",
+    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/bam3.jpg",
     gif: "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX.gif",
     showImage: true,
     showVideo: true,
@@ -471,7 +471,7 @@ export const portfolioArray: PortfolioItem[] = [
     title: "Creatively Raw. Curiosity Driven.",
     description:
       "A bilingual space for those who aren’t afraid to question, create, and grow.",
-    video: "https://ampd-asset.s3.us-east-2.amazonaws.com/VV+Web+Banner+2.mp4",
+    video: "https://ampd-asset.s3.us-east-2.amazonaws.com/VV_Intro_V01.mp4",
     poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/vv-poster.png",
     photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/vv-poster.png",
     gif: "https://ampd-asset.s3.us-east-2.amazonaws.com/vv-poster.png",
