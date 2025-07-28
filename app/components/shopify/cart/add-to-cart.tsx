@@ -3,7 +3,7 @@
 import { useActionState } from "react"
 import { motion } from "motion/react"
 import type { Product, ProductVariant } from "../../../lib/shopify/types"
-import type { MetaPixelAddToCartData } from "../../../types/meta-pixel"
+// import type { MetaPixelAddToCartData } from "../../../types/meta-pixel"
 import clsx from "clsx"
 import { addItem } from "./actions"
 import { useProduct } from "../product/product-context"
@@ -44,41 +44,41 @@ function SubmitButton({
       const eventId = generateEventId()
 
       // Client-side Meta Pixel event
-      if (typeof window !== "undefined" && window.fbq) {
-        const eventData: MetaPixelAddToCartData = {
-          content_ids: [product.id],
-          content_type: "product",
-          content_name: product.title,
-          content_category: "txmx-boxing",
-          value: Number.parseFloat(variant.price.amount) * quantity,
-          currency: variant.price.currencyCode,
-          num_items: quantity,
-        }
+      // if (typeof window !== "undefined" && window.fbq) {
+      //   const eventData: MetaPixelAddToCartData = {
+      //     content_ids: [product.id],
+      //     content_type: "product",
+      //     content_name: product.title,
+      //     content_category: "txmx-boxing",
+      //     value: Number.parseFloat(variant.price.amount) * quantity,
+      //     currency: variant.price.currencyCode,
+      //     num_items: quantity,
+      //   }
 
-        // Fixed: Use options object for eventID
-        window.fbq("track", "AddToCart", eventData, { eventID: eventId })
-      }
+      //   // Fixed: Use options object for eventID
+      //   window.fbq("track", "AddToCart", eventData, { eventID: eventId })
+      // }
 
       // Server-side Conversions API event
-      fetch("/api/meta/txmx/add-to-cart", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          eventId,
-          productId: product.id,
-          productTitle: product.title,
-          productHandle: product.handle,
-          variantId: selectedVariantId,
-          variantTitle: variant.title,
-          quantity,
-          value: Number.parseFloat(variant.price.amount) * quantity,
-          currency: variant.price.currencyCode,
-        }),
-      }).catch((error) => {
-        console.error("Failed to track add to cart event:", error)
-      })
+      // fetch("/api/meta/txmx/add-to-cart", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify({
+      //     eventId,
+      //     productId: product.id,
+      //     productTitle: product.title,
+      //     productHandle: product.handle,
+      //     variantId: selectedVariantId,
+      //     variantTitle: variant.title,
+      //     quantity,
+      //     value: Number.parseFloat(variant.price.amount) * quantity,
+      //     currency: variant.price.currencyCode,
+      //   }),
+      // }).catch((error) => {
+      //   console.error("Failed to track add to cart event:", error)
+      // })
     }
   }
 

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react"
 import Image from "next/image"
 import Link from "next/link"
 import type { Product } from "../../lib/shopify/types"
-import type { MetaPixelViewContentData, MetaPixelEvent } from "../../types/meta-pixel"
+// import type { MetaPixelViewContentData, MetaPixelEvent } from "../../types/meta-pixel"
 
 interface ProductImageCarouselProps {
   products: Product[]
@@ -49,38 +49,38 @@ export function ProductImageCarousel({ products }: ProductImageCarouselProps) {
         const eventId = generateEventId()
 
         // Client-side Meta Pixel event
-        if (typeof window !== "undefined" && window.fbq) {
-          const eventData: MetaPixelViewContentData = {
-            content_ids: [product.id],
-            content_type: "product",
-            content_name: product.title,
-            content_category: "txmx-boxing",
-            value: Number.parseFloat(product.priceRange.minVariantPrice.amount),
-            currency: product.priceRange.minVariantPrice.currencyCode,
-          }
+        // if (typeof window !== "undefined" && window.fbq) {
+        //   const eventData: MetaPixelViewContentData = {
+        //     content_ids: [product.id],
+        //     content_type: "product",
+        //     content_name: product.title,
+        //     content_category: "txmx-boxing",
+        //     value: Number.parseFloat(product.priceRange.minVariantPrice.amount),
+        //     currency: product.priceRange.minVariantPrice.currencyCode,
+        //   }
 
-          const eventOptions: MetaPixelEvent = { eventID: eventId }
+        //   const eventOptions: MetaPixelEvent = { eventID: eventId }
 
-          window.fbq("track", "ViewContent", eventData, eventOptions)
-        }
+        //   window.fbq("track", "ViewContent", eventData, eventOptions)
+        // }
 
         // Server-side Conversions API event
-        fetch("/api/meta/txmx/view-content", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            eventId,
-            productId: product.id,
-            productTitle: product.title,
-            productHandle: product.handle,
-            value: Number.parseFloat(product.priceRange.minVariantPrice.amount),
-            currency: product.priceRange.minVariantPrice.currencyCode,
-          }),
-        }).catch((error) => {
-          console.error("Failed to track view content event:", error)
-        })
+        // fetch("/api/meta/txmx/view-content", {
+        //   method: "POST",
+        //   headers: {
+        //     "Content-Type": "application/json",
+        //   },
+        //   body: JSON.stringify({
+        //     eventId,
+        //     productId: product.id,
+        //     productTitle: product.title,
+        //     productHandle: product.handle,
+        //     value: Number.parseFloat(product.priceRange.minVariantPrice.amount),
+        //     currency: product.priceRange.minVariantPrice.currencyCode,
+        //   }),
+        // }).catch((error) => {
+        //   console.error("Failed to track view content event:", error)
+        // })
       }
     }
   }, [currentIndex, allImages, products])
@@ -333,38 +333,38 @@ export function ProductInfoSidebar({ products }: ProductInfoSidebarProps) {
               const eventId = generateEventId()
 
               // Client-side Meta Pixel event
-              if (typeof window !== "undefined" && window.fbq) {
-                const eventData: MetaPixelViewContentData = {
-                  content_ids: [currentProduct.id],
-                  content_type: "product",
-                  content_name: currentProduct.title,
-                  content_category: "txmx-boxing",
-                  value: Number.parseFloat(currentProduct.priceRange.minVariantPrice.amount),
-                  currency: currentProduct.priceRange.minVariantPrice.currencyCode,
-                }
+              // if (typeof window !== "undefined" && window.fbq) {
+              //   const eventData: MetaPixelViewContentData = {
+              //     content_ids: [currentProduct.id],
+              //     content_type: "product",
+              //     content_name: currentProduct.title,
+              //     content_category: "txmx-boxing",
+              //     value: Number.parseFloat(currentProduct.priceRange.minVariantPrice.amount),
+              //     currency: currentProduct.priceRange.minVariantPrice.currencyCode,
+              //   }
 
-                const eventOptions: MetaPixelEvent = { eventID: eventId }
+              //   const eventOptions: MetaPixelEvent = { eventID: eventId }
 
-                window.fbq("track", "ViewContent", eventData, eventOptions)
-              }
+              //   window.fbq("track", "ViewContent", eventData, eventOptions)
+              // }
 
               // Server-side Conversions API event
-              fetch("/api/meta/txmx/view-content", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  eventId,
-                  productId: currentProduct.id,
-                  productTitle: currentProduct.title,
-                  productHandle: currentProduct.handle,
-                  value: Number.parseFloat(currentProduct.priceRange.minVariantPrice.amount),
-                  currency: currentProduct.priceRange.minVariantPrice.currencyCode,
-                }),
-              }).catch((error) => {
-                console.error("Failed to track view content event:", error)
-              })
+              // fetch("/api/meta/txmx/view-content", {
+              //   method: "POST",
+              //   headers: {
+              //     "Content-Type": "application/json",
+              //   },
+              //   body: JSON.stringify({
+              //     eventId,
+              //     productId: currentProduct.id,
+              //     productTitle: currentProduct.title,
+              //     productHandle: currentProduct.handle,
+              //     value: Number.parseFloat(currentProduct.priceRange.minVariantPrice.amount),
+              //     currency: currentProduct.priceRange.minVariantPrice.currencyCode,
+              //   }),
+              // }).catch((error) => {
+              //   console.error("Failed to track view content event:", error)
+              // })
             }}
           >
             {/* Sliding Background Effect - Exact same as drop badge */}

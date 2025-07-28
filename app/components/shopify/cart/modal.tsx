@@ -14,7 +14,7 @@ import OpenCart from "./open-cart"
 import LoadingDots from "../loading-dots"
 import Price from "../price"
 import { CheckCircle, ExternalLink, ShoppingBag } from "lucide-react"
-import type { MetaPixelInitiateCheckoutData } from "../../../types/meta-pixel"
+// import type { MetaPixelInitiateCheckoutData, MetaPixelEvent } from "../../../types/meta-pixel"
 
 type MerchandiseSearchParams = {
   [key: string]: string
@@ -176,44 +176,45 @@ export default function CartModal() {
         const cartValue = Number.parseFloat(cart.cost.totalAmount.amount)
 
         // Client-side Meta Pixel event
-        if (typeof window !== "undefined" && window.fbq) {
-          const eventData: MetaPixelInitiateCheckoutData = {
-            content_ids: cart.lines.map((item) => item.merchandise.product.id),
-            content_type: "product",
-            content_category: "txmx-boxing",
-            value: cartValue,
-            currency: cart.cost.totalAmount.currencyCode,
-            num_items: cart.totalQuantity,
-          }
+        // if (typeof window !== "undefined" && window.fbq) {
+        //   const eventData: MetaPixelInitiateCheckoutData = {
+        //     content_ids: cart.lines.map((item) => item.merchandise.product.id),
+        //     content_type: "product",
+        //     content_category: "txmx-boxing",
+        //     value: cartValue,
+        //     currency: cart.cost.totalAmount.currencyCode,
+        //     num_items: cart.totalQuantity,
+        //   }
 
-          window.fbq("track", "InitiateCheckout", eventData, { eventID: eventId })
-        }
+        //   const eventOptions: MetaPixelEvent = { eventID: eventId }
+        //   window.fbq("track", "InitiateCheckout", eventData, eventOptions)
+        // }
 
         // Server-side Conversions API event
-        fetch("/api/meta/txmx/initiate-checkout", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            eventId,
-            cartId: cart.id,
-            value: cartValue,
-            currency: cart.cost.totalAmount.currencyCode,
-            numItems: cart.totalQuantity,
-            products: cart.lines.map((item) => ({
-              productId: item.merchandise.product.id,
-              productTitle: item.merchandise.product.title,
-              productHandle: item.merchandise.product.handle,
-              variantId: item.merchandise.id,
-              variantTitle: item.merchandise.title,
-              quantity: item.quantity,
-              price: Number.parseFloat(item.cost.totalAmount.amount),
-            })),
-          }),
-        }).catch((error) => {
-          console.error("Failed to track initiate checkout event:", error)
-        })
+        // fetch("/api/meta/txmx/initiate-checkout", {
+        //   method: "POST",
+        //   headers: {
+        //     "Content-Type": "application/json",
+        //   },
+        //   body: JSON.stringify({
+        //     eventId,
+        //     cartId: cart.id,
+        //     value: cartValue,
+        //     currency: cart.cost.totalAmount.currencyCode,
+        //     numItems: cart.totalQuantity,
+        //     products: cart.lines.map((item) => ({
+        //       productId: item.merchandise.product.id,
+        //       productTitle: item.merchandise.product.title,
+        //       productHandle: item.merchandise.product.handle,
+        //       variantId: item.merchandise.id,
+        //       variantTitle: item.merchandise.title,
+        //       quantity: item.quantity,
+        //       price: Number.parseFloat(item.cost.totalAmount.amount),
+        //     })),
+        //   }),
+        // }).catch((error) => {
+        //   console.error("Failed to track initiate checkout event:", error)
+        // })
       }
 
       const checkoutUrl = await getCheckoutUrl()
@@ -229,7 +230,6 @@ export default function CartModal() {
         } else {
           // On desktop, always open in new tab - no popup detection
           const newTab = window.open(checkoutUrl, "_blank", "noopener,noreferrer")
-
           // Set state to in progress regardless of newTab return value
           // Modern browsers may return null even when tab opens successfully
           setCheckoutWindow(newTab)
@@ -370,7 +370,6 @@ export default function CartModal() {
                         <DeleteItemButton item={item} optimisticUpdate={updateCartItem} />
                       </div>
                     </div>
-
                     <div className="flex flex-col flex-1 min-w-0">
                       <Link
                         href={merchandiseUrl}
@@ -382,11 +381,10 @@ export default function CartModal() {
                       {item.merchandise.title !== DEFAULT_OPTION && (
                         <p className="text-sm text-white/70 mt-1 font-medium">{item.merchandise.title}</p>
                       )}
-
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center bg-black border border-white">
                           <EditItemQuantityButton item={item} type="minus" optimisticUpdate={updateCartItem} />
-                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-1">
+                          <p className="w-8 h-8 text-center text-sm font-black text-black bg-white py-2">
                             {item.quantity}
                           </p>
                           <EditItemQuantityButton item={item} type="plus" optimisticUpdate={updateCartItem} />
