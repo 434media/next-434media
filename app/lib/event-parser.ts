@@ -12,23 +12,27 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
     console.log(`🔍 Parsing event URL: ${url}`)
 
     // Validate URL
-    const urlObj = new URL(url)
-    const hostname = urlObj.hostname.toLowerCase()
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
 
-    // Check supported platforms
-    if (!hostname.includes("meetup.com") && !hostname.includes("eventbrite.com") && !hostname.includes("lu.ma")) {
+    // Strictly check supported platforms using an allowlist of exact hostnames
+    const allowedHostnames = ["www.meetup.com", "www.eventbrite.com", "lu.ma"];
+    if (!allowedHostnames.includes(hostname)) {
       return {
         success: false,
         error: "Unsupported platform. Currently supports Meetup.com, Eventbrite.com, and Lu.ma",
-      }
+      };
     }
+
+    // Reconstruct the URL to ensure it only includes the validated hostname and pathname
+    const sanitizedUrl = `${urlObj.protocol}//${hostname}${urlObj.pathname}`;
 
     // Add this before the fetch call to handle timeout:
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
     // Fetch with proper headers to avoid blocking
-    const response = await fetch(url, {
+    const response = await fetch(sanitizedUrl, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
