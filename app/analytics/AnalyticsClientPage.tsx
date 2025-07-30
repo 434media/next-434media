@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import CryptoJS from "crypto-js"
 import { motion } from "motion/react"
 import AdminPasswordModal from "../components/AdminPasswordModal"
 import { DashboardHeader } from "../components/analytics/DashboardHeader"
@@ -52,13 +53,17 @@ export default function AnalyticsClientPage() {
   }, [selectedDateRange, selectedPropertyId, isAuthenticated])
 
   const handleVerified = (password: string) => {
-    sessionStorage.setItem("adminKey", password)
+    const encryptedPassword = CryptoJS.AES.encrypt(password, "encryption-key").toString()
+    sessionStorage.setItem("adminKey", encryptedPassword)
     setIsAuthenticated(true)
   }
 
   const loadAvailableProperties = async () => {
     try {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+      const encryptedAdminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+      const adminKey = encryptedAdminKey
+        ? CryptoJS.AES.decrypt(encryptedAdminKey, "encryption-key").toString(CryptoJS.enc.Utf8)
+        : null
       if (!adminKey) return
 
       console.log("Loading available properties...")
