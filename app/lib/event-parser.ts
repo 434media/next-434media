@@ -15,8 +15,9 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
     const urlObj = new URL(url)
     const hostname = urlObj.hostname.toLowerCase()
 
-    // Check supported platforms
-    if (!hostname.includes("meetup.com") && !hostname.includes("eventbrite.com") && !hostname.includes("lu.ma")) {
+    // Strict allow-list validation for supported platforms
+    const allowedHostnames = ["meetup.com", "eventbrite.com", "lu.ma"]
+    if (!allowedHostnames.some(allowed => hostname === allowed || hostname.endsWith(`.${allowed}`))) {
       return {
         success: false,
         error: "Unsupported platform. Currently supports Meetup.com, Eventbrite.com, and Lu.ma",
