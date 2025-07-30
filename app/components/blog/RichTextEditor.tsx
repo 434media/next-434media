@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
+import DOMPurify from "dompurify"
 import {
   Bold,
   Italic,
@@ -118,7 +119,7 @@ export default function RichTextEditor({ value, onChange, placeholder, className
           range.deleteContents()
 
           const div = document.createElement("div")
-          div.innerHTML = html
+          div.innerHTML = DOMPurify.sanitize(html)
           const fragment = document.createDocumentFragment()
 
           while (div.firstChild) {
