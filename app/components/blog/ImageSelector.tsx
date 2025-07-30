@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import isValidUrl from "validator/lib/isURL"
 import { useState, useEffect, useCallback } from "react"
 import { Upload, ImageIcon, LinkIcon, X, Check, Search, Loader2, RefreshCw, AlertCircle, Edit2 } from "lucide-react"
 import Image from "next/image"
@@ -439,7 +440,14 @@ export default function ImageSelector({
                 <input
                   type="url"
                   value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
+                  onChange={(e) => {
+                    const input = e.target.value;
+                    if (isValidUrl(input)) {
+                      setUrlInput(input);
+                    } else {
+                      setUrlInput(""); // Clear input if invalid
+                    }
+                  }}
                   placeholder="https://example.com/image.jpg"
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                 />
@@ -457,7 +465,7 @@ export default function ImageSelector({
               <div className="mt-4">
                 <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
                 <img
-                  src={urlInput || "/placeholder.svg"}
+                  src={isValidUrl(urlInput) ? urlInput : "/placeholder.svg"}
                   alt="URL preview"
                   className="w-full h-32 object-cover rounded-lg border border-gray-200"
                   onError={(e) => {
