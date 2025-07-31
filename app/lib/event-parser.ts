@@ -60,11 +60,12 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
 
     let result: ParsedEventData
 
-    if (hostname.includes("meetup.com")) {
+    // Use strict hostname matching for platform selection
+    if (hostname === "meetup.com" || hostname.endsWith(".meetup.com")) {
       result = await parseMeetupEvent($, url)
-    } else if (hostname.includes("eventbrite.com")) {
+    } else if (hostname === "eventbrite.com" || hostname.endsWith(".eventbrite.com")) {
       result = await parseEventbriteEvent($, url)
-    } else if (hostname.includes("lu.ma")) {
+    } else if (hostname === "lu.ma" || hostname.endsWith(".lu.ma")) {
       result = await parseLumaEvent($, url)
     } else {
       throw new Error("Unsupported platform")
