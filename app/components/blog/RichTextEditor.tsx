@@ -219,16 +219,51 @@ export default function RichTextEditor({ value, onChange, placeholder, className
   }
 
   // Handle video embed
+  // Helper to check allowed hosts
+  function getVideoHost(url: string): "youtube" | "vimeo" | null {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.host.toLowerCase();
+      if (
+        host === "youtube.com" ||
+        host === "www.youtube.com"
+      ) {
+        return "youtube";
+      }
+      if (host === "youtu.be") {
+        return "youtube";
+      }
+      if (
+        host === "vimeo.com" ||
+        host === "www.vimeo.com"
+      ) {
+        return "vimeo";
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   const handleInsertVideo = () => {
     if (videoUrl) {
-      let embedHtml = ""
+      let embedHtml = "";
+      const videoHost = getVideoHost(videoUrl);
 
       // YouTube
-      if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
-        const videoId = videoUrl.includes("youtu.be")
-          ? videoUrl.split("/").pop()?.split("?")[0]
-          : videoUrl.split("v=")[1]?.split("&")[0]
-
+      if (videoHost === "youtube") {
+        let videoId: string | undefined;
+        try {
+          const parsed = new URL(videoUrl);
+          if (parsed.host === "youtu.be") {
+            videoId = parsed.pathname.split("/").pop()?.split("?")[0];
+          } else {
+            // youtube.com or www.youtube.com
+            videoId = parsed.searchParams.get("v") ?? undefined;
+          }
+        } catch {
+          videoId = undefined;
+        }
         if (videoId) {
           embedHtml = `
             <div class="my-6 relative w-full aspect-video">
@@ -239,12 +274,18 @@ export default function RichTextEditor({ value, onChange, placeholder, className
                 allowfullscreen>
               </iframe>
             </div>
-          `
+          `;
         }
       }
       // Vimeo
-      else if (videoUrl.includes("vimeo.com")) {
-        const videoId = videoUrl.split("/").pop()
+      else if (videoHost === "vimeo") {
+        let videoId: string | undefined;
+        try {
+          const parsed = new URL(videoUrl);
+          videoId = parsed.pathname.split("/").pop();
+        } catch {
+          videoId = undefined;
+        }
         if (videoId) {
           embedHtml = `
             <div class="my-6 relative w-full aspect-video">
@@ -255,7 +296,7 @@ export default function RichTextEditor({ value, onChange, placeholder, className
                 allowfullscreen>
               </iframe>
             </div>
-          `
+          `;
         }
       }
       // Direct video URL
@@ -267,13 +308,13 @@ export default function RichTextEditor({ value, onChange, placeholder, className
               Your browser does not support the video tag.
             </video>
           </div>
-        `
+        `;
       }
 
       if (embedHtml) {
-        insertHTMLAtCursor(embedHtml)
-        setShowVideoEmbed(false)
-        setVideoUrl("")
+        insertHTMLAtCursor(embedHtml);
+        setShowVideoEmbed(false);
+        setVideoUrl("");
       }
     }
   }
