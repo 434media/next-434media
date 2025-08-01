@@ -139,7 +139,7 @@ export function extractEmbeddedMedia(html: string): EmbeddedMedia[] {
   const iframes = tempDiv.querySelectorAll("iframe")
   iframes.forEach((iframe, index) => {
     try {
-      const urlObj = new URL(iframe.src);
+      const urlObj = new URL(iframe.src, window.location.origin);
       const hostname = urlObj.hostname;
       const isYouTube = hostname === "youtube.com" || hostname.endsWith(".youtube.com");
       const isVimeo = hostname === "vimeo.com" || hostname.endsWith(".vimeo.com");
