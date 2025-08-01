@@ -60,6 +60,7 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
 
     let result: ParsedEventData
 
+    // Use strict hostname matching for platform selection
     if (hostname === "meetup.com" || hostname.endsWith(".meetup.com")) {
       result = await parseMeetupEvent($, url)
     } else if (hostname === "eventbrite.com" || hostname.endsWith(".eventbrite.com")) {
