@@ -8,6 +8,7 @@ import { motion } from "motion/react"
 import { useProduct } from "./product-context"
 import { useEffect, useState } from "react"
 import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
+import sanitizeHtml from "sanitize-html"
 
 interface QuantitySelectorProps {
   quantity: number
@@ -70,7 +71,7 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
   // Create a truncated version of the description (first 150 characters)
   const createTruncatedText = (html: string, maxLength = 150) => {
     // Strip HTML tags for character counting
-    const textOnly = html.replace(/<[^>]*>/g, "")
+    const textOnly = sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} })
     if (textOnly.length <= maxLength) return html
 
     // Find a good breaking point (end of sentence or word)
@@ -85,7 +86,7 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
   }
 
   const truncatedText = product.descriptionHtml ? createTruncatedText(product.descriptionHtml) : ""
-  const needsTruncation = product.descriptionHtml ? product.descriptionHtml.replace(/<[^>]*>/g, "").length > 150 : false
+  const needsTruncation = product.descriptionHtml ? sanitizeHtml(product.descriptionHtml, { allowedTags: [], allowedAttributes: {} }).length > 150 : false
 
   if (isDesktop) {
     // Desktop layout - properly contained within viewport with all content visible
