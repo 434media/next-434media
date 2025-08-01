@@ -22,8 +22,20 @@ interface SourceIconConfig {
   gradientTo: string
 }
 
+// Helper to extract host from a string, or return null if not a valid URL
+const getHost = (str: string): string | null => {
+  try {
+    // Add protocol if missing, to allow parsing bare domains
+    const url = str.match(/^https?:\/\//) ? new URL(str) : new URL("http://" + str);
+    return url.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+};
+
 const getSourceIconConfig = (source: string): SourceIconConfig => {
-  const lowerSource = source.toLowerCase()
+  const lowerSource = source.toLowerCase();
+  const host = getHost(source);
 
   // Main social platforms
   if (lowerSource.includes("facebook")) {
@@ -34,7 +46,11 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
       gradientTo: "to-[#1877F2]/5",
     }
   }
-  if (lowerSource.includes("twitter") || lowerSource.includes("x.com") || lowerSource === "x") {
+  if (
+    lowerSource.includes("twitter") ||
+    lowerSource === "x" ||
+    (host === "x.com" || host === "www.x.com")
+  ) {
     return {
       icon: <TwitterIcon />,
       color: "text-[#1DA1F2]",
