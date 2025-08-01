@@ -12,9 +12,19 @@ export interface VideoInfo {
 
 export function analyzeVideoUrl(url: string): VideoInfo {
   const cleanUrl = url.trim()
+  let hostname = "";
+  try {
+    hostname = new URL(cleanUrl).hostname.replace(/^www\./, "");
+  } catch (e) {
+    // If URL parsing fails, treat as unsupported
+    return {
+      type: "unsupported",
+      url: cleanUrl,
+    }
+  }
 
   // YouTube detection
-  if (cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be")) {
+  if (hostname === "youtube.com" || hostname === "youtu.be") {
     const videoId = extractYouTubeId(cleanUrl)
     if (videoId) {
       return {
@@ -28,7 +38,7 @@ export function analyzeVideoUrl(url: string): VideoInfo {
   }
 
   // Vimeo detection
-  if (cleanUrl.includes("vimeo.com")) {
+  if (hostname === "vimeo.com") {
     const videoId = extractVimeoId(cleanUrl)
     if (videoId) {
       return {

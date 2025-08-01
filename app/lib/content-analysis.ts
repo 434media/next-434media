@@ -138,13 +138,21 @@ export function extractEmbeddedMedia(html: string): EmbeddedMedia[] {
   // Extract videos (iframes and video elements)
   const iframes = tempDiv.querySelectorAll("iframe")
   iframes.forEach((iframe, index) => {
-    if (iframe.src.includes("youtube.com") || iframe.src.includes("vimeo.com")) {
-      media.push({
-        id: `video_${Date.now()}_${index}`,
-        type: "video",
-        url: iframe.src,
-        embedded_at: new Date().toISOString(),
-      })
+    try {
+      const urlObj = new URL(iframe.src, window.location.origin);
+      const hostname = urlObj.hostname;
+      const isYouTube = hostname === "youtube.com" || hostname.endsWith(".youtube.com");
+      const isVimeo = hostname === "vimeo.com" || hostname.endsWith(".vimeo.com");
+      if (isYouTube || isVimeo) {
+        media.push({
+          id: `video_${Date.now()}_${index}`,
+          type: "video",
+          url: iframe.src,
+          embedded_at: new Date().toISOString(),
+        })
+      }
+    } catch (e) {
+      // Invalid URL, skip this iframe
     }
   })
 
