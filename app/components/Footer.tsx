@@ -26,10 +26,10 @@ export default function Footer() {
   const footerLinks: FooterLink[] = [{ label: "Contact", href: "/contact" }]
 
   const adminLinks = [
-    { label: "Analytics Dashboard", href: "/analytics" },
+    { label: "GA4 Dashboard", href: "/analytics-web" },
+    { label: "Meta Insights", href: "/analytics-instagram" },
     { label: "Blog Admin", href: "/admin/blog" },
     { label: "Media Admin", href: "/admin/blog/media" },
-    { label: "Data Admin", href: "/admin/insert-data" },
   ]
 
   useEffect(() => {

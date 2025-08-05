@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react"
 import { Button } from "./Button"
-import { RefreshCw, LogOut, Loader2, BarChart3, ChevronDown, Globe } from "lucide-react"
+import { RefreshCw, LogOut, Loader2, ChevronDown, Globe } from "lucide-react"
 import type { AnalyticsProperty } from "../../types/analytics"
 
 interface DashboardHeaderProps {
@@ -69,7 +69,7 @@ export function DashboardHeader({
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
-            <BarChart3 className="h-6 w-6 text-blue-400" />
+            <GA4Icon className="h-6 w-6 text-blue-400" />
           </motion.div>
           <div>
             <motion.h1
@@ -181,7 +181,7 @@ export function DashboardHeader({
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
-            <BarChart3 className="h-8 w-8 text-blue-400" />
+            <GA4Icon className="h-8 w-8 text-blue-400" />
           </motion.div>
           <div>
             <motion.h1
@@ -281,5 +281,14 @@ export function DashboardHeader({
         transition={{ duration: 1.5, delay: 0.5 }}
       />
     </div>
+  )
+}
+
+// ga4 svg icon
+function GA4Icon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" {...props}>
+      <path d="M22.84 2.998v17.999a2.983 2.983 0 01-2.967 2.998 2.98 2.98 0 01-.368-.02 3.06 3.06 0 01-2.61-3.1V3.12A3.06 3.06 0 0119.51.02a2.983 2.983 0 013.329 2.978zM4.133 18.055a2.973 2.973 0 100 5.945 2.973 2.973 0 000-5.945zm7.872-9.01h-.05a3.06 3.06 0 00-2.892 3.126v7.985c0 2.167.954 3.482 2.35 3.763a2.978 2.978 0 003.57-2.927v-8.959a2.983 2.983 0 00-2.978-2.988z" />
+    </svg>
   )
 }

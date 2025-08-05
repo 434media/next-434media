@@ -205,7 +205,7 @@ export function MetricsOverview({
             `}
             />
 
-            <CardContent className="relative p-4 sm:p-5 lg:p-5 h-full flex flex-col justify-between mt-1 sm:mt-2">
+            <CardContent className="relative p-4 sm:p-5 lg:p-5 h-full flex flex-col justify-between mt-1 sm:mt-0">
               {isLoading || parentLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-white/60 animate-spin" />

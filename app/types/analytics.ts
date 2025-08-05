@@ -34,6 +34,15 @@ export interface AnalyticsSummary {
   activeUsers?: number
   propertyId?: string
   _source?: string
+  // Instagram specific fields
+  totalFollowers?: number
+  followersChange?: number
+  totalImpressions?: number
+  impressionsChange?: number
+  totalReach?: number
+  reachChange?: number
+  engagementRate?: number
+  engagementRateChange?: number
 }
 
 export interface DailyMetricsData {
@@ -140,4 +149,12 @@ export interface ConfigurationStatus {
   availableProperties?: AnalyticsProperty[]
   defaultPropertyId?: string
   configuredProperties?: AnalyticsProperty[]
+}
+
+export type AnalyticsDataSource = "google_analytics" | "instagram_insights" | "meta_pixel"
+
+export interface InstagramAnalyticsProperty extends AnalyticsProperty {
+  account_id: string
+  username: string
+  account_type: "BUSINESS" | "CREATOR"
 }
