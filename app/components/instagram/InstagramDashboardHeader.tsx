@@ -94,7 +94,7 @@ export function InstagramDashboardHeader({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              Instagram Analytics
+              Meta Insights
             </motion.h1>
             <motion.p
               className="text-white/60 text-xs"

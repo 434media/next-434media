@@ -17,20 +17,11 @@ interface FooterLink {
 
 export default function Footer() {
   const [isVisible, setIsVisible] = useState(false)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const footerRef = useRef<HTMLElement>(null)
-  const menuRef = useRef<HTMLLIElement>(null)
   const currentYear = new Date().getFullYear()
 
   // Updated footer links - Contact now links to /contact page
-  const footerLinks: FooterLink[] = [{ label: "Contact", href: "/contact" }]
-
-  const adminLinks = [
-    { label: "GA4 Dashboard", href: "/analytics-web" },
-    { label: "Meta Insights", href: "/analytics-instagram" },
-    { label: "Blog Admin", href: "/admin/blog" },
-    { label: "Media Admin", href: "/admin/blog/media" },
-  ]
+  const footerLinks: FooterLink[] = [{ label: "Take the next step", href: "/contact" }]
 
   useEffect(() => {
     // Use IntersectionObserver to detect when footer is visible
@@ -61,48 +52,6 @@ export default function Footer() {
       }
     }
   }, [])
-
-  // Handle click outside to close menu
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false)
-      }
-    }
-
-    if (isMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isMenuOpen])
-
-  // Handle escape key to close menu
-  useEffect(() => {
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isMenuOpen) {
-        setIsMenuOpen(false)
-      }
-    }
-
-    if (isMenuOpen) {
-      document.addEventListener("keydown", handleEscapeKey)
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleEscapeKey)
-    }
-  }, [isMenuOpen])
-
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen)
-  }
-
-  const closeMenu = () => {
-    setIsMenuOpen(false)
-  }
 
   return (
     <footer
@@ -252,139 +201,11 @@ export default function Footer() {
                               href={link.href}
                               className="text-sm sm:text-base text-neutral-400 hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded"
                             >
-                              {link.label}
+                              {link.label} <span aria-hidden="true"><ChevronRight className="inline-block ml-1" /></span>
                             </Link>
                           )}
                         </li>
                       ))}
-                      <li className="relative" ref={menuRef}>
-                        <button
-                          onClick={toggleMenu}
-                          className="text-sm sm:text-base text-neutral-400 hover:text-emerald-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded-md flex items-center gap-2 px-3 py-2 hover:bg-neutral-800/50 group"
-                          aria-expanded={isMenuOpen}
-                          aria-haspopup="true"
-                          aria-label="Admin menu"
-                        >
-                          Admin
-                          <ChevronRight
-                            className={`w-4 h-4 transition-all duration-300 group-hover:translate-x-0.5 ${
-                              isMenuOpen ? "rotate-90" : ""
-                            }`}
-                          />
-                        </button>
-
-                        <AnimatePresence>
-                          {isMenuOpen && (
-                            <>
-                              {/* Enhanced backdrop overlay */}
-                              <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.3 }}
-                                className="fixed inset-0 bg-black/40 backdrop-blur-md z-40"
-                                onClick={closeMenu}
-                              />
-
-                              {/* Centered overlay menu */}
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                                transition={{
-                                  type: "spring",
-                                  stiffness: 400,
-                                  damping: 25,
-                                  duration: 0.4,
-                                }}
-                                className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 sm:top-auto sm:bottom-0 sm:right-8 sm:left-auto sm:transform-none w-80 sm:w-72 bg-gradient-to-br from-neutral-900/95 to-neutral-950/95 backdrop-blur-xl border border-neutral-700/60 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                              >
-                                {/* Enhanced header with glow effect */}
-                                <div className="relative px-6 py-4 border-b border-neutral-700/50 bg-gradient-to-r from-emerald-500/15 to-emerald-600/15">
-                                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-emerald-600/5 blur-xl"></div>
-                                  <div className="relative flex items-center justify-between">
-                                    <div>
-                                      <h4 className="text-base font-bold text-emerald-400 tracking-wide">
-                                        ADMIN PANEL
-                                      </h4>
-                                      <p className="text-xs text-neutral-400 mt-1">Management Dashboard</p>
-                                    </div>
-                                    <button
-                                      onClick={closeMenu}
-                                      className="p-1 rounded-full hover:bg-neutral-800/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                                      aria-label="Close admin menu"
-                                    >
-                                      <svg
-                                        className="w-4 h-4 text-neutral-400 hover:text-white"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M6 18L18 6M6 6l12 12"
-                                        />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Enhanced menu items */}
-                                <div className="py-3">
-                                  {adminLinks.map((adminLink, index) => (
-                                    <motion.div
-                                      key={adminLink.label}
-                                      initial={{ opacity: 0, x: -30 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{
-                                        delay: index * 0.1 + 0.1,
-                                        duration: 0.4,
-                                        ease: "easeOut",
-                                      }}
-                                    >
-                                      <Link
-                                        href={adminLink.href}
-                                        onClick={closeMenu}
-                                        className="group flex items-center px-6 py-4 text-sm text-neutral-300 hover:text-white hover:bg-gradient-to-r hover:from-emerald-500/15 hover:to-emerald-600/15 transition-all duration-300 border-l-3 border-transparent hover:border-emerald-500/60 focus:outline-none focus:bg-gradient-to-r focus:from-emerald-500/15 focus:to-emerald-600/15 focus:text-white focus:border-emerald-500/60 relative overflow-hidden"
-                                      >
-                                        {/* Hover glow effect */}
-                                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-emerald-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                                        <div className="relative flex items-center w-full">
-                                          <div className="w-3 h-3 rounded-full bg-neutral-600 group-hover:bg-emerald-500 transition-all duration-300 mr-4 flex-shrink-0 group-hover:shadow-lg group-hover:shadow-emerald-500/30"></div>
-                                          <div className="flex-1">
-                                            <span className="font-semibold block">{adminLink.label}</span>
-                                            <span className="text-xs text-neutral-500 group-hover:text-neutral-400 transition-colors duration-300">
-                                              {adminLink.label === "Analytics Dashboard" && "View site analytics"}
-                                              {adminLink.label === "Blog Admin" && "Manage blog posts"}
-                                              {adminLink.label === "Media Admin" && "Upload & organize media"}
-                                              {adminLink.label === "Data Admin" && "Analytics & insights"}
-                                            </span>
-                                          </div>
-                                          <ChevronRight className="w-4 h-4 ml-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300 text-emerald-500" />
-                                        </div>
-                                      </Link>
-                                    </motion.div>
-                                  ))}
-                                </div>
-
-                                {/* Enhanced footer with additional info */}
-                                <div className="px-6 py-4 border-t border-neutral-700/50 bg-neutral-950/60">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <p className="text-xs text-neutral-500">Secure Access</p>
-                                      <p className="text-xs text-emerald-400 font-medium">Authentication Required</p>
-                                    </div>
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            </>
-                          )}
-                        </AnimatePresence>
-                      </li>
                     </ul>
                   </nav>
                 </div>
