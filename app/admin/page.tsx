@@ -23,7 +23,7 @@ const adminSections: AdminSection[] = [
   {
     id: "analytics-web",
     title: "GA4 DASHBOARD",
-    subtitle: "Google Analytics 4 Insights",
+    subtitle: "Google Analytics 4 Dashboard",
     href: "/analytics-web",
     icon: <GA4Icon className="w-8 h-8" />,
     delay: 0.1,
@@ -33,7 +33,7 @@ const adminSections: AdminSection[] = [
   {
     id: "analytics-instagram",
     title: "META INSIGHTS",
-    subtitle: "Instagram Analytics Dashboard",
+    subtitle: "Instagram Insights Dashboard",
     href: "/analytics-instagram",
     icon: <InstagramIcon className="w-8 h-8" />,
     delay: 0.15,
