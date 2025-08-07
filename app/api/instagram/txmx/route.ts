@@ -296,39 +296,47 @@ export async function GET(request: NextRequest) {
             limit: "25",
           })
 
-          // Get insights for each media item
-          const mediaWithInsights = await Promise.all(
-            mediaData.data.map(async (media: any) => {
-              try {
-                const insights = await fetchInstagramData(`${media.id}/insights`, accessToken, {
-                  metric: "impressions,reach,engagement",
-                })
+          if (!mediaData.data || mediaData.data.length === 0) {
+            return NextResponse.json({
+              success: true,
+              data: [],
+              timestamp: new Date().toISOString(),
+            })
+          }
 
-                const insightsMap = insights.data.reduce((acc: any, insight: any) => {
+          // Batch fetch insights for all media items
+          const mediaIds = mediaData.data.map((media: any) => media.id)
+          const batchedInsights = await fetchInstagramData(`${instagramAccountId}/media`, accessToken, {
+            fields: `insights.metric(impressions,reach,engagement).period(lifetime){values}`,
+            ids: `[${mediaIds.join(",")}]`,
+          })
+
+          const insightsMap = new Map()
+          if (batchedInsights) {
+            for (const mediaId in batchedInsights) {
+              const insightsData = batchedInsights[mediaId]?.insights?.data
+              if (insightsData) {
+                const mediaInsights = insightsData.reduce((acc: any, insight: any) => {
                   acc[insight.name] = insight.values[0]?.value || 0
                   return acc
                 }, {})
-
-                return {
-                  ...media,
-                  insights: insightsMap,
-                  engagement_rate: calculateEngagementRate(
-                    (media.like_count || 0) + (media.comments_count || 0),
-                    insightsMap.reach || 1,
-                  ),
-                  hashtags: extractHashtags(media.caption || ""),
-                }
-              } catch (error) {
-                console.warn(`Failed to get insights for media ${media.id}:`, error)
-                return {
-                  ...media,
-                  insights: { impressions: 0, reach: 0, engagement: 0 },
-                  engagement_rate: 0,
-                  hashtags: extractHashtags(media.caption || ""),
-                }
+                insightsMap.set(mediaId, mediaInsights)
               }
-            }),
-          )
+            }
+          }
+
+          const mediaWithInsights = mediaData.data.map((media: any) => {
+            const insights = insightsMap.get(media.id) || { impressions: 0, reach: 0, engagement: 0 }
+            return {
+              ...media,
+              insights,
+              engagement_rate: calculateEngagementRate(
+                (media.like_count || 0) + (media.comments_count || 0),
+                insights.reach || 1,
+              ),
+              hashtags: extractHashtags(media.caption || ""),
+            }
+          })
 
           return NextResponse.json({
             success: true,

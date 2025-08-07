@@ -74,16 +74,12 @@ export default function InstagramAnalyticsClientPage() {
     setError(null)
 
     try {
-      // Test connection first
-      const connectionResponse = await fetch("/api/instagram/txmxboxing?endpoint=test-connection", {
-        headers: {
-          "x-admin-key": adminKey,
-        },
-      })
+      const headers = { "x-admin-key": adminKey }
 
+      // Test connection first
+      const connectionResponse = await fetch("/api/instagram/txmxboxing?endpoint=test-connection", { headers })
       if (!connectionResponse.ok) {
         if (connectionResponse.status === 401) {
-          // Unauthorized - clear session and require re-authentication
           sessionStorage.removeItem("adminKey")
           localStorage.removeItem("adminKey")
           setIsAuthenticated(false)
@@ -91,50 +87,30 @@ export default function InstagramAnalyticsClientPage() {
         }
         throw new Error("Failed to connect to Instagram API")
       }
-
       const connectionData = await connectionResponse.json()
       setConnectionStatus(connectionData)
 
-      // Load account info
-      const accountResponse = await fetch("/api/instagram/txmxboxing?endpoint=account-info", {
-        headers: {
-          "x-admin-key": adminKey,
-        },
-      })
-
-      if (accountResponse.ok) {
-        const accountResult = await accountResponse.json()
-        setAccountData(accountResult.data)
-      }
-
-      // Load insights data
+      // All other data can be fetched in parallel
       const startDate = getStartDateForRange(dateRange)
       const endDate = "today"
 
-      const insightsResponse = await fetch(
-        `/api/instagram/txmxboxing?endpoint=insights&startDate=${startDate}&endDate=${endDate}`,
-        {
-          headers: {
-            "x-admin-key": adminKey,
-          },
-        },
-      )
+      const [accountResult, insightsResult, mediaResult] = await Promise.all([
+        fetch("/api/instagram/txmxboxing?endpoint=account-info", { headers }).then(res => res.json()),
+        fetch(`/api/instagram/txmxboxing?endpoint=insights&startDate=${startDate}&endDate=${endDate}`, {
+          headers,
+        }).then(res => res.json()),
+        fetch("/api/instagram/txmxboxing?endpoint=media", { headers }).then(res => res.json()),
+      ])
 
-      if (insightsResponse.ok) {
-        const insightsResult = await insightsResponse.json()
+      if (accountResult.data) {
+        setAccountData(accountResult.data)
+      }
+
+      if (insightsResult.data) {
         setInsightsData(insightsResult.data)
       }
 
-      // Load media data
-      const mediaResponse = await fetch("/api/instagram/txmxboxing?endpoint=media", {
-        headers: {
-          "x-admin-key": adminKey,
-        },
-      })
-
-      if (mediaResponse.ok) {
-        const mediaResult = await mediaResponse.json()
-        // Transform the media data to match our expected type
+      if (mediaResult.data) {
         const transformedMedia: InstagramMediaWithInsights[] = (mediaResult.data || []).map((media: any) => ({
           id: media.id,
           media_type: media.media_type,
@@ -143,7 +119,7 @@ export default function InstagramAnalyticsClientPage() {
           permalink: media.permalink,
           caption: media.caption || "",
           timestamp: media.timestamp,
-          username: accountData?.username || "txmxboxing", // Use account username or fallback
+          username: accountResult.data?.username || "txmxboxing", // Use fetched account username
           like_count: media.like_count || 0,
           comments_count: media.comments_count || 0,
           insights: {
