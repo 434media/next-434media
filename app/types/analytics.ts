@@ -1,160 +1,184 @@
-// Property configuration interface
+// Base analytics interfaces
 export interface AnalyticsProperty {
   id: string
   name: string
-  key: string
   isConfigured?: boolean
-  isDefault?: boolean
 }
 
-export interface PropertyConfig {
-  properties: AnalyticsProperty[]
-  defaultPropertyId: string
+export interface AnalyticsConnectionStatus {
+  configured: boolean
+  connected: boolean
+  success?: boolean
+  propertyId?: string
+  dimensionCount?: number
+  metricCount?: number
+  error?: string
+  lastChecked?: string
 }
 
-// Date range interface
 export interface DateRange {
   startDate: string
   endDate: string
-  label: string
+  label?: string
 }
 
-// Core analytics data structures
-export interface AnalyticsSummary {
-  totalPageViews: number
-  totalSessions: number
-  totalUsers: number
-  bounceRate: number
-  averageSessionDuration: number
-  // Additional fields for UI
-  pageViewsChange?: number
-  sessionsChange?: number
-  usersChange?: number
-  bounceRateChange?: number
-  activeUsers?: number
-  propertyId?: string
-  _source?: string
-  // Instagram specific fields
-  totalFollowers?: number
-  followersChange?: number
-  totalImpressions?: number
-  impressionsChange?: number
-  totalReach?: number
-  reachChange?: number
-  engagementRate?: number
-  engagementRateChange?: number
+// Google Analytics specific interfaces
+export interface GoogleAnalyticsProperty extends AnalyticsProperty {
+  propertyId: string
+  accountId: string
+  displayName: string
+  createTime: string
+  updateTime: string
+  parent: string
+  currencyCode: string
+  timeZone: string
+  industryCategory: string
+  serviceLevel: string
 }
 
-export interface DailyMetricsData {
-  date: string
+export interface GoogleAnalyticsConnectionStatus extends AnalyticsConnectionStatus {
+  accountId?: string
+  webDataStreamId?: string
+  measurementId?: string
+  properties?: GoogleAnalyticsProperty[]
+}
+
+export interface GoogleAnalyticsData {
   pageViews: number
   sessions: number
   users: number
   bounceRate: number
+  avgSessionDuration: number
+  conversionRate: number
+  topPages: Array<{
+    page: string
+    views: number
+    uniqueViews: number
+  }>
+  trafficSources: Array<{
+    source: string
+    sessions: number
+    percentage: number
+  }>
+  deviceBreakdown: Array<{
+    device: string
+    sessions: number
+    percentage: number
+  }>
+  geographicData: Array<{
+    country: string
+    sessions: number
+    percentage: number
+  }>
 }
 
-export interface DailyMetricsResponse {
-  data: DailyMetricsData[]
-  totalPageViews: number
-  totalSessions: number
+export interface GoogleAnalyticsMetrics {
   totalUsers: number
-  propertyId?: string
-  _source?: string
-}
-
-export interface TopPageData {
-  path: string
-  title: string
-  pageViews: number
-  sessions: number
+  totalSessions: number
+  totalPageViews: number
+  averageSessionDuration: number
   bounceRate: number
+  conversionRate: number
+  usersChange: number
+  sessionsChange: number
+  pageViewsChange: number
+  durationChange: number
+  bounceRateChange: number
+  conversionRateChange: number
 }
 
-export interface PageViewsResponse {
-  data: TopPageData[]
-  propertyId?: string
-  _source?: string
+// Chart data interfaces
+export interface ChartDataPoint {
+  date: string
+  value: number
+  label?: string
 }
 
 export interface TrafficSourceData {
   source: string
-  medium: string
   sessions: number
   users: number
-  newUsers: number
-}
-
-export interface TrafficSourcesResponse {
-  data: TrafficSourceData[]
-  propertyId?: string
-  _source?: string
+  percentage: number
+  change: number
 }
 
 export interface DeviceData {
-  deviceCategory: string
+  device: string
   sessions: number
   users: number
-}
-
-export interface DeviceDataResponse {
-  data: DeviceData[]
-  propertyId?: string
-  _source?: string
+  percentage: number
+  bounceRate: number
 }
 
 export interface GeographicData {
   country: string
-  city: string
+  countryCode: string
   sessions: number
   users: number
-  newUsers: number
+  percentage: number
+  bounceRate: number
 }
 
-export interface GeographicDataResponse {
-  data: GeographicData[]
-  propertyId?: string
-  _source?: string
+export interface TopPageData {
+  page: string
+  title: string
+  views: number
+  uniqueViews: number
+  avgTimeOnPage: number
+  bounceRate: number
+  exitRate: number
 }
 
-export interface RealtimeData {
-  totalActiveUsers: number
-  topCountries: Array<{
-    country: string
-    activeUsers: number
-  }>
-  propertyId?: string
-  _source?: string
-}
-
-// Connection status - simplified
-export interface AnalyticsConnectionStatus {
+// API Response interfaces
+export interface AnalyticsApiResponse<T> {
+  data: T
   success: boolean
   error?: string
-  propertyId?: string
-  dimensionCount?: number
-  metricCount?: number
-  projectId?: string
-  availableProperties?: AnalyticsProperty[]
-  defaultPropertyId?: string
+  timestamp: string
 }
 
-// Configuration status - simplified
-export interface ConfigurationStatus {
+export interface AnalyticsConfigResponse {
   configured: boolean
-  missingVariables: string[]
-  propertyId?: string
-  projectId?: string
-  hasServiceAccountKey: boolean
-  hasAdminPassword: boolean
-  availableProperties?: AnalyticsProperty[]
-  defaultPropertyId?: string
-  configuredProperties?: AnalyticsProperty[]
+  connected: boolean
+  properties: AnalyticsProperty[]
+  error?: string
 }
 
-export type AnalyticsDataSource = "google_analytics" | "instagram_insights" | "meta_pixel"
+// Component prop interfaces
+export interface AnalyticsMetricsProps {
+  data: GoogleAnalyticsMetrics
+  loading?: boolean
+}
 
-export interface InstagramAnalyticsProperty extends AnalyticsProperty {
-  account_id: string
-  username: string
-  account_type: "BUSINESS" | "CREATOR"
+export interface AnalyticsChartProps {
+  data: ChartDataPoint[]
+  title: string
+  loading?: boolean
+}
+
+export interface AnalyticsTableProps {
+  data: TopPageData[]
+  loading?: boolean
+}
+
+export interface AnalyticsDateRangeProps {
+  dateRange: DateRange
+  onDateRangeChange: (range: DateRange) => void
+}
+
+// Performance types
+export type PerformanceMetric =
+  | "pageViews"
+  | "sessions"
+  | "users"
+  | "bounceRate"
+  | "avgSessionDuration"
+  | "conversionRate"
+
+export interface PerformanceBadge {
+  metric: PerformanceMetric
+  value: number
+  change: number
+  trend: "up" | "down" | "neutral"
+  level: "excellent" | "good" | "average" | "poor"
 }

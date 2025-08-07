@@ -92,7 +92,8 @@ export default function AnalyticsClientPage() {
 
         // Set default property (first configured property or first property)
         if (properties.length > 0 && !selectedPropertyId) {
-          const defaultProperty = properties.find((p: AnalyticsProperty) => p.isDefault) || properties[0]
+          const defaultProperty =
+            properties.find((p: AnalyticsProperty) => p.isConfigured) || properties[0]
           if (defaultProperty) {
             console.log("Setting default property:", defaultProperty)
             setSelectedPropertyId(defaultProperty.id)

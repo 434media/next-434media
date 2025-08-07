@@ -1,485 +1,279 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "../../components/analytics/Button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/analytics/Card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/analytics/Card"
 import { Badge } from "../../components/analytics/Badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/analytics/Tabs"
 import AdminPasswordModal from "../../components/AdminPasswordModal"
 import {
   Loader2,
-  Upload,
+  Users,
   Database,
-  FileSpreadsheet,
   RefreshCw,
-  AlertTriangle,
-  CheckCircle2,
-  X,
-  Calendar,
-  Trash2,
-  BarChart3,
-  Info,
+  Upload,
   ExternalLink,
+  Mail,
+  FileSpreadsheet,
+  Send,
+  BarChart3,
+  Settings,
+  FolderSyncIcon as Sync,
 } from "lucide-react"
 import { useToast } from "../../hooks/use-toast"
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 
-interface DataStatus {
-  trafficSources: number
-  pageViews: number
-  geographic: number
-  devices: number
-  dailySummary: number
-  loading: boolean
-  error: string | null
-}
-
-interface UploadProgress {
-  stage: string
-  progress: number
-  message: string
-}
-
-interface UploadResult {
-  success: boolean
-  message: string
-  dataType?: string
-  recordsProcessed?: number
-  results?: {
-    trafficSources: number
-    pageViews: number
-    geographic: number
-    devices: number
-    summary: number
-    errors: string[]
+interface CrmStats {
+  contacts: {
+    total_contacts: number
+    active_contacts: number
+    synced_to_airtable: number
+    synced_to_mailchimp: number
+    unique_sources: number
   }
-  error?: string
+  submissions: {
+    total_submissions: number
+    unique_form_types: number
+  }
+  newsletters: {
+    total_subscriptions: number
+    unique_newsletter_types: number
+  }
 }
 
-type DateRangeOption = "7days" | "30days" | "90days"
-type DataType = "trafficSources" | "pageViews" | "geographic" | "devices" | "dailySummary" | "all"
+interface Contact {
+  id: number
+  email: string
+  first_name?: string
+  last_name?: string
+  company?: string
+  phone?: string
+  source: string
+  tags: string[]
+  status: string
+  synced_to_airtable: boolean
+  synced_to_mailchimp: boolean
+  created_at: string
+  submission_count: number
+  newsletter_count: number
+  form_types: string[]
+  newsletter_types: string[]
+}
 
 export default function InsertDataPage() {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminPassword, setAdminPassword] = useState("")
-  const [dataStatus, setDataStatus] = useState<DataStatus>({
-    trafficSources: 0,
-    pageViews: 0,
-    geographic: 0,
-    devices: 0,
-    dailySummary: 0,
-    loading: false,
-    error: null,
-  })
-  const [dateRange, setDateRange] = useState<DateRangeOption>("30days")
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
-    stage: "idle",
-    progress: 0,
-    message: "",
-  })
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
-  const [dbInitialized, setDbInitialized] = useState(false)
-  const [initializing, setInitializing] = useState(false)
-  const [deletingData, setDeletingData] = useState(false)
-  const [selectedDataTypes, setSelectedDataTypes] = useState<DataType[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [crmStats, setCrmStats] = useState<CrmStats | null>(null)
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [selectedContacts, setSelectedContacts] = useState<number[]>([])
+  const [syncing, setSyncing] = useState(false)
+  const [activeTab, setActiveTab] = useState("overview")
   const { toast } = useToast()
 
-  // Check if database is initialized
+  // Check for existing admin session
   useEffect(() => {
-    if (authenticated) {
-      checkDatabaseStatus()
+    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (adminKey) {
+      setAdminPassword(adminKey)
+      setAuthenticated(true)
+      loadCrmData(adminKey)
+    } else {
+      setIsLoading(false)
     }
-  }, [authenticated])
+  }, [])
 
   const handlePasswordVerified = (password: string) => {
+    sessionStorage.setItem("adminKey", password)
     setAdminPassword(password)
     setAuthenticated(true)
-    toast({
-      title: "Authentication successful",
-      description: "You now have access to the data management tools.",
-      variant: "default",
-    })
+    loadCrmData(password)
   }
 
   const handlePasswordCancel = () => {
     window.history.back()
   }
 
-  const checkDatabaseStatus = async () => {
+  const loadCrmData = async (adminKey: string) => {
+    setIsLoading(true)
+    setError(null)
+
     try {
-      setDataStatus((prev) => ({ ...prev, loading: true, error: null }))
-
-      // First check if tables exist
-      const response = await fetch(`/api/analytics/init-database?adminKey=${encodeURIComponent(adminPassword)}`)
-      const data = await response.json()
-
-      if (data.tables && Array.isArray(data.tables)) {
-        setDbInitialized(data.tables.length >= 5)
-      } else {
-        setDbInitialized(false)
-      }
-
-      // Then check data status
-      const statusResponse = await fetch("/api/analytics/data-status", {
-        headers: {
-          "x-admin-key": adminPassword,
-        },
+      // Load CRM stats
+      const statsResponse = await fetch("/api/crm/contacts?endpoint=stats", {
+        headers: { "x-admin-key": adminKey },
       })
 
-      if (!statusResponse.ok) {
-        throw new Error(`Status check failed: ${statusResponse.status}`)
+      if (statsResponse.ok) {
+        const statsResult = await statsResponse.json()
+        setCrmStats(statsResult.data)
       }
 
-      const statusData = await statusResponse.json()
-
-      setDataStatus({
-        trafficSources: statusData.trafficSources || 0,
-        pageViews: statusData.pageViews || 0,
-        geographic: statusData.geographic || 0,
-        devices: statusData.devices || 0,
-        dailySummary: statusData.dailySummary || 0,
-        loading: false,
-        error: null,
+      // Load contacts
+      const contactsResponse = await fetch("/api/crm/contacts", {
+        headers: { "x-admin-key": adminKey },
       })
-    } catch (error) {
-      console.error("Error checking data status:", error)
-      setDataStatus((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      }))
-    }
-  }
 
-  const initializeDatabase = async () => {
-    setInitializing(true)
-    try {
-      const response = await fetch(`/api/analytics/init-database?adminKey=${encodeURIComponent(adminPassword)}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setDbInitialized(true)
-        toast({
-          title: "Database initialized",
-          description: `Created ${data.tables?.length || 0} tables successfully.`,
-          variant: "default",
-        })
-      } else {
-        toast({
-          title: "Database initialization failed",
-          description: data.error || "Unknown error",
-          variant: "destructive",
-        })
+      if (contactsResponse.ok) {
+        const contactsResult = await contactsResponse.json()
+        setContacts(contactsResult.data)
       }
-    } catch (error) {
-      toast({
-        title: "Database initialization error",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
+    } catch (err) {
+      console.error("Error loading CRM data:", err)
+      setError(err instanceof Error ? err.message : "Failed to load CRM data")
     } finally {
-      setInitializing(false)
+      setIsLoading(false)
     }
   }
 
-  const insertSampleData = async () => {
-    setUploading(true)
-    setUploadProgress({
-      stage: "preparing",
-      progress: 10,
-      message: "Preparing sample data...",
-    })
-
-    try {
-      // Update progress
-      setUploadProgress({
-        stage: "uploading",
-        progress: 30,
-        message: "Uploading sample data...",
-      })
-
-      const response = await fetch("/api/analytics/insert-historical-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminPassword,
-        },
-        body: JSON.stringify({ dateRange }),
-      })
-
-      setUploadProgress({
-        stage: "processing",
-        progress: 70,
-        message: "Processing data...",
-      })
-
-      const result = await response.json()
-
-      setUploadProgress({
-        stage: "complete",
-        progress: 100,
-        message: result.success ? "Data inserted successfully!" : "Error inserting data",
-      })
-
-      setUploadResult(result)
-
-      if (result.success) {
-        toast({
-          title: "Sample data inserted",
-          description: `Successfully inserted ${dateRange} sample data.`,
-          variant: "default",
-        })
-        // Refresh data status
-        checkDatabaseStatus()
-      } else {
-        toast({
-          title: "Error inserting sample data",
-          description: result.error || "Unknown error",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      setUploadProgress({
-        stage: "error",
-        progress: 100,
-        message: "Error uploading data",
-      })
-
-      setUploadResult({
-        success: false,
-        message: "Error uploading data",
-        error: error instanceof Error ? error.message : "Unknown error",
-      })
-
-      toast({
-        title: "Upload error",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
-    } finally {
-      setUploading(false)
+  const handleRefresh = () => {
+    if (adminPassword) {
+      loadCrmData(adminPassword)
     }
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-    setUploadProgress({
-      stage: "preparing",
-      progress: 10,
-      message: `Preparing file: ${file.name}...`,
-    })
-
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("dateRange", dateRange)
-
-      // Update progress
-      setUploadProgress({
-        stage: "uploading",
-        progress: 30,
-        message: "Uploading file...",
-      })
-
-      const response = await fetch("/api/analytics/upload-data", {
-        method: "POST",
-        headers: {
-          "x-admin-key": adminPassword,
-        },
-        body: formData,
-      })
-
-      setUploadProgress({
-        stage: "processing",
-        progress: 70,
-        message: "Processing data...",
-      })
-
-      const result = await response.json()
-
-      setUploadProgress({
-        stage: "complete",
-        progress: 100,
-        message: result.success ? "File processed successfully!" : "Error processing file",
-      })
-
-      setUploadResult(result)
-
-      if (result.success) {
-        toast({
-          title: "File uploaded successfully",
-          description: `Processed ${result.recordsProcessed} records of ${result.dataType} data.`,
-          variant: "default",
-        })
-        // Refresh data status
-        checkDatabaseStatus()
-      } else {
-        toast({
-          title: "Error processing file",
-          description: result.error || "Unknown error",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      setUploadProgress({
-        stage: "error",
-        progress: 100,
-        message: "Error uploading file",
-      })
-
-      setUploadResult({
-        success: false,
-        message: "Error uploading file",
-        error: error instanceof Error ? error.message : "Unknown error",
-      })
-
-      toast({
-        title: "Upload error",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
-    } finally {
-      setUploading(false)
-      // Reset file input
-      event.target.value = ""
-    }
-  }
-
-  const clearData = async () => {
-    if (!confirm("Are you sure you want to clear all analytics data? This cannot be undone.")) {
-      return
-    }
-
-    try {
-      const response = await fetch("/api/analytics/clear-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminPassword,
-        },
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "Data cleared",
-          description: `Successfully cleared ${result.deletedCount} records.`,
-          variant: "default",
-        })
-        // Refresh data status
-        checkDatabaseStatus()
-      } else {
-        toast({
-          title: "Error clearing data",
-          description: result.error || "Unknown error",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error clearing data",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const toggleDataTypeSelection = (dataType: DataType) => {
-    setSelectedDataTypes((prev) => {
-      if (dataType === "all") {
-        // If "all" is selected, toggle between all selected and none selected
-        return prev.length === 5 ? [] : ["trafficSources", "pageViews", "geographic", "devices", "dailySummary"]
-      } else {
-        // Toggle individual data type
-        return prev.includes(dataType) ? prev.filter((type) => type !== dataType) : [...prev, dataType]
-      }
-    })
-  }
-
-  const deleteSelectedData = async () => {
-    if (selectedDataTypes.length === 0) {
-      toast({
-        title: "No data types selected",
-        description: "Please select at least one data type to delete.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!confirm(`Are you sure you want to delete the selected data types? This cannot be undone.`)) {
-      return
-    }
-
-    setDeletingData(true)
-
-    try {
-      const response = await fetch("/api/analytics/delete-data-types", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": adminPassword,
-        },
-        body: JSON.stringify({ dataTypes: selectedDataTypes }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "Data deleted",
-          description: `Successfully deleted ${result.deletedCount} records from ${selectedDataTypes.length} data types.`,
-          variant: "default",
-        })
-        // Reset selected data types
-        setSelectedDataTypes([])
-        // Refresh data status
-        checkDatabaseStatus()
-      } else {
-        toast({
-          title: "Error deleting data",
-          description: result.error || "Unknown error",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error deleting data",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
-    } finally {
-      setDeletingData(false)
-    }
-  }
-
-  const getStatusBadge = (count: number) => {
-    if (count > 0) {
-      return (
-        <Badge variant="default" className="ml-2">
-          Has Data ({count})
-        </Badge>
-      )
-    }
-    return (
-      <Badge variant="secondary" className="ml-2">
-        Empty
-      </Badge>
+  const handleContactSelection = (contactId: number) => {
+    setSelectedContacts((prev) =>
+      prev.includes(contactId) ? prev.filter((id) => id !== contactId) : [...prev, contactId],
     )
   }
 
-  const isDataTypeSelected = (dataType: DataType) => {
-    return selectedDataTypes.includes(dataType)
+  const handleSelectAll = () => {
+    if (selectedContacts.length === contacts.length) {
+      setSelectedContacts([])
+    } else {
+      setSelectedContacts(contacts.map((contact) => contact.id))
+    }
   }
 
-  const areAllDataTypesSelected = () => {
-    return selectedDataTypes.length === 5
+  const handleSyncToAirtable = async () => {
+    if (selectedContacts.length === 0) {
+      toast({
+        title: "No contacts selected",
+        description: "Please select contacts to sync to Airtable.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSyncing(true)
+    try {
+      const response = await fetch("/api/crm/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "sync-to-airtable",
+          contactIds: selectedContacts,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Airtable sync completed",
+          description: result.message,
+          variant: "default",
+        })
+        handleRefresh()
+        setSelectedContacts([])
+      } else {
+        toast({
+          title: "Airtable sync failed",
+          description: result.error || "Unknown error",
+          variant: "destructive",
+        })
+      }
+    } catch (err) {
+      toast({
+        title: "Sync error",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleSyncToMailchimp = async () => {
+    if (selectedContacts.length === 0) {
+      toast({
+        title: "No contacts selected",
+        description: "Please select contacts to sync to Mailchimp.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSyncing(true)
+    try {
+      const response = await fetch("/api/crm/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "sync-to-mailchimp",
+          contactIds: selectedContacts,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Mailchimp sync completed",
+          description: result.message,
+          variant: "default",
+        })
+        handleRefresh()
+        setSelectedContacts([])
+      } else {
+        toast({
+          title: "Mailchimp sync failed",
+          description: result.error || "Unknown error",
+          variant: "destructive",
+        })
+      }
+    } catch (err) {
+      toast({
+        title: "Sync error",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getSourceBadgeColor = (source: string) => {
+    switch (source) {
+      case "contact-form":
+        return "bg-blue-100 text-blue-800"
+      case "newsletter":
+        return "bg-green-100 text-green-800"
+      case "sdoh-newsletter":
+        return "bg-purple-100 text-purple-800"
+      case "txmx-newsletter":
+        return "bg-orange-100 text-orange-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
   // Show authentication modal if not authenticated
@@ -489,574 +283,405 @@ export default function InsertDataPage() {
         isOpen={true}
         onVerified={handlePasswordVerified}
         onCancel={handlePasswordCancel}
-        action="access analytics data management"
+        action="access the CRM data management system"
       />
     )
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading CRM data...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="container mx-auto py-10 px-4 sm:px-6">
+    <div className="container mx-auto py-10 px-4 sm:px-6 pt-32 md:pt-24">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Analytics Data Management</h1>
-            <p className="text-gray-500 mt-1">Upload, manage, and view analytics data</p>
+            <h1 className="text-3xl font-bold">CRM Data Management</h1>
+            <p className="text-gray-500 mt-1">Manage contacts, sync to Airtable and Mailchimp</p>
           </div>
-          <Button
-            onClick={() => window.open("/analytics", "_blank")}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            <BarChart3 className="mr-2 h-4 w-4" />
-            View Analytics Dashboard
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleRefresh} disabled={isLoading} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button onClick={() => window.open("/analytics-web", "_blank")} variant="outline">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Analytics
+            </Button>
+          </div>
         </div>
 
-        {/* Data Source Information */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="mb-8"
-        >
-          <Card className="border-blue-300 overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-400 to-blue-500 text-white">
-              <CardTitle className="flex items-center gap-2">
-                <Info size={20} />
-                Data Source Information
-              </CardTitle>
-              <CardDescription className="text-blue-100">
-                Understanding where your analytics data comes from
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <p>The analytics dashboard uses data from two potential sources:</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border rounded-lg p-4 bg-blue-50">
-                    <h3 className="font-medium text-blue-700 flex items-center gap-2 mb-2">
-                      <Database className="h-4 w-4" /> Local Database
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Data stored in your Neon database. This includes historical data you've uploaded or generated. To
-                      test Google Analytics connection, delete this data.
-                    </p>
-                  </div>
-                  <div className="border rounded-lg p-4 bg-green-50">
-                    <h3 className="font-medium text-green-700 flex items-center gap-2 mb-2">
-                      <ExternalLink className="h-4 w-4" /> Google Analytics API
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Live data fetched directly from Google Analytics. If your GA4 connection is working, you'll still
-                      see data after clearing the local database.
-                    </p>
-                  </div>
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-                  <p className="text-sm text-amber-800">
-                    <strong>Tip:</strong> To verify your Google Analytics connection is working, delete all local data
-                    using the tools below, then visit the analytics dashboard. Any data that appears is coming directly
-                    from Google Analytics.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {!dbInitialized && (
+        {/* Error Display */}
+        {error && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg"
           >
-            <Card className="mb-8 border-yellow-300 overflow-hidden">
-              <div className="relative">
-                <CardHeader className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white pb-6">
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle size={20} />
-                    Database Not Initialized
+            <p className="text-red-200">Error: {error}</p>
+          </motion.div>
+        )}
+
+        {/* CRM Stats Overview */}
+        {crmStats && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{crmStats.contacts.total_contacts}</div>
+                <p className="text-xs text-muted-foreground">{crmStats.contacts.active_contacts} active</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Form Submissions</CardTitle>
+                <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{crmStats.submissions.total_submissions}</div>
+                <p className="text-xs text-muted-foreground">{crmStats.submissions.unique_form_types} form types</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Newsletter Subs</CardTitle>
+                <Mail className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{crmStats.newsletters.total_subscriptions}</div>
+                <p className="text-xs text-muted-foreground">
+                  {crmStats.newsletters.unique_newsletter_types} newsletter types
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Sync Status</CardTitle>
+                <Sync className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span>Airtable:</span>
+                    <span className="font-medium">{crmStats.contacts.synced_to_airtable}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Mailchimp:</span>
+                    <span className="font-medium">{crmStats.contacts.synced_to_mailchimp}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Main Content Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="contacts">Contacts</TabsTrigger>
+              <TabsTrigger value="sync">Sync Tools</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Database className="h-5 w-5" />
+                      CRM Database Status
+                    </CardTitle>
+                    <CardDescription>Overview of your custom CRM data</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span>Total Contacts</span>
+                      <Badge variant="secondary">{crmStats?.contacts.total_contacts || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Form Submissions</span>
+                      <Badge variant="secondary">{crmStats?.submissions.total_submissions || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Newsletter Subscriptions</span>
+                      <Badge variant="secondary">{crmStats?.newsletters.total_subscriptions || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Data Sources</span>
+                      <Badge variant="secondary">{crmStats?.contacts.unique_sources || 0}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ExternalLink className="h-5 w-5" />
+                      External Integrations
+                    </CardTitle>
+                    <CardDescription>Sync status with external platforms</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span>Airtable Synced</span>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                        {crmStats?.contacts.synced_to_airtable || 0}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Mailchimp Synced</span>
+                      <Badge variant="outline" className="bg-green-50 text-green-700">
+                        {crmStats?.contacts.synced_to_mailchimp || 0}
+                      </Badge>
+                    </div>
+                    <div className="pt-4 border-t">
+                      <p className="text-sm text-gray-600">
+                        Use the Sync Tools tab to sync selected contacts to Airtable or Mailchimp.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="contacts" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Contact Management
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={handleSelectAll} disabled={contacts.length === 0}>
+                        {selectedContacts.length === contacts.length ? "Deselect All" : "Select All"}
+                      </Button>
+                      <Badge variant="secondary">{selectedContacts.length} selected</Badge>
+                    </div>
                   </CardTitle>
-                  <CardDescription className="text-yellow-100">
-                    The analytics tables don't exist yet. Initialize them before uploading data.
+                  <CardDescription>
+                    Manage your contacts and their associated data. Select contacts to sync to external platforms.
                   </CardDescription>
                 </CardHeader>
-              </div>
-              <CardContent className="pt-6">
-                <p className="mb-4">
-                  You need to create the database tables before you can upload analytics data. Click the button below to
-                  initialize the database.
-                </p>
-                <Button
-                  onClick={initializeDatabase}
-                  disabled={initializing}
-                  className="bg-amber-500 hover:bg-amber-600"
-                >
-                  {initializing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Initializing...
-                    </>
+                <CardContent>
+                  {contacts.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No contacts found</p>
+                      <p className="text-sm text-gray-400">Contacts will appear here as forms are submitted</p>
+                    </div>
                   ) : (
-                    <>
-                      <Database className="mr-2 h-4 w-4" />
-                      Initialize Database
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <Card className="overflow-hidden h-full">
-              <div className="relative">
-                <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-700 text-white pb-6">
-                  <CardTitle className="flex items-center gap-2">
-                    <Database size={20} />
-                    Current Data Status
-                  </CardTitle>
-                  <CardDescription className="text-blue-100">
-                    Overview of analytics data in the database
-                  </CardDescription>
-                </CardHeader>
-              </div>
-              <CardContent className="pt-6">
-                {dataStatus.loading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                  </div>
-                ) : dataStatus.error ? (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-800">
-                    <p className="font-medium">Error checking data status</p>
-                    <p className="text-sm">{dataStatus.error}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md transition-colors">
-                      <span>Traffic Sources</span>
-                      {getStatusBadge(dataStatus.trafficSources)}
-                    </div>
-                    <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md transition-colors">
-                      <span>Page Views</span>
-                      {getStatusBadge(dataStatus.pageViews)}
-                    </div>
-                    <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md transition-colors">
-                      <span>Geographic Data</span>
-                      {getStatusBadge(dataStatus.geographic)}
-                    </div>
-                    <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md transition-colors">
-                      <span>Device Data</span>
-                      {getStatusBadge(dataStatus.devices)}
-                    </div>
-                    <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md transition-colors">
-                      <span>Daily Summary</span>
-                      {getStatusBadge(dataStatus.dailySummary)}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between border-t pt-6">
-                <Button variant="outline" onClick={checkDatabaseStatus} disabled={dataStatus.loading}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={clearData}
-                  disabled={
-                    dataStatus.loading || !Object.values(dataStatus).some((val) => typeof val === "number" && val > 0)
-                  }
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clear All Data
-                </Button>
-              </CardFooter>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <Card className="overflow-hidden h-full">
-              <div className="relative">
-                <CardHeader className="bg-gradient-to-r from-green-500 to-green-700 text-white pb-6">
-                  <CardTitle className="flex items-center gap-2">
-                    <Upload size={20} />
-                    Upload Analytics Data
-                  </CardTitle>
-                  <CardDescription className="text-green-100">
-                    Upload data from files or use sample data
-                  </CardDescription>
-                </CardHeader>
-              </div>
-              <CardContent className="pt-6">
-                <Tabs defaultValue="sample" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="sample">Sample Data</TabsTrigger>
-                    <TabsTrigger value="file">File Upload</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="sample" className="space-y-6">
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Select Date Range</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(["7days", "30days", "90days"] as const).map((range) => (
-                            <Button
-                              key={range}
-                              variant={dateRange === range ? "default" : "outline"}
-                              onClick={() => setDateRange(range)}
-                              className={`w-full ${
-                                dateRange === range
-                                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                                  : ""
-                              }`}
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              {range === "7days" ? "7 Days" : range === "30days" ? "30 Days" : "90 Days"}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      <Button
-                        onClick={insertSampleData}
-                        disabled={uploading || !dbInitialized}
-                        className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
-                      >
-                        {uploading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Insert Sample Data
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="file" className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Select Date Range</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(["7days", "30days", "90days"] as const).map((range) => (
-                            <Button
-                              key={range}
-                              variant={dateRange === range ? "default" : "outline"}
-                              onClick={() => setDateRange(range)}
-                              className={`w-full ${
-                                dateRange === range
-                                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                                  : ""
-                              }`}
-                            >
-                              <Calendar className="mr-2 h-4 w-4" />
-                              {range === "7days" ? "7 Days" : range === "30days" ? "30 Days" : "90 Days"}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Upload File (CSV or Excel)</label>
-                        <div className="flex items-center justify-center w-full">
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 border-gray-300 transition-colors">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <FileSpreadsheet className="w-8 h-8 mb-2 text-gray-500" />
-                              <p className="mb-2 text-sm text-gray-500">
-                                <span className="font-semibold">Click to upload</span> or drag and drop
-                              </p>
-                              <p className="text-xs text-gray-500">CSV or Excel files</p>
+                      {contacts.map((contact) => (
+                        <div
+                          key={contact.id}
+                          className={`p-4 border rounded-lg transition-colors ${
+                            selectedContacts.includes(contact.id)
+                              ? "border-blue-300 bg-blue-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedContacts.includes(contact.id)}
+                                onChange={() => handleContactSelection(contact.id)}
+                                className="mt-1"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="font-medium">
+                                    {contact.first_name || contact.last_name
+                                      ? `${contact.first_name || ""} ${contact.last_name || ""}`.trim()
+                                      : contact.email}
+                                  </h3>
+                                  <Badge className={getSourceBadgeColor(contact.source)}>{contact.source}</Badge>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-2">{contact.email}</p>
+                                {contact.company && <p className="text-sm text-gray-500 mb-2">{contact.company}</p>}
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <span>Created: {formatDate(contact.created_at)}</span>
+                                  <span>Submissions: {contact.submission_count}</span>
+                                  <span>Newsletters: {contact.newsletter_count}</span>
+                                </div>
+                                {contact.tags && contact.tags.length > 0 && (
+                                  <div className="flex gap-1 mt-2">
+                                    {contact.tags.map((tag, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs">
+                                        {tag}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept=".csv,.xlsx,.xls"
-                              onChange={handleFileUpload}
-                              disabled={uploading || !dbInitialized}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Selective Data Deletion */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-          className="mb-8"
-        >
-          <Card className="overflow-hidden border-red-200">
-            <CardHeader className="bg-gradient-to-r from-red-500 to-red-700 text-white">
-              <CardTitle className="flex items-center gap-2">
-                <Trash2 size={20} />
-                Selective Data Deletion
-              </CardTitle>
-              <CardDescription className="text-red-100">
-                Delete specific types of data from the database
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
-                  <p className="text-sm text-amber-800">
-                    <strong>Testing Google Analytics Connection:</strong> Delete all local data to verify if your Google
-                    Analytics connection is working. Any data that appears in the dashboard after deletion is coming
-                    directly from Google Analytics.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Select Data Types to Delete</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleDataTypeSelection("all")}
-                      className={areAllDataTypesSelected() ? "bg-red-50 text-red-700 border-red-300" : ""}
-                    >
-                      {areAllDataTypesSelected() ? "Deselect All" : "Select All"}
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => toggleDataTypeSelection("trafficSources")}
-                      className={`justify-start ${
-                        isDataTypeSelected("trafficSources") ? "bg-red-50 text-red-700 border-red-300" : ""
-                      }`}
-                      disabled={dataStatus.trafficSources === 0}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>Traffic Sources</span>
-                        {getStatusBadge(dataStatus.trafficSources)}
-                      </div>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => toggleDataTypeSelection("pageViews")}
-                      className={`justify-start ${
-                        isDataTypeSelected("pageViews") ? "bg-red-50 text-red-700 border-red-300" : ""
-                      }`}
-                      disabled={dataStatus.pageViews === 0}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>Page Views</span>
-                        {getStatusBadge(dataStatus.pageViews)}
-                      </div>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => toggleDataTypeSelection("geographic")}
-                      className={`justify-start ${
-                        isDataTypeSelected("geographic") ? "bg-red-50 text-red-700 border-red-300" : ""
-                      }`}
-                      disabled={dataStatus.geographic === 0}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>Geographic Data</span>
-                        {getStatusBadge(dataStatus.geographic)}
-                      </div>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => toggleDataTypeSelection("devices")}
-                      className={`justify-start ${
-                        isDataTypeSelected("devices") ? "bg-red-50 text-red-700 border-red-300" : ""
-                      }`}
-                      disabled={dataStatus.devices === 0}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>Device Data</span>
-                        {getStatusBadge(dataStatus.devices)}
-                      </div>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => toggleDataTypeSelection("dailySummary")}
-                      className={`justify-start ${
-                        isDataTypeSelected("dailySummary") ? "bg-red-50 text-red-700 border-red-300" : ""
-                      }`}
-                      disabled={dataStatus.dailySummary === 0}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>Daily Summary</span>
-                        {getStatusBadge(dataStatus.dailySummary)}
-                      </div>
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <Button
-                    variant="destructive"
-                    onClick={deleteSelectedData}
-                    disabled={
-                      deletingData ||
-                      selectedDataTypes.length === 0 ||
-                      !Object.values(dataStatus).some((val) => typeof val === "number" && val > 0)
-                    }
-                    className="w-full"
-                  >
-                    {deletingData ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Selected Data Types
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {uploading && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mt-8"
-          >
-            <Card className="overflow-hidden">
-              <div className="relative">
-                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-700 text-white pb-6">
-                  <CardTitle className="flex items-center gap-2">
-                    <Loader2 className="animate-spin" size={20} />
-                    Upload Progress
-                  </CardTitle>
-                  <CardDescription className="text-purple-100">{uploadProgress.message}</CardDescription>
-                </CardHeader>
-              </div>
-              <CardContent className="pt-6">
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <motion.div
-                    className="bg-purple-600 h-2.5 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${uploadProgress.progress}%` }}
-                    transition={{ duration: 0.5 }}
-                  ></motion.div>
-                </div>
-                <p className="text-sm text-gray-500 mt-2">
-                  {uploadProgress.stage === "preparing" && "Preparing data..."}
-                  {uploadProgress.stage === "uploading" && "Uploading to server..."}
-                  {uploadProgress.stage === "processing" && "Processing data..."}
-                  {uploadProgress.stage === "complete" && "Upload complete!"}
-                  {uploadProgress.stage === "error" && "Error uploading data"}
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {uploadResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mt-8"
-          >
-            <Card className={`overflow-hidden ${uploadResult.success ? "border-green-300" : "border-red-300"}`}>
-              <div className="relative">
-                <CardHeader
-                  className={`${
-                    uploadResult.success
-                      ? "bg-gradient-to-r from-green-500 to-green-700"
-                      : "bg-gradient-to-r from-red-500 to-red-700"
-                  } text-white pb-6`}
-                >
-                  <CardTitle className="flex items-center gap-2">
-                    {uploadResult.success ? <CheckCircle2 size={20} /> : <X size={20} />}
-                    Upload Result
-                  </CardTitle>
-                  <CardDescription className={uploadResult.success ? "text-green-100" : "text-red-100"}>
-                    {uploadResult.message}
-                  </CardDescription>
-                </CardHeader>
-              </div>
-              <CardContent className="pt-6">
-                {uploadResult.success ? (
-                  <div className="space-y-4">
-                    <p>
-                      Successfully processed {uploadResult.recordsProcessed} records of {uploadResult.dataType} data.
-                    </p>
-
-                    {uploadResult.results && (
-                      <div className="space-y-2">
-                        <h4 className="font-medium">Records inserted:</h4>
-                        <ul className="list-disc pl-5 space-y-1">
-                          {uploadResult.results.trafficSources > 0 && (
-                            <li>Traffic Sources: {uploadResult.results.trafficSources}</li>
-                          )}
-                          {uploadResult.results.pageViews > 0 && <li>Page Views: {uploadResult.results.pageViews}</li>}
-                          {uploadResult.results.geographic > 0 && (
-                            <li>Geographic Data: {uploadResult.results.geographic}</li>
-                          )}
-                          {uploadResult.results.devices > 0 && <li>Device Data: {uploadResult.results.devices}</li>}
-                          {uploadResult.results.summary > 0 && <li>Summary Records: {uploadResult.results.summary}</li>}
-                        </ul>
-
-                        {uploadResult.results.errors.length > 0 && (
-                          <div className="mt-4">
-                            <h4 className="font-medium text-red-600">Errors:</h4>
-                            <ul className="list-disc pl-5 space-y-1 text-red-600">
-                              {uploadResult.results.errors.map((error, index) => (
-                                <li key={index}>{error}</li>
-                              ))}
-                            </ul>
+                            <div className="flex items-center gap-2">
+                              {contact.synced_to_airtable && (
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                                  Airtable
+                                </Badge>
+                              )}
+                              {contact.synced_to_mailchimp && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 text-xs">
+                                  Mailchimp
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                    <div className="pt-4">
-                      <Button
-                        onClick={() => window.open("/analytics", "_blank")}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <BarChart3 className="mr-2 h-4 w-4" />
-                        View Analytics Dashboard
-                      </Button>
+            <TabsContent value="sync" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ExternalLink className="h-5 w-5" />
+                      Sync to Airtable
+                    </CardTitle>
+                    <CardDescription>Sync selected contacts to your Airtable CRM base</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-sm text-gray-600">
+                      <p>
+                        Selected contacts: <strong>{selectedContacts.length}</strong>
+                      </p>
+                      <p>
+                        Already synced: <strong>{crmStats?.contacts.synced_to_airtable || 0}</strong>
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleSyncToAirtable}
+                      disabled={selectedContacts.length === 0 || syncing}
+                      className="w-full"
+                    >
+                      {syncing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Sync to Airtable
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      This will create or update records in your Airtable base with the selected contact information.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Mail className="h-5 w-5" />
+                      Sync to Mailchimp
+                    </CardTitle>
+                    <CardDescription>Add selected contacts to your Mailchimp mailing lists</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-sm text-gray-600">
+                      <p>
+                        Selected contacts: <strong>{selectedContacts.length}</strong>
+                      </p>
+                      <p>
+                        Already synced: <strong>{crmStats?.contacts.synced_to_mailchimp || 0}</strong>
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleSyncToMailchimp}
+                      disabled={selectedContacts.length === 0 || syncing}
+                      className="w-full bg-transparent"
+                      variant="outline"
+                    >
+                      {syncing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Sync to Mailchimp
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      This will add the selected contacts as subscribers to your Mailchimp audience.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Sync Configuration
+                  </CardTitle>
+                  <CardDescription>Configure your external integrations</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">Airtable Configuration</h4>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p>Base ID: {process.env.NEXT_PUBLIC_AIRTABLE_BASE_ID ? "✓ Configured" : "❌ Missing"}</p>
+                        <p>API Key: {process.env.AIRTABLE_API_KEY ? "✓ Configured" : "❌ Missing"}</p>
+                      </div>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-2">Mailchimp Configuration</h4>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p>API Key: {process.env.MAILCHIMP_API_KEY ? "✓ Configured" : "❌ Missing"}</p>
+                        <p>List ID: {process.env.MAILCHIMP_LIST_ID ? "✓ Configured" : "❌ Missing"}</p>
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <p className="font-medium text-red-800">Error details:</p>
-                    <p className="text-sm text-red-700">{uploadResult.error}</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> Make sure your environment variables are properly configured for external
+                      integrations to work correctly.
+                    </p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
       </motion.div>
     </div>
   )
