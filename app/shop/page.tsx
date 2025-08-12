@@ -84,7 +84,7 @@ export default function ShopPage() {
               loop
               playsInline
               className="w-full h-full object-cover"
-              poster="/placeholder.svg?height=1080&width=1920"
+              poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
             >
               <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
               Your browser does not support the video tag.
