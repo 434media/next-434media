@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Image placeholder">
+  <style>
+    :root {
+      --bg-start: #e5e7eb; /* slate-200 */
+      --bg-end: #cbd5e1;   /* slate-300 */
+      --frame: rgba(255,255,255,0.7);
+      --shape: rgba(100,116,139,0.7); /* slate-500 */
+      --text: #475569; /* slate-600 */
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-start: #0f172a; /* slate-900 */
+        --bg-end: #1f2937;   /* gray-800 */
+        --frame: rgba(148,163,184,0.15); /* subtle frame */
+        --shape: rgba(148,163,184,0.35); /* slate-400 */
+        --text: #94a3b8; /* slate-400 */
+      }
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="var(--bg-start)"/>
+      <stop offset="100%" stop-color="var(--bg-end)"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <g>
+    <rect x="140" y="140" width="520" height="320" rx="12" fill="var(--frame)"/>
+    <path d="M180 420 L320 280 L420 380 L500 300 L620 420 Z" fill="var(--shape)"/>
+    <circle cx="260" cy="260" r="40" fill="var(--shape)"/>
+  </g>
+  <text x="50%" y="92%" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji" font-size="22" fill="var(--text)">Image placeholder</text>
+</svg>

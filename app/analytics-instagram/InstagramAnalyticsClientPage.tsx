@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import AdminPasswordModal from "../components/AdminPasswordModal"
 import { InstagramDashboardHeader } from "../components/instagram/InstagramDashboardHeader"
 import { InstagramMetricsOverview } from "../components/instagram/InstagramMetricsOverview"
-import { InstagramEngagementChart } from "../components/instagram/InstagramEngagementChart"
 import { InstagramTopPostsTable } from "../components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "../components/instagram/InstagramAccountInfo"
 import { InstagramDateRangeSelector } from "../components/instagram/InstagramDateRangeSelector"
@@ -16,10 +15,20 @@ import type {
 } from "../types/instagram-insights"
 
 interface InstagramInsightsData {
-  impressions: number
   reach: number
+  content_interactions: number
   profile_views: number
+  // follower breakdowns provided by API
+  reach_followers?: number
+  reach_non_followers?: number
+  profile_views_followers?: number
+  profile_views_non_followers?: number
+  content_interactions_followers?: number
+  content_interactions_non_followers?: number
   website_clicks: number
+  follows: number
+  unfollows: number
+  net_follower_growth: number
   followers_count: number
   follows_count: number
   media_count: number
@@ -77,7 +86,7 @@ export default function InstagramAnalyticsClientPage() {
       const headers = { "x-admin-key": adminKey }
 
       // Test connection first
-      const connectionResponse = await fetch("/api/instagram/txmxboxing?endpoint=test-connection", { headers })
+      const connectionResponse = await fetch("/api/instagram/txmx?endpoint=test-connection", { headers })
       if (!connectionResponse.ok) {
         if (connectionResponse.status === 401) {
           sessionStorage.removeItem("adminKey")
@@ -85,7 +94,14 @@ export default function InstagramAnalyticsClientPage() {
           setIsAuthenticated(false)
           return
         }
-        throw new Error("Failed to connect to Instagram API")
+        // Try to surface server error details if available
+        try {
+          const errJson = await connectionResponse.json()
+          const message = errJson?.error || errJson?.details || "Failed to connect to Instagram API"
+          throw new Error(message)
+        } catch {
+          throw new Error("Failed to connect to Instagram API")
+        }
       }
       const connectionData = await connectionResponse.json()
       setConnectionStatus(connectionData)
@@ -94,12 +110,25 @@ export default function InstagramAnalyticsClientPage() {
       const startDate = getStartDateForRange(dateRange)
       const endDate = "today"
 
+      const [accountRes, insightsRes, mediaRes] = await Promise.all([
+        fetch("/api/instagram/txmx?endpoint=account-info", { headers }),
+        fetch(`/api/instagram/txmx?endpoint=insights&startDate=${startDate}&endDate=${endDate}`, { headers }),
+        fetch("/api/instagram/txmx?endpoint=media", { headers }),
+      ])
+
       const [accountResult, insightsResult, mediaResult] = await Promise.all([
-        fetch("/api/instagram/txmxboxing?endpoint=account-info", { headers }).then(res => res.json()),
-        fetch(`/api/instagram/txmxboxing?endpoint=insights&startDate=${startDate}&endDate=${endDate}`, {
-          headers,
-        }).then(res => res.json()),
-        fetch("/api/instagram/txmxboxing?endpoint=media", { headers }).then(res => res.json()),
+        (async () => {
+          if (!accountRes.ok) throw new Error((await accountRes.json()).details || "Failed to fetch account info")
+          return accountRes.json()
+        })(),
+        (async () => {
+          if (!insightsRes.ok) throw new Error((await insightsRes.json()).details || "Failed to fetch insights")
+          return insightsRes.json()
+        })(),
+        (async () => {
+          if (!mediaRes.ok) throw new Error((await mediaRes.json()).details || "Failed to fetch media")
+          return mediaRes.json()
+        })(),
       ])
 
       if (accountResult.data) {
@@ -218,9 +247,16 @@ export default function InstagramAnalyticsClientPage() {
           isLoading={isLoading}
         />
 
-        <div className="mb-6">
+        <div className="mb-6 mt-6">
           <InstagramDateRangeSelector selectedRange={dateRange} onRangeChange={setDateRange} />
         </div>
+
+        {/* Order: Account Info -> Date Range -> Top Posts -> Metrics Overview -> Engagement Chart */}
+        {!isLoading && accountData &&
+          <div className="mb-6">
+            <InstagramAccountInfo account={accountData} />
+          </div>
+        }
 
         {error && (
           <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg">
@@ -234,40 +270,34 @@ export default function InstagramAnalyticsClientPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {accountData && <InstagramAccountInfo account={accountData} />}
+            <InstagramTopPostsTable
+              media={mediaData}
+              followerCount={accountData?.followers_count || 0}
+              connectionStatus={connectionStatus}
+            />
 
             <InstagramMetricsOverview
               insights={
                 insightsData || {
-                  impressions: 0,
                   reach: 0,
+                  content_interactions: 0,
                   profile_views: 0,
+                  reach_followers: 0,
+                  reach_non_followers: 0,
+                  profile_views_followers: 0,
+                  profile_views_non_followers: 0,
+                  content_interactions_followers: 0,
+                  content_interactions_non_followers: 0,
                   website_clicks: 0,
+                  follows: 0,
+                  unfollows: 0,
+                  net_follower_growth: 0,
                   followers_count: 0,
                   follows_count: 0,
                   media_count: 0,
                 }
               }
               dateRange={dateRange}
-              connectionStatus={connectionStatus}
-            />
-
-            <InstagramEngagementChart
-              insights={
-                insightsData || {
-                  impressions: 0,
-                  reach: 0,
-                  profile_views: 0,
-                  website_clicks: 0,
-                }
-              }
-              dateRange={dateRange}
-              connectionStatus={connectionStatus}
-            />
-
-            <InstagramTopPostsTable
-              media={mediaData}
-              followerCount={accountData?.followers_count || 0}
               connectionStatus={connectionStatus}
             />
           </div>

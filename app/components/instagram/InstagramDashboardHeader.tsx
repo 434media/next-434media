@@ -1,7 +1,11 @@
 "use client"
 
+import type React from "react"
+
 import { motion } from "motion/react"
-import { RefreshCw, LogOut, Loader2 } from 'lucide-react'
+import { RefreshCw, LogOut, Loader2, ChevronDown } from "lucide-react"
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "../../components/analytics/Button"
 
 interface InstagramDashboardHeaderProps {
@@ -27,13 +31,200 @@ interface InstagramDashboardHeaderProps {
   isLoading?: boolean
 }
 
-export function InstagramDashboardHeader({ 
-  connectionStatus, 
+export function InstagramDashboardHeader({
+  connectionStatus,
   accountData,
   onRefresh = () => {},
   onLogout = () => {},
-  isLoading = false
+  isLoading = false,
 }: InstagramDashboardHeaderProps) {
+  // Simple account dropdown (future-ready). Default to TXMX Boxing
+  const derivedAccountLabel = accountData ? `@${accountData.username}` : "TXMX Boxing"
+  const [selectedAccount, setSelectedAccount] = useState<string>(derivedAccountLabel)
+
+  const accounts = [
+    { name: derivedAccountLabel, disabled: false },
+    { name: "Digital Canvas", disabled: true },
+    { name: "Vemos Vamos", disabled: true },
+    { name: "MilCityUSA", disabled: true },
+    { name: "The AMPD Project", disabled: true },
+  ]
+
+  const isConnected = !!connectionStatus?.success
+
+  // Reusable account selector (custom popover replacing native <select>)
+  function AccountSelector({ compact = false }: { compact?: boolean }) {
+    const [open, setOpen] = useState(false)
+    const btnRef = useRef<HTMLButtonElement | null>(null)
+    const listRef = useRef<HTMLUListElement | null>(null)
+    const [highlightIndex, setHighlightIndex] = useState<number>(
+      () => accounts.findIndex((a) => a.name === selectedAccount) || 0,
+    )
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+    const close = useCallback(() => setOpen(false), [])
+
+    // Close on outside click
+    useEffect(() => {
+      if (!open) return
+      function handle(e: MouseEvent) {
+        if (!btnRef.current && !listRef.current) return
+        if (btnRef.current?.contains(e.target as Node) || listRef.current?.contains(e.target as Node)) return
+        close()
+      }
+      window.addEventListener("mousedown", handle)
+      return () => window.removeEventListener("mousedown", handle)
+    }, [open, close])
+
+    // Compute absolute viewport position (for portal) so we can escape overflow-hidden clipping
+    const computePosition = useCallback(() => {
+      if (!btnRef.current) return
+      const rect = btnRef.current.getBoundingClientRect()
+      setMenuPos({
+        top: rect.top + (window.scrollY || window.pageYOffset) + rect.height + 4,
+        left: rect.left + (window.scrollX || window.pageXOffset),
+        width: rect.width,
+      })
+    }, [])
+
+    useLayoutEffect(() => {
+      if (open) computePosition()
+    }, [open, computePosition])
+
+    useEffect(() => {
+      if (!open) return
+      function onResize() { computePosition() }
+      function onScroll() { computePosition() }
+      window.addEventListener("resize", onResize)
+      window.addEventListener("scroll", onScroll, true)
+      return () => {
+        window.removeEventListener("resize", onResize)
+        window.removeEventListener("scroll", onScroll, true)
+      }
+    }, [open, computePosition])
+
+    const onKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault()
+        if (!open) {
+          setOpen(true)
+        } else {
+          const selectedAccountData = accounts[highlightIndex]
+          if (!selectedAccountData.disabled) {
+            setSelectedAccount(selectedAccountData.name)
+            close()
+          }
+        }
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setOpen(true)
+        setHighlightIndex((i) => (i + 1) % accounts.length)
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setOpen(true)
+        setHighlightIndex((i) => (i - 1 + accounts.length) % accounts.length)
+      } else if (e.key === "Escape") {
+        if (open) {
+          e.preventDefault()
+          close()
+        }
+      } else if (e.key === "Tab") {
+        close()
+      }
+    }
+
+    // Ensure highlight follows selected when list opens
+    useEffect(() => {
+      if (open) {
+        const idx = accounts.findIndex((a) => a.name === selectedAccount)
+        if (idx >= 0) setHighlightIndex(idx)
+      }
+    }, [open, selectedAccount])
+
+    const baseClasses = compact ? "pl-8 pr-8 py-2 text-sm" : "pl-10 pr-9 py-2 text-sm"
+
+    return (
+      <div className={`relative ${compact ? "w-full" : "min-w-[180px]"}`}>
+        <button
+          ref={btnRef}
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          onKeyDown={onKeyDown}
+          className={`group w-full rounded-lg border border-white/20 bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-pink-500/50 backdrop-blur-sm text-left text-white relative transition-colors ${baseClasses}`}
+        >
+          <div
+            className={`absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${isConnected ? "bg-green-400" : "bg-red-400"} pointer-events-none`}
+          />
+          <span className="block truncate pr-2">{selectedAccount}</span>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60 group-hover:text-white/80 transition-colors" />
+        </button>
+        {open && menuPos && typeof document !== "undefined" &&
+          createPortal(
+            <ul
+              ref={listRef}
+              role="listbox"
+              aria-activedescendant={`insta-acc-${highlightIndex}`}
+              tabIndex={-1}
+              style={{ position: "absolute", top: menuPos.top, left: menuPos.left, width: menuPos.width, zIndex: 1000, animation: "fadeIn 0.15s ease-out" }}
+              className="max-h-60 overflow-auto rounded-lg border border-white/20 bg-slate-900/95 backdrop-blur-md shadow-xl ring-1 ring-black/20 focus:outline-none"
+            >
+              {accounts.map((acc, i) => {
+                const active = i === highlightIndex
+                const selected = acc.name === selectedAccount
+                const disabled = acc.disabled
+                return (
+                  <li
+                    id={`insta-acc-${i}`}
+                    key={acc.name}
+                    role="option"
+                    aria-selected={selected}
+                    aria-disabled={disabled}
+                    onMouseEnter={() => setHighlightIndex(i)}
+                    onMouseDown={(e) => {
+                      if (disabled) return
+                      e.preventDefault()
+                      setSelectedAccount(acc.name)
+                      close()
+                    }}
+                    className={`px-3 py-2.5 text-sm flex items-center gap-3 transition-colors duration-150 ${
+                      disabled
+                        ? "cursor-not-allowed text-white/30"
+                        : `cursor-pointer ${active ? "bg-pink-500/20" : ""} ${selected ? "text-pink-300 font-medium" : "text-white/90"} hover:bg-pink-500/30`
+                    }`}
+                  >
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                        disabled
+                          ? "bg-gray-500"
+                          : selected
+                            ? (isConnected ? "bg-green-400" : "bg-red-400")
+                            : "bg-gray-400"
+                      }`}
+                    />
+                    <span className="truncate flex-1">{acc.name}</span>
+                    {selected && !disabled && (
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-pink-300/70 flex-shrink-0">
+                        Selected
+                      </span>
+                    )}
+                    {disabled && (
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-white/20 flex-shrink-0">
+                        Coming Soon
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+              {accounts.length === 0 && <li className="px-3 py-2 text-xs text-white/50">No accounts</li>}
+            </ul>,
+            document.body
+          )}
+      </div>
+    )
+  }
+
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-white/10 mb-8">
       {/* Sophisticated 434 Media Logo Pattern with Enhanced Contrast */}
@@ -77,19 +268,12 @@ export function InstagramDashboardHeader({
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-              <InstagramIcon className="h-6 w-6 text-pink-400" />
+              <InstagramIcon className="w-8 h-8 text-pink-400" />
             </motion.div>
-            {accountData?.profile_picture_url && (
-              <img
-                src={accountData.profile_picture_url || "/placeholder.svg"}
-                alt={`${accountData.username} profile`}
-                className="w-10 h-10 rounded-full border-2 border-pink-400/50"
-              />
-            )}
           </div>
           <div>
             <motion.h1
-              className="text-lg font-bold text-white mb-1"
+              className="text-lg font-bold text-white"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
@@ -97,12 +281,12 @@ export function InstagramDashboardHeader({
               Meta Insights
             </motion.h1>
             <motion.p
-              className="text-white/60 text-xs"
+              className="text-white/60 text-[11px] mt-1"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
             >
-              {accountData ? `@${accountData.username} - ${accountData.name}` : "Social media insights and engagement metrics"}
+              Social media insights and engagement metrics
             </motion.p>
           </div>
         </motion.div>
@@ -114,20 +298,8 @@ export function InstagramDashboardHeader({
           transition={{ duration: 0.6, delay: 0.2 }}
           className="flex flex-col gap-3"
         >
-          {/* Connection Status */}
-          <div className="relative w-full">
-            <div className={`bg-white/10 border rounded-lg px-4 py-2 text-sm backdrop-blur-sm flex items-center w-full ${
-              connectionStatus?.success
-                ? "border-green-500/20 text-green-200"
-                : "border-red-500/20 text-red-200"
-            }`}>
-              <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                connectionStatus?.success ? "bg-green-400" : "bg-red-400"
-              }`} />
-              <span>{connectionStatus?.success ? "Connected" : "Disconnected"}</span>
-            </div>
-          </div>
-
+          {/* Account Selector (mobile) */}
+          <AccountSelector compact />
           {/* Button Group - Full width on mobile */}
           <div className="flex gap-2 w-full">
             <Button
@@ -173,19 +345,12 @@ export function InstagramDashboardHeader({
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-              <InstagramIcon className="h-8 w-8 text-pink-400" />
+              <InstagramIcon className="w-8 h-8 text-pink-400" />
             </motion.div>
-            {accountData?.profile_picture_url && (
-              <img
-                src={accountData.profile_picture_url || "/placeholder.svg"}
-                alt={`${accountData.username} profile`}
-                className="w-16 h-16 rounded-full border-2 border-pink-400/50"
-              />
-            )}
           </div>
           <div>
             <motion.h1
-              className="text-xl font-bold text-white mb-2"
+              className="text-xl font-bold text-white"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
@@ -193,12 +358,12 @@ export function InstagramDashboardHeader({
               Meta Insights
             </motion.h1>
             <motion.p
-              className="text-white/60 text-sm"
+              className="text-white/60 text-xs mt-1"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
             >
-              {accountData ? `@${accountData.username} - ${accountData.name}` : "Social media insights and engagement metrics"}
+              Social media insights and engagement metrics
             </motion.p>
           </div>
         </motion.div>
@@ -209,16 +374,9 @@ export function InstagramDashboardHeader({
           transition={{ duration: 0.6, delay: 0.2 }}
           className="flex items-center gap-3"
         >
-          {/* Connection Status */}
-          <div className={`bg-white/10 border rounded-lg px-4 py-2 text-sm backdrop-blur-sm flex items-center ${
-            connectionStatus?.success
-              ? "border-green-500/20 text-green-200"
-              : "border-red-500/20 text-red-200"
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              connectionStatus?.success ? "bg-green-400" : "bg-red-400"
-            }`} />
-            <span>{connectionStatus?.success ? "Connected" : "Disconnected"}</span>
+          {/* Account Selector + Inline Status */}
+          <div className="flex items-center gap-3">
+            <AccountSelector />
           </div>
 
           <Button
@@ -243,15 +401,6 @@ export function InstagramDashboardHeader({
           </Button>
         </motion.div>
       </div>
-
-      {/* Connection Status Message */}
-      {connectionStatus?.message && (
-        <div className="relative z-10 mx-4 sm:mx-8 mb-4">
-          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-600">
-            <p className="text-slate-300 text-sm">{connectionStatus.message}</p>
-          </div>
-        </div>
-      )}
 
       {/* Animated gradient line at bottom */}
       <motion.div

@@ -18,50 +18,49 @@ interface InstagramAccountInfoProps {
 
 export function InstagramAccountInfo({ account }: InstagramAccountInfoProps) {
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-600 p-6">
-      <h2 className="text-xl font-semibold text-white mb-4">Account Information</h2>
-
-      <div className="flex items-start space-x-6">
-        <img
-          src={account.profile_picture_url || "/placeholder.svg"}
-          alt={`${account.username} profile`}
-          className="w-20 h-20 rounded-full border-2 border-purple-400"
-        />
-
-        <div className="flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{formatNumber(account.followers_count)}</div>
-              <div className="text-sm text-slate-400">Followers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{formatNumber(account.follows_count)}</div>
-              <div className="text-sm text-slate-400">Following</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-white">{formatNumber(account.media_count)}</div>
-              <div className="text-sm text-slate-400">Posts</div>
-            </div>
+    <div
+      className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl"
+      style={{
+        willChange: "auto",
+        backfaceVisibility: "hidden",
+        transform: "translateZ(0)",
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+          style={{ willChange: "transform" }}
+        >
+          <div className="w-12 h-12 rounded-lg overflow-hidden">
+            <img
+              src={account.profile_picture_url || "/placeholder.svg"}
+              alt={`${account.username} profile`}
+              className="w-full h-full object-cover"
+            />
           </div>
+        </div>
+        <div>
+          <h3 className="text-white text-xl font-bold mb-1">{account.biography}</h3>
+          <a href={`https://www.instagram.com/${account.username}`} target="_blank" rel="noopener noreferrer" className="text-white/60 text-sm font-medium hover:underline">
+            <p>
+              @{account.username}
+            </p>
+          </a>
+        </div>
+      </div>
 
-          {account.biography && (
-            <div className="mb-3">
-              <p className="text-slate-300 text-sm">{account.biography}</p>
-            </div>
-          )}
-
-          {account.website && (
-            <div>
-              <a
-                href={account.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 text-sm underline"
-              >
-                {account.website}
-              </a>
-            </div>
-          )}
+      <div className="flex justify-between gap-0 lg:gap-8">
+        <div className="text-center">
+          <div className="text-2xl lg:text-3xl font-bold text-white mb-1">{formatNumber(account.followers_count)}</div>
+          <div className="text-sm text-slate-300 font-medium">Followers</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl lg:text-3xl font-bold text-white mb-1">{formatNumber(account.follows_count)}</div>
+          <div className="text-sm text-slate-300 font-medium">Following</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl lg:text-3xl font-bold text-white mb-1">{formatNumber(account.media_count)}</div>
+          <div className="text-sm text-slate-300 font-medium">Posts</div>
         </div>
       </div>
     </div>

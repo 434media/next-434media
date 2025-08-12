@@ -14,7 +14,6 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ['image/avif', 'image/webp'],
-    domains: ["placehold.co"],
     remotePatterns: [
       {
         protocol: "https",
@@ -24,6 +23,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'cdn.shopify.com',
         pathname: '/s/files/**'
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+        pathname: '/**'
       }
     ],
   },  

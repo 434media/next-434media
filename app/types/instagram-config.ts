@@ -6,6 +6,7 @@ export interface InstagramConfigStatus {
   hasAccessToken: boolean
   hasAppId: boolean
   hasFacebookPageId: boolean
+  hasBusinessAccountId: boolean
   hasAppSecret: boolean
   hasWebhookConfig: boolean
   apiVersion: string
@@ -18,6 +19,7 @@ export interface InstagramAppConfig {
   appSecret?: string
   accessToken: string
   facebookPageId: string
+  businessAccountId?: string
   webhookVerifyToken?: string
   webhookSecret?: string
   apiVersion: string

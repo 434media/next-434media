@@ -1,14 +1,16 @@
 import type { InstagramMedia, InstagramMediaInsights, InstagramTimeRange } from "../types/instagram-insights"
 
 // Format numbers for display
-export function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M"
+export function formatNumber(num: number | null | undefined): string {
+  if (num == null || isNaN(Number(num))) return "0"
+  const n = Number(num)
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1) + "M"
   }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + "K"
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1) + "K"
   }
-  return num.toString()
+  return n.toString()
 }
 
 // Format percentage
