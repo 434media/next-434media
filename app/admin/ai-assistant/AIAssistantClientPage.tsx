@@ -321,9 +321,15 @@ export default function ChatbotApp() {
                 return <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
               }
               // Debug fallback: show compact raw structure when no text extracted
+              const debugEnabled = process.env.NEXT_PUBLIC_AI_DEBUG === "true"
               const truncate = (v: any, len = 120) => {
                 if (typeof v !== "string") return v
                 return v.length > len ? v.slice(0, len) + "…" : v
+              }
+              if (!debugEnabled) {
+                return (
+                  <div className="text-xs italic text-slate-400">(No response text produced by model)</div>
+                )
               }
               const compact = {
                 id: message.id,

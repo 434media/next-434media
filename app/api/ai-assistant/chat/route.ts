@@ -43,6 +43,11 @@ export async function POST(req: Request) {
       }
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY missing in environment (production?) returning explanatory message")
+      return new Response("OpenAI API key not configured on server.")
+    }
+
     const result = streamText({
       model: openai("gpt-4o"),
       messages: convertToModelMessages(messages),
@@ -52,7 +57,16 @@ export async function POST(req: Request) {
     console.log("Streaming response created successfully")
 
   // Return text stream so the client hook can construct assistant messages and tool events
-  return result.toTextStreamResponse()
+  const response = result.toTextStreamResponse()
+  // If the model produces no tokens some clients show empty bubble; add header marker
+  return new Response(response.body, {
+    headers: {
+      ...Object.fromEntries(response.headers.entries()),
+      'x-ai-route': 'chat',
+    },
+    status: response.status,
+    statusText: response.statusText,
+  })
   } catch (error) {
     console.error("Chat API error:", error)
     return new Response(

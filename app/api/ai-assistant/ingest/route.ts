@@ -7,6 +7,13 @@ export async function POST() {
   const startTime = Date.now()
 
   try {
+    // Early environment validation for clearer production errors
+    if (!process.env.NOTION_TOKEN) {
+      throw new Error("NOTION_TOKEN environment variable is missing in this environment")
+    }
+    if (!process.env.NOTION_DATABASE_ID) {
+      throw new Error("NOTION_DATABASE_ID environment variable is missing in this environment")
+    }
     console.log("🔄 Starting Notion data ingestion...")
 
     await saveSyncStatus({
@@ -50,6 +57,10 @@ export async function POST() {
       {
         error: "Failed to ingest Notion data",
         details: error instanceof Error ? error.message : "Unknown error",
+        missingEnv: {
+          NOTION_TOKEN: !!process.env.NOTION_TOKEN,
+          NOTION_DATABASE_ID: !!process.env.NOTION_DATABASE_ID,
+        },
       },
       { status: 500 },
     )
