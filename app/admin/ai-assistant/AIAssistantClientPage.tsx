@@ -153,15 +153,21 @@ export default function ChatbotApp() {
   // Extract readable text from AI SDK UIMessage shapes (supports parts[] and content[] arrays)
   const getMessageText = (message: any): string => {
     if (!message) return ""
+    // Direct string content fallback
     if (typeof message.content === "string") return message.content
+    if (typeof message.text === "string") return message.text
+
     const collect = (arr: any[]) =>
       arr
         .map((p: any) => {
           if (!p) return ""
-          // AI SDK v5: parts may be { type: 'text', text } or streaming { type: 'text-delta', textDelta }
-          if (p.type === "text" && typeof p.text === "string") return p.text
-          if (p.type === "text-delta" && typeof p.textDelta === "string") return p.textDelta
-          // Some providers use { type: 'tool-result', result: string } – ignore here
+          // Stable text part
+            if (p.type === "text" && typeof p.text === "string") return p.text
+          // Streaming delta: AI SDK transformTextToUiMessageStream uses 'delta' field, not 'textDelta'
+            if (p.type === "text-delta") {
+              if (typeof p.textDelta === "string") return p.textDelta
+              if (typeof p.delta === "string") return p.delta
+            }
           return ""
         })
         .join("")
@@ -170,6 +176,13 @@ export default function ChatbotApp() {
     if (Array.isArray(message.content)) return collect(message.content)
     return ""
   }
+
+  // Debug: log messages to inspect part shapes while developing
+  useEffect(() => {
+    if (messages.length > 0) {
+      console.debug("[AI Debug] Latest messages:", messages.map(m => ({ id: m.id, role: m.role, parts: m.parts?.map((p:any)=>({ type: p.type, keys: Object.keys(p) })) })))
+    }
+  }, [messages])
 
   const renderSyncStatus = () => {
     if (!syncInfo?.syncStatus) return null
@@ -302,7 +315,40 @@ export default function ChatbotApp() {
               return null
             })}
 
-            <div className="whitespace-pre-wrap leading-relaxed">{getMessageText(message)}</div>
+            {(() => {
+              const text = getMessageText(message)
+              if (text && text.trim().length > 0) {
+                return <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+              }
+              // Debug fallback: show compact raw structure when no text extracted
+              const truncate = (v: any, len = 120) => {
+                if (typeof v !== "string") return v
+                return v.length > len ? v.slice(0, len) + "…" : v
+              }
+              const compact = {
+                id: message.id,
+                role: message.role,
+                keys: Object.keys(message || {}),
+                parts: Array.isArray(message.parts)
+                  ? message.parts.map((p: any) => ({
+                      type: p.type,
+                      state: p.state,
+                      text: truncate(p.text),
+                      delta: truncate(p.delta),
+                      textDelta: truncate(p.textDelta),
+                      providerMetadata: p.providerMetadata ? Object.keys(p.providerMetadata) : undefined,
+                    }))
+                  : undefined,
+                content: Array.isArray(message.content)
+                  ? message.content.map((p: any) => ({ type: p.type, keys: Object.keys(p) }))
+                  : undefined,
+              }
+              return (
+                <div className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed">
+                  <em>(no text extracted)</em> {JSON.stringify(compact, null, 2)}
+                </div>
+              )
+            })()}
 
             {message.toolInvocations?.map((toolInvocation: any, toolIndex: number) => {
               if (
