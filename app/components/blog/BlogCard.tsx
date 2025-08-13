@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import SmartImage from "@/app/components/SmartImage"
 import Link from "next/link"
 import { Calendar, Clock, Eye, User, Tag } from "lucide-react"

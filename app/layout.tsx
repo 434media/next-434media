@@ -256,9 +256,9 @@ export default async function RootLayout({
               logo: `${siteUrl}/opengraph-image.png`,
               sameAs: [
                 'https://www.facebook.com/434media',
-                'https://www.linkedin.com/company/434-media',
+                'https://www.linkedin.com/company/434media',
                 'https://x.com/434media',
-                'https://www.instagram.com/434media/'
+                'https://www.instagram.com/digitalcanvas.community'
               ],
               contactPoint: [{
                 '@type': 'ContactPoint',
