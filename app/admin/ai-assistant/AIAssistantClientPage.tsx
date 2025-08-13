@@ -1,41 +1,28 @@
 "use client"
 
-import type React from "react"
-
+import React, { useRef } from "react"
+import { AIChatbotHeader } from "../../components//ai/AIChatbotHeader"
 import { useChat } from "@ai-sdk/react"
-// Use a text stream transport because the server returns result.toTextStreamResponse()
-// DefaultChatTransport expects a UI message chunk stream; with a plain text stream
-// it won't construct assistant messages, so we switch to TextStreamChatTransport.
 import { TextStreamChatTransport } from "ai"
 import { useState, useEffect } from "react"
 import { Button } from "../../components/analytics/Button"
-import { Input } from "../../components/analytics/Input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../../components/analytics/Card"
+import { Card, CardContent, CardFooter } from "../../components/analytics/Card"
 import { Badge } from "../../components/analytics/Badge"
-import {
-  Loader2,
-  Database,
-  ImageIcon,
-  Bot,
-  User,
-  ExternalLink,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Search,
-  XCircle,
-} from "lucide-react"
-import Image from "next/image"
+import { Loader2, Brain, AlertCircle, CheckCircle, Clock } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
+import MessageBubble from "../../components/ai/MessageBubble"
+import TypingIndicator from "../../components/ai/TypingIndicator"
+import ChatInput from "../../components/ai/ChatInput"
 
 export default function ChatbotApp() {
-  // Centralize API route (actual route lives at app/api/ai-assistant/ingest/route.ts)
-  const INGEST_API = "/api/ai-assistant/ingest"
+  const API_BASE = "/api/ai-assistant"
+  const INGEST_API = `${API_BASE}/ingest`
   const [input, setInput] = useState("")
 
+  const pendingImageIntentRef = useRef<string | null>(null)
   const { messages, status, error, sendMessage, stop } = useChat({
     transport: new TextStreamChatTransport({
-      api: "/api/ai-assistant/chat",
+      api: `${API_BASE}/chat`,
       headers: {
         "Content-Type": "application/json",
       },
@@ -47,12 +34,61 @@ export default function ChatbotApp() {
       console.log("Message finished:", message)
       // Debug: confirm assistant message appended
       console.log("All messages after finish:", messages)
+      // If there is a pending image intent, create placeholder AFTER assistant reply
+      if (pendingImageIntentRef.current) {
+        const prompt = pendingImageIntentRef.current
+        pendingImageIntentRef.current = null
+        // Ensure assistant message has timestamp assigned (if not yet, we approximate)
+        const assistantTs = Date.now()
+        const placeholderId = `img-${assistantTs}-${Math.random().toString(36).slice(2,8)}`
+        setSyntheticMessages(prev => [
+          ...prev,
+          {
+            id: placeholderId,
+            role: 'assistant',
+            prompt,
+            status: 'generating',
+            createdAt: assistantTs + 1, // always after assistant
+          },
+        ])
+        generateImage(prompt, placeholderId)
+      }
     },
   })
 
   const [isIngesting, setIsIngesting] = useState(false)
   const [ingestStatus, setIngestStatus] = useState<string>("")
   const [syncInfo, setSyncInfo] = useState<any>(null)
+  interface SyntheticMessage {
+    id: string
+    role: 'assistant'
+    prompt: string
+    status: 'generating' | 'done' | 'error'
+    imageBase64?: string
+    imageAlt?: string
+    error?: string
+    createdAt: number // epoch ms for stable ordering
+  }
+  const [syntheticMessages, setSyntheticMessages] = useState<SyntheticMessage[]>([])
+  const [messageTimestamps, setMessageTimestamps] = useState<Record<string, number>>({})
+  const nextTimestampRef = useRef<number>(Date.now())
+
+  // Assign stable timestamps to base messages once
+  useEffect(() => {
+    if (!messages) return
+    setMessageTimestamps(prev => {
+      let changed = false
+      const updated = { ...prev }
+      for (const m of messages) {
+        if (!updated[m.id]) {
+          nextTimestampRef.current = Math.max(Date.now(), nextTimestampRef.current + 1)
+          updated[m.id] = nextTimestampRef.current
+          changed = true
+        }
+      }
+      return changed ? updated : prev
+    })
+  }, [messages])
 
   const isLoading = status === "streaming"
 
@@ -62,8 +98,8 @@ export default function ChatbotApp() {
 
   const loadSyncStatus = async () => {
     try {
-  console.log("Loading sync status from", INGEST_API, "...")
-  const response = await fetch(INGEST_API, {
+      console.log("Loading sync status from", INGEST_API, "...")
+      const response = await fetch(INGEST_API, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -127,19 +163,69 @@ export default function ChatbotApp() {
     }
   }
 
+  const handleClearChat = () => {
+    // Clear messages by reloading or implementing a clear function
+    window.location.reload()
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
-
-    sendMessage({
-      text: input,
-    })
-
+    processUserInput(input.trim())
     setInput("")
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value)
+  }
+
+  const imagePromptRegex = /(generate|create|make|design)\s+(an?\s+)?(image|logo|icon|illustration|graphic|picture|art|painting)/i
+
+  async function processUserInput(raw: string) {
+    const wantsImage = imagePromptRegex.test(raw)
+    sendMessage({ text: raw })
+    if (wantsImage) {
+      pendingImageIntentRef.current = raw
+    }
+  }
+
+  async function generateImage(prompt: string, placeholderId: string) {
+    console.debug('[IMG] start generation', { prompt, placeholderId })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 65000)
+    try {
+      let res = await fetch('/api/ai-assistant/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }), // default server size 1024x1024 (dall-e-3 requirement)
+        signal: controller.signal,
+      })
+      if (!res.ok && res.status === 400) {
+        // Retry with square size explicitly if first attempt failed (defensive)
+        try {
+          const firstErr = await res.json().catch(() => ({}))
+          console.warn('[IMG] first attempt 400, retrying with explicit 1024x1024', firstErr)
+        } catch {}
+        res = await fetch('/api/ai-assistant/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, size: '1024x1024' }),
+          signal: controller.signal,
+        })
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      console.debug('[IMG] success', { placeholderId, bytes: data.image?.length })
+  setSyntheticMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, status: 'done', imageBase64: data.image, imageAlt: data.revisedPrompt || prompt } : m))
+    } catch (e) {
+      console.warn('[IMG] failed', e)
+  setSyntheticMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, status: 'error', error: e instanceof Error ? e.message : 'Unknown error' } : m))
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
   const handleClearError = () => {
@@ -162,12 +248,12 @@ export default function ChatbotApp() {
         .map((p: any) => {
           if (!p) return ""
           // Stable text part
-            if (p.type === "text" && typeof p.text === "string") return p.text
+          if (p.type === "text" && typeof p.text === "string") return p.text
           // Streaming delta: AI SDK transformTextToUiMessageStream uses 'delta' field, not 'textDelta'
-            if (p.type === "text-delta") {
-              if (typeof p.textDelta === "string") return p.textDelta
-              if (typeof p.delta === "string") return p.delta
-            }
+          if (p.type === "text-delta") {
+            if (typeof p.textDelta === "string") return p.textDelta
+            if (typeof p.delta === "string") return p.delta
+          }
           return ""
         })
         .join("")
@@ -180,7 +266,14 @@ export default function ChatbotApp() {
   // Debug: log messages to inspect part shapes while developing
   useEffect(() => {
     if (messages.length > 0) {
-      console.debug("[AI Debug] Latest messages:", messages.map(m => ({ id: m.id, role: m.role, parts: m.parts?.map((p:any)=>({ type: p.type, keys: Object.keys(p) })) })))
+      console.debug(
+        "[AI Debug] Latest messages:",
+        messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          parts: m.parts?.map((p: any) => ({ type: p.type, keys: Object.keys(p) })),
+        })),
+      )
     }
   }, [messages])
 
@@ -221,242 +314,26 @@ export default function ChatbotApp() {
     )
   }
 
-  const renderMessage = (message: any, index: number) => {
-    const isUser = message.role === "user"
-
-    return (
-      <motion.div
-        key={message.id}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: index * 0.1 }}
-        className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
-      >
-        <div className={`flex items-start space-x-2 max-w-[85%] ${isUser ? "flex-row-reverse space-x-reverse" : ""}`}>
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.2, delay: index * 0.1 + 0.1 }}
-            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-              isUser ? "bg-blue-500" : "bg-slate-600"
-            }`}
-          >
-            {isUser ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-white" />}
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2, delay: index * 0.1 + 0.2 }}
-            className={`rounded-lg p-3 ${isUser ? "bg-blue-500 text-white" : "bg-slate-50 text-slate-900 border border-slate-200"}`}
-          >
-            {message.toolInvocations?.some((t: any) => t.toolName === "searchKnowledgeBase") && !isUser && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex items-center space-x-1 text-xs text-blue-600 mb-2 opacity-70"
-              >
-                <Search className="w-3 h-3" />
-                <span>Searched knowledge base</span>
-              </motion.div>
-            )}
-
-            {message.toolInvocations?.map((toolInvocation: any, toolIndex: number) => {
-              if (toolInvocation.toolName === "generateImage" && toolInvocation.result) {
-                if (toolInvocation.result.success && toolInvocation.result.image) {
-                  return (
-                    <motion.div
-                      key={toolIndex}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
-                      className="mb-3"
-                    >
-                      <div className="flex items-center space-x-2 mb-2">
-                        <ImageIcon className="w-4 h-4" />
-                        <span className="text-sm font-medium">Generated Image</span>
-                      </div>
-                      <motion.div whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
-                        <Image
-                          src={`data:image/png;base64,${toolInvocation.result.image}`}
-                          alt={toolInvocation.result.prompt}
-                          width={256}
-                          height={256}
-                          className="rounded-lg shadow-sm"
-                        />
-                      </motion.div>
-                      <p className="text-xs mt-1 opacity-70">Prompt: {toolInvocation.result.prompt}</p>
-                    </motion.div>
-                  )
-                }
-
-                if (!toolInvocation.result.success && toolInvocation.result.error) {
-                  return (
-                    <motion.div
-                      key={toolIndex}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
-                      className="mb-3"
-                    >
-                      <div className="flex items-center space-x-2 mb-2">
-                        <XCircle className="w-4 h-4 text-red-500" />
-                        <span className="text-sm font-medium text-red-600">Image Generation Failed</span>
-                      </div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="text-sm text-red-700 mb-1">Unable to generate image</p>
-                        <p className="text-xs text-red-600">Error: {toolInvocation.result.error}</p>
-                        <p className="text-xs text-red-500 mt-1">Prompt: {toolInvocation.result.prompt}</p>
-                      </div>
-                    </motion.div>
-                  )
-                }
-              }
-              return null
-            })}
-
-            {(() => {
-              const text = getMessageText(message)
-              if (text && text.trim().length > 0) {
-                return <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
-              }
-              // Debug fallback: show compact raw structure when no text extracted
-              const debugEnabled = process.env.NEXT_PUBLIC_AI_DEBUG === "true"
-              const truncate = (v: any, len = 120) => {
-                if (typeof v !== "string") return v
-                return v.length > len ? v.slice(0, len) + "…" : v
-              }
-              if (!debugEnabled) {
-                return (
-                  <div className="text-xs italic text-slate-400">(No response text produced by model)</div>
-                )
-              }
-              const compact = {
-                id: message.id,
-                role: message.role,
-                keys: Object.keys(message || {}),
-                parts: Array.isArray(message.parts)
-                  ? message.parts.map((p: any) => ({
-                      type: p.type,
-                      state: p.state,
-                      text: truncate(p.text),
-                      delta: truncate(p.delta),
-                      textDelta: truncate(p.textDelta),
-                      providerMetadata: p.providerMetadata ? Object.keys(p.providerMetadata) : undefined,
-                    }))
-                  : undefined,
-                content: Array.isArray(message.content)
-                  ? message.content.map((p: any) => ({ type: p.type, keys: Object.keys(p) }))
-                  : undefined,
-              }
-              return (
-                <div className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed">
-                  <em>(no text extracted)</em> {JSON.stringify(compact, null, 2)}
-                </div>
-              )
-            })()}
-
-            {message.toolInvocations?.map((toolInvocation: any, toolIndex: number) => {
-              if (
-                toolInvocation.toolName === "searchKnowledgeBase" &&
-                toolInvocation.result?.found &&
-                toolInvocation.result?.sources
-              ) {
-                return (
-                  <motion.div
-                    key={toolIndex}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 }}
-                    className="mt-3 pt-3 border-t border-slate-200"
-                  >
-                    <div className="text-xs text-slate-500 mb-2">Sources:</div>
-                    <div className="space-y-1">
-                      {toolInvocation.result.sources.slice(0, 3).map((source: any, sourceIndex: number) => (
-                        <div key={sourceIndex} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-600 truncate flex-1">{source.title}</span>
-                          {source.url && (
-                            <a
-                              href={source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-500 hover:text-blue-700 ml-2 flex-shrink-0"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )
-              }
-              return null
-            })}
-          </motion.div>
-        </div>
-      </motion.div>
-    )
-  }
+  // New message rendering handled by MessageBubble component
 
   return (
-    <div className="min-h-screen bg-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <Card className="mb-4 bg-white border border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-slate-900">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                >
-                  <Bot className="w-6 h-6 text-blue-500" />
-                </motion.div>
-                <span>AI Knowledge Assistant</span>
-              </CardTitle>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <Button onClick={handleIngestNotion} disabled={isIngesting} variant="outline" size="sm">
-                    {isIngesting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <Database className="w-4 h-4 mr-2" />
-                        Sync Notion Data
-                      </>
-                    )}
-                  </Button>
-                  <AnimatePresence>
-                    {ingestStatus && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-                          {ingestStatus}
-                        </Badge>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                {renderSyncStatus()}
-              </div>
-            </CardHeader>
-          </Card>
-        </motion.div>
+  <div className="min-h-screen bg-white p-4 mt-32 md:mt-16">
+      <div className="max-w-5xl mx-auto">
+        <AIChatbotHeader
+          onSyncNotion={handleIngestNotion}
+          isLoading={isLoading}
+          isSyncing={isIngesting}
+          syncStatus={ingestStatus}
+          lastSync={syncInfo?.syncStatus?.lastSync || null}
+        />
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <Card className="h-[70vh] flex flex-col bg-white border border-slate-200 shadow-sm">
-            <CardContent className="flex-1 overflow-y-auto p-6">
+          <Card className="h-[70vh] flex flex-col bg-white shadow-none rounded-xl border-none">
+            <CardContent className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6">
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -473,47 +350,41 @@ export default function ChatbotApp() {
                 </motion.div>
               )}
 
-              <AnimatePresence>
-                {messages.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-center text-slate-600 mt-8"
-                  >
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-                    >
-                      <Bot className="w-12 h-12 mx-auto mb-4 text-blue-500 opacity-70" />
-                    </motion.div>
-                    <p className="text-lg font-medium mb-2 text-slate-900">Welcome to your AI Knowledge Assistant!</p>
-                    <p className="text-sm">
-                      I can help you with information from your Notion knowledge base and generate images.
-                    </p>
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.5 }}
-                      className="mt-4 text-xs space-y-1"
-                    >
-                      <p>• Ask questions about your team, processes, or company info</p>
-                      <p>• Request image generation with "generate an image of..."</p>
-                      <p>• I'll give you conversational answers using your internal docs</p>
-                      <p className="font-medium text-blue-600">
-                        Try: "Who are our team members?" or "Generate a company logo"
-                      </p>
-                      {syncInfo?.stats?.totalPages > 0 && (
-                        <p className="text-green-600 font-medium">
-                          ✅ {syncInfo.stats.totalPages} pages ready for search
-                        </p>
-                      )}
-                    </motion.div>
-                  </motion.div>
-                ) : (
-                  <div className="space-y-4">{messages.map(renderMessage)}</div>
-                )}
-              </AnimatePresence>
+              <div className="space-y-4">
+                {[
+                  ...messages.map((m: any) => ({
+                    id: m.id,
+                    role: m.role as 'user' | 'assistant',
+                    content: getMessageText(m),
+                    createdAt: messageTimestamps[m.id] || Date.now(),
+                  })),
+                  ...syntheticMessages.map(sm => ({
+                    id: sm.id,
+                    role: 'assistant' as const,
+                    content: sm.status === 'generating' ? `Generating image: "${sm.prompt}" ...` : sm.status === 'error' ? `Image generation failed: ${sm.error}` : `Image generated for: ${sm.prompt}`,
+                    createdAt: sm.createdAt,
+                    imageBase64: sm.imageBase64,
+                    imageAlt: sm.imageAlt,
+                    isStreaming: sm.status === 'generating',
+                  })),
+                ]
+                  .sort((a, b) => a.createdAt - b.createdAt)
+                  .map(item => (
+                    <MessageBubble
+                      key={item.id}
+                      message={{
+                        id: item.id,
+                        role: item.role,
+                        content: item.content,
+                        timestamp: new Date(item.createdAt),
+                        imageBase64: (item as any).imageBase64,
+                        imageAlt: (item as any).imageAlt,
+                      }}
+                      isStreaming={(item as any).isStreaming}
+                    />
+                  ))}
+                {isLoading && <TypingIndicator />}
+              </div>
 
               <AnimatePresence>
                 {isLoading && (
@@ -524,12 +395,12 @@ export default function ChatbotApp() {
                     className="flex justify-start mb-4"
                   >
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-white" />
+                      <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center">
+                        <Brain className="w-4 h-4 text-white" />
                       </div>
-                      <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                      <div className="bg-white rounded-lg p-3 border border-purple-200 shadow-sm">
                         <div className="flex items-center space-x-2">
-                          <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                          <Loader2 className="w-4 animate-spin text-purple-600" />
                           <span className="text-sm text-slate-700">Searching and thinking...</span>
                           <Button onClick={handleStop} variant="ghost" size="sm" className="ml-2">
                             Stop
@@ -541,21 +412,15 @@ export default function ChatbotApp() {
                 )}
               </AnimatePresence>
             </CardContent>
-
-            <CardFooter className="border-t border-slate-200 bg-white">
-              <form onSubmit={handleSubmit} className="flex w-full space-x-2">
-                <Input
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder="Ask me about your team, company processes, or request an image..."
-                  className="flex-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+            <CardFooter className="bg-transparent pt-2">
+              <form onSubmit={handleSubmit} className="w-full">
+                <ChatInput
                   disabled={isLoading}
+                  onSendMessage={async (val) => {
+                    processUserInput(val)
+                  }}
+                  className="w-full"
                 />
-                <motion.div whileTap={{ scale: 0.95 }}>
-                  <Button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-500 hover:bg-blue-600">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send"}
-                  </Button>
-                </motion.div>
               </form>
             </CardFooter>
           </Card>

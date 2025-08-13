@@ -31,7 +31,7 @@ export async function POST(req: Request) {
           kbContext = top
             .map(
               (r, i) =>
-                `Source ${i + 1}: ${r.title}\n${r.content.substring(0, 600)}$${r.content.length > 600 ? "..." : ""}`,
+                `Source ${i + 1}: ${r.title}\n${r.content.substring(0, 600)}${r.content.length > 600 ? "..." : ""}`,
             )
             .join("\n---\n")
         } else {
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: openai("gpt-4o"),
       messages: convertToModelMessages(messages),
-      system: `You are a helpful AI assistant with access to an internal knowledge base. Always answer conversationally.\n\nKnowledge Base Context (may be empty):\n${kbContext}\n\nInstructions:\n- If context provided, synthesize it into a natural answer and cite document titles inline.\n- If context says no docs found, be transparent and still provide a helpful general answer.\n- Be concise but thorough.`,
+  system: `You are a helpful AI assistant with access to an internal knowledge base. Always answer conversationally.\n\nKnowledge Base Context (may be empty):\n${kbContext}\n\nInstructions:\n- If context provided, synthesize it into a natural answer and cite document titles inline.\n- If context says no docs found, be transparent and still provide a helpful general answer.\n- Be concise but thorough.\n- The platform can generate images separately AFTER your reply. If the user requests or implies they want an image, DO NOT say you cannot create images. Provide: (1) a brief creative description / concept (<= 4 sentences), (2) optionally 3 concise variation bullet points. Avoid apologetic language or disclaimers about not generating images.\n- Never output phrases like "I can't create images" or "I cannot generate images".\n- Keep stylistic tone consistent with brand: confident, clear, no fluff.`,
     })
 
     console.log("Streaming response created successfully")

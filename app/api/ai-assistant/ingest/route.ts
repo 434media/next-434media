@@ -22,7 +22,7 @@ export async function POST() {
       status: "in-progress",
     })
 
-    const result = await ingestNotionData()
+  const result = await ingestNotionData()
 
     // Save to persistent storage
     await saveKnowledgeBaseToDisk()
@@ -38,8 +38,8 @@ export async function POST() {
     console.log(`✅ Ingestion completed in ${duration}ms`)
 
     return NextResponse.json({
-      message: `Successfully ingested ${result.count} pages from Notion`,
-      count: result.count,
+  message: `Successfully ingested ${result.count} pages from Notion`,
+  count: result.count,
       duration: `${duration}ms`,
       timestamp: new Date().toISOString(),
     })

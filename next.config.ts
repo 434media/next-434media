@@ -7,11 +7,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-
-  /*  experimental: {
-    useCache: true,
-  }, */
-
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
@@ -32,7 +27,7 @@ const nextConfig: NextConfig = {
     ],
   },  
   
-  // Add explicit rewrites for the SDOH routes
+  // Explicit rewrites for the SDOH routes
   async rewrites() {
     return {
       beforeFiles: [

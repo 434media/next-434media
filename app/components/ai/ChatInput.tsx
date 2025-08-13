@@ -4,16 +4,20 @@ import type React from "react"
 
 import { useState, useRef, type KeyboardEvent } from "react"
 import { motion } from "motion/react"
+import { Rocket } from "lucide-react"
 
 interface ChatInputProps {
   onSendMessage: (content: string) => Promise<void>
   disabled: boolean
+  maxLength?: number
+  className?: string
 }
 
-export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
+export default function ChatInput({ onSendMessage, disabled, maxLength = 2000, className = "" }: ChatInputProps) {
   const [input, setInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [focused, setFocused] = useState(false)
 
   const handleSubmit = async () => {
     if (!input.trim() || disabled || isSubmitting) return
@@ -50,36 +54,49 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
   }
 
+  const remaining = maxLength - input.length
+
   return (
-    <div className="flex items-end space-x-3">
+    <div
+      className={`group relative flex items-end gap-3 rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 transition-all ${
+        focused ? "ring-2 ring-purple-500/60 shadow-md" : "ring-1 ring-black/10"
+      } ${disabled ? "opacity-60" : ""} ${className}`}
+    >
       <div className="flex-1 relative">
-        <textarea
+        <motion.textarea
           ref={textareaRef}
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => {
+            if (e.target.value.length <= maxLength) handleInputChange(e)
+          }}
           onKeyDown={handleKeyDown}
-          placeholder="Ask a question about your content..."
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="Ask our AI assistant"
           disabled={disabled || isSubmitting}
-          className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 pr-12 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500 min-h-[48px] max-h-[120px]"
+          className="w-full resize-none bg-transparent rounded-md px-1 py-1 pr-10 focus:outline-none text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed min-h-[40px] max-h-[140px]"
           rows={1}
+          style={{ lineHeight: 1.4 }}
+          initial={false}
+          animate={{ opacity: disabled ? 0.7 : 1 }}
         />
-        <div className="absolute right-3 bottom-3 text-xs text-slate-400">{input.length}/2000</div>
+        <div className="absolute right-2 bottom-1 text-[10px] text-slate-400 select-none">
+          {remaining < 200 ? remaining : ''}
+        </div>
       </div>
-
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.08, backgroundColor: "#4c1d95" }}
+        whileTap={{ scale: 0.92 }}
         onClick={handleSubmit}
         disabled={!input.trim() || disabled || isSubmitting}
-        className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white p-3 rounded-lg transition-colors duration-200 flex-shrink-0"
+        className="relative inline-flex items-center justify-center h-10 w-10 rounded-lg bg-black text-white shadow-sm disabled:bg-slate-300 disabled:text-slate-600 transition-colors"
       >
         {isSubmitting ? (
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
         ) : (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
+          <Rocket className="w-4 h-4 text-white" />
         )}
+        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
       </motion.button>
     </div>
   )

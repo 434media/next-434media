@@ -9,7 +9,7 @@ import { types } from "pg"
 types.setTypeParser(1082, (value: string) => value)
 
 // Create a connection pool for Neon PostgreSQL
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
