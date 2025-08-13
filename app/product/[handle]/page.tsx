@@ -11,10 +11,7 @@ import { ProductProvider } from "../../components/shopify/product/product-contex
 import { ProductDescription } from "../../components/shopify/product/product-description"
 import { BackButton } from "../../components/shopify/product/back-button"
 
-export async function generateMetadata(props: {
-  params: Promise<{ handle: string }>
-}): Promise<Metadata> {
-  const params = await props.params
+export async function generateMetadata({ params }: { params: { handle: string } }): Promise<Metadata> {
   const product = await getProduct(params.handle)
 
   if (!product) return notFound()
@@ -92,8 +89,7 @@ async function RelatedProducts({ id }: { id: string }) {
 }
 
 // Main ProductPage component with updated TXMX styling and responsive layout
-export default async function ProductPage(props: { params: Promise<{ handle: string }> }) {
-  const params = await props.params
+export default async function ProductPage({ params }: { params: { handle: string } }) {
   const product = await getProduct(params.handle)
 
   if (!product) return notFound()

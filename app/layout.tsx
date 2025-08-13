@@ -71,6 +71,10 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "/",
+    languages: {
+      "en-US": `${siteUrl}/`,
+      "es-ES": `${siteUrl}/es`,
+    },
   },
   openGraph: {
     type: "website",
@@ -143,6 +147,10 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+  {/* Basic hreflang links for primary locales */}
+  <link rel="alternate" hrefLang="en" href={`${siteUrl}/`} />
+  <link rel="alternate" hrefLang="es" href={`${siteUrl}/es`} />
+  <link rel="alternate" hrefLang="x-default" href={`${siteUrl}/`} />
 
         {/* Google Tag Manager */}
         <Script id="google-tag-manager" strategy="afterInteractive">
@@ -235,6 +243,48 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
       >
+        {/* Structured Data: Organization & WebSite with potential SearchAction */}
+        <script
+          type="application/ld+json"
+          // Keep this lightweight & generated server-side (no dynamic client data required)
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: '434 MEDIA',
+              url: siteUrl,
+              logo: `${siteUrl}/opengraph-image.png`,
+              sameAs: [
+                'https://www.facebook.com/434media',
+                'https://www.linkedin.com/company/434-media',
+                'https://x.com/434media',
+                'https://www.instagram.com/434media/'
+              ],
+              contactPoint: [{
+                '@type': 'ContactPoint',
+                contactType: 'customer support',
+                email: 'build@434media.com',
+                availableLanguage: ['en','es']
+              }]
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebSite',
+              name: '434 MEDIA',
+              url: siteUrl,
+              potentialAction: {
+                '@type': 'SearchAction',
+                target: `${siteUrl}/search?q={search_term_string}`,
+                'query-input': 'required name=search_term_string'
+              }
+            })
+          }}
+        />
         {/* Google Tag Manager (noscript) */}
         <noscript>
           <iframe

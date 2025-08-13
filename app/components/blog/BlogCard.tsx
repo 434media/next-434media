@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import SmartImage from "@/app/components/SmartImage"
 import Link from "next/link"
 import { Calendar, Clock, Eye, User, Tag } from "lucide-react"
 import type { BlogPost } from "../../types/blog-types"
@@ -44,10 +45,11 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
         <Link href={`/blog/${post.slug}`} className="block">
           <div className="relative h-80 overflow-hidden">
             {post.featured_image && !imageError ? (
-              <Image
+              <SmartImage
                 src={post.featured_image || "/placeholder.svg"}
                 alt={post.title}
                 fill
+                sizes="(min-width:1024px) 800px, 100vw"
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
                 onError={() => setImageError(true)}
               />
@@ -108,10 +110,11 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
       <Link href={`/blog/${post.slug}`} className="block">
         <div className="relative h-48 overflow-hidden">
           {post.featured_image && !imageError ? (
-            <Image
+            <SmartImage
               src={post.featured_image || "/placeholder.svg"}
               alt={post.title}
               fill
+              sizes="(min-width:1024px) 400px, 50vw"
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               onError={() => setImageError(true)}
             />

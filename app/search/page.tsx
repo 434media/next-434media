@@ -7,14 +7,20 @@ import { CollectionNavbar } from "../components/shopify/collection-navbar"
 import { Skeleton } from "../components/shopify/skeleton"
 
 export const metadata = {
-  title: "Search",
+  title: "Search | 434 MEDIA Store",
   description: "Search for products in the store.",
+  robots: {
+    index: false,
+    follow: true,
+    googleBot: { index: false, follow: true },
+  },
 }
 
-export default async function SearchPage(props: {
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>
+export default async function SearchPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined }
 }) {
-  const searchParams = await props.searchParams
   const { sort, q: searchValue } = searchParams as { [key: string]: string }
   const { sortKey, reverse } = sorting.find((item) => item.slug === sort) || defaultSort
 

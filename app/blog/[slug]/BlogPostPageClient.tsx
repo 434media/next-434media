@@ -10,9 +10,7 @@ import BlogCard from "../../components/blog/BlogCard"
 import type { BlogPost } from "../../types/blog-types"
 
 interface BlogPostPageProps {
-  params: Promise<{
-    slug: string
-  }>
+  params: { slug: string }
 }
 
 // Custom SVG Icons based on Simple Icons
@@ -50,8 +48,7 @@ const LoadingSpinner = () => (
 )
 
 export default function BlogPostPageClient({ params }: BlogPostPageProps) {
-  // Unwrap params using React.use()
-  const { slug } = use(params)
+  const { slug } = params
 
   const [post, setPost] = useState<BlogPost | null>(null)
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([])

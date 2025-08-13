@@ -263,12 +263,15 @@ function PortfolioItem({
           {item.gif && (
             <Image
               src={item.gif || "/placeholder.svg"}
-              alt=""
+              alt="Animated preview"
               width={1600}
               height={900}
               className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 rounded-2xl"
               style={{ opacity: isHovered ? 1 : 0 }}
               aria-hidden="true"
+              unoptimized
+              loading="lazy"
+              decoding="async"
             />
           )}
         </div>

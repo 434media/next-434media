@@ -25,9 +25,9 @@ async function loadGoogleFont(font: string, text: string) {
   return null
 }
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
   try {
-    const { slug } = await params
+  const { slug } = params
     const { searchParams } = new URL(request.url)
 
     // Get parameters with proper defaults

@@ -3,10 +3,10 @@ import { getBlogImageData } from "../../../../lib/blog-db"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   try {
-    const { id: imageId } = await params
+    const { id: imageId } = params
 
     if (!imageId) {
       return new NextResponse("Image ID is required", { status: 400 })
@@ -24,7 +24,7 @@ export async function GET(
     headers.set("Cache-Control", "public, max-age=31536000, immutable") // Cache for 1 year
     headers.set("Content-Length", imageData.data.length.toString())
 
-    return new NextResponse(imageData.data, {
+  return new NextResponse(new Uint8Array(imageData.data), {
       status: 200,
       headers,
     })

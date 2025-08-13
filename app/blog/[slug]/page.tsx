@@ -4,11 +4,11 @@ import { getBlogPostBySlug } from "../../lib/blog-db"
 import BlogPostPageClient from "./BlogPostPageClient"
 
 type Props = {
-  params: Promise<{ slug: string }>
+  params: { slug: string }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
+  const { slug } = params
   const post = await getBlogPostBySlug(slug)
 
   if (!post) {
@@ -76,6 +76,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     alternates: {
       canonical: `${baseUrl}/blog/${slug}`,
+      languages: {
+        'en-US': `${baseUrl}/blog/${slug}`,
+        // If localized slug variants exist later they can be added here
+        'es-ES': `${baseUrl}/es/blog/${slug}`,
+      },
     },
     robots: {
       index: post.status === "published",
@@ -88,11 +93,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         "max-snippet": -1,
       },
     },
+    other: {
+      // Provide JSON-LD inline if consumer wants to embed later
+      structuredData: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title,
+        description: post.excerpt || post.meta_description || '',
+        image: ogImageUrl,
+        datePublished: post.created_at,
+        dateModified: post.updated_at || post.created_at,
+        author: [{ '@type': 'Person', name: post.author || '434 Media' }],
+        publisher: {
+          '@type': 'Organization',
+          name: '434 MEDIA',
+          logo: { '@type': 'ImageObject', url: `${baseUrl}/opengraph-image.png` }
+        },
+        mainEntityOfPage: `${baseUrl}/blog/${slug}`,
+        articleSection: post.category || 'Technology',
+        keywords: keywordsArray.join(', ')
+      })
+    }
   }
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const { slug } = await params
+  const { slug } = params
   const post = await getBlogPostBySlug(slug)
 
   if (!post) {
@@ -100,5 +126,33 @@ export default async function BlogPostPage({ params }: Props) {
   }
 
   // Pass params as a Promise to match the expected type
-  return <BlogPostPageClient params={Promise.resolve({ slug })} />
+  return (
+    <>
+      {/* Inject structured data from metadata.other if present for crawlers */}
+      {post.status === 'published' && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: post.title,
+            description: post.excerpt || post.meta_description || '',
+            image: post.featured_image || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'}/opengraph-image.png`,
+            datePublished: post.created_at,
+            dateModified: post.updated_at || post.created_at,
+            author: [{ '@type': 'Person', name: post.author || '434 Media' }],
+            publisher: {
+              '@type': 'Organization',
+              name: '434 MEDIA',
+              logo: { '@type': 'ImageObject', url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'}/opengraph-image.png` }
+            },
+            mainEntityOfPage: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'}/blog/${slug}`,
+            articleSection: post.category || 'Technology',
+            keywords: (Array.isArray(post.tags) ? post.tags : []).join(', ')
+          }) }}
+        />
+      )}
+  <BlogPostPageClient params={{ slug }} />
+    </>
+  )
 }
