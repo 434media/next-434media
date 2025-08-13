@@ -27,30 +27,21 @@ async function ensureDbInitialized() {
   }
 }
 
-// Simple admin verification - accepts both admin and intern passwords
+// Simple admin verification - only admin password
 function verifyAdminPassword(password: string): boolean {
   const adminPassword = process.env.ADMIN_PASSWORD
-  const internPassword = process.env.INTERN_PASSWORD
 
-  // Check admin password
-  if (adminPassword && password.length === adminPassword.length) {
-    let result = 0
-    for (let i = 0; i < password.length; i++) {
-      result |= password.charCodeAt(i) ^ adminPassword.charCodeAt(i)
-    }
-    if (result === 0) return true
+  if (!adminPassword || password.length !== adminPassword.length) {
+    return false
   }
 
-  // Check intern password
-  if (internPassword && password.length === internPassword.length) {
-    let result = 0
-    for (let i = 0; i < password.length; i++) {
-      result |= password.charCodeAt(i) ^ internPassword.charCodeAt(i)
-    }
-    if (result === 0) return true
+  // Timing-safe comparison to prevent timing attacks
+  let result = 0
+  for (let i = 0; i < password.length; i++) {
+    result |= password.charCodeAt(i) ^ adminPassword.charCodeAt(i)
   }
 
-  return false
+  return result === 0
 }
 
 // Generate slug from title
@@ -148,7 +139,7 @@ export async function updateBlogPostAction(formData: FormData) {
 export async function deleteBlogPostAction(id: string, adminPassword: string) {
   await ensureDbInitialized()
 
-  // Verify admin password (same as events)
+  // Verify admin password
   if (!verifyAdminPassword(adminPassword)) {
     return { success: false, error: "Invalid admin password" }
   }

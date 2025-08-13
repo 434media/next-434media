@@ -4,13 +4,10 @@ import { useState, useEffect, useCallback } from "react"
 import { ArrowLeft, Upload, Trash2, Search, ImageIcon, Check, Loader2, Plus, RefreshCw, Edit2, X } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import AdminPasswordModal from "../../../components/AdminPasswordModal"
 import ImageEditor from "../../../components/blog/ImageEditor"
 import type { BlogImage } from "../../../types/blog-types"
 
 export default function MediaLibraryPage() {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [adminPassword, setAdminPassword] = useState("")
   const [images, setImages] = useState<BlogImage[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -27,7 +24,8 @@ export default function MediaLibraryPage() {
   const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
   const loadImages = useCallback(async () => {
-    if (!authenticated) return
+    const adminPassword = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (!adminPassword) return
 
     setIsLoading(true)
     setError(null)
@@ -50,7 +48,7 @@ export default function MediaLibraryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [authenticated, lastRefresh])
+  }, [lastRefresh])
 
   useEffect(() => {
     loadImages()
@@ -65,15 +63,6 @@ export default function MediaLibraryPage() {
       return () => clearTimeout(timer)
     }
   }, [successMessage])
-
-  const handlePasswordVerified = (password: string) => {
-    setAdminPassword(password)
-    setAuthenticated(true)
-  }
-
-  const handlePasswordCancel = () => {
-    window.history.back()
-  }
 
   const handleFileSelect = () => {
     const input = document.createElement("input")
@@ -113,6 +102,9 @@ export default function MediaLibraryPage() {
 
   const handleFileUpload = async (files: FileList) => {
     if (!files || files.length === 0) return
+
+    const adminPassword = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (!adminPassword) return
 
     setIsUploading(true)
     setUploadProgress(0)
@@ -187,6 +179,9 @@ export default function MediaLibraryPage() {
   const handleDeleteSelected = async () => {
     if (selectedImages.length === 0) return
 
+    const adminPassword = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (!adminPassword) return
+
     try {
       setError(null)
 
@@ -255,18 +250,6 @@ export default function MediaLibraryPage() {
     } catch (e) {
       return "Unknown date"
     }
-  }
-
-  // Show authentication modal if not authenticated
-  if (!authenticated) {
-    return (
-      <AdminPasswordModal
-        isOpen={true}
-        onVerified={handlePasswordVerified}
-        onCancel={handlePasswordCancel}
-        action="access media library"
-      />
-    )
   }
 
   return (

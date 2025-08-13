@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from "../components/analytics/Card"
+import { Card, CardContent, CardHeader } from "../../components/analytics/Card"
 
 export default function Loading() {
   return (

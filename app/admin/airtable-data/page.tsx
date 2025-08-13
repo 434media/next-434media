@@ -5,7 +5,6 @@ import { Button } from "../../components/analytics/Button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/analytics/Card"
 import { Badge } from "../../components/analytics/Badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/analytics/Tabs"
-import AdminPasswordModal from "../../components/AdminPasswordModal"
 import {
   Loader2,
   Users,
@@ -61,8 +60,6 @@ interface Contact {
 }
 
 export default function InsertDataPage() {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [adminPassword, setAdminPassword] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [crmStats, setCrmStats] = useState<CrmStats | null>(null)
@@ -72,28 +69,13 @@ export default function InsertDataPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const { toast } = useToast()
 
-  // Check for existing admin session
+  // Load CRM data on component mount
   useEffect(() => {
     const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
     if (adminKey) {
-      setAdminPassword(adminKey)
-      setAuthenticated(true)
       loadCrmData(adminKey)
-    } else {
-      setIsLoading(false)
     }
   }, [])
-
-  const handlePasswordVerified = (password: string) => {
-    sessionStorage.setItem("adminKey", password)
-    setAdminPassword(password)
-    setAuthenticated(true)
-    loadCrmData(password)
-  }
-
-  const handlePasswordCancel = () => {
-    window.history.back()
-  }
 
   const loadCrmData = async (adminKey: string) => {
     setIsLoading(true)
@@ -128,8 +110,9 @@ export default function InsertDataPage() {
   }
 
   const handleRefresh = () => {
-    if (adminPassword) {
-      loadCrmData(adminPassword)
+    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (adminKey) {
+      loadCrmData(adminKey)
     }
   }
 
@@ -156,6 +139,9 @@ export default function InsertDataPage() {
       })
       return
     }
+
+    const adminPassword = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (!adminPassword) return
 
     setSyncing(true)
     try {
@@ -208,6 +194,9 @@ export default function InsertDataPage() {
       })
       return
     }
+
+    const adminPassword = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (!adminPassword) return
 
     setSyncing(true)
     try {
@@ -274,18 +263,6 @@ export default function InsertDataPage() {
       default:
         return "bg-gray-100 text-gray-800"
     }
-  }
-
-  // Show authentication modal if not authenticated
-  if (!authenticated) {
-    return (
-      <AdminPasswordModal
-        isOpen={true}
-        onVerified={handlePasswordVerified}
-        onCancel={handlePasswordCancel}
-        action="access the CRM data management system"
-      />
-    )
   }
 
   if (isLoading) {

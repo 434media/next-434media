@@ -2,19 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion } from "motion/react"
-import AdminPasswordModal from "../components/AdminPasswordModal"
-import { DashboardHeader } from "../components/analytics/DashboardHeader"
-import { DateRangeSelector } from "../components/analytics/DateRangeSelector"
-import { MetricsOverview } from "../components/analytics/MetricsOverview"
-import { PageViewsChart } from "../components/analytics/PageViewsChart"
-import { TopPagesTable } from "../components/analytics/TopPagesTable"
-import { TrafficSourcesChart } from "../components/analytics/TrafficSourcesChart"
-import { DeviceBreakdown } from "../components/analytics/DeviceBreakdown"
-import { GeographicMap } from "../components/analytics/GeographicMap"
-import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "../types/analytics"
+import { DashboardHeader } from "../../components/analytics/DashboardHeader"
+import { DateRangeSelector } from "../../components/analytics/DateRangeSelector"
+import { MetricsOverview } from "../../components/analytics/MetricsOverview"
+import { PageViewsChart } from "../../components/analytics/PageViewsChart"
+import { TopPagesTable } from "../../components/analytics/TopPagesTable"
+import { TrafficSourcesChart } from "../../components/analytics/TrafficSourcesChart"
+import { DeviceBreakdown } from "../../components/analytics/DeviceBreakdown"
+import { GeographicMap } from "../../components/analytics/GeographicMap"
+import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "../../types/analytics"
 
 export default function AnalyticsClientPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [selectedDateRange, setSelectedDateRange] = useState<DateRange>({
     startDate: "30daysAgo",
@@ -26,35 +24,18 @@ export default function AnalyticsClientPage() {
   const [error, setError] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<AnalyticsConnectionStatus | null>(null)
 
-  // Check for existing admin session
+  // Load properties on component mount
   useEffect(() => {
-    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-    if (adminKey) {
-      setIsAuthenticated(true)
-      // Load properties immediately when authenticated
-      loadAvailableProperties()
-      testConnection()
-    }
+    loadAvailableProperties()
+    testConnection()
   }, [])
-
-  // Add a separate useEffect to load properties when authentication changes
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadAvailableProperties()
-    }
-  }, [isAuthenticated])
 
   // Refresh data when date range or property changes
   useEffect(() => {
-    if (isAuthenticated && selectedPropertyId) {
+    if (selectedPropertyId) {
       forceRefreshData()
     }
-  }, [selectedDateRange, selectedPropertyId, isAuthenticated])
-
-  const handleVerified = (password: string) => {
-    sessionStorage.setItem("adminKey", password)
-    setIsAuthenticated(true)
-  }
+  }, [selectedDateRange, selectedPropertyId])
 
   const loadAvailableProperties = async () => {
     try {
@@ -92,8 +73,7 @@ export default function AnalyticsClientPage() {
 
         // Set default property (first configured property or first property)
         if (properties.length > 0 && !selectedPropertyId) {
-          const defaultProperty =
-            properties.find((p: AnalyticsProperty) => p.isConfigured) || properties[0]
+          const defaultProperty = properties.find((p: AnalyticsProperty) => p.isConfigured) || properties[0]
           if (defaultProperty) {
             console.log("Setting default property:", defaultProperty)
             setSelectedPropertyId(defaultProperty.id)
@@ -145,7 +125,7 @@ export default function AnalyticsClientPage() {
   const handleLogout = () => {
     sessionStorage.removeItem("adminKey")
     localStorage.removeItem("adminKey")
-    setIsAuthenticated(false)
+    window.location.href = "/admin"
   }
 
   const testConnection = async () => {
@@ -171,19 +151,6 @@ export default function AnalyticsClientPage() {
       console.error("Connection test error:", err)
       // Don't set error - just continue with zero data
     }
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <AdminPasswordModal
-          isOpen={true}
-          onVerified={handleVerified}
-          onCancel={() => (window.location.href = "/")}
-          action="access the analytics dashboard"
-        />
-      </div>
-    )
   }
 
   return (

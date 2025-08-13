@@ -1,115 +1,69 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
-// Rate limiting for brute force protection
-const attempts = new Map<string, { count: number; lastAttempt: number }>()
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    // Get client IP properly for production (Vercel)
-    const forwardedFor = request.headers.get("x-forwarded-for")
-    const realIP = request.headers.get("x-real-ip")
-    const clientIP = forwardedFor?.split(",")[0]?.trim() || realIP || "127.0.0.1"
-
-    // Rate limiting check
-    const now = Date.now()
-    const clientAttempts = attempts.get(clientIP)
-
-    if (clientAttempts && clientAttempts.count >= 5 && now - clientAttempts.lastAttempt < 300000) {
-      // 5 minutes lockout after 5 failed attempts
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too many failed attempts. Please try again later.",
-        },
-        { status: 429 },
-      )
+    // Ensure we always return JSON
+    const headers = {
+      "Content-Type": "application/json",
     }
 
-    // Get password from request
-    const { password } = await request.json()
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError)
+      return NextResponse.json({ success: false, error: "Invalid JSON in request body" }, { status: 400, headers })
+    }
 
-    // Check if password is provided
+    const { password } = body
+
     if (!password) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Password is required",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ success: false, error: "Password is required" }, { status: 400, headers })
     }
 
-    // Get passwords from environment variables
     const adminPassword = process.env.ADMIN_PASSWORD
-    const internPassword = process.env.INTERN_PASSWORD
 
     if (!adminPassword) {
-      console.error("ADMIN_PASSWORD environment variable is not set")
+      console.error("ADMIN_PASSWORD environment variable not set")
       return NextResponse.json(
-        {
-          success: false,
-          error: "Server configuration error",
-        },
-        { status: 500 },
+        { success: false, error: "Admin password not configured on server" },
+        { status: 500, headers },
       )
     }
 
-    // Timing-safe comparison to prevent timing attacks
-    const isAdminValid = timingSafeEqual(password, adminPassword)
-    const isInternValid = internPassword ? timingSafeEqual(password, internPassword) : false
-    const isValid = isAdminValid || isInternValid
-
-    if (!isValid) {
-      // Track failed attempt
-      const current = attempts.get(clientIP) || { count: 0, lastAttempt: 0 }
-      attempts.set(clientIP, { count: current.count + 1, lastAttempt: now })
-
-      // Log failed attempt (in production, use secure logging)
-      console.warn(`Failed admin/intern login attempt from ${clientIP}`)
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid admin or intern password",
-        },
-        { status: 401 },
-      )
+    if (password !== adminPassword) {
+      return NextResponse.json({ success: false, error: "Invalid password" }, { status: 401, headers })
     }
 
-    // Reset attempts on successful verification
-    attempts.delete(clientIP)
+    // Set session cookie that expires in 24 hours
+    const cookieStore = await cookies()
+    const sessionValue = Buffer.from(adminPassword).toString("base64")
 
-    // Log successful verification with user type
-    const userType = isAdminValid ? "admin" : "intern"
-    console.log(`Successful ${userType} verification from ${clientIP}`)
-
-    // Return success with user type
-    return NextResponse.json({
-      success: true,
-      userType: userType,
+    cookieStore.set("admin-session", sessionValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60, // 24 hours
+      path: "/",
     })
+
+    return NextResponse.json({ success: true }, { headers })
   } catch (error) {
-    console.error("Error verifying admin password:", error)
+    console.error("Admin verification error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "An error occurred during verification",
+        error: "Internal server error",
+        details:
+          process.env.NODE_ENV === "development" && error && typeof error === "object" && "message" in error
+            ? (error as { message?: string }).message
+            : undefined,
       },
-      { status: 500 },
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
     )
   }
-}
-
-// Timing-safe comparison to prevent timing attacks
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false
-  }
-
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
-
-  return result === 0
 }

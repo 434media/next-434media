@@ -1,18 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import AdminPasswordModal from "../components/AdminPasswordModal"
-import { InstagramDashboardHeader } from "../components/instagram/InstagramDashboardHeader"
-import { InstagramMetricsOverview } from "../components/instagram/InstagramMetricsOverview"
-import { InstagramTopPostsTable } from "../components/instagram/InstagramTopPostsTable"
-import { InstagramAccountInfo } from "../components/instagram/InstagramAccountInfo"
-import { InstagramDateRangeSelector } from "../components/instagram/InstagramDateRangeSelector"
+import { InstagramDashboardHeader } from "../../components/instagram/InstagramDashboardHeader"
+import { InstagramMetricsOverview } from "../../components/instagram/InstagramMetricsOverview"
+import { InstagramTopPostsTable } from "../../components/instagram/InstagramTopPostsTable"
+import { InstagramAccountInfo } from "../../components/instagram/InstagramAccountInfo"
+import { InstagramDateRangeSelector } from "../../components/instagram/InstagramDateRangeSelector"
 import type {
   InstagramTimeRange,
   InstagramAccount,
   InstagramMedia,
   InstagramMediaInsights,
-} from "../types/instagram-insights"
+} from "../../types/instagram-insights"
 
 interface InstagramInsightsData {
   reach: number
@@ -41,7 +40,6 @@ type InstagramMediaWithInsights = InstagramMedia & {
 }
 
 export default function InstagramAnalyticsClientPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<InstagramTimeRange>("30d")
@@ -56,27 +54,13 @@ export default function InstagramAnalyticsClientPage() {
     account?: any
   } | null>(null)
 
-  // Check for existing admin session
+  // Load Instagram data on component mount and when date range changes
   useEffect(() => {
     const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
     if (adminKey) {
-      setIsAuthenticated(true)
-      // Load properties immediately when authenticated
       loadInstagramData(adminKey)
-    } else {
-      setIsLoading(false)
     }
-  }, [])
-
-  // Load Instagram data when authenticated or date range changes
-  useEffect(() => {
-    if (isAuthenticated) {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-      if (adminKey) {
-        loadInstagramData(adminKey)
-      }
-    }
-  }, [isAuthenticated, dateRange])
+  }, [dateRange])
 
   const loadInstagramData = async (adminKey: string) => {
     setIsLoading(true)
@@ -91,7 +75,7 @@ export default function InstagramAnalyticsClientPage() {
         if (connectionResponse.status === 401) {
           sessionStorage.removeItem("adminKey")
           localStorage.removeItem("adminKey")
-          setIsAuthenticated(false)
+          window.location.href = "/admin"
           return
         }
         // Try to surface server error details if available
@@ -191,11 +175,6 @@ export default function InstagramAnalyticsClientPage() {
     }
   }
 
-  const handleVerified = (password: string) => {
-    sessionStorage.setItem("adminKey", password)
-    setIsAuthenticated(true)
-  }
-
   const handleRefresh = () => {
     const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
     if (adminKey) {
@@ -206,34 +185,7 @@ export default function InstagramAnalyticsClientPage() {
   const handleLogout = () => {
     sessionStorage.removeItem("adminKey")
     localStorage.removeItem("adminKey")
-    setIsAuthenticated(false)
-    // Reset all data states
-    setInsightsData(null)
-    setAccountData(null)
-    setMediaData([])
-    setConnectionStatus(null)
-    setError(null)
-  }
-
-  if (isLoading && !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <AdminPasswordModal
-          isOpen={true}
-          onVerified={handleVerified}
-          onCancel={() => (window.location.href = "/")}
-          action="access the instagram analytics dashboard"
-        />
-      </div>
-    )
+    window.location.href = "/admin"
   }
 
   return (
@@ -252,11 +204,11 @@ export default function InstagramAnalyticsClientPage() {
         </div>
 
         {/* Order: Account Info -> Date Range -> Top Posts -> Metrics Overview -> Engagement Chart */}
-        {!isLoading && accountData &&
+        {!isLoading && accountData && (
           <div className="mb-6">
             <InstagramAccountInfo account={accountData} />
           </div>
-        }
+        )}
 
         {error && (
           <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg">

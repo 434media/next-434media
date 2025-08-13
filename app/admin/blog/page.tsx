@@ -4,12 +4,9 @@ import { useState, useEffect } from "react"
 import { Plus, Edit, Trash2, Eye, Search, Filter, Sparkles, TrendingUp, Users, ImageIcon } from "lucide-react"
 import { getBlogPostsAction, deleteBlogPostAction } from "@/app/actions/blog"
 import BlogEditor from "../../components/blog/BlogEditor"
-import AdminPasswordModal from "../../components/AdminPasswordModal"
 import type { BlogPost } from "../../types/blog-types"
 
 export default function AdminBlogPage() {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [adminPassword, setAdminPassword] = useState("")
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -19,23 +16,12 @@ export default function AdminBlogPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "published">("all")
 
   useEffect(() => {
-    if (authenticated) {
-      loadPosts()
-    }
-  }, [authenticated])
+    loadPosts()
+  }, [])
 
   useEffect(() => {
     filterPosts()
   }, [posts, searchTerm, statusFilter])
-
-  const handlePasswordVerified = (password: string) => {
-    setAdminPassword(password)
-    setAuthenticated(true)
-  }
-
-  const handlePasswordCancel = () => {
-    window.history.back()
-  }
 
   const loadPosts = async () => {
     setIsLoading(true)
@@ -80,6 +66,10 @@ export default function AdminBlogPage() {
       return
     }
 
+    // Get admin password from session
+    const adminPassword = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
+    if (!adminPassword) return
+
     const result = await deleteBlogPostAction(post.id, adminPassword)
     if (result.success) {
       setPosts(posts.filter((p) => p.id !== post.id))
@@ -110,18 +100,6 @@ export default function AdminBlogPage() {
   const publishedPosts = (posts || []).filter((p) => p.status === "published")
   const draftPosts = (posts || []).filter((p) => p.status === "draft")
   const totalViews = (posts || []).reduce((sum, post) => sum + (post.view_count || 0), 0)
-
-  // Show authentication modal if not authenticated
-  if (!authenticated) {
-    return (
-      <AdminPasswordModal
-        isOpen={true}
-        onVerified={handlePasswordVerified}
-        onCancel={handlePasswordCancel}
-        action="access blog management"
-      />
-    )
-  }
 
   if (showEditor) {
     return (

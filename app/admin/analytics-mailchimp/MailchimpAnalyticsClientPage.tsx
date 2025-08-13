@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import AdminPasswordModal from "../components/AdminPasswordModal"
-import { MailchimpDashboardHeader } from "../components/mailchimp/MailchimpDashboardHeader"
-import { MailchimpMetricsOverview } from "../components/mailchimp/MailchimpMetricsOverview"
-import { MailchimpTopCampaignsTable } from "../components/mailchimp/MailchimpTopCampaignsTable"
-import { MailchimpDateRangeSelector } from "../components/mailchimp/MailchimpDateRangeSelector"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/analytics/Card"
-import { Badge } from "../components/analytics/Badge"
-import { useToast } from "../hooks/use-toast"
+import { MailchimpDashboardHeader } from "../../components/mailchimp/MailchimpDashboardHeader"
+import { MailchimpMetricsOverview } from "../../components/mailchimp/MailchimpMetricsOverview"
+import { MailchimpTopCampaignsTable } from "../../components/mailchimp/MailchimpTopCampaignsTable"
+import { MailchimpDateRangeSelector } from "../../components/mailchimp/MailchimpDateRangeSelector"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/analytics/Card"
+import { Badge } from "../../components/analytics/Badge"
+import { useToast } from "../../hooks/use-toast"
 import type {
   MailchimpAnalyticsSummary,
   MailchimpCampaignPerformanceResponse,
@@ -18,7 +17,7 @@ import type {
   MailchimpListsResponse,
   MailchimpCampaignsResponse,
   MailchimpRealtimeData,
-} from "../types/mailchimp-analytics"
+} from "../../types/mailchimp-analytics"
 
 interface MailchimpAnalyticsData {
   summary?: MailchimpAnalyticsSummary
@@ -32,9 +31,7 @@ interface MailchimpAnalyticsData {
 }
 
 export default function MailchimpAnalyticsClientPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [data, setData] = useState<MailchimpAnalyticsData>({})
   const [dateRange, setDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // 30 days ago
@@ -44,25 +41,15 @@ export default function MailchimpAnalyticsClientPage() {
   const [configStatus, setConfigStatus] = useState<any>(null)
   const { toast } = useToast()
 
-  // Check for existing admin session on component mount
-  useEffect(() => {
-    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-    if (adminKey) {
-      setIsAuthenticated(true)
-    }
-  }, [])
-
   // Check configuration on component mount
   useEffect(() => {
     fetchConfig()
   }, [])
 
-  // Fetch data when authenticated and date range changes
+  // Fetch data when date range changes
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchAllData()
-    }
-  }, [isAuthenticated, dateRange, selectedAudienceId])
+    fetchAllData()
+  }, [dateRange, selectedAudienceId])
 
   const fetchConfig = async () => {
     try {
@@ -151,30 +138,12 @@ export default function MailchimpAnalyticsClientPage() {
     }
   }
 
-  const handleVerified = (password: string) => {
-    sessionStorage.setItem("adminKey", password)
-    setIsAuthenticated(true)
-  }
-
   const handleDateRangeChange = (newRange: { startDate: string; endDate: string }) => {
     setDateRange(newRange)
   }
 
   const handleAudienceChange = (audienceId: string) => {
     setSelectedAudienceId(audienceId)
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <AdminPasswordModal
-          isOpen={true}
-          onVerified={handleVerified}
-          onCancel={() => (window.location.href = "/")}
-          action="access the Mailchimp analytics dashboard"
-        />
-      </div>
-    )
   }
 
   if (!configStatus?.configured) {
@@ -227,8 +196,8 @@ export default function MailchimpAnalyticsClientPage() {
       <MailchimpDateRangeSelector dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
 
       {data.summary && (
-        <MailchimpMetricsOverview 
-          data={data.summary} 
+        <MailchimpMetricsOverview
+          data={data.summary}
           campaignData={data.allCampaigns?.data || []}
           geographicData={data.geographic?.data || []}
           allAudiences={data.lists?.data || []}
@@ -236,9 +205,7 @@ export default function MailchimpAnalyticsClientPage() {
         />
       )}
 
-      {data.allCampaigns && 
-        <MailchimpTopCampaignsTable data={data.allCampaigns} />
-      }
+      {data.allCampaigns && <MailchimpTopCampaignsTable data={data.allCampaigns} />}
     </div>
   )
 }
