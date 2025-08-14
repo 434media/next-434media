@@ -1,5 +1,7 @@
 import { Pool } from "pg"
 import type { Event } from "../types/event-types"
+// Bring in lead table init lazily to avoid circular import
+import { initLeadTable } from "./lead-db"
 
 // Configure pg to return DATE columns as strings instead of Date objects
 // This prevents timezone conversion issues
@@ -57,6 +59,12 @@ export async function initializeDatabase() {
     `)
 
     console.log("Neon database initialized successfully")
+    try {
+      await initLeadTable()
+      console.log("Leads table ensured")
+    } catch (e) {
+      console.error("Lead table init error", e)
+    }
   } catch (error) {
     console.error("Database initialization error:", error)
     throw error

@@ -90,6 +90,16 @@ const adminSections: AdminSection[] = [
     size: "large",
     description: "Manage and view Airtable bases, tables, and records directly from the Airtable API",
   },
+  {
+    id: "web-scraper",
+    title: "WEB SCRAPER",
+    subtitle: "Sales Lead Generator",
+    href: "/admin/web-scraper",
+    icon: <FileText className="w-8 h-8" />,
+    delay: 0.35,
+    size: "large",
+    description: "Search and collect company lead data, manage statuses, and export to CSV",
+  },
 ]
 
 export default function AdminPage() {
