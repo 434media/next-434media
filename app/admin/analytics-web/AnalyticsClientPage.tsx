@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion } from "motion/react"
 import { DashboardHeader } from "../../components/analytics/DashboardHeader"
+import { PDFExportButton } from "../../components/analytics/PDFExportButton"
 import { DateRangeSelector } from "../../components/analytics/DateRangeSelector"
 import { MetricsOverview } from "../../components/analytics/MetricsOverview"
 import { PageViewsChart } from "../../components/analytics/PageViewsChart"
@@ -154,7 +155,7 @@ export default function AnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pt-24 md:pt-20">
+  <div id="analytics-root" className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pt-24 md:pt-20">
       {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -179,16 +180,21 @@ export default function AnalyticsClientPage() {
 
       <div className="relative z-10 pt-8 pb-8">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Header */}
+          {/* Header + Actions */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <DashboardHeader
-              onRefresh={handleRefresh}
-              onLogout={handleLogout}
-              isLoading={isLoading}
-              availableProperties={availableProperties}
-              selectedPropertyId={selectedPropertyId}
-              onPropertyChange={handlePropertyChange}
-            />
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <DashboardHeader
+                onRefresh={handleRefresh}
+                onLogout={handleLogout}
+                isLoading={isLoading}
+                availableProperties={availableProperties}
+                selectedPropertyId={selectedPropertyId}
+                onPropertyChange={handlePropertyChange}
+              />
+              <div className="flex items-start justify-end">
+                <PDFExportButton filename={`ga4-analytics-${new Date().toISOString().slice(0,10)}.pdf`} contextLabel="GA4 Analytics" variant="full" />
+              </div>
+            </div>
           </motion.div>
 
           {/* Date Range Selector */}

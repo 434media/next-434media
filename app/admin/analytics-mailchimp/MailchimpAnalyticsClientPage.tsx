@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { MailchimpDashboardHeader } from "../../components/mailchimp/MailchimpDashboardHeader"
+import { PDFExportButton } from "../../components/analytics/PDFExportButton"
 import { MailchimpMetricsOverview } from "../../components/mailchimp/MailchimpMetricsOverview"
 import { MailchimpTopCampaignsTable } from "../../components/mailchimp/MailchimpTopCampaignsTable"
 import { MailchimpDateRangeSelector } from "../../components/mailchimp/MailchimpDateRangeSelector"
@@ -184,14 +185,19 @@ export default function MailchimpAnalyticsClientPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8 pt-32 md:pt-24">
-      <MailchimpDashboardHeader
-        isLoading={isLoading}
-        onRefresh={fetchAllData}
-        selectedAudienceId={selectedAudienceId}
-        onAudienceChange={handleAudienceChange}
-        availableAudiences={data.lists?.data || []}
-      />
+    <div id="analytics-root" className="container mx-auto px-4 py-8 space-y-8 pt-32 md:pt-24">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <MailchimpDashboardHeader
+          isLoading={isLoading}
+          onRefresh={fetchAllData}
+          selectedAudienceId={selectedAudienceId}
+          onAudienceChange={handleAudienceChange}
+          availableAudiences={data.lists?.data || []}
+        />
+        <div className="flex items-start justify-end">
+          <PDFExportButton filename={`mailchimp-analytics-${new Date().toISOString().slice(0,10)}.pdf`} contextLabel="Mailchimp Analytics" variant="full" />
+        </div>
+      </div>
 
       <MailchimpDateRangeSelector dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
 

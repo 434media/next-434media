@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { InstagramDashboardHeader } from "../../components/instagram/InstagramDashboardHeader"
+import { PDFExportButton } from "../../components/analytics/PDFExportButton"
 import { InstagramMetricsOverview } from "../../components/instagram/InstagramMetricsOverview"
 import { InstagramTopPostsTable } from "../../components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "../../components/instagram/InstagramAccountInfo"
@@ -189,15 +190,20 @@ export default function InstagramAnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div id="analytics-root" className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-8 pt-32 md:pt-24">
-        <InstagramDashboardHeader
-          connectionStatus={connectionStatus}
-          accountData={accountData}
-          onRefresh={handleRefresh}
-          onLogout={handleLogout}
-          isLoading={isLoading}
-        />
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <InstagramDashboardHeader
+            connectionStatus={connectionStatus}
+            accountData={accountData}
+            onRefresh={handleRefresh}
+            onLogout={handleLogout}
+            isLoading={isLoading}
+          />
+          <div className="flex items-start justify-end">
+            <PDFExportButton filename={`instagram-analytics-${new Date().toISOString().slice(0,10)}.pdf`} contextLabel="Instagram Analytics" variant="full" />
+          </div>
+        </div>
 
         <div className="mb-6 mt-6">
           <InstagramDateRangeSelector selectedRange={dateRange} onRangeChange={setDateRange} />
