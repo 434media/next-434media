@@ -24,6 +24,32 @@ export async function initLeadTable() {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_company_unique ON leads(company_name);
       CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
       CREATE INDEX IF NOT EXISTS idx_leads_company ON leads(company_name);
+      CREATE TABLE IF NOT EXISTS lead_contacts (
+        id SERIAL PRIMARY KEY,
+        lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        title VARCHAR(255),
+        email VARCHAR(255),
+        phone VARCHAR(100),
+        linkedin_url TEXT,
+        twitter_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_lead_contacts_lead_id ON lead_contacts(lead_id);
+      CREATE TABLE IF NOT EXISTS lead_jobs (
+        id SERIAL PRIMARY KEY,
+        job_id VARCHAR(64) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'queued',
+        payload JSONB,
+        error TEXT,
+        started_at TIMESTAMPTZ,
+        finished_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_jobs_job_id ON lead_jobs(job_id);
+      CREATE INDEX IF NOT EXISTS idx_lead_jobs_status ON lead_jobs(status);
     `)
   } finally {
     client.release()
@@ -215,5 +241,39 @@ export async function listContacts(leadId: string) {
   try {
     const r = await client.query('SELECT * FROM lead_contacts WHERE lead_id = $1 ORDER BY id ASC', [leadId])
     return r.rows
+  } finally { client.release() }
+}
+
+// JOB HELPERS
+export async function createJob(job: { job_id: string; type: string; payload?: any }) {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO lead_jobs (job_id, type, status, payload) VALUES ($1,$2,'queued',$3)`,
+      [job.job_id, job.type, job.payload || null]
+    )
+  } finally { client.release() }
+}
+
+export async function updateJobStatus(job_id: string, patch: { status?: string; error?: string; started_at?: boolean; finished_at?: boolean }) {
+  const client = await pool.connect()
+  try {
+    const sets: string[] = ['updated_at = NOW()']
+    const values: any[] = []
+    let idx = 1
+    if (patch.status) { sets.push(`status = $${idx}`); values.push(patch.status); idx++ }
+    if (patch.error) { sets.push(`error = $${idx}`); values.push(patch.error); idx++ }
+    if (patch.started_at) { sets.push(`started_at = NOW()`) }
+    if (patch.finished_at) { sets.push(`finished_at = NOW()`) }
+    values.push(job_id)
+    await client.query(`UPDATE lead_jobs SET ${sets.join(', ')} WHERE job_id = $${idx}`, values)
+  } finally { client.release() }
+}
+
+export async function getJob(job_id: string) {
+  const client = await pool.connect()
+  try {
+    const r = await client.query('SELECT * FROM lead_jobs WHERE job_id = $1', [job_id])
+    return r.rows[0] || null
   } finally { client.release() }
 }

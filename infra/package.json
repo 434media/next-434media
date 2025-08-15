@@ -1,0 +1,24 @@
+{
+  "name": "lead-scraper-infra",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cd lambda && tsc -p tsconfig.json",
+    "cdk": "cdk",
+    "deploy": "npm run build && cdk deploy",
+    "synth": "npm run build && cdk synth"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.9",
+  "@types/aws-lambda": "8.10.138",
+    "typescript": "5.4.5"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.151.0",
+    "constructs": "10.3.0",
+  "@aws-sdk/client-secrets-manager": "3.614.0",
+  "@aws-sdk/client-sqs": "3.614.0",
+    "aws-lambda": "^1.0.7"
+  }
+}

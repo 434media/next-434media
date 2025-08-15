@@ -1,5 +1,5 @@
-import { chromium, Browser, Page } from 'playwright'
-import { bulkUpsertLeads, addContacts } from './lead-db'
+import { bulkUpsertLeads, addContacts, initLeadTable } from './lead-db'
+import { scrapeCore, CoreScrapeInput } from '../../shared/scraper-core'
 
 export interface ScrapeInput {
   query?: string
@@ -38,104 +38,10 @@ const phoneRegex = /(\+?\d[\d\s().-]{8,}\d)/g
 export async function runScrape(input: ScrapeInput): Promise<ScrapeResultSummary> {
   const { urls = [], industry, location } = input
   if (!urls.length) throw new Error('At least one URL required after preprocessing')
-
-  const errors: { url: string; message: string }[] = []
-  const candidates: TempLeadCandidate[] = []
-
-  let browser: Browser | null = null
-  try {
-    browser = await chromium.launch({ headless: true })
-    const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (LeadScraperBot)' })
-
-    for (const target of urls.slice(0, input.limit || 20)) {
-      const rootUrl = normalizeRoot(target)
-      const visited = new Set<string>()
-      const toVisit: string[] = [rootUrl]
-      // Deep crawl default ON: only set deep=false to disable.
-      const maxExtra = input.deep === false ? 0 : (input.perSitePageLimit ?? 5)
-
-      let aggregateHtml = ''
-      let baseCompanyName: string | undefined
-      let primarySource = rootUrl
-
-      while (toVisit.length && visited.size < (1 + maxExtra)) {
-        const nextUrl = toVisit.shift()!
-        if (visited.has(nextUrl)) continue
-        visited.add(nextUrl)
-        let page: Page | null = null
-        try {
-          page = await context.newPage()
-          await page.goto(nextUrl, { timeout: 35000, waitUntil: 'domcontentloaded' })
-          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2))
-          const html = await page.content()
-          aggregateHtml += `\n<!-- PAGE:${nextUrl} -->\n` + html
-          if (!baseCompanyName) {
-            const title = (await page.title())?.trim() || ''
-            const metaSiteName = await page.locator('meta[property="og:site_name"]').getAttribute('content')
-            const metaTitle = await page.locator('meta[property="og:title"]').getAttribute('content')
-            baseCompanyName = simplifyName(metaSiteName || metaTitle || title || new URL(nextUrl).hostname)
-            primarySource = nextUrl
-          }
-          // Queue internal candidate pages
-          if (visited.size === 1 && maxExtra > 0) {
-            const anchors = await page.$$eval('a', els => els.map(e => ({ href: (e as HTMLAnchorElement).href, text: (e.textContent||'').toLowerCase() })))
-            const keywords = ['about', 'team', 'contact', 'company', 'who-we-are', 'people']
-            const rootOrigin = new URL(rootUrl).origin
-            const internal = anchors
-              .filter(a => a.href.startsWith(rootOrigin))
-              .filter(a => keywords.some(k => a.href.toLowerCase().includes(k) || a.text.includes(k)))
-              .map(a => stripHash(a.href))
-            for (const candidate of arrayUnique(internal).slice(0, maxExtra)) {
-              if (!visited.has(candidate)) toVisit.push(candidate)
-            }
-          }
-        } catch (err: any) {
-          errors.push({ url: nextUrl, message: err.message || 'Unknown error' })
-        } finally {
-          await page?.close().catch(()=>{})
-        }
-      }
-
-      try {
-        // Fallback: use domain as company name if meta/title missing.
-        if (!baseCompanyName) {
-          try { baseCompanyName = new URL(rootUrl).hostname.replace(/^www\./,'') } catch {}
-        }
-        if (baseCompanyName) {
-          const emails = arrayUnique(matchAll(aggregateHtml, emailRegex)).filter(e => !e.toLowerCase().includes('example'))
-          const phones = arrayUnique(matchAll(aggregateHtml, phoneRegex)).map(normalizePhone)
-          const locationGuess = extractLocation(aggregateHtml) || location
-          const person = extractPersonAndTitle(aggregateHtml)
-          const socials = extractSocialProfiles(aggregateHtml)
-          const multiContacts = extractMultipleContacts(aggregateHtml, emails)
-          candidates.push({
-            company_name: baseCompanyName,
-            website_url: canonicalizeUrl(rootUrl),
-            industry,
-            location: locationGuess,
-            email: emails[0],
-            phone: phones[0],
-            source_url: primarySource,
-            contact_name: person?.name,
-            contact_title: person?.title,
-            contacts: multiContacts.map(c => ({ ...c, linkedin_url: socials.linkedin, twitter_url: socials.twitter }))
-          })
-        } else {
-          errors.push({ url: target, message: 'Company name not detected' })
-        }
-      } catch (err: any) {
-        errors.push({ url: target, message: err.message || 'Post-process error' })
-      }
-    }
-  } finally {
-    await browser?.close().catch(()=>{})
-  }
-
-  const dedupedMap = new Map<string, TempLeadCandidate>()
-  for (const c of candidates) {
-    if (!dedupedMap.has(c.company_name)) dedupedMap.set(c.company_name, c)
-  }
-  const deduped = Array.from(dedupedMap.values())
+  await initLeadTable().catch(()=>{})
+  const coreInput: CoreScrapeInput = { urls, industry, location, deep: input.deep, perSitePageLimit: input.perSitePageLimit, limit: input.limit }
+  const core = await scrapeCore(coreInput)
+  const deduped = core.candidates
 
   const inserted = await bulkUpsertLeads(
     deduped.map(d => ({
@@ -151,155 +57,30 @@ export async function runScrape(input: ScrapeInput): Promise<ScrapeResultSummary
     }))
   )
 
+  // Persist multi contacts best-effort: fetch IDs by company_name after upsert
+  // (Simple approach: query each lead individually to get id)
+  try {
+    const { pool } = await import('./db')
+    const client = await pool.connect()
+    try {
+      for (const c of deduped) {
+        if (!c.contacts?.length) continue
+        const res = await client.query('SELECT id FROM leads WHERE company_name = $1', [c.company_name])
+        if (res.rows[0]) {
+          await addContacts(res.rows[0].id.toString(), c.contacts)
+        }
+      }
+    } finally { client.release() }
+  } catch (err) {
+    // Non-fatal
+    console.error('Add contacts failed', err)
+  }
+
   // Add multi-contacts (best-effort) after upsert
   // NOTE: We need the lead IDs; simplest approach: not fetching here to keep runtime small.
   // Future enhancement: map company_name back to ID with a SELECT.
   // Skipping persistence of extra contacts until we fetch IDs (left as TODO or optional optimization).
 
-  return {
-    newLeads: inserted,
-    processedPages: urls.length,
-    extracted: deduped.length,
-    errors,
-    leadsPreview: deduped.slice(0, 10).map(l => l.company_name),
-  }
+  return { newLeads: inserted, processedPages: core.processedPages, extracted: deduped.length, errors: core.errors, leadsPreview: deduped.slice(0, 10).map(l => l.company_name) }
 }
-
-function matchAll(text: string, regex: RegExp): string[] {
-  const out: string[] = []
-  let m: RegExpExecArray | null
-  const r = new RegExp(regex.source, regex.flags)
-  while ((m = r.exec(text)) !== null) {
-    out.push(m[0])
-  }
-  return out
-}
-
-function arrayUnique<T>(arr: T[]): T[] { return Array.from(new Set(arr)) }
-
-function normalizePhone(p: string): string { return p.replace(/[^+\d]/g, '').slice(0, 18) }
-
-function stripHash(u: string): string { try { const x = new URL(u); x.hash=''; return x.toString() } catch { return u } }
-
-function normalizeRoot(u: string): string {
-  try {
-    const url = new URL(u)
-    // ensure we start from homepage if path is long; keep as-is if root-level provided
-    if (url.pathname.split('/').filter(Boolean).length > 2) {
-      url.pathname = '/'
-      url.search = ''
-    }
-    url.hash = ''
-    return url.toString()
-  } catch { return u }
-}
-
-function canonicalizeUrl(u: string): string {
-  try { const url = new URL(u); url.hash=''; return url.toString() } catch { return u }
-}
-
-function simplifyName(name: string): string {
-  return name.replace(/\s+\|.*$/, '').replace(/•.*$/, '').trim().slice(0, 120)
-}
-
-function extractLocation(html: string): string | undefined {
-  const lower = html.toLowerCase()
-  const markers = ['address', 'location', 'headquarters']
-  const idx = markers.map(m => lower.indexOf(m)).filter(i => i > -1).sort()[0]
-  if (idx === undefined) return undefined
-  const snippet = lower.slice(idx, idx + 400)
-  const cityState = /\b([a-zA-Z .'-]{3,}),\s*(?:[A-Z]{2})\b/.exec(snippet)
-  if (cityState) return capitalizeWords(cityState[0])
-  return undefined
-}
-
-function capitalizeWords(str: string): string {
-  return str.replace(/\b([a-z])/g, c => c.toUpperCase())
-}
-
-// Very lightweight heuristic to grab a probable person name + title from About/Team pages.
-function extractPersonAndTitle(html: string): { name: string; title?: string } | undefined {
-  // Strip scripts/styles for cleaner parsing window
-  const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'')
-  // Common title words
-  const titleWords = ['Founder','Co-Founder','CEO','Chief','Officer','CTO','CFO','COO','CMO','President','Director','Manager','Lead','Head','Owner','Partner']
-  // Look for patterns like <h2>Jane Doe – CEO</h2> or <h3>John Smith, Founder</h3>
-  const headingRegex = /<(h[1-4])[^>]*>([^<]{3,120})<\/\1>/gi
-  let m: RegExpExecArray | null
-  while ((m = headingRegex.exec(cleaned)) !== null) {
-    const text = m[2].replace(/&amp;/g,'&').trim()
-    if (text.split(/\s+/).length > 12) continue
-    // Separator candidates
-    const parts = text.split(/[–\-\u2013\u2014,:|]/).map(p=>p.trim()).filter(Boolean)
-    if (parts.length >= 2) {
-      const maybeName = parts[0]
-      const maybeTitle = parts.slice(1).join(' ').replace(/\s+/g,' ')
-      if (looksLikeName(maybeName) && containsTitleWord(maybeTitle, titleWords)) {
-        return { name: sanitizeName(maybeName), title: shortenTitle(maybeTitle) }
-      }
-    }
-    // Single part but contains a title word at end
-    if (containsTitleWord(text, titleWords)) {
-      const tokens = text.split(/[,]/)[0]
-      const nameGuess = tokens.replace(/\b(CEO|CTO|CFO|COO|CMO)\b.*$/i,'').trim()
-      if (looksLikeName(nameGuess)) {
-        const title = text.replace(nameGuess,'').replace(/^[\s,\-–]+/,'').trim()
-        if (title) return { name: sanitizeName(nameGuess), title: shortenTitle(title) }
-      }
-    }
-  }
-  return undefined
-}
-
-function looksLikeName(str: string): boolean {
-  const words = str.split(/\s+/)
-  return words.length <= 4 && words.every(w => /^[A-Za-z'\.]{2,}$/.test(w)) && /[A-Za-z]/.test(str)
-}
-function containsTitleWord(text: string, words: string[]): boolean {
-  const lower = text.toLowerCase()
-  return words.some(w => lower.includes(w.toLowerCase()))
-}
-function sanitizeName(n: string): string { return n.replace(/\s+/g,' ').trim() }
-function shortenTitle(t: string): string { return t.split(/\s+/).slice(0, eightWordCap(t)).join(' ') }
-function eightWordCap(t: string): number { return Math.min(8, t.split(/\s+/).length) }
-
-function extractSocialProfiles(html: string): { linkedin?: string; twitter?: string } {
-  const lower = html.toLowerCase()
-  const linkedinMatch = /https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/[a-z0-9_\-/]+/i.exec(html)
-  const twitterMatch = /https?:\/\/(?:www\.)?twitter\.com\/[a-z0-9_]+/i.exec(html) || /https?:\/\/(?:www\.)?x\.com\/[a-z0-9_]+/i.exec(html)
-  return { linkedin: linkedinMatch?.[0], twitter: twitterMatch?.[0] }
-}
-
-function extractMultipleContacts(html: string, foundEmails: string[]): Array<{ name: string; title?: string; email?: string; phone?: string }> {
-  const blocks = html.split(/<h[1-4][^>]*>/i).slice(1).map(b => b.slice(0, 500))
-  const contacts: Array<{ name: string; title?: string; email?: string; phone?: string }> = []
-  for (const block of blocks) {
-    const text = block.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').trim()
-    if (!text) continue
-    const line = text.split(/\n|\r/)[0].slice(0,160)
-    // Pattern: Name (Title)
-    const m = /([A-Z][A-Za-z'\.]+\s+[A-Z][A-Za-z'\.]+)(?:\s*[–\-\u2013\u2014:,|]+\s*([^\n]{2,80}))?/.exec(line)
-    if (m) {
-      const name = sanitizeName(m[1])
-      if (looksLikeName(name)) {
-        const title = m[2]?.trim()
-        const email = foundEmails.find(e => line.includes(e.split('@')[0]))
-        contacts.push({ name, title: title && shortenTitle(title), email })
-      }
-    }
-    if (contacts.length >= 10) break
-  }
-  return dedupeContacts(contacts)
-}
-
-function dedupeContacts(arr: Array<{ name: string } & any>) {
-  const seen = new Set<string>()
-  const out: typeof arr = []
-  for (const c of arr) {
-    const key = c.name.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(c)
-  }
-  return out
-}
+// All detailed extraction logic moved into shared/scraper-core
