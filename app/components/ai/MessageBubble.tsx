@@ -24,11 +24,13 @@ interface Message {
 interface MessageBubbleProps {
   message: Message
   isStreaming?: boolean
+  variant?: 'default' | 'bw'
 }
 
-export default function MessageBubble({ message, isStreaming = false }: MessageBubbleProps) {
+export default function MessageBubble({ message, isStreaming = false, variant = 'default' }: MessageBubbleProps) {
   const [showSources, setShowSources] = useState(false)
   const isUser = message.role === "user"
+  const isBW = variant === 'bw'
 
   return (
     <motion.div
@@ -41,7 +43,7 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
         <div className={`flex items-start gap-3 ${isUser ? "flex-row-reverse gap-3" : ""}`}>
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ring-1 ring-black/10 ${
-              isUser ? "bg-black text-white" : "bg-purple-100 text-purple-700"
+              isUser ? (isBW ? 'bg-black text-white' : 'bg-black text-white') : (isBW ? 'bg-white text-black border border-black/10' : 'bg-purple-100 text-purple-700')
             }`}
           >
             {isUser ? (
@@ -61,11 +63,11 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
             <div
               className={`relative rounded-2xl px-4 py-3 leading-relaxed text-[15px] shadow-sm backdrop-blur-sm transition-colors ${
                 isUser
-                  ? "bg-black text-white"
-                  : "bg-white text-slate-900 border border-purple-100/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]"
+                  ? (isBW ? 'bg-black text-white' : 'bg-black text-white')
+                  : (isBW ? 'bg-white text-black border border-black/10 shadow-sm' : 'bg-white text-slate-900 border border-purple-100/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]')
               }`}
             >
-              {!isUser && (
+              {!isUser && !isBW && (
                 <motion.span
                   className="pointer-events-none absolute inset-0 rounded-2xl"
                   initial={{ opacity: 0 }}
@@ -83,7 +85,7 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     whileHover={{ scale: 1.02 }}
-                    className="overflow-hidden rounded-lg border border-purple-200/60 bg-white/40 backdrop-blur"
+                    className={`overflow-hidden rounded-lg border ${isBW ? 'border-black/20 bg-white' : 'border-purple-200/60 bg-white/40'} backdrop-blur`}
                   >
                     <img
                       src={`data:image/png;base64,${message.imageBase64}`}
@@ -92,7 +94,7 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
                       loading="lazy"
                     />
                     {message.imageAlt && (
-                      <div className="text-[11px] text-slate-500 px-3 py-2 border-t border-purple-100/60 bg-white/60">
+                      <div className={`text-[11px] ${isBW ? 'text-black/60 border-black/10' : 'text-slate-500 border-purple-100/60'} px-3 py-2 border-t  bg-white/60`}>
                         {message.imageAlt}
                       </div>
                     )}
@@ -105,8 +107,8 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        strong: (props: any) => <strong className="font-semibold text-slate-900" {...props} />,
-                        em: (props: any) => <em className="text-slate-700" {...props} />,
+                        strong: (props: any) => <strong className={`font-semibold ${isBW ? 'text-black' : 'text-slate-900'}`} {...props} />,
+                        em: (props: any) => <em className={`${isBW ? 'text-black/70' : 'text-slate-700'}`} {...props} />,
                         code: ({ inline, className, children, ...rest }: any) => {
                           const lang = /language-(\w+)/.exec(className || '')?.[1]
                           return inline ? (
@@ -117,11 +119,11 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
                             </pre>
                           )
                         },
-                        a: (props: any) => <a className="text-purple-600 hover:text-purple-700 underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                        a: (props: any) => <a className={`${isBW ? 'text-black underline decoration-black/30 hover:decoration-black' : 'text-purple-600 hover:text-purple-700 underline'}`} target="_blank" rel="noopener noreferrer" {...props} />,
                         ul: (props: any) => <ul className="list-disc ml-5 space-y-1" {...props} />,
                         ol: (props: any) => <ol className="list-decimal ml-5 space-y-1" {...props} />,
-                        blockquote: (props: any) => <blockquote className="border-l-4 border-purple-300 pl-3 italic text-slate-700" {...props} />,
-                        hr: () => <hr className="my-4 border-purple-200/60" />,
+                        blockquote: (props: any) => <blockquote className={`border-l-4 ${isBW ? 'border-black/30 text-black/70' : 'border-purple-300 text-slate-700'} pl-3 italic`} {...props} />,
+                        hr: () => <hr className={`my-4 ${isBW ? 'border-black/10' : 'border-purple-200/60'}`} />,
                       } as Components}
                     >
                       {message.content}
@@ -174,10 +176,10 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
                       {message.sources.map((source, index) => (
                         <div
                           key={index}
-                          className="bg-white/90 backdrop-blur border border-purple-100 rounded-lg p-3 text-xs shadow-sm"
+                          className={`backdrop-blur rounded-lg p-3 text-xs shadow-sm ${isBW ? 'bg-white border border-black/10' : 'bg-white/90 border border-purple-100'}`}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-slate-900 tracking-wide">{source.title}</span>
+                            <span className="font-medium tracking-wide ${isBW ? 'text-black' : 'text-slate-900'}">{source.title}</span>
                             <span className="text-slate-500 font-mono text-[10px]">
                               {Math.round(source.similarity * 100)}% match
                             </span>
@@ -187,7 +189,7 @@ export default function MessageBubble({ message, isStreaming = false }: MessageB
                               href={source.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-purple-600 hover:text-purple-700 font-medium"
+                              className={`${isBW ? 'text-black underline decoration-black/30 hover:decoration-black' : 'text-purple-600 hover:text-purple-700'} font-medium`}
                             >
                               View source
                             </a>

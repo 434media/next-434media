@@ -7,13 +7,15 @@ import { motion } from "motion/react"
 import { Rocket } from "lucide-react"
 
 interface ChatInputProps {
-  onSendMessage: (content: string) => Promise<void>
+  onSendMessage: (content: string) => void | Promise<void>
   disabled: boolean
   maxLength?: number
   className?: string
+  placeholder?: string
+  variant?: 'default' | 'bw'
 }
 
-export default function ChatInput({ onSendMessage, disabled, maxLength = 2000, className = "" }: ChatInputProps) {
+export default function ChatInput({ onSendMessage, disabled, maxLength = 2000, className = "", placeholder = "Ask our AI assistant", variant = 'default' }: ChatInputProps) {
   const [input, setInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -58,9 +60,9 @@ export default function ChatInput({ onSendMessage, disabled, maxLength = 2000, c
 
   return (
     <div
-      className={`group relative flex items-end gap-3 rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 transition-all ${
-        focused ? "ring-2 ring-purple-500/60 shadow-md" : "ring-1 ring-black/10"
-      } ${disabled ? "opacity-60" : ""} ${className}`}
+      className={`group relative flex items-end gap-3 rounded-xl px-4 py-3 transition-all ${
+        variant === 'bw' ? 'bg-white border border-black/10' : 'bg-white/10 backdrop-blur-sm'
+      } ${focused ? (variant === 'bw' ? 'ring-2 ring-black shadow-md' : 'ring-2 ring-purple-500/60 shadow-md') : 'ring-1 ring-black/10'} ${disabled ? 'opacity-60' : ''} ${className}`}
     >
       <div className="flex-1 relative">
         <motion.textarea
@@ -72,7 +74,7 @@ export default function ChatInput({ onSendMessage, disabled, maxLength = 2000, c
           onKeyDown={handleKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Ask our AI assistant"
+          placeholder={placeholder}
           disabled={disabled || isSubmitting}
           className="w-full resize-none bg-transparent rounded-md px-1 py-1 pr-10 focus:outline-none text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed min-h-[40px] max-h-[140px]"
           rows={1}
@@ -85,11 +87,11 @@ export default function ChatInput({ onSendMessage, disabled, maxLength = 2000, c
         </div>
       </div>
       <motion.button
-        whileHover={{ scale: 1.08, backgroundColor: "#4c1d95" }}
+        whileHover={{ scale: 1.08, backgroundColor: variant === 'bw' ? '#000000' : '#4c1d95' }}
         whileTap={{ scale: 0.92 }}
         onClick={handleSubmit}
         disabled={!input.trim() || disabled || isSubmitting}
-        className="relative inline-flex items-center justify-center h-10 w-10 rounded-lg bg-black text-white shadow-sm disabled:bg-slate-300 disabled:text-slate-600 transition-colors"
+        className={`relative inline-flex items-center justify-center h-10 w-10 rounded-lg text-white shadow-sm disabled:bg-slate-300 disabled:text-slate-600 transition-colors ${variant === 'bw' ? 'bg-black' : 'bg-black'}`}
       >
         {isSubmitting ? (
           <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
