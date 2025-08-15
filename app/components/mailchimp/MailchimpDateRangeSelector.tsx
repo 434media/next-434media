@@ -78,7 +78,7 @@ export function MailchimpDateRangeSelector({ dateRange, onDateRangeChange }: Mai
     >
       {/* Main Date Range Selector */}
       <div
-        className="flex flex-col lg:flex-row items-start lg:items-center lg:justify-between gap-4 p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-black shadow-xl"
+        className="flex flex-col lg:flex-row items-start lg:items-center lg:justify-between gap-4 p-6 bg-gradient-to-r from-white/60 to-white/50 rounded-xl border border-black shadow-xl"
         style={{
           willChange: "auto",
           backfaceVisibility: "hidden",
