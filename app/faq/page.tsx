@@ -1,7 +1,4 @@
-import dynamic from "next/dynamic"
-
-// Dynamically import to avoid SSR issues with motion/react & window usage
-const FAQAssistant = dynamic(() => import("../components/ai/FAQAssistant"), { ssr: false })
+import FAQAssistant from "../components/ai/FAQAssistant"
 
 export const metadata = {
   title: "FAQ | 434 Media",
