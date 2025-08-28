@@ -476,7 +476,7 @@ export const portfolioArray: PortfolioItem[] = [
       "A bilingual space for those who aren’t afraid to question, create, and grow.",
     video: "https://ampd-asset.s3.us-east-2.amazonaws.com/VV_Intro_V01.mp4",
     poster: "https://ampd-asset.s3.us-east-2.amazonaws.com/vemosvamos-poster.png",
-    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/vemosvamos-poster.png",
+    photo: "https://ampd-asset.s3.us-east-2.amazonaws.com/vemos-vamos/Pitch+Deck.png",
     gif: "https://ampd-asset.s3.us-east-2.amazonaws.com/vemosvamos-poster.png",
     showImage: true,
     showVideo: true,
