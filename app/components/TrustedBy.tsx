@@ -89,7 +89,7 @@ const TrustedBy = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-                className="text-neutral-600 font-medium text-lg sm:text-xl md:text-2xl lg:text-3xl max-w-2xl leading-snug tracking-tight text-balance"
+                className="text-neutral-600 font-medium text-lg sm:text-xl md:text-2xl lg:text-3xl max-w-7xl leading-snug tracking-tight text-balance"
               >
                 Leveraging networks to connect people, places and things through creative media and smart marketing.
               </motion.p>
@@ -120,7 +120,7 @@ const TrustedBy = () => {
         </motion.div>
 
         <motion.div
-          className="hidden md:block text-center mb-12 md:mb-16"
+          className="hidden text-center mb-12 md:mb-16"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
@@ -132,7 +132,7 @@ const TrustedBy = () => {
         </motion.div>
 
         <motion.div
-          className="grid grid-cols-2 md:grid-cols-3 border border-gray-200"
+          className="grid grid-cols-2 md:grid-cols-3 border border-gray-200 md:-mt-16"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.4 }}
