@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
 import { useCallback, useEffect, useState, useRef } from "react"
+import { GlowingEffect } from "./GlowingEffect"
 
 interface NavMenuProps {
   isOpen: boolean
@@ -20,7 +21,7 @@ interface NavigationSquare {
   textColor: string
   delay: number
   size: "large" | "medium" | "small"
-  logo?: string // Add optional logo URL
+  logo?: string
 }
 
 const navigationSquares: NavigationSquare[] = [
@@ -28,7 +29,7 @@ const navigationSquares: NavigationSquare[] = [
     id: "digital-canvas",
     title: "DIGITAL CANVAS",
     subtitle: "Creative layer of 434 MEDIA",
-    href: "/digital-canvas",
+    href: "https://www.digitalcanvas.community/",
     gradient: "from-gray-800 via-gray-700 to-gray-900",
     textColor: "text-white",
     delay: 0.1,
@@ -57,7 +58,7 @@ const navigationSquares: NavigationSquare[] = [
     size: "large",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg",
   },
-    {
+  {
     id: "events",
     title: "COMMUNITY EVENTS",
     subtitle: "Where Networks Meet Action",
@@ -97,7 +98,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
   const getSquareClasses = (size: string) => {
     switch (size) {
       case "large":
-        return "col-span-2 row-span-2 h-48 md:h-56 lg:h-64"
+        return "col-span-2 row-span-1 h-24 md:col-span-2 md:row-span-2 md:h-56 lg:h-64"
       case "medium":
         return "col-span-2 row-span-1 h-24 md:h-28 lg:h-32"
       case "small":
@@ -124,40 +125,31 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
         onMouseEnter={() => setHoveredSquare(square.id)}
         onMouseLeave={() => setHoveredSquare(null)}
       >
-        <Link href={square.href} onClick={onClose} className="block relative w-full h-full">
+        <GlowingEffect
+          variant="white"
+          glow={true}
+          disabled={true}
+          proximity={50}
+          spread={30}
+          blur={2}
+          borderWidth={2}
+          className="rounded-3xl"
+        />
+
+        <Link
+          href={square.href}
+          onClick={onClose}
+          className="block relative w-full h-full"
+          {...(square.id === "digital-canvas" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        >
           {/* Gradient Background */}
           <motion.div
             className={`absolute inset-0 bg-gradient-to-br ${square.gradient}`}
             animate={{
-              scale: hoveredSquare === square.id ? 1.1 : 1,
-              rotate: hoveredSquare === square.id ? 2 : 0,
+              scale: hoveredSquare === square.id ? 1.02 : 1,
+              rotate: hoveredSquare === square.id ? 1 : 0,
             }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-          />
-
-          {/* 434 Media Logo Background Pattern - Clean Static Version */}
-          <div
-            className="absolute inset-0 opacity-5"
-            style={{
-              backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
-              backgroundSize: "80px 80px",
-              backgroundRepeat: "repeat",
-              backgroundPosition: "center",
-              filter: "invert(1) brightness(2)",
-            }}
-          />
-
-          {/* Animated mesh overlay */}
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_0%,transparent_50%)] animate-pulse" />
-          </div>
-
-          {/* Hover glow effect */}
-          <motion.div
-            className="absolute inset-0 bg-white/10 rounded-3xl"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: hoveredSquare === square.id ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
           />
 
           {/* Content Container */}
@@ -182,7 +174,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                     />
                   </motion.div>
                   <motion.p
-                    className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    className={`hidden md:block font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
                     initial={{ opacity: 0.8 }}
                     animate={{
                       opacity: hoveredSquare === square.id ? 1 : 0.8,
@@ -194,7 +186,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   </motion.p>
                 </div>
               ) : (
-                // Text version (existing)
+                // Text version
                 <>
                   <motion.h3
                     className={`font-ggx88 text-xl md:text-2xl lg:text-3xl ${square.textColor} leading-tight mb-2 drop-shadow-md relative z-20`}
@@ -206,7 +198,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                     {square.title}
                   </motion.h3>
                   <motion.p
-                    className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    className={`hidden md:block font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
                     initial={{ opacity: 0.8 }}
                     animate={{
                       opacity: hoveredSquare === square.id ? 1 : 0.8,
@@ -220,25 +212,6 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
               )}
             </div>
           </div>
-
-          {/* Animated border */}
-          <motion.div
-            className="absolute inset-0 border-2 border-white/30 rounded-3xl"
-            animate={{
-              borderColor: hoveredSquare === square.id ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)",
-              scale: hoveredSquare === square.id ? 1.02 : 1,
-            }}
-            transition={{ duration: 0.3 }}
-          />
-
-          {/* Shimmer effect on hover */}
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full"
-            animate={{
-              translateX: hoveredSquare === square.id ? "200%" : "-100%",
-            }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-          />
         </Link>
       </motion.div>
     ))
@@ -306,22 +279,32 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                 }}
                 className="relative h-full bg-black overflow-y-auto"
               >
-                <div className="p-6 md:p-8 lg:p-12 h-full">
-                  {/* Header */}
+                <div className="h-full flex flex-col p-4 md:p-8 lg:p-12">
+                  {/* Mobile Close Button - Fixed positioning */}
+                  <div className="lg:hidden flex justify-end mb-4">
+                    <motion.button
+                      onClick={onClose}
+                      className="text-white p-2 rounded-full z-50 bg-black/30 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 shadow-lg"
+                      whileHover={{ scale: 1.1, rotate: 90 }}
+                      whileTap={{ scale: 0.9 }}
+                      aria-label="Close menu"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <i className="ri-close-line h-5 w-5" />
+                    </motion.button>
+                  </div>
+
+                  {/* Header - Optimized spacing */}
                   <motion.div
                     initial={{ opacity: 0, y: -30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.2 }}
-                    className="mb-8 lg:mb-12"
+                    className="mb-6 md:mb-8 lg:mb-12 flex-shrink-0"
                   >
-                    <h2
-                      id="nav-menu-title"
-                      className="text-4xl md:text-5xl lg:text-6xl font-menda-black text-white mb-4 leading-tight"
-                    >
-                      <span className="text-white">434 MEDIA</span>
-                    </h2>
                     <motion.p
-                      className="text-gray-300 text-lg md:text-xl max-w-2xl leading-relaxed"
+                      className="text-gray-100 font-semibold text-xl md:text-2xl lg:text-3xl xl:text-4xl max-w-2xl leading-tight md:leading-tight lg:leading-tight tracking-wide text-center md:text-left"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.6, delay: 0.4 }}
@@ -330,16 +313,13 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                     </motion.p>
                   </motion.div>
 
-                  {/* Navigation Grid - Fixed to prevent cutoff */}
-                  <div className="grid grid-cols-4 gap-4 md:gap-6 lg:gap-8 auto-rows-min max-w-full">
-                    {renderNavigationSquares()}
+                  {/* Navigation Grid - Flex-grow to fill remaining space */}
+                  <div className="flex-grow flex flex-col justify-center">
+                    <div className="grid grid-cols-4 gap-3 md:gap-6 lg:gap-8 auto-rows-min max-w-full">
+                      {renderNavigationSquares()}
+                    </div>
                   </div>
                 </div>
-
-                {/* Decorative elements */}
-                <div className="absolute top-20 right-10 w-2 h-2 bg-white rounded-full animate-pulse" />
-                <div className="absolute top-40 right-20 w-1 h-1 bg-gray-400 rounded-full animate-pulse delay-1000" />
-                <div className="absolute bottom-32 left-10 w-1.5 h-1.5 bg-gray-300 rounded-full animate-pulse delay-500" />
               </motion.div>
 
               {/* Right Side - 434 Media Logo with Black and White Background */}
@@ -437,7 +417,6 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
 
                 {/* Enhanced Logo Container */}
                 <div className="absolute inset-0 flex items-center justify-center p-8">
-                  {/* Main Logo with Enhanced Animations */}
                   <motion.div
                     className="relative w-full h-full flex items-center justify-center z-10"
                     initial={{ rotate: -20, scale: 0.6, opacity: 0 }}
@@ -473,37 +452,6 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                 </div>
               </motion.div>
             </div>
-
-            {/* Mobile Close Button */}
-            <motion.button
-              onClick={onClose}
-              className="lg:hidden absolute top-6 right-6 text-white p-3 rounded-full z-50 bg-black/30 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 shadow-lg"
-              whileHover={{ scale: 1.1, rotate: 90 }}
-              whileTap={{ scale: 0.9 }}
-              aria-label="Close menu"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <i className="ri-close-line h-6 w-6" />
-            </motion.button>
-
-            {/* Mobile Logo Overlay */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ delay: 0.6 }}
-              className="lg:hidden absolute bottom-8 right-8 w-16 h-16"
-            >
-              <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
-                alt="434 Media Logo"
-                width={64}
-                height={64}
-                className="object-contain w-full h-full opacity-70"
-              />
-            </motion.div>
           </div>
         </motion.aside>
       )}

@@ -16,29 +16,43 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
   className = "",
   scrambleOnMount = false,
   scrambleOnHover = false,
-  duration = 50,
+  duration = 35, // Reduced duration for smoother animation
 }) => {
   const [scrambledText, setScrambledText] = useState(text)
   const [isScrambled, setIsScrambled] = useState(scrambleOnMount)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Define scramble function with useCallback to avoid recreating it on every render
   const scramble = useCallback(() => {
     let index = 0
     const originalText = text
-    const characters = "!<>-_\\/[]{}—=+*^?#________"
+    const alphaNumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    const tech = "01010101"
+    const characters = alphaNumeric + symbols + tech
+
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
 
     intervalRef.current = setInterval(() => {
       let newText = ""
       for (let i = 0; i < originalText.length; i++) {
-        if (i < index) {
+        if (originalText[i] === " ") {
+          newText += " "
+        } else if (i < index) {
           newText += originalText[i]
-        } else {
+        } else if (i === index) {
           newText += characters[Math.floor(Math.random() * characters.length)]
+        } else {
+          const charSet = i % 3 === 0 ? alphaNumeric : i % 3 === 1 ? symbols : tech
+          newText += charSet[Math.floor(Math.random() * charSet.length)]
         }
       }
       setScrambledText(newText)
-      index += 1
+
+      if (Math.random() > 0.7) {
+        index += 1
+      }
 
       if (index > originalText.length) {
         clearInterval(intervalRef.current!)
@@ -69,16 +83,22 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
 
   const handleMouseLeave = () => {
     if (scrambleOnHover) {
-      clearInterval(intervalRef.current!)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
       setScrambledText(text)
       setIsScrambled(false)
     }
   }
 
   return (
-    <span className={className} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <span
+      className={`${className} transition-all duration-100`} // Added smooth transition
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{ fontVariantNumeric: "tabular-nums" }} // Prevent layout shift during scramble
+    >
       {scrambledText}
     </span>
   )
 }
-

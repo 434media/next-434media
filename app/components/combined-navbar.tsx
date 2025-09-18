@@ -8,7 +8,6 @@ import CartModal from "./shopify/cart/modal"
 import { useCart } from "./shopify/cart/cart-context"
 import { ScrambleText } from "./ScrambleText"
 import NavMenu from "./Navmenu"
-import { MarqueeText } from "./MarqueeText"
 import { useMobile } from "../hooks/use-mobile"
 import type { Menu } from "../../app/lib/shopify/types"
 
@@ -34,11 +33,6 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
   const { cart } = useCart()
   const isMobile = useMobile()
   const hasMounted = useHasMounted()
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   // Check if cart has items - only after component has mounted
   const hasCartItems = hasMounted && typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
@@ -71,20 +65,9 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
 
   return (
     <>
-      {/* Mobile Marquee - Only on mobile */}
-      {hasMounted && isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-50 w-full overflow-hidden py-2 border-b border-emerald-500/10 bg-black/80 backdrop-blur-md">
-          <MarqueeText
-            text="ACTION SPEAKS LOUDER"
-            className="text-lg font-bold cursor-pointer"
-            speed={15}
-            onClick={toggleActionMenu}
-          />
-        </div>
-      )}
       <motion.header
-        className={`fixed ${hasMounted && isMobile ? "top-[40px]" : "top-0"} left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
-          isScrolled ? "bg-black/80 shadow-lg py-2" : "bg-gradient-to-b from-black/70 to-black/10 py-4"
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
+          isScrolled ? "bg-black/95 shadow-lg py-2" : "bg-black/85 py-4"
         }`}
         initial={{ y: -100 }}
         animate={{ y: 0 }}
