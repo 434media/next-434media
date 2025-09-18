@@ -93,56 +93,6 @@ export default function Footer() {
                 </h2>
 
                 <div className="flex items-center gap-4">
-                  {/* SDOH Logo Link - Replaced text with SVG image */}
-                  <Link
-                    href="/sdoh"
-                    className="group relative overflow-hidden rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
-                    aria-label="Learn about SDOH"
-                  >
-                    <div className="relative z-10 h-6 w-auto transition-all duration-300 group-hover:opacity-80">
-                      <Image
-                        src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
-                        alt="¿Qué es SDOH?"
-                        width={100}
-                        height={24}
-                        className="w-auto h-full grayscale"
-                      />
-                    </div>
-                    <span className="absolute inset-0 z-0 bg-gradient-to-r from-emerald-400/10 via-sky-400/10 to-purple-500/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded"></span>
-                  </Link>
-
-                  {/* AIM Logo Link */}
-                  <Link
-                    href="https://www.aimsatx.com/"
-                    className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1 flex items-center justify-center"
-                    aria-label="Visit AIM page"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <div className="w-7 h-7 relative flex items-center justify-center">
-                      <AIMLogo
-                        variant="white"
-                        className="w-full h-full transition-transform duration-300 hover:scale-110"
-                      />
-                    </div>
-                  </Link>
-
-                  {/* Shopify Store Link */}
-                  <Link
-                    href="/shop"
-                    className="text-white hover:text-emerald-500 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded p-1 flex items-center justify-center"
-                    aria-label="Visit our Shopify store"
-                  >
-                    <div className="w-6 h-6 relative">
-                      <Image
-                        src="https://ampd-asset.s3.us-east-2.amazonaws.com/shopify_glyph_white.svg"
-                        alt="Shopify"
-                        fill
-                        className="object-contain transition-transform duration-300 hover:scale-110"
-                      />
-                    </div>
-                  </Link>
-
                   {/* LinkedIn link */}
                   <a
                     href="https://www.linkedin.com/company/434media"
@@ -170,8 +120,7 @@ export default function Footer() {
                   <div className="max-w-md">
                     <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Subscribe to our newsletter</h3>
                     <p className="text-base sm:text-lg text-gray-400">
-                      Get insights on ROI-driven media strategies and creative approaches that deliver measurable
-                      results.
+                      See how we blend creativity with community impact through innovative storytelling and design.
                     </p>
                   </div>
                   <Newsletter />

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence } from "motion/react"
 import { X } from "lucide-react"
 import Image from "next/image"
 
@@ -186,13 +186,13 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 p-2 bg-black border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black rounded-lg"
+            className="absolute top-6 md:top-4 right-4 z-20 p-2 bg-black border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black rounded-lg"
             aria-label="Close newsletter signup"
           >
             <X className="h-4 w-4" />
           </button>
 
-          <div className="flex flex-col lg:flex-row min-h-[600px]">
+          <div className="flex flex-col lg:flex-row min-h-[500px] md:min-h-[600px]">
             {/* Left Side - Image */}
             <div className="lg:w-1/2 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30 z-10" />
@@ -206,7 +206,7 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
             </div>
 
             {/* Right Side - Newsletter Form */}
-            <div className="lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center relative overflow-hidden">
+            <div className="lg:w-1/2 p-6 md:p-8 lg:p-12 flex flex-col justify-center relative overflow-hidden">
               {/* Header with Logo */}
               <div className="text-center mb-8">
                 <motion.div
@@ -217,7 +217,7 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                 >
                   <div className="flex justify-center">
                     <div className="relative">
-                      <div className="text-4xl lg:text-5xl font-black text-white tracking-wider uppercase transition-colors duration-500 font-menda-black">
+                      <div className="text-4xl font-black text-white tracking-wider uppercase transition-colors duration-500 font-menda-black">
                         434 MEDIA
                       </div>
                     </div>
@@ -230,16 +230,15 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                   transition={{ delay: 0.2 }}
                   className="mb-6"
                 >
-                  <h2 className="text-2xl lg:text-3xl font-black text-white tracking-wider uppercase transition-colors duration-500">
-                    Stay Connected
+                  <h2 className="text-2xl font-black text-white tracking-wider uppercase transition-colors duration-500">
+                    JOIN OUR MONTHLY NEWSLETTER
                   </h2>
                 </motion.div>
 
                 {/* Value Proposition */}
                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
                   <p className="text-lg text-white leading-relaxed font-semibold tracking-wide transition-colors duration-500">
-                    Get exclusive insights, creative inspiration, and be first to know about our latest projects and
-                    industry trends.
+                    Explore how we blend creativity with community impact through innovative storytelling and design.
                   </p>
                 </motion.div>
               </div>
@@ -337,10 +336,10 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                         </motion.div>
                       </div>
                       <h3 className="text-2xl lg:text-3xl font-black text-white mb-4 tracking-wider uppercase transition-colors duration-500">
-                        WELCOME TO 434
+                        Subscription Confirmed!
                       </h3>
                       <p className="text-white text-lg leading-relaxed font-semibold tracking-wide transition-colors duration-500">
-                        You're now connected to our creative community.
+                        Our next issue will be in your inbox soon.
                       </p>
                     </div>
                   </motion.div>

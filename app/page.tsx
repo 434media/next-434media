@@ -15,7 +15,7 @@ export default function Home() {
     if (!hasSeenNewsletter) {
       const timer = setTimeout(() => {
         setShowNewsletter(true)
-      }, 5000)
+      }, 3000)
 
       return () => clearTimeout(timer)
     }

@@ -11,9 +11,9 @@ const trustedByIcons = [
     website: "https://velocitytx.org/",
   },
   {
-    name: "Alt Bionics",
-    iconFile: "https://ampd-asset.s3.us-east-2.amazonaws.com/altbionics.png",
-    website: "https://www.altbionics.com/",
+    name: "Builders VC",
+    iconFile: "https://ampd-asset.s3.us-east-2.amazonaws.com/builders-dark.svg",
+    website: "https://www.builders.vc/",
   },
   {
     name: "The Health Cell",
@@ -126,8 +126,8 @@ const TrustedBy = () => {
           transition={{ duration: 0.6, delay: 0.2 }}
           viewport={{ once: true }}
         >
-          <h2 className="text-4xl/[0.8] md:text-6xl/[0.8] lg:text-8xl/[0.8] xl:text-9xl/[0.8] font-black text-black mb-4 tracking-tighter">
-            Trusted by.
+          <h2 className="text-4xl/[0.8] md:text-6xl/[0.8] lg:text-8xl/[0.8] xl:text-9xl/[0.8] font-ggx88 text-black mb-4 tracking-tighter">
+            Trusted by
           </h2>
         </motion.div>
 
@@ -170,7 +170,7 @@ const TrustedBy = () => {
                 <img
                   src={item.iconFile || "/placeholder.svg"}
                   alt={`${item.name} logo`}
-                  className="w-16 h-16 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain group-hover:invert transition-colors duration-300"
+                  className="w-24 md:w-40 h-auto object-contain group-hover:invert transition-colors duration-300"
                 />
               </div>
             </motion.button>

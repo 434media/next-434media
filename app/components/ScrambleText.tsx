@@ -16,11 +16,12 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
   className = "",
   scrambleOnMount = false,
   scrambleOnHover = false,
-  duration = 35, // Reduced duration for smoother animation
+  duration = 25, // Reduced duration for faster animation
 }) => {
   const [scrambledText, setScrambledText] = useState(text)
   const [isScrambled, setIsScrambled] = useState(scrambleOnMount)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const animationFrameRef = useRef<number | null>(null) // Added RAF for smoother animation
 
   const scramble = useCallback(() => {
     let index = 0
@@ -33,8 +34,11 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
     }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
 
-    intervalRef.current = setInterval(() => {
+    const animate = () => {
       let newText = ""
       for (let i = 0; i < originalText.length; i++) {
         if (originalText[i] === " ") {
@@ -50,16 +54,19 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
       }
       setScrambledText(newText)
 
-      if (Math.random() > 0.7) {
+      if (Math.random() > 0.6) {
         index += 1
       }
 
       if (index > originalText.length) {
-        clearInterval(intervalRef.current!)
         setScrambledText(originalText)
         setIsScrambled(false)
+      } else {
+        intervalRef.current = setTimeout(animate, duration)
       }
-    }, duration)
+    }
+
+    animate()
   }, [text, duration])
 
   // Effect for initial scramble on mount
@@ -69,34 +76,43 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
     }
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+        clearTimeout(intervalRef.current)
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
       }
     }
   }, [scrambleOnMount, scramble])
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     if (scrambleOnHover && !isScrambled) {
       setIsScrambled(true)
       scramble()
     }
-  }
+  }, [scrambleOnHover, isScrambled, scramble])
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     if (scrambleOnHover) {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+        clearTimeout(intervalRef.current)
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
       }
       setScrambledText(text)
       setIsScrambled(false)
     }
-  }
+  }, [scrambleOnHover, text])
 
   return (
     <span
-      className={`${className} transition-all duration-100`} // Added smooth transition
+      className={`${className}`} // Removed transition to prevent layout conflicts
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ fontVariantNumeric: "tabular-nums" }} // Prevent layout shift during scramble
+      style={{
+        fontVariantNumeric: "tabular-nums",
+        willChange: isScrambled ? "contents" : "auto",
+      }}
     >
       {scrambledText}
     </span>
