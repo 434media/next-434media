@@ -16,36 +16,57 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
   className = "",
   scrambleOnMount = false,
   scrambleOnHover = false,
-  duration = 50,
+  duration = 25, // Reduced duration for faster animation
 }) => {
   const [scrambledText, setScrambledText] = useState(text)
   const [isScrambled, setIsScrambled] = useState(scrambleOnMount)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const animationFrameRef = useRef<number | null>(null) // Added RAF for smoother animation
 
-  // Define scramble function with useCallback to avoid recreating it on every render
   const scramble = useCallback(() => {
     let index = 0
     const originalText = text
-    const characters = "!<>-_\\/[]{}—=+*^?#________"
+    const alphaNumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    const tech = "01010101"
+    const characters = alphaNumeric + symbols + tech
 
-    intervalRef.current = setInterval(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+    }
+
+    const animate = () => {
       let newText = ""
       for (let i = 0; i < originalText.length; i++) {
-        if (i < index) {
+        if (originalText[i] === " ") {
+          newText += " "
+        } else if (i < index) {
           newText += originalText[i]
-        } else {
+        } else if (i === index) {
           newText += characters[Math.floor(Math.random() * characters.length)]
+        } else {
+          const charSet = i % 3 === 0 ? alphaNumeric : i % 3 === 1 ? symbols : tech
+          newText += charSet[Math.floor(Math.random() * charSet.length)]
         }
       }
       setScrambledText(newText)
-      index += 1
+
+      if (Math.random() > 0.6) {
+        index += 1
+      }
 
       if (index > originalText.length) {
-        clearInterval(intervalRef.current!)
         setScrambledText(originalText)
         setIsScrambled(false)
+      } else {
+        intervalRef.current = setTimeout(animate, duration)
       }
-    }, duration)
+    }
+
+    animate()
   }, [text, duration])
 
   // Effect for initial scramble on mount
@@ -55,30 +76,45 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
     }
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+        clearTimeout(intervalRef.current)
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
       }
     }
   }, [scrambleOnMount, scramble])
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     if (scrambleOnHover && !isScrambled) {
       setIsScrambled(true)
       scramble()
     }
-  }
+  }, [scrambleOnHover, isScrambled, scramble])
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     if (scrambleOnHover) {
-      clearInterval(intervalRef.current!)
+      if (intervalRef.current) {
+        clearTimeout(intervalRef.current)
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
       setScrambledText(text)
       setIsScrambled(false)
     }
-  }
+  }, [scrambleOnHover, text])
 
   return (
-    <span className={className} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <span
+      className={`${className}`} // Removed transition to prevent layout conflicts
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        fontVariantNumeric: "tabular-nums",
+        willChange: isScrambled ? "contents" : "auto",
+      }}
+    >
       {scrambledText}
     </span>
   )
 }
-

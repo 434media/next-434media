@@ -2,8 +2,9 @@
 
 import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
-import Image from "next/image"
 import { useCallback, useEffect, useState, useRef } from "react"
+import { Vortex } from "./vortex"
+import { XCircleIcon } from "lucide-react"
 
 interface NavMenuProps {
   isOpen: boolean
@@ -20,7 +21,7 @@ interface NavigationSquare {
   textColor: string
   delay: number
   size: "large" | "medium" | "small"
-  logo?: string // Add optional logo URL
+  logo?: string
 }
 
 const navigationSquares: NavigationSquare[] = [
@@ -28,7 +29,7 @@ const navigationSquares: NavigationSquare[] = [
     id: "digital-canvas",
     title: "DIGITAL CANVAS",
     subtitle: "Creative layer of 434 MEDIA",
-    href: "/digital-canvas",
+    href: "https://www.digitalcanvas.community/",
     gradient: "from-gray-800 via-gray-700 to-gray-900",
     textColor: "text-white",
     delay: 0.1,
@@ -57,15 +58,15 @@ const navigationSquares: NavigationSquare[] = [
     size: "large",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg",
   },
-    {
+  {
     id: "events",
-    title: "COMMUNITY EVENTS",
+    title: "EVENTS",
     subtitle: "Where Networks Meet Action",
     href: "/events",
     gradient: "from-gray-900 via-gray-800 to-black",
     textColor: "text-white",
     delay: 0.3,
-    size: "large",
+    size: "medium",
   },
   {
     id: "blog",
@@ -97,150 +98,80 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
   const getSquareClasses = (size: string) => {
     switch (size) {
       case "large":
-        return "col-span-2 row-span-2 h-48 md:h-56 lg:h-64"
+        return "col-span-1 row-span-1 h-32 md:col-span-1 md:row-span-2 md:h-48 lg:h-52 rounded-none md:rounded-3xl"
       case "medium":
-        return "col-span-2 row-span-1 h-24 md:h-28 lg:h-32"
+        return "col-span-1 row-span-1 h-32 md:h-24 lg:h-26 rounded-none md:rounded-3xl"
       case "small":
-        return "col-span-2 row-span-1 h-24 md:h-28 lg:h-32"
+        return "col-span-1 row-span-1 h-32 md:h-24 lg:h-26 rounded-none md:rounded-3xl"
       default:
-        return "col-span-2 row-span-1 h-24 md:h-28 lg:h-32"
+        return "col-span-1 row-span-1 h-32 md:h-24 lg:h-26 rounded-none md:rounded-3xl"
     }
   }
 
   const renderNavigationSquares = useCallback(() => {
-    return navigationSquares.map((square) => (
-      <motion.div
+    return navigationSquares.map((square, index) => (
+      <div
         key={square.id}
-        initial={{ opacity: 0, scale: 0.8, rotateY: -15 }}
-        animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-        transition={{
-          duration: 0.7,
-          delay: square.delay,
-          type: "spring",
-          stiffness: 120,
-          damping: 15,
-        }}
-        className={`group relative overflow-hidden rounded-3xl ${getSquareClasses(square.size)}`}
+        className={`group relative overflow-hidden ${getSquareClasses(square.size)}`}
         onMouseEnter={() => setHoveredSquare(square.id)}
         onMouseLeave={() => setHoveredSquare(null)}
       >
-        <Link href={square.href} onClick={onClose} className="block relative w-full h-full">
-          {/* Gradient Background */}
-          <motion.div
-            className={`absolute inset-0 bg-gradient-to-br ${square.gradient}`}
-            animate={{
-              scale: hoveredSquare === square.id ? 1.1 : 1,
-              rotate: hoveredSquare === square.id ? 2 : 0,
-            }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-          />
-
-          {/* 434 Media Logo Background Pattern - Clean Static Version */}
-          <div
-            className="absolute inset-0 opacity-5"
-            style={{
-              backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
-              backgroundSize: "80px 80px",
-              backgroundRepeat: "repeat",
-              backgroundPosition: "center",
-              filter: "invert(1) brightness(2)",
-            }}
-          />
-
-          {/* Animated mesh overlay */}
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_0%,transparent_50%)] animate-pulse" />
+        {(square.id === "digital-canvas" || hoveredSquare === square.id) && (
+          <div className="absolute inset-0 z-0">
+            <Vortex
+              backgroundColor="#000"
+              particleCount={200}
+              baseHue={120 + index * 60}
+              baseSpeed={0.15}
+              rangeSpeed={1.2}
+              baseRadius={0.8}
+              rangeRadius={1.5}
+              containerClassName="w-full h-full"
+            />
           </div>
+        )}
 
-          {/* Hover glow effect */}
-          <motion.div
-            className="absolute inset-0 bg-white/10 rounded-3xl"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: hoveredSquare === square.id ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-          />
-
-          {/* Content Container */}
-          <div className="relative h-full flex flex-col justify-center items-center p-6 md:p-8 z-10 text-center">
-            {/* Logo or Text Content */}
+        <Link
+          href={square.href}
+          onClick={onClose}
+          className="block relative w-full h-full"
+          {...(square.id === "digital-canvas" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        >
+          <div className="relative h-full flex flex-col justify-center items-center p-4 md:p-6 z-20 text-center">
             <div className="flex flex-col justify-center items-center">
               {square.logo ? (
-                // Logo version
-                <div className="flex flex-col items-center justify-center space-y-3">
-                  <motion.div
-                    className="relative"
-                    animate={{
-                      y: hoveredSquare === square.id ? -4 : 0,
-                      scale: hoveredSquare === square.id ? 1.05 : 1,
-                    }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
-                  >
+                <div className="flex flex-col items-center justify-center space-y-2 md:space-y-3">
+                  <div className="relative">
                     <img
                       src={square.logo || "/placeholder.svg"}
                       alt={square.title}
-                      className="h-16 md:h-20 lg:h-32 w-auto object-contain drop-shadow-lg"
+                      className="h-12 md:h-16 lg:h-20 w-auto object-contain drop-shadow-lg transition-colors duration-300"
                     />
-                  </motion.div>
-                  <motion.p
-                    className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
-                    initial={{ opacity: 0.8 }}
-                    animate={{
-                      opacity: hoveredSquare === square.id ? 1 : 0.8,
-                      y: hoveredSquare === square.id ? -2 : 0,
-                    }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  </div>
+                  <p
+                    className={`block font-geist-sans text-xs md:text-sm lg:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
                   >
                     {square.subtitle}
-                  </motion.p>
+                  </p>
                 </div>
               ) : (
-                // Text version (existing)
                 <>
-                  <motion.h3
-                    className={`font-ggx88 text-xl md:text-2xl lg:text-3xl ${square.textColor} leading-tight mb-2 drop-shadow-md relative z-20`}
-                    animate={{
-                      y: hoveredSquare === square.id ? -4 : 0,
-                    }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  <h3
+                    className={`font-ggx88 text-lg md:text-xl lg:text-2xl ${square.textColor} leading-tight mb-1.5 md:mb-2 drop-shadow-md relative z-20`}
                   >
                     {square.title}
-                  </motion.h3>
-                  <motion.p
-                    className={`font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
-                    initial={{ opacity: 0.8 }}
-                    animate={{
-                      opacity: hoveredSquare === square.id ? 1 : 0.8,
-                      y: hoveredSquare === square.id ? -2 : 0,
-                    }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  </h3>
+                  <p
+                    className={`block font-geist-sans text-xs md:text-sm ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
                   >
                     {square.subtitle}
-                  </motion.p>
+                  </p>
                 </>
               )}
             </div>
           </div>
-
-          {/* Animated border */}
-          <motion.div
-            className="absolute inset-0 border-2 border-white/30 rounded-3xl"
-            animate={{
-              borderColor: hoveredSquare === square.id ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)",
-              scale: hoveredSquare === square.id ? 1.02 : 1,
-            }}
-            transition={{ duration: 0.3 }}
-          />
-
-          {/* Shimmer effect on hover */}
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full"
-            animate={{
-              translateX: hoveredSquare === square.id ? "200%" : "-100%",
-            }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-          />
         </Link>
-      </motion.div>
+      </div>
     ))
   }, [hoveredSquare, onClose])
 
@@ -291,218 +222,57 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
           id={id}
         >
           <div className="relative w-full h-full">
-            <div className="absolute inset-0 grid grid-cols-1 lg:grid-cols-2">
-              {/* Left Side - Navigation Squares */}
-              <motion.div
-                ref={menuRef}
-                initial={{ x: "-100%", rotateY: -15 }}
-                animate={{ x: 0, rotateY: 0 }}
-                exit={{ x: "-100%", rotateY: -15 }}
-                transition={{
-                  type: "spring",
-                  damping: 25,
-                  stiffness: 200,
-                  duration: 0.8,
-                }}
-                className="relative h-full bg-black overflow-y-auto"
-              >
-                <div className="p-6 md:p-8 lg:p-12 h-full">
-                  {/* Header */}
-                  <motion.div
-                    initial={{ opacity: 0, y: -30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    className="mb-8 lg:mb-12"
+            <motion.div
+              ref={menuRef}
+              initial={{ x: "-100%", rotateY: -15 }}
+              animate={{ x: 0, rotateY: 0 }}
+              exit={{ x: "-100%", rotateY: -15 }}
+              transition={{
+                type: "spring",
+                damping: 25,
+                stiffness: 200,
+                duration: 0.8,
+              }}
+              className="relative h-full bg-black overflow-y-auto md:overflow-hidden w-full"
+            >
+              <div className="h-full flex flex-col p-4 md:py-6 md:px-8 lg:py-8 lg:px-12">
+                <div className="flex justify-end mb-3 md:mb-0">
+                  <motion.button
+                    onClick={onClose}
+                    className="text-white p-2 rounded-full z-50 bg-black/30 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 shadow-lg"
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    aria-label="Close menu"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 }}
                   >
-                    <h2
-                      id="nav-menu-title"
-                      className="text-4xl md:text-5xl lg:text-6xl font-menda-black text-white mb-4 leading-tight"
-                    >
-                      <span className="text-white">434 MEDIA</span>
-                    </h2>
-                    <motion.p
-                      className="text-gray-300 text-lg md:text-xl max-w-2xl leading-relaxed"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.6, delay: 0.4 }}
-                    >
-                      Explore how we blend creativity with community impact through innovative storytelling and design.
-                    </motion.p>
-                  </motion.div>
+                    <XCircleIcon className="h-6 w-6 md:h-8 md:w-8" />
+                  </motion.button>
+                </div>
 
-                  {/* Navigation Grid - Fixed to prevent cutoff */}
-                  <div className="grid grid-cols-4 gap-4 md:gap-6 lg:gap-8 auto-rows-min max-w-full">
+                <motion.div
+                  initial={{ opacity: 0, y: -30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  className="mb-4 md:mb-6 lg:mb-8 flex-shrink-0"
+                >
+                  <motion.p
+                    className="max-w-sm mx-auto md:mx-0 md:px-12 lg:px-16 text-gray-100 font-semibold text-2xl lg:text-4xl md:max-w-4xl leading-snug md:leading-snug lg:leading-snug tracking-wide"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.6, delay: 0.4 }}
+                  >
+                    Explore how we blend creativity with community impact through innovative storytelling and design.
+                  </motion.p>
+                </motion.div>
+
+                <div className="flex-grow flex flex-col justify-center md:justify-start">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-4 lg:gap-6 auto-rows-min max-w-full">
                     {renderNavigationSquares()}
                   </div>
                 </div>
-
-                {/* Decorative elements */}
-                <div className="absolute top-20 right-10 w-2 h-2 bg-white rounded-full animate-pulse" />
-                <div className="absolute top-40 right-20 w-1 h-1 bg-gray-400 rounded-full animate-pulse delay-1000" />
-                <div className="absolute bottom-32 left-10 w-1.5 h-1.5 bg-gray-300 rounded-full animate-pulse delay-500" />
-              </motion.div>
-
-              {/* Right Side - 434 Media Logo with Black and White Background */}
-              <motion.div
-                initial={{ x: "100%", rotateY: 15 }}
-                animate={{ x: 0, rotateY: 0 }}
-                exit={{ x: "100%", rotateY: 15 }}
-                transition={{
-                  type: "spring",
-                  damping: 25,
-                  stiffness: 200,
-                  delay: 0.1,
-                  duration: 0.8,
-                }}
-                className="hidden lg:block relative h-full overflow-hidden"
-              >
-                {/* Dynamic Gradient Background */}
-                <motion.div
-                  className="absolute inset-0 bg-black"
-                  animate={{
-                    background: [
-                      "linear-gradient(135deg, #000000 0%, #1f2937 50%, #374151 100%)",
-                      "linear-gradient(135deg, #111827 0%, #000000 50%, #1f2937 100%)",
-                      "linear-gradient(135deg, #374151 0%, #111827 50%, #000000 100%)",
-                      "linear-gradient(135deg, #1f2937 0%, #374151 50%, #111827 100%)",
-                      "linear-gradient(135deg, #000000 0%, #1f2937 50%, #374151 100%)",
-                    ],
-                  }}
-                  transition={{
-                    duration: 8,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                  }}
-                />
-
-                {/* Animated overlay patterns */}
-                <motion.div
-                  className="absolute inset-0 opacity-30"
-                  style={{
-                    backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.2) 0%, transparent 50%),
-                                     radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 0%, transparent 50%)`,
-                  }}
-                  animate={{
-                    backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"],
-                  }}
-                  transition={{
-                    duration: 12,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                  }}
-                />
-
-                {/* Floating gradient orbs */}
-                <motion.div
-                  className="absolute top-1/4 left-1/4 w-32 h-32 bg-white/10 rounded-full blur-2xl"
-                  animate={{
-                    x: [0, 50, 0],
-                    y: [0, -30, 0],
-                    scale: [1, 1.3, 1],
-                  }}
-                  transition={{
-                    duration: 6,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                  }}
-                />
-                <motion.div
-                  className="absolute bottom-1/3 right-1/4 w-40 h-40 bg-gray-300/15 rounded-full blur-3xl"
-                  animate={{
-                    x: [0, -40, 0],
-                    y: [0, 40, 0],
-                    scale: [1, 1.2, 1],
-                  }}
-                  transition={{
-                    duration: 8,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                    delay: 2,
-                  }}
-                />
-
-                {/* Close Button */}
-                <motion.button
-                  onClick={onClose}
-                  className="absolute top-8 right-8 text-white p-3 rounded-full z-50 bg-black/20 backdrop-blur-sm hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-white/30 group transition-all duration-200 shadow-lg"
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 }}
-                  aria-label="Close menu"
-                >
-                  <i className="ri-close-line h-8 w-8 transition-transform duration-200" />
-                </motion.button>
-
-                {/* Enhanced Logo Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-8">
-                  {/* Main Logo with Enhanced Animations */}
-                  <motion.div
-                    className="relative w-full h-full flex items-center justify-center z-10"
-                    initial={{ rotate: -20, scale: 0.6, opacity: 0 }}
-                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 150,
-                      damping: 20,
-                      delay: 0.4,
-                      duration: 1.2,
-                    }}
-                    whileHover={{
-                      scale: 1.1,
-                      rotate: [0, 5, -5, 0],
-                      transition: {
-                        duration: 0.6,
-                        rotate: {
-                          duration: 0.8,
-                          ease: "easeInOut",
-                        },
-                      },
-                    }}
-                  >
-                    <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
-                      alt="434 Media Logo"
-                      width={800}
-                      height={800}
-                      className="object-contain w-full h-full max-w-[95%] max-h-[95%] drop-shadow-2xl filter brightness-0 invert"
-                      priority
-                    />
-                  </motion.div>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Mobile Close Button */}
-            <motion.button
-              onClick={onClose}
-              className="lg:hidden absolute top-6 right-6 text-white p-3 rounded-full z-50 bg-black/30 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 shadow-lg"
-              whileHover={{ scale: 1.1, rotate: 90 }}
-              whileTap={{ scale: 0.9 }}
-              aria-label="Close menu"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <i className="ri-close-line h-6 w-6" />
-            </motion.button>
-
-            {/* Mobile Logo Overlay */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ delay: 0.6 }}
-              className="lg:hidden absolute bottom-8 right-8 w-16 h-16"
-            >
-              <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
-                alt="434 Media Logo"
-                width={64}
-                height={64}
-                className="object-contain w-full h-full opacity-70"
-              />
+              </div>
             </motion.div>
           </div>
         </motion.aside>
