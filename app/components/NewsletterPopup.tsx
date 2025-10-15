@@ -186,10 +186,10 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-6 md:top-4 right-4 z-20 p-2 bg-black border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black rounded-lg"
+            className="absolute top-3 md:top-4 right-4 z-20 p-2 bg-black border md:border-2 border-white text-white hover:bg-white hover:text-black transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black rounded-lg"
             aria-label="Close newsletter signup"
           >
-            <X className="h-4 w-4" />
+            <X className="h-2 w-2" />
           </button>
 
           <div className="flex flex-col lg:flex-row min-h-[500px] md:min-h-[600px]">
