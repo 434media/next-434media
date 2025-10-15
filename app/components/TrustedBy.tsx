@@ -1,5 +1,6 @@
 "use client"
-import { motion, useScroll, useTransform } from "framer-motion"
+
+import { motion, useScroll, useTransform } from "motion/react"
 import { useState, useRef } from "react"
 import { Vortex } from "./vortex"
 import Image from "next/image"
@@ -144,7 +145,7 @@ const TrustedBy = () => {
               onClick={() => handleIconClick(item.website)}
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
-              className="relative flex items-center justify-center p-8 md:p-12 lg:p-16 border-r border-b border-gray-200 [&:nth-child(2n)]:border-r-0 md:[&:nth-child(3n)]:border-r-0 transition-colors duration-300 group min-h-[160px] md:min-h-[200px] lg:min-h-[240px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-inset overflow-hidden"
+              className="relative flex items-center justify-center p-8 md:p-12 lg:p-16 border-r border-b border-gray-200 [&:nth-child(2n)]:border-r-0 md:[&:nth-child(2n)]:border-r md:[&:nth-child(3n)]:border-r-0 transition-colors duration-300 group min-h-[160px] md:min-h-[200px] lg:min-h-[240px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-inset overflow-hidden"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}

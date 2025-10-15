@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
 import { useCallback, useEffect, useState, useRef } from "react"
 import { Vortex } from "./vortex"
+import { XCircleIcon } from "lucide-react"
 
 interface NavMenuProps {
   isOpen: boolean
@@ -97,13 +98,13 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
   const getSquareClasses = (size: string) => {
     switch (size) {
       case "large":
-        return "col-span-1 row-span-1 h-32 md:col-span-1 md:row-span-2 md:h-56 lg:h-64 rounded-none md:rounded-3xl"
+        return "col-span-1 row-span-1 h-32 md:col-span-1 md:row-span-2 md:h-48 lg:h-52 rounded-none md:rounded-3xl"
       case "medium":
-        return "col-span-1 row-span-1 h-32 md:h-28 lg:h-32 rounded-none md:rounded-3xl"
+        return "col-span-1 row-span-1 h-32 md:h-24 lg:h-26 rounded-none md:rounded-3xl"
       case "small":
-        return "col-span-1 row-span-1 h-32 md:h-28 lg:h-32 rounded-none md:rounded-3xl"
+        return "col-span-1 row-span-1 h-32 md:h-24 lg:h-26 rounded-none md:rounded-3xl"
       default:
-        return "col-span-1 row-span-1 h-32 md:h-28 lg:h-32 rounded-none md:rounded-3xl"
+        return "col-span-1 row-span-1 h-32 md:h-24 lg:h-26 rounded-none md:rounded-3xl"
     }
   }
 
@@ -115,7 +116,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
         onMouseEnter={() => setHoveredSquare(square.id)}
         onMouseLeave={() => setHoveredSquare(null)}
       >
-        {hoveredSquare === square.id && (
+        {(square.id === "digital-canvas" || hoveredSquare === square.id) && (
           <div className="absolute inset-0 z-0">
             <Vortex
               backgroundColor="#000"
@@ -136,19 +137,19 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
           className="block relative w-full h-full"
           {...(square.id === "digital-canvas" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         >
-          <div className="relative h-full flex flex-col justify-center items-center p-6 md:p-8 z-20 text-center">
+          <div className="relative h-full flex flex-col justify-center items-center p-4 md:p-6 z-20 text-center">
             <div className="flex flex-col justify-center items-center">
               {square.logo ? (
-                <div className="flex flex-col items-center justify-center space-y-3">
+                <div className="flex flex-col items-center justify-center space-y-2 md:space-y-3">
                   <div className="relative">
                     <img
                       src={square.logo || "/placeholder.svg"}
                       alt={square.title}
-                      className="h-16 md:h-20 lg:h-32 w-auto object-contain drop-shadow-lg transition-colors duration-300"
+                      className="h-12 md:h-16 lg:h-20 w-auto object-contain drop-shadow-lg transition-colors duration-300"
                     />
                   </div>
                   <p
-                    className={`block font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    className={`block font-geist-sans text-xs md:text-sm lg:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
                   >
                     {square.subtitle}
                   </p>
@@ -156,12 +157,12 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
               ) : (
                 <>
                   <h3
-                    className={`font-ggx88 text-xl md:text-2xl lg:text-3xl ${square.textColor} leading-tight mb-2 drop-shadow-md relative z-20`}
+                    className={`font-ggx88 text-lg md:text-xl lg:text-2xl ${square.textColor} leading-tight mb-1.5 md:mb-2 drop-shadow-md relative z-20`}
                   >
                     {square.title}
                   </h3>
                   <p
-                    className={`block font-geist-sans text-sm md:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    className={`block font-geist-sans text-xs md:text-sm ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
                   >
                     {square.subtitle}
                   </p>
@@ -232,10 +233,10 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                 stiffness: 200,
                 duration: 0.8,
               }}
-              className="relative h-full bg-black overflow-y-auto w-full"
+              className="relative h-full bg-black overflow-y-auto md:overflow-hidden w-full"
             >
-              <div className="h-full flex flex-col p-4 md:p-8 lg:p-12">
-                <div className="flex justify-end mb-4">
+              <div className="h-full flex flex-col p-4 md:py-6 md:px-8 lg:py-8 lg:px-12">
+                <div className="flex justify-end mb-3 md:mb-0">
                   <motion.button
                     onClick={onClose}
                     className="text-white p-2 rounded-full z-50 bg-black/30 backdrop-blur-sm hover:bg-black/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all duration-200 shadow-lg"
@@ -246,7 +247,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.4 }}
                   >
-                    <i className="ri-close-line h-5 w-5" />
+                    <XCircleIcon className="h-6 w-6 md:h-8 md:w-8" />
                   </motion.button>
                 </div>
 
@@ -254,10 +255,10 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   initial={{ opacity: 0, y: -30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.2 }}
-                  className="mb-6 md:mb-8 lg:mb-12 flex-shrink-0"
+                  className="mb-4 md:mb-6 lg:mb-8 flex-shrink-0"
                 >
                   <motion.p
-                    className="text-gray-100 font-semibold text-xl md:text-2xl lg:text-3xl xl:text-5xl max-w-5xl leading-tight md:leading-tight lg:leading-tight tracking-wide text-center mx-auto"
+                    className="max-w-sm mx-auto md:mx-0 md:px-12 lg:px-16 text-gray-100 font-semibold text-2xl lg:text-4xl md:max-w-4xl leading-snug md:leading-snug lg:leading-snug tracking-wide"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.6, delay: 0.4 }}
@@ -266,8 +267,8 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   </motion.p>
                 </motion.div>
 
-                <div className="flex-grow flex flex-col justify-center">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-6 lg:gap-8 auto-rows-min max-w-full">
+                <div className="flex-grow flex flex-col justify-center md:justify-start">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-4 lg:gap-6 auto-rows-min max-w-full">
                     {renderNavigationSquares()}
                   </div>
                 </div>
