@@ -233,17 +233,17 @@ export function AddEventModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all duration-500 scale-100 animate-in slide-in-from-bottom">
         {/* Enhanced Header with Gradient */}
-        <div className="relative flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 rounded-t-3xl">
+        <div className="relative flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-neutral-50 via-neutral-50 to-yellow-50 rounded-t-3xl">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Sparkles className="h-7 w-7 text-amber-600 animate-pulse" />
-              <div className="absolute inset-0 h-7 w-7 text-amber-400 animate-ping opacity-20">
+              <Sparkles className="h-7 w-7 text-neutral-600 animate-pulse" />
+              <div className="absolute inset-0 h-7 w-7 text-neutral-400 animate-ping opacity-20">
                 <Sparkles className="h-7 w-7" />
               </div>
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Create Amazing Event</h2>
-              <p className="text-sm text-amber-700 font-medium">
+              <p className="text-sm text-neutral-700 font-medium">
                 {isAdminVerified ? "✅ Admin verified - Ready to create!" : "Import or create manually"}
               </p>
             </div>
@@ -283,9 +283,9 @@ export function AddEventModal({
             /* Enhanced URL Input Section */
             <div className="space-y-8">
               <div className="text-center">
-                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-100 to-orange-100 px-4 py-2 rounded-full mb-4">
-                  <Zap className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-semibold text-amber-800">Smart Event Import</span>
+                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-neutral-100 to-neutral-100 px-4 py-2 rounded-full mb-4">
+                  <Zap className="h-4 w-4 text-neutral-600" />
+                  <span className="text-sm font-semibold text-neutral-800">Smart Event Import</span>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Import from Event Platform</h3>
                 <p className="text-gray-600 text-sm leading-relaxed max-w-md mx-auto">
@@ -307,13 +307,13 @@ export function AddEventModal({
                       placeholder="https://www.meetup.com/your-event..."
                       value={eventUrl}
                       onChange={(e) => setEventUrl(e.target.value)}
-                      className="pl-12 w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200 text-sm"
+                      className="pl-12 w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200 text-sm"
                     />
                   </div>
                   <button
                     onClick={handleUrlParse}
                     disabled={isParsingUrl || !eventUrl.trim()}
-                    className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 px-8 py-4 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] transition-all duration-200 hover:scale-105 transform-gpu shadow-lg"
+                    className="bg-gradient-to-r from-neutral-600 to-neutral-600 hover:from-neutral-700 hover:to-neutral-700 px-8 py-4 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] transition-all duration-200 hover:scale-105 transform-gpu shadow-lg"
                   >
                     {isParsingUrl ? (
                       <div className="flex items-center gap-2">
@@ -338,7 +338,7 @@ export function AddEventModal({
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-amber-500 to-orange-500 h-3 rounded-full transition-all duration-300 relative"
+                        className="bg-gradient-to-r from-neutral-500 to-neutral-500 h-3 rounded-full transition-all duration-300 relative"
                         style={{ width: `${parseProgress}%` }}
                       >
                         <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
@@ -350,15 +350,15 @@ export function AddEventModal({
                 {/* Enhanced Platform Indicators */}
                 <div className="flex items-center justify-center gap-6 text-xs text-gray-500 pt-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full animate-pulse"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-neutral-400 to-neutral-500 rounded-full animate-pulse"></div>
                     <span className="font-medium">Meetup.com</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-red-500 rounded-full animate-pulse delay-200"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-neutral-400 to-red-500 rounded-full animate-pulse delay-200"></div>
                     <span className="font-medium">Eventbrite.com</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full animate-pulse delay-400"></div>
+                    <div className="w-3 h-3 bg-gradient-to-r from-yellow-400 to-neutral-500 rounded-full animate-pulse delay-400"></div>
                     <span className="font-medium">Lu.ma</span>
                   </div>
                 </div>
@@ -377,7 +377,7 @@ export function AddEventModal({
               {/* Enhanced Manual Entry Button */}
               <button
                 onClick={() => setManualEntry(true)}
-                className="w-full px-6 py-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-amber-400 hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 transition-all duration-300 text-gray-600 hover:text-amber-700 group"
+                className="w-full px-6 py-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-neutral-400 hover:bg-gradient-to-r hover:from-neutral-50 hover:to-neutral-50 transition-all duration-300 text-gray-600 hover:text-neutral-700 group"
               >
                 <div className="flex items-center justify-center gap-3">
                   <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
@@ -400,7 +400,7 @@ export function AddEventModal({
                     value={eventData.title}
                     onChange={(e) => setEventData((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="Enter an amazing event title"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
 
@@ -414,7 +414,7 @@ export function AddEventModal({
                     onChange={(e) => setEventData((prev) => ({ ...prev, description: e.target.value }))}
                     placeholder="Tell people what makes this event special..."
                     rows={3}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none transition-all duration-200"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent resize-none transition-all duration-200"
                   />
                 </div>
 
@@ -430,7 +430,7 @@ export function AddEventModal({
                       required
                       value={eventData.date}
                       onChange={(e) => setEventData((prev) => ({ ...prev, date: e.target.value }))}
-                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -446,7 +446,7 @@ export function AddEventModal({
                       type="time"
                       value={eventData.time}
                       onChange={(e) => setEventData((prev) => ({ ...prev, time: e.target.value }))}
-                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                     />
                   </div>
 
@@ -457,7 +457,7 @@ export function AddEventModal({
                         key={timeOption}
                         type="button"
                         onClick={() => setEventData((prev) => ({ ...prev, time: timeOption }))}
-                        className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-amber-100 text-gray-600 hover:text-amber-700 rounded-lg transition-all duration-200 font-medium hover:scale-105"
+                        className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-neutral-100 text-gray-600 hover:text-neutral-700 rounded-lg transition-all duration-200 font-medium hover:scale-105"
                       >
                         {(() => {
                           const [hours, minutes] = timeOption.split(":")
@@ -482,7 +482,7 @@ export function AddEventModal({
                       value={eventData.location}
                       onChange={(e) => setEventData((prev) => ({ ...prev, location: e.target.value }))}
                       placeholder="Where will this happen?"
-                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -498,7 +498,7 @@ export function AddEventModal({
                       value={eventData.organizer}
                       onChange={(e) => setEventData((prev) => ({ ...prev, organizer: e.target.value }))}
                       placeholder="Who's organizing this?"
-                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -513,7 +513,7 @@ export function AddEventModal({
                     onChange={(e) =>
                       setEventData((prev) => ({ ...prev, category: e.target.value as Event["category"] }))
                     }
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                   >
                     <option value="other">Other</option>
                     <option value="conference">Conference</option>
@@ -532,7 +532,7 @@ export function AddEventModal({
                     value={eventData.price}
                     onChange={(e) => setEventData((prev) => ({ ...prev, price: e.target.value }))}
                     placeholder="Free, $25, etc."
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -547,7 +547,7 @@ export function AddEventModal({
                       value={eventData.url}
                       onChange={(e) => setEventData((prev) => ({ ...prev, url: e.target.value }))}
                       placeholder="https://example.com/event"
-                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -564,7 +564,7 @@ export function AddEventModal({
                       value={eventData.image}
                       onChange={(e) => setEventData((prev) => ({ ...prev, image: e.target.value }))}
                       placeholder="https://example.com/image.jpg"
-                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200"
+                      className="pl-12 w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -584,12 +584,12 @@ export function AddEventModal({
                 <button
                   onClick={handleSubmit}
                   disabled={!isFormValid || !isAdminVerified || isSubmitting}
-                  className="flex-1 relative bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-8 py-3 rounded-xl font-bold transition-all duration-200 hover:scale-105 transform-gpu shadow-lg disabled:cursor-not-allowed disabled:scale-100 overflow-hidden"
+                  className="flex-1 relative bg-gradient-to-r from-neutral-600 to-neutral-600 hover:from-neutral-700 hover:to-neutral-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-8 py-3 rounded-xl font-bold transition-all duration-200 hover:scale-105 transform-gpu shadow-lg disabled:cursor-not-allowed disabled:scale-100 overflow-hidden"
                 >
                   {/* Submit Progress Bar */}
                   {isSubmitting && (
                     <div
-                      className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-amber-400 transition-all duration-300"
+                      className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-neutral-400 transition-all duration-300"
                       style={{ width: `${submitProgress}%` }}
                     />
                   )}

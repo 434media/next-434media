@@ -47,43 +47,43 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
     switch (category) {
       case "conference":
         return {
-          bg: "bg-gradient-to-r from-amber-500 to-orange-500",
+          bg: "bg-gradient-to-r from-neutral-500 to-neutral-500",
           text: "text-white",
-          lightBg: "bg-amber-50",
-          lightText: "text-amber-800",
-          border: "border-amber-200",
+          lightBg: "bg-neutral-50",
+          lightText: "text-neutral-800",
+          border: "border-neutral-200",
         }
       case "workshop":
         return {
-          bg: "bg-gradient-to-r from-amber-400 to-yellow-500",
+          bg: "bg-gradient-to-r from-neutral-400 to-yellow-500",
           text: "text-white",
-          lightBg: "bg-amber-50",
-          lightText: "text-amber-800",
-          border: "border-amber-200",
+          lightBg: "bg-neutral-50",
+          lightText: "text-neutral-800",
+          border: "border-neutral-200",
         }
       case "meetup":
         return {
-          bg: "bg-gradient-to-r from-yellow-500 to-amber-500",
+          bg: "bg-gradient-to-r from-yellow-500 to-neutral-500",
           text: "text-white",
           lightBg: "bg-yellow-50",
-          lightText: "text-amber-800",
+          lightText: "text-neutral-800",
           border: "border-yellow-200",
         }
       case "networking":
         return {
-          bg: "bg-gradient-to-r from-amber-500 to-orange-500",
+          bg: "bg-gradient-to-r from-neutral-500 to-neutral-500",
           text: "text-white",
-          lightBg: "bg-amber-50",
-          lightText: "text-amber-800",
-          border: "border-amber-200",
+          lightBg: "bg-neutral-50",
+          lightText: "text-neutral-800",
+          border: "border-neutral-200",
         }
       default:
         return {
-          bg: "bg-gradient-to-r from-amber-500 to-orange-500",
+          bg: "bg-gradient-to-r from-neutral-500 to-neutral-500",
           text: "text-white",
-          lightBg: "bg-amber-50",
-          lightText: "text-amber-800",
-          border: "border-amber-200",
+          lightBg: "bg-neutral-50",
+          lightText: "text-neutral-800",
+          border: "border-neutral-200",
         }
     }
   }
@@ -227,33 +227,33 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
                     {/* Left Column - Event Details */}
                     <div>
                       <div className="mb-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-                          <Calendar className="h-5 w-5 mr-2 text-amber-500" />
+                        <h4 className="text-lg font-semibold text-neutral-900 mb-3 flex items-center">
+                          <Calendar className="h-5 w-5 mr-2 text-neutral-500" />
                           Event Details
                         </h4>
                         <div className="space-y-3 pl-7">
                           <div className="flex items-start">
-                            <Clock className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-700">{formatEventDate(event.date, event.time)}</span>
+                            <Clock className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
+                            <span className="text-neutral-700">{formatEventDate(event.date, event.time)}</span>
                           </div>
                           {event.location && (
                             <div className="flex items-start">
-                              <MapPin className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-gray-700">{event.location}</span>
+                              <MapPin className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-neutral-700">{event.location}</span>
                             </div>
                           )}
                           {event.organizer && (
                             <div className="flex items-start">
-                              <User className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-gray-700">
+                              <User className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-neutral-700">
                                 <span className="font-medium">Organized by:</span> {event.organizer}
                               </span>
                             </div>
                           )}
                           {event.attendees && (
                             <div className="flex items-start">
-                              <Users className="h-5 w-5 mr-2 text-amber-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-gray-700">
+                              <Users className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-neutral-700">
                                 <span className="font-medium">Attendees:</span> {event.attendees}
                               </span>
                             </div>
@@ -263,10 +263,10 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
 
                       {/* Price Info */}
                       {event.price && (
-                        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                        <div className="mb-6 p-4 rounded-xl bg-neutral-50 border border-neutral-100">
                           <div className="flex justify-between items-center">
-                            <span className="text-gray-700 font-medium">Price</span>
-                            <span className="text-amber-600 font-bold">{event.price}</span>
+                            <span className="text-neutral-700 font-medium">Price</span>
+                            <span className="text-neutral-600 font-bold">{event.price}</span>
                           </div>
                         </div>
                       )}
@@ -276,8 +276,8 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
                     <div>
                       {event.description && (
                         <div className="mb-6">
-                          <h4 className="text-lg font-semibold text-gray-900 mb-3">Description</h4>
-                          <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">{event.description}</div>
+                          <h4 className="text-lg font-semibold text-neutral-900 mb-3">Description</h4>
+                          <div className="text-neutral-700 leading-relaxed whitespace-pre-wrap">{event.description}</div>
                         </div>
                       )}
                     </div>
@@ -290,7 +290,7 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
                         href={event.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02]"
+                        className="flex-1 bg-gradient-to-r from-neutral-500 to-neutral-500 hover:from-neutral-600 hover:to-neutral-600 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02]"
                       >
                         <ExternalLink className="h-5 w-5" />
                         View Original Event
@@ -300,7 +300,7 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
                     )}
                     <button
                       onClick={onClose}
-                      className="flex-1 border-2 border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-4 py-3 rounded-xl transition-colors duration-200"
+                      className="flex-1 border-2 border-neutral-200 hover:border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-700 px-4 py-3 rounded-xl transition-colors duration-200"
                     >
                       Close
                     </button>
@@ -319,7 +319,7 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
                 {/* Conditional Footer - Only show for imported events */}
                 {!isManualEvent && event.source && (
                   <div className="px-6 pb-4">
-                    <div className="text-center text-xs text-gray-400 border-t border-gray-100 pt-3">
+                    <div className="text-center text-xs text-neutral-400 border-t border-neutral-100 pt-3">
                       Imported from {event.source.charAt(0).toUpperCase() + event.source.slice(1)}
                     </div>
                   </div>

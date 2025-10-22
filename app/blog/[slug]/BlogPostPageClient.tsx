@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { Calendar, Clock, Eye, User, Tag, ArrowLeft, Share2, Copy, X, Heart, Bookmark } from "lucide-react"
+import { ArrowLeft, Share2, Copy, X } from "lucide-react"
 import { getBlogPostBySlugAction, getBlogPostsAction } from "@/app/actions/blog"
 import BlogCard from "../../components/blog/BlogCard"
 import type { BlogPost } from "../../types/blog-types"
@@ -26,22 +26,12 @@ const LinkedInIcon = () => (
   </svg>
 )
 
-// Enhanced Loading Component
 const LoadingSpinner = () => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 flex items-center justify-center">
+  <div className="min-h-screen bg-white flex items-center justify-center">
     <div className="relative">
-      {/* Animated rings */}
-      <div className="absolute inset-0 rounded-full border-4 border-purple-200 animate-ping"></div>
-      <div className="relative w-16 h-16 rounded-full border-4 border-purple-600 border-t-transparent animate-spin"></div>
-
-      {/* Center content */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-6 h-6 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full animate-pulse"></div>
-      </div>
-
-      {/* Loading text */}
-      <div className="absolute top-20 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-        <div className="text-purple-600 font-medium text-sm animate-pulse">Loading article...</div>
+      <div className="w-12 h-12 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin"></div>
+      <div className="absolute top-16 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+        <div className="text-gray-900 font-medium text-sm">Loading article...</div>
       </div>
     </div>
   </div>
@@ -56,8 +46,6 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
   const [showShareModal, setShowShareModal] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
-  const [isBookmarked, setIsBookmarked] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
 
   useEffect(() => {
@@ -75,7 +63,6 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
         setPost(postResult.post)
 
-        // Safe handling of related posts with proper null checks
         const posts = relatedResult.success && relatedResult.posts ? relatedResult.posts : []
         const filtered = posts
           .filter((p) => p.id !== postResult.post!.id && p.category === postResult.post!.category)
@@ -115,19 +102,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
   }
 
   const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      technology: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-100",
-      marketing: "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100",
-      events: "bg-purple-50 text-purple-700 border-purple-200 ring-purple-100",
-      business: "bg-amber-50 text-amber-700 border-amber-200 ring-amber-100",
-      medical: "bg-red-50 text-red-700 border-red-200 ring-red-100",
-      science: "bg-cyan-50 text-cyan-700 border-cyan-200 ring-cyan-100",
-      robotics: "bg-orange-50 text-orange-700 border-orange-200 ring-orange-100",
-      military: "bg-slate-50 text-slate-700 border-slate-200 ring-slate-100",
-      "txmx boxing": "bg-yellow-50 text-yellow-700 border-yellow-200 ring-yellow-100",
-      community: "bg-pink-50 text-pink-700 border-pink-200 ring-pink-100",
-    }
-    return colors[category.toLowerCase()] || "bg-slate-50 text-slate-700 border-slate-200 ring-slate-100"
+    return "bg-gray-100 text-gray-900 border-gray-200"
   }
 
   const handleShare = async (platform: string) => {
@@ -176,113 +151,69 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
   return (
     <>
-      {/* Reading Progress Bar */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-slate-200 z-40">
+      <div className="fixed top-0 left-0 w-full h-0.5 bg-gray-200 z-40">
         <div
-          className="h-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-150 ease-out"
+          className="h-full bg-gray-900 transition-all duration-150 ease-out"
           style={{ width: `${readingProgress}%` }}
         />
       </div>
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50">
-        {/* Floating Background Elements - Using Tailwind animation classes */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse [animation-delay:2s]"></div>
-          <div className="absolute bottom-1/4 left-1/3 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse [animation-delay:4s]"></div>
-        </div>
-
-        {/* Hero Section */}
-        <header className="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden mt-6 md:mt-0">
-          {/* Hero Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width%3D%2260%22 height%3D%2260%22 viewBox%3D%220 0 60 60%22 xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg fill%3D%22none%22 fillRule%3D%22evenodd%22%3E%3Cg fill%3D%22%23ffffff%22 fillOpacity%3D%220.1%22%3E%3Ccircle cx%3D%2230%22 cy%3D%2230%22 r%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')]"></div>
-          </div>
-
-          <div className="relative max-w-4xl mx-auto px-6 pt-24 sm:pt-32 lg:pt-40 pb-16 lg:pb-24">
+      <div className="min-h-screen bg-white">
+        <header className="relative bg-white border-b border-gray-200 mt-6 md:mt-0">
+          <div className="relative max-w-3xl mx-auto px-6 pt-16 sm:pt-20 pb-12 sm:pb-16">
             {/* Back Button */}
             <Link
               href="/blog"
-              className="inline-flex items-center gap-2 text-purple-200 hover:text-white transition-all duration-300 mb-8 group backdrop-blur-sm bg-white/10 px-4 py-2 rounded-xl border border-white/20 hover:bg-white/20"
+              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors duration-200 mb-8 group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span className="text-sm font-medium">Back to Insights</span>
+              <span className="text-sm font-medium">Blog</span>
             </Link>
 
             {/* Category Badge */}
-            <div className="mb-6">
+            <div className="mb-4">
               <span
-                className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold border backdrop-blur-sm shadow-lg ring-1 ${getCategoryColor(post.category)}`}
+                className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${getCategoryColor(post.category)}`}
               >
-                <Tag className="w-4 h-4 mr-2" />
                 {post.category}
               </span>
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-6 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-gray-900 leading-tight mb-6 tracking-tight">
               {post.title}
             </h1>
 
             {/* Excerpt */}
-            {post.excerpt && (
-              <p className="text-lg sm:text-xl text-purple-100 leading-relaxed mb-8 max-w-3xl font-light">
-                {post.excerpt}
-              </p>
-            )}
+            {post.excerpt && <p className="text-lg text-gray-600 leading-relaxed mb-8 font-normal">{post.excerpt}</p>}
 
             {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-4 text-purple-200 mb-8">
-              <div className="flex items-center gap-2 backdrop-blur-sm bg-white/10 px-3 py-2 rounded-lg border border-white/20">
-                <User className="w-4 h-4" />
-                <span className="font-medium text-sm">{post.author}</span>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 pb-8 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">{post.author}</span>
               </div>
-              <div className="flex items-center gap-2 backdrop-blur-sm bg-white/10 px-3 py-2 rounded-lg border border-white/20">
-                <Calendar className="w-4 h-4" />
-                <span className="text-sm">{formatDate(post.published_at || post.created_at)}</span>
+              <span className="text-gray-400">·</span>
+              <div className="flex items-center gap-2">
+                <span>{formatDate(post.published_at || post.created_at)}</span>
               </div>
               {post.read_time && (
-                <div className="flex items-center gap-2 backdrop-blur-sm bg-white/10 px-3 py-2 rounded-lg border border-white/20">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm">{post.read_time} min read</span>
-                </div>
+                <>
+                  <span className="text-gray-400">·</span>
+                  <div className="flex items-center gap-2">
+                    <span>{post.read_time} min read</span>
+                  </div>
+                </>
               )}
-              <div className="flex items-center gap-2 backdrop-blur-sm bg-white/10 px-3 py-2 rounded-lg border border-white/20">
-                <Eye className="w-4 h-4" />
-                <span className="text-sm">{post.view_count} views</span>
-              </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mt-8">
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl font-medium"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200 text-sm font-medium"
               >
                 <Share2 className="w-4 h-4" />
                 Share
-              </button>
-
-              <button
-                onClick={() => setIsLiked(!isLiked)}
-                className={`p-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${
-                  isLiked
-                    ? "bg-red-500 text-white shadow-lg"
-                    : "bg-white/10 text-white hover:bg-white/20 border border-white/20"
-                }`}
-              >
-                <Heart className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`} />
-              </button>
-
-              <button
-                onClick={() => setIsBookmarked(!isBookmarked)}
-                className={`p-3 rounded-xl transition-all duration-300 transform hover:scale-105 ${
-                  isBookmarked
-                    ? "bg-yellow-500 text-white shadow-lg"
-                    : "bg-white/10 text-white hover:bg-white/20 border border-white/20"
-                }`}
-              >
-                <Bookmark className={`w-5 h-5 ${isBookmarked ? "fill-current" : ""}`} />
               </button>
             </div>
           </div>
@@ -290,66 +221,61 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
         {/* Featured Image */}
         {post.featured_image && (
-          <section className="relative -mt-16 mb-16 z-10">
-            <div className="max-w-6xl mx-auto px-6">
-              <div className="relative h-64 sm:h-80 lg:h-[32rem] rounded-2xl overflow-hidden shadow-2xl group mt-6 md:mt-0">
+          <section className="relative pt-6 md:mt-10">
+            <div className="max-w-3xl mx-auto px-6">
+              <div className="relative h-64 sm:h-80 lg:h-[28rem] rounded-lg overflow-hidden bg-gray-100">
                 <Image
                   src={post.featured_image || "/placeholder.svg"}
                   alt={post.title}
                   fill
                   style={{ objectFit: "cover" }}
-                  className={`object-cover transition-all duration-700 ${imageLoaded ? "scale-100 opacity-100" : "scale-105 opacity-0"}`}
+                  className={`object-cover transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                   priority
                   onLoad={() => setImageLoaded(true)}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
             </div>
           </section>
         )}
 
         {/* Article Content */}
-        <main className="relative z-10">
-          <div className="max-w-4xl mx-auto px-6 mb-16">
-            <article className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
-              <div className="p-8 lg:p-12">
+        <main className="relative">
+          <div className="max-w-3xl mx-auto px-6 mb-16">
+            <article>
+              <div className="py-8">
                 {/* Content */}
                 <div
-                  className="prose prose-lg prose-slate max-w-none 
-                    prose-headings:text-slate-900 prose-headings:font-bold prose-headings:tracking-tight
-                    prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-8
-                    prose-h2:text-2xl prose-h2:mb-4 prose-h2:mt-8
-                    prose-h3:text-xl prose-h3:mb-3 prose-h3:mt-6
-                    prose-p:text-slate-700 prose-p:leading-relaxed prose-p:mb-6
-                    prose-a:text-purple-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline
-                    prose-strong:text-slate-900 prose-strong:font-semibold
-                    prose-em:text-slate-600
-                    prose-blockquote:border-l-4 prose-blockquote:border-purple-500 prose-blockquote:bg-purple-50 prose-blockquote:p-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                    prose-code:bg-slate-100 prose-code:text-purple-800 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm
-                    prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-pre:rounded-lg prose-pre:p-4
-                    prose-img:rounded-lg prose-img:shadow-lg prose-img:border prose-img:border-slate-200
-                    prose-ul:space-y-2 prose-ol:space-y-2
-                    prose-li:text-slate-700
-                    prose-table:border-collapse prose-table:border prose-table:border-slate-200
-                    prose-th:bg-slate-50 prose-th:border prose-th:border-slate-200 prose-th:p-3
-                    prose-td:border prose-td:border-slate-200 prose-td:p-3"
+                  className="prose prose-lg prose-gray max-w-none 
+                    prose-headings:text-gray-900 prose-headings:font-semibold prose-headings:tracking-tight
+                    prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-8 prose-h1:leading-tight
+                    prose-h2:text-2xl prose-h2:mb-4 prose-h2:mt-8 prose-h2:leading-tight
+                    prose-h3:text-xl prose-h3:mb-3 prose-h3:mt-8 prose-h3:leading-snug
+                    prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-6 prose-p:text-base
+                    prose-a:text-gray-900 prose-a:font-medium prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-gray-600
+                    prose-strong:text-gray-900 prose-strong:font-semibold
+                    prose-em:text-gray-700
+                    prose-blockquote:border-l-2 prose-blockquote:border-gray-900 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-700
+                    prose-code:bg-gray-100 prose-code:text-gray-900 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
+                    prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg prose-pre:p-4
+                    prose-img:rounded-lg prose-img:border prose-img:border-gray-200
+                    prose-ul:my-6 prose-ol:my-6
+                    prose-li:text-gray-700 prose-li:my-2
+                    prose-table:border-collapse prose-table:border prose-table:border-gray-200
+                    prose-th:bg-gray-50 prose-th:border prose-th:border-gray-200 prose-th:p-3 prose-th:text-left prose-th:font-semibold
+                    prose-td:border prose-td:border-gray-200 prose-td:p-3"
                   dangerouslySetInnerHTML={{ __html: post.content }}
                 />
 
                 {/* Tags */}
                 {post.tags && post.tags.length > 0 && (
-                  <div className="mt-12 pt-8 border-t border-slate-200">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                      <Tag className="w-5 h-5" />
-                      Tags
-                    </h3>
-                    <div className="flex flex-wrap gap-3">
+                  <div className="mt-12 pt-8 border-t border-gray-200">
+                    <div className="flex flex-wrap gap-2">
                       {post.tags.map((tag: string, index: number) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 hover:from-purple-100 hover:to-blue-100 transition-all duration-300 cursor-pointer transform hover:scale-105 shadow-sm hover:shadow-md border border-purple-200"
+                          className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
                         >
-                          #{tag}
+                          {tag}
                         </span>
                       ))}
                     </div>
@@ -362,19 +288,16 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
         {/* Related Posts */}
         {relatedPosts.length > 0 && (
-          <section className="py-16 bg-white/50 backdrop-blur-sm border-t border-white/20">
-            <div className="max-w-7xl mx-auto px-6">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-slate-900 mb-4">Related Articles</h2>
-                <div className="w-24 h-1 bg-gradient-to-r from-purple-600 to-blue-600 mx-auto rounded-full" />
-                <p className="text-slate-600 mt-4 text-lg">Discover more insights from our ecosystem</p>
+          <section className="py-16 bg-gray-50 border-t border-gray-200">
+            <div className="max-w-6xl mx-auto px-6">
+              <div className="mb-12">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Related Articles</h2>
+                <p className="text-gray-600">More insights from our ecosystem</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {relatedPosts.map((relatedPost, index) => (
-                  <div key={relatedPost.id} className="transform transition-all duration-500 hover:scale-105">
-                    <BlogCard post={relatedPost} />
-                  </div>
+                {relatedPosts.map((relatedPost) => (
+                  <BlogCard key={relatedPost.id} post={relatedPost} />
                 ))}
               </div>
             </div>
@@ -383,16 +306,16 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
         {/* Share Modal */}
         {showShareModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform animate-in zoom-in-95 duration-300">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <Share2 className="w-5 h-5" />
                   Share Article
                 </h3>
                 <button
                   onClick={() => setShowShareModal(false)}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -401,7 +324,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               <div className="space-y-3">
                 <button
                   onClick={() => handleShare("twitter")}
-                  className="w-full flex items-center gap-3 p-4 bg-black hover:bg-slate-800 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="w-full flex items-center gap-3 p-3 bg-black hover:bg-gray-800 text-white rounded-lg transition-colors text-sm font-medium"
                 >
                   <TwitterIcon />
                   Share on X (Twitter)
@@ -409,7 +332,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
                 <button
                   onClick={() => handleShare("linkedin")}
-                  className="w-full flex items-center gap-3 p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
                 >
                   <LinkedInIcon />
                   Share on LinkedIn
@@ -417,17 +340,13 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
                 <button
                   onClick={() => handleShare("copy")}
-                  className={`w-full flex items-center gap-3 p-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                    copySuccess ? "bg-green-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-900"
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-sm font-medium ${
+                    copySuccess ? "bg-green-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-900"
                   }`}
                 >
                   <Copy className="w-5 h-5" />
                   {copySuccess ? "Link Copied! ✓" : "Copy Link"}
                 </button>
-              </div>
-
-              <div className="mt-4 text-center text-sm text-slate-500">
-                Help spread the word about 434 Media's insights
               </div>
             </div>
           </div>

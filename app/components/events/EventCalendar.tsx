@@ -128,7 +128,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
       case "conference":
         return "bg-red-100 text-red-800 border-red-200"
       case "workshop":
-        return "bg-orange-100 text-orange-800 border-orange-200"
+        return "bg-neutral-100 text-neutral-800 border-neutral-200"
       case "meetup":
         return "bg-yellow-100 text-yellow-800 border-yellow-200"
       case "networking":
@@ -142,7 +142,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
   if (!isClient) {
     return (
       <div className="w-full animate-pulse">
-        <div className="h-64 bg-gray-200 rounded-lg"></div>
+        <div className="h-64 bg-neutral-200 rounded-lg"></div>
       </div>
     )
   }
@@ -151,7 +151,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
     <div className="w-full relative">
       {/* Calendar Header with 434 Logo Background */}
       <div
-        className="flex items-center justify-between mb-6 p-6 rounded-2xl border border-amber-200 shadow-lg relative overflow-hidden"
+        className="flex items-center justify-between mb-6 p-6 rounded-2xl border border-neutral-200 shadow-lg relative overflow-hidden"
         style={{
           background: `
             linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%),
@@ -166,30 +166,30 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
         <div className="absolute inset-0 bg-white/90"></div>
 
         <div className="flex-1 relative z-10">
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3 mb-2">
-            <CalendarIcon className="h-6 w-6 text-amber-600" />
+          <h2 className="text-2xl font-bold text-neutral-900 flex items-center gap-3 mb-2">
+            <CalendarIcon className="h-6 w-6 text-neutral-600" />
             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
           </h2>
-          <p className="text-sm text-gray-600 flex items-center gap-2 mb-4">
-            <Sparkles className="h-4 w-4 text-amber-500" />
+          <p className="text-sm text-neutral-600 flex items-center gap-2 mb-4">
+            <Sparkles className="h-4 w-4 text-neutral-500" />
             {currentMonthEvents} event{currentMonthEvents !== 1 ? "s" : ""} this month
           </p>
           <div className="flex items-center space-x-3">
             <button
               onClick={goToToday}
-              className="text-sm px-4 py-2 bg-amber-100 text-amber-700 rounded-xl hover:bg-amber-200 transition-all duration-200 font-medium"
+              className="text-sm px-4 py-2 bg-neutral-100 text-neutral-700 rounded-xl hover:bg-neutral-200 transition-all duration-200 font-medium"
             >
               Today
             </button>
             <button
               onClick={() => navigateMonth("prev")}
-              className="h-10 w-10 border border-gray-300 rounded-xl hover:bg-amber-50 hover:border-amber-300 flex items-center justify-center transition-all duration-200"
+              className="h-10 w-10 border border-neutral-300 rounded-xl hover:bg-neutral-50 hover:border-neutral-300 flex items-center justify-center transition-all duration-200"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <button
               onClick={() => navigateMonth("next")}
-              className="h-10 w-10 border border-gray-300 rounded-xl hover:bg-amber-50 hover:border-amber-300 flex items-center justify-center transition-all duration-200"
+              className="h-10 w-10 border border-neutral-300 rounded-xl hover:bg-neutral-50 hover:border-neutral-300 flex items-center justify-center transition-all duration-200"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -201,18 +201,18 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
           <img
             src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
             alt="434 Media Logo"
-            className="h-32 w-auto invert scale-125 down-shadow-lg drop-shadow-lg drop-shadow-amber-200/40"
+            className="h-32 w-auto invert scale-125 down-shadow-lg drop-shadow-lg drop-shadow-neutral-200/40"
           />
         </div>
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden">
         {/* Day Headers */}
-        <div className="grid grid-cols-7 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+        <div className="grid grid-cols-7 bg-gradient-to-r from-neutral-50 to-neutral-100 border-b border-neutral-200">
           {dayNames.map((day, index) => (
-            <div key={day} className="p-4 text-center text-sm font-bold text-gray-700">
-              <span className={cn(index === 0 || index === 6 ? "text-amber-600" : "text-gray-700")}>{day}</span>
+            <div key={day} className="p-4 text-center text-sm font-bold text-neutral-700">
+              <span className={cn(index === 0 || index === 6 ? "text-neutral-600" : "text-neutral-700")}>{day}</span>
             </div>
           ))}
         </div>
@@ -227,12 +227,12 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
               <div
                 key={index}
                 className={cn(
-                  "min-h-[100px] p-3 border-r border-b border-gray-100 cursor-pointer transition-all duration-200 relative",
-                  !day.isCurrentMonth && "bg-gray-50/50",
-                  day.isToday && "bg-amber-50 border-amber-200",
-                  isSelected && "bg-orange-50 border-orange-200",
+                  "min-h-[100px] p-3 border-r border-b border-neutral-100 cursor-pointer transition-all duration-200 relative",
+                  !day.isCurrentMonth && "bg-neutral-50/50",
+                  day.isToday && "bg-neutral-50 border-neutral-200",
+                  isSelected && "bg-neutral-50 border-neutral-200",
                   hasEvents && day.isCurrentMonth && "hover:bg-blue-50",
-                  !hasEvents && day.isCurrentMonth && "hover:bg-amber-50",
+                  !hasEvents && day.isCurrentMonth && "hover:bg-neutral-50",
                 )}
                 onClick={() => setSelectedDate(day.date)}
               >
@@ -241,8 +241,8 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
                   <span
                     className={cn(
                       "text-lg font-medium",
-                      day.isToday && "text-amber-600 font-bold",
-                      !day.isCurrentMonth && "text-gray-400",
+                      day.isToday && "text-neutral-600 font-bold",
+                      !day.isCurrentMonth && "text-neutral-400",
                       hasEvents && day.isCurrentMonth && "text-blue-600",
                     )}
                   >
@@ -283,19 +283,19 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
       {/* Centered Modal for Event Summary */}
       {showModal && modalEvents.length > 0 && modalDate && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md max-h-[70vh] overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl border border-neutral-200 w-full max-w-md max-h-[70vh] overflow-hidden">
             {/* Modal Header */}
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200">
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-neutral-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
                     <CalendarIcon className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-800">
+                    <h3 className="text-lg font-bold text-neutral-800">
                       {modalEvents.length} Event{modalEvents.length !== 1 ? "s" : ""}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-neutral-600">
                       {modalDate.toLocaleDateString("en-US", {
                         weekday: "long",
                         month: "long",
@@ -306,7 +306,7 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
                 </div>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -328,26 +328,26 @@ export function EventCalendar({ events, onEventClick }: EventCalendarProps) {
                       setShowModal(false)
                     }}
                   >
-                    <h4 className="font-bold text-sm text-gray-800 mb-2">{event.title}</h4>
+                    <h4 className="font-bold text-sm text-neutral-800 mb-2">{event.title}</h4>
 
                     {/* Event Details */}
                     <div className="space-y-2">
                       {event.time && (
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-neutral-600">
                           <Clock className="h-3 w-3" />
                           <span>{formatTime12Hour(event.time)}</span>
                         </div>
                       )}
 
                       {event.location && (
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-neutral-600">
                           <MapPin className="h-3 w-3" />
                           <span className="truncate">{event.location}</span>
                         </div>
                       )}
 
                       {event.description && (
-                        <div className="text-xs text-gray-600 mt-2">
+                        <div className="text-xs text-neutral-600 mt-2">
                           {event.description.length > 100
                             ? `${event.description.substring(0, 100)}...`
                             : event.description}

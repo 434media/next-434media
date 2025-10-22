@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Save, Eye, Upload, X, Plus, Sparkles, FileText, Settings } from "lucide-react"
+import { Save, Eye, Upload, X, Plus, FileText, Settings } from "lucide-react"
 import { createBlogPostAction, updateBlogPostAction, getBlogCategoriesAction } from "@/app/actions/blog"
 import AdminPasswordModal from "../../components/AdminPasswordModal"
 import ImageSelector from "../../components/blog/ImageSelector"
@@ -112,19 +112,17 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
 
   if (showPreview) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen bg-white">
         <div className="max-w-4xl mx-auto p-4 sm:p-6 pt-24 sm:pt-28">
           {/* Preview Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Preview Mode
-              </h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Preview Mode</h1>
               <p className="text-gray-600 mt-1">See how your post will look to readers</p>
             </div>
             <button
               onClick={() => setShowPreview(false)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all transform hover:scale-105 shadow-lg"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all"
             >
               <X className="w-4 h-4" />
               <span className="hidden sm:inline">Close Preview</span>
@@ -133,22 +131,20 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
           </div>
 
           {/* Preview Content */}
-          <article className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 backdrop-blur-sm border border-white/20">
+          <article className="bg-white rounded-lg border border-gray-200 p-6 sm:p-8">
             {featuredImage && (
               <img
                 src={featuredImage || "/placeholder.svg"}
                 alt={title}
-                className="w-full h-48 sm:h-64 object-cover rounded-xl mb-6 shadow-lg"
+                className="w-full h-48 sm:h-64 object-cover rounded-lg mb-6"
               />
             )}
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">{title}</h1>
             {excerpt && (
-              <p className="text-lg sm:text-xl text-gray-600 italic mb-6 border-l-4 border-purple-500 pl-4">
-                {excerpt}
-              </p>
+              <p className="text-lg sm:text-xl text-gray-600 mb-6 border-l-4 border-gray-900 pl-4">{excerpt}</p>
             )}
             <div
-              className="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-purple-600"
+              className="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-gray-900 prose-a:underline"
               dangerouslySetInnerHTML={{ __html: content }}
             />
           </article>
@@ -158,13 +154,13 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 pt-24 sm:pt-28">
         {/* Header */}
         <div className="flex flex-col gap-4 mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
                 {post ? "Edit Post" : "Create New Post"}
               </h1>
               <p className="text-gray-600 mt-1">
@@ -176,7 +172,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
             <div className="hidden lg:flex items-center gap-3">
               <button
                 onClick={() => setShowPreview(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all transform hover:scale-105 shadow-lg"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
               >
                 <Eye className="w-4 h-4" />
                 Preview
@@ -184,7 +180,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
               <button
                 onClick={() => handleSaveClick("draft")}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:transform-none"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 Save Draft
@@ -192,16 +188,15 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
               <button
                 onClick={() => handleSaveClick("published")}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:transform-none"
+                className="flex items-center gap-2 px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all disabled:opacity-50"
               >
                 <Upload className="w-4 h-4" />
-                <Sparkles className="w-4 h-4" />
                 Publish
               </button>
               {onCancel && (
                 <button
                   onClick={onCancel}
-                  className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all transform hover:scale-105 shadow-lg"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                 >
                   Cancel
                 </button>
@@ -211,11 +206,11 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
 
           {/* Mobile Action Bar */}
           <div className="lg:hidden">
-            <div className="bg-white rounded-2xl shadow-xl p-4 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setShowPreview(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all shadow-lg"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                 >
                   <Eye className="w-4 h-4" />
                   <span className="text-sm font-medium">Preview</span>
@@ -223,7 +218,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 <button
                   onClick={() => handleSaveClick("draft")}
                   disabled={isLoading}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span className="text-sm font-medium">Save</span>
@@ -233,16 +228,15 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 <button
                   onClick={() => handleSaveClick("published")}
                   disabled={isLoading}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" />
-                  <Sparkles className="w-4 h-4" />
                   <span className="font-medium">Publish Post</span>
                 </button>
                 {onCancel && (
                   <button
                     onClick={onCancel}
-                    className="px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all shadow-lg"
+                    className="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                   >
                     Cancel
                   </button>
@@ -256,9 +250,9 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
           {/* Main Content */}
           <div className="xl:col-span-2 space-y-6">
             {/* Title */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-purple-600" />
+                <FileText className="w-5 h-5 text-gray-900" />
                 <label className="text-lg font-semibold text-gray-900">Post Title</label>
                 <span className="text-red-500">*</span>
               </div>
@@ -266,16 +260,16 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-lg transition-all"
+                className="w-full px-4 py-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-lg transition-all"
                 placeholder="Enter an engaging title..."
                 required
               />
             </div>
 
-            {/* Content - Replace the existing textarea with RichTextEditor */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            {/* Content */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-purple-600" />
+                <FileText className="w-5 h-5 text-gray-900" />
                 <label className="text-lg font-semibold text-gray-900">Content</label>
                 <span className="text-red-500">*</span>
               </div>
@@ -285,24 +279,24 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 placeholder="Write your amazing content here..."
                 className="min-h-[500px]"
               />
-              <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                <p className="text-sm text-purple-700">
-                  <strong>✨ Rich Editor Features:</strong> Use the toolbar above for formatting, links, images, videos,
-                  and more!
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-700">
+                  <strong>Rich Editor Features:</strong> Use the toolbar above for headings, formatting, lists, links,
+                  images, videos, and more!
                 </p>
               </div>
             </div>
 
             {/* Excerpt */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-5 h-5 text-blue-600" />
+                <FileText className="w-5 h-5 text-gray-900" />
                 <label className="text-lg font-semibold text-gray-900">Excerpt</label>
               </div>
               <textarea
                 value={excerpt}
                 onChange={(e) => setExcerpt(e.target.value)}
-                className="w-full h-24 px-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
+                className="w-full h-24 px-4 py-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none transition-all"
                 placeholder="Brief description that appears in post previews..."
               />
             </div>
@@ -311,9 +305,9 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Status & Category */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Settings className="w-5 h-5 text-green-600" />
+                <Settings className="w-5 h-5 text-gray-900" />
                 <h3 className="text-lg font-semibold text-gray-900">Post Settings</h3>
               </div>
               <div className="space-y-4">
@@ -322,10 +316,10 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as "draft" | "published")}
-                    className="w-full px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
                   >
-                    <option value="draft">📝 Draft</option>
-                    <option value="published">🚀 Published</option>
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
                   </select>
                 </div>
                 <div>
@@ -333,7 +327,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
                   >
                     {categories.map((cat) => (
                       <option key={cat.slug} value={cat.slug}>
@@ -346,7 +340,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
             </div>
 
             {/* Tags */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-lg">🏷️</span>
                 <h3 className="text-lg font-semibold text-gray-900">Tags</h3>
@@ -357,12 +351,12 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
-                  className="flex-1 px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
+                  className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm transition-all"
                   placeholder="Add tag..."
                 />
                 <button
                   onClick={handleAddTag}
-                  className="px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all transform hover:scale-105 shadow-lg"
+                  className="px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -371,12 +365,12 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                 {tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="inline-flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-800 rounded-xl text-sm font-medium border border-purple-200"
+                    className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium border border-gray-200"
                   >
                     #{tag}
                     <button
                       onClick={() => handleRemoveTag(tag)}
-                      className="text-purple-600 hover:text-purple-800 transition-colors"
+                      className="text-gray-600 hover:text-gray-900 transition-colors"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -386,7 +380,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
             </div>
 
             {/* Featured Image */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-lg">🖼️</span>
                 <h3 className="text-lg font-semibold text-gray-900">Featured Image</h3>
@@ -399,7 +393,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
             </div>
 
             {/* SEO */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 border border-white/20 backdrop-blur-sm">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-lg">🔍</span>
                 <h3 className="text-lg font-semibold text-gray-900">SEO & Author</h3>
@@ -411,7 +405,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                     type="text"
                     value={author}
                     onChange={(e) => setAuthor(e.target.value)}
-                    className="w-full px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm transition-all"
                     placeholder="434 Media Team"
                   />
                 </div>
@@ -420,7 +414,7 @@ export default function BlogEditor({ post, onSave, onCancel }: BlogEditorProps) 
                   <textarea
                     value={metaDescription}
                     onChange={(e) => setMetaDescription(e.target.value)}
-                    className="w-full h-20 px-3 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm resize-none transition-all"
+                    className="w-full h-20 px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm resize-none transition-all"
                     placeholder="SEO description for search engines..."
                     maxLength={160}
                   />
