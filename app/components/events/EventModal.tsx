@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react"
 import { Dialog, Transition, DialogPanel, TransitionChild } from "@headlessui/react"
-import { X, Calendar, MapPin, Users, User, ExternalLink, Clock, Edit, Trash2 } from "lucide-react"
+import { X, Calendar, MapPin, Users, User, ExternalLink, Clock } from "lucide-react"
 import type { Event } from "../../types/event-types"
 import { formatEventDate } from "../../lib/event-utils"
 import { cn } from "../../lib/utils"
@@ -11,11 +11,9 @@ interface EventModalProps {
   event: Event | null
   isOpen: boolean
   onClose: () => void
-  onEditRequest?: (event: Event) => void
-  onDeleteRequest?: (event: Event) => void
 }
 
-export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequest }: EventModalProps) {
+export function EventModal({ event, isOpen, onClose }: EventModalProps) {
   const [isCopied, setIsCopied] = useState(false)
 
   useEffect(() => {
@@ -98,19 +96,7 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
     }
   }
 
-  const handleEditClick = () => {
-    if (onEditRequest) {
-      onEditRequest(event)
-      onClose()
-    }
-  }
 
-  const handleDeleteClick = () => {
-    if (onDeleteRequest) {
-      onDeleteRequest(event)
-      onClose()
-    }
-  }
 
   // Check if this is a manual event (no source or source is 'manual')
   const isManualEvent = !event.source || event.source === "manual"
@@ -141,7 +127,7 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
               leaveFrom="opacity-100 scale-100 translate-y-0"
               leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-2xl transition-all">
+              <DialogPanel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-2xl transition-all">
                 {/* Header with Image Background */}
                 <div className="relative">
                   <div className="h-48 sm:h-64 overflow-hidden">
@@ -163,48 +149,8 @@ export function EventModal({ event, isOpen, onClose, onEditRequest, onDeleteRequ
                       </div>
                     )}
 
-                    {/* Category Badge */}
-                    {event.category && (
-                      <div className="absolute top-4 left-4 z-20">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
-                            categoryColors.bg,
-                            categoryColors.text,
-                          )}
-                        >
-                          {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Action Buttons - Improved positioning */}
-                    <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-                      {/* Edit Button */}
-                      {onEditRequest && (
-                        <button
-                          type="button"
-                          className="rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-blue-500/30 transition-all duration-200 hover:scale-110 border border-white/20 hover:border-blue-300/50"
-                          onClick={handleEditClick}
-                          title="Edit event"
-                        >
-                          <Edit className="h-5 w-5" />
-                        </button>
-                      )}
-
-                      {/* Delete Button */}
-                      {onDeleteRequest && (
-                        <button
-                          type="button"
-                          className="rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-red-500/30 transition-all duration-200 hover:scale-110 border border-white/20 hover:border-red-300/50"
-                          onClick={handleDeleteClick}
-                          title="Delete event"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      )}
-
-                      {/* Close Button */}
+                    {/* Close Button */}
+                    <div className="absolute top-4 right-4 z-20">
                       <button
                         type="button"
                         className="rounded-full bg-white/20 backdrop-blur-sm p-2 text-white hover:bg-white/30 transition-colors duration-200 border border-white/20"

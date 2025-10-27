@@ -12,6 +12,8 @@ export interface Event {
   url?: string
   source?: "meetup" | "eventbrite" | "luma" | "manual"
   image?: string
+  tags?: string // Comma-separated tags from Airtable
+  isPast?: boolean // Auto-managed by Airtable system
   created_at?: string
   updated_at?: string
 }
