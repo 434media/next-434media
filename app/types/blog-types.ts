@@ -14,7 +14,6 @@ export interface BlogPost {
   created_at: string
   updated_at: string
   read_time?: number
-  view_count?: number
   embedded_media?: EmbeddedMedia[] // New: Track embedded media
 }
 
