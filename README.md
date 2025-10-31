@@ -1,13 +1,11 @@
 # 434 MEDIA
 
 This repository contains the source code for the official 434 Media website. 
-It is a modern, full-stack application built with Next.js, TypeScript, and a PostgreSQL database.
     
 ## Key Features
 
 *   **Next.js 15 with App Router**: Leverages the latest features of Next.js for server components, layouts, and API routes.
 *   **TypeScript**: Fully typed codebase for improved developer experience and code quality.
-*   **PostgreSQL Database**: Uses a Neon serverless Postgres database for storing images and analytics data.
 *   **Airtable Integration**: Blog content, events, and newsletter data stored in Airtable for easy collaboration and management.
 *   **Internationalization (i18n)**: Supports multiple languages (English and Spanish) using dictionary files and dynamic routing.
 *   **Blog Engine**: A complete blog with posts, categories, and media stored in Airtable for streamlined content management.
