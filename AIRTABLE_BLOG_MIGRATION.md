@@ -16,7 +16,7 @@ Table Name: `Blog Posts`
 **Fields:**
 - `Title` (Single line text) - Required
 - `Slug` (Single line text) - URL-friendly version of title
-- `Content` (Long text) - HTML content of the blog post
+- `Content` (Rich text) - **RECOMMENDED**: Rich text content with formatting (bold, italic, links, etc.). Also supports markdown and HTML.
 - `Excerpt` (Long text) - Short description/summary
 - `Featured Image` (Attachment) - Main image for the post
 - `Featured Image URL` (Single line text) - Fallback URL for featured image
@@ -53,6 +53,23 @@ Add these options to the Category single select field:
 2. Select "Single select" field type
 3. Add each category option listed above
 4. Set a default value (recommended: "Technology")
+
+#### Rich Text Content Setup
+
+**Content Field Configuration:**
+1. Change the "Content" field type to "Rich text"
+2. This enables rich formatting including:
+   - **Bold text** and *italic text*
+   - Links to external websites
+   - Bulleted and numbered lists
+   - Headers and subheaders
+   - Code blocks and inline code
+
+**Supported Content Formats:**
+- **Rich Text**: Use Airtable's built-in rich text editor
+- **Markdown**: The system auto-detects and converts markdown syntax
+- **HTML**: Legacy HTML content is sanitized and displayed
+- **Plain Text**: Automatically formatted with proper paragraphs
 
 ## Environment Variables
 
@@ -169,6 +186,8 @@ To migrate existing blog data from PostgreSQL to Airtable:
 9. **Reduced Complexity**: Eliminates PostgreSQL dependencies for blog content
 10. **Performance**: Single Select categories eliminate API calls for category resolution (4.5s vs 12+s page load)
 11. **Simplified Filtering**: Direct category name matching without ID resolution improves reliability
+12. **Rich Text Support**: Native rich text editing in Airtable with automatic conversion to HTML (bold, italic, links, etc.)
+13. **Multiple Content Formats**: Supports rich text, markdown, and HTML content seamlessly
 
 ## Rollback Plan
 

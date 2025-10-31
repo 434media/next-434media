@@ -1,5 +1,6 @@
 import Airtable from "airtable"
 import type { BlogPost, BlogCategory, CreateBlogPostData, UpdateBlogPostData, BlogFilters } from "../types/blog-types"
+import { convertAirtableRichTextToHTMLSync } from "./rich-text-converter"
 
 // Initialize Airtable base for Blog
 const airtableBlogBaseId = process.env.AIRTABLE_BLOG_BASE_ID
@@ -49,11 +50,14 @@ function mapAirtableToBlogPost(record: any): BlogPost {
     }
   }
 
+  // Process rich text content
+  const processedContent = convertAirtableRichTextToHTMLSync(fields.Content)
+
   return {
     id: record.id,
     title: fields.Title || "",
     slug: fields.Slug || generateSlug(fields.Title || ""),
-    content: fields.Content || "",
+    content: processedContent,
     excerpt: fields.Excerpt || undefined,
     featured_image: featuredImage,
     meta_description: fields["Meta Description"] || undefined,
@@ -64,7 +68,7 @@ function mapAirtableToBlogPost(record: any): BlogPost {
     published_at: fields["Published At"] || (fields.Status === "Published" ? record._createdTime : undefined),
     created_at: record._createdTime,
     updated_at: fields["Updated At"] || record._createdTime,
-    read_time: fields["Read Time"] || calculateReadTime(fields.Content || ""),
+    read_time: fields["Read Time"] || calculateReadTime(processedContent || ""),
   }
 }
 
