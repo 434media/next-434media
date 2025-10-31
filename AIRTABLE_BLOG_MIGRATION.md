@@ -21,7 +21,7 @@ Table Name: `Blog Posts`
 - `Featured Image` (Attachment) - Main image for the post
 - `Featured Image URL` (Single line text) - Fallback URL for featured image
 - `Meta Description` (Single line text) - SEO meta description
-- `Category` (Single select) - Options: Technology, Marketing, Events, Business, Local, Medical, Science, Robotics, Military, TXMX Boxing, Community
+- `Category` (Single select) - **REQUIRED**: Options: Technology, Marketing, Events, Business, Local, Medical, Science, Robotics, Military, TXMX Boxing, Community
 - `Tags` (Single line text) - Comma-separated tags
 - `Status` (Single select) - Options: Draft, Published
 - `Author` (Single line text) - Default: "434 Media"
@@ -29,26 +29,30 @@ Table Name: `Blog Posts`
 - `Updated At` (Date & time) - Last modification time
 - `Read Time` (Number) - Estimated reading time in minutes
 
-#### Categories Table
-Table Name: `Categories`
+#### Categories Setup (Single Select Field)
 
-**Fields:**
-- `Name` (Single line text) - Required, category display name
-- `Slug` (Single line text) - URL-friendly version
-- `Description` (Long text) - Category description
+**IMPORTANT**: Categories are managed as a Single Select field in the Blog Posts table, not as a separate table. This approach is simpler, faster, and requires no API calls for category resolution.
 
-**Default Categories to Add:**
-1. Technology - Latest tech trends and innovations
-2. Marketing - Digital marketing strategies and tips
-3. Events - Event planning and networking insights
-4. Business - Business growth and entrepreneurship
-5. Local - Local community news and partnerships
-6. Medical - Medical innovations and healthcare technology
-7. Science - Scientific breakthroughs and research
-8. Robotics - Robotics and automation advances
-9. Military - Military technology and defense innovations
-10. TXMX Boxing - TXMX Boxing news and sports coverage
-11. Community - Community events and local business news
+**Category Options to Configure:**
+Add these options to the Category single select field:
+
+1. **Technology** - Latest tech trends and innovations
+2. **Marketing** - Digital marketing strategies and tips
+3. **Events** - Event planning and networking insights
+4. **Business** - Business growth and entrepreneurship
+5. **Local** - Local community news and partnerships
+6. **Medical** - Medical innovations and healthcare technology
+7. **Science** - Scientific breakthroughs and research
+8. **Robotics** - Robotics and automation advances
+9. **Military** - Military technology and defense innovations
+10. **TXMX Boxing** - TXMX Boxing news and sports coverage
+11. **Community** - Community events and local business news
+
+**Setup Instructions:**
+1. In Airtable, click on the Category field in Blog Posts table
+2. Select "Single select" field type
+3. Add each category option listed above
+4. Set a default value (recommended: "Technology")
 
 ## Environment Variables
 
@@ -163,6 +167,8 @@ To migrate existing blog data from PostgreSQL to Airtable:
 7. **Attachments**: Native handling of images and media files
 8. **Workflow**: Can create approval workflows and collaborate on drafts
 9. **Reduced Complexity**: Eliminates PostgreSQL dependencies for blog content
+10. **Performance**: Single Select categories eliminate API calls for category resolution (4.5s vs 12+s page load)
+11. **Simplified Filtering**: Direct category name matching without ID resolution improves reliability
 
 ## Rollback Plan
 

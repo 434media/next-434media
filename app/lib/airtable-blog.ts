@@ -57,9 +57,7 @@ function mapAirtableToBlogPost(record: any): BlogPost {
     excerpt: fields.Excerpt || undefined,
     featured_image: featuredImage,
     meta_description: fields["Meta Description"] || undefined,
-    category: Array.isArray(fields.Category) 
-      ? (fields.Category.length > 0 ? fields.Category[0] : "Technology")
-      : (fields.Category || "Technology"),
+    category: fields.Category || "Technology", // Single select field - returns string directly
     tags: fields.Tags ? (Array.isArray(fields.Tags) ? fields.Tags : fields.Tags.split(',').map((tag: string) => tag.trim())) : [],
     status: (fields.Status === "Published" || fields["Is Published"] === true) ? "published" : "draft",
     author: fields.Author || "434 Media",
@@ -95,51 +93,8 @@ function mapBlogPostToAirtable(post: Omit<BlogPost, "id" | "created_at" | "updat
   return airtableData
 }
 
-// Map Airtable record to BlogCategory interface
-function mapAirtableToBlogCategory(record: any, postCount: number = 0): BlogCategory {
-  const fields = record.fields
-  
-  return {
-    id: record.id,
-    name: fields.Name || "",
-    slug: fields.Slug || generateSlug(fields.Name || ""),
-    description: fields.Description || undefined,
-    post_count: postCount,
-    created_at: record._createdTime,
-  }
-}
 
-// Cache for category names
-const categoryCache = new Map<string, string>()
 
-// Resolve category ID to category name
-async function resolveCategoryName(categoryId: string): Promise<string> {
-  if (categoryCache.has(categoryId)) {
-    return categoryCache.get(categoryId)!
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.airtable.com/v0/${airtableBlogBaseId}/Categories/${categoryId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${airtableBlogApiKey}`,
-        },
-      }
-    )
-
-    if (response.ok) {
-      const data = await response.json()
-      const categoryName = data.fields?.Name || "Technology"
-      categoryCache.set(categoryId, categoryName)
-      return categoryName
-    }
-  } catch (error) {
-    console.error("Error resolving category:", error)
-  }
-
-  return "Technology" // Default fallback
-}
 
 // Get all blog posts from Airtable
 export async function getBlogPostsFromAirtable(filters: BlogFilters = {}): Promise<BlogPost[]> {
@@ -193,24 +148,12 @@ export async function getBlogPostsFromAirtable(filters: BlogFilters = {}): Promi
 
     const posts = records.map(mapAirtableToBlogPost)
 
-    // Resolve category IDs to names for all posts
-    const postsWithResolvedCategories = await Promise.all(
-      posts.map(async (post) => {
-        if (post.category && post.category.startsWith('rec')) {
-          // This is a record ID, resolve it to category name
-          const categoryName = await resolveCategoryName(post.category)
-          return { ...post, category: categoryName }
-        }
-        return post
-      })
-    )
-
     // Apply offset if specified (Airtable doesn't support offset directly)
     if (filters.offset) {
-      return postsWithResolvedCategories.slice(filters.offset)
+      return posts.slice(filters.offset)
     }
 
-    return postsWithResolvedCategories
+    return posts
   } catch (error) {
     console.error("Error fetching blog posts from Airtable:", error)
     
@@ -255,13 +198,6 @@ export async function getBlogPostBySlugFromAirtable(slug: string): Promise<BlogP
     }
 
     const post = mapAirtableToBlogPost(records[0])
-    
-    // Resolve category ID to name if needed
-    if (post.category && post.category.startsWith('rec')) {
-      const categoryName = await resolveCategoryName(post.category)
-      post.category = categoryName
-    }
-    
     return post
   } catch (error) {
     console.error("Error fetching blog post by slug from Airtable:", error)
@@ -364,14 +300,7 @@ export async function deleteBlogPostFromAirtable(id: string): Promise<void> {
 // Get all blog categories from Airtable
 export async function getBlogCategoriesFromAirtable(): Promise<BlogCategory[]> {
   try {
-    // First, get all categories
-    const categoryRecords = await blogBase("Categories")
-      .select({
-        sort: [{ field: "Name", direction: "asc" }],
-      })
-      .all()
-
-    // Then get post counts for each category
+    // Get all published blog posts to extract categories from single select field
     const postRecords = await blogBase("Blog Posts")
       .select({
         filterByFormula: '{Status} = "Published"',
@@ -379,51 +308,33 @@ export async function getBlogCategoriesFromAirtable(): Promise<BlogCategory[]> {
       })
       .all()
 
-    // Count posts per category
-    const postCounts: { [key: string]: number } = {}
+    // Extract unique categories from posts
+    const categoryMap = new Map<string, number>()
+    
     postRecords.forEach((record) => {
       const category = record.fields.Category as string
       if (category) {
-        postCounts[category] = (postCounts[category] || 0) + 1
+        categoryMap.set(category, (categoryMap.get(category) || 0) + 1)
       }
     })
 
-    return categoryRecords.map((record) => {
-      const category = mapAirtableToBlogCategory(record)
-      category.post_count = postCounts[category.name] || 0
-      return category
-    })
+    // Convert to BlogCategory format and sort alphabetically
+    return Array.from(categoryMap.entries())
+      .map(([categoryName, count], index) => ({
+        id: `cat-${index}`,
+        name: categoryName,
+        slug: categoryName.toLowerCase().replace(/\s+/g, '-'),
+        post_count: count,
+        created_at: new Date().toISOString()
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   } catch (error) {
     console.error("Error fetching blog categories from Airtable:", error)
     throw new Error("Failed to fetch blog categories from Airtable")
   }
 }
 
-// Create a new blog category in Airtable
-export async function createBlogCategoryInAirtable(categoryData: Omit<BlogCategory, "id" | "created_at" | "post_count">): Promise<BlogCategory> {
-  try {
-    const slug = categoryData.slug || generateSlug(categoryData.name)
-    
-    const records = await blogBase("Categories").create([
-      {
-        fields: {
-          Name: categoryData.name,
-          Slug: slug,
-          Description: categoryData.description || "",
-        },
-      },
-    ])
 
-    if (records.length === 0) {
-      throw new Error("No records created")
-    }
-
-    return mapAirtableToBlogCategory(records[0], 0)
-  } catch (error) {
-    console.error("Error creating blog category in Airtable:", error)
-    throw new Error("Failed to create blog category in Airtable")
-  }
-}
 
 // Test Airtable connection for blog
 export async function testAirtableBlogConnection(): Promise<boolean> {
