@@ -170,7 +170,7 @@ export function AddEventModal({
           : "manual",
       }
 
-      const { addEventAction } = await import("@/app/actions/events")
+      const { addEventAction } = await import("@/app/actions/events-airtable")
       const result = await addEventAction(eventToSubmit, adminPassword)
 
       setSubmitProgress(100)

@@ -1,15 +1,15 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getBlogPostBySlug } from "../../lib/blog-db"
+import { getBlogPostBySlugFromAirtable } from "../../lib/airtable-blog"
 import BlogPostPageClient from "./BlogPostPageClient"
 
 type Props = {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = params
-  const post = await getBlogPostBySlug(slug)
+  const { slug } = await params
+  const post = await getBlogPostBySlugFromAirtable(slug)
 
   if (!post) {
     return {
@@ -118,8 +118,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const { slug } = params
-  const post = await getBlogPostBySlug(slug)
+  const { slug } = await params
+  const post = await getBlogPostBySlugFromAirtable(slug)
 
   if (!post) {
     notFound()

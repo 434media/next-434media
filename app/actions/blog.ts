@@ -2,28 +2,21 @@
 
 import { revalidatePath } from "next/cache"
 import {
-  createBlogPost,
-  updateBlogPost,
-  deleteBlogPost,
-  getBlogPosts,
-  getBlogPostBySlug,
-  getBlogCategories,
-  initializeBlogDatabase,
-} from "../lib/blog-db"
+  createBlogPostInAirtable,
+  updateBlogPostInAirtable,
+  deleteBlogPostFromAirtable,
+  getBlogPostsFromAirtable,
+  getBlogPostBySlugFromAirtable,
+  getBlogCategoriesFromAirtable,
+  testAirtableBlogConnection,
+} from "../lib/airtable-blog"
 import type { CreateBlogPostData, UpdateBlogPostData, BlogFilters } from "../types/blog-types"
 
-// Initialize database on first load
-let dbInitialized = false
-
-async function ensureDbInitialized() {
-  if (!dbInitialized) {
-    try {
-      await initializeBlogDatabase()
-      dbInitialized = true
-    } catch (error) {
-      console.error("Database initialization warning:", error)
-      dbInitialized = true
-    }
+// Airtable connection verification
+async function ensureAirtableConnected() {
+  const isConnected = await testAirtableBlogConnection()
+  if (!isConnected) {
+    throw new Error("Airtable blog connection failed")
   }
 }
 
@@ -61,9 +54,9 @@ function calculateReadTime(content: string): number {
 }
 
 export async function createBlogPostAction(formData: FormData) {
-  await ensureDbInitialized()
-
   try {
+    await ensureAirtableConnected()
+
     const adminPassword = formData.get("adminPassword") as string
 
     // Verify admin password
@@ -88,7 +81,7 @@ export async function createBlogPostAction(formData: FormData) {
       read_time: calculateReadTime(content),
     }
 
-    const post = await createBlogPost(postData)
+    const post = await createBlogPostInAirtable(postData)
 
     revalidatePath("/blog")
     revalidatePath("/admin/blog")
@@ -101,9 +94,9 @@ export async function createBlogPostAction(formData: FormData) {
 }
 
 export async function updateBlogPostAction(formData: FormData) {
-  await ensureDbInitialized()
-
   try {
+    await ensureAirtableConnected()
+
     const id = formData.get("id") as string
     const title = formData.get("title") as string
     const content = formData.get("content") as string
@@ -123,7 +116,7 @@ export async function updateBlogPostAction(formData: FormData) {
       read_time: content ? calculateReadTime(content) : undefined,
     }
 
-    const post = await updateBlogPost(id, updates)
+    const post = await updateBlogPostInAirtable(id, updates)
 
     revalidatePath("/blog")
     revalidatePath("/admin/blog")
@@ -137,15 +130,15 @@ export async function updateBlogPostAction(formData: FormData) {
 }
 
 export async function deleteBlogPostAction(id: string, adminPassword: string) {
-  await ensureDbInitialized()
-
-  // Verify admin password
-  if (!verifyAdminPassword(adminPassword)) {
-    return { success: false, error: "Invalid admin password" }
-  }
-
   try {
-    await deleteBlogPost(id)
+    await ensureAirtableConnected()
+
+    // Verify admin password
+    if (!verifyAdminPassword(adminPassword)) {
+      return { success: false, error: "Invalid admin password" }
+    }
+
+    await deleteBlogPostFromAirtable(id)
 
     revalidatePath("/blog")
     revalidatePath("/admin/blog")
@@ -158,10 +151,10 @@ export async function deleteBlogPostAction(id: string, adminPassword: string) {
 }
 
 export async function getBlogPostsAction(filters: BlogFilters = {}) {
-  await ensureDbInitialized()
-
   try {
-    const posts = await getBlogPosts(filters)
+    await ensureAirtableConnected()
+
+    const posts = await getBlogPostsFromAirtable(filters)
     return { success: true, posts }
   } catch (error) {
     console.error("Error fetching blog posts:", error)
@@ -170,10 +163,10 @@ export async function getBlogPostsAction(filters: BlogFilters = {}) {
 }
 
 export async function getBlogPostBySlugAction(slug: string) {
-  await ensureDbInitialized()
-
   try {
-    const post = await getBlogPostBySlug(slug)
+    await ensureAirtableConnected()
+
+    const post = await getBlogPostBySlugFromAirtable(slug)
     return { success: true, post }
   } catch (error) {
     console.error("Error fetching blog post:", error)
@@ -182,10 +175,10 @@ export async function getBlogPostBySlugAction(slug: string) {
 }
 
 export async function getBlogCategoriesAction() {
-  await ensureDbInitialized()
-
   try {
-    const categories = await getBlogCategories()
+    await ensureAirtableConnected()
+
+    const categories = await getBlogCategoriesFromAirtable()
     return { success: true, categories }
   } catch (error) {
     console.error("Error fetching blog categories:", error)

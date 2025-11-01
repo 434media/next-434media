@@ -92,3 +92,20 @@ body {
 .health-glow:hover::before {
   opacity: 1;
 }
+
+/* Blog content link styles */
+.blog-content a {
+  color: #111827; /* gray-900 */
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+}
+
+.blog-content a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: #111827;
+}
+
+

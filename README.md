@@ -1,16 +1,15 @@
-# 434 Media Website (next-434media)
+# 434 MEDIA
 
 This repository contains the source code for the official 434 Media website. 
-It is a modern, full-stack application built with Next.js, TypeScript, and a PostgreSQL database.
-
+    
 ## Key Features
 
 *   **Next.js 15 with App Router**: Leverages the latest features of Next.js for server components, layouts, and API routes.
 *   **TypeScript**: Fully typed codebase for improved developer experience and code quality.
-*   **PostgreSQL Database**: Uses a Neon serverless Postgres database for storing blog content, images, and analytics data.
+*   **Airtable Integration**: Blog content, events, and newsletter data stored in Airtable for easy collaboration and management.
 *   **Internationalization (i18n)**: Supports multiple languages (English and Spanish) using dictionary files and dynamic routing.
-*   **Blog Engine**: A complete blog with posts, categories, and an image media library. Images are stored directly in the database as binary data.
-*   **Admin Dashboard**: A password-protected admin area to manage blog content, upload media, and view/upload website analytics.
+*   **Blog Engine**: A complete blog with posts, categories, and media stored in Airtable for streamlined content management.
+*   **Admin Dashboard**: A password-protected admin area to view/upload website analytics (blog content managed via Airtable).
 *   **Analytics Integration**: Supports uploading and displaying analytics data from CSV/Excel files or connecting directly to the Google Analytics API.
 *   **Tailwind CSS**: Styled with Tailwind CSS for a utility-first approach.
 *   **SEO Optimized**: Includes comprehensive metadata generation, `robots.txt` configuration, and Open Graph tags for optimal search engine visibility.
@@ -19,7 +18,7 @@ It is a modern, full-stack application built with Next.js, TypeScript, and a Pos
 
 *   **Framework**: [Next.js](https://nextjs.org/)
 *   **Language**: [TypeScript](https://www.typescriptlang.org/)
-*   **Database**: [PostgreSQL](https://www.postgresql.org/) (via [Neon](https://neon.tech/))
+*   **Database**: [PostgreSQL](https://www.postgresql.org/) (via [Neon](https://neon.tech/)) + [Airtable](https://airtable.com/)
 *   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 *   **UI Components**: [Shadcn/ui](https://ui.shadcn.com/), [Lucide React](https://lucide.dev/)
 *   **Deployment**: [Vercel](https://vercel.com/)
@@ -66,6 +65,12 @@ Now, open `.env.local` and fill in the required values:
 *   `DATABASE_URL`: The connection string for your PostgreSQL database. You can get this from your Neon dashboard.
 *   `ADMIN_PASSWORD`: A secret key to protect the admin routes (`/admin/*`).
 *   `NEXT_PUBLIC_SITE_URL`: The public URL of your local development environment (e.g., `http://localhost:3000`).
+*   `AIRTABLE_BLOG_BASE_ID`: Your Airtable base ID for blog content management.
+*   `AIRTABLE_BLOG_API_KEY`: Your Airtable personal access token.
+*   `AIRTABLE_EVENTS_BASE_ID`: Your Airtable base ID for events (if using events feature).
+*   `AIRTABLE_EVENTS_API_KEY`: Your Airtable API key for events.
+
+For detailed Airtable setup instructions, see [AIRTABLE_BLOG_MIGRATION.md](./AIRTABLE_BLOG_MIGRATION.md).
 
 ### 4. Run the Development Server
 
@@ -77,7 +82,7 @@ npm run dev
 
 The application should now be running at [http://localhost:3000](http://localhost:3000).
 
-The first time you run the application, the necessary database tables (for the blog, images, etc.) will be automatically created. You can see the status logs in your terminal.
+The first time you run the application, the necessary database tables for images and analytics will be automatically created in PostgreSQL. Blog content is managed through Airtable. You can see the status logs in your terminal.
 
 ---
 

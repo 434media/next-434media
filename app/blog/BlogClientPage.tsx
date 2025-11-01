@@ -23,18 +23,29 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
     async function loadCategories() {
       try {
         setLoading(true)
-        const categoriesResult = await getBlogCategoriesAction()
-        const categoriesData = categoriesResult.success ? categoriesResult.categories || [] : []
+        
+        // Always create categories from posts first
+        const uniqueCategories = [...new Set(posts.map(post => post.category).filter(Boolean))]
+        const categoriesData = uniqueCategories.map((categoryName, index) => ({
+          id: `cat-${index}`,
+          name: categoryName,
+          slug: categoryName.toLowerCase().replace(/\s+/g, '-'),
+          post_count: posts.filter(post => post.category === categoryName).length,
+          created_at: new Date().toISOString()
+        }))
         setCategories(categoriesData)
       } catch (error) {
         console.error("Error loading blog categories:", error)
+        setCategories([])
       } finally {
         setLoading(false)
       }
     }
 
-    loadCategories()
-  }, [])
+    if (posts.length > 0) {
+      loadCategories()
+    }
+  }, [posts])
 
   useEffect(() => {
     if (selectedCategory) {
@@ -48,9 +59,7 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
   const featuredPost = filteredPosts.length > 0 ? filteredPosts[0] : null
   const recentPosts = filteredPosts.length > 1 ? filteredPosts.slice(1, 7) : []
 
-  const selectedCategoryName = selectedCategory
-    ? categories.find((cat) => cat.slug === selectedCategory)?.name || "All Posts"
-    : "All Posts"
+  const selectedCategoryName = selectedCategory || "All Posts"
 
   return (
     <div className="min-h-screen bg-white">
@@ -124,13 +133,13 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
                     categories.length > 0 &&
                     categories.map((category) => (
                       <button
-                        key={category.slug}
+                        key={category.name}
                         onClick={() => {
-                          setSelectedCategory(category.slug)
+                          setSelectedCategory(category.name)
                           setIsDropdownOpen(false)
                         }}
                         className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
-                          selectedCategory === category.slug
+                          selectedCategory === category.name
                             ? "bg-gray-100 text-gray-900"
                             : "text-gray-700 hover:bg-gray-50"
                         }`}
@@ -159,10 +168,10 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
                   categories.length > 0 &&
                   categories.map((category) => (
                     <button
-                      key={category.slug}
-                      onClick={() => setSelectedCategory(category.slug)}
+                      key={category.name}
+                      onClick={() => setSelectedCategory(category.name)}
                       className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                        selectedCategory === category.slug
+                        selectedCategory === category.name
                           ? "text-gray-900 border-b-2 border-gray-900 -mb-[1px]"
                           : "text-gray-600 hover:text-gray-900"
                       }`}

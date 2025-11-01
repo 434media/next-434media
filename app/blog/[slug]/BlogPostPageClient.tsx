@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowLeft, Share2, Copy, X } from "lucide-react"
+import { ArrowLeft, Share2, Copy, X, ExternalLink } from "lucide-react"
 import { getBlogPostBySlugAction, getBlogPostsAction } from "@/app/actions/blog"
 import BlogCard from "../../components/blog/BlogCard"
 import type { BlogPost } from "../../types/blog-types"
@@ -92,6 +92,34 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
     window.addEventListener("scroll", updateReadingProgress)
     return () => window.removeEventListener("scroll", updateReadingProgress)
   }, [])
+
+  // Process external links to add Lucide React icons
+  useEffect(() => {
+    if (!post?.content) return
+
+    const blogContent = document.querySelector('.blog-content')
+    if (!blogContent) return
+
+    const externalLinks = blogContent.querySelectorAll('a[href^="http"]:not([href*="434media.com"])')
+    
+    externalLinks.forEach((link) => {
+      // Check if icon already added
+      if (link.querySelector('.external-link-icon')) return
+
+      // Create icon wrapper
+      const iconWrapper = document.createElement('span')
+      iconWrapper.className = 'external-link-icon inline-flex items-center ml-1'
+      iconWrapper.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-60">
+          <path d="m7 17 10-10"></path>
+          <path d="M17 7H7v10"></path>
+        </svg>
+      `
+      
+      // Append icon to link
+      link.appendChild(iconWrapper)
+    })
+  }, [post?.content])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -244,29 +272,31 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
             <article>
               <div className="py-8">
                 {/* Content */}
-                <div
-                  className="prose prose-lg prose-gray max-w-none 
-                    prose-headings:text-gray-900 prose-headings:font-semibold prose-headings:tracking-tight
-                    prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-8 prose-h1:leading-tight
-                    prose-h2:text-2xl prose-h2:mb-4 prose-h2:mt-8 prose-h2:leading-tight
-                    prose-h3:text-xl prose-h3:mb-3 prose-h3:mt-8 prose-h3:leading-snug
-                    prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-6 prose-p:text-base
-                    prose-a:text-gray-900 prose-a:font-medium prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-gray-600
-                    prose-strong:text-gray-900 prose-strong:font-semibold
-                    prose-em:text-gray-700
-                    prose-blockquote:border-l-2 prose-blockquote:border-gray-900 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-700
-                    prose-code:bg-gray-100 prose-code:text-gray-900 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
-                    prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg prose-pre:p-4
-                    prose-img:rounded-lg prose-img:border prose-img:border-gray-200
-                    prose-ul:my-6 prose-ol:my-6
-                    prose-li:text-gray-700 prose-li:my-2
-                    prose-table:border-collapse prose-table:border prose-table:border-gray-200
-                    prose-th:bg-gray-50 prose-th:border prose-th:border-gray-200 prose-th:p-3 prose-th:text-left prose-th:font-semibold
-                    prose-td:border prose-td:border-gray-200 prose-td:p-3"
-                  dangerouslySetInnerHTML={{ __html: post.content }}
-                />
-
-                {/* Tags */}
+            <div
+                className={`
+                blog-content
+                prose max-w-none
+                prose-headings:text-gray-900 prose-headings:font-semibold
+                prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-8
+                prose-strong:text-gray-900 prose-strong:font-semibold
+                prose-em:text-gray-700 prose-em:italic
+                prose-ul:text-gray-700 prose-li:text-gray-700
+                prose-ol:text-gray-700
+                prose-blockquote:text-gray-600 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic
+                prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded
+                prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:overflow-x-auto
+                prose-img:rounded-lg prose-img:shadow-md
+                prose-hr:border-gray-300
+                prose-table:border-collapse prose-thead:bg-gray-50 prose-th:border prose-th:border-gray-300 prose-th:p-2 prose-td:border prose-td:border-gray-300 prose-td:p-2
+                prose-h1:text-3xl prose-h1:mb-4
+                prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-8
+                prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-6
+                prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-4
+                prose-h5:text-base prose-h5:mb-1 prose-h5:mt-3
+                prose-h6:text-sm prose-h6:mb-1 prose-h6:mt-2
+            `.replace(/\s+/g, ' ').trim()}
+                dangerouslySetInnerHTML={{ __html: post.content }}
+            />                {/* Tags */}
                 {post.tags && post.tags.length > 0 && (
                   <div className="mt-12 pt-8 border-t border-gray-200">
                     <div className="flex flex-wrap gap-2">

@@ -99,7 +99,6 @@ export default function AdminBlogPage() {
   // Calculate stats with safe fallbacks
   const publishedPosts = (posts || []).filter((p) => p.status === "published")
   const draftPosts = (posts || []).filter((p) => p.status === "draft")
-  const totalViews = (posts || []).reduce((sum, post) => sum + (post.view_count || 0), 0)
 
   if (showEditor) {
     return (
@@ -170,8 +169,8 @@ export default function AdminBlogPage() {
                 <Users className="w-4 h-4 text-gray-700" />
               </div>
               <div>
-                <p className="text-xs text-gray-600 font-medium">Total Views</p>
-                <p className="text-lg font-bold text-black">{totalViews.toLocaleString()}</p>
+                <p className="text-xs text-gray-600 font-medium">Total Articles</p>
+                <p className="text-lg font-bold text-black">{posts.length}</p>
               </div>
             </div>
           </div>
@@ -259,9 +258,7 @@ export default function AdminBlogPage() {
                     <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Category
                     </th>
-                    <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Views
-                    </th>
+
                     <th className="px-3 sm:px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Date
                     </th>
@@ -310,12 +307,7 @@ export default function AdminBlogPage() {
                           {post.category}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <Eye className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-sm font-medium text-black">{post.view_count || 0}</span>
-                        </div>
-                      </td>
+
                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs text-gray-500">
                         {formatDate(post.published_at || post.created_at)}
                       </td>

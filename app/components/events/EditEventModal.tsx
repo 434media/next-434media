@@ -116,7 +116,7 @@ export function EditEventModal({
         updated_at: new Date().toISOString(),
       }
 
-      const { updateEventAction } = await import("@/app/actions/events")
+      const { updateEventAction } = await import("@/app/actions/events-airtable")
 
       // Fix: Pass the event ID as string and the updated event data separately
       const result = await updateEventAction(event.id, updatedEvent)

@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getBlogPosts } from "../lib/blog-db"
+import { getBlogPostsFromAirtable } from "../lib/airtable-blog"
 import BlogClientPage from "./BlogClientPage"
 
 export const metadata: Metadata = {
@@ -52,12 +52,22 @@ export const metadata: Metadata = {
 
 export default async function BlogPage() {
   try {
-    const allPosts = await getBlogPosts()
-    const publishedPosts = allPosts.filter((post) => post.status === "published")
+    console.log("🔍 Loading blog posts from Airtable...")
+    const publishedPosts = await getBlogPostsFromAirtable({ status: "published" })
+    console.log(`✅ Successfully loaded ${publishedPosts.length} blog posts`)
 
     return <BlogClientPage initialPosts={publishedPosts} />
   } catch (error) {
-    console.error("Error loading blog posts:", error)
+    console.error("❌ Error loading blog posts:", error)
+    
+    // Provide helpful error information
+    if (error instanceof Error) {
+      console.error("Blog loading error details:", {
+        message: error.message,
+        name: error.name
+      })
+    }
+    
     return <BlogClientPage initialPosts={[]} />
   }
 }
