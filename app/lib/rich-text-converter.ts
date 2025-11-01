@@ -1,50 +1,131 @@
 import { marked } from 'marked'
 
 /**
- * Basic HTML sanitization for server-side use
- * Allows safe HTML tags and removes dangerous ones
+ * Secure HTML sanitization for server-side use
+ * Uses a strict allowlist approach to prevent XSS attacks
  */
 function sanitizeHTML(html: string): string {
-  // Allow safe HTML tags for rich text content
-  const allowedTags = [
+  if (!html || typeof html !== 'string') {
+    return ''
+  }
+
+  // First, completely remove all script and style tags and their content
+  // Use a more comprehensive approach to handle all variations
+  let sanitized = html
+    // Remove script tags with any attributes and content (case insensitive)
+    .replace(/<script\s*[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    // Remove standalone script tags
+    .replace(/<script\s*[^>]*\/?>/gi, '')
+    // Remove style tags with any attributes and content (case insensitive)
+    .replace(/<style\s*[^>]*>[\s\S]*?<\/style\s*>/gi, '')
+    // Remove standalone style tags
+    .replace(/<style\s*[^>]*\/?>/gi, '')
+    // Remove any other dangerous tags
+    .replace(/<(iframe|object|embed|form|input|button|meta|link)\s*[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(iframe|object|embed|form|input|button|meta|link)\s*[^>]*\/?>/gi, '')
+
+  // Define allowed tags and attributes
+  const allowedTags = new Set([
     'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead',
-    'tbody', 'tr', 'td', 'th', 'div', 'span'
-  ]
-  
-  // Simple tag allowlist - remove any tags not in the allowed list
-  let sanitized = html.replace(/<(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g, (match, closing, tagName) => {
-    if (allowedTags.includes(tagName.toLowerCase())) {
-      return match
+    'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'div', 'span'
+  ])
+
+  const allowedAttributes = new Set(['href', 'class', 'target', 'rel'])
+
+  // Parse and rebuild HTML with only allowed tags and attributes
+  sanitized = sanitized.replace(/<(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)\s*([^>]*)>/g, (match, closing, tagName, attributes) => {
+    const normalizedTag = tagName.toLowerCase()
+    
+    if (!allowedTags.has(normalizedTag)) {
+      return '' // Remove disallowed tags completely
     }
-    return '' // Remove disallowed tags
-  })
-  
-  // Remove any remaining script or style content
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-  sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-  
-  // Add security attributes to external links
-  sanitized = sanitized.replace(
-    /<a\s+href="(https?:\/\/[^"]+)"([^>]*)>/g,
-    (match, url, attrs) => {
-      // Check if it's an external link (not our domain)
-      if (!url.includes('434media.com') && !url.includes('localhost')) {
-        // Only add attributes if they don't already exist
-        if (!attrs.includes('target=') && !attrs.includes('rel=')) {
-          return `<a href="${url}" target="_blank" rel="noopener noreferrer"${attrs}>`;
-        }
+
+    // For closing tags, just return the cleaned version
+    if (closing === '/') {
+      return `</${normalizedTag}>`
+    }
+
+    // For opening tags, filter attributes
+    let cleanAttributes = ''
+    if (attributes.trim()) {
+      const attrMatches = attributes.match(/\s*([a-zA-Z-]+)\s*=\s*["']([^"']*)["']/g) || []
+      const cleanAttrs = attrMatches
+        .map((attr: string) => {
+          const match = attr.match(/\s*([a-zA-Z-]+)\s*=\s*["']([^"']*)["']/)
+          if (!match) return ''
+          
+          const [, name, value] = match
+          if (allowedAttributes.has(name?.toLowerCase())) {
+            // Additional validation for href attributes
+            if (name.toLowerCase() === 'href') {
+              // Only allow http, https, mailto, and relative URLs
+              if (/^(https?:\/\/|mailto:|\/|#)/.test(value)) {
+                return `${name}="${value.replace(/"/g, '&quot;')}"`
+              }
+            } else {
+              return `${name}="${value.replace(/"/g, '&quot;')}"`
+            }
+          }
+          return ''
+        })
+        .filter((attr: string) => attr.length > 0)
+        .join(' ')
+      
+      if (cleanAttrs) {
+        cleanAttributes = ' ' + cleanAttrs
       }
-      return match;
     }
-  );
-  
+
+    return `<${normalizedTag}${cleanAttributes}>`
+  })
+
+  // Secure external link processing with proper domain validation
+  sanitized = sanitized.replace(
+    /<a\s+([^>]*href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*)>/gi,
+    (match, attributes, url) => {
+      try {
+        const urlObj = new URL(url)
+        const hostname = urlObj.hostname.toLowerCase()
+        
+        // Check if it's truly our domain (exact match or subdomain)
+        const isOurDomain = hostname === '434media.com' || 
+                           hostname.endsWith('.434media.com') ||
+                           hostname === 'localhost' ||
+                           hostname.startsWith('127.') ||
+                           hostname.startsWith('192.168.')
+
+        if (!isOurDomain) {
+          // Add security attributes for external links
+          let secureAttrs = attributes
+          if (!secureAttrs.includes('target=')) {
+            secureAttrs += ' target="_blank"'
+          }
+          if (!secureAttrs.includes('rel=')) {
+            secureAttrs += ' rel="noopener noreferrer"'
+          }
+          return `<a ${secureAttrs}>`
+        }
+        return match
+      } catch (e) {
+        // If URL parsing fails, treat as external for safety
+        let secureAttrs = attributes
+        if (!secureAttrs.includes('target=')) {
+          secureAttrs += ' target="_blank"'
+        }
+        if (!secureAttrs.includes('rel=')) {
+          secureAttrs += ' rel="noopener noreferrer"'
+        }
+        return `<a ${secureAttrs}>`
+      }
+    }
+  )
+
   // Add spacing classes to paragraphs that don't already have them
-  sanitized = sanitized.replace(/<p(?!\s+class=)([^>]*)>/gi, '<p class="mb-8"$1>')
+  sanitized = sanitized.replace(/<p(?!\s+[^>]*class\s*=)([^>]*)>/gi, '<p class="mb-8"$1>')
   
   // Convert double line breaks to paragraph breaks for better spacing
   sanitized = sanitized.replace(/\n\n+/g, '</p>\n<p class="mb-8">')
-  
+
   return sanitized
 }
 
