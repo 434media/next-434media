@@ -6,7 +6,7 @@ import { motion } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
-import { ChevronRight, FileText, ImageIcon, ChevronLeft } from "lucide-react"
+import { ChevronRight, ChevronLeft, Bot } from "lucide-react"
 
 interface AdminSection {
   id: string
@@ -21,60 +21,44 @@ interface AdminSection {
 
 const adminSections: AdminSection[] = [
   {
-    id: "ai-assistant",
-    title: "AI ASSISTANT",
-    subtitle: "RAG (Retrieval-Augmented Generation) Chatbot",
-    href: "/admin/ai-assistant",
-    icon: <OpenAIIcon className="w-8 h-8" />,
-    delay: 0,
+    id: "analytics-hub",
+    title: "ANALYTICS HUB",
+    subtitle: "GA4 • Instagram • Mailchimp",
+    href: "/admin/analytics",
+    icon: <GA4Icon className="w-8 h-8" />,
+    delay: 0.1,
     size: "large",
-    description: "Powered by OpenAI and the AI SDK, this chatbot provides intelligent responses trained on 434 MEDIA content",
+    description: "Unified dashboards for website traffic, social engagement, and email marketing performance in one place",
   },
   {
-  id: "analytics-hub",
-  title: "ANALYTICS HUB",
-  subtitle: "GA4 • Instagram • Mailchimp",
-  href: "/admin/analytics",
-  icon: <GA4Icon className="w-8 h-8" />,
-  delay: 0.1,
-  size: "large",
-  description: "Unified dashboards for website traffic, social engagement, and email marketing performance in one place",
-  },
-  {
-    id: "blog-admin",
-    title: "BLOG ADMIN",
-    subtitle: "Content Management",
-    href: "/admin/blog",
-    icon: <FileText className="w-8 h-8" />,
+    id: "sop-documentation",
+    title: "SOP DOCUMENTATION",
+    subtitle: "Standard Operating Procedures",
+    href: "/admin/sop-documentation",
+    icon: <AirtableIcon className="w-8 h-8" />,
     delay: 0.2,
     size: "large",
-    description: "Create, edit, and manage blog posts with our built-in rich text editor, and PostgreSQL database integration"
+    description: "Access to all standard operating procedures and documentation for internal processes",
   },
+]
+
+const testingSections: AdminSection[] = [
   {
-    id: "media-admin",
-    title: "MEDIA ADMIN",
-    subtitle: "Blog Asset Management Hub",
-    href: "/admin/blog/media",
-    icon: <ImageIcon className="w-8 h-8" />,
-    delay: 0.25,
+    id: "ai-assistant",
+    title: "AI ASSISTANT",
+    subtitle: "RAG Chatbot Testing",
+    href: "/admin/ai-assistant",
+    icon: <Bot className="w-8 h-8" />,
+    delay: 0.1,
     size: "large",
-    description: "Upload, organize, and manage media assets and images for blog posts, from our PostgreSQL database",
-  },
-  {
-    id: "data-admin",
-    title: "AIRTABLE DATA",
-    subtitle: "CRM File Management",
-    href: "/admin/airtable-data",
-    icon: <AirtableIcon className="w-8 h-8" />,
-    delay: 0.3,
-    size: "large",
-    description: "Manage and view Airtable bases, tables, and records directly from the Airtable API",
+    description: "Test and interact with the AI assistant powered by retrieval-augmented generation for accurate responses",
   },
 ]
 
 export default function AdminPage() {
   const [hoveredSection, setHoveredSection] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [activeView, setActiveView] = useState<'admin' | 'testing'>('admin')
 
   useEffect(() => {
     setMounted(true)
@@ -83,11 +67,11 @@ export default function AdminPage() {
   const getSquareClasses = (size: string) => {
     switch (size) {
       case "large":
-        return "col-span-2 row-span-2 h-48 md:h-56 lg:h-64"
+        return "col-span-1 sm:col-span-2 lg:row-span-2 h-40 sm:h-48 md:h-56 lg:h-64"
       case "medium":
-        return "col-span-2 row-span-1 h-24 md:h-28 lg:h-32"
+        return "col-span-1 row-span-1 h-32 sm:h-36 md:h-40"
       default:
-        return "col-span-2 row-span-1 h-24 md:h-28 lg:h-32"
+        return "col-span-1 sm:col-span-2 row-span-1 h-24 sm:h-28 md:h-32"
     }
   }
 
@@ -99,34 +83,109 @@ export default function AdminPage() {
     )
   }
 
+  const currentSections = activeView === 'admin' ? adminSections : testingSections
+
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-8 pt-32 md:pt-24">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-24 sm:pt-28 md:pt-24">
+        {/* Top Navigation - Mobile First Design */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex flex-col gap-6 mb-12 md:flex-row md:items-center md:justify-between"
+        >
+          {/* Back to Home - Above tabs on mobile, top left on desktop */}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors duration-300 text-lg group justify-start"
+          >
+            <motion.span className="group-hover:-translate-x-1 transition-transform duration-300">
+              <ChevronLeft className="inline-block" />
+            </motion.span>
+            Back to Home
+          </Link>
+
+          {/* Navigation Tabs - Full width on mobile, centered on desktop */}
+          <div className="flex items-center gap-4 md:gap-8 justify-start md:justify-center">
+            <button
+              onClick={() => setActiveView('admin')}
+              className={`text-lg md:text-xl lg:text-2xl font-ggx88 transition-all duration-300 relative ${
+                activeView === 'admin' 
+                  ? 'text-white' 
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              ADMIN PANEL
+              {activeView === 'admin' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute -bottom-2 left-0 right-0 h-0.5 bg-white"
+                  transition={{ duration: 0.3 }}
+                />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveView('testing')}
+              className={`text-lg md:text-xl lg:text-2xl font-ggx88 transition-all duration-300 relative ${
+                activeView === 'testing' 
+                  ? 'text-white' 
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              TESTING PLAYGROUND
+              {activeView === 'testing' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute -bottom-2 left-0 right-0 h-0.5 bg-white"
+                  transition={{ duration: 0.3 }}
+                />
+              )}
+            </button>
+          </div>
+
+          {/* Spacer for balance - hidden on mobile */}
+          <div className="hidden md:block md:w-32"></div>
+        </motion.div>
+
         {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-12 text-center"
+          className="mb-12 text-left md:text-center"
         >
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-ggx88 text-white mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-ggx88 text-white mb-4 md:mb-6 leading-tight">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-300 to-white">
-              ADMIN PANEL
+              {activeView === 'admin' ? 'ADMIN PANEL' : 'TESTING PLAYGROUND'}
             </span>
           </h1>
           <motion.p
-            className="text-gray-400 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed"
+            className="text-gray-400 text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed text-left md:text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
-            Centralized management dashboard for analytics, content, and system administration
+            {activeView === 'admin' 
+              ? 'Access to 434 SOP Documentation, Analytics and management tools'
+              : 'Explore concept workflows built with different AI Models and integrations'
+            }
           </motion.p>
         </motion.div>
 
-        {/* Admin Sections Grid */}
-        <div className="grid grid-cols-4 gap-4 md:gap-6 lg:gap-8 auto-rows-min max-w-full mb-12">
-          {adminSections.map((section) => (
+        {/* Sections Grid */}
+        <motion.div 
+          key={activeView}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className={`grid gap-3 sm:gap-4 md:gap-6 lg:gap-8 auto-rows-min max-w-full mb-12 ${
+            activeView === 'admin' 
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' 
+              : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4'
+          }`}
+        >
+          {currentSections.map((section) => (
             <motion.div
               key={section.id}
               initial={{ opacity: 0, scale: 0.8, rotateY: -15 }}
@@ -172,11 +231,11 @@ export default function AdminPage() {
                 />
 
                 {/* Content Container */}
-                <div className="relative h-full flex flex-col justify-center items-center p-6 md:p-8 z-10 text-center">
-                  <div className="flex flex-col items-center justify-center space-y-3">
+                <div className="relative h-full flex flex-col justify-center items-start sm:items-center p-4 sm:p-6 md:p-8 z-10 text-left sm:text-center">
+                  <div className="flex flex-col items-start sm:items-center justify-center space-y-2 sm:space-y-3 w-full">
                     {/* Icon */}
                     <motion.div
-                      className="text-white mb-2"
+                      className="text-white mb-1 sm:mb-2"
                       animate={{
                         y: hoveredSection === section.id ? -4 : 0,
                         scale: hoveredSection === section.id ? 1.1 : 1,
@@ -188,7 +247,7 @@ export default function AdminPage() {
 
                     {/* Title */}
                     <motion.h3
-                      className="font-ggx88 text-lg md:text-xl lg:text-2xl text-white leading-tight mb-1"
+                      className="font-ggx88 text-base sm:text-lg md:text-xl lg:text-2xl text-white leading-tight mb-1"
                       animate={{
                         y: hoveredSection === section.id ? -2 : 0,
                       }}
@@ -199,7 +258,7 @@ export default function AdminPage() {
 
                     {/* Subtitle */}
                     <motion.p
-                      className="font-geist-sans text-sm md:text-base text-gray-400 leading-relaxed"
+                      className="font-geist-sans text-xs sm:text-sm md:text-base text-gray-400 leading-relaxed"
                       initial={{ opacity: 0.8 }}
                       animate={{
                         opacity: hoveredSection === section.id ? 1 : 0.8,
@@ -210,14 +269,14 @@ export default function AdminPage() {
                       {section.subtitle}
                     </motion.p>
 
-                    {/* Description - only show on large cards when hovered */}
+                    {/* Description - only show on large cards when hovered or on mobile */}
                     {section.size === "large" && (
                       <motion.p
-                        className="font-geist-sans text-xs text-gray-500 leading-relaxed mt-2 max-w-xs"
+                        className="font-geist-sans text-xs text-gray-500 leading-relaxed mt-1 sm:mt-2 max-w-xs block sm:hidden md:block"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{
-                          opacity: hoveredSection === section.id ? 1 : 0,
-                          height: hoveredSection === section.id ? "auto" : 0,
+                          opacity: hoveredSection === section.id ? 1 : 0.7,
+                          height: hoveredSection === section.id || window.innerWidth < 640 ? "auto" : 0,
                         }}
                         transition={{ duration: 0.3, ease: "easeOut" }}
                       >
@@ -261,24 +320,6 @@ export default function AdminPage() {
               </Link>
             </motion.div>
           ))}
-        </div>
-
-        {/* Back to Home Link */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="text-center"
-        >
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors duration-300 text-lg group"
-          >
-            <motion.span className="group-hover:-translate-x-1 transition-transform duration-300">
-              <ChevronLeft className="inline-block" />
-            </motion.span>
-            Back to Home
-          </Link>
         </motion.div>
 
         {/* Footer Logo */}

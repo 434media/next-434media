@@ -70,10 +70,7 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
                     <span>{post.read_time} min read</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>{post.view_count}</span>
-                </div>
+          
               </div>
             </div>
           </div>
@@ -129,10 +126,7 @@ export default function BlogCard({ post, featured = false }: BlogCardProps) {
                 <span>{post.read_time} min</span>
               </div>
             )}
-            <div className="flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5" />
-              <span>{post.view_count}</span>
-            </div>
+       
           </div>
         </div>
       </Link>
