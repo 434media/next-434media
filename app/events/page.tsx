@@ -267,7 +267,7 @@ export default function EventsPage() {
                             <span className="lg:hidden"> Scroll up to select a different date or show all events.</span>
                           </>
                         )
-                        : 'Curated experiences from our Airtable database. Join events that build meaningful connections.'
+                        : 'Join events that build meaningful connections.'
                       }
                     </p>
                     {/* Only show this button on desktop when date is selected */}
