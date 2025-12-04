@@ -1,21 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { i18n } from "./i18n-config"
 
-// Define a list of paths that should bypass the middleware
+// Define a list of paths that should bypass the proxy
 const BYPASS_PATHS = ["/_next/", "/api/", "/favicon.ico", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".mp3", ".mp4"]
 
 export const config = {
-  // Only run middleware on specific paths to improve performance
+  // Only run proxy on specific paths to improve performance
   matcher: [
     // Skip all internal paths (_next)
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // Skip middleware for paths that should bypass
+  // Skip proxy for paths that should bypass
   if (BYPASS_PATHS.some((path) => pathname.includes(path))) {
     return NextResponse.next()
   }
