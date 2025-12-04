@@ -11,8 +11,11 @@ import { ProductProvider } from "../../components/shopify/product/product-contex
 import { ProductDescription } from "../../components/shopify/product/product-description"
 import { BackButton } from "../../components/shopify/product/back-button"
 
-export async function generateMetadata({ params }: { params: { handle: string } }): Promise<Metadata> {
-  const product = await getProduct(params.handle)
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const { handle } = await params
+  const product = await getProduct(handle)
 
   if (!product) return notFound()
 
@@ -89,17 +92,25 @@ async function RelatedProducts({ id }: { id: string }) {
 }
 
 // Main ProductPage component with updated TXMX styling and responsive layout
-export default async function ProductPage({ params }: { params: { handle: string } }) {
-  const product = await getProduct(params.handle)
+export default async function ProductPage({ params }: { params: Promise<{ handle: string }> }) {
+  const { handle } = await params
+  let product;
+  
+  try {
+    product = await getProduct(handle);
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    notFound();
+  }
 
-  if (!product) return notFound()
+  if (!product) return notFound();
 
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.title,
     description: product.description,
-    image: product.featuredImage.url,
+    ...(product.featuredImage?.url && { image: product.featuredImage.url }),
     offers: {
       "@type": "AggregateOffer",
       availability: product.availableForSale ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",

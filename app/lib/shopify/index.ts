@@ -67,6 +67,12 @@ export async function shopifyFetch<T>({
   variables?: Record<string, unknown>
 }): Promise<{ status: number; body: T } | never> {
   try {
+    if (!endpoint || !key) {
+      throw new Error(
+        `Shopify credentials not configured. Domain: ${domain ? 'set' : 'missing'}, Key: ${key ? 'set' : 'missing'}`
+      );
+    }
+
     const result = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -474,14 +480,24 @@ export async function getProduct(handle: string): Promise<Product | undefined> {
   // cacheTag(TAGS.products);
   // cacheLife('days');
 
-  const res = await shopifyFetch<ShopifyProductOperation>({
-    query: getProductQuery,
-    variables: {
-      handle
-    }
-  });
+  try {
+    const res = await shopifyFetch<ShopifyProductOperation>({
+      query: getProductQuery,
+      variables: {
+        handle
+      }
+    });
 
-  return reshapeProduct(res.body.data.product, false);
+    if (!res.body?.data?.product) {
+      console.error('Product not found in Shopify response:', handle);
+      return undefined;
+    }
+
+    return reshapeProduct(res.body.data.product, false);
+  } catch (error) {
+    console.error('Error fetching product from Shopify:', handle, error);
+    throw error;
+  }
 }
 
 export async function getProductRecommendations(
@@ -560,11 +576,11 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
   }
 
   if (isCollectionUpdate) {
-    revalidateTag(TAGS.collections);
+    revalidateTag(TAGS.collections, 'default');
   }
 
   if (isProductUpdate) {
-    revalidateTag(TAGS.products);
+    revalidateTag(TAGS.products, 'default');
   }
 
   return NextResponse.json({ status: 200, revalidated: true, now: Date.now() });

@@ -53,7 +53,7 @@ export default function ShopPage() {
     setIsLoading(true)
     // Brief loading state for better UX
     setTimeout(() => {
-      window.location.href = "product/txmx-boxing-founders-tee?color=Black"
+      window.location.href = "/product/txmx-boxing-founders-tee?color=Black"
     }, 150)
   }, [])
 
