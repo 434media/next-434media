@@ -41,7 +41,7 @@ import {
   getCollectionProductsQuery 
 } from "./queries/collection"
 import { getMenuQuery } from "./queries/menu"
-import { getPageQuery, getPagesQuery } from "./queries/page"
+import { getPageQuery, getPagesQuery } from "./queries/page-queries"
 import { 
   getProductQuery,
   getProductsQuery,
