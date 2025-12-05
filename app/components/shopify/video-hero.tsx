@@ -265,7 +265,7 @@ export function VideoHero({
             playsInline
             loop
             muted={true}
-            poster="/placeholder.svg?height=1080&width=1920&text=Loading..."
+            poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
             aria-label={`${title} promotional video`}
             preload="auto"
           >

@@ -282,7 +282,7 @@ export function CollectionBanner({
                 loop
                 autoPlay
                 className="h-full w-full object-cover"
-                poster="/placeholder.svg?height=600&width=1600&text=Loading..."
+                poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
               >
                 <source src={image} type="video/mp4" />
                 Your browser does not support the video tag.

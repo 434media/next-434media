@@ -116,7 +116,7 @@ export function ProductImageCarousel({ products }: ProductImageCarouselProps) {
           className="absolute inset-0"
         >
           <Image
-            src={allImages[currentIndex]?.url || "/placeholder.svg?height=400&width=400"}
+            src={allImages[currentIndex]?.url || ''}
             alt={allImages[currentIndex]?.altText || "Product image"}
             fill
             className="object-cover"

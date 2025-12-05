@@ -363,7 +363,7 @@ export default function CartModal() {
                           width={80}
                           height={80}
                           alt={item.merchandise.product.featuredImage.altText || item.merchandise.product.title}
-                          src={item.merchandise.product.featuredImage.url || "/placeholder.svg"}
+                          src={item.merchandise.product.featuredImage?.url || ''}
                         />
                       </Link>
                       <div className="absolute -top-2 -left-2">
