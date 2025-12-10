@@ -40,16 +40,6 @@ const adminSections: AdminSection[] = [
     size: "large",
     description: "Submit new feed items that will be sent to Airtable for Digital Canvas distribution",
   },
-  {
-    id: "sop-documentation",
-    title: "SOP DOCUMENTATION",
-    subtitle: "Standard Operating Procedures",
-    href: "/admin/sop-documentation",
-    icon: <AirtableIcon className="w-8 h-8" />,
-    delay: 0.2,
-    size: "large",
-    description: "Access to all standard operating procedures and documentation for internal processes",
-  },
 ]
 
 const testingSections: AdminSection[] = [

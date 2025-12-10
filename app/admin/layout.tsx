@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Shield, LogIn, AlertCircle } from "lucide-react"
+import { Shield, AlertCircle } from "lucide-react"
 
 export default function AdminLayout({
   children,
