@@ -11,6 +11,7 @@ import {
   getAvailableProperties,
 } from "../../lib/google-analytics"
 import { validateAnalyticsConfig, getConfigurationStatus } from "../../lib/analytics-config"
+import { getSession } from "../../lib/auth"
 
 // Helper function to convert relative dates to YYYY-MM-DD format
 function formatDateForGA(dateString: string): string {
@@ -92,27 +93,23 @@ export async function GET(request: NextRequest) {
     const endDateParam = searchParams.get("endDate") || "today"
     const propertyIdParam = searchParams.get("propertyId") // Get as string | null
     const propertyId = propertyIdParam || undefined // Convert null to undefined
-    const adminKey = request.headers.get("x-admin-key")
 
     console.log("[Analytics API] Request parameters:", {
       endpoint,
       startDateParam,
       endDateParam,
       propertyId,
-      hasAdminKey: !!adminKey,
-      adminKeyLength: adminKey?.length || 0,
     })
 
-    // Validate admin key
-    const expectedAdminKey = process.env.ADMIN_PASSWORD
-    console.log("[Analytics API] Admin key validation:", {
-      hasExpectedKey: !!expectedAdminKey,
-      expectedKeyLength: expectedAdminKey?.length || 0,
-      keysMatch: adminKey === expectedAdminKey,
+    // Validate session
+    const session = await getSession()
+    console.log("[Analytics API] Session validation:", {
+      hasSession: !!session,
+      userEmail: session?.email,
     })
 
-    if (!adminKey || adminKey !== expectedAdminKey) {
-      console.error("[Analytics API] Invalid admin key")
+    if (!session) {
+      console.error("[Analytics API] No valid session")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

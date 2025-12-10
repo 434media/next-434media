@@ -82,13 +82,10 @@ export function PageViewsChart({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-
         // Log the request details for debugging
         console.log("[PageViewsChart] Fetching data with:", {
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
-          hasAdminKey: !!adminKey,
           propertyId,
         })
 
@@ -97,11 +94,7 @@ export function PageViewsChart({
           url += `&propertyId=${propertyId}`
         }
 
-        const response = await fetch(url, {
-          headers: {
-            "x-admin-key": adminKey || "",
-          },
-        })
+        const response = await fetch(url)
 
         if (!response.ok) {
           const errorText = await response.text()

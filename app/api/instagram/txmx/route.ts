@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getSession } from "../../../lib/auth"
 import { validateInstagramConfig, getInstagramConfigurationStatus } from "../../../lib/instagram-config"
 import { calculateEngagementRate, extractHashtags } from "../../../lib/instagram-utils"
 
@@ -105,19 +106,17 @@ export async function GET(request: NextRequest) {
     const startDateParam = searchParams.get("startDate") || "30daysAgo"
     const endDateParam = searchParams.get("endDate") || "today"
   const debug = (searchParams.get("debug") || "").toLowerCase() === "true"
-    const adminKey = request.headers.get("x-admin-key")
 
     console.log("[Instagram API] Request parameters:", {
       endpoint,
       startDateParam,
       endDateParam,
-      hasAdminKey: !!adminKey,
     })
 
-    // Validate admin key
-    const expectedAdminKey = process.env.ADMIN_PASSWORD
-    if (!adminKey || adminKey !== expectedAdminKey) {
-      console.error("[Instagram API] Invalid admin key")
+    // Check for valid session
+    const session = await getSession()
+    if (!session) {
+      console.error("[Instagram API] No valid session")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

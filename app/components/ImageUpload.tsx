@@ -53,14 +53,9 @@ export function ImageUpload({
       // Upload to server
       const formData = new FormData()
       formData.append("file", file)
-
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
       
       const response = await fetch("/api/upload", {
         method: "POST",
-        headers: {
-          "x-admin-key": adminKey || "",
-        },
         body: formData,
       })
 

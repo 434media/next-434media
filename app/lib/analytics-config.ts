@@ -14,9 +14,6 @@ export const analyticsConfig = {
 
   // Service Account Authentication (JSON key)
   googleServiceAccountKey: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-
-  // Admin authentication
-  adminPassword: process.env.ADMIN_PASSWORD,
 } as const
 
 // Property configuration array
@@ -59,7 +56,6 @@ export function getMissingEnvironmentVariables(): string[] {
   // Core required variables
   if (!analyticsConfig.gcpProjectId) missing.push("GCP_PROJECT_ID")
   if (!analyticsConfig.googleServiceAccountKey) missing.push("GOOGLE_SERVICE_ACCOUNT_KEY")
-  if (!analyticsConfig.adminPassword) missing.push("ADMIN_PASSWORD")
 
   // Property IDs (at least main property should be configured)
   if (!analyticsConfig.ga4PropertyId) missing.push("GA4_PROPERTY_ID")
@@ -133,7 +129,6 @@ export function getConfigurationStatus() {
     propertyId: analyticsConfig.ga4PropertyId,
     projectId: analyticsConfig.gcpProjectId,
     hasServiceAccountKey: !!analyticsConfig.googleServiceAccountKey,
-    hasAdminPassword: !!analyticsConfig.adminPassword,
     environmentVariables: {
       GA4_PROPERTY_ID: !!process.env.GA4_PROPERTY_ID,
       GA4_PROPERTY_ID_TXMX: !!process.env.GA4_PROPERTY_ID_TXMX,
@@ -144,7 +139,6 @@ export function getConfigurationStatus() {
       GA4_PROPERTY_ID_DIGITALCANVAS: !!process.env.GA4_PROPERTY_ID_DIGITALCANVAS,
       GCP_PROJECT_ID: !!process.env.GCP_PROJECT_ID,
       GOOGLE_SERVICE_ACCOUNT_KEY: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-      ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
     },
   }
 }

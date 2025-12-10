@@ -27,21 +27,17 @@ export function TopPagesTable({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-
         let url = `/api/analytics?endpoint=toppages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
         if (propertyId) {
           url += `&propertyId=${propertyId}`
         }
 
-        const response = await fetch(url, {
-          headers: {
-            "x-admin-key": adminKey || "",
-          },
-        })
+        const response = await fetch(url)
 
         if (!response.ok) {
-          throw new Error("Failed to fetch top pages data")
+          const errorData = await response.json().catch(() => ({ error: response.statusText }))
+          console.error("Top pages API error:", response.status, errorData)
+          throw new Error(errorData.error || "Failed to fetch top pages data")
         }
 
         const result = await response.json()

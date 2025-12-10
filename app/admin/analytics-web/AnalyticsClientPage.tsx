@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion } from "motion/react"
 import { DashboardHeader } from "../../components/analytics/DashboardHeader"
 import { DateRangeSelector } from "../../components/analytics/DateRangeSelector"
 import { MetricsOverview } from "../../components/analytics/MetricsOverview"
@@ -10,6 +9,7 @@ import { TopPagesTable } from "../../components/analytics/TopPagesTable"
 import { TrafficSourcesChart } from "../../components/analytics/TrafficSourcesChart"
 import { DeviceBreakdown } from "../../components/analytics/DeviceBreakdown"
 import { GeographicMap } from "../../components/analytics/GeographicMap"
+import { InfoTooltip } from "../../components/analytics/InfoTooltip"
 import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "../../types/analytics"
 
 export default function AnalyticsClientPage() {
@@ -39,14 +39,9 @@ export default function AnalyticsClientPage() {
 
   const loadAvailableProperties = async () => {
     try {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-      if (!adminKey) return
-
       console.log("Loading available properties...")
 
-      const response = await fetch("/api/analytics?endpoint=properties", {
-        headers: { "x-admin-key": adminKey },
-      })
+      const response = await fetch("/api/analytics?endpoint=properties")
 
       if (response.ok) {
         const result = await response.json()
@@ -122,26 +117,17 @@ export default function AnalyticsClientPage() {
     setError(null)
   }
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("adminKey")
-    localStorage.removeItem("adminKey")
+  const handleLogout = async () => {
+    await fetch("/api/auth/signout", { method: "POST" })
     window.location.href = "/admin"
   }
 
   const testConnection = async () => {
-    try {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-      if (!adminKey) {
-        return
-      }
-
-      const url = selectedPropertyId
+    try {      const url = selectedPropertyId
         ? `/api/analytics?endpoint=test-connection&propertyId=${selectedPropertyId}`
         : "/api/analytics?endpoint=test-connection"
 
-      const response = await fetch(url, {
-        headers: { "x-admin-key": adminKey },
-      })
+      const response = await fetch(url)
 
       if (response.ok) {
         const status = await response.json()
@@ -154,66 +140,32 @@ export default function AnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pt-24 md:pt-20">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-            rotate: [0, 180, 360],
-          }}
-          transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-          className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"
-        />
-        <motion.div
-          animate={{
-            x: [0, -100, 0],
-            y: [0, 100, 0],
-            rotate: [360, 180, 0],
-          }}
-          transition={{ duration: 25, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"
-        />
-      </div>
-
-      <div className="relative z-10 pt-8 pb-8">
+    <div className="min-h-screen bg-black pt-24 md:pt-20">
+      <div className="pt-8 pb-8">
         <div className="container mx-auto px-4 max-w-7xl">
           {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <DashboardHeader
-              onRefresh={handleRefresh}
-              onLogout={handleLogout}
-              isLoading={isLoading}
-              availableProperties={availableProperties}
-              selectedPropertyId={selectedPropertyId}
-              onPropertyChange={handlePropertyChange}
-            />
-          </motion.div>
+          <DashboardHeader
+            onRefresh={handleRefresh}
+            onLogout={handleLogout}
+            isLoading={isLoading}
+            availableProperties={availableProperties}
+            selectedPropertyId={selectedPropertyId}
+            onPropertyChange={handlePropertyChange}
+          />
 
           {/* Date Range Selector */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="mb-8"
-          >
+          <div className="mb-8">
             <DateRangeSelector selectedRange={selectedDateRange} onRangeChange={handleDateRangeChange} />
-          </motion.div>
+          </div>
 
           {/* Connection Status - Only show if connected */}
           {connectionStatus?.success && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="mb-4"
-            >
-              <div className="p-4 rounded-xl backdrop-blur-sm bg-green-500/10 border border-green-500/20">
+            <div className="mb-4">
+              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-green-400">Google Analytics: Connected</p>
-                    <p className="text-xs text-white/60 mt-1">
+                    <p className="text-sm font-medium text-white">Google Analytics Connected</p>
+                    <p className="text-xs text-white/50 mt-1">
                       Property: {connectionStatus.propertyId} | Dimensions: {connectionStatus.dimensionCount} | Metrics:{" "}
                       {connectionStatus.metricCount}
                     </p>
@@ -227,18 +179,13 @@ export default function AnalyticsClientPage() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* Error Display */}
           {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="mb-4"
-            >
-              <div className="p-4 rounded-xl backdrop-blur-sm bg-red-500/10 border border-red-500/20">
+            <div className="mb-4">
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                 <p className="text-sm font-medium text-red-400">Error</p>
                 <p className="text-xs text-white/60 mt-1">{error}</p>
                 <button
@@ -248,113 +195,105 @@ export default function AnalyticsClientPage() {
                   Dismiss
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* Analytics Dashboard - Always show components */}
           <>
             {/* Metrics Overview */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="mb-8"
-            >
+            <div className="mb-10 md:mb-12">
+              <div className="flex items-center mb-4">
+                <h2 className="text-lg font-semibold text-white">Key Metrics</h2>
+                <InfoTooltip content="High-level overview of your website's performance. Users are unique visitors, Sessions are visits, Page Views are total pages loaded, and Bounce Rate is the percentage of single-page visits." />
+              </div>
               <MetricsOverview
                 dateRange={selectedDateRange}
                 isLoading={isLoading}
                 setError={setError}
                 propertyId={selectedPropertyId}
               />
-            </motion.div>
+            </div>
 
             {/* Page Views Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="mb-8"
-            >
+            <div className="mb-10 md:mb-12">
+              <div className="flex items-center mb-4">
+                <h2 className="text-lg font-semibold text-white">Traffic Trend</h2>
+                <InfoTooltip content="Daily page view trends showing traffic patterns over time. Use this to identify peak traffic days and overall growth trends." />
+              </div>
               <PageViewsChart
                 dateRange={selectedDateRange}
                 isLoading={isLoading}
                 setError={setError}
                 propertyId={selectedPropertyId}
               />
-            </motion.div>
+            </div>
 
-            {/* Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5 }}
-              >
+            {/* Top Pages and Traffic Sources - Side by Side on Desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10 md:mb-12">
+              <div>
+                <div className="flex items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white">Top Performing Pages</h2>
+                  <InfoTooltip content="Your most visited pages ranked by views. This helps identify your most valuable content and where users spend their time." />
+                </div>
+                <TopPagesTable
+                  dateRange={selectedDateRange}
+                  isLoading={isLoading}
+                  setError={setError}
+                  propertyId={selectedPropertyId}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white">Traffic Sources</h2>
+                  <InfoTooltip content="Where your visitors are coming from. Referral traffic comes from other websites, organic is from search engines, and direct is when users type your URL directly." />
+                </div>
                 <TrafficSourcesChart
                   dateRange={selectedDateRange}
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
                 />
-              </motion.div>
+              </div>
+            </div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.6 }}
-              >
+            {/* Geographic Distribution and Device Types - Side by Side on Desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10 md:mb-12 pb-8">
+              <div>
+                <div className="flex items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white">Geographic Distribution</h2>
+                  <InfoTooltip content="Where your visitors are located geographically. This helps understand your audience's location and can inform regional content strategies." />
+                </div>
+                <GeographicMap
+                  dateRange={selectedDateRange}
+                  isLoading={isLoading}
+                  setError={setError}
+                  propertyId={selectedPropertyId}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white">Device Types</h2>
+                  <InfoTooltip content="The types of devices visitors use to access your site. This helps ensure your site is optimized for the most common device types." />
+                </div>
                 <DeviceBreakdown
                   dateRange={selectedDateRange}
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
                 />
-              </motion.div>
+              </div>
             </div>
-
-            {/* Geographic Map */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.7 }}
-              className="mb-8"
-            >
-              <GeographicMap
-                dateRange={selectedDateRange}
-                isLoading={isLoading}
-                setError={setError}
-                propertyId={selectedPropertyId}
-              />
-            </motion.div>
-
-            {/* Top Pages Table */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.8 }}
-              className="mb-8"
-            >
-              <TopPagesTable
-                dateRange={selectedDateRange}
-                isLoading={isLoading}
-                setError={setError}
-                propertyId={selectedPropertyId}
-              />
-            </motion.div>
           </>
 
           {/* Footer */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.9 }}
-            className="text-center text-white/60 text-sm"
-          >
+          <div className="text-center text-white/40 text-sm pt-8 pb-4">
             <p>
               Powered by Google Analytics 4 <span className="hidden md:inline">•</span>{" "}
               <span className="block md:inline">Last updated: {new Date().toLocaleString()}</span>
             </p>
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>

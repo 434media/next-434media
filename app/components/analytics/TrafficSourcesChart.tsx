@@ -82,9 +82,9 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
   // Default for all other sources
   return {
     icon: <Globe className="h-5 w-5" />,
-    color: "text-purple-400",
-    gradientFrom: "from-purple-500/20",
-    gradientTo: "to-purple-600/5",
+    color: "text-sky-400",
+    gradientFrom: "from-sky-500/20",
+    gradientTo: "to-cyan-600/5",
   }
 }
 
@@ -101,21 +101,17 @@ export function TrafficSourcesChart({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const adminKey = sessionStorage.getItem("adminKey")
-
         let url = `/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
         if (propertyId) {
           url += `&propertyId=${propertyId}`
         }
 
-        const response = await fetch(url, {
-          headers: {
-            "x-admin-key": adminKey || "",
-          },
-        })
+        const response = await fetch(url)
 
         if (!response.ok) {
-          throw new Error("Failed to fetch traffic sources data")
+          const errorData = await response.json().catch(() => ({ error: response.statusText }))
+          console.error("Traffic sources API error:", response.status, errorData)
+          throw new Error(errorData.error || "Failed to fetch traffic sources data")
         }
 
         const result = await response.json()
@@ -141,17 +137,17 @@ export function TrafficSourcesChart({
       className="h-full"
     >
       <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-pink-500/5 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 via-transparent to-cyan-500/5 rounded-lg" />
 
         <CardHeader className="relative pb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <motion.div
-                className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl shadow-lg"
+                className="p-3 bg-gradient-to-br from-sky-500/20 to-cyan-500/20 rounded-xl shadow-lg"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
-                <TrendingUp className="h-6 w-6 text-purple-400" />
+                <TrendingUp className="h-6 w-6 text-sky-400" />
               </motion.div>
               <div>
                 <CardTitle className="text-white text-xl font-bold mb-1">Traffic Sources</CardTitle>
@@ -170,11 +166,11 @@ export function TrafficSourcesChart({
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
               >
-                <Loader2 className="h-6 w-6 text-purple-400" />
+                <Loader2 className="h-6 w-6 text-sky-400" />
               </motion.div>
             </div>
           ) : (
-            <div className="space-y-4 max-h-80 md:max-h-110 overflow-y-auto pr-1">
+            <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
               {data.map((source, index) => {
                 const percentage = totalSessions > 0 ? (source.sessions / totalSessions) * 100 : 0
                 const iconConfig = getSourceIconConfig(source.source)

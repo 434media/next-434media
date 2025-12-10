@@ -47,16 +47,10 @@ export default function ChatInterface() {
     setStreamingContent("")
 
     try {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-      if (!adminKey) {
-        throw new Error("No admin key found")
-      }
-
       const response = await fetch("/api/ai-assistant/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${adminKey}`,
         },
         body: JSON.stringify({
           message: content,

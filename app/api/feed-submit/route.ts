@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createFeedItem } from "../../lib/airtable-feed"
+import { getSession } from "../../lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
-    // Check admin authentication
-    const adminKey = request.headers.get("x-admin-key")
-    const validAdminKey = process.env.ADMIN_PASSWORD
-
-    if (!adminKey || adminKey !== validAdminKey) {
+    // Check admin authentication using session
+    const session = await getSession()
+    
+    if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
@@ -49,11 +49,10 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve feed items (optional - for viewing existing items)
 export async function GET(request: NextRequest) {
   try {
-    // Check admin authentication
-    const adminKey = request.headers.get("x-admin-key")
-    const validAdminKey = process.env.ADMIN_PASSWORD
-
-    if (!adminKey || adminKey !== validAdminKey) {
+    // Check admin authentication using session
+    const session = await getSession()
+    
+    if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
@@ -92,11 +91,10 @@ export async function GET(request: NextRequest) {
 // PATCH endpoint to update an existing feed item
 export async function PATCH(request: NextRequest) {
   try {
-    // Check admin authentication
-    const adminKey = request.headers.get("x-admin-key")
-    const validAdminKey = process.env.ADMIN_PASSWORD
-
-    if (!adminKey || adminKey !== validAdminKey) {
+    // Check admin authentication using session
+    const session = await getSession()
+    
+    if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
@@ -141,11 +139,10 @@ export async function PATCH(request: NextRequest) {
 // DELETE endpoint to delete a feed item
 export async function DELETE(request: NextRequest) {
   try {
-    // Check admin authentication
-    const adminKey = request.headers.get("x-admin-key")
-    const validAdminKey = process.env.ADMIN_PASSWORD
-
-    if (!adminKey || adminKey !== validAdminKey) {
+    // Check admin authentication using session
+    const session = await getSession()
+    
+    if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }

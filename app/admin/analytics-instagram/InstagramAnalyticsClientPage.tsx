@@ -56,25 +56,18 @@ export default function InstagramAnalyticsClientPage() {
 
   // Load Instagram data on component mount and when date range changes
   useEffect(() => {
-    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-    if (adminKey) {
-      loadInstagramData(adminKey)
-    }
+    loadInstagramData()
   }, [dateRange])
 
-  const loadInstagramData = async (adminKey: string) => {
+  const loadInstagramData = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const headers = { "x-admin-key": adminKey }
-
       // Test connection first
-      const connectionResponse = await fetch("/api/instagram/txmx?endpoint=test-connection", { headers })
+      const connectionResponse = await fetch("/api/instagram/txmx?endpoint=test-connection")
       if (!connectionResponse.ok) {
         if (connectionResponse.status === 401) {
-          sessionStorage.removeItem("adminKey")
-          localStorage.removeItem("adminKey")
           window.location.href = "/admin"
           return
         }
@@ -95,9 +88,9 @@ export default function InstagramAnalyticsClientPage() {
       const endDate = "today"
 
       const [accountRes, insightsRes, mediaRes] = await Promise.all([
-        fetch("/api/instagram/txmx?endpoint=account-info", { headers }),
-        fetch(`/api/instagram/txmx?endpoint=insights&startDate=${startDate}&endDate=${endDate}`, { headers }),
-        fetch("/api/instagram/txmx?endpoint=media", { headers }),
+        fetch("/api/instagram/txmx?endpoint=account-info"),
+        fetch(`/api/instagram/txmx?endpoint=insights&startDate=${startDate}&endDate=${endDate}`),
+        fetch("/api/instagram/txmx?endpoint=media"),
       ])
 
       const [accountResult, insightsResult, mediaResult] = await Promise.all([
@@ -176,20 +169,16 @@ export default function InstagramAnalyticsClientPage() {
   }
 
   const handleRefresh = () => {
-    const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-    if (adminKey) {
-      loadInstagramData(adminKey)
-    }
+    loadInstagramData()
   }
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("adminKey")
-    localStorage.removeItem("adminKey")
+  const handleLogout = async () => {
+    await fetch("/api/auth/signout", { method: "POST" })
     window.location.href = "/admin"
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900">
       <div className="container mx-auto px-4 py-8 pt-32 md:pt-24">
         <InstagramDashboardHeader
           connectionStatus={connectionStatus}

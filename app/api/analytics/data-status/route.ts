@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
+import { getSession } from "../../../lib/auth"
 
 const sql = neon(process.env.DATABASE_URL!)
 
 export async function GET(request: Request) {
   try {
-    // Check for admin authorization
-    const adminKey = request.headers.get("x-admin-key")
+    // Check for valid session
+    const session = await getSession()
 
-    if (!adminKey || adminKey !== process.env.ADMIN_PASSWORD) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

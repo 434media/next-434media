@@ -28,21 +28,17 @@ export function GeographicMap({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        const adminKey = sessionStorage.getItem("adminKey")
-
         let url = `/api/analytics?endpoint=geographic&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
         if (propertyId) {
           url += `&propertyId=${propertyId}`
         }
 
-        const response = await fetch(url, {
-          headers: {
-            "x-admin-key": adminKey || "",
-          },
-        })
+        const response = await fetch(url)
 
         if (!response.ok) {
-          throw new Error("Failed to fetch geographic data")
+          const errorData = await response.json().catch(() => ({ error: response.statusText }))
+          console.error("Geographic API error:", response.status, errorData)
+          throw new Error(errorData.error || "Failed to fetch geographic data")
         }
 
         const result = await response.json()

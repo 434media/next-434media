@@ -6,7 +6,7 @@ import { motion } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronLeft, Bot, FileText } from "lucide-react"
+import { ChevronRight, ChevronLeft, Bot } from "lucide-react"
 
 interface AdminSection {
   id: string

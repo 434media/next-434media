@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
+import { getSession } from "../../../lib/auth"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -113,11 +114,10 @@ export async function POST(request: NextRequest) {
   try {
     console.log("[Historical Data API] Starting data insertion...")
 
-    // Verify admin access
-    const adminKey = request.headers.get("x-admin-key")
-    const expectedAdminKey = process.env.ADMIN_PASSWORD
+    // Check for valid session
+    const session = await getSession()
 
-    if (!adminKey || adminKey !== expectedAdminKey) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -274,10 +274,9 @@ export async function POST(request: NextRequest) {
 // GET endpoint to check if historical data exists
 export async function GET(request: NextRequest) {
   try {
-    const adminKey = request.headers.get("x-admin-key")
-    const expectedAdminKey = process.env.ADMIN_PASSWORD
+    const session = await getSession()
 
-    if (!adminKey || adminKey !== expectedAdminKey) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

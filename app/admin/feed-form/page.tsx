@@ -202,14 +202,9 @@ export default function FeedFormPage() {
   const loadFeedItems = async () => {
     setIsLoading(true)
     try {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
       const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
       
-      const response = await fetch(`/api/feed-submit?table=${currentBrand?.tableName || "thefeed"}`, {
-        headers: {
-          "x-admin-key": adminKey || "",
-        },
-      })
+      const response = await fetch(`/api/feed-submit?table=${currentBrand?.tableName || "thefeed"}`)
 
       const result = await response.json()
 
@@ -473,7 +468,6 @@ export default function FeedFormPage() {
         method,
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey || "",
         },
         body: JSON.stringify(body),
       })
@@ -596,13 +590,8 @@ export default function FeedFormPage() {
     }
 
     try {
-      const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
-      
       const response = await fetch(`/api/feed-submit?id=${id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-key": adminKey || "",
-        },
       })
 
       const result = await response.json()

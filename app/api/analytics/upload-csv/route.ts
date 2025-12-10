@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Pool } from "pg"
 import { parse } from "csv-parse/sync"
+import { getSession } from "../../../lib/auth"
 
 // Create a connection pool for Neon PostgreSQL
 const pool = new Pool({
@@ -12,9 +13,9 @@ const pool = new Pool({
 
 export async function POST(request: NextRequest) {
   try {
-    // Check admin authentication
-    const authHeader = request.headers.get("x-admin-key")
-    if (authHeader !== process.env.ADMIN_PASSWORD) {
+    // Check for valid session
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 

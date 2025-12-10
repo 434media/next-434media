@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { writeFile, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
+import { getSession } from "../../lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
-    // Check admin authentication
-    const adminKey = request.headers.get("x-admin-key")
-    const validAdminKey = process.env.ADMIN_PASSWORD
+    // Check for valid session
+    const session = await getSession()
 
-    if (!adminKey || adminKey !== validAdminKey) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
+import { getSession } from "../../../lib/auth"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -78,11 +79,10 @@ CREATE INDEX IF NOT EXISTS idx_device_data_date ON vercel_device_data(date);
 
 export async function GET(request: Request) {
   try {
-    // Check for admin authorization
-    const url = new URL(request.url)
-    const adminKey = url.searchParams.get("adminKey")
+    // Check for valid session
+    const session = await getSession()
 
-    if (!adminKey || adminKey !== process.env.ADMIN_PASSWORD) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
