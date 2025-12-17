@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "motion/react"
 import { useMobile } from "../../hooks/use-mobile"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
@@ -200,103 +199,79 @@ export default function SDOHNewsletter({
 
   return (
     <div className="w-full" id="newsletter">
-      <AnimatePresence mode="wait">
-        {!isSuccess ? (
-          <motion.form
-            ref={formRef}
-            key="subscribe-form"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            onSubmit={handleSubmit}
-            className="newsletter-form"
-            aria-label="SDOH Newsletter subscription form"
-          >
-            <div className="relative flex flex-col sm:flex-row items-center overflow-hidden rounded-lg bg-white/10 border border-white/20 shadow-lg focus-within:ring-2 focus-within:ring-white/50">
-              <label htmlFor="sdoh-email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="sdoh-email"
-                ref={inputRef}
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={d.placeholder || "Enter your email"}
-                className="w-full px-4 py-3 sm:py-4 bg-transparent focus:outline-none text-white text-sm sm:text-base placeholder-white/70"
-                aria-describedby={error ? "newsletter-error" : undefined}
+      {!isSuccess ? (
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="newsletter-form"
+          aria-label="SDOH Newsletter subscription form"
+        >
+          <div className="relative flex flex-col sm:flex-row items-center overflow-hidden bg-white/10 border border-white/20">
+            <label htmlFor="sdoh-email" className="sr-only">
+              Email address
+            </label>
+            <input
+              id="sdoh-email"
+              ref={inputRef}
+              name="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={d.placeholder || "Enter your email"}
+              className="w-full px-4 py-3 sm:py-4 bg-transparent focus:outline-none text-white text-sm sm:text-base placeholder-white/70"
+              aria-describedby={error ? "newsletter-error" : undefined}
+              disabled={isSubmitting}
+              autoComplete="email"
+            />
+            <div className={`${isMobile ? "w-full mt-2 px-4 pb-4" : "absolute right-2"}`}>
+              <button
+                type="submit"
                 disabled={isSubmitting}
-                autoComplete="email"
-              />
-              <div className={`${isMobile ? "w-full mt-2 px-4 pb-4" : "absolute right-2"}`}>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`${isMobile ? "w-full" : "w-auto px-4 h-10"} bg-white text-neutral-700 rounded-full flex items-center justify-center hover:bg-neutral-100 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-700 py-2 px-4`}
-                  aria-label="Subscribe to SDOH newsletter"
-                >
-                  <motion.div
-                    animate={isSubmitting ? { rotate: 360 } : { rotate: 0 }}
-                    transition={isSubmitting ? { duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" } : {}}
-                    className="flex items-center justify-center"
-                  >
-                    {isSubmitting ? (
-                      <LoadingIcon className="h-5 w-5" />
-                    ) : (
-                      <>
-                        {isMobile ? (
-                          <span className="flex items-center">
-                            {d.buttonText || "Subscribe"} <ArrowIcon className="h-5 w-5 ml-2" />
-                          </span>
-                        ) : (
-                          <span className="flex items-center">
-                            {d.buttonText || "Subscribe"} <ArrowIcon className="h-5 w-5 ml-2" />
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </motion.div>
-                </button>
-              </div>
+                className={`${isMobile ? "w-full" : "w-auto px-4 h-10"} bg-white text-neutral-900 flex items-center justify-center hover:bg-neutral-100 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-900 py-2 px-4 font-medium`}
+                aria-label="Subscribe to SDOH newsletter"
+              >
+                {isSubmitting ? (
+                  <LoadingIcon className="h-5 w-5" />
+                ) : (
+                  <span className="flex items-center">
+                    {d.buttonText || "Subscribe"} <ArrowIcon className="h-5 w-5 ml-2" />
+                  </span>
+                )}
+              </button>
             </div>
+          </div>
 
-            {!isDevelopment && (
-              <div
-                ref={turnstileRef}
-                data-theme="dark"
-                data-size="flexible"
-                className="w-full mt-4 flex justify-center"
-                aria-label="Security verification"
-              />
-            )}
+          {!isDevelopment && (
+            <div
+              ref={turnstileRef}
+              data-theme="dark"
+              data-size="flexible"
+              className="w-full mt-4 flex justify-center"
+              aria-label="Security verification"
+            />
+          )}
 
-            {error && (
-              <div id="newsletter-error" className="text-white/90 text-sm mt-2 px-2" role="alert">
-                {error}
-              </div>
-            )}
-          </motion.form>
-        ) : (
-          <motion.div
-            key="success-message"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="mt-6 bg-white/20 border border-white/30 px-4 sm:px-6 py-4 rounded-lg flex items-center shadow-lg"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="bg-neutral-500 rounded-full p-1 mr-3 flex-shrink-0">
-              <CheckIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+          {error && (
+            <div id="newsletter-error" className="text-white/90 text-sm mt-2 px-2" role="alert">
+              {error}
             </div>
-            <span className="text-white text-sm sm:text-base font-medium">
-              {d.successMessage || "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon."}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </form>
+      ) : (
+        <div
+          className="mt-6 bg-white/10 border border-white/20 px-4 sm:px-6 py-4 flex items-center"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="bg-cyan-500 rounded-full p-1 mr-3 flex-shrink-0">
+            <CheckIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+          </div>
+          <span className="text-white text-sm sm:text-base font-medium">
+            {d.successMessage || "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon."}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

@@ -56,7 +56,7 @@ export default function SDOHClientWrapper({ initialLocale = i18n.defaultLocale }
       </div>
 
       {/* Client page that doesn't rely on server props */}
-      <SDOHClientPageDynamic locale={safeLocale as Locale} />
+      <SDOHClientPageDynamic />
     </>
   )
 }

@@ -1,169 +1,334 @@
 "use client"
-import { useEffect, useState } from "react"
+
+import type React from "react"
+import { useState, useRef, useEffect } from "react"
+import Image from "next/image"
 import { FadeIn } from "../FadeIn"
+import { useMobile } from "../../hooks/use-mobile"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
-// Client-side only floating particles component
-function FloatingParticles() {
-  const [particles, setParticles] = useState<
-    Array<{
-      id: number
-      top: string
-      left: string
-      delay: string
-      duration: string
-      size: "small" | "large"
-    }>
-  >([])
-
-  useEffect(() => {
-    // Generate particles only on the client side
-    const newParticles: Array<{
-      id: number
-      top: string
-      left: string
-      delay: string
-      duration: string
-      size: "small" | "large"
-    }> = []
-
-    // Generate small cyan particles
-    for (let i = 0; i < 6; i++) {
-      newParticles.push({
-        id: i,
-        top: `${Math.random() * 100}%`,
-        left: `${Math.random() * 100}%`,
-        delay: `${i * 0.5}s`,
-        duration: `${8 + Math.random() * 10}s`,
-        size: "small",
-      })
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        element: HTMLElement,
+        options: {
+          sitekey: string
+          callback: (token: string) => void
+          "refresh-expired"?: "auto" | "manual"
+        },
+      ) => string
+      getResponse: (widgetId: string) => string | null
+      reset: (widgetId: string) => void
     }
-
-    // Generate larger yellow particles
-    for (let i = 0; i < 6; i++) {
-      newParticles.push({
-        id: i + 6,
-        top: `${Math.random() * 100}%`,
-        left: `${Math.random() * 100}%`,
-        delay: `${i * 0.5}s`,
-        duration: `${8 + Math.random() * 10}s`,
-        size: "large",
-      })
-    }
-
-    setParticles(newParticles)
-  }, [])
-
-  return (
-    <>
-      {particles.map((particle) => (
-        <div
-          key={particle.id}
-          className={`absolute ${
-            particle.size === "small" ? "w-4 h-4 bg-cyan-500/20" : "w-6 h-6 bg-yellow-500/20"
-          } rounded-full animate-float-slow`}
-          style={{
-            top: particle.top,
-            left: particle.left,
-            animationDelay: particle.delay,
-            animationDuration: particle.duration,
-          }}
-        ></div>
-      ))}
-    </>
-  )
+  }
 }
+
+interface NewsletterDictionary {
+  placeholder: string
+  buttonText: string
+  successMessage: string
+  errorMessage: string
+  securityError: string
+  completeVerification: string
+  [key: string]: string
+}
+
+const defaultNewsletterText: NewsletterDictionary = {
+  placeholder: "Enter your email",
+  buttonText: "Subscribe",
+  successMessage: "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.",
+  errorMessage: "Please enter a valid email address",
+  securityError: "Security verification not loaded. Please refresh and try again.",
+  completeVerification: "Please complete the security verification",
+}
+
+const isDevelopment = process.env.NODE_ENV === "development"
 
 interface SDOHImpactMessageProps {
   locale: Locale
   dict: Dictionary
 }
 
-export default function SDOHImpactMessage({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  locale,
-  dict,
-}: SDOHImpactMessageProps) {
-  // Use the dictionary if provided, otherwise use default English text
-  const d = dict?.sdoh?.impact || {
-    // Default English text
+export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessageProps) {
+  const [email, setEmail] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const turnstileRef = useRef<HTMLDivElement>(null)
+  const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const isMobile = useMobile()
+
+  const impactDict = dict?.sdoh?.impact || {
     question: "What can I do to make a difference?",
     message: "If you've ever asked, ",
     conclusion: " — this is where you start.",
   }
 
+  const newsletterDict =
+    dict?.newsletter && typeof dict.newsletter === "object"
+      ? (dict.newsletter as unknown as NewsletterDictionary)
+      : defaultNewsletterText
+
+  const joinText = locale === "es" ? "Únete a la conversación" : "Join the Conversation"
+
+  useEffect(() => {
+    if (isDevelopment || turnstileWidget) return
+
+    const loadTurnstile = () => {
+      if (document.getElementById("turnstile-script")) return
+
+      const script = document.createElement("script")
+      script.id = "turnstile-script"
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js"
+      script.async = true
+      script.defer = true
+      document.body.appendChild(script)
+
+      script.onload = () => {
+        if (window.turnstile && turnstileRef.current) {
+          const widgetId = window.turnstile.render(turnstileRef.current, {
+            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
+            callback: () => {},
+            "refresh-expired": "auto",
+          })
+          setTurnstileWidget(widgetId)
+        }
+      }
+    }
+
+    loadTurnstile()
+
+    return () => {
+      if (turnstileWidget && window.turnstile) {
+        try {
+          window.turnstile.reset(turnstileWidget)
+        } catch (error) {
+          console.error("Error resetting Turnstile widget:", error)
+        }
+      }
+    }
+  }, [turnstileWidget])
+
+  const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0.9.-]+\.[a-zA-Z]{2,}$/
+
+  const validateEmail = (email: string): boolean => {
+    return emailPattern.test(email)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!email.trim()) {
+      setError(newsletterDict.errorMessage || "Please enter your email address")
+      inputRef.current?.focus()
+      return
+    }
+
+    if (!validateEmail(email)) {
+      setError(newsletterDict.errorMessage || "Please enter a valid email address")
+      inputRef.current?.focus()
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      let turnstileResponse = undefined
+
+      if (!isDevelopment) {
+        if (!window.turnstile || !turnstileWidget) {
+          throw new Error(newsletterDict.securityError || "Security verification not loaded. Please refresh and try again.")
+        }
+
+        turnstileResponse = window.turnstile.getResponse(turnstileWidget)
+        if (!turnstileResponse) {
+          throw new Error(newsletterDict.completeVerification || "Please complete the security verification")
+        }
+      }
+
+      const response = await fetch("/api/sdoh-newsletter", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(turnstileResponse && { "cf-turnstile-response": turnstileResponse }),
+        },
+        body: JSON.stringify({
+          email,
+          source: "SDOH",
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to subscribe to newsletter")
+      }
+
+      setEmail("")
+      setIsSuccess(true)
+      formRef.current?.reset()
+
+      if (!isDevelopment && turnstileWidget && window.turnstile) {
+        window.turnstile.reset(turnstileWidget)
+      }
+
+      setTimeout(() => setIsSuccess(false), 5000)
+    } catch (error) {
+      console.error("Error subscribing to newsletter:", error)
+      setError(`${error instanceof Error ? error.message : "An unexpected error occurred"}. Please try again.`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
-    <section className="py-16 sm:py-24 overflow-hidden relative">
-      <div className="container mx-auto px-4 sm:px-6 max-w-5xl relative z-10">
+    <section className="py-20 sm:py-28 lg:py-32 overflow-hidden relative bg-neutral-900" id="newsletter">
+      {/* Accent line */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-yellow-400" />
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl relative z-10">
         <FadeIn>
-          <div className="relative">
-            {/* Background elements */}
-            <div className="absolute inset-0 -z-10" aria-hidden="true">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-32 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent transform -rotate-3"></div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-32 bg-gradient-to-r from-transparent via-yellow-500/10 to-transparent transform rotate-3"></div>
+          <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+            {/* Left side - SDOH Logo */}
+            <div className="relative order-2 md:order-1">
+              <div className="relative w-full max-w-md mx-auto">
+                <Image
+                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+                  alt="SDOH Logo"
+                  width={400}
+                  height={400}
+                  className="w-full h-auto"
+                />
+                {/* Corner accents */}
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyan-500" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400" />
+              </div>
             </div>
 
-            {/* Main content */}
-            <div className="max-w-5xl mx-auto text-center">
-              <div className="inline-block mb-6">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-16 w-16 text-cyan-600 mx-auto animate-pulse"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+            {/* Right side - Impact Message + Newsletter */}
+            <div className="order-1 md:order-2">
+              {/* Impact Message as Header */}
+              <div className="mb-8">
+                <blockquote className="relative">
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight">
+                    <span className="text-white">{impactDict.message}</span>
+                    <span className="text-cyan-400 italic">&quot;{impactDict.question}&quot;</span>
+                    <span className="text-white">{impactDict.conclusion}</span>
+                  </p>
+                </blockquote>
               </div>
 
-              <blockquote className="relative">
-                <div className="relative z-10">
-                  <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight sm:leading-tight md:leading-tight lg:leading-tight">
-                    <span className="text-neutral-800">{d.message}</span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-cyan-700 italic">
-                      &quot;{d.question}&quot;
-                    </span>
-                    <span className="text-neutral-800">{d.conclusion}</span>
-                  </p>
-                </div>
+              {/* Join the Conversation */}
+              <p className="text-lg text-white/80 mb-6">{joinText}</p>
 
-                {/* Decorative quotes */}
-                <div className="absolute -top-20 -left-16 text-9xl text-cyan-200/30 font-serif" aria-hidden="true">
-                  &quot;
-                </div>
-                <div className="absolute -bottom-20 -right-16 text-9xl text-cyan-200/30 font-serif" aria-hidden="true">
-                  &quot;
-                </div>
-              </blockquote>
+              {/* Newsletter Form */}
+              <div className="w-full">
+                {!isSuccess ? (
+                  <form
+                    ref={formRef}
+                    onSubmit={handleSubmit}
+                    className="newsletter-form"
+                    aria-label="SDOH Newsletter subscription form"
+                  >
+                    <div className="relative flex flex-col sm:flex-row items-center overflow-hidden bg-white/10 border border-white/20">
+                      <label htmlFor="sdoh-email" className="sr-only">
+                        Email address
+                      </label>
+                      <input
+                        id="sdoh-email"
+                        ref={inputRef}
+                        name="email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder={newsletterDict.placeholder || "Enter your email"}
+                        className="w-full px-4 py-3 sm:py-4 bg-transparent focus:outline-none text-white text-sm sm:text-base placeholder-white/70"
+                        aria-describedby={error ? "newsletter-error" : undefined}
+                        disabled={isSubmitting}
+                        autoComplete="email"
+                      />
+                      <div className={`${isMobile ? "w-full mt-2 px-4 pb-4" : "absolute right-2"}`}>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className={`${isMobile ? "w-full" : "w-auto px-4 h-10"} bg-white text-neutral-900 flex items-center justify-center hover:bg-neutral-100 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-900 py-2 px-4 font-medium`}
+                          aria-label="Subscribe to SDOH newsletter"
+                        >
+                          {isSubmitting ? (
+                            <LoadingIcon className="h-5 w-5" />
+                          ) : (
+                            <span className="flex items-center">
+                              {newsletterDict.buttonText || "Subscribe"} <ArrowIcon className="h-5 w-5 ml-2" />
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!isDevelopment && (
+                      <div
+                        ref={turnstileRef}
+                        data-theme="dark"
+                        data-size="flexible"
+                        className="w-full mt-4 flex justify-center"
+                        aria-label="Security verification"
+                      />
+                    )}
+
+                    {error && (
+                      <div id="newsletter-error" className="text-white/90 text-sm mt-2 px-2" role="alert">
+                        {error}
+                      </div>
+                    )}
+                  </form>
+                ) : (
+                  <div
+                    className="bg-white/10 border border-white/20 px-4 sm:px-6 py-4 flex items-center"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <div className="bg-cyan-500 p-1 mr-3 flex-shrink-0">
+                      <CheckIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                    </div>
+                    <span className="text-white text-sm sm:text-base font-medium">
+                      {newsletterDict.successMessage || "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon."}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </FadeIn>
       </div>
-
-      {/* Floating particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <FloatingParticles />
-      </div>
-
-      {/* Add animation keyframes */}
-      <style jsx>{`
-       @keyframes float-slow {
-         0% { transform: translateY(0) translateX(0); opacity: 0; }
-         50% { opacity: 1; }
-         100% { transform: translateY(-100px) translateX(100px); opacity: 0; }
-       }
-       .animate-float-slow {
-         animation: float-slow linear infinite;
-       }
-       @media (prefers-reduced-motion: reduce) {
-         .animate-float-slow, .animate-pulse {
-           animation: none !important;
-         }
-       }
-     `}</style>
     </section>
   )
 }
+
+const ArrowIcon = ({ className }: { className?: string }) => (
+  <svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M13 5L20 12L13 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 12H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+const LoadingIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    ></path>
+  </svg>
+)
+
+const CheckIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M5 13L9 17L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)

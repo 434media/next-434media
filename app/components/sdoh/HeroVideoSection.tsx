@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 
 interface HeroVideoSectionProps {
   prefersReducedMotion?: boolean
@@ -8,18 +8,6 @@ interface HeroVideoSectionProps {
 
 export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSectionProps) {
   const [isMuted, setIsMuted] = useState(true)
-  const [hasScrolled, setHasScrolled] = useState(false)
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setHasScrolled(true)
-      }
-    }
-
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
 
   const toggleMute = () => {
     const video = document.querySelector("video")
@@ -30,54 +18,25 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
   }
 
   return (
-    <section className="relative w-full h-screen overflow-hidden" aria-label="SDOH Conference Hero Video">
-      <div className="absolute inset-0 bg-black">
-        {/* Enhanced fallback background */}
+    <section 
+      className="relative w-full aspect-[4/5] sm:aspect-[16/10] md:aspect-[16/9] lg:h-screen lg:aspect-auto overflow-hidden" 
+      aria-label="SDOH Conference Hero Video"
+    >
+      <div className="absolute inset-0 bg-neutral-900">
+        {/* Fallback background */}
         <div className="relative w-full h-full">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#1a2a3a] via-[#2d4356] to-[#1a2a3a] z-0">
-            {/* Enhanced patterns for visual interest */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(6,182,212,0.15)_0%,rgba(0,0,0,0)_50%)]"></div>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(251,191,36,0.15)_0%,rgba(0,0,0,0)_50%)]"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/40"></div>
+          <div className="absolute inset-0 bg-neutral-900 z-0" />
 
-            {/* Animated grid pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="w-full h-full bg-[linear-gradient(rgba(6,182,212,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.3)_1px,transparent_1px)] bg-[size:50px_50px] animate-pulse"></div>
-            </div>
-          </div>
-
-          {/* Enhanced video player */}
+          {/* Video player */}
           <div className="absolute inset-0 z-10">
-            {/* Resource hints for faster loading */}
-            <link
-              rel="preload"
-              href="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Post+Promo+WEB.mp4"
-              as="video"
-              type="video/mp4"
-              fetchPriority="high"
-              crossOrigin="anonymous"
-            />
-            <link
-              rel="preload"
-              href="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
-              as="image"
-              type="image/png"
-              fetchPriority="high"
-              crossOrigin="anonymous"
-            />
-
-            {/* Enhanced video element */}
             <video
               autoPlay={!prefersReducedMotion}
               loop
               muted
               playsInline
               poster="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
-              className="w-full h-full object-cover transition-all duration-1000"
+              className="w-full h-full object-cover"
               preload="metadata"
-              style={{
-                filter: hasScrolled ? "brightness(0.8) contrast(1.1)" : "brightness(1) contrast(1)",
-              }}
             >
               <source
                 src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Post+Promo+WEB.mp4"
@@ -87,21 +46,21 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
               Your browser does not support the video tag.
             </video>
 
-            {/* Enhanced overlay gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/20 z-20"></div>
+            {/* Simple overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/40 via-transparent to-neutral-900/20 z-20" />
           </div>
 
-          {/* Enhanced video controls */}
-          <div className="absolute bottom-6 right-6 z-40">
+          {/* Video controls */}
+          <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-40">
             <button
               onClick={toggleMute}
-              className="group p-4 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 hover:scale-110 shadow-lg"
+              className="p-3 sm:p-4 bg-white text-neutral-900 hover:bg-neutral-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-900"
               aria-label={isMuted ? "Unmute video" : "Mute video"}
             >
               {isMuted ? (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 transition-transform duration-300 group-hover:scale-110"
+                  className="h-5 w-5 sm:h-6 sm:w-6"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -122,7 +81,7 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
               ) : (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 transition-transform duration-300 group-hover:scale-110"
+                  className="h-5 w-5 sm:h-6 sm:w-6"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
