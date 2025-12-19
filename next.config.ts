@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Increase body size limit for file uploads (10MB)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
@@ -24,6 +30,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'v5.airtableusercontent.com',
+        pathname: '/**'
+      },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
         pathname: '/**'
       }
     ],

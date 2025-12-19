@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { upload } from "@vercel/blob/client"
 import { Upload, X, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react"
 import { Button } from "./analytics/Button"
 
@@ -50,27 +51,23 @@ export function ImageUpload({
       }
       reader.readAsDataURL(file)
 
-      // Upload to server
-      const formData = new FormData()
-      formData.append("file", file)
-      
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      // Generate unique filename
+      const timestamp = Date.now()
+      const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      const filename = `${timestamp}-${originalName}`
+
+      // Upload directly to Vercel Blob (client-side upload)
+      const blob = await upload(filename, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
       })
 
-      const result = await response.json()
-
-      if (result.success && result.url) {
-        onChange(result.url)
-        setPreview(result.url)
-      } else {
-        alert(result.error || "Upload failed")
-        setPreview(value)
-      }
+      onChange(blob.url)
+      setPreview(blob.url)
     } catch (error) {
       console.error("Upload error:", error)
-      alert("Failed to upload file")
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      alert(`Failed to upload file: ${errorMessage}`)
       setPreview(value)
     } finally {
       setIsUploading(false)
