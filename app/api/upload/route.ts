@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
+import { put } from "@vercel/blob"
 import { getSession } from "../../lib/auth"
 
 export async function POST(request: NextRequest) {
@@ -49,25 +47,15 @@ export async function POST(request: NextRequest) {
     const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
     const filename = `${timestamp}-${originalName}`
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), "public", "uploads")
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
-
-    // Convert file to buffer and save
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    const filepath = path.join(uploadsDir, filename)
-
-    await writeFile(filepath, buffer)
-
-    // Return public URL
-    const url = `/uploads/${filename}`
+    // Upload to Vercel Blob
+    const blob = await put(filename, file, {
+      access: "public",
+      addRandomSuffix: false,
+    })
 
     return NextResponse.json({
       success: true,
-      url,
+      url: blob.url,
       filename,
       size: file.size,
       type: file.type,

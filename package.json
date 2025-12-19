@@ -27,6 +27,7 @@
     "@types/pg": "^8.15.2",
     "@types/sanitize-html": "^2.16.0",
     "@vercel/analytics": "^1.5.0",
+    "@vercel/blob": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
     "ai": "^5.0.10",
     "airtable": "^0.12.2",
