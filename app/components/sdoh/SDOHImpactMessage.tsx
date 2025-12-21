@@ -1,37 +1,18 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef } from "react"
 import Image from "next/image"
 import { FadeIn } from "../FadeIn"
 import { useMobile } from "../../hooks/use-mobile"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        element: HTMLElement,
-        options: {
-          sitekey: string
-          callback: (token: string) => void
-          "refresh-expired"?: "auto" | "manual"
-        },
-      ) => string
-      getResponse: (widgetId: string) => string | null
-      reset: (widgetId: string) => void
-    }
-  }
-}
-
 interface NewsletterDictionary {
   placeholder: string
   buttonText: string
   successMessage: string
   errorMessage: string
-  securityError: string
-  completeVerification: string
   [key: string]: string
 }
 
@@ -40,11 +21,7 @@ const defaultNewsletterText: NewsletterDictionary = {
   buttonText: "Subscribe",
   successMessage: "Thanks for subscribing to the SDOH newsletter! We'll be in touch soon.",
   errorMessage: "Please enter a valid email address",
-  securityError: "Security verification not loaded. Please refresh and try again.",
-  completeVerification: "Please complete the security verification",
 }
-
-const isDevelopment = process.env.NODE_ENV === "development"
 
 interface SDOHImpactMessageProps {
   locale: Locale
@@ -56,8 +33,6 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const turnstileRef = useRef<HTMLDivElement>(null)
-  const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isMobile = useMobile()
@@ -74,44 +49,6 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
       : defaultNewsletterText
 
   const joinText = locale === "es" ? "Únete a la conversación" : "Join the Conversation"
-
-  useEffect(() => {
-    if (isDevelopment || turnstileWidget) return
-
-    const loadTurnstile = () => {
-      if (document.getElementById("turnstile-script")) return
-
-      const script = document.createElement("script")
-      script.id = "turnstile-script"
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js"
-      script.async = true
-      script.defer = true
-      document.body.appendChild(script)
-
-      script.onload = () => {
-        if (window.turnstile && turnstileRef.current) {
-          const widgetId = window.turnstile.render(turnstileRef.current, {
-            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            callback: () => {},
-            "refresh-expired": "auto",
-          })
-          setTurnstileWidget(widgetId)
-        }
-      }
-    }
-
-    loadTurnstile()
-
-    return () => {
-      if (turnstileWidget && window.turnstile) {
-        try {
-          window.turnstile.reset(turnstileWidget)
-        } catch (error) {
-          console.error("Error resetting Turnstile widget:", error)
-        }
-      }
-    }
-  }, [turnstileWidget])
 
   const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0.9.-]+\.[a-zA-Z]{2,}$/
 
@@ -138,24 +75,10 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
     setIsSubmitting(true)
 
     try {
-      let turnstileResponse = undefined
-
-      if (!isDevelopment) {
-        if (!window.turnstile || !turnstileWidget) {
-          throw new Error(newsletterDict.securityError || "Security verification not loaded. Please refresh and try again.")
-        }
-
-        turnstileResponse = window.turnstile.getResponse(turnstileWidget)
-        if (!turnstileResponse) {
-          throw new Error(newsletterDict.completeVerification || "Please complete the security verification")
-        }
-      }
-
       const response = await fetch("/api/sdoh-newsletter", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(turnstileResponse && { "cf-turnstile-response": turnstileResponse }),
         },
         body: JSON.stringify({
           email,
@@ -171,10 +94,6 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
       setEmail("")
       setIsSuccess(true)
       formRef.current?.reset()
-
-      if (!isDevelopment && turnstileWidget && window.turnstile) {
-        window.turnstile.reset(turnstileWidget)
-      }
 
       setTimeout(() => setIsSuccess(false), 5000)
     } catch (error) {
@@ -269,16 +188,6 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
                         </button>
                       </div>
                     </div>
-
-                    {!isDevelopment && (
-                      <div
-                        ref={turnstileRef}
-                        data-theme="dark"
-                        data-size="flexible"
-                        className="w-full mt-4 flex justify-center"
-                        aria-label="Security verification"
-                      />
-                    )}
 
                     {error && (
                       <div id="newsletter-error" className="text-white/90 text-sm mt-2 px-2" role="alert">

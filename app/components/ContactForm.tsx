@@ -4,24 +4,6 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 
-// Define the global interface for window.turnstile
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        element: HTMLElement,
-        options: {
-          sitekey: string
-          callback: (token: string) => void
-          "refresh-expired"?: "auto" | "manual"
-        },
-      ) => string
-      getResponse: (widgetId: string) => string | null
-      reset: (widgetId: string) => void
-    }
-  }
-}
-
 interface ContactFormProps {
   className?: string
   isVisible?: boolean
@@ -43,9 +25,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const formRef = useRef<HTMLFormElement>(null)
-  const turnstileRef = useRef<HTMLDivElement>(null)
-  const [turnstileWidget, setTurnstileWidget] = useState<string | null>(null)
-  const [turnstileLoaded, setTurnstileLoaded] = useState(false)
   const firstNameRef = useRef<HTMLInputElement>(null)
 
   const formVariants = {
@@ -59,84 +38,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     visible: { opacity: 1, scale: 1, transition: { duration: 0.5 } },
     exit: { opacity: 0, scale: 0.8, transition: { duration: 0.5 } },
   }
-
-  const isDevelopment = process.env.NODE_ENV === "development"
-
-  // Load Turnstile script
-  useEffect(() => {
-    if (isDevelopment || turnstileLoaded || !isVisible) return
-
-    const loadTurnstile = () => {
-      if (document.getElementById("turnstile-script")) {
-        setTurnstileLoaded(true)
-        return
-      }
-
-      const script = document.createElement("script")
-      script.id = "turnstile-script"
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-      script.async = true
-      script.defer = true
-      script.onload = () => {
-        setTurnstileLoaded(true)
-      }
-      script.onerror = () => {
-        console.error("Failed to load Turnstile script")
-      }
-      document.body.appendChild(script)
-
-      return () => {
-        if (document.getElementById("turnstile-script")) {
-          document.getElementById("turnstile-script")?.remove()
-        }
-      }
-    }
-
-    loadTurnstile()
-  }, [isDevelopment, turnstileLoaded, isVisible])
-
-  // Initialize Turnstile widget when visible
-  useEffect(() => {
-    if (isDevelopment || !isVisible || !turnstileLoaded || !window.turnstile || turnstileWidget) return
-
-    // Small delay to ensure the DOM is ready
-    const timeoutId = setTimeout(() => {
-      if (turnstileRef.current) {
-        try {
-          // Clear any existing content
-          turnstileRef.current.innerHTML = ""
-
-          const widgetId = window.turnstile?.render(turnstileRef.current, {
-            sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "",
-            callback: () => {
-              // Clear any turnstile-related errors when successfully completed
-              setFieldErrors((prev) => ({ ...prev, turnstile: "" }))
-            },
-            "refresh-expired": "auto",
-          })
-
-          if (widgetId) {
-            setTurnstileWidget(widgetId)
-          }
-        } catch (error) {
-          console.error("Error rendering Turnstile widget:", error)
-        }
-      }
-    }, 300)
-
-    return () => {
-      clearTimeout(timeoutId)
-      // Clean up widget when component unmounts or becomes invisible
-      if (turnstileWidget && window.turnstile) {
-        try {
-          window.turnstile?.reset(turnstileWidget)
-          setTurnstileWidget(null)
-        } catch (error) {
-          console.error("Error resetting Turnstile widget:", error)
-        }
-      }
-    }
-  }, [isDevelopment, isVisible, turnstileLoaded, turnstileWidget])
 
   // Focus first input when form becomes visible
   useEffect(() => {
@@ -196,23 +97,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     }
 
     try {
-      let turnstileResponse = undefined
-
-      if (!isDevelopment) {
-        if (!window.turnstile) {
-          throw new Error("Turnstile is not initialized")
-        }
-
-        if (turnstileWidget) {
-          turnstileResponse = window.turnstile?.getResponse(turnstileWidget)
-          if (!turnstileResponse) {
-            throw new Error("Please complete the security challenge")
-          }
-        } else {
-          throw new Error("Turnstile widget is not initialized")
-        }
-      }
-
       // Log the request for debugging
       console.log("Submitting form with data:", formValues)
 
@@ -220,7 +104,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(turnstileResponse && { "cf-turnstile-response": turnstileResponse }),
         },
         body: JSON.stringify(formValues),
       })
@@ -239,10 +122,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
       setTimeout(() => {
         setHasSubmitted(false)
       }, 5000)
-
-      if (!isDevelopment && turnstileWidget && window.turnstile) {
-        window.turnstile.reset(turnstileWidget)
-      }
     } catch (error) {
       console.error("Error submitting form:", error)
       setError(
@@ -415,48 +294,6 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   ></textarea>
                 </div>
               </div>
-
-              {!isDevelopment && (
-                <div className="mt-4">
-                  <div
-                    ref={turnstileRef}
-                    data-size="flexible"
-                    className="w-full flex justify-center items-center min-h-[70px]"
-                    aria-label="Security challenge"
-                  >
-                    {!turnstileLoaded && (
-                      <div className="text-sm text-neutral-400 flex items-center">
-                        <svg
-                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-emerald-500"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Loading security challenge...
-                      </div>
-                    )}
-                  </div>
-                  {fieldErrors.turnstile && (
-                    <p className="mt-1 text-sm text-red-600 text-center" id="turnstile-error">
-                      {fieldErrors.turnstile}
-                    </p>
-                  )}
-                </div>
-              )}
 
               {error && (
                 <div

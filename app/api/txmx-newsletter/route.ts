@@ -2,12 +2,10 @@ import { NextResponse } from "next/server"
 import Airtable from "airtable"
 import axios from "axios"
 import crypto from "crypto"
-
-const isDevelopment = process.env.NODE_ENV === "development"
+import { checkBotId } from "botid/server"
 
 const airtableBaseId = process.env.AIRTABLE_BASE_ID
 const airtableApiKey = process.env.AIRTABLE_API_KEY
-const turnstileSecretKey = process.env.TURNSTILE_SECRET_KEY
 const mailchimpApiKey = process.env.MAILCHIMP_API_KEY
 const mailchimpListId = process.env.MAILCHIMP_AUDIENCE_ID
 
@@ -22,8 +20,12 @@ const mailchimpDatacenter = mailchimpApiKey ? mailchimpApiKey.split("-").pop() :
 export async function POST(request: Request) {
   try {
     const { email } = await request.json()
-    const turnstileToken = request.headers.get("cf-turnstile-response")
-    const remoteIp = request.headers.get("CF-Connecting-IP")
+
+    // Verify the request is not from a bot using BotID
+    const verification = await checkBotId()
+    if (verification.isBot) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
 
     if (!airtableBaseId || !airtableApiKey) {
       console.error("Airtable configuration is missing")
@@ -33,38 +35,6 @@ export async function POST(request: Request) {
     const mailchimpEnabled = mailchimpApiKey && mailchimpListId
     if (!mailchimpEnabled) {
       console.warn("Mailchimp integration disabled - missing API key or Audience ID")
-    }
-
-    if (!isDevelopment) {
-      if (!turnstileSecretKey) {
-        console.error("Turnstile secret key is not defined")
-        return NextResponse.json({ error: "Server configuration error" }, { status: 500 })
-      }
-
-      // Verify Turnstile token
-      if (turnstileToken) {
-        const idempotencyKey = crypto.randomUUID()
-        const turnstileVerification = await axios.post(
-          "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-          new URLSearchParams({
-            secret: turnstileSecretKey,
-            response: turnstileToken,
-            remoteip: remoteIp || "",
-            idempotency_key: idempotencyKey,
-          }),
-          {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          },
-        )
-
-        if (!turnstileVerification.data.success) {
-          const errorCodes = turnstileVerification.data["error-codes"] || []
-          console.error("Turnstile verification failed:", errorCodes)
-          return NextResponse.json({ error: "Turnstile verification failed", errorCodes }, { status: 400 })
-        }
-      } else {
-        return NextResponse.json({ error: "Turnstile token is missing" }, { status: 400 })
-      }
     }
 
     const airtablePromise = base("Email Sign Up (All Sites)").create([
