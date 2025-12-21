@@ -122,6 +122,21 @@ export function extractEmbeddedMedia(html: string): EmbeddedMedia[] {
   tempDiv.innerHTML = html
   const media: EmbeddedMedia[] = []
 
+  // Helper to validate video platform URLs
+  const isValidVideoPlatform = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url)
+      const hostname = urlObj.hostname.toLowerCase()
+      return hostname === 'youtube.com' || 
+        hostname === 'www.youtube.com' ||
+        hostname === 'vimeo.com' ||
+        hostname === 'www.vimeo.com' ||
+        hostname === 'player.vimeo.com'
+    } catch {
+      return false
+    }
+  }
+
   // Extract images
   const images = tempDiv.querySelectorAll("img")
   images.forEach((img, index) => {
@@ -138,7 +153,7 @@ export function extractEmbeddedMedia(html: string): EmbeddedMedia[] {
   // Extract videos (iframes and video elements)
   const iframes = tempDiv.querySelectorAll("iframe")
   iframes.forEach((iframe, index) => {
-    if (iframe.src.includes("youtube.com") || iframe.src.includes("vimeo.com")) {
+    if (isValidVideoPlatform(iframe.src)) {
       media.push({
         id: `video_${Date.now()}_${index}`,
         type: "video",

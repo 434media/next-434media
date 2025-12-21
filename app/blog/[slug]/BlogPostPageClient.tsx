@@ -208,37 +208,35 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-gray-900 leading-tight mb-6 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 leading-tight mb-6 tracking-tight">
               {post.title}
             </h1>
 
             {/* Excerpt */}
-            {post.excerpt && <p className="text-lg text-gray-600 leading-relaxed mb-8 font-normal">{post.excerpt}</p>}
+            {post.excerpt && <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8 font-normal">{post.excerpt}</p>}
 
-            {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 pb-8 border-b border-gray-200">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{post.author}</span>
+            {/* Meta Info with Share Button */}
+            <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-600 pb-8 border-b border-gray-200">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">{post.author}</span>
+                </div>
+                <span className="text-gray-400">·</span>
+                <div className="flex items-center gap-2">
+                  <span>{formatDate(post.published_at || post.created_at)}</span>
+                </div>
+                {post.read_time && (
+                  <>
+                    <span className="text-gray-400">·</span>
+                    <div className="flex items-center gap-2">
+                      <span>{post.read_time} min read</span>
+                    </div>
+                  </>
+                )}
               </div>
-              <span className="text-gray-400">·</span>
-              <div className="flex items-center gap-2">
-                <span>{formatDate(post.published_at || post.created_at)}</span>
-              </div>
-              {post.read_time && (
-                <>
-                  <span className="text-gray-400">·</span>
-                  <div className="flex items-center gap-2">
-                    <span>{post.read_time} min read</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 mt-8">
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200 text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 text-sm font-medium"
               >
                 <Share2 className="w-4 h-4" />
                 Share
@@ -247,17 +245,17 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
           </div>
         </header>
 
-        {/* Featured Image */}
+        {/* Featured Image - 4:5 Aspect Ratio */}
         {post.featured_image && (
-          <section className="relative pt-6 md:mt-10">
+          <section className="relative pt-6 md:pt-10">
             <div className="max-w-3xl mx-auto px-6">
-              <div className="relative h-64 sm:h-80 lg:h-[28rem] rounded-lg overflow-hidden bg-gray-100">
+              <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-gray-100">
                 <Image
                   src={post.featured_image || "/placeholder.svg"}
                   alt={post.title}
                   fill
-                  style={{ objectFit: "cover" }}
-                  className={`object-cover transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+                  style={{ objectFit: "contain" }}
+                  className={`transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                   priority
                   onLoad={() => setImageLoaded(true)}
                 />
@@ -275,28 +273,30 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
             <div
                 className={`
                 blog-content
-                prose max-w-none
-                prose-headings:text-gray-900 prose-headings:font-semibold
-                prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-8
+                prose prose-lg max-w-none
+                prose-headings:text-gray-900 prose-headings:font-bold prose-headings:tracking-tight
+                prose-p:text-gray-700 prose-p:leading-relaxed prose-p:text-base prose-p:mb-6
                 prose-strong:text-gray-900 prose-strong:font-semibold
                 prose-em:text-gray-700 prose-em:italic
-                prose-ul:text-gray-700 prose-li:text-gray-700
+                prose-ul:text-gray-700 prose-li:text-gray-700 prose-li:text-base
                 prose-ol:text-gray-700
-                prose-blockquote:text-gray-600 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic
-                prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded
-                prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:overflow-x-auto
-                prose-img:rounded-lg prose-img:shadow-md
-                prose-hr:border-gray-300
-                prose-table:border-collapse prose-thead:bg-gray-50 prose-th:border prose-th:border-gray-300 prose-th:p-2 prose-td:border prose-td:border-gray-300 prose-td:p-2
-                prose-h1:text-3xl prose-h1:mb-4
-                prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-8
-                prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-6
-                prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-4
-                prose-h5:text-base prose-h5:mb-1 prose-h5:mt-3
-                prose-h6:text-sm prose-h6:mb-1 prose-h6:mt-2
+                prose-blockquote:text-gray-600 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:font-normal
+                prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-medium
+                prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:overflow-x-auto prose-pre:rounded-lg
+                prose-img:rounded-xl prose-img:shadow-md
+                prose-a:text-gray-900 prose-a:font-medium prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-gray-600
+                prose-hr:border-gray-200
+                prose-table:border-collapse prose-thead:bg-gray-50 prose-th:border prose-th:border-gray-300 prose-th:p-3 prose-th:text-left prose-th:font-semibold prose-td:border prose-td:border-gray-300 prose-td:p-3
+                prose-h1:text-2xl sm:prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-10
+                prose-h2:text-xl sm:prose-h2:text-2xl prose-h2:mb-4 prose-h2:mt-10
+                prose-h3:text-lg sm:prose-h3:text-xl prose-h3:mb-3 prose-h3:mt-8
+                prose-h4:text-base sm:prose-h4:text-lg prose-h4:mb-3 prose-h4:mt-6 prose-h4:font-semibold
+                prose-h5:text-base prose-h5:mb-2 prose-h5:mt-4 prose-h5:font-semibold
+                prose-h6:text-sm prose-h6:mb-2 prose-h6:mt-4 prose-h6:font-semibold prose-h6:uppercase prose-h6:tracking-wide
             `.replace(/\s+/g, ' ').trim()}
                 dangerouslySetInnerHTML={{ __html: post.content }}
-            />                {/* Tags */}
+            />
+                {/* Tags */}
                 {post.tags && post.tags.length > 0 && (
                   <div className="mt-12 pt-8 border-t border-gray-200">
                     <div className="flex flex-wrap gap-2">
@@ -321,11 +321,11 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
           <section className="py-16 bg-gray-50 border-t border-gray-200">
             <div className="max-w-6xl mx-auto px-6">
               <div className="mb-12">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Related Articles</h2>
-                <p className="text-gray-600">More insights from our ecosystem</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 tracking-tight">Related Articles</h2>
+                <p className="text-gray-600 text-sm sm:text-base">More insights from our ecosystem</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 {relatedPosts.map((relatedPost) => (
                   <BlogCard key={relatedPost.id} post={relatedPost} />
                 ))}

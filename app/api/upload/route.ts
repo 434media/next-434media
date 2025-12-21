@@ -5,6 +5,7 @@ import { getSession } from "../../lib/auth"
 // Configure route segment for uploads
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // 60 seconds timeout for file uploads
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody

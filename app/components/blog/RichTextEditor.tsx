@@ -84,6 +84,78 @@ interface HistoryEntry {
   timestamp: number
 }
 
+// URL validation helpers
+function getHostname(url: string): string | null {
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname.toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+function isYouTubeUrl(hostname: string): boolean {
+  return hostname === 'youtube.com' || 
+    hostname === 'www.youtube.com' ||
+    hostname === 'youtu.be' ||
+    hostname === 'www.youtu.be'
+}
+
+function isVimeoUrl(hostname: string): boolean {
+  return hostname === 'vimeo.com' || 
+    hostname === 'www.vimeo.com' ||
+    hostname === 'player.vimeo.com'
+}
+
+// Extract YouTube video ID safely
+function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const urlObj = new URL(url)
+    const hostname = urlObj.hostname.toLowerCase()
+    
+    if (hostname === 'youtu.be' || hostname === 'www.youtu.be') {
+      // Short URL format: youtu.be/VIDEO_ID
+      const pathMatch = urlObj.pathname.match(/^\/([a-zA-Z0-9_-]{11})/)
+      return pathMatch ? pathMatch[1] : null
+    }
+    
+    // Standard YouTube URL: youtube.com/watch?v=VIDEO_ID
+    const videoId = urlObj.searchParams.get('v')
+    if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      return videoId
+    }
+    
+    // Embed URL format: youtube.com/embed/VIDEO_ID
+    const embedMatch = urlObj.pathname.match(/^\/embed\/([a-zA-Z0-9_-]{11})/)
+    return embedMatch ? embedMatch[1] : null
+  } catch {
+    return null
+  }
+}
+
+// Extract Vimeo video ID safely
+function extractVimeoVideoId(url: string): string | null {
+  try {
+    const urlObj = new URL(url)
+    const pathMatch = urlObj.pathname.match(/^\/(?:video\/)?([0-9]{1,15})(?:\/|$)/)
+    return pathMatch ? pathMatch[1] : null
+  } catch {
+    return null
+  }
+}
+
+// HTML entity escaping for safe display
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }
+  return text.replace(/[&<>"']/g, (char) => map[char])
+}
+
 // Modern formatting utilities to replace deprecated execCommand
 class ModernEditor {
   static formatSelection(element: HTMLElement, tag: string, className?: string) {
@@ -582,8 +654,24 @@ export default function RichTextEditor({
   // Handle link insertion with black/white theme
   const handleInsertLink = () => {
     if (linkUrl) {
+      // Validate URL format
+      let validatedUrl: string
+      try {
+        const urlObj = new URL(linkUrl)
+        // Only allow http/https protocols
+        if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+          alert('Only HTTP and HTTPS URLs are allowed')
+          return
+        }
+        validatedUrl = urlObj.href
+      } catch {
+        alert('Please enter a valid URL')
+        return
+      }
+
       const text = linkText || selectedText || linkUrl
-      const html = `<a href="${linkUrl}" class="text-gray-900 hover:text-black underline decoration-2 underline-offset-2 transition-colors font-medium" target="_blank" rel="noopener noreferrer">${text}</a>`
+      const escapedText = escapeHtml(text)
+      const html = `<a href="${validatedUrl}" class="text-gray-900 hover:text-black underline decoration-2 underline-offset-2 transition-colors font-medium" target="_blank" rel="noopener noreferrer">${escapedText}</a>`
 
       insertHTMLAtCursor(html)
 
@@ -599,18 +687,17 @@ export default function RichTextEditor({
   const handleInsertVideo = () => {
     if (videoUrl) {
       let embedHtml = ""
+      const hostname = getHostname(videoUrl)
 
-      // YouTube
-      if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
-        const videoId = videoUrl.includes("youtu.be")
-          ? videoUrl.split("/").pop()?.split("?")[0]
-          : videoUrl.split("v=")[1]?.split("&")[0]
+      // YouTube - using proper URL parsing
+      if (hostname && isYouTubeUrl(hostname)) {
+        const videoId = extractYouTubeVideoId(videoUrl)
 
         if (videoId) {
           embedHtml = `
             <div class="my-6 relative w-full aspect-video">
               <iframe 
-                src="https://www.youtube.com/embed/${videoId}" 
+                src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}" 
                 class="absolute inset-0 w-full h-full rounded-xl shadow-lg"
                 frameborder="0" 
                 allowfullscreen>
@@ -619,14 +706,14 @@ export default function RichTextEditor({
           `
         }
       }
-      // Vimeo
-      else if (videoUrl.includes("vimeo.com")) {
-        const videoId = videoUrl.split("/").pop()
+      // Vimeo - using proper URL parsing
+      else if (hostname && isVimeoUrl(hostname)) {
+        const videoId = extractVimeoVideoId(videoUrl)
         if (videoId) {
           embedHtml = `
             <div class="my-6 relative w-full aspect-video">
               <iframe 
-                src="https://player.vimeo.com/video/${videoId}" 
+                src="https://player.vimeo.com/video/${encodeURIComponent(videoId)}" 
                 class="absolute inset-0 w-full h-full rounded-xl shadow-lg"
                 frameborder="0" 
                 allowfullscreen>
@@ -635,16 +722,23 @@ export default function RichTextEditor({
           `
         }
       }
-      // Direct video URL
+      // Direct video URL - validate URL format first
       else {
-        embedHtml = `
-          <div class="my-6">
-            <video controls class="w-full rounded-xl shadow-lg">
-              <source src="${videoUrl}" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-        `
+        try {
+          const urlObj = new URL(videoUrl)
+          if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+            embedHtml = `
+              <div class="my-6">
+                <video controls class="w-full rounded-xl shadow-lg">
+                  <source src="${urlObj.href}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            `
+          }
+        } catch {
+          // Invalid URL, don't embed
+        }
       }
 
       if (embedHtml) {

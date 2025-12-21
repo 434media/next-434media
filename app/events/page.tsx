@@ -155,7 +155,7 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-[100dvh] bg-white">
       <FadeIn>
         <div className="relative pt-28 pb-16 md:pt-40 md:pb-32 bg-black text-white overflow-hidden">
           {/* Vortex Background */}

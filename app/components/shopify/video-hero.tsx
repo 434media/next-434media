@@ -223,7 +223,7 @@ export function VideoHero({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-screen overflow-hidden bg-black"
+      className="relative w-full h-[100dvh] overflow-hidden bg-black"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

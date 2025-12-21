@@ -7,29 +7,67 @@ interface ParseResult {
   error?: string
 }
 
+// Helper to strictly validate hostname against allowed domains
+function isAllowedHostname(hostname: string, allowedDomain: string): boolean {
+  const normalizedHostname = hostname.toLowerCase()
+  const normalizedDomain = allowedDomain.toLowerCase()
+  // Exact match or valid subdomain (must have dot before domain)
+  return normalizedHostname === normalizedDomain || 
+    normalizedHostname.endsWith(`.${normalizedDomain}`)
+}
+
+// Helper to determine platform from validated URL
+function getPlatformFromHostname(hostname: string): 'meetup' | 'eventbrite' | 'luma' | null {
+  const normalizedHostname = hostname.toLowerCase()
+  if (isAllowedHostname(normalizedHostname, 'meetup.com')) return 'meetup'
+  if (isAllowedHostname(normalizedHostname, 'eventbrite.com')) return 'eventbrite'
+  if (isAllowedHostname(normalizedHostname, 'lu.ma')) return 'luma'
+  return null
+}
+
 export async function parseEventUrl(url: string): Promise<ParseResult> {
   try {
     console.log(`🔍 Parsing event URL: ${url}`)
 
-    // Validate URL
-    const urlObj = new URL(url)
+    // Validate URL and ensure HTTPS only
+    let urlObj: URL
+    try {
+      urlObj = new URL(url)
+    } catch {
+      return {
+        success: false,
+        error: "Invalid URL format.",
+      }
+    }
+
+    // Only allow HTTPS protocol to prevent protocol-based attacks
+    if (urlObj.protocol !== 'https:') {
+      return {
+        success: false,
+        error: "Only HTTPS URLs are supported for security reasons.",
+      }
+    }
+
     const hostname = urlObj.hostname.toLowerCase()
+    const platform = getPlatformFromHostname(hostname)
 
     // Strict allow-list validation for supported platforms
-    const allowedHostnames = ["meetup.com", "eventbrite.com", "lu.ma"]
-    if (!allowedHostnames.some(allowed => hostname === allowed || hostname.endsWith(`.${allowed}`))) {
+    if (!platform) {
       return {
         success: false,
         error: "Unsupported platform. Currently supports Meetup.com, Eventbrite.com, and Lu.ma",
       }
     }
 
+    // Reconstruct the URL from parsed components to prevent SSRF via URL manipulation
+    const safeUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`
+
     // Add this before the fetch call to handle timeout:
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
     // Fetch with proper headers to avoid blocking
-    const response = await fetch(url, {
+    const response = await fetch(safeUrl, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -60,13 +98,15 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
 
     let result: ParsedEventData
 
-    if (hostname.includes("meetup.com")) {
-      result = await parseMeetupEvent($, url)
-    } else if (hostname.includes("eventbrite.com")) {
-      result = await parseEventbriteEvent($, url)
-    } else if (hostname.includes("lu.ma")) {
-      result = await parseLumaEvent($, url)
+    // Use the pre-validated platform instead of includes() checks
+    if (platform === 'meetup') {
+      result = await parseMeetupEvent($, safeUrl)
+    } else if (platform === 'eventbrite') {
+      result = await parseEventbriteEvent($, safeUrl)
+    } else if (platform === 'luma') {
+      result = await parseLumaEvent($, safeUrl)
     } else {
+      // This should never happen due to earlier validation
       throw new Error("Unsupported platform")
     }
 

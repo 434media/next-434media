@@ -67,11 +67,28 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
     setSelectionComplete(missing.length === 0)
   }, [state, product.options])
 
+  // Helper to safely strip HTML tags using DOM parser (handles malformed HTML properly)
+  const stripHtmlTags = (html: string): string => {
+    // Use DOMParser for proper HTML parsing (handles edge cases like unclosed tags)
+    if (typeof window !== 'undefined') {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      return doc.body.textContent || ''
+    }
+    // Fallback for SSR - use iterative replacement to handle nested/malformed tags
+    let result = html
+    let prev = ''
+    while (prev !== result) {
+      prev = result
+      result = result.replace(/<[^>]*>|<[^>]*$/g, '')
+    }
+    return result
+  }
+
   // Create a truncated version of the description (first 150 characters)
   const createTruncatedText = (html: string, maxLength = 150) => {
-    // Strip HTML tags for character counting
-    const textOnly = html.replace(/<[^>]*>/g, "")
-    if (textOnly.length <= maxLength) return html
+    // Strip HTML tags for character counting using safe method
+    const textOnly = stripHtmlTags(html)
+    if (textOnly.length <= maxLength) return textOnly
 
     // Find a good breaking point (end of sentence or word)
     const truncated = textOnly.substring(0, maxLength)
@@ -85,7 +102,7 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
   }
 
   const truncatedText = product.descriptionHtml ? createTruncatedText(product.descriptionHtml) : ""
-  const needsTruncation = product.descriptionHtml ? product.descriptionHtml.replace(/<[^>]*>/g, "").length > 150 : false
+  const needsTruncation = product.descriptionHtml ? stripHtmlTags(product.descriptionHtml).length > 150 : false
 
   if (isDesktop) {
     // Desktop layout - properly contained within viewport with all content visible

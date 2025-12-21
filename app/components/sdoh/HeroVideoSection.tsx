@@ -19,7 +19,7 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
 
   return (
     <section 
-      className="relative w-full min-h-[100dvh] sm:min-h-[100dvh] md:min-h-[100dvh] lg:h-screen overflow-hidden" 
+      className="relative w-full h-[100dvh] overflow-hidden" 
       aria-label="SDOH Conference Hero Video"
     >
       <div className="absolute inset-0 bg-neutral-900">

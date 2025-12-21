@@ -72,9 +72,9 @@ export default function ShopPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-black text-white overflow-hidden">
+      <main className="min-h-[100dvh] bg-black text-white overflow-hidden">
         {/* Desktop Hero Section with Video */}
-        <section className="hidden md:block relative h-screen">
+        <section className="hidden md:block relative h-[100dvh]">
           {/* Background Video */}
           <div className="absolute inset-0 z-0">
             <video
@@ -137,8 +137,8 @@ export default function ShopPage() {
         </section>
 
         {/* Mobile Video Section (1080x1350 aspect ratio) */}
-        <section className="block md:hidden min-h-screen bg-black relative">
-          <div className="w-full h-screen flex items-center justify-center relative">
+        <section className="block md:hidden min-h-[100dvh] bg-black relative">
+          <div className="w-full h-[100dvh] flex items-center justify-center relative">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

@@ -148,7 +148,7 @@ export function HeroSection() {
   }, [isMobile, isLoading])
 
   return (
-    <section className="relative h-screen w-full overflow-hidden bg-neutral-900" aria-labelledby="hero-heading">
+    <section className="relative h-[100dvh] w-full overflow-hidden bg-neutral-900" aria-labelledby="hero-heading">
       <div className="absolute inset-0 bg-neutral-950 flex items-center justify-center">
         {/* Visually hidden text for screen readers and SEO */}
         <div className="sr-only">

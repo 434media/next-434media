@@ -10,32 +10,57 @@ export interface VideoInfo {
   duration?: number
 }
 
+// Helper to safely parse URL and check hostname
+function getHostname(url: string): string | null {
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname.toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+// Strict hostname validation for video platforms
+function isYouTubeUrl(hostname: string): boolean {
+  return hostname === 'youtube.com' || 
+    hostname === 'www.youtube.com' ||
+    hostname === 'youtu.be' ||
+    hostname === 'www.youtu.be'
+}
+
+function isVimeoUrl(hostname: string): boolean {
+  return hostname === 'vimeo.com' || 
+    hostname === 'www.vimeo.com' ||
+    hostname === 'player.vimeo.com'
+}
+
 export function analyzeVideoUrl(url: string): VideoInfo {
   const cleanUrl = url.trim()
+  const hostname = getHostname(cleanUrl)
 
-  // YouTube detection
-  if (cleanUrl.includes("youtube.com") || cleanUrl.includes("youtu.be")) {
+  // YouTube detection using proper URL parsing
+  if (hostname && isYouTubeUrl(hostname)) {
     const videoId = extractYouTubeId(cleanUrl)
     if (videoId) {
       return {
         type: "youtube",
         videoId,
         url: cleanUrl,
-        embedUrl: `https://www.youtube.com/embed/${videoId}`,
-        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        embedUrl: `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`,
+        thumbnailUrl: `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/maxresdefault.jpg`,
       }
     }
   }
 
-  // Vimeo detection
-  if (cleanUrl.includes("vimeo.com")) {
+  // Vimeo detection using proper URL parsing
+  if (hostname && isVimeoUrl(hostname)) {
     const videoId = extractVimeoId(cleanUrl)
     if (videoId) {
       return {
         type: "vimeo",
         videoId,
         url: cleanUrl,
-        embedUrl: `https://player.vimeo.com/video/${videoId}`,
+        embedUrl: `https://player.vimeo.com/video/${encodeURIComponent(videoId)}`,
       }
     }
   }
@@ -55,9 +80,10 @@ export function analyzeVideoUrl(url: string): VideoInfo {
 }
 
 function extractYouTubeId(url: string): string | null {
+  // Use non-greedy matching and limit capture group length to prevent polynomial regex
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/watch\?.*?v=([a-zA-Z0-9_-]{11})/,
   ]
 
   for (const pattern of patterns) {
@@ -71,15 +97,25 @@ function extractYouTubeId(url: string): string | null {
 }
 
 function extractVimeoId(url: string): string | null {
-  const pattern = /vimeo\.com\/(?:video\/)?(\d+)/
+  // Vimeo IDs are numeric, limit length to prevent issues
+  const pattern = /vimeo\.com\/(?:video\/)?([0-9]{1,15})(?:\?|$|\/)/
   const match = url.match(pattern)
   return match ? match[1] : null
 }
 
 function isDirectVideoUrl(url: string): boolean {
-  const videoExtensions = [".mp4", ".webm", ".ogg", ".mov", ".avi", ".wmv", ".flv"]
-  const lowerUrl = url.toLowerCase()
-  return videoExtensions.some((ext) => lowerUrl.includes(ext))
+  // Use URL pathname for extension check instead of includes()
+  try {
+    const urlObj = new URL(url)
+    const pathname = urlObj.pathname.toLowerCase()
+    const videoExtensions = [".mp4", ".webm", ".ogg", ".mov", ".avi", ".wmv", ".flv"]
+    return videoExtensions.some((ext) => pathname.endsWith(ext))
+  } catch {
+    // If URL parsing fails, fall back to simple extension check on the end
+    const lowerUrl = url.toLowerCase()
+    const videoExtensions = [".mp4", ".webm", ".ogg", ".mov", ".avi", ".wmv", ".flv"]
+    return videoExtensions.some((ext) => lowerUrl.endsWith(ext))
+  }
 }
 
 export function generateVideoEmbedHtml(

@@ -77,9 +77,32 @@ export function ImageUpload({
     }
   }
 
+  // Helper to validate and sanitize image URLs
+  const getSafeImageUrl = (url: string): string | null => {
+    if (!url) return null
+    try {
+      const urlObj = new URL(url.trim())
+      // Only allow http, https, data (for base64), and blob (for local uploads) protocols
+      if (['http:', 'https:', 'data:', 'blob:'].includes(urlObj.protocol)) {
+        return urlObj.href
+      }
+    } catch {
+      // Invalid URL
+    }
+    return null
+  }
+
   const handleUrlChange = (url: string) => {
-    onChange(url)
-    setPreview(url)
+    // Validate URL before accepting it
+    const safeUrl = getSafeImageUrl(url)
+    if (safeUrl || url === '') {
+      onChange(safeUrl || '')
+      setPreview(safeUrl || '')
+    } else {
+      // Still set the input value so user can see what they typed
+      onChange(url)
+      setPreview('') // Don't preview invalid URLs
+    }
   }
 
   const handleClear = () => {
@@ -193,11 +216,11 @@ export function ImageUpload({
       )}
 
       {/* Preview */}
-      {preview && (
+      {preview && getSafeImageUrl(preview) && (
         <div className="relative border border-gray-300 rounded-lg overflow-hidden bg-gray-50 p-2">
           <div className="relative w-full h-48 flex items-center justify-center">
             <img
-              src={preview}
+              src={getSafeImageUrl(preview) || ''}
               alt="Preview"
               className="max-w-full max-h-full object-contain rounded"
               onError={() => setPreview("")}

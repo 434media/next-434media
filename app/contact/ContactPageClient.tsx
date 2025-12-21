@@ -68,8 +68,8 @@ export function ContactPageClient() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-black text-white overflow-hidden">
-      <div className="relative min-h-screen flex items-center py-8 lg:py-12">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-neutral-900 via-neutral-800 to-black text-white overflow-hidden">
+      <div className="relative min-h-[100dvh] flex items-center py-8 lg:py-12">
         {/* Dynamic Background Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div

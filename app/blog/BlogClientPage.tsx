@@ -56,13 +56,13 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
     }
   }, [selectedCategory, posts])
 
-  const featuredPost = filteredPosts.length > 0 ? filteredPosts[0] : null
-  const recentPosts = filteredPosts.length > 1 ? filteredPosts.slice(1, 7) : []
+  // All posts go in the grid (no separate featured post)
+  const allPosts = filteredPosts
 
   const selectedCategoryName = selectedCategory || "All Posts"
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-[100dvh] bg-white">
       <section className="relative bg-gradient-to-br from-neutral-950 via-neutral-900 to-black pt-32 md:pt-36 md:pb-28 pb-24 overflow-hidden">
         {/* Sophisticated 434 Media Logo Pattern */}
         <div className="absolute inset-0 opacity-[0.08] sm:opacity-[0.12] pointer-events-none" aria-hidden="true">
@@ -82,13 +82,13 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6">
             <div className="space-y-3 sm:space-y-4 max-w-4xl">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight">
                 <span className="bg-gradient-to-r from-white via-gray-100 to-gray-200 bg-clip-text text-transparent">
                   News & Insights
                 </span>
               </h1>
 
-              <p className="mb-8 md:mb-0 text-base md:text-lg text-gray-300 leading-relaxed max-w-xs md:max-w-2xl mx-auto">
+              <p className="mb-8 md:mb-0 text-base sm:text-lg md:text-xl text-gray-300 leading-relaxed max-w-xs sm:max-w-lg md:max-w-2xl mx-auto font-normal">
                 Your destination for insights from the <span className="text-white font-semibold">434 MEDIA</span> team,
                 our local partners, and our diverse ecosystem.
               </p>
@@ -183,20 +183,12 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
             </div>
           </nav>
 
-          {/* Featured Post */}
-          {featuredPost && (
-            <div className="mb-16">
-              <h2 className="sr-only">Featured article</h2>
-              <BlogCard post={featuredPost} featured />
-            </div>
-          )}
-
-          {/* Recent Posts Grid */}
-          {recentPosts && recentPosts.length > 0 && (
+          {/* Posts Grid */}
+          {allPosts && allPosts.length > 0 && (
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Latest Articles</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {recentPosts.map((post) => (
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-8 tracking-tight">Latest Articles</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                {allPosts.map((post) => (
                   <BlogCard key={post.id} post={post} />
                 ))}
               </div>
