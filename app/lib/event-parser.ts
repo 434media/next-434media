@@ -7,6 +7,9 @@ interface ParseResult {
   error?: string
 }
 
+// Strict allow-list of permitted domains for SSRF prevention
+const ALLOWED_DOMAINS = ['meetup.com', 'eventbrite.com', 'lu.ma'] as const
+
 // Helper to strictly validate hostname against allowed domains
 function isAllowedHostname(hostname: string, allowedDomain: string): boolean {
   const normalizedHostname = hostname.toLowerCase()
@@ -25,48 +28,57 @@ function getPlatformFromHostname(hostname: string): 'meetup' | 'eventbrite' | 'l
   return null
 }
 
+// Validate URL is in allow-list to prevent SSRF attacks
+function validateUrlForSSRF(url: string): { valid: true; safeUrl: string; platform: 'meetup' | 'eventbrite' | 'luma' } | { valid: false; error: string } {
+  let urlObj: URL
+  try {
+    urlObj = new URL(url)
+  } catch {
+    return { valid: false, error: "Invalid URL format." }
+  }
+
+  // Only allow HTTPS protocol to prevent protocol-based attacks
+  if (urlObj.protocol !== 'https:') {
+    return { valid: false, error: "Only HTTPS URLs are supported for security reasons." }
+  }
+
+  const hostname = urlObj.hostname.toLowerCase()
+  const platform = getPlatformFromHostname(hostname)
+
+  // Strict allow-list validation - SSRF protection
+  if (!platform) {
+    return { 
+      valid: false, 
+      error: `Unsupported platform. Only ${ALLOWED_DOMAINS.join(', ')} are supported.` 
+    }
+  }
+
+  // Reconstruct URL from validated components to ensure safety
+  // This prevents URL manipulation attacks
+  const safeUrl = `https://${urlObj.hostname}${urlObj.pathname}${urlObj.search}`
+
+  return { valid: true, safeUrl, platform }
+}
+
 export async function parseEventUrl(url: string): Promise<ParseResult> {
   try {
     console.log(`🔍 Parsing event URL: ${url}`)
 
-    // Validate URL and ensure HTTPS only
-    let urlObj: URL
-    try {
-      urlObj = new URL(url)
-    } catch {
-      return {
-        success: false,
-        error: "Invalid URL format.",
-      }
+    // Validate URL against allow-list to prevent SSRF attacks
+    const validation = validateUrlForSSRF(url)
+    if (!validation.valid) {
+      return { success: false, error: validation.error }
     }
 
-    // Only allow HTTPS protocol to prevent protocol-based attacks
-    if (urlObj.protocol !== 'https:') {
-      return {
-        success: false,
-        error: "Only HTTPS URLs are supported for security reasons.",
-      }
-    }
-
-    const hostname = urlObj.hostname.toLowerCase()
-    const platform = getPlatformFromHostname(hostname)
-
-    // Strict allow-list validation for supported platforms
-    if (!platform) {
-      return {
-        success: false,
-        error: "Unsupported platform. Currently supports Meetup.com, Eventbrite.com, and Lu.ma",
-      }
-    }
-
-    // Reconstruct the URL from parsed components to prevent SSRF via URL manipulation
-    const safeUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`
+    const { safeUrl, platform } = validation
 
     // Add this before the fetch call to handle timeout:
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
     // Fetch with proper headers to avoid blocking
+    // SSRF Protection: URL has been validated against strict allow-list above
+    // Redirects are disabled to prevent redirect-based SSRF bypass attacks
     const response = await fetch(safeUrl, {
       headers: {
         "User-Agent":
@@ -79,6 +91,7 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
         Pragma: "no-cache",
       },
       signal: controller.signal,
+      redirect: "error", // Prevent redirect-based SSRF bypass
     })
 
     clearTimeout(timeoutId)
@@ -119,10 +132,26 @@ export async function parseEventUrl(url: string): Promise<ParseResult> {
   } catch (error) {
     console.error("❌ Error parsing event:", error)
 
+    // Handle redirect errors (blocked for SSRF prevention)
+    if (error instanceof TypeError && error.message.includes("redirect")) {
+      return {
+        success: false,
+        error: "The event page redirected to another location. Please use the final event URL directly.",
+      }
+    }
+
     if (error instanceof TypeError && error.message.includes("fetch")) {
       return {
         success: false,
         error: "Network error. Please check the URL and try again.",
+      }
+    }
+
+    // Handle abort errors from timeout
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        success: false,
+        error: "Request timed out. Please try again.",
       }
     }
 

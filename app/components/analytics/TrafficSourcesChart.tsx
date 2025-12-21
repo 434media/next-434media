@@ -22,11 +22,28 @@ interface SourceIconConfig {
   gradientTo: string
 }
 
+// Helper to safely check if source matches a platform domain or name
+// Uses strict matching to prevent substring bypass attacks (e.g., evil.com/facebook)
+const matchesPlatform = (source: string, patterns: string[]): boolean => {
+  const lowerSource = source.toLowerCase()
+  return patterns.some(pattern => {
+    // Exact match
+    if (lowerSource === pattern) return true
+    // Match as subdomain (e.g., "m.facebook.com")
+    if (lowerSource.endsWith(`.${pattern}`)) return true
+    // Match domain at start (e.g., "facebook.com/page")
+    if (lowerSource.startsWith(`${pattern}/`) || lowerSource.startsWith(`${pattern}?`)) return true
+    // Match with www prefix
+    if (lowerSource === `www.${pattern}` || lowerSource.startsWith(`www.${pattern}/`)) return true
+    return false
+  })
+}
+
 const getSourceIconConfig = (source: string): SourceIconConfig => {
   const lowerSource = source.toLowerCase()
 
-  // Main social platforms
-  if (lowerSource.includes("facebook")) {
+  // Main social platforms - use strict domain matching
+  if (matchesPlatform(lowerSource, ["facebook", "facebook.com", "fb.com", "fb.me"])) {
     return {
       icon: <FacebookIcon />,
       color: "text-[#1877F2]",
@@ -34,7 +51,7 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
       gradientTo: "to-[#1877F2]/5",
     }
   }
-  if (lowerSource.includes("twitter") || lowerSource.includes("x.com") || lowerSource === "x") {
+  if (matchesPlatform(lowerSource, ["twitter", "twitter.com", "x", "x.com", "t.co"])) {
     return {
       icon: <TwitterIcon />,
       color: "text-[#1DA1F2]",
@@ -42,7 +59,7 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
       gradientTo: "to-[#1DA1F2]/5",
     }
   }
-  if (lowerSource.includes("linkedin")) {
+  if (matchesPlatform(lowerSource, ["linkedin", "linkedin.com", "lnkd.in"])) {
     return {
       icon: <LinkedInIcon />,
       color: "text-[#0A66C2]",
@@ -50,7 +67,7 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
       gradientTo: "to-[#0A66C2]/5",
     }
   }
-  if (lowerSource.includes("instagram")) {
+  if (matchesPlatform(lowerSource, ["instagram", "instagram.com", "instagr.am"])) {
     return {
       icon: <InstagramIcon />,
       color: "text-[#E4405F]",
@@ -60,7 +77,7 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
   }
 
   // Direct traffic
-  if (lowerSource.includes("direct") || lowerSource === "(direct)") {
+  if (lowerSource === "direct" || lowerSource === "(direct)" || lowerSource === "(none)") {
     return {
       icon: <Globe className="h-5 w-5" />,
       color: "text-emerald-400",
@@ -69,8 +86,8 @@ const getSourceIconConfig = (source: string): SourceIconConfig => {
     }
   }
 
-  // Google (special case since it's common)
-  if (lowerSource.includes("google")) {
+  // Google (special case since it's common) - use strict domain matching
+  if (matchesPlatform(lowerSource, ["google", "google.com", "googleapis.com"])) {
     return {
       icon: <span className="text-lg">🔍</span>,
       color: "text-blue-400",

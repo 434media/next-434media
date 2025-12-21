@@ -303,7 +303,14 @@ export default function RichTextEditor({
 
   // Update word and character count
   const updateCounts = useCallback((content: string) => {
-    const text = content.replace(/<[^>]*>/g, '').trim()
+    // Use loop to handle nested/malformed tags that a single replace might miss
+    let text = content
+    let prevLength: number
+    do {
+      prevLength = text.length
+      text = text.replace(/<[^>]*>/g, '')
+    } while (text.length !== prevLength)
+    text = text.trim()
     setWordCount(text ? text.split(/\s+/).length : 0)
     setCharacterCount(text.length)
   }, [])
@@ -374,7 +381,13 @@ export default function RichTextEditor({
     
     // Check max length
     if (maxLength) {
-      const text = html.replace(/<[^>]*>/g, '')
+      // Use loop to handle nested/malformed tags that a single replace might miss
+      let text = html
+      let prevLength: number
+      do {
+        prevLength = text.length
+        text = text.replace(/<[^>]*>/g, '')
+      } while (text.length !== prevLength)
       if (text.length > maxLength) {
         return // Don't update if exceeds max length
       }

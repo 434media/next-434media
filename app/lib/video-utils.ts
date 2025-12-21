@@ -80,19 +80,39 @@ export function analyzeVideoUrl(url: string): VideoInfo {
 }
 
 function extractYouTubeId(url: string): string | null {
-  // Use non-greedy matching and limit capture group length to prevent polynomial regex
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-    /youtube\.com\/watch\?.*?v=([a-zA-Z0-9_-]{11})/,
-  ]
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern)
-    if (match && match[1]) {
-      return match[1]
+  // Use URL API for safe parsing instead of regex to prevent ReDoS
+  try {
+    const urlObj = new URL(url)
+    const hostname = urlObj.hostname.toLowerCase()
+    
+    // Handle youtu.be short URLs - video ID is in the pathname
+    if (hostname === 'youtu.be' || hostname === 'www.youtu.be') {
+      const videoId = urlObj.pathname.slice(1).split('/')[0]
+      if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+        return videoId
+      }
     }
+    
+    // Handle youtube.com URLs
+    if (hostname === 'youtube.com' || hostname === 'www.youtube.com') {
+      // Check for /embed/ path
+      if (urlObj.pathname.startsWith('/embed/')) {
+        const videoId = urlObj.pathname.slice(7).split('/')[0]
+        if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+          return videoId
+        }
+      }
+      
+      // Check for ?v= query parameter
+      const videoId = urlObj.searchParams.get('v')
+      if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+        return videoId
+      }
+    }
+  } catch {
+    // Invalid URL, return null
   }
-
+  
   return null
 }
 
