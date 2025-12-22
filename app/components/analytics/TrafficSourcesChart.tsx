@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { Globe, Loader2, Users, MousePointer, TrendingUp } from "lucide-react"
 import type { DateRange } from "../../types/analytics"

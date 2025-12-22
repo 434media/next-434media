@@ -164,10 +164,10 @@ export function PageViewsChart({
       className="w-full"
     >
       <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-emerald-500/5" />
         <CardHeader className="relative pb-4">
           <CardTitle className="text-white flex items-center gap-3 text-lg md:text-xl">
-            <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg">
+            <div className="p-2 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-lg">
               <TrendingUp className="h-5 w-5 text-blue-400" />
             </div>
             <span className="flex-1 min-w-0">Page Views Over Time</span>

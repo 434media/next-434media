@@ -135,7 +135,7 @@ export default function UnifiedAnalyticsPage() {
                   {active && (
                     <motion.span
                       layoutId="active-indicator"
-                      className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-gradient-to-b from-fuchsia-400 to-indigo-400"
+                      className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-gradient-to-b from-emerald-400 to-emerald-600"
                     />
                   )}
                 </button>

@@ -3,12 +3,15 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { Button } from "./Button"
-import { Calendar, Clock, CalendarDays } from "lucide-react"
+import { Calendar, Clock, CalendarDays, FileText, Image } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
 
 interface DateRangeSelectorProps {
   selectedRange: DateRange
   onRangeChange: (range: DateRange) => void
+  onDownloadCSV?: () => void
+  onDownloadPNG?: () => void
+  isLoading?: boolean
 }
 
 const dateRangeOptions: DateRange[] = [
@@ -18,7 +21,7 @@ const dateRangeOptions: DateRange[] = [
   { startDate: "90daysAgo", endDate: "today", label: "Last 90 days" },
 ]
 
-export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSelectorProps) {
+export function DateRangeSelector({ selectedRange, onRangeChange, onDownloadCSV, onDownloadPNG, isLoading = false }: DateRangeSelectorProps) {
   const [showCustom, setShowCustom] = useState(false)
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
@@ -51,32 +54,33 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-4"
+      className="space-y-3"
       style={{ willChange: "transform" }}
     >
       {/* Main Date Range Selector */}
       <div
-        className="flex flex-col lg:flex-row items-start lg:items-center gap-4 p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl"
+        className="p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl"
         style={{
           willChange: "auto",
           backfaceVisibility: "hidden",
           transform: "translateZ(0)",
         }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
-            style={{ willChange: "transform" }}
-          >
-            <Calendar className="h-6 w-6 text-blue-400" />
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="p-3 bg-gradient-to-br from-emerald-500/20 to-emerald-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+              style={{ willChange: "transform" }}
+            >
+              <Calendar className="h-6 w-6 text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="text-white text-xl font-bold mb-1">Date Range</h3>
+              <p className="text-white/60 text-sm font-medium">Select your analytics period</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-white text-xl font-bold mb-1">Date Range</h3>
-            <p className="text-white/60 text-sm font-medium">Select your analytics period</p>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2 flex-1">
+          <div className="flex flex-wrap items-center gap-2 flex-1">
           {dateRangeOptions.map((option, index) => (
             <motion.div
               key={option.label}
@@ -91,7 +95,7 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
                 size="sm"
                 className={`relative transition-all duration-300 hover:scale-105 ${
                   selectedRange.label === option.label
-                    ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg"
+                    ? "bg-gradient-to-r from-emerald-600 to-emerald-600 hover:from-emerald-700 hover:to-emerald-700 text-white border-0 shadow-lg"
                     : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20 hover:border-white/30 hover:text-white"
                 }`}
                 style={{ willChange: "transform" }}
@@ -100,7 +104,7 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
                 {selectedRange.label === option.label && (
                   <motion.div
                     layoutId="activeRange"
-                    className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-md -z-10"
+                    className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-emerald-500/20 rounded-md -z-10"
                     style={{ willChange: "transform" }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
@@ -132,11 +136,43 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
           </motion.div>
         </div>
 
-        <div className="flex items-center gap-2 text-white/60 text-sm">
-          <Clock className="h-4 w-4" />
-          <span>Auto-refresh: 30s</span>
-          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+          <div className="flex items-center gap-2 text-white/60 text-sm">
+            <Clock className="h-4 w-4" />
+            <span>Auto-refresh: 30s</span>
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+          </div>
         </div>
+
+        {/* Download Options - Below date range as a subtle row */}
+        {(onDownloadCSV || onDownloadPNG) && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="flex items-center gap-4">
+              <span className="text-white/50 text-sm">Export:</span>
+              {onDownloadCSV && (
+                <button
+                  onClick={onDownloadCSV}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 text-sm text-white/70 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Download CSV"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>CSV</span>
+                </button>
+              )}
+              {onDownloadPNG && (
+                <button
+                  onClick={onDownloadPNG}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 text-sm text-white/70 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Download PNG"
+                >
+                  <Image className="h-4 w-4" />
+                  <span>PNG</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Custom Date Range Picker */}
@@ -165,7 +201,7 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
                     type="date"
                     value={customStartDate || formatDateForInput(selectedRange.startDate)}
                     onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
 
@@ -175,7 +211,7 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
                     type="date"
                     value={customEndDate || formatDateForInput(selectedRange.endDate)}
                     onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
 
@@ -183,7 +219,7 @@ export function DateRangeSelector({ selectedRange, onRangeChange }: DateRangeSel
                   <Button
                     onClick={handleCustomDateApply}
                     disabled={!customStartDate || !customEndDate}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-600 hover:from-emerald-700 hover:to-emerald-700 text-white border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     Apply
                   </Button>

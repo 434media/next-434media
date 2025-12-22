@@ -2,9 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "./Card"
-import { Eye, Users, MousePointer, TrendingUp, TrendingDown, Loader2 } from "lucide-react"
-import { InfoTooltip } from "./InfoTooltip"
+import { Eye, Users, MousePointer, Clock, TrendingUp, TrendingDown, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
 
 interface MetricsOverviewProps {
@@ -110,93 +108,132 @@ export function MetricsOverview({
     }
   }, [dateRange, setError, adminKey, propertyId])
 
+  const formatNumber = (num: number): string => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
+    return num.toLocaleString()
+  }
+
   const metrics = [
     {
-      title: "Users",
+      title: "Total Users",
+      subtitle: "Unique visitors",
       value: data?.totalUsers || 0,
       change: data?.usersChange || 0,
       icon: Users,
+      color: "from-blue-500 to-cyan-500",
+      bgColor: "bg-blue-500/10",
+      iconColor: "text-blue-400",
     },
     {
       title: "Sessions",
+      subtitle: "Total visits",
       value: data?.totalSessions || 0,
       change: data?.sessionsChange || 0,
       icon: MousePointer,
+      color: "from-emerald-500 to-teal-500",
+      bgColor: "bg-emerald-500/10",
+      iconColor: "text-emerald-400",
     },
     {
       title: "Page Views",
+      subtitle: "Pages loaded",
       value: data?.totalPageViews || 0,
       change: data?.pageViewsChange || 0,
       icon: Eye,
+      color: "from-violet-500 to-purple-500",
+      bgColor: "bg-violet-500/10",
+      iconColor: "text-violet-400",
     },
     {
       title: "Bounce Rate",
+      subtitle: "Single-page visits",
       value: data?.averageBounceRate || 0,
       change: data?.bounceRateChange || 0,
-      icon: TrendingUp,
+      icon: Clock,
+      color: "from-amber-500 to-orange-500",
+      bgColor: "bg-amber-500/10",
+      iconColor: "text-amber-400",
       isPercentage: true,
+      invertChange: true, // Lower bounce rate is better
     },
   ]
 
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-      {/* Main Metrics - 2x2 grid on mobile, 4 columns on desktop */}
-      {metrics.map((metric, index) => (
-        <div
-          key={metric.title}
-          className="col-span-1"
-        >
-          <Card
-            className="relative overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 transition-colors duration-300 group cursor-pointer h-[140px] sm:h-[120px] lg:h-[120px]"
-          >
+  const loading = isLoading || parentLoading
 
-            <CardContent className="relative p-4 sm:p-5 lg:p-5 h-full flex flex-col justify-between mt-1 sm:mt-0">
-              {isLoading || parentLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-white/60 animate-spin" />
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {metrics.map((metric) => {
+        const changeValue = metric.change || 0
+        const isPositive = metric.invertChange ? changeValue < 0 : changeValue > 0
+        const isNegative = metric.invertChange ? changeValue > 0 : changeValue < 0
+        const hasChange = changeValue !== 0
+
+        return (
+          <div
+            key={metric.title}
+            className="relative group"
+          >
+            {/* Card */}
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-5 transition-all duration-300 hover:border-white/20 hover:from-white/[0.12] hover:to-white/[0.04]">
+              {/* Gradient accent line */}
+              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${metric.color} opacity-60`} />
+              
+              {/* Loading state */}
+              {loading ? (
+                <div className="flex flex-col items-center justify-center h-[100px]">
+                  <Loader2 className="h-6 w-6 text-white/40 animate-spin" />
+                  <span className="text-xs text-white/40 mt-2">Loading...</span>
                 </div>
               ) : (
                 <>
-                  <div className="flex items-start justify-between mb-3 sm:mb-3">
-                    <div className="p-2 sm:p-2.5 bg-white/10 rounded-lg sm:rounded-xl mt-4 md:mt-0">
-                      <metric.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+                  {/* Header: Icon and Change Badge */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-2.5 rounded-xl ${metric.bgColor}`}>
+                      <metric.icon className={`h-5 w-5 ${metric.iconColor}`} />
                     </div>
-
-                    {metric.change !== 0 && (
+                    
+                    {hasChange && (
                       <div
-                        className={`
-                          flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 
-                          rounded-full text-[10px] sm:text-xs font-medium
-                          ${
-                            metric.change > 0
-                              ? "bg-white/10 text-white/70 border border-white/20"
-                              : "bg-white/10 text-white/70 border border-white/20"
-                          }
-                        `}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          isPositive
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                            : isNegative
+                            ? "bg-red-500/15 text-red-400 border border-red-500/20"
+                            : "bg-white/10 text-white/60 border border-white/10"
+                        }`}
                       >
-                        {metric.change > 0 ? (
-                          <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                        {isPositive ? (
+                          <ArrowUpRight className="h-3 w-3" />
                         ) : (
-                          <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          <ArrowDownRight className="h-3 w-3" />
                         )}
-                        <span className="hidden xs:inline">{Math.abs(metric.change).toFixed(1)}%</span>
-                        <span className="xs:hidden">{Math.abs(metric.change).toFixed(0)}%</span>
+                        <span>{Math.abs(changeValue).toFixed(1)}%</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-0.5 sm:space-y-1">
-                    <div className="text-xl sm:text-2xl font-bold text-white leading-none">
-                      {metric.isPercentage ? `${(metric.value * 100).toFixed(1)}%` : metric.value.toLocaleString()}
-                    </div>
-                    <p className="text-white/70 text-xs sm:text-sm font-medium leading-none">{metric.title}</p>
+                  {/* Value */}
+                  <div className="mb-1">
+                    <span className="text-3xl font-bold text-white tracking-tight">
+                      {metric.isPercentage 
+                        ? `${(metric.value * 100).toFixed(1)}%`
+                        : formatNumber(metric.value)
+                      }
+                    </span>
+                  </div>
+
+                  {/* Title and Subtitle */}
+                  <div>
+                    <p className="text-sm font-medium text-white/90">{metric.title}</p>
+                    <p className="text-xs text-white/50">{metric.subtitle}</p>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

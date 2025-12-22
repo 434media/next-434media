@@ -44,10 +44,10 @@ export function DashboardHeader({
         />
       </div>
 
-      {/* Enhanced Floating Elements with Green/Blue/Purple */}
+      {/* Enhanced Floating Elements with Green/Blue/emerald */}
       <div className="absolute top-16 sm:top-20 left-4 sm:left-10 w-20 h-20 sm:w-24 sm:h-24 bg-emerald-400/20 rounded-full blur-2xl animate-pulse" />
       <div className="absolute top-32 sm:top-40 right-8 sm:right-20 w-32 h-32 sm:w-40 sm:h-40 bg-blue-400/25 rounded-full blur-3xl animate-pulse delay-1000" />
-      <div className="absolute bottom-16 sm:bottom-20 left-1/4 w-24 h-24 sm:w-28 sm:h-28 bg-purple-400/20 rounded-full blur-2xl animate-pulse delay-500" />
+      <div className="absolute bottom-16 sm:bottom-20 left-1/4 w-24 h-24 sm:w-28 sm:h-28 bg-emerald-400/20 rounded-full blur-2xl animate-pulse delay-500" />
       <div className="absolute top-24 sm:top-32 right-1/4 w-16 h-16 sm:w-20 sm:h-20 bg-teal-400/25 rounded-full blur-xl animate-pulse delay-700" />
 
       {/* Additional floating elements */}
@@ -65,7 +65,7 @@ export function DashboardHeader({
           className="flex items-center gap-4"
         >
           <motion.div
-            className="p-3 bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+            className="p-3 bg-gradient-to-br from-blue-500/30 to-emerald-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
@@ -177,7 +177,7 @@ export function DashboardHeader({
           className="flex items-center gap-4"
         >
           <motion.div
-            className="p-3 bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+            className="p-3 bg-gradient-to-br from-blue-500/30 to-emerald-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
@@ -275,7 +275,7 @@ export function DashboardHeader({
 
       {/* Animated gradient line at bottom */}
       <motion.div
-        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-teal-500"
+        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-teal-500"
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
         transition={{ duration: 1.5, delay: 0.5 }}

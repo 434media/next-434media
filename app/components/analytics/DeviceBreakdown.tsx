@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "./Card"
+import { Card, CardContent, } from "./Card"
 import { Smartphone, Monitor, Loader2, Tablet } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
 
