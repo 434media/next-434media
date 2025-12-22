@@ -15,6 +15,8 @@ import type {
   MailchimpGeographicResponse,
   MailchimpListsResponse,
   MailchimpCampaignsResponse,
+  MailchimpTag,
+  MailchimpTagsResponse,
 } from "../types/mailchimp-analytics"
 import { getDefaultAudienceId } from "./mailchimp-config"
 
@@ -535,36 +537,80 @@ export async function getMailchimpCampaignsData(
 
     let endpoint = `/campaigns?status=sent&since_send_time=${sinceSendTime}&before_send_time=${beforeSendTime}&count=100&sort_field=send_time&sort_dir=DESC`
 
-    // Include ALL report summary fields, especially bounces and unsubscribed
-    endpoint += `&fields=campaigns.id,campaigns.settings.title,campaigns.settings.subject_line,campaigns.send_time,campaigns.recipients,campaigns.archive_url,campaigns.report_summary.opens,campaigns.report_summary.unique_opens,campaigns.report_summary.open_rate,campaigns.report_summary.clicks,campaigns.report_summary.subscriber_clicks,campaigns.report_summary.click_rate,campaigns.report_summary.emails_sent,campaigns.report_summary.unsubscribed,campaigns.report_summary.bounces,campaigns.report_summary.forwards,campaigns.report_summary.forward_opens,campaigns.report_summary.ecommerce,total_items`
-
     if (audienceId) {
       const targetAudienceId = getAudienceId(audienceId)
       endpoint += `&list_id=${targetAudienceId}`
     }
 
-    console.log("[Mailchimp] Fetching campaigns with endpoint:", endpoint)
+    console.log("[Mailchimp] Fetching campaigns list...")
 
     const campaignsData = await makeMailchimpRequest<{ campaigns: MailchimpCampaign[]; total_items: number }>(endpoint)
 
-    const data: MailchimpCampaign[] = campaignsData.campaigns || []
+    const campaignsList: MailchimpCampaign[] = campaignsData.campaigns || []
+
+    // Fetch detailed reports for each campaign to get bounces and unsubscribes
+    // The /campaigns endpoint doesn't include these in report_summary
+    const campaignsWithReports: MailchimpCampaign[] = await Promise.all(
+      campaignsList.map(async (campaign) => {
+        try {
+          // Fetch the full report for this campaign
+          const report = await makeMailchimpRequest<{
+            id: string
+            emails_sent: number
+            opens: { opens_total: number; unique_opens: number; open_rate: number }
+            clicks: { clicks_total: number; unique_clicks: number; click_rate: number }
+            bounces: { hard_bounces: number; soft_bounces: number; syntax_errors: number }
+            unsubscribed: number
+            forwards: { forwards_count: number; forwards_opens: number }
+            ecommerce: { total_orders: number; total_spent: number; total_revenue: number }
+          }>(`/reports/${campaign.id}`)
+
+          // Merge report data into campaign
+          return {
+            ...campaign,
+            report_summary: {
+              ...campaign.report_summary,
+              emails_sent: report.emails_sent || campaign.report_summary?.emails_sent || 0,
+              opens: report.opens?.opens_total || campaign.report_summary?.opens || 0,
+              unique_opens: report.opens?.unique_opens || campaign.report_summary?.unique_opens || 0,
+              open_rate: report.opens?.open_rate || campaign.report_summary?.open_rate || 0,
+              clicks: report.clicks?.clicks_total || campaign.report_summary?.clicks || 0,
+              subscriber_clicks: report.clicks?.unique_clicks || campaign.report_summary?.subscriber_clicks || 0,
+              click_rate: report.clicks?.click_rate || campaign.report_summary?.click_rate || 0,
+              bounces: (report.bounces?.hard_bounces || 0) + (report.bounces?.soft_bounces || 0),
+              unsubscribed: report.unsubscribed || 0,
+              forwards: report.forwards?.forwards_count || campaign.report_summary?.forwards || 0,
+              forward_opens: report.forwards?.forwards_opens || campaign.report_summary?.forward_opens || 0,
+              ecommerce: {
+                total_orders: report.ecommerce?.total_orders || 0,
+                total_spent: report.ecommerce?.total_spent || 0,
+                total_revenue: report.ecommerce?.total_revenue || 0,
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`[Mailchimp] Failed to fetch report for campaign ${campaign.id}:`, error)
+          return campaign
+        }
+      })
+    )
 
     // Log the first campaign's report summary to debug what data we're getting
-    if (data.length > 0 && data[0].report_summary) {
-      console.log("[Mailchimp] Sample campaign report_summary:", {
-        campaignId: data[0].id,
-        opens: data[0].report_summary.opens,
-        clicks: data[0].report_summary.clicks,
-        bounces: data[0].report_summary.bounces,
-        unsubscribed: data[0].report_summary.unsubscribed,
-        emails_sent: data[0].report_summary.emails_sent,
-        open_rate: data[0].report_summary.open_rate,
-        click_rate: data[0].report_summary.click_rate,
+    if (campaignsWithReports.length > 0 && campaignsWithReports[0].report_summary) {
+      console.log("[Mailchimp] Sample campaign report_summary (with detailed report):", {
+        campaignId: campaignsWithReports[0].id,
+        opens: campaignsWithReports[0].report_summary.opens,
+        clicks: campaignsWithReports[0].report_summary.clicks,
+        bounces: campaignsWithReports[0].report_summary.bounces,
+        unsubscribed: campaignsWithReports[0].report_summary.unsubscribed,
+        emails_sent: campaignsWithReports[0].report_summary.emails_sent,
+        open_rate: campaignsWithReports[0].report_summary.open_rate,
+        click_rate: campaignsWithReports[0].report_summary.click_rate,
       })
     }
 
     return {
-      data,
+      data: campaignsWithReports,
       totalCampaigns: campaignsData.total_items || 0,
       listId: audienceId ? getAudienceId(audienceId) : undefined,
       _source: "mailchimp",
@@ -623,5 +669,103 @@ export async function getMailchimpRealtimeData(audienceId?: string): Promise<Mai
   } catch (error) {
     console.error("[Mailchimp] Error in getMailchimpRealtimeData:", error)
     throw error
+  }
+}
+
+// Get tags/segments for an audience with member counts
+// Mailchimp has two concepts: Tags (simple labels) and Segments (saved searches)
+// This function fetches BOTH and combines them
+export async function getMailchimpTags(audienceId?: string): Promise<MailchimpTagsResponse> {
+  console.log("[Mailchimp] getMailchimpTags called with audienceId:", audienceId)
+
+  try {
+    const targetAudienceId = getAudienceId(audienceId)
+
+    // Fetch tags using tag-search endpoint with empty name to get all tags
+    // Note: This endpoint may not return all tags, so we also fetch segments
+    let allTags: MailchimpTag[] = []
+    
+    try {
+      // Try fetching actual tags first
+      const tagsData = await makeMailchimpRequest<{
+        tags: Array<{ id: number; name: string }>;
+        total_items: number
+      }>(
+        `/lists/${targetAudienceId}/tag-search?count=100`
+      )
+      
+      console.log("[Mailchimp] Tags from tag-search:", tagsData.total_items, "tags")
+      
+      // Tags from tag-search don't include member_count, we need to fetch each tag's members
+      // For efficiency, we'll just add them with 0 count initially
+      if (tagsData.tags) {
+        allTags = tagsData.tags.map(tag => ({
+          id: tag.id,
+          name: tag.name,
+          member_count: 0, // Will be updated below if we can fetch member counts
+          type: 'tag',
+        }))
+      }
+    } catch (tagError) {
+      console.log("[Mailchimp] tag-search failed, falling back to segments only:", tagError)
+    }
+
+    // Also fetch segments (which includes static segments often used as tags)
+    const segmentsData = await makeMailchimpRequest<{
+      segments: Array<{ id: number; name: string; member_count: number; type: string; created_at: string; updated_at: string }>;
+      total_items: number
+    }>(
+      `/lists/${targetAudienceId}/segments?count=100&fields=segments.id,segments.name,segments.member_count,segments.type,segments.created_at,segments.updated_at,total_items`
+    )
+
+    console.log("[Mailchimp] Segments fetched:", segmentsData.total_items, "segments")
+    
+    // Log all segments for debugging
+    if (segmentsData.segments) {
+      console.log("[Mailchimp] All segments:", segmentsData.segments.map(s => `${s.name} (${s.member_count}) [${s.type}]`).join(", "))
+    }
+
+    // Add segments to tags list
+    const segmentTags: MailchimpTag[] = (segmentsData.segments || []).map(segment => ({
+      id: segment.id,
+      name: segment.name,
+      member_count: segment.member_count || 0,
+      type: segment.type || 'saved',
+      created_at: segment.created_at,
+      updated_at: segment.updated_at,
+    }))
+
+    // Combine and deduplicate by name
+    const combinedTags = [...allTags]
+    for (const segmentTag of segmentTags) {
+      const existingIndex = combinedTags.findIndex(t => t.name.toLowerCase() === segmentTag.name.toLowerCase())
+      if (existingIndex >= 0) {
+        // Update with segment data which has member_count
+        combinedTags[existingIndex] = segmentTag
+      } else {
+        combinedTags.push(segmentTag)
+      }
+    }
+
+    // Sort by member count descending
+    combinedTags.sort((a, b) => (b.member_count || 0) - (a.member_count || 0))
+
+    console.log("[Mailchimp] Final combined tags:", combinedTags.map(t => `${t.name} (${t.member_count})`).join(", "))
+
+    return {
+      tags: combinedTags,
+      total_items: combinedTags.length,
+      listId: targetAudienceId,
+      _source: "mailchimp",
+    }
+  } catch (error) {
+    console.error("[Mailchimp] Error in getMailchimpTags:", error)
+    // Return empty tags on error instead of throwing
+    return {
+      tags: [],
+      total_items: 0,
+      listId: audienceId || '',
+      _source: "mailchimp",
+    }
   }
 }

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../analytics/Card"
 import { Badge } from "../analytics/Badge"
-import { TrendingUp, Mail, Users, MousePointer, UserMinus, AlertTriangle, BarChart3 } from 'lucide-react'
+import { TrendingUp, Mail, Users, MousePointer, UserMinus, AlertTriangle, BarChart3, Eye, Globe } from 'lucide-react'
 import type { MailchimpAnalyticsSummary } from "../../types/mailchimp-analytics"
 
 interface MailchimpMetricsOverviewProps {
@@ -138,6 +138,17 @@ function safeNumber(value: any): number {
   return 0
 }
 
+// Helper function to format large numbers
+function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return `${(num / 1000000).toFixed(1)}M`
+  }
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`
+  }
+  return num.toLocaleString()
+}
+
 export function MailchimpMetricsOverview({ 
   data, 
   campaignData = [], 
@@ -261,83 +272,102 @@ export function MailchimpMetricsOverview({
     bounceRate
   })
 
+  // Metrics configuration - clean white design
   const metrics = [
     {
       title: "Total Subscribers",
-      value: totalSubscribers.toLocaleString(),
+      value: formatNumber(totalSubscribers),
       icon: Users,
       description: audienceDescription,
     },
     {
-      title: "Total Campaigns",
-      value: totalCampaigns.toLocaleString(),
+      title: "Campaigns Sent",
+      value: totalCampaigns.toString(),
       icon: Mail,
-      description: `Campaigns sent in selected period`,
+      description: `In selected period`,
     },
     {
-      title: "Recipients",
-      value: totalRecipients.toLocaleString(),
+      title: "Emails Sent",
+      value: formatNumber(totalRecipients),
       icon: TrendingUp,
-      description: `Total recipients across ${validCampaigns.length} campaigns`,
+      description: `Across ${validCampaigns.length} campaign${validCampaigns.length !== 1 ? 's' : ''}`,
     },
     {
       title: "Open Rate",
-      value: `${openRate.toFixed(2)}%`,
-      icon: BarChart3,
-      description: "Industry average: 21.33%",
+      value: `${openRate.toFixed(1)}%`,
+      icon: Eye,
+      description: "Industry avg: 21.33%",
       badge: getPerformanceBadge(openRate, "open_rate"),
     },
     {
       title: "Click Rate",
       value: `${clickRate.toFixed(2)}%`,
       icon: MousePointer,
-      description: "Industry average: 2.62%",
+      description: "Industry avg: 2.62%",
       badge: getPerformanceBadge(clickRate, "click_rate"),
     },
     {
-      title: "Unsubscribe Rate",
-      value: `${unsubscribeRate.toFixed(2)}%`,
-      icon: UserMinus,
-      description: "Industry average: 0.21%",
-      badge: getPerformanceBadge(unsubscribeRate, "unsubscribe_rate"),
-    },
-    {
-      title: "Bounce Rate",
-      value: `${bounceRate.toFixed(2)}%`,
-      icon: AlertTriangle,
-      description: "Industry average: 0.70%",
-      badge: getPerformanceBadge(bounceRate, "bounce_rate"),
-    },
-    {
       title: "Total Opens",
-      value: totalOpens.toLocaleString(),
-      icon: TrendingUp,
-      description: `Email opens across ${validCampaigns.length} campaigns`,
+      value: formatNumber(totalOpens),
+      icon: BarChart3,
+      description: `Unique: ${formatNumber(validCampaigns.reduce((sum, c) => sum + safeNumber(c.report_summary?.unique_opens), 0))}`,
     },
     {
       title: "Total Clicks",
-      value: totalClicks.toLocaleString(),
+      value: formatNumber(totalClicks),
       icon: MousePointer,
-      description: `Link clicks across ${validCampaigns.length} campaigns`,
+      description: `Link clicks`,
+    },
+    {
+      title: "Bounces",
+      value: totalBounces > 0 ? formatNumber(totalBounces) : "0",
+      subValue: `${bounceRate.toFixed(2)}%`,
+      icon: AlertTriangle,
+      description: "Industry avg: 0.70%",
+      badge: getPerformanceBadge(bounceRate, "bounce_rate"),
+    },
+    {
+      title: "Unsubscribes",
+      value: totalUnsubscribes > 0 ? formatNumber(totalUnsubscribes) : "0",
+      subValue: `${unsubscribeRate.toFixed(2)}%`,
+      icon: UserMinus,
+      description: "Industry avg: 0.21%",
+      badge: getPerformanceBadge(unsubscribeRate, "unsubscribe_rate"),
     },
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
       {metrics.map((metric) => (
-        <Card key={metric.title} className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
-            <metric.icon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{metric.value}</div>
-              {metric.badge && metric.badge}
+        <div
+          key={metric.title}
+          className="relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:shadow-md"
+        >
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <metric.icon className="h-4 w-4 text-neutral-400" />
+              {metric.badge && (
+                <div className="flex-shrink-0">
+                  {metric.badge}
+                </div>
+              )}
             </div>
-            <CardDescription className="mt-1">{metric.description}</CardDescription>
-          </CardContent>
-        </Card>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-neutral-900">
+                {metric.value}
+              </span>
+              {metric.subValue && (
+                <span className="text-xs text-neutral-500">
+                  ({metric.subValue})
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-medium text-neutral-600 mt-1">
+              {metric.title}
+            </span>
+            <p className="mt-1 text-xs text-neutral-400">{metric.description}</p>
+          </div>
+        </div>
       ))}
     </div>
   )

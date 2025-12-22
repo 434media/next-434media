@@ -8,6 +8,7 @@ import {
   getMailchimpListsData,
   getMailchimpCampaignsData,
   getMailchimpRealtimeData,
+  getMailchimpTags,
 } from "../../lib/mailchimp-analytics"
 
 export async function GET(request: NextRequest) {
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       "geographic",
       "realtime",
       "all-campaigns",
+      "tags",
     ]
 
     if (!availableEndpoints.includes(endpoint)) {
@@ -98,6 +100,15 @@ export async function GET(request: NextRequest) {
           campaignsWithData: data.data.length,
           sampleBounces: data.data[0]?.report_summary?.bounces,
           sampleUnsubscribed: data.data[0]?.report_summary?.unsubscribed,
+        })
+        break
+
+      case "tags":
+        console.log("[Mailchimp API] Fetching tags data...")
+        data = await getMailchimpTags(audienceId || undefined)
+        console.log("[Mailchimp API] tags data fetched:", {
+          totalTags: data.total_items,
+          tags: data.tags.map((t: { name: string; member_count?: number }) => `${t.name} (${t.member_count || 0})`).join(", "),
         })
         break
 

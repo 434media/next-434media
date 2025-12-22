@@ -329,3 +329,20 @@ export interface PerformanceBadgeProps {
   value: number
   type: "open_rate" | "click_rate" | "unsubscribe_rate"
 }
+
+// Tag/Segment types
+export interface MailchimpTag {
+  id: number
+  name: string
+  member_count?: number
+  type?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface MailchimpTagsResponse {
+  tags: MailchimpTag[]
+  total_items: number
+  listId: string
+  _source: string
+}
