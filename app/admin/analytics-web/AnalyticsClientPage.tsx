@@ -476,30 +476,6 @@ export default function AnalyticsClientPage() {
       
       <div className="py-6">
         <div className="container mx-auto px-4 max-w-7xl">
-          {/* Connection Status - Only show if connected */}
-          {connectionStatus?.success && (
-            <div className="mb-4">
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-white">Google Analytics Connected</p>
-                    <p className="text-xs text-white/50 mt-1">
-                      Property: {connectionStatus.propertyId} | Dimensions: {connectionStatus.dimensionCount} | Metrics:{" "}
-                      {connectionStatus.metricCount}
-                    </p>
-                  </div>
-                  <button
-                    onClick={testConnection}
-                    disabled={isLoading}
-                    className="text-xs bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1 rounded-md transition-colors"
-                  >
-                    {isLoading ? "Testing..." : "Test Connection"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Error Display */}
           {error && (
             <div className="mb-4">

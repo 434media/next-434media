@@ -99,67 +99,90 @@ export default function UnifiedAnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex">
-      {/* Sidebar (visible on all breakpoints; icon-only until lg) */}
-      <aside className="mt-20 md:mt-16 flex flex-col w-16 md:w-20 lg:w-64 border-r border-white/10 backdrop-blur-sm bg-black/30">
-        <div className="p-4 lg:px-6 lg:py-8 flex flex-col gap-8">
-          <div className="space-y-1">
-            <h2 className="hidden md:block text-xs lg:text-sm uppercase tracking-wider text-white/60 font-medium">Analytics</h2>
-            <p className="hidden lg:block text-[10px] lg:text-xs text-white/40 leading-relaxed">Unified dashboards for web, social, and email performance.</p>
-          </div>
-          <nav className="flex flex-col gap-3">
-            {tabs.map((t) => {
-              const Icon = t.icon
-              const active = activeTab === t.key
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`group relative flex items-center justify-center lg:justify-start gap-3 rounded-xl px-2 lg:px-3 py-3 lg:py-2 text-sm transition-colors ${
-                    active ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
-                  }`}
-                  title={t.label}
-                >
-                  <motion.span
-                    layoutId="analytics-icon-highlight"
-                    className={`flex items-center justify-center w-8 h-8 rounded-lg ${
-                      active ? "bg-white/10" : "bg-white/5 group-hover:bg-white/10"
+    <div className="min-h-screen bg-neutral-100 text-neutral-900">
+      {/* Mobile Tab Bar - Fixed at bottom on mobile */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-black border-t border-white/10 safe-area-pb">
+        <nav className="flex justify-around py-1.5">
+          {tabs.map((t) => {
+            const Icon = t.icon
+            const active = activeTab === t.key
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
+                  active ? "text-white" : "text-white/50"
+                }`}
+              >
+                <span className={`p-1.5 rounded-lg ${active ? "bg-white/10" : ""}`}>
+                  <Icon className={`w-5 h-5 ${t.color}`} />
+                </span>
+                <span className="text-[9px] font-medium">{t.label.split(" ")[0]}</span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      <div className="flex">
+        {/* Sidebar - Desktop only, not fixed so footer shows */}
+        <aside className="hidden md:flex pt-16 flex-col w-20 lg:w-64 border-r border-neutral-200 bg-black min-h-screen flex-shrink-0">
+          <div className="p-4 lg:px-6 lg:py-6 flex flex-col gap-6 sticky top-16">
+            <div className="space-y-1">
+              <h2 className="hidden lg:block text-sm uppercase tracking-wider text-white/60 font-medium">Analytics</h2>
+              <p className="hidden lg:block text-xs text-white/40 leading-relaxed">Unified dashboards for web, social, and email.</p>
+            </div>
+            <nav className="flex flex-col gap-2">
+              {tabs.map((t) => {
+                const Icon = t.icon
+                const active = activeTab === t.key
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`group relative flex items-center justify-center lg:justify-start gap-3 rounded-xl px-2 lg:px-3 py-2.5 lg:py-2.5 text-sm transition-colors ${
+                      active ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
                     }`}
+                    title={t.label}
                   >
-                    <Icon className={`w-5 h-5 ${t.color}`} />
-                  </motion.span>
-                  <span className="hidden lg:flex flex-col text-left leading-tight">
-                    <span className="font-medium text-xs">{t.label}</span>
-                    <span className="text-[10px] text-white/40">{t.description}</span>
-                  </span>
-                  {active && (
-                    <motion.span
-                      layoutId="active-indicator"
-                      className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-gradient-to-b from-emerald-400 to-emerald-600"
-                    />
-                  )}
-                </button>
-              )
-            })}
-          </nav>
-        </div>
-      </aside>
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="pt-4 md:pt-0">
+                    <span
+                      className={`flex items-center justify-center w-9 h-9 rounded-lg ${
+                        active ? "bg-white/10" : "bg-white/5 group-hover:bg-white/10"
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 ${t.color}`} />
+                    </span>
+                    <span className="hidden lg:flex flex-col text-left leading-tight">
+                      <span className="font-medium text-sm">{t.label}</span>
+                      <span className="text-[11px] text-white/40">{t.description}</span>
+                    </span>
+                    {active && (
+                      <motion.span
+                        layoutId="active-indicator"
+                        className="absolute left-0 top-0 bottom-0 w-1 rounded-r bg-gradient-to-b from-emerald-400 to-emerald-600"
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Content */}
+        <main className="flex-1 pb-16 md:pb-0">
           {/* Animating tab transitions */}
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.4 }}
-            className="min-h-screen"
+            transition={{ duration: 0.3 }}
           >
             {ActiveComponent}
           </motion.div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
