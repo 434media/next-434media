@@ -313,15 +313,16 @@ export async function getFeedItemBySlug(slug: string): Promise<FeedItem | null> 
 }
 
 // Create a new feed item in Airtable
-export async function createFeedItem(item: Partial<FeedItem>): Promise<FeedItem> {
+export async function createFeedItem(item: Partial<FeedItem>, tableName?: string): Promise<FeedItem> {
   if (!feedBase) {
     throw new Error("Airtable not configured for The Feed. Please set THEFEEDS_BASE_ID and AIRTABLE_API_KEY")
   }
 
   try {
     const airtableData = mapFeedItemToAirtable(item)
+    const targetTable = tableName || thefeedsTableName
 
-    const records = await feedBase(thefeedsTableName).create([
+    const records = await feedBase(targetTable).create([
       {
         fields: airtableData,
       },
@@ -339,15 +340,16 @@ export async function createFeedItem(item: Partial<FeedItem>): Promise<FeedItem>
 }
 
 // Update a feed item in Airtable
-export async function updateFeedItem(id: string, updates: Partial<FeedItem>): Promise<FeedItem> {
+export async function updateFeedItem(id: string, updates: Partial<FeedItem>, tableName?: string): Promise<FeedItem> {
   if (!feedBase) {
     throw new Error("Airtable not configured for The Feed")
   }
 
   try {
     const airtableUpdates = mapFeedItemToAirtable(updates)
+    const targetTable = tableName || thefeedsTableName
 
-    const records = await feedBase(thefeedsTableName).update([
+    const records = await feedBase(targetTable).update([
       {
         id,
         fields: airtableUpdates,
@@ -366,13 +368,14 @@ export async function updateFeedItem(id: string, updates: Partial<FeedItem>): Pr
 }
 
 // Delete a feed item from Airtable
-export async function deleteFeedItem(id: string): Promise<void> {
+export async function deleteFeedItem(id: string, tableName?: string): Promise<void> {
   if (!feedBase) {
     throw new Error("Airtable not configured for The Feed")
   }
 
   try {
-    await feedBase(thefeedsTableName).destroy([id])
+    const targetTable = tableName || thefeedsTableName
+    await feedBase(targetTable).destroy([id])
   } catch (error) {
     console.error("Error deleting feed item from Airtable:", error)
     throw new Error("Failed to delete feed item from Airtable")

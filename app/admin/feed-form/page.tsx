@@ -614,9 +614,13 @@ export default function FeedFormPage() {
     try {
       const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
       
+      // Get current brand's table name
+      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
+      const tableName = currentBrand?.tableName || "thefeed"
+      
       // Determine if we're editing or creating
       const isEditing = editingId !== null
-      const url = "/api/feed-submit"
+      const url = `/api/feed-submit?table=${tableName}`
       const method = isEditing ? "PATCH" : "POST"
       const body = isEditing ? { id: editingId, ...formData } : formData
       
@@ -746,7 +750,11 @@ export default function FeedFormPage() {
     }
 
     try {
-      const response = await fetch(`/api/feed-submit?id=${id}`, {
+      // Get current brand's table name
+      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
+      const tableName = currentBrand?.tableName || "thefeed"
+      
+      const response = await fetch(`/api/feed-submit?id=${id}&table=${tableName}`, {
         method: "DELETE",
       })
 

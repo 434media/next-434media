@@ -14,6 +14,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get table name from query parameters
+    const { searchParams } = new URL(request.url)
+    const tableName = searchParams.get("table") || undefined
+
     // Parse request body
     const feedData = await request.json()
 
@@ -26,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create feed item in Airtable
-    const createdItem = await createFeedItem(feedData)
+    const createdItem = await createFeedItem(feedData, tableName)
 
     return NextResponse.json({
       success: true,
@@ -101,6 +105,10 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    // Get table name from query parameters
+    const { searchParams } = new URL(request.url)
+    const tableName = searchParams.get("table") || undefined
+
     // Parse request body
     const { id, ...updates } = await request.json()
 
@@ -116,7 +124,7 @@ export async function PATCH(request: NextRequest) {
     const { updateFeedItem } = await import("../../lib/airtable-feed")
     
     // Update feed item in Airtable
-    const updatedItem = await updateFeedItem(id, updates)
+    const updatedItem = await updateFeedItem(id, updates, tableName)
 
     return NextResponse.json({
       success: true,
@@ -149,9 +157,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Get ID from query parameters
+    // Get ID and table name from query parameters
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
+    const tableName = searchParams.get("table") || undefined
 
     if (!id) {
       return NextResponse.json(
@@ -164,7 +173,7 @@ export async function DELETE(request: NextRequest) {
     const { deleteFeedItem } = await import("../../lib/airtable-feed")
     
     // Delete feed item from Airtable
-    await deleteFeedItem(id)
+    await deleteFeedItem(id, tableName)
 
     return NextResponse.json({
       success: true,
