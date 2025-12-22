@@ -1,17 +1,104 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { motion } from "motion/react"
+import { useState, useEffect, useCallback } from "react"
+import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
 import { Button } from "../../components/analytics/Button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/analytics/Card"
 import { Badge } from "../../components/analytics/Badge"
 
 import { useToast } from "../../hooks/use-toast"
-import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X } from "lucide-react"
+import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, Star } from "lucide-react"
 import Link from "next/link"
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
+
+// Collapsible Section Component
+interface CollapsibleSectionProps {
+  id: string
+  title: string
+  description: string
+  icon: React.ReactNode
+  isOpen: boolean
+  onToggle: () => void
+  isComplete?: boolean
+  children: React.ReactNode
+}
+
+function CollapsibleSection({ 
+  id, 
+  title, 
+  description, 
+  icon, 
+  isOpen, 
+  onToggle, 
+  isComplete = false,
+  children
+}: CollapsibleSectionProps) {
+  return (
+    <div className={`border rounded-xl overflow-hidden transition-all duration-200 ${
+      isOpen 
+        ? 'border-blue-300 shadow-lg shadow-blue-100/50 bg-white' 
+        : isComplete 
+          ? 'border-green-200 bg-green-50/30 hover:border-green-300' 
+          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+    }`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${
+            isOpen 
+              ? 'bg-blue-100 text-blue-600' 
+              : isComplete 
+                ? 'bg-green-100 text-green-600' 
+                : 'bg-gray-100 text-gray-500'
+          }`}>
+            {icon}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className={`font-semibold ${isOpen ? 'text-blue-900' : 'text-gray-900'}`}>
+                {title}
+              </h3>
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {isComplete && !isOpen && (
+            <CheckCircle2 className="h-5 w-5 text-green-500" />
+          )}
+          <div className={`p-1 rounded-full transition-colors ${
+            isOpen ? 'bg-blue-100' : 'bg-gray-100'
+          }`}>
+            {isOpen ? (
+              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'text-blue-600' : 'text-gray-400'}`} />
+            ) : (
+              <ChevronRight className={`h-5 w-5 ${isComplete ? 'text-green-500' : 'text-gray-400'}`} />
+            )}
+          </div>
+        </div>
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+          >
+            <div className="px-5 pb-5 pt-2 border-t border-gray-100">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 type FeedType = "video" | "article" | "podcast" | "newsletter"
 type FeedStatus = "draft" | "published" | "archived"
@@ -155,6 +242,10 @@ export default function FeedFormPage() {
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hasDraft, setHasDraft] = useState(false)
+  
+  // Collapsible section states - all collapsed by default
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set())
+  
   const [formData, setFormData] = useState<FeedFormData>({
     title: "",
     type: "newsletter",
@@ -165,6 +256,61 @@ export default function FeedFormPage() {
     published_date: new Date().toISOString().split("T")[0],
     status: "draft",
   })
+
+  // Toggle section open/close
+  const toggleSection = (sectionId: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev)
+      if (next.has(sectionId)) {
+        next.delete(sectionId)
+      } else {
+        next.add(sectionId)
+      }
+      return next
+    })
+  }
+
+  // Expand all sections
+  const expandAllSections = () => {
+    const allSections = ["basic", "metadata", "hero", "sections", "event", "spotlight1", "spotlight2", "spotlight3"]
+    setOpenSections(new Set(allSections))
+  }
+
+  // Collapse all sections
+  const collapseAllSections = () => {
+    setOpenSections(new Set())
+  }
+
+  // Check if a section is complete
+  const isSectionComplete = useCallback((sectionId: string): boolean => {
+    switch (sectionId) {
+      case "basic":
+        return !!(formData.title && formData.summary)
+      case "metadata":
+        return !!(formData.authors.length > 0 || formData.topics.length > 0)
+      case "hero":
+        return !!(formData.hero_image_desktop || formData.founders_note_text)
+      case "sections":
+        return !!(formData.featured_post_title || formData.last_month_gif)
+      case "event":
+        return !!(formData.upcoming_event_title)
+      case "spotlight1":
+        return !!(formData.spotlight_1_title)
+      case "spotlight2":
+        return !!(formData.spotlight_2_title)
+      case "spotlight3":
+        return !!(formData.spotlight_3_title)
+      default:
+        return false
+    }
+  }, [formData])
+
+  // Calculate overall completion percentage
+  const getCompletionPercentage = useCallback((): number => {
+    const sections = ["basic", "metadata", "hero", "sections", "event", "spotlight1", "spotlight2", "spotlight3"]
+    const completedCount = sections.filter(s => isSectionComplete(s)).length
+    return Math.round((completedCount / sections.length) * 100)
+  }, [isSectionComplete])
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -239,14 +385,17 @@ export default function FeedFormPage() {
       .trim()
   }
 
-  // Format date for display
+  // Format date for display in CST timezone
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A"
     try {
-      return new Date(dateString).toLocaleDateString("en-US", {
+      // Parse the date and display in CST (America/Chicago)
+      const date = new Date(dateString + 'T12:00:00')
+      return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
+        timeZone: "America/Chicago"
       })
     } catch {
       return dateString
@@ -283,27 +432,34 @@ export default function FeedFormPage() {
     }
   }
 
-  // Filter feed items
-  const filteredFeedItems = feedItems.filter((item) => {
-    const statusMatch = filterStatus === "all" || item.status === filterStatus
-    const typeMatch = filterType === "all" || item.type === filterType
-    
-    // Date range filtering
-    let dateMatch = true
-    if (dateFilter.start || dateFilter.end) {
-      const itemDate = new Date(item.published_date)
-      if (dateFilter.start) {
-        const startDate = new Date(dateFilter.start)
-        dateMatch = dateMatch && itemDate >= startDate
+  // Filter and sort feed items (latest date first)
+  const filteredFeedItems = feedItems
+    .filter((item) => {
+      const statusMatch = filterStatus === "all" || item.status === filterStatus
+      const typeMatch = filterType === "all" || item.type === filterType
+      
+      // Date range filtering
+      let dateMatch = true
+      if (dateFilter.start || dateFilter.end) {
+        const itemDate = new Date(item.published_date + 'T12:00:00')
+        if (dateFilter.start) {
+          const startDate = new Date(dateFilter.start + 'T00:00:00')
+          dateMatch = dateMatch && itemDate >= startDate
+        }
+        if (dateFilter.end) {
+          const endDate = new Date(dateFilter.end + 'T23:59:59')
+          dateMatch = dateMatch && itemDate <= endDate
+        }
       }
-      if (dateFilter.end) {
-        const endDate = new Date(dateFilter.end)
-        dateMatch = dateMatch && itemDate <= endDate
-      }
-    }
-    
-    return statusMatch && typeMatch && dateMatch
-  })
+      
+      return statusMatch && typeMatch && dateMatch
+    })
+    .sort((a, b) => {
+      // Sort by published_date descending (latest first)
+      const dateA = new Date(a.published_date + 'T12:00:00').getTime()
+      const dateB = new Date(b.published_date + 'T12:00:00').getTime()
+      return dateB - dateA
+    })
 
   const handleInputChange = (field: keyof FeedFormData, value: string) => {
     setFormData((prev) => ({
@@ -804,136 +960,94 @@ export default function FeedFormPage() {
 
         {/* View Section */}
         {activeTab === "view" && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
-                <span className="ml-3 text-lg text-gray-500">Loading feeds...</span>
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                <span className="ml-3 text-gray-500">Loading feeds...</span>
               </div>
             ) : (
               <>
-
-                {/* Feed Items List */}
+                {/* Feed Items Grid */}
                 {filteredFeedItems.length === 0 ? (
-                  <div className="bg-white border border-gray-200 rounded-xl p-16 text-center shadow-sm">
-                    <Eye className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">No feed items found</h3>
-                    <p className="text-gray-500 text-lg">
+                  <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
+                    <Eye className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <h3 className="text-xl font-bold text-gray-900 mb-1">No feed items found</h3>
+                    <p className="text-gray-500 text-sm">
                       {feedItems.length === 0
                         ? "Get started by using the Create New button above."
-                        : "No items match your current filters. Try adjusting your filters or create a new feed item."}
+                        : "No items match your current filters."}
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                     {filteredFeedItems.map((item) => {
-                      // Determine which image to display (priority: featured_post_image > hero_image_desktop > og_image)
                       const displayImage = item.featured_post_image || item.hero_image_desktop || item.og_image
                       
                       return (
                         <div
                           key={item.id}
-                          className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200 group"
+                          className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-gray-300 hover:shadow-md transition-all duration-150 group"
                         >
-                          <div className="flex flex-col lg:flex-row">
-                            {/* Featured Image */}
-                            {displayImage && (
-                              <div className="lg:w-80 h-56 lg:h-auto relative overflow-hidden bg-gray-100 flex-shrink-0">
-                                <img
-                                  src={displayImage}
-                                  alt={item.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                />
-                                {/* Type badge overlay */}
-                                <div className="absolute top-4 left-4">
-                                  <Badge className={`${getTypeColor(item.type)} shadow-md text-xs px-3 py-1`}>
-                                    {item.type.toUpperCase()}
-                                  </Badge>
-                                </div>
-                              </div>
-                            )}
+                          {/* Image - Desktop only */}
+                          {displayImage && (
+                            <div className="hidden md:block h-24 relative overflow-hidden bg-gray-100">
+                              <img
+                                src={displayImage}
+                                alt={item.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              {/* Status indicator dot */}
+                              <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full shadow-sm ${
+                                item.status === "published" ? "bg-green-500" :
+                                item.status === "draft" ? "bg-amber-500" : "bg-gray-400"
+                              }`} title={item.status} />
+                            </div>
+                          )}
+                          
+                          {/* Content */}
+                          <div className="p-3">
+                            {/* Header row */}
+                            <div className="flex items-center justify-between gap-1 mb-1.5">
+                              <span className={`text-[10px] font-bold uppercase tracking-wide ${
+                                item.type === "newsletter" ? "text-orange-600" :
+                                item.type === "video" ? "text-purple-600" :
+                                item.type === "article" ? "text-blue-600" :
+                                "text-pink-600"
+                              }`}>
+                                {item.type}
+                              </span>
+                              {/* Mobile status dot */}
+                              <div className={`md:hidden w-2 h-2 rounded-full ${
+                                item.status === "published" ? "bg-green-500" :
+                                item.status === "draft" ? "bg-amber-500" : "bg-gray-400"
+                              }`} title={item.status} />
+                            </div>
                             
-                            {/* Content */}
-                            <div className="flex-1 p-6 lg:p-8">
-                              <div className="flex items-start justify-between gap-4 mb-4">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3 mb-3">
-                                    <Badge className={`${getStatusColor(item.status)} text-xs px-3 py-1`}>
-                                      {item.status.toUpperCase()}
-                                    </Badge>
-                                    <span className="text-sm text-gray-500 flex items-center gap-1.5">
-                                      <Calendar className="h-4 w-4" />
-                                      {formatDate(item.published_date)}
-                                    </span>
-                                  </div>
-                                  
-                                  <h3 className="text-2xl font-bold mb-3 leading-tight group-hover:text-blue-600 transition-colors">
-                                    {item.title}
-                                  </h3>
-                                  
-                                  <p className="text-base text-gray-600 mb-4 line-clamp-2 leading-relaxed">
-                                    {item.summary}
-                                  </p>
-                                  
-                                  {/* Metadata */}
-                                  <div className="space-y-3">
-                                    {item.slug && (
-                                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                                        <LinkIcon className="h-4 w-4 flex-shrink-0" />
-                                        <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">{item.slug}</code>
-                                      </div>
-                                    )}
-                                    
-                                    {item.authors && item.authors.length > 0 && (
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {item.authors.map((author, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-xs font-normal">
-                                              {author}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {item.topics && item.topics.length > 0 && (
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {item.topics.map((topic, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-xs font-normal bg-blue-50 text-blue-700 border-blue-200">
-                                              {topic}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* Action Buttons */}
-                              <div className="flex gap-3 mt-6 pt-6 border-t border-gray-100">
-                                <Button
-                                  onClick={() => handleEdit(item)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex items-center gap-2 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  Edit
-                                </Button>
-                                <Button
-                                  onClick={() => handleDelete(item.id!)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex items-center gap-2 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete
-                                </Button>
-                              </div>
+                            {/* Title */}
+                            <h3 className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
+                              {item.title}
+                            </h3>
+                            
+                            {/* Date */}
+                            <p className="text-[11px] text-gray-400 mb-2">
+                              {formatDate(item.published_date)}
+                            </p>
+                            
+                            {/* Action buttons */}
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleEdit(item)}
+                                className="flex-1 px-2 py-1.5 text-[11px] font-medium text-gray-600 bg-gray-50 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item.id!)}
+                                className="px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -948,16 +1062,118 @@ export default function FeedFormPage() {
 
         {/* Create Section */}
         {activeTab === "create" && (
-          <div>
+          <div className="relative">
+            {/* Sticky Header Bar - Always visible while scrolling */}
+            <div className="sticky top-16 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Left: Status & Info */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status:</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => handleInputChange("status", e.target.value)}
+                      className={`px-3 py-1.5 text-sm font-semibold rounded-lg border-2 focus:ring-2 focus:ring-offset-1 focus:outline-none transition-all ${
+                        formData.status === "published" 
+                          ? "bg-green-50 border-green-300 text-green-700 focus:ring-green-500"
+                          : formData.status === "draft"
+                          ? "bg-amber-50 border-amber-300 text-amber-700 focus:ring-amber-500"
+                          : "bg-gray-50 border-gray-300 text-gray-700 focus:ring-gray-500"
+                      }`}
+                    >
+                      <option value="draft">📝 Draft</option>
+                      <option value="published">✅ Published</option>
+                      <option value="archived">📦 Archived</option>
+                    </select>
+                  </div>
+                  
+                  {/* Completion Indicator */}
+                  {formData.type === "newsletter" && (
+                    <div className="hidden sm:flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            getCompletionPercentage() === 100 
+                              ? 'bg-green-500' 
+                              : getCompletionPercentage() >= 50 
+                                ? 'bg-blue-500' 
+                                : 'bg-amber-500'
+                          }`}
+                          style={{ width: `${getCompletionPercentage()}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-gray-500">
+                        {getCompletionPercentage()}%
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Draft indicator */}
+                  {hasDraft && !editingId && (
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
+                      <Save className="h-3 w-3 mr-1" />
+                      Draft saved
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Right: Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      if (editingId) handleCancelEdit()
+                      setActiveTab("view")
+                    }}
+                    className="text-gray-600"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="button"
+                    size="sm"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className={`font-semibold transition-all ${
+                      editingId 
+                        ? 'bg-blue-600 hover:bg-blue-700' 
+                        : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
+                    } text-white shadow-md hover:shadow-lg`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        {editingId ? "Updating..." : "Saving..."}
+                      </>
+                    ) : (
+                      <>
+                        {editingId ? (
+                          <><Save className="h-4 w-4 mr-1.5" />Update</>
+                        ) : formData.status === "published" ? (
+                          <><Send className="h-4 w-4 mr-1.5" />Publish</>
+                        ) : (
+                          <><Save className="h-4 w-4 mr-1.5" />Save Draft</>
+                        )}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Draft Notification */}
             {hasDraft && !editingId && (
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-2">
-                  <FileText className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <FileText className="h-5 w-5 text-amber-600" />
+                  </div>
                   <div>
-                    <p className="font-medium text-amber-900">Draft Available</p>
-                    <p className="text-sm text-amber-700">You have an unfinished feed item saved.</p>
-                    <p className="text-xs text-amber-600 italic mt-1">💾 Drafts are automatically saved to your browser's local storage as you type</p>
+                    <p className="font-semibold text-amber-900">Draft Available</p>
+                    <p className="text-sm text-amber-700">You have an unfinished feed item saved locally.</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -966,9 +1182,8 @@ export default function FeedFormPage() {
                     variant="outline"
                     size="sm"
                     onClick={loadDraft}
-                    className="flex items-center gap-2"
+                    className="bg-white border-amber-300 text-amber-700 hover:bg-amber-50"
                   >
-                    <FileText className="h-4 w-4" />
                     Load Draft
                   </Button>
                   <Button
@@ -976,54 +1191,78 @@ export default function FeedFormPage() {
                     variant="outline"
                     size="sm"
                     onClick={clearDraft}
-                    className="flex items-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                    className="text-red-600 hover:bg-red-50 hover:border-red-300"
                   >
                     <X className="h-4 w-4" />
-                    Discard
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Auto-save Info - Show when no draft exists and not editing */}
-            {!hasDraft && !editingId && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-700 italic">
-                  💾 Your progress is automatically saved to your browser's local storage as you type
-                </p>
-              </div>
-            )}
-
-            {/* Editing Notification */}
+            {/* Editing Banner */}
             {editingId && (
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Edit className="h-5 w-5 text-blue-600" />
-                  <span className="font-medium text-blue-900">Editing Feed Item</span>
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Edit className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-blue-900">Editing Mode</p>
+                    <p className="text-sm text-blue-700">Updating: {formData.title || "Untitled"}</p>
+                  </div>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={handleCancelEdit}
-                  className="flex items-center gap-2"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
                 >
-                  <X className="h-4 w-4" />
-                  Cancel Edit
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
                 </Button>
               </div>
             )}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Basic Information
-                  </CardTitle>
-                  <CardDescription>Essential details for the feed item</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+
+            {/* Section Toggle Controls */}
+            {formData.type === "newsletter" && (
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium text-gray-600">Newsletter Sections</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={expandAllSections}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                  >
+                    Expand All
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={collapseAllSections}
+                    className="text-xs text-gray-500 hover:text-gray-700 font-medium px-2 py-1 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    Collapse All
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Basic Information - Collapsible */}
+              <CollapsibleSection
+                id="basic"
+                title="Basic Information"
+                description="Title, type, summary, and publishing details"
+                icon={<FileText className="h-5 w-5" />}
+                isOpen={openSections.has("basic")}
+                onToggle={() => toggleSection("basic")}
+                isComplete={isSectionComplete("basic")}
+              >
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Title <span className="text-red-500">*</span>
@@ -1032,7 +1271,7 @@ export default function FeedFormPage() {
                       type="text"
                       value={formData.title}
                       onChange={(e) => handleInputChange("title", e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
                       placeholder="Enter feed item title"
                       required
                     />
@@ -1044,26 +1283,26 @@ export default function FeedFormPage() {
                       <select
                         value={formData.type}
                         onChange={(e) => handleInputChange("type", e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
-                        <option value="video">Video</option>
-                        <option value="article">Article</option>
-                        <option value="podcast">Podcast</option>
-                        <option value="newsletter">Newsletter</option>
+                        <option value="video">🎬 Video</option>
+                        <option value="article">📄 Article</option>
+                        <option value="podcast">🎙️ Podcast</option>
+                        <option value="newsletter">📰 Newsletter</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2">Status</label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) => handleInputChange("status", e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="draft">Draft</option>
-                        <option value="published">Published</option>
-                        <option value="archived">Archived</option>
-                      </select>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <Calendar className="h-4 w-4" />
+                        Published Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.published_date}
+                        onChange={(e) => handleInputChange("published_date", e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
                     </div>
                   </div>
 
@@ -1079,72 +1318,58 @@ export default function FeedFormPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <Calendar className="h-4 w-4" />
-                        Published Date
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.published_date}
-                        onChange={(e) => handleInputChange("published_date", e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <LinkIcon className="h-4 w-4" />
-                        Slug
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.slug}
-                        onChange={(e) => handleInputChange("slug", e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="auto-generated-from-title"
-                      />
-                    </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                      <LinkIcon className="h-4 w-4" />
+                      Slug
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.slug}
+                      onChange={(e) => handleInputChange("slug", e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                      placeholder="auto-generated-from-title"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Auto-generated from title if left empty</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CollapsibleSection>
 
-              {/* Metadata */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Tag className="h-5 w-5" />
-                    Metadata
-                  </CardTitle>
-                  <CardDescription>Authors, topics, and images</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {/* Metadata - Collapsible */}
+              <CollapsibleSection
+                id="metadata"
+                title="Metadata"
+                description="Authors, topics, and social image"
+                icon={<Tag className="h-5 w-5" />}
+                isOpen={openSections.has("metadata")}
+                onToggle={() => toggleSection("metadata")}
+                isComplete={isSectionComplete("metadata")}
+              >
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium mb-2">
                         <Users className="h-4 w-4" />
-                        Authors (comma-separated)
+                        Authors
                       </label>
                       <p className="text-xs text-gray-500 mb-2">
-                        Options: Digital Canvas Team, Dev Team, Creative Team, Podcast Team
+                        Comma-separated: Digital Canvas Team, Dev Team, Creative Team
                       </p>
                       <input
                         type="text"
                         onChange={(e) => handleArrayInput("authors", e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Digital Canvas Team, Dev Team"
                       />
                       {formData.authors.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {formData.authors.map((author, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
                               {author}
                               <button
                                 type="button"
                                 onClick={() => removeArrayItem("authors", idx)}
                                 className="ml-1 hover:text-blue-900"
-                                aria-label="Remove author"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -1157,24 +1382,24 @@ export default function FeedFormPage() {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium mb-2">
                         <Tag className="h-4 w-4" />
-                        Topics (comma-separated)
+                        Topics
                       </label>
+                      <p className="text-xs text-gray-500 mb-2">Comma-separated tags</p>
                       <input
                         type="text"
                         onChange={(e) => handleArrayInput("topics", e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Technology, Design, Business"
                       />
                       {formData.topics.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
                           {formData.topics.map((topic, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 text-sm rounded-full">
                               {topic}
                               <button
                                 type="button"
                                 onClick={() => removeArrayItem("topics", idx)}
-                                className="ml-1 hover:text-green-900"
-                                aria-label="Remove topic"
+                                className="ml-1 hover:text-emerald-900"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -1189,41 +1414,41 @@ export default function FeedFormPage() {
                     <ImageUpload
                       value={formData.og_image || ""}
                       onChange={(value) => handleInputChange("og_image", value)}
-                      label="OG Image"
+                      label="OG Image (Social Share)"
                     />
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CollapsibleSection>
 
               {/* Newsletter-Specific Fields (conditional) */}
               {formData.type === "newsletter" && (
                 <>
-                  {/* Hero & Founder's Note */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Newsletter Content - Hero & Founder's Note</CardTitle>
-                      <CardDescription>Hero images and founder's note section</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                  {/* Hero & Founder's Note - Collapsible */}
+                  <CollapsibleSection
+                    id="hero"
+                    title="Hero & Founder's Note"
+                    description="Hero images and opening message"
+                    icon={<Star className="h-5 w-5" />}
+                    isOpen={openSections.has("hero")}
+                    onToggle={() => toggleSection("hero")}
+                    isComplete={isSectionComplete("hero")}
+                  >
+                    <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <ImageUpload
-                            value={formData.hero_image_desktop || ""}
-                            onChange={(value) => handleInputChange("hero_image_desktop", value)}
-                            label="Hero Image Desktop"
-                          />
-                        </div>
-                        <div>
-                          <ImageUpload
-                            value={formData.hero_image_mobile || ""}
-                            onChange={(value) => handleInputChange("hero_image_mobile", value)}
-                            label="Hero Image Mobile"
-                          />
-                        </div>
+                        <ImageUpload
+                          value={formData.hero_image_desktop || ""}
+                          onChange={(value) => handleInputChange("hero_image_desktop", value)}
+                          label="Hero Image Desktop"
+                        />
+                        <ImageUpload
+                          value={formData.hero_image_mobile || ""}
+                          onChange={(value) => handleInputChange("hero_image_mobile", value)}
+                          label="Hero Image Mobile"
+                        />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium mb-2">Founder's Note Text</label>
+                        <label className="block text-sm font-medium mb-2">Founder's Note</label>
                         <RichTextEditor
                           value={formData.founders_note_text || ""}
                           onChange={(value) => handleInputChange("founders_note_text", value)}
@@ -1232,88 +1457,91 @@ export default function FeedFormPage() {
                         />
                       </div>
 
-                      <div>
+                      <ImageUpload
+                        value={formData.founders_note_image || ""}
+                        onChange={(value) => handleInputChange("founders_note_image", value)}
+                        label="Founder's Note Image"
+                      />
+                    </div>
+                  </CollapsibleSection>
+
+                  {/* GIFs & Featured Post - Collapsible */}
+                  <CollapsibleSection
+                    id="sections"
+                    title="Content Sections"
+                    description="Last Month, The Drop, and Featured Post"
+                    icon={<ImageIcon className="h-5 w-5" />}
+                    isOpen={openSections.has("sections")}
+                    onToggle={() => toggleSection("sections")}
+                    isComplete={isSectionComplete("sections")}
+                  >
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ImageUpload
-                          value={formData.founders_note_image || ""}
-                          onChange={(value) => handleInputChange("founders_note_image", value)}
-                          label="Founder's Note Image"
+                          value={formData.last_month_gif || ""}
+                          onChange={(value) => handleInputChange("last_month_gif", value)}
+                          label="Last Month GIF"
+                        />
+                        <ImageUpload
+                          value={formData.the_drop_gif || ""}
+                          onChange={(value) => handleInputChange("the_drop_gif", value)}
+                          label="The Drop GIF"
                         />
                       </div>
-                    </CardContent>
-                  </Card>
 
-                  {/* GIFs & Featured Post */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Newsletter Content - Sections</CardTitle>
-                      <CardDescription>Last Month, The Drop, and Featured Post</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <ImageUpload
-                            value={formData.last_month_gif || ""}
-                            onChange={(value) => handleInputChange("last_month_gif", value)}
-                            label="Last Month GIF"
-                          />
-                        </div>
-                        <div>
-                          <ImageUpload
-                            value={formData.the_drop_gif || ""}
-                            onChange={(value) => handleInputChange("the_drop_gif", value)}
-                            label="The Drop GIF"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-4">
-                        <h4 className="font-medium mb-3">Featured Post</h4>
-                        <div className="space-y-4">
+                      <div className="border-t border-gray-200 pt-4">
+                        <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-purple-500" />
+                          Featured Post
+                        </h4>
+                        <div className="space-y-4 bg-purple-50/50 rounded-lg p-4 border border-purple-100">
                           <div>
-                            <label className="block text-sm font-medium mb-2">Featured Post Title</label>
+                            <label className="block text-sm font-medium mb-2">Title</label>
                             <input
                               type="text"
                               value={formData.featured_post_title || ""}
                               onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                               placeholder="Featured post title"
                             />
                           </div>
+                          <ImageUpload
+                            value={formData.featured_post_image || ""}
+                            onChange={(value) => handleInputChange("featured_post_image", value)}
+                            label="Image"
+                          />
                           <div>
-                            <ImageUpload
-                              value={formData.featured_post_image || ""}
-                              onChange={(value) => handleInputChange("featured_post_image", value)}
-                              label="Featured Post Image"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">Featured Post Content</label>
+                            <label className="block text-sm font-medium mb-2">Content</label>
                             <RichTextEditor
                               value={formData.featured_post_content || ""}
                               onChange={(value) => handleInputChange("featured_post_content", value)}
                               placeholder="Featured post content (supports Markdown)"
-                              minRows={4}
+                              minRows={3}
                             />
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </CollapsibleSection>
 
-                  {/* Upcoming Event */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Newsletter Content - Upcoming Event</CardTitle>
-                      <CardDescription>Event details and call-to-action</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                  {/* Upcoming Event - Collapsible */}
+                  <CollapsibleSection
+                    id="event"
+                    title="Upcoming Event"
+                    description="Event details and call-to-action"
+                    icon={<Calendar className="h-5 w-5" />}
+                    isOpen={openSections.has("event")}
+                    onToggle={() => toggleSection("event")}
+                    isComplete={isSectionComplete("event")}
+                  >
+                    <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium mb-2">Event Title</label>
                         <input
                           type="text"
                           value={formData.upcoming_event_title || ""}
                           onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="Event title"
                         />
                       </div>
@@ -1327,29 +1555,25 @@ export default function FeedFormPage() {
                         />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <ImageUpload
-                            value={formData.upcoming_event_image_desktop || ""}
-                            onChange={(value) => handleInputChange("upcoming_event_image_desktop", value)}
-                            label="Event Image Desktop"
-                          />
-                        </div>
-                        <div>
-                          <ImageUpload
-                            value={formData.upcoming_event_image_mobile || ""}
-                            onChange={(value) => handleInputChange("upcoming_event_image_mobile", value)}
-                            label="Event Image Mobile"
-                          />
-                        </div>
+                        <ImageUpload
+                          value={formData.upcoming_event_image_desktop || ""}
+                          onChange={(value) => handleInputChange("upcoming_event_image_desktop", value)}
+                          label="Event Image Desktop"
+                        />
+                        <ImageUpload
+                          value={formData.upcoming_event_image_mobile || ""}
+                          onChange={(value) => handleInputChange("upcoming_event_image_mobile", value)}
+                          label="Event Image Mobile"
+                        />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 rounded-lg p-4 border border-blue-100">
                         <div>
-                          <label className="block text-sm font-medium mb-2">CTA Text</label>
+                          <label className="block text-sm font-medium mb-2">CTA Button Text</label>
                           <input
                             type="text"
                             value={formData.upcoming_event_cta_text || ""}
                             onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Register Now"
                           />
                         </div>
@@ -1359,29 +1583,34 @@ export default function FeedFormPage() {
                             type="url"
                             value={formData.upcoming_event_cta_link || ""}
                             onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="https://example.com/register"
                           />
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </CollapsibleSection>
 
-                  {/* Spotlights */}
+                  {/* Spotlights - Collapsible */}
                   {[1, 2, 3].map((num) => (
-                    <Card key={num}>
-                      <CardHeader>
-                        <CardTitle>Spotlight {num}</CardTitle>
-                        <CardDescription>Details for spotlight item {num}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
+                    <CollapsibleSection
+                      key={num}
+                      id={`spotlight${num}`}
+                      title={`Spotlight ${num}`}
+                      description={`Highlight section ${num} with image and CTA`}
+                      icon={<Sparkles className="h-5 w-5" />}
+                      isOpen={openSections.has(`spotlight${num}`)}
+                      onToggle={() => toggleSection(`spotlight${num}`)}
+                      isComplete={isSectionComplete(`spotlight${num}`)}
+                    >
+                      <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium mb-2">Title</label>
                           <input
                             type="text"
                             value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
                             onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder={`Spotlight ${num} title`}
                           />
                         </div>
@@ -1390,25 +1619,23 @@ export default function FeedFormPage() {
                           <RichTextEditor
                             value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""}
                             onChange={(value) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
-                            placeholder={`Spotlight ${num} description (supports Markdown)`}
-                            minRows={3}
+                            placeholder={`Spotlight ${num} description`}
+                            minRows={2}
                           />
                         </div>
-                        <div>
-                          <ImageUpload
-                            value={formData[`spotlight_${num}_image` as keyof FeedFormData] as string || ""}
-                            onChange={(value) => handleInputChange(`spotlight_${num}_image` as keyof FeedFormData, value)}
-                            label="Image"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <ImageUpload
+                          value={formData[`spotlight_${num}_image` as keyof FeedFormData] as string || ""}
+                          onChange={(value) => handleInputChange(`spotlight_${num}_image` as keyof FeedFormData, value)}
+                          label="Image"
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
                           <div>
                             <label className="block text-sm font-medium mb-2">CTA Text</label>
                             <input
                               type="text"
                               value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
                               onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder="Learn More"
                             />
                           </div>
@@ -1418,53 +1645,35 @@ export default function FeedFormPage() {
                               type="url"
                               value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
                               onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder="https://example.com/link"
                             />
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </CollapsibleSection>
                   ))}
                 </>
               )}
 
-              {/* Submit Button */}
-              <div className="flex flex-col sm:flex-row justify-between gap-4">
+              {/* Bottom Action Bar - For additional options */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-4 mt-6 border-t border-gray-200">
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" onClick={() => {
-                    if (editingId) {
-                      handleCancelEdit()
-                    }
-                    setActiveTab("view")
-                  }}>
-                    Cancel
-                  </Button>
                   {!editingId && (
                     <Button
                       type="button"
                       variant="outline"
                       onClick={loadMockData}
-                      className="flex items-center gap-2 text-purple-600 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300"
+                      className="text-purple-600 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300"
                     >
-                      <FileText className="h-4 w-4" />
-                      Load Mock Data
+                      <FileText className="h-4 w-4 mr-2" />
+                      Load Test Data
                     </Button>
                   )}
                 </div>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {editingId ? "Updating..." : "Submitting..."}
-                    </>
-                  ) : (
-                    <>
-                      {editingId ? <Save className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                      {editingId ? "Update Feed Item" : "Submit to Airtable"}
-                    </>
-                  )}
-                </Button>
+                <p className="text-xs text-gray-500 italic">
+                  💾 Your work is auto-saved to browser storage
+                </p>
               </div>
             </form>
           </div>

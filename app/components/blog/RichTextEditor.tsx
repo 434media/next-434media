@@ -16,7 +16,6 @@
  * - Character counting and limits
  * - Read-only mode support
  * - Preview mode
- * - Black and white theme (no purple colors)
  * 
  * @author 434Media
  * @version 2.0.0
