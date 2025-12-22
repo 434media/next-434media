@@ -166,18 +166,18 @@ export function PageViewsChart({
       <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-emerald-500/5" />
         <CardHeader className="relative pb-4">
-          <CardTitle className="text-white flex items-center gap-3 text-lg md:text-xl">
-            <div className="p-2 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-blue-400" />
+          <CardTitle className="text-white flex items-center gap-2 sm:gap-3 text-base sm:text-lg md:text-xl">
+            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-lg shrink-0">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
             </div>
-            <span className="flex-1 min-w-0">Page Views Over Time</span>
-            <div className="flex items-center gap-2 text-sm text-white/60 shrink-0">
-              <Calendar className="h-4 w-4" />
+            <span className="flex-1 min-w-0 truncate">Page Views Over Time</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-white/60 shrink-0">
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">{dateRange.label}</span>
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="relative p-4 md:p-6">
+        <CardContent className="relative p-3 sm:p-4 md:p-6">
           {isLoading || parentLoading ? (
             <div className="flex items-center justify-center h-64 md:h-96">
               <motion.div
@@ -295,18 +295,16 @@ export function PageViewsChart({
               transition={{ delay: 0.3 }}
               className="mt-4 pt-4 border-t border-white/10"
             >
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm text-white/60">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-2 text-xs sm:text-sm text-white/60">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span>Total: {data.reduce((sum, item) => sum + item.pageViews, 0).toLocaleString()} views</span>
                   <span>
-                    Average:{" "}
-                    {Math.round(data.reduce((sum, item) => sum + item.pageViews, 0) / data.length).toLocaleString()} per
-                    day
+                    Avg: {Math.round(data.reduce((sum, item) => sum + item.pageViews, 0) / data.length).toLocaleString()}/day
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
-                  <span>Data source: {dataSource}</span>
+                  <span className="text-[10px] sm:text-xs">Source: {dataSource}</span>
                 </div>
               </div>
             </motion.div>

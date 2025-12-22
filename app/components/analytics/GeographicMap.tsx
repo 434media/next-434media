@@ -64,22 +64,22 @@ export function GeographicMap({
       transition={{ duration: 0.5, delay: 0.4 }}
       className="h-full"
     >
-      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full">
+      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-red-500/5 rounded-lg" />
 
-        <CardHeader className="relative pb-6">
-          <div className="flex items-center gap-4">
+        <CardHeader className="relative pb-4 sm:pb-6">
+          <div className="flex items-center gap-3 sm:gap-4">
             <motion.div
-              className="p-3 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl shadow-lg"
+              className="p-2 sm:p-3 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-lg sm:rounded-xl shadow-lg shrink-0"
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
             >
-              <Globe className="h-6 w-6 text-orange-400" />
+              <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-orange-400" />
             </motion.div>
-            <div>
-              <CardTitle className="text-white text-xl font-bold mb-1">Geographic Distribution</CardTitle>
-              <p className="text-white/60 text-sm font-medium">
-                {totalSessions.toLocaleString()} sessions across regions
+            <div className="min-w-0">
+              <CardTitle className="text-white text-base sm:text-xl font-bold mb-0.5 sm:mb-1">Geographic Distribution</CardTitle>
+              <p className="text-white/60 text-xs sm:text-sm font-medium truncate">
+                {totalSessions.toLocaleString()} sessions
               </p>
             </div>
           </div>
@@ -96,7 +96,7 @@ export function GeographicMap({
               </motion.div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-80 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-h-[400px] md:max-h-80 overflow-y-auto pr-1">
               {/* Top Countries Section */}
               <div className="space-y-4">
                 <motion.div

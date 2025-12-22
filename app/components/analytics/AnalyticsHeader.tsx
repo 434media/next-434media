@@ -83,29 +83,29 @@ export function AnalyticsHeader({
   }
 
   return (
-    <div className="bg-black border-b border-white/10">
+    <div className="bg-black border-b border-white/10 overflow-hidden w-full max-w-full">
       {/* Top Row: Title, Property Selector, Actions */}
-      <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-4">
+      <div className="mx-auto px-3 sm:px-4 max-w-7xl overflow-hidden w-full">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">
           {/* Left: Title and Property */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-xl border border-white/10">
-                <GA4Icon className="h-6 w-6 text-blue-400" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-lg sm:rounded-xl border border-white/10 shrink-0">
+                <GA4Icon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-400" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-white">
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-bold text-white truncate">
                   {selectedProperty?.name || "Analytics Dashboard"}
                 </h1>
-                <p className="text-white/50 text-xs">
-                  {selectedPropertyId ? `Property ID: ${selectedPropertyId}` : "Select a property to view analytics"}
+                <p className="text-white/50 text-[10px] sm:text-xs truncate">
+                  {selectedPropertyId ? `ID: ${selectedPropertyId}` : "Select a property"}
                 </p>
               </div>
             </div>
 
             {/* Property Selector */}
             {onPropertyChange && (
-              <div className="relative min-w-[160px]">
+              <div className="relative w-full sm:w-auto sm:min-w-[160px]">
                 {isPropertiesLoading ? (
                   <div className="bg-white/5 border border-white/10 text-white rounded-lg px-3 py-2 text-sm flex items-center">
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -164,17 +164,17 @@ export function AnalyticsHeader({
       </div>
 
       {/* Bottom Row: Date Range and Download - This is the sticky part */}
-      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md">
-        <div className="container mx-auto px-4 max-w-7xl py-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            {/* Date Range Options */}
+      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-hidden w-full">
+        <div className="mx-auto px-3 sm:px-4 max-w-7xl py-2 sm:py-3 overflow-hidden w-full">
+          <div className="flex flex-col gap-2 sm:gap-3">
+            {/* Date Range Options - Wrap on mobile, no horizontal scroll */}
             <div className="flex flex-wrap items-center gap-2">
-              <Calendar className="h-4 w-4 text-emerald-400 hidden sm:block" />
+              <Calendar className="h-4 w-4 text-emerald-400 hidden sm:block shrink-0" />
               {dateRangeOptions.map((option) => (
                 <button
                   key={option.label}
                   onClick={() => onRangeChange(option)}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-all ${
+                  className={`px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-sm rounded-lg transition-all whitespace-nowrap ${
                     selectedRange.label === option.label
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                       : "bg-white/5 text-white/70 border border-transparent hover:bg-white/10 hover:text-white"
@@ -185,7 +185,7 @@ export function AnalyticsHeader({
               ))}
               <button
                 onClick={() => setShowCustom(!showCustom)}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-sm rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
                   showCustom
                     ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                     : "bg-white/5 text-white/70 border border-transparent hover:bg-white/10 hover:text-white"

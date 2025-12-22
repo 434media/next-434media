@@ -153,22 +153,22 @@ export function TrafficSourcesChart({
       transition={{ duration: 0.5, delay: 0.2 }}
       className="h-full"
     >
-      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full">
+      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 via-transparent to-cyan-500/5 rounded-lg" />
 
-        <CardHeader className="relative pb-6">
+        <CardHeader className="relative pb-4 sm:pb-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <motion.div
-                className="p-3 bg-gradient-to-br from-sky-500/20 to-cyan-500/20 rounded-xl shadow-lg"
+                className="p-2 sm:p-3 bg-gradient-to-br from-sky-500/20 to-cyan-500/20 rounded-lg sm:rounded-xl shadow-lg shrink-0"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
-                <TrendingUp className="h-6 w-6 text-sky-400" />
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-sky-400" />
               </motion.div>
-              <div>
-                <CardTitle className="text-white text-xl font-bold mb-1">Traffic Sources</CardTitle>
-                <p className="text-white/60 text-sm font-medium">
+              <div className="min-w-0">
+                <CardTitle className="text-white text-base sm:text-xl font-bold mb-0.5 sm:mb-1">Traffic Sources</CardTitle>
+                <p className="text-white/60 text-xs sm:text-sm font-medium truncate">
                   {totalSessions.toLocaleString()} sessions • {data.length} sources
                 </p>
               </div>
@@ -199,15 +199,15 @@ export function TrafficSourcesChart({
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className={`group p-4 rounded-xl bg-gradient-to-r ${iconConfig.gradientFrom} ${iconConfig.gradientTo} border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}
+                    className={`group p-3 sm:p-4 rounded-xl bg-gradient-to-r ${iconConfig.gradientFrom} ${iconConfig.gradientTo} border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-lg bg-white/10 ${iconConfig.color} flex-shrink-0`}>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className={`p-2 sm:p-3 rounded-lg bg-white/10 ${iconConfig.color} flex-shrink-0`}>
                         {iconConfig.icon}
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-white font-medium text-base capitalize truncate">{displayName}</h3>
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <h3 className="text-white font-medium text-sm sm:text-base capitalize truncate">{displayName}</h3>
 
                         <div className="mt-3 w-full bg-white/10 rounded-full h-2 overflow-hidden">
                           <motion.div
@@ -218,18 +218,18 @@ export function TrafficSourcesChart({
                           />
                         </div>
 
-                        <div className="flex items-center justify-between mt-2">
-                          <p className="text-white/60 text-xs font-medium">{percentage.toFixed(1)}% of traffic</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-1 sm:gap-0">
+                          <p className="text-white/60 text-[10px] sm:text-xs font-medium">{percentage.toFixed(1)}% of traffic</p>
 
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-1.5">
-                              <MousePointer className="h-3 w-3 text-white/60" />
-                              <p className="text-white font-semibold text-sm">{source.sessions.toLocaleString()}</p>
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="flex items-center gap-1 sm:gap-1.5">
+                              <MousePointer className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white/60" />
+                              <p className="text-white font-semibold text-xs sm:text-sm">{source.sessions.toLocaleString()}</p>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
-                              <Users className="h-3 w-3 text-white/60" />
-                              <p className="text-white font-semibold text-sm">{source.users.toLocaleString()}</p>
+                            <div className="flex items-center gap-1 sm:gap-1.5">
+                              <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white/60" />
+                              <p className="text-white font-semibold text-xs sm:text-sm">{source.users.toLocaleString()}</p>
                             </div>
                           </div>
                         </div>

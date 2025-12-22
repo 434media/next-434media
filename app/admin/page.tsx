@@ -67,11 +67,11 @@ export default function AdminPage() {
   const getSquareClasses = (size: string) => {
     switch (size) {
       case "large":
-        return "col-span-1 sm:col-span-2 lg:row-span-2 h-40 sm:h-48 md:h-56 lg:h-64"
+        return "col-span-1 sm:col-span-2 lg:row-span-2 h-32 sm:h-36 md:h-40 lg:h-48"
       case "medium":
-        return "col-span-1 row-span-1 h-32 sm:h-36 md:h-40"
+        return "col-span-1 row-span-1 h-28 sm:h-32 md:h-36"
       default:
-        return "col-span-1 sm:col-span-2 row-span-1 h-24 sm:h-28 md:h-32"
+        return "col-span-1 sm:col-span-2 row-span-1 h-24 sm:h-28"
     }
   }
 
@@ -153,21 +153,21 @@ export default function AdminPage() {
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-12 text-left md:text-center"
+          className="mb-8 text-left md:text-center"
         >
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-ggx88 text-white mb-4 md:mb-6 leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-white mb-3 md:mb-4 leading-tight">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-300 to-white">
               {activeView === 'admin' ? 'ADMIN PANEL' : 'TESTING PLAYGROUND'}
             </span>
           </h1>
           <motion.p
-            className="text-gray-400 text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed text-left md:text-center"
+            className="text-gray-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed text-left md:text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             {activeView === 'admin' 
-              ? 'Access to 434 SOP Documentation, Analytics and management tools'
+              ? 'Access to 434 Analytics and Content Management Tools'
               : 'Explore concept workflows built with different AI Models and integrations'
             }
           </motion.p>
@@ -197,7 +197,7 @@ export default function AdminPage() {
                 stiffness: 120,
                 damping: 15,
               }}
-              className={`group relative overflow-hidden rounded-3xl ${getSquareClasses(section.size)} border border-gray-800`}
+              className={`group relative overflow-hidden rounded-xl ${getSquareClasses(section.size)} border border-gray-800`}
               onMouseEnter={() => setHoveredSection(section.id)}
               onMouseLeave={() => setHoveredSection(null)}
             >
@@ -206,7 +206,7 @@ export default function AdminPage() {
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900"
                   animate={{
-                    scale: hoveredSection === section.id ? 1.05 : 1,
+                    scale: hoveredSection === section.id ? 1.02 : 1,
                   }}
                   transition={{ duration: 0.4, ease: "easeOut" }}
                 />
@@ -224,21 +224,21 @@ export default function AdminPage() {
 
                 {/* Hover glow effect */}
                 <motion.div
-                  className="absolute inset-0 bg-white/5 rounded-3xl"
+                  className="absolute inset-0 bg-white/3 rounded-xl"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: hoveredSection === section.id ? 1 : 0 }}
                   transition={{ duration: 0.3 }}
                 />
 
                 {/* Content Container */}
-                <div className="relative h-full flex flex-col justify-center items-start sm:items-center p-4 sm:p-6 md:p-8 z-10 text-left sm:text-center">
-                  <div className="flex flex-col items-start sm:items-center justify-center space-y-2 sm:space-y-3 w-full">
+                <div className="relative h-full flex flex-col justify-center items-start sm:items-center p-3 sm:p-4 md:p-5 z-10 text-left sm:text-center">
+                  <div className="flex flex-col items-start sm:items-center justify-center space-y-1.5 sm:space-y-2 w-full">
                     {/* Icon */}
                     <motion.div
-                      className="text-white mb-1 sm:mb-2"
+                      className="text-white mb-0.5 sm:mb-1"
                       animate={{
-                        y: hoveredSection === section.id ? -4 : 0,
-                        scale: hoveredSection === section.id ? 1.1 : 1,
+                        y: hoveredSection === section.id ? -2 : 0,
+                        scale: hoveredSection === section.id ? 1.05 : 1,
                       }}
                       transition={{ duration: 0.3, ease: "easeOut" }}
                     >
@@ -247,9 +247,9 @@ export default function AdminPage() {
 
                     {/* Title */}
                     <motion.h3
-                      className="font-ggx88 text-base sm:text-lg md:text-xl lg:text-2xl text-white leading-tight mb-1"
+                      className="font-ggx88 text-sm sm:text-base md:text-lg lg:text-xl text-white leading-tight"
                       animate={{
-                        y: hoveredSection === section.id ? -2 : 0,
+                        y: hoveredSection === section.id ? -1 : 0,
                       }}
                       transition={{ duration: 0.3, ease: "easeOut" }}
                     >
@@ -258,25 +258,23 @@ export default function AdminPage() {
 
                     {/* Subtitle */}
                     <motion.p
-                      className="font-geist-sans text-xs sm:text-sm md:text-base text-gray-400 leading-relaxed"
+                      className="font-geist-sans text-xs sm:text-sm text-gray-400 leading-relaxed"
                       initial={{ opacity: 0.8 }}
                       animate={{
                         opacity: hoveredSection === section.id ? 1 : 0.8,
-                        y: hoveredSection === section.id ? -1 : 0,
                       }}
                       transition={{ duration: 0.3, ease: "easeOut" }}
                     >
                       {section.subtitle}
                     </motion.p>
 
-                    {/* Description - only show on large cards when hovered or on mobile */}
+                    {/* Description - only show on large cards when hovered */}
                     {section.size === "large" && (
                       <motion.p
-                        className="font-geist-sans text-xs text-gray-500 leading-relaxed mt-1 sm:mt-2 max-w-xs block sm:hidden md:block"
-                        initial={{ opacity: 0, height: 0 }}
+                        className="font-geist-sans text-[10px] sm:text-xs text-gray-500 leading-relaxed max-w-xs hidden md:block"
+                        initial={{ opacity: 0 }}
                         animate={{
-                          opacity: hoveredSection === section.id ? 1 : 0.7,
-                          height: hoveredSection === section.id || window.innerWidth < 640 ? "auto" : 0,
+                          opacity: hoveredSection === section.id ? 0.7 : 0,
                         }}
                         transition={{ duration: 0.3, ease: "easeOut" }}
                       >
@@ -288,10 +286,9 @@ export default function AdminPage() {
 
                 {/* Animated border */}
                 <motion.div
-                  className="absolute inset-0 border-2 border-gray-700 rounded-3xl"
+                  className="absolute inset-0 border border-gray-700 rounded-xl"
                   animate={{
-                    borderColor: hoveredSection === section.id ? "rgba(255,255,255,0.3)" : "rgba(107,114,128,1)",
-                    scale: hoveredSection === section.id ? 1.02 : 1,
+                    borderColor: hoveredSection === section.id ? "rgba(255,255,255,0.2)" : "rgba(55,65,81,1)",
                   }}
                   transition={{ duration: 0.3 }}
                 />
@@ -321,27 +318,6 @@ export default function AdminPage() {
             </motion.div>
           ))}
         </motion.div>
-
-        {/* Footer Logo */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 1.0 }}
-          className="fixed bottom-8 right-8 w-16 h-16 opacity-20"
-        >
-          <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
-            alt="434 Media Logo"
-            width={64}
-            height={64}
-            className="object-contain w-full h-full"
-          />
-        </motion.div>
-
-        {/* Decorative elements */}
-        <div className="absolute top-20 right-10 w-2 h-2 bg-white rounded-full animate-pulse opacity-30" />
-        <div className="absolute top-40 right-20 w-1 h-1 bg-gray-400 rounded-full animate-pulse delay-1000 opacity-20" />
-        <div className="absolute bottom-32 left-10 w-1.5 h-1.5 bg-white rounded-full animate-pulse delay-500 opacity-25" />
       </div>
     </div>
   )

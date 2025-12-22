@@ -14,13 +14,26 @@ import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "..
 // Download analytics summary as CSV
 async function downloadAnalyticsCSV(dateRange: DateRange, propertyId?: string, propertyName?: string) {
   try {
-    const response = await fetch(`/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`)
+    // Fetch all data in parallel
+    const [summaryResponse, pagesResponse, trafficResponse, devicesResponse] = await Promise.all([
+      fetch(`/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
+      fetch(`/api/analytics?endpoint=top-pages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
+      fetch(`/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
+      fetch(`/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`)
+    ])
     
-    if (!response.ok) {
+    if (!summaryResponse.ok) {
       throw new Error('Failed to fetch analytics data')
     }
     
-    const data = await response.json()
+    const data = await summaryResponse.json()
+    const pagesData = pagesResponse.ok ? await pagesResponse.json() : { data: [] }
+    const trafficData = trafficResponse.ok ? await trafficResponse.json() : { data: [] }
+    const devicesData = devicesResponse.ok ? await devicesResponse.json() : { data: [] }
+    
+    const topPages = pagesData.data?.slice(0, 10) || []
+    const trafficSources = trafficData.data?.slice(0, 6) || []
+    const devices = devicesData.data || []
     
     // Determine property ID and name
     const displayPropertyId = propertyId || data.propertyId || '488543948'
@@ -32,23 +45,53 @@ async function downloadAnalyticsCSV(dateRange: DateRange, propertyId?: string, p
     const propertySlug = displayPropertyName.replace(/\s+/g, '-').toLowerCase()
     const filename = `${propertySlug}-analytics-${labelSlug}-${today}.csv`
     
+    // Metrics to exclude from CSV export
+    const csvExcludedMetrics = ['pageViewsChange', 'sessionsChange', 'usersChange', 'bounceRateChange', '_source', 'source', 'propertyId', 'averageSessionDuration', 'activeUsers', 'avgSessionDuration']
+    
     // Create CSV content
     let csvContent = `${displayPropertyName} Analytics Report\n`
     csvContent += `Property ID: ${displayPropertyId}\n`
     csvContent += `Date Range: ${dateRange.label || 'Custom'}\n`
     csvContent += `Generated: ${new Date().toLocaleString()}\n\n`
+    
+    // Key Metrics Section
+    csvContent += "=== KEY METRICS ===\n"
     csvContent += "Metric,Value\n"
     
-    if (data.metrics) {
-      Object.entries(data.metrics).forEach(([key, value]) => {
-        csvContent += `${key},${value}\n`
+    const metrics = data.metrics || data
+    Object.entries(metrics).forEach(([key, value]) => {
+      if (typeof value !== 'object' && !csvExcludedMetrics.some(excluded => key.toLowerCase().includes(excluded.toLowerCase()))) {
+        const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()
+        csvContent += `${formattedKey},${formatMetricValue(key, value as number | string)}\n`
+      }
+    })
+    
+    // Top Pages Section
+    if (topPages.length > 0) {
+      csvContent += "\n=== TOP PAGES ===\n"
+      csvContent += "Page,Views\n"
+      topPages.forEach((page: { pagePath?: string; path?: string; pageViews?: number; views?: number }) => {
+        const pagePath = page.pagePath || page.path || '/'
+        const views = page.pageViews || page.views || 0
+        csvContent += `"${pagePath}",${views}\n`
       })
-    } else if (data) {
-      // Fallback for different response structures
-      Object.entries(data).forEach(([key, value]) => {
-        if (typeof value !== 'object') {
-          csvContent += `${key},${value}\n`
-        }
+    }
+    
+    // Traffic Sources Section
+    if (trafficSources.length > 0) {
+      csvContent += "\n=== TRAFFIC SOURCES ===\n"
+      csvContent += "Source,Sessions,Users\n"
+      trafficSources.forEach((source: { source: string; sessions: number; users: number }) => {
+        csvContent += `"${source.source}",${source.sessions},${source.users}\n`
+      })
+    }
+    
+    // Device Types Section
+    if (devices.length > 0) {
+      csvContent += "\n=== DEVICE TYPES ===\n"
+      csvContent += "Device,Sessions,Users\n"
+      devices.forEach((device: { deviceCategory: string; sessions: number; users: number }) => {
+        csvContent += `"${device.deviceCategory}",${device.sessions},${device.users}\n`
       })
     }
     
@@ -96,8 +139,8 @@ function formatMetricValue(key: string, value: number | string): string {
   return String(value)
 }
 
-// Metrics to exclude from PNG export
-const EXCLUDED_METRICS = ['pageViewsChange', 'sessionsChange', 'usersChange', 'bounceRateChange', '_source', 'source', 'propertyId']
+// Metrics to exclude from PNG export (including average session duration and active users)
+const EXCLUDED_METRICS = ['pageViewsChange', 'sessionsChange', 'usersChange', 'bounceRateChange', '_source', 'source', 'propertyId', 'averageSessionDuration', 'activeUsers', 'avgSessionDuration']
 
 // Property name lookup map
 const PROPERTY_NAMES: Record<string, string> = {
@@ -113,10 +156,12 @@ const PROPERTY_NAMES: Record<string, string> = {
 // Download analytics as PNG using Canvas API (avoids CSS color parsing issues)
 async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, propertyName?: string) {
   try {
-    // Fetch analytics data and top pages in parallel
-    const [summaryResponse, pagesResponse] = await Promise.all([
+    // Fetch all data in parallel
+    const [summaryResponse, pagesResponse, trafficResponse, devicesResponse] = await Promise.all([
       fetch(`/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=top-pages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`)
+      fetch(`/api/analytics?endpoint=top-pages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
+      fetch(`/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
+      fetch(`/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`)
     ])
     
     if (!summaryResponse.ok) {
@@ -125,7 +170,12 @@ async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, p
     
     const data = await summaryResponse.json()
     const pagesData = pagesResponse.ok ? await pagesResponse.json() : { data: [] }
+    const trafficData = trafficResponse.ok ? await trafficResponse.json() : { data: [] }
+    const devicesData = devicesResponse.ok ? await devicesResponse.json() : { data: [] }
+    
     const topPages = pagesData.data?.slice(0, 5) || []
+    const trafficSources = trafficData.data?.slice(0, 5) || []
+    const devices = devicesData.data || []
     
     // Determine property ID and name
     const displayPropertyId = propertyId || data.propertyId || '488543948'
@@ -139,9 +189,17 @@ async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, p
       return
     }
     
-    // Set canvas size (taller to accommodate top pages)
+    // Calculate dynamic canvas height based on content
+    const hasPages = topPages.length > 0
+    const hasSources = trafficSources.length > 0
+    const hasDevices = devices.length > 0
+    let canvasHeight = 500 // Base height for header + metrics
+    if (hasPages) canvasHeight += 280 // Top pages section
+    if (hasSources || hasDevices) canvasHeight += 300 // Traffic sources and devices section
+    
+    // Set canvas size
     canvas.width = 1200
-    canvas.height = topPages.length > 0 ? 950 : 800
+    canvas.height = canvasHeight
     
     // Draw background
     ctx.fillStyle = '#0a0a0a'
@@ -289,6 +347,104 @@ async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, p
         
         currentY += rowHeight
       })
+      
+      currentY += 30 // Add spacing after top pages
+    }
+    
+    // Draw Traffic Sources and Device Types side by side
+    if (trafficSources.length > 0 || devices.length > 0) {
+      const sectionWidth = (canvas.width - 140) / 2
+      const tableX = 60
+      const rowHeight = 35
+      
+      // Traffic Sources Section (left side)
+      if (trafficSources.length > 0) {
+        // Section header
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('Traffic Sources', tableX, currentY + 25)
+        
+        let sourceY = currentY + 50
+        
+        // Table header
+        ctx.fillStyle = '#1f2937'
+        ctx.fillRect(tableX, sourceY, sectionWidth, rowHeight)
+        
+        ctx.fillStyle = '#9ca3af'
+        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('SOURCE', tableX + 15, sourceY + 22)
+        ctx.textAlign = 'right'
+        ctx.fillText('SESSIONS', tableX + sectionWidth - 15, sourceY + 22)
+        
+        sourceY += rowHeight
+        
+        // Traffic source rows
+        trafficSources.forEach((source: { source: string; sessions: number; users: number }, index: number) => {
+          ctx.fillStyle = index % 2 === 0 ? '#111827' : '#0a0a0a'
+          ctx.fillRect(tableX, sourceY, sectionWidth, rowHeight)
+          
+          ctx.fillStyle = '#e5e7eb'
+          ctx.font = '13px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'left'
+          const sourceName = source.source === '(direct)' ? 'Direct' : source.source
+          const truncatedSource = sourceName.length > 25 ? sourceName.substring(0, 22) + '...' : sourceName
+          ctx.fillText(truncatedSource, tableX + 15, sourceY + 22)
+          
+          ctx.fillStyle = '#10b981'
+          ctx.font = 'bold 13px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'right'
+          ctx.fillText(formatNumber(source.sessions), tableX + sectionWidth - 15, sourceY + 22)
+          
+          sourceY += rowHeight
+        })
+      }
+      
+      // Device Types Section (right side)
+      if (devices.length > 0) {
+        const deviceX = tableX + sectionWidth + 20
+        
+        // Section header
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('Device Types', deviceX, currentY + 25)
+        
+        let deviceY = currentY + 50
+        
+        // Table header
+        ctx.fillStyle = '#1f2937'
+        ctx.fillRect(deviceX, deviceY, sectionWidth, rowHeight)
+        
+        ctx.fillStyle = '#9ca3af'
+        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillText('DEVICE', deviceX + 15, deviceY + 22)
+        ctx.textAlign = 'right'
+        ctx.fillText('SESSIONS', deviceX + sectionWidth - 15, deviceY + 22)
+        
+        deviceY += rowHeight
+        
+        // Device type rows
+        devices.forEach((device: { deviceCategory: string; sessions: number; users: number }, index: number) => {
+          ctx.fillStyle = index % 2 === 0 ? '#111827' : '#0a0a0a'
+          ctx.fillRect(deviceX, deviceY, sectionWidth, rowHeight)
+          
+          ctx.fillStyle = '#e5e7eb'
+          ctx.font = '13px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'left'
+          const deviceName = device.deviceCategory.charAt(0).toUpperCase() + device.deviceCategory.slice(1)
+          ctx.fillText(deviceName, deviceX + 15, deviceY + 22)
+          
+          ctx.fillStyle = '#8b5cf6'
+          ctx.font = 'bold 13px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'right'
+          ctx.fillText(formatNumber(device.sessions), deviceX + sectionWidth - 15, deviceY + 22)
+          
+          deviceY += rowHeight
+        })
+      }
     }
     
     // Draw footer
@@ -451,9 +607,9 @@ export default function AnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black pt-[56px] md:pt-[64px]">
+    <div className="min-h-screen bg-black pt-[56px] md:pt-[64px] overflow-hidden w-full max-w-full">
       {/* Unified Sticky Analytics Header */}
-      <div className="sticky top-[56px] md:top-[64px] z-40">
+      <div className="sticky top-[56px] md:top-[64px] z-40 overflow-hidden">
         <AnalyticsHeader
           onRefresh={handleRefresh}
           onLogout={handleLogout}
@@ -474,8 +630,8 @@ export default function AnalyticsClientPage() {
         />
       </div>
       
-      <div className="py-6">
-        <div className="container mx-auto px-4 max-w-7xl">
+      <div className="py-4 sm:py-6 overflow-hidden w-full">
+        <div className="mx-auto px-3 sm:px-4 max-w-7xl overflow-hidden w-full">
           {/* Error Display */}
           {error && (
             <div className="mb-4">
@@ -495,9 +651,9 @@ export default function AnalyticsClientPage() {
           {/* Analytics Dashboard - Always show components */}
           <>
             {/* Metrics Overview */}
-            <div className="mb-10 md:mb-12">
-              <div className="flex items-center mb-4">
-                <h2 className="text-lg font-semibold text-white">Key Metrics</h2>
+            <div className="mb-10 sm:mb-12">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
                 <InfoTooltip content="High-level overview of your website's performance. Users are unique visitors, Sessions are visits, Page Views are total pages loaded, and Bounce Rate is the percentage of single-page visits." />
               </div>
               <MetricsOverview
@@ -509,9 +665,9 @@ export default function AnalyticsClientPage() {
             </div>
 
             {/* Page Views Chart */}
-            <div className="mb-10 md:mb-12">
-              <div className="flex items-center mb-4">
-                <h2 className="text-lg font-semibold text-white">Traffic Trend</h2>
+            <div className="mb-10 sm:mb-12">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                <h2 className="text-sm sm:text-lg font-semibold text-white">Traffic Trend</h2>
                 <InfoTooltip content="Daily page view trends showing traffic patterns over time. Use this to identify peak traffic days and overall growth trends." />
               </div>
               <PageViewsChart
@@ -522,11 +678,11 @@ export default function AnalyticsClientPage() {
               />
             </div>
 
-            {/* Top Pages and Traffic Sources - Side by Side on Desktop */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10 md:mb-12">
+            {/* Top Pages and Traffic Sources - Stack on mobile */}
+            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 mb-10 sm:mb-12">
               <div>
-                <div className="flex items-center mb-4">
-                  <h2 className="text-lg font-semibold text-white">Top Performing Pages</h2>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Pages</h2>
                   <InfoTooltip content="Your most visited pages ranked by views. This helps identify your most valuable content and where users spend their time." />
                 </div>
                 <TopPagesTable
@@ -538,8 +694,8 @@ export default function AnalyticsClientPage() {
               </div>
 
               <div>
-                <div className="flex items-center mb-4">
-                  <h2 className="text-lg font-semibold text-white">Traffic Sources</h2>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Traffic Sources</h2>
                   <InfoTooltip content="Where your visitors are coming from. Referral traffic comes from other websites, organic is from search engines, and direct is when users type your URL directly." />
                 </div>
                 <TrafficSourcesChart
@@ -551,11 +707,11 @@ export default function AnalyticsClientPage() {
               </div>
             </div>
 
-            {/* Geographic Distribution and Device Types - Side by Side on Desktop */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10 md:mb-12 pb-8">
+            {/* Geographic Distribution and Device Types - Stack on mobile */}
+            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 mb-10 sm:mb-12 pb-8">
               <div>
-                <div className="flex items-center mb-4">
-                  <h2 className="text-lg font-semibold text-white">Geographic Distribution</h2>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Geographic Distribution</h2>
                   <InfoTooltip content="Where your visitors are located geographically. This helps understand your audience's location and can inform regional content strategies." />
                 </div>
                 <GeographicMap
@@ -567,8 +723,8 @@ export default function AnalyticsClientPage() {
               </div>
 
               <div>
-                <div className="flex items-center mb-4">
-                  <h2 className="text-lg font-semibold text-white">Device Types</h2>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Device Types</h2>
                   <InfoTooltip content="The types of devices visitors use to access your site. This helps ensure your site is optimized for the most common device types." />
                 </div>
                 <DeviceBreakdown

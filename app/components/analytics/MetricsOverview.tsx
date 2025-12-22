@@ -162,7 +162,7 @@ export function MetricsOverview({
   const loading = isLoading || parentLoading
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 w-full overflow-hidden">
       {metrics.map((metric) => {
         const changeValue = metric.change || 0
         const isPositive = metric.invertChange ? changeValue < 0 : changeValue > 0
@@ -172,30 +172,30 @@ export function MetricsOverview({
         return (
           <div
             key={metric.title}
-            className="relative group"
+            className="relative group min-w-0"
           >
             {/* Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-5 transition-all duration-300 hover:border-white/20 hover:from-white/[0.12] hover:to-white/[0.04]">
+            <div className="relative overflow-hidden rounded-lg sm:rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-2.5 sm:p-5 transition-all duration-300 hover:border-white/20 hover:from-white/[0.12] hover:to-white/[0.04]">
               {/* Gradient accent line */}
               <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${metric.color} opacity-60`} />
               
               {/* Loading state */}
               {loading ? (
-                <div className="flex flex-col items-center justify-center h-[100px]">
-                  <Loader2 className="h-6 w-6 text-white/40 animate-spin" />
-                  <span className="text-xs text-white/40 mt-2">Loading...</span>
+                <div className="flex flex-col items-center justify-center h-[80px] sm:h-[100px]">
+                  <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-white/40 animate-spin" />
+                  <span className="text-[10px] sm:text-xs text-white/40 mt-2">Loading...</span>
                 </div>
               ) : (
                 <>
                   {/* Header: Icon and Change Badge */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`p-2.5 rounded-xl ${metric.bgColor}`}>
-                      <metric.icon className={`h-5 w-5 ${metric.iconColor}`} />
+                  <div className="flex items-start justify-between mb-2 sm:mb-4">
+                    <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl ${metric.bgColor}`}>
+                      <metric.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${metric.iconColor}`} />
                     </div>
                     
                     {hasChange && (
                       <div
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
                           isPositive
                             ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
                             : isNegative
@@ -204,9 +204,9 @@ export function MetricsOverview({
                         }`}
                       >
                         {isPositive ? (
-                          <ArrowUpRight className="h-3 w-3" />
+                          <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         ) : (
-                          <ArrowDownRight className="h-3 w-3" />
+                          <ArrowDownRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         )}
                         <span>{Math.abs(changeValue).toFixed(1)}%</span>
                       </div>
@@ -214,8 +214,8 @@ export function MetricsOverview({
                   </div>
 
                   {/* Value */}
-                  <div className="mb-1">
-                    <span className="text-3xl font-bold text-white tracking-tight">
+                  <div className="mb-0.5 sm:mb-1">
+                    <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
                       {metric.isPercentage 
                         ? `${(metric.value * 100).toFixed(1)}%`
                         : formatNumber(metric.value)
@@ -225,8 +225,8 @@ export function MetricsOverview({
 
                   {/* Title and Subtitle */}
                   <div>
-                    <p className="text-sm font-medium text-white/90">{metric.title}</p>
-                    <p className="text-xs text-white/50">{metric.subtitle}</p>
+                    <p className="text-xs sm:text-sm font-medium text-white/90">{metric.title}</p>
+                    <p className="text-[10px] sm:text-xs text-white/50 hidden sm:block">{metric.subtitle}</p>
                   </div>
                 </>
               )}
