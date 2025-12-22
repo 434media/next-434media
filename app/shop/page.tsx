@@ -86,7 +86,7 @@ export default function ShopPage() {
               className="w-full h-full object-cover"
               poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
             >
-              <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
+              <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER+V2.mp4" type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           </div>
@@ -154,7 +154,7 @@ export default function ShopPage() {
                 playsInline
                 className="w-full h-full object-cover"
               >
-                <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER.mp4" type="video/mp4" />
+                <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER+V2.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
 
