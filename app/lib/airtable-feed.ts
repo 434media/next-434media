@@ -3,7 +3,7 @@ import Airtable from "airtable"
 // Initialize Airtable base for The Feed
 const thefeedsBaseId = process.env.THEFEEDS_BASE_ID
 const thefeedsApiKey = process.env.AIRTABLE_API_KEY || process.env.AIRTABLE_EVENTS_API_KEY
-const thefeedsTableName = process.env.THEFEEDS_TABLE_NAME || "thefeed"
+const thefeedsTableName = process.env.THEFEEDS_TABLE_NAME || "THEFEED"
 
 if (!thefeedsBaseId || !thefeedsApiKey) {
   console.warn("The Feed Airtable configuration is missing. Please set THEFEEDS_BASE_ID and AIRTABLE_API_KEY")
@@ -252,6 +252,8 @@ export async function getFeedItems(filters?: { status?: string; type?: string; t
 
   try {
     const tableName = filters?.tableName || thefeedsTableName
+    console.log(`Fetching from Airtable - Base ID: ${thefeedsBaseId}, Table: ${tableName}`)
+    
     let filterFormula = ""
     const conditions: string[] = []
 
@@ -279,9 +281,32 @@ export async function getFeedItems(filters?: { status?: string; type?: string; t
       .select(selectOptions)
       .all()
 
+    console.log(`Successfully fetched ${records.length} records from table: ${tableName}`)
     return records.map(mapAirtableToFeedItem)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching feed items from Airtable:", error)
+    
+    // Provide more detailed error information
+    if (error?.error === 'NOT_AUTHORIZED' || error?.statusCode === 403) {
+      console.error(`
+=== AIRTABLE AUTHORIZATION ERROR ===
+Table: ${filters?.tableName || thefeedsTableName}
+Base ID: ${thefeedsBaseId}
+
+This error typically means:
+1. The API key doesn't have access to this specific table
+2. The table name doesn't match exactly (case-sensitive)
+3. The Personal Access Token needs to be updated with the correct scopes
+
+To fix:
+1. Go to https://airtable.com/create/tokens
+2. Edit your Personal Access Token
+3. Ensure the base containing this table is added to the token's scopes
+4. Verify the table name matches exactly what's in Airtable
+=====================================
+      `)
+    }
+    
     return []
   }
 }

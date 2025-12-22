@@ -69,15 +69,23 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type") || undefined
     const tableName = searchParams.get("table") || undefined
 
+    console.log(`[API] Fetching feed items - table: ${tableName || 'default'}`)
+
     // Import getFeedItems dynamically to avoid circular dependencies
     const { getFeedItems } = await import("../../lib/airtable-feed")
     
     const items = await getFeedItems({ status, type, tableName })
 
+    // If no items returned, it could be an authorization issue
+    if (items.length === 0) {
+      console.log(`[API] No items returned for table: ${tableName || 'default'}. This could indicate an authorization issue or empty table.`)
+    }
+
     return NextResponse.json({
       success: true,
       data: items,
       count: items.length,
+      table: tableName || 'thefeed',
     })
   } catch (error) {
     console.error("Error fetching feed items:", error)
@@ -86,6 +94,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch feed items",
+        hint: "Check server logs for detailed Airtable authorization error messages",
       },
       { status: 500 }
     )

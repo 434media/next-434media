@@ -115,19 +115,19 @@ const BRAND_FEEDS: BrandFeed[] = [
   {
     id: "digital-canvas",
     name: "The Feed - Digital Canvas",
-    tableName: "thefeed",
+    tableName: "THEFEED",
     description: "Digital Canvas content feed"
   },
   {
     id: "vemos-vamos",
     name: "Culture Deck - Vemos Vamos",
-    tableName: "culture_deck",
+    tableName: "CULTUREDECK",
     description: "Vemos Vamos cultural content"
   },
   {
     id: "txmx-boxing",
     name: "8 Count - TXMX Boxing",
-    tableName: "8_count",
+    tableName: "8COUNT",
     description: "TXMX Boxing updates"
   }
 ]
