@@ -80,7 +80,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
       >
         <div className="flex items-center gap-3">
           <div
-            className="p-3 bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+            className="p-3 bg-pink-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
             style={{ willChange: "transform" }}
           >
             <Calendar className="h-6 w-6 text-pink-400" />
@@ -104,7 +104,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
                 onClick={() => onRangeChange(option.value)}
                 className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 ${
                   selectedRange === option.value
-                    ? "bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white border-0 shadow-lg"
+                    ? "bg-pink-500 hover:bg-pink-600 text-white border-0 shadow-lg"
                     : "bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:border-white/30 hover:text-white"
                 }`}
                 style={{ willChange: "transform" }}
@@ -113,7 +113,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
                 {selectedRange === option.value && (
                   <motion.div
                     layoutId="activeRange"
-                    className="absolute inset-0 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-md -z-10"
+                    className="absolute inset-0 bg-pink-500/20 rounded-md -z-10"
                     style={{ willChange: "transform" }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
@@ -186,7 +186,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
                   <button
                     onClick={handleCustomDateApply}
                     disabled={!customStartDate || !customEndDate}
-                    className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 rounded-lg text-sm font-medium"
+                    className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 rounded-lg text-sm font-medium"
                   >
                     Apply
                   </button>

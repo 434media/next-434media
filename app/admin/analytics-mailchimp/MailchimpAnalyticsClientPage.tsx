@@ -560,9 +560,9 @@ export default function MailchimpAnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white pt-16">
+    <div className="min-h-[100dvh] bg-black pt-16 overflow-hidden w-full max-w-full">
       {/* Header - with padding to clear fixed navbar */}
-      <div className="border-b border-neutral-100">
+      <div className="border-b border-white/10 overflow-hidden">
         <MailchimpHeader
           isLoading={isLoading}
           onRefresh={fetchAllData}
@@ -577,20 +577,28 @@ export default function MailchimpAnalyticsClientPage() {
       </div>
 
       {/* Main Content */}
-      <div ref={contentRef} className="container mx-auto px-4 py-8 space-y-8 max-w-7xl">
+      <div ref={contentRef} className="mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-8 sm:space-y-10 max-w-7xl overflow-hidden w-full">
         {/* Metrics Overview */}
-        {data.summary && (
-          <MailchimpMetricsOverview
-            data={data.summary}
-            campaignData={data.allCampaigns?.data || []}
-            geographicData={data.geographic?.data || []}
-            allAudiences={data.lists?.data || []}
-            selectedAudienceId={selectedAudienceId}
-          />
-        )}
+        <div>
+          <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+            <h2 className="text-sm sm:text-lg font-semibold text-white">Performance Metrics</h2>
+          </div>
+          {data.summary && (
+            <MailchimpMetricsOverview
+              data={data.summary}
+              campaignData={data.allCampaigns?.data || []}
+              geographicData={data.geographic?.data || []}
+              allAudiences={data.lists?.data || []}
+              selectedAudienceId={selectedAudienceId}
+            />
+          )}
+        </div>
 
         {/* Tags Section - Full Width */}
         <div>
+          <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+            <h2 className="text-sm sm:text-lg font-semibold text-white">Audience Tags</h2>
+          </div>
           <MailchimpTagsOverview
             tags={data.tags?.tags || []}
             selectedTag={selectedTag}
@@ -601,6 +609,9 @@ export default function MailchimpAnalyticsClientPage() {
 
         {/* Recent Campaigns - Full Width */}
         <div>
+          <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+            <h2 className="text-sm sm:text-lg font-semibold text-white">Recent Campaigns</h2>
+          </div>
           {data.allCampaigns && <MailchimpTopCampaignsTable data={data.allCampaigns} />}
         </div>
       </div>

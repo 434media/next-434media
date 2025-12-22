@@ -90,8 +90,8 @@ export function AnalyticsHeader({
           {/* Left: Title and Property */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-lg sm:rounded-xl border border-white/10 shrink-0">
-                <GA4Icon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-400" />
+              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg sm:rounded-xl border border-white/10 shrink-0">
+                <GA4Icon className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400" />
               </div>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg font-bold text-white truncate">

@@ -44,15 +44,15 @@ export function DashboardHeader({
         />
       </div>
 
-      {/* Enhanced Floating Elements with Green/Blue/emerald */}
+      {/* Enhanced Floating Elements with Green accents */}
       <div className="absolute top-16 sm:top-20 left-4 sm:left-10 w-20 h-20 sm:w-24 sm:h-24 bg-emerald-400/20 rounded-full blur-2xl animate-pulse" />
-      <div className="absolute top-32 sm:top-40 right-8 sm:right-20 w-32 h-32 sm:w-40 sm:h-40 bg-blue-400/25 rounded-full blur-3xl animate-pulse delay-1000" />
+      <div className="absolute top-32 sm:top-40 right-8 sm:right-20 w-32 h-32 sm:w-40 sm:h-40 bg-teal-400/25 rounded-full blur-3xl animate-pulse delay-1000" />
       <div className="absolute bottom-16 sm:bottom-20 left-1/4 w-24 h-24 sm:w-28 sm:h-28 bg-emerald-400/20 rounded-full blur-2xl animate-pulse delay-500" />
       <div className="absolute top-24 sm:top-32 right-1/4 w-16 h-16 sm:w-20 sm:h-20 bg-teal-400/25 rounded-full blur-xl animate-pulse delay-700" />
 
       {/* Additional floating elements */}
-      <div className="absolute top-1/2 left-8 w-12 h-12 sm:w-16 sm:h-16 bg-cyan-400/20 rounded-full blur-lg animate-pulse delay-300" />
-      <div className="absolute bottom-1/3 right-12 w-14 h-14 sm:w-18 sm:h-18 bg-indigo-400/25 rounded-full blur-lg animate-pulse delay-900" />
+      <div className="absolute top-1/2 left-8 w-12 h-12 sm:w-16 sm:h-16 bg-green-400/20 rounded-full blur-lg animate-pulse delay-300" />
+      <div className="absolute bottom-1/3 right-12 w-14 h-14 sm:w-18 sm:h-18 bg-emerald-400/25 rounded-full blur-lg animate-pulse delay-900" />
       <div className="absolute top-3/4 left-1/3 w-10 h-10 sm:w-14 sm:h-14 bg-green-400/20 rounded-full blur-lg animate-pulse delay-1200" />
 
       {/* Mobile Layout (< sm) */}
@@ -65,11 +65,11 @@ export function DashboardHeader({
           className="flex items-center gap-4"
         >
           <motion.div
-            className="p-3 bg-gradient-to-br from-blue-500/30 to-emerald-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+            className="p-3 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
-            <GA4Icon className="h-6 w-6 text-blue-400" />
+            <GA4Icon className="h-6 w-6 text-emerald-400" />
           </motion.div>
           <div>
             <motion.h1
@@ -108,11 +108,11 @@ export function DashboardHeader({
                 </div>
               ) : availableProperties.length > 0 ? (
                 <div className="relative w-full">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-400 pointer-events-none z-10 flex-shrink-0" />
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-400 pointer-events-none z-10 flex-shrink-0" />
                   <select
                     value={selectedPropertyId}
                     onChange={(e) => onPropertyChange(e.target.value)}
-                    className="bg-white/10 border border-white/20 text-white rounded-lg pl-10 pr-8 py-2 text-sm backdrop-blur-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none cursor-pointer w-full"
+                    className="bg-white/10 border border-white/20 text-white rounded-lg pl-10 pr-8 py-2 text-sm backdrop-blur-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer w-full"
                   >
                     {!selectedPropertyId && (
                       <option value="" className="bg-slate-800 text-white/60">
@@ -177,11 +177,11 @@ export function DashboardHeader({
           className="flex items-center gap-4"
         >
           <motion.div
-            className="p-3 bg-gradient-to-br from-blue-500/30 to-emerald-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+            className="p-3 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
-            <GA4Icon className="h-8 w-8 text-blue-400" />
+            <GA4Icon className="h-8 w-8 text-emerald-400" />
           </motion.div>
           <div>
             <motion.h1
@@ -221,11 +221,11 @@ export function DashboardHeader({
               ) : availableProperties.length > 0 ? (
                 // Property selector with options
                 <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-400 pointer-events-none z-10" />
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-400 pointer-events-none z-10" />
                   <select
                     value={selectedPropertyId}
                     onChange={(e) => onPropertyChange(e.target.value)}
-                    className="bg-white/10 border border-white/20 text-white rounded-lg pl-10 pr-8 py-2 text-sm backdrop-blur-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none cursor-pointer w-full"
+                    className="bg-white/10 border border-white/20 text-white rounded-lg pl-10 pr-8 py-2 text-sm backdrop-blur-sm hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer w-full"
                   >
                     {!selectedPropertyId && (
                       <option value="" className="bg-slate-800 text-white/60">
@@ -275,7 +275,7 @@ export function DashboardHeader({
 
       {/* Animated gradient line at bottom */}
       <motion.div
-        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-teal-500"
+        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500"
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
         transition={{ duration: 1.5, delay: 0.5 }}

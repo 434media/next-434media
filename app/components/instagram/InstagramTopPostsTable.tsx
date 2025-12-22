@@ -44,47 +44,43 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <div className="flex flex-col min-w-0">
-      <span className="text-xs md:text-sm uppercase tracking-wide text-slate-300 font-semibold">{label}</span>
-      <span className="text-lg md:text-xl font-black text-white tabular-nums whitespace-nowrap leading-tight">{value}</span>
+      <span className="text-[10px] sm:text-xs uppercase tracking-wide text-slate-400 font-medium">{label}</span>
+      <span className="text-base sm:text-lg font-bold text-white tabular-nums whitespace-nowrap leading-tight">{value}</span>
     </div>
   )
 
   return (
-    <div className="relative bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4 md:p-6">
-      <div className="mb-4 md:mb-6 flex items-center justify-between">
-        <h2 className="text-2xl md:text-3xl font-black text-white">Top Performing Posts</h2>
-      </div>
-
+    <div className="relative overflow-hidden w-full max-w-full">
       {/* Carousel */}
       <div className="relative">
     {/* Overlay controls (mobile + desktop) */}
-    <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex items-center justify-between px-1">
+    <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex items-center justify-between px-1 z-10">
           <button
             type="button"
             aria-label="Scroll left"
             onClick={() => scroll("left")}
             disabled={!canScrollLeft}
-            className="pointer-events-auto h-8 w-8 md:h-12 md:w-12 rounded-full bg-black/50 text-white grid place-items-center backdrop-blur-sm border border-white/20 hover:bg-black/70 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="pointer-events-auto h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-pink-500/80 text-white grid place-items-center backdrop-blur-sm border border-pink-400/30 hover:bg-pink-600 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 transition-colors"
           >
-            <ChevronLeft className="h-4 w-4 md:h-6 md:w-6" aria-hidden="true" />
+            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
           </button>
           <button
             type="button"
             aria-label="Scroll right"
             onClick={() => scroll("right")}
             disabled={!canScrollRight}
-            className="pointer-events-auto h-8 w-8 md:h-12 md:w-12 rounded-full bg-black/50 text-white grid place-items-center backdrop-blur-sm border border-white/20 hover:bg-black/70 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="pointer-events-auto h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-pink-500/80 text-white grid place-items-center backdrop-blur-sm border border-pink-400/30 hover:bg-pink-600 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 transition-colors"
           >
-            <ChevronRight className="h-4 w-4 md:h-6 md:w-6" aria-hidden="true" />
+            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
           </button>
         </div>
 
         <div
           ref={scrollRef}
-          className="overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
+          className="overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-1"
           style={{ scrollSnapType: "x mandatory" }}
         >
-          <div className="flex gap-4">
+          <div className="flex gap-3 sm:gap-4">
             {connectionStatus?.success ? (
               sortedMedia.length > 0 ? (
                 sortedMedia.map((post) => {
@@ -95,7 +91,7 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
                   return (
                     <div
                       key={post.id}
-                      className="snap-start shrink-0 basis-full md:basis-1/2 lg:basis-1/3 rounded-xl overflow-hidden bg-slate-900/60 border border-slate-700"
+                      className="snap-start shrink-0 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3 rounded-xl overflow-hidden bg-slate-900/60 border border-pink-500/20 hover:border-pink-500/40 transition-colors"
                     >
                       {/* Media */}
                       <div className="relative w-full aspect-video bg-slate-800">
@@ -109,29 +105,29 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
                             if (!img.src.endsWith("/placeholder.svg")) img.src = "/placeholder.svg"
                           }}
                         />
-                        <div className="absolute top-3 left-3 inline-flex items-center px-2 py-1 rounded bg-black/60 text-white text-xs font-semibold uppercase tracking-wide border border-white/10">
+                        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 inline-flex items-center px-2 py-1 rounded bg-pink-500/90 text-white text-xs font-semibold uppercase tracking-wide border border-white/10">
                           {getMediaTypeDisplayName(post.media_type)}
                         </div>
                       </div>
 
                       {/* Content */}
-                      <div className="p-4 md:p-6">
-                        <div className="flex flex-col gap-4">
+                      <div className="p-3 sm:p-4 md:p-5">
+                        <div className="flex flex-col gap-3 sm:gap-4">
                           <div className="min-w-0">
                             <a
                               href={post.permalink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-lg md:text-xl font-extrabold text-white hover:text-purple-300 transition-colors line-clamp-2 break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 rounded-sm"
+                              className="text-base sm:text-lg font-extrabold text-white hover:text-pink-300 transition-colors line-clamp-2 break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70 rounded-sm"
                             >
                               {truncateCaption(post.caption, 100) || "View on Instagram"}
                             </a>
-                            <div className="mt-1 text-slate-300 text-sm font-semibold">
+                            <div className="mt-1 text-slate-400 text-xs sm:text-sm font-medium">
                               {formatInstagramDate(post.timestamp)}
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3 md:gap-4 justify-items-start">
+                          <div className="grid grid-cols-2 gap-2 sm:gap-3 justify-items-start">
                             <Stat label="Likes" value={formatNumber(post.like_count || 0)} />
                             <Stat label="Comments" value={formatNumber(post.comments_count || 0)} />
                             <Stat label="Shares" value={formatNumber(shares)} />
@@ -139,18 +135,18 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
                           </div>
                         </div>
 
-                        <div className="mt-4 flex items-center justify-between">
-                          <div className="text-slate-300 text-sm">
-                            <span className="font-semibold">Engagement Rate: </span>
-                            <span className="font-black text-white">{engagementRate.toFixed(2)}%</span>
+                        <div className="mt-3 sm:mt-4 flex items-center justify-between gap-2">
+                          <div className="text-slate-300 text-xs sm:text-sm">
+                            <span className="font-medium">Engagement: </span>
+                            <span className="font-bold text-pink-400">{engagementRate.toFixed(2)}%</span>
                           </div>
                           <a
                             href={post.permalink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold"
+                            className="inline-flex items-center px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md bg-pink-500 hover:bg-pink-600 text-white text-xs sm:text-sm font-bold transition-colors shrink-0"
                           >
-                            Open Post
+                            Open
                           </a>
                         </div>
                       </div>
@@ -158,22 +154,22 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
                   )
                 })
               ) : (
-                <div className="snap-center shrink-0 w-full rounded-xl bg-slate-900/60 border border-slate-700 p-8 text-center text-slate-400">
+                <div className="snap-center shrink-0 w-full rounded-xl bg-slate-900/60 border border-slate-700 p-6 sm:p-8 text-center text-slate-400">
                   No posts found
                 </div>
               )
             ) : (
               // Placeholder cards when not connected
               Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="snap-center shrink-0 w-full rounded-xl overflow-hidden bg-slate-900/60 border border-slate-700">
+                <div key={i} className="snap-center shrink-0 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3 rounded-xl overflow-hidden bg-slate-900/60 border border-slate-700">
                   <div className="w-full aspect-video bg-slate-800 animate-pulse" />
-                  <div className="p-6 space-y-4">
-                    <div className="h-6 w-2/3 bg-slate-800 rounded animate-pulse" />
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="h-10 bg-slate-800 rounded animate-pulse" />
-                      <div className="h-10 bg-slate-800 rounded animate-pulse" />
-                      <div className="h-10 bg-slate-800 rounded animate-pulse" />
-                      <div className="h-10 bg-slate-800 rounded animate-pulse" />
+                  <div className="p-4 sm:p-6 space-y-4">
+                    <div className="h-5 sm:h-6 w-2/3 bg-slate-800 rounded animate-pulse" />
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      <div className="h-8 sm:h-10 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-8 sm:h-10 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-8 sm:h-10 bg-slate-800 rounded animate-pulse" />
+                      <div className="h-8 sm:h-10 bg-slate-800 rounded animate-pulse" />
                     </div>
                   </div>
                 </div>

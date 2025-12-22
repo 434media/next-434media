@@ -244,7 +244,7 @@ export function InstagramDashboardHeader({
 
       {/* Enhanced Floating Elements with Instagram Colors */}
       <div className="absolute top-16 sm:top-20 left-4 sm:left-10 w-20 h-20 sm:w-24 sm:h-24 bg-pink-400/20 rounded-full blur-2xl animate-pulse" />
-      <div className="absolute top-32 sm:top-40 right-8 sm:right-20 w-32 h-32 sm:w-40 sm:h-40 bg-purple-400/25 rounded-full blur-3xl animate-pulse delay-1000" />
+      <div className="absolute top-32 sm:top-40 right-8 sm:right-20 w-32 h-32 sm:w-40 sm:h-40 bg-pink-400/25 rounded-full blur-3xl animate-pulse delay-1000" />
       <div className="absolute bottom-16 sm:bottom-20 left-1/4 w-24 h-24 sm:w-28 sm:h-28 bg-orange-400/20 rounded-full blur-2xl animate-pulse delay-500" />
       <div className="absolute top-24 sm:top-32 right-1/4 w-16 h-16 sm:w-20 sm:h-20 bg-yellow-400/25 rounded-full blur-xl animate-pulse delay-700" />
 
@@ -264,7 +264,7 @@ export function InstagramDashboardHeader({
         >
           <div className="flex items-center gap-3">
             <motion.div
-              className="p-3 bg-gradient-to-br from-pink-500/30 to-purple-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+              className="p-3 bg-pink-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
@@ -341,7 +341,7 @@ export function InstagramDashboardHeader({
         >
           <div className="flex items-center gap-4">
             <motion.div
-              className="p-3 bg-gradient-to-br from-pink-500/30 to-purple-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
+              className="p-3 bg-pink-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
@@ -404,7 +404,7 @@ export function InstagramDashboardHeader({
 
       {/* Animated gradient line at bottom */}
       <motion.div
-        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-500"
+        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-400 via-pink-500 to-pink-600"
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
         transition={{ duration: 1.5, delay: 0.5 }}

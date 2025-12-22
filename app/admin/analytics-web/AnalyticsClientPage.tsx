@@ -207,8 +207,8 @@ async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, p
     
     // Draw gradient accent bar at top
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0)
-    gradient.addColorStop(0, '#3b82f6')
-    gradient.addColorStop(1, '#8b5cf6')
+    gradient.addColorStop(0, '#10b981')
+    gradient.addColorStop(1, '#14b8a6')
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, canvas.width, 6)
     
@@ -455,8 +455,8 @@ async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, p
     
     // Draw decorative gradient line at bottom
     const bottomGradient = ctx.createLinearGradient(0, canvas.height - 6, canvas.width, canvas.height - 6)
-    bottomGradient.addColorStop(0, '#3b82f6')
-    bottomGradient.addColorStop(1, '#8b5cf6')
+    bottomGradient.addColorStop(0, '#10b981')
+    bottomGradient.addColorStop(1, '#14b8a6')
     ctx.fillStyle = bottomGradient
     ctx.fillRect(0, canvas.height - 6, canvas.width, 6)
     
@@ -651,7 +651,7 @@ export default function AnalyticsClientPage() {
           {/* Analytics Dashboard - Always show components */}
           <>
             {/* Metrics Overview */}
-            <div className="mb-10 sm:mb-12">
+            <div className="py-16 md:py-20">
               <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
                 <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
                 <InfoTooltip content="High-level overview of your website's performance. Users are unique visitors, Sessions are visits, Page Views are total pages loaded, and Bounce Rate is the percentage of single-page visits." />
@@ -665,7 +665,7 @@ export default function AnalyticsClientPage() {
             </div>
 
             {/* Page Views Chart */}
-            <div className="mb-10 sm:mb-12">
+            <div className="">
               <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
                 <h2 className="text-sm sm:text-lg font-semibold text-white">Traffic Trend</h2>
                 <InfoTooltip content="Daily page view trends showing traffic patterns over time. Use this to identify peak traffic days and overall growth trends." />
@@ -679,7 +679,7 @@ export default function AnalyticsClientPage() {
             </div>
 
             {/* Top Pages and Traffic Sources - Stack on mobile */}
-            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 mb-10 sm:mb-12">
+            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 py-12 md:py-16">
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
                   <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Pages</h2>
@@ -708,7 +708,7 @@ export default function AnalyticsClientPage() {
             </div>
 
             {/* Geographic Distribution and Device Types - Stack on mobile */}
-            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 mb-10 sm:mb-12 pb-8">
+            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 py-2 md:py-16">
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
                   <h2 className="text-sm sm:text-lg font-semibold text-white">Geographic Distribution</h2>

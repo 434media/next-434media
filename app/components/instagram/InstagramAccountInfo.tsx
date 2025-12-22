@@ -18,49 +18,49 @@ interface InstagramAccountInfoProps {
 
 export function InstagramAccountInfo({ account }: InstagramAccountInfoProps) {
   return (
-    <div
-      className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl"
-      style={{
-        willChange: "auto",
-        backfaceVisibility: "hidden",
-        transform: "translateZ(0)",
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
-          style={{ willChange: "transform" }}
-        >
-          <div className="w-12 h-12 rounded-lg overflow-hidden">
-            <img
-              src={account.profile_picture_url || "/placeholder.svg"}
-              alt={`${account.username} profile`}
-              className="w-full h-full object-cover"
-            />
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-4 sm:p-6">
+      {/* Pink gradient accent line */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-400 to-pink-600 opacity-60" />
+      
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Left: Profile */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-0.5 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full shrink-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden bg-black">
+              <img
+                src={account.profile_picture_url || "/placeholder.svg"}
+                alt={`${account.username} profile`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-white text-sm sm:text-base font-bold truncate">{account.name || account.biography}</h3>
+            <a 
+              href={`https://www.instagram.com/${account.username}`} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-pink-400 text-xs sm:text-sm font-medium hover:underline"
+            >
+              @{account.username}
+            </a>
           </div>
         </div>
-        <div>
-          <h3 className="text-white text-xl font-bold mb-1">{account.biography}</h3>
-          <a href={`https://www.instagram.com/${account.username}`} target="_blank" rel="noopener noreferrer" className="text-white/60 text-sm font-medium hover:underline">
-            <p>
-              @{account.username}
-            </p>
-          </a>
-        </div>
-      </div>
 
-      <div className="flex justify-between gap-0 lg:gap-8">
-        <div className="text-center">
-          <div className="text-2xl lg:text-3xl font-bold text-white mb-1">{formatNumber(account.followers_count)}</div>
-          <div className="text-sm text-slate-300 font-medium">Followers</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl lg:text-3xl font-bold text-white mb-1">{formatNumber(account.follows_count)}</div>
-          <div className="text-sm text-slate-300 font-medium">Following</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl lg:text-3xl font-bold text-white mb-1">{formatNumber(account.media_count)}</div>
-          <div className="text-sm text-slate-300 font-medium">Posts</div>
+        {/* Right: Stats */}
+        <div className="flex justify-between sm:justify-end gap-4 sm:gap-8">
+          <div className="text-center sm:text-right">
+            <div className="text-lg sm:text-2xl font-bold text-white">{formatNumber(account.followers_count)}</div>
+            <div className="text-[10px] sm:text-xs text-white/60 font-medium">Followers</div>
+          </div>
+          <div className="text-center sm:text-right">
+            <div className="text-lg sm:text-2xl font-bold text-white">{formatNumber(account.follows_count)}</div>
+            <div className="text-[10px] sm:text-xs text-white/60 font-medium">Following</div>
+          </div>
+          <div className="text-center sm:text-right">
+            <div className="text-lg sm:text-2xl font-bold text-white">{formatNumber(account.media_count)}</div>
+            <div className="text-[10px] sm:text-xs text-white/60 font-medium">Posts</div>
+          </div>
         </div>
       </div>
     </div>

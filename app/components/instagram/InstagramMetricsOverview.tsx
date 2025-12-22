@@ -110,35 +110,30 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
   ]
 
   return (
-    <div className="bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Performance Overview</h2>
-        <span className="text-base font-medium text-slate-300">{getRangeLabel(dateRange)}</span>
-      </div>
-
+    <div className="overflow-hidden w-full max-w-full">
       <div className="relative">
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {metrics.map((metric) => (
             <div
               key={metric.title}
-              className={`${metric.bgColor} ${metric.borderColor} backdrop-blur-sm rounded-xl border p-8`}
+              className={`${metric.bgColor} ${metric.borderColor} backdrop-blur-sm rounded-xl border p-4 sm:p-6 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg`}
             >
-              <div className="flex items-center justify-between mb-3 relative">
-                <h3 className="text-base font-semibold text-slate-200 peer cursor-help">{metric.title}</h3>
+              <div className="flex items-center justify-between mb-2 sm:mb-3 relative">
+                <h3 className="text-sm sm:text-base font-semibold text-slate-200 peer cursor-help">{metric.title}</h3>
                 {/* Desktop-only tooltip shown on hover over title */}
-                <div className="hidden md:block absolute left-0 top-full mt-1 w-64 rounded-md bg-slate-900/90 border border-slate-700 px-3 py-2 text-xs text-slate-200 opacity-0 transition-opacity duration-150 pointer-events-none peer-hover:opacity-100">
+                <div className="hidden md:block absolute left-0 top-full mt-1 w-64 rounded-md bg-slate-900/90 border border-slate-700 px-3 py-2 text-xs text-slate-200 opacity-0 transition-opacity duration-150 pointer-events-none peer-hover:opacity-100 z-10">
                   {metric.description}
                 </div>
               </div>
-              <div className={`text-3xl font-bold ${metric.color} mb-2`}>
+              <div className={`text-2xl sm:text-3xl font-bold ${metric.color} mb-1 sm:mb-2`}>
                 {connectionStatus?.success ? formatNumber(metric.value) : "--"}
               </div>
-              {/* Hide description on mobile; shown via tooltip above on desktop */}
-              <p className="hidden">{metric.description}</p>
+              {/* Show description on mobile */}
+              <p className="text-xs text-slate-400 sm:hidden">{metric.description}</p>
               {connectionStatus?.success &&
                 metric.breakdown &&
                 (metric.breakdown.followers != null || metric.breakdown.non_followers != null) && (
-                  <div className="hidden md:grid mt-3 text-xs text-slate-400 grid-cols-1 gap-1">
+                  <div className="hidden sm:grid mt-3 text-xs text-slate-400 grid-cols-1 gap-1">
                     {metric.breakdown.followers != null && (
                       <div>
                         <span className="text-slate-300 font-medium">Followers:</span>
@@ -160,9 +155,9 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
         {/* Not Connected Overlay */}
         {!connectionStatus?.success && (
           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-xl flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-red-400 text-xl font-bold mb-3">Not Connected</div>
-              <div className="text-slate-300 text-base font-medium">
+            <div className="text-center px-4">
+              <div className="text-red-400 text-lg sm:text-xl font-bold mb-2 sm:mb-3">Not Connected</div>
+              <div className="text-slate-300 text-sm sm:text-base font-medium">
                 {connectionStatus?.message || "Instagram API connection required"}
               </div>
             </div>

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Eye, Users, MousePointer, Clock, TrendingUp, TrendingDown, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Eye, Users, MousePointer, Clock, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
 
 interface MetricsOverviewProps {

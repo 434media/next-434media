@@ -30,7 +30,7 @@ const tabs: TabConfig[] = [
     label: "Google Analytics",
     icon: GA4Icon,
     description: "Website traffic & engagement (GA4)",
-    color: "text-amber-400",
+    color: "text-emerald-400",
   },
   {
     key: "instagram",
@@ -44,7 +44,7 @@ const tabs: TabConfig[] = [
     label: "Mailchimp Analytics",
     icon: MailchimpIcon,
     description: "Email campaigns & subscribers",
-    color: "text-yellow-300",
+    color: "text-yellow-400",
   },
 ]
 

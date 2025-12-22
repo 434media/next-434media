@@ -337,38 +337,40 @@ export function MailchimpMetricsOverview({
   ]
 
   return (
-    <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-      {metrics.map((metric) => (
-        <div
-          key={metric.title}
-          className="relative overflow-hidden rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:shadow-md"
-        >
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <metric.icon className="h-4 w-4 text-neutral-400" />
-              {metric.badge && (
-                <div className="flex-shrink-0">
-                  {metric.badge}
-                </div>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-bold text-neutral-900">
-                {metric.value}
-              </span>
-              {metric.subValue && (
-                <span className="text-xs text-neutral-500">
-                  ({metric.subValue})
+    <div className="overflow-hidden w-full max-w-full">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        {metrics.map((metric) => (
+          <div
+            key={metric.title}
+            className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4 transition-all hover:bg-white/10"
+          >
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <metric.icon className="h-4 w-4 text-yellow-400" />
+                {metric.badge && (
+                  <div className="flex-shrink-0">
+                    {metric.badge}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg sm:text-xl font-bold text-white">
+                  {metric.value}
                 </span>
-              )}
+                {metric.subValue && (
+                  <span className="text-[10px] sm:text-xs text-white/50">
+                    ({metric.subValue})
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] sm:text-xs font-medium text-white/70 mt-1">
+                {metric.title}
+              </span>
+              <p className="mt-1 text-[10px] sm:text-xs text-white/40 hidden sm:block">{metric.description}</p>
             </div>
-            <span className="text-xs font-medium text-neutral-600 mt-1">
-              {metric.title}
-            </span>
-            <p className="mt-1 text-xs text-neutral-400">{metric.description}</p>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
