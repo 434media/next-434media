@@ -455,16 +455,32 @@ export default function InstagramAnalyticsClientPage() {
   // Handle account change
   const handleAccountChange = (accountId: string) => {
     setSelectedAccount(accountId)
-    // Note: Currently only txmx is connected. Other accounts would need their own API routes.
+  }
+
+  // Get the API route for the selected account
+  const getApiRoute = () => {
+    switch (selectedAccount) {
+      case "vemos":
+        return "/api/instagram/vemos"
+      case "milcity":
+        return "/api/instagram/milcity"
+      case "ampd":
+        return "/api/instagram/ampd"
+      case "txmx":
+      default:
+        return "/api/instagram/txmx"
+    }
   }
 
   const loadInstagramData = async () => {
     setIsLoading(true)
     setError(null)
+    
+    const apiRoute = getApiRoute()
 
     try {
       // Test connection first
-      const connectionResponse = await fetch("/api/instagram/txmx?endpoint=test-connection")
+      const connectionResponse = await fetch(`${apiRoute}?endpoint=test-connection`)
       if (!connectionResponse.ok) {
         if (connectionResponse.status === 401) {
           window.location.href = "/admin"
@@ -495,9 +511,9 @@ export default function InstagramAnalyticsClientPage() {
 
       // Fetch data with individual error handling - don't fail entirely if one request fails
       const [accountRes, insightsRes, mediaRes] = await Promise.all([
-        fetch("/api/instagram/txmx?endpoint=account-info").catch(() => null),
-        fetch(`/api/instagram/txmx?endpoint=insights&startDate=${startDate}&endDate=${endDate}`).catch(() => null),
-        fetch("/api/instagram/txmx?endpoint=media").catch(() => null),
+        fetch(`${apiRoute}?endpoint=account-info`).catch(() => null),
+        fetch(`${apiRoute}?endpoint=insights&startDate=${startDate}&endDate=${endDate}`).catch(() => null),
+        fetch(`${apiRoute}?endpoint=media`).catch(() => null),
       ])
 
       // Process account data
@@ -537,7 +553,7 @@ export default function InstagramAnalyticsClientPage() {
               permalink: media.permalink,
               caption: media.caption || "",
               timestamp: media.timestamp,
-              username: accountData?.username || "txmxboxing",
+              username: accountData?.username || selectedAccount,
               like_count: media.like_count || 0,
               comments_count: media.comments_count || 0,
               insights: {
@@ -568,7 +584,7 @@ export default function InstagramAnalyticsClientPage() {
       // Fetch reach breakdown by media type
       try {
         const reachStartDate = getStartDateForRange(dateRange)
-        const reachBreakdownRes = await fetch(`/api/instagram/txmx?endpoint=reach-breakdown&startDate=${reachStartDate}&endDate=today&debug=true`)
+        const reachBreakdownRes = await fetch(`${apiRoute}?endpoint=reach-breakdown&startDate=${reachStartDate}&endDate=today&debug=true`)
         console.log("[ReachBreakdown] Fetching for range:", reachStartDate)
         if (reachBreakdownRes.ok) {
           const reachBreakdownResult = await reachBreakdownRes.json()

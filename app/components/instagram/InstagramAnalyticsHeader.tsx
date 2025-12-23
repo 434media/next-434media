@@ -16,10 +16,10 @@ import type { InstagramTimeRange, InstagramAccount } from "../../types/instagram
 // Instagram accounts available for selection
 const instagramAccounts = [
   { id: "txmx", label: "TXMX Boxing", value: "txmxboxing", available: true },
-  { id: "vemos", label: "Vemos Vamos", value: "vemosvamos", available: false },
+  { id: "vemos", label: "Vemos Vamos", value: "vemosvamos", available: true },
   { id: "digitalcanvas", label: "Digital Canvas", value: "digitalcanvas", available: false },
-  { id: "ampd", label: "AMPD Project", value: "ampdproject", available: false },
-  { id: "milcity", label: "MilCityUSA", value: "milcityusa", available: false },
+  { id: "ampd", label: "AMPD Project", value: "ampdproject", available: true },
+  { id: "milcity", label: "MilCityUSA", value: "milcityusa", available: true },
 ]
 
 interface InstagramAnalyticsHeaderProps {

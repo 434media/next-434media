@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
 import { Button } from "../../components/analytics/Button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/analytics/Card"
 import { Badge } from "../../components/analytics/Badge"
 
 import { useToast } from "../../hooks/use-toast"

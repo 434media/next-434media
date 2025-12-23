@@ -20,6 +20,37 @@ export const instagramConfig: InstagramAppConfig = {
   ],
 }
 
+// Vemos Vamos Instagram configuration (uses Vemos Vamos Insights App)
+export const vemosInstagramConfig: InstagramAppConfig = {
+  appId: process.env.INSTAGRAM_APP_ID_VEMOS || "",
+  appSecret: process.env.INSTAGRAM_APP_SECRET,
+  accessToken: process.env.INSTAGRAM_ACCESS_TOKEN_VEMOS || "",
+  facebookPageId: process.env.FACEBOOK_PAGE_ID_VEMOS || "",
+  businessAccountId: process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID_VEMOS,
+  webhookVerifyToken: process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN,
+  webhookSecret: process.env.INSTAGRAM_WEBHOOK_SECRET,
+  apiVersion: "v23.0",
+  scopes: [
+    "instagram_basic",
+    "instagram_manage_insights",
+    "instagram_content_publish",
+    "pages_show_list",
+    "pages_read_engagement",
+    "business_management",
+  ],
+}
+
+// Get Instagram config for a specific account
+export function getInstagramConfigForAccount(accountId: string): InstagramAppConfig {
+  switch (accountId) {
+    case "vemos":
+      return vemosInstagramConfig
+    case "txmx":
+    default:
+      return instagramConfig
+  }
+}
+
 // Validate TXMX Instagram configuration
 export function validateInstagramConfig(): InstagramConfigStatus {
   const missingRequired: string[] = []
