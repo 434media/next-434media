@@ -11,6 +11,7 @@ interface ImageUploadProps {
   label: string
   accept?: string
   maxSize?: number // in MB
+  hideUrl?: boolean // Hide the URL display from the UI
 }
 
 export function ImageUpload({ 
@@ -18,7 +19,8 @@ export function ImageUpload({
   onChange, 
   label, 
   accept = "image/*,.gif",
-  maxSize = 10 
+  maxSize = 10,
+  hideUrl = false
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadMethod, setUploadMethod] = useState<"url" | "file">("url")
@@ -144,13 +146,20 @@ export function ImageUpload({
       {/* URL Input */}
       {uploadMethod === "url" && (
         <div className="flex gap-2">
-          <input
-            type="url"
-            value={value}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="https://example.com/image.jpg"
-          />
+          {hideUrl && value ? (
+            <div className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 text-sm flex items-center gap-2">
+              <LinkIcon className="h-4 w-4 text-green-500" />
+              <span>Image URL added</span>
+            </div>
+          ) : (
+            <input
+              type="url"
+              value={value}
+              onChange={(e) => handleUrlChange(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="https://example.com/image.jpg"
+            />
+          )}
           {value && (
             <Button
               type="button"
@@ -226,7 +235,7 @@ export function ImageUpload({
               onError={() => setPreview("")}
             />
           </div>
-          {value && (
+          {value && !hideUrl && (
             <div className="mt-2 p-2 bg-white rounded text-xs text-gray-600 break-all">
               {value}
             </div>

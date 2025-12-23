@@ -1423,6 +1423,7 @@ export default function FeedFormPage() {
                       value={formData.og_image || ""}
                       onChange={(value) => handleInputChange("og_image", value)}
                       label="OG Image (Social Share)"
+                      hideUrl
                     />
                   </div>
                 </div>
@@ -1447,11 +1448,13 @@ export default function FeedFormPage() {
                           value={formData.hero_image_desktop || ""}
                           onChange={(value) => handleInputChange("hero_image_desktop", value)}
                           label="Hero Image Desktop"
+                          hideUrl
                         />
                         <ImageUpload
                           value={formData.hero_image_mobile || ""}
                           onChange={(value) => handleInputChange("hero_image_mobile", value)}
                           label="Hero Image Mobile"
+                          hideUrl
                         />
                       </div>
 
@@ -1469,6 +1472,7 @@ export default function FeedFormPage() {
                         value={formData.founders_note_image || ""}
                         onChange={(value) => handleInputChange("founders_note_image", value)}
                         label="Founder's Note Image"
+                        hideUrl
                       />
                     </div>
                   </CollapsibleSection>
@@ -1489,11 +1493,13 @@ export default function FeedFormPage() {
                           value={formData.last_month_gif || ""}
                           onChange={(value) => handleInputChange("last_month_gif", value)}
                           label="Last Month GIF"
+                          hideUrl
                         />
                         <ImageUpload
                           value={formData.the_drop_gif || ""}
                           onChange={(value) => handleInputChange("the_drop_gif", value)}
                           label="The Drop GIF"
+                          hideUrl
                         />
                       </div>
 
@@ -1517,6 +1523,7 @@ export default function FeedFormPage() {
                             value={formData.featured_post_image || ""}
                             onChange={(value) => handleInputChange("featured_post_image", value)}
                             label="Image"
+                            hideUrl
                           />
                           <div>
                             <label className="block text-sm font-medium mb-2">Content</label>
@@ -1567,11 +1574,13 @@ export default function FeedFormPage() {
                           value={formData.upcoming_event_image_desktop || ""}
                           onChange={(value) => handleInputChange("upcoming_event_image_desktop", value)}
                           label="Event Image Desktop"
+                          hideUrl
                         />
                         <ImageUpload
                           value={formData.upcoming_event_image_mobile || ""}
                           onChange={(value) => handleInputChange("upcoming_event_image_mobile", value)}
                           label="Event Image Mobile"
+                          hideUrl
                         />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 rounded-lg p-4 border border-blue-100">
@@ -1635,6 +1644,7 @@ export default function FeedFormPage() {
                           value={formData[`spotlight_${num}_image` as keyof FeedFormData] as string || ""}
                           onChange={(value) => handleInputChange(`spotlight_${num}_image` as keyof FeedFormData, value)}
                           label="Image"
+                          hideUrl
                         />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
                           <div>
