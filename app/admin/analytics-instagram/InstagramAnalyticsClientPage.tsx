@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { InstagramAnalyticsHeader } from "../../components/instagram/InstagramAnalyticsHeader"
-import { InstagramMetricsOverview } from "../../components/instagram/InstagramMetricsOverview"
+import { InstagramKeyMetrics } from "../../components/instagram/InstagramKeyMetrics"
 import { InstagramTopPostsTable } from "../../components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "../../components/instagram/InstagramAccountInfo"
 import { InstagramDemographics } from "../../components/instagram/InstagramDemographics"
@@ -565,26 +565,13 @@ export default function InstagramAnalyticsClientPage() {
             </div>
           ) : (
             <>
-              {/* Top Posts */}
-              <div className="mb-10 sm:mb-12">
-                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Posts</h2>
-                  <InfoTooltip content="Your most engaging posts ranked by likes, comments, and overall engagement rate. Engagement rate is calculated as (likes + comments) / followers." />
-                </div>
-                <InstagramTopPostsTable
-                  media={mediaData}
-                  followerCount={accountData?.followers_count || 0}
-                  connectionStatus={connectionStatus}
-                />
-              </div>
-
-              {/* Metrics Overview */}
+              {/* Key Metrics - Primary KPIs for Sales & Marketing */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
                   <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
-                  <InfoTooltip content="Instagram insights including reach, profile views, content interactions, and follower growth over the selected time period." />
+                  <InfoTooltip content="Core performance indicators for sales and marketing: audience size, reach, engagement rate, and website conversions." />
                 </div>
-                <InstagramMetricsOverview
+                <InstagramKeyMetrics
                   insights={
                     insightsData || {
                       reach: 0,
@@ -592,10 +579,6 @@ export default function InstagramAnalyticsClientPage() {
                       profile_views: 0,
                       reach_followers: 0,
                       reach_non_followers: 0,
-                      profile_views_followers: 0,
-                      profile_views_non_followers: 0,
-                      content_interactions_followers: 0,
-                      content_interactions_non_followers: 0,
                       website_clicks: 0,
                       follows: 0,
                       unfollows: 0,
@@ -610,7 +593,19 @@ export default function InstagramAnalyticsClientPage() {
                 />
               </div>
 
-              {/* Content Performance & Audience Insights - Two Column Layout */}
+              {/* Audience Demographics */}
+              <div className="mb-10 sm:mb-12">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Audience Demographics</h2>
+                  <InfoTooltip content="Demographics of your engaged audience over the last 90 days, including top countries, cities, and age/gender breakdown." />
+                </div>
+                <InstagramDemographics
+                  demographics={demographicsData}
+                  isLoading={isLoadingSecondary}
+                />
+              </div>
+
+              {/* Content Performance & Best Time - Two Column Layout */}
               <div className="mb-10 sm:mb-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Reach Breakdown by Content Type */}
                 <div>
@@ -638,15 +633,16 @@ export default function InstagramAnalyticsClientPage() {
                 </div>
               </div>
 
-              {/* Audience Demographics */}
+              {/* Top Posts */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Audience Demographics</h2>
-                  <InfoTooltip content="Demographics of your engaged audience over the last 90 days, including top countries, cities, and age/gender breakdown." />
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Posts</h2>
+                  <InfoTooltip content="Your most engaging posts ranked by likes, comments, and overall engagement rate. Engagement rate is calculated as (likes + comments) / followers." />
                 </div>
-                <InstagramDemographics
-                  demographics={demographicsData}
-                  isLoading={isLoadingSecondary}
+                <InstagramTopPostsTable
+                  media={mediaData}
+                  followerCount={accountData?.followers_count || 0}
+                  connectionStatus={connectionStatus}
                 />
               </div>
             </>

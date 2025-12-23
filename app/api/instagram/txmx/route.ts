@@ -465,9 +465,27 @@ export async function GET(request: NextRequest) {
               }
             }
           } else {
-            insightsTotalsNumeric = await fetchTotalsNumeric("day")
-            if (debug) {
-              console.log("[DEBUG][insights] totals day", JSON.stringify(insightsTotalsNumeric?.data || [], null, 2))
+            try {
+              insightsTotalsNumeric = await fetchTotalsNumeric("day")
+              if (debug) {
+                console.log("[DEBUG][insights] totals day raw response:", JSON.stringify(insightsTotalsNumeric, null, 2))
+                // Log the structure of each metric to help debug
+                if (insightsTotalsNumeric?.data) {
+                  for (const m of insightsTotalsNumeric.data) {
+                    console.log(`[DEBUG][insights] metric "${m.name}" structure:`, {
+                      has_total_value: m.total_value !== undefined,
+                      total_value_type: typeof m.total_value,
+                      total_value_value: m.total_value?.value,
+                      has_values_array: Array.isArray(m.values),
+                      values_length: m.values?.length,
+                    })
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("[Instagram API] Failed to fetch totals metrics:", err)
+              // Initialize as empty so fallback logic triggers
+              insightsTotalsNumeric = { data: [] }
             }
           }
 
@@ -490,18 +508,66 @@ export async function GET(request: NextRequest) {
                 until: Math.floor(new Date(c.until).getTime() / 1000).toString(),
               })
               const m = res?.data?.find((d: any) => d.name === 'follows_and_unfollows')
-              if (m?.values) {
-                for (const e of m.values) {
-                  const v = e?.value
-                  if (v && typeof v === 'object') {
-                    aggregatedFollows.follows += typeof v.follows === 'number' ? v.follows : 0
-                    aggregatedFollows.unfollows += typeof v.unfollows === 'number' ? v.unfollows : 0
+              if (m) {
+                // Handle total_value structure (metric_type=total_value response)
+                if (m.total_value !== undefined) {
+                  const tv = m.total_value
+                  // Direct follows/unfollows on total_value object
+                  if (typeof tv.follows === 'number') aggregatedFollows.follows += tv.follows
+                  if (typeof tv.unfollows === 'number') aggregatedFollows.unfollows += tv.unfollows
+                  // Check total_value.value object
+                  if (tv.value && typeof tv.value === 'object') {
+                    if (typeof tv.value.follows === 'number') aggregatedFollows.follows += tv.value.follows
+                    if (typeof tv.value.unfollows === 'number') aggregatedFollows.unfollows += tv.value.unfollows
+                  }
+                  // Check breakdowns
+                  if (tv.breakdowns) {
+                    for (const bd of tv.breakdowns) {
+                      for (const r of (bd.results || [])) {
+                        const val = r.value
+                        if (val && typeof val === 'object') {
+                          if (typeof val.follows === 'number') aggregatedFollows.follows += val.follows
+                          if (typeof val.unfollows === 'number') aggregatedFollows.unfollows += val.unfollows
+                        }
+                      }
+                    }
+                  }
+                }
+                // Fallback to values array structure
+                if (m.values && Array.isArray(m.values)) {
+                  for (const e of m.values) {
+                    const v = e?.value
+                    if (v && typeof v === 'object') {
+                      aggregatedFollows.follows += typeof v.follows === 'number' ? v.follows : 0
+                      aggregatedFollows.unfollows += typeof v.unfollows === 'number' ? v.unfollows : 0
+                    }
                   }
                 }
               }
             }
           } else {
-            insightsTotalsFollows = await fetchTotalsFollows("day")
+            try {
+              insightsTotalsFollows = await fetchTotalsFollows("day")
+              if (debug) {
+                console.log("[DEBUG][insights] follows day raw response:", JSON.stringify(insightsTotalsFollows, null, 2))
+                // Log the structure of the follows metric
+                if (insightsTotalsFollows?.data) {
+                  for (const m of insightsTotalsFollows.data) {
+                    console.log(`[DEBUG][insights] follows metric "${m.name}" structure:`, {
+                      has_total_value: m.total_value !== undefined,
+                      total_value_type: typeof m.total_value,
+                      total_value_content: m.total_value,
+                      has_values_array: Array.isArray(m.values),
+                      values_length: m.values?.length,
+                      first_value: m.values?.[0],
+                    })
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("[Instagram API] Failed to fetch follows metrics:", err)
+              insightsTotalsFollows = { data: [] }
+            }
           }
 
           // Get current follower count
@@ -524,6 +590,7 @@ export async function GET(request: NextRequest) {
           // Helper to safely sum values list (values can be numbers or objects)
           const sumValuesSeries = (metricName: string): number => {
             if (metricName === 'reach' && totalDays > 30) return reachSum
+            if (!insightsTimeSeries?.data) return 0
             const m = insightsTimeSeries.data.find((metric: any) => metric.name === metricName)
             if (!m || !Array.isArray(m.values)) return 0
             return m.values.reduce((sum: number, entry: any) => {
@@ -544,11 +611,32 @@ export async function GET(request: NextRequest) {
             }, 0)
           }
 
-          // Helper for totals response
+          // Helper for totals response - handles both total_value structure AND values array
           const sumValuesTotals = (metricName: string): number => {
             if (aggregatedTotalsNumeric) return aggregatedTotalsNumeric[metricName] || 0
+            if (!insightsTotalsNumeric?.data) return 0
             const m = insightsTotalsNumeric.data.find((metric: any) => metric.name === metricName)
-            if (!m || !Array.isArray(m.values)) return 0
+            if (!m) return 0
+            
+            // Check for total_value structure first (metric_type=total_value response)
+            if (m.total_value !== undefined) {
+              if (typeof m.total_value === 'number') return m.total_value
+              if (m.total_value && typeof m.total_value === 'object') {
+                if (typeof m.total_value.value === 'number') return m.total_value.value
+                // Handle breakdown structure
+                const breakdowns = m.total_value.breakdowns || []
+                let sum = 0
+                for (const bd of breakdowns) {
+                  for (const r of (bd.results || [])) {
+                    if (typeof r.value === 'number') sum += r.value
+                  }
+                }
+                if (sum > 0) return sum
+              }
+            }
+            
+            // Fallback to values array (time-series response)
+            if (!Array.isArray(m.values)) return 0
             return m.values.reduce((sum: number, entry: any) => {
               const val = entry?.value
               if (typeof val === 'number') return sum + val
@@ -570,7 +658,31 @@ export async function GET(request: NextRequest) {
             const result = { followers: 0, non_followers: 0 }
             if (!insightsTotalsNumeric?.data) return result
             const m = insightsTotalsNumeric.data.find((metric: any) => metric.name === metricName)
-            if (!m || !Array.isArray(m.values)) return result
+            if (!m) return result
+            
+            // Check for total_value.breakdowns structure (metric_type=total_value with follow_type breakdown)
+            if (m.total_value?.breakdowns) {
+              for (const bd of m.total_value.breakdowns) {
+                // Check if this breakdown is by follow_type
+                const keys = bd.dimension_keys || []
+                const hasFollowType = keys.includes('follow_type') || keys.includes('follower_type')
+                if (hasFollowType) {
+                  for (const r of (bd.results || [])) {
+                    const dims = r.dimension_values || []
+                    const val = typeof r.value === 'number' ? r.value : 0
+                    for (const d of dims) {
+                      const dUpper = String(d).toUpperCase()
+                      if (dUpper === 'FOLLOWER') result.followers += val
+                      else if (dUpper === 'NON_FOLLOWER') result.non_followers += val
+                    }
+                  }
+                }
+              }
+              if (result.followers > 0 || result.non_followers > 0) return result
+            }
+            
+            // Fallback to values array structure
+            if (!Array.isArray(m.values)) return result
             for (const entry of m.values) {
               const val = entry?.value
               if (val && typeof val === 'object') {
@@ -616,8 +728,44 @@ export async function GET(request: NextRequest) {
 
           // Extract follows / unfollows and growth from follows_and_unfollows metric
           const sumFollowMetric = (field: 'follows' | 'unfollows', source: any = insightsTotalsFollows): number => {
+            if (!source?.data) return 0
             const m = source.data.find((metric: any) => metric.name === "follows_and_unfollows")
-            if (!m || !Array.isArray(m.values)) return 0
+            if (!m) return 0
+            
+            // Check for total_value structure first (metric_type=total_value response)
+            if (m.total_value !== undefined) {
+              const tv = m.total_value
+              // Direct value object with follows/unfollows
+              if (tv && typeof tv === 'object' && typeof tv[field] === 'number') {
+                return tv[field]
+              }
+              // Check in total_value.value object
+              if (tv.value && typeof tv.value === 'object' && typeof tv.value[field] === 'number') {
+                return tv.value[field]
+              }
+              // Sum from breakdowns if present
+              if (tv.breakdowns) {
+                let sum = 0
+                for (const bd of tv.breakdowns) {
+                  for (const r of (bd.results || [])) {
+                    // Check dimension_values for the field name
+                    const dims = r.dimension_values || []
+                    const val = typeof r.value === 'number' ? r.value : 0
+                    for (const d of dims) {
+                      if (String(d).toLowerCase() === field) sum += val
+                    }
+                    // Also check if the result has direct follows/unfollows
+                    if (r.value && typeof r.value === 'object' && typeof r.value[field] === 'number') {
+                      sum += r.value[field]
+                    }
+                  }
+                }
+                if (sum > 0) return sum
+              }
+            }
+            
+            // Fallback to values array structure
+            if (!Array.isArray(m.values)) return 0
             return m.values.reduce((sum: number, entry: any) => {
               const val = entry?.value
               if (val && typeof val === 'object') {
@@ -629,14 +777,26 @@ export async function GET(request: NextRequest) {
           }
           let totalFollows = totalDays > 30 ? aggregatedFollows.follows : sumFollowMetric('follows')
           let totalUnfollows = totalDays > 30 ? aggregatedFollows.unfollows : sumFollowMetric('unfollows')
+          
+          if (debug) {
+            console.log("[DEBUG][insights] totalDays:", totalDays)
+            console.log("[DEBUG][insights] aggregatedFollows:", aggregatedFollows)
+            console.log("[DEBUG][insights] totalFollows before fallback:", totalFollows)
+            console.log("[DEBUG][insights] totalUnfollows before fallback:", totalUnfollows)
+          }
+          
           if (!aggregatedTotalsNumeric && totalFollows === 0 && totalUnfollows === 0) {
             try {
               const fallbackFollows = await fetchTotalsFollows("days_28")
               if (debug) {
-                console.log("[DEBUG][insights] follows_and_unfollows days_28", JSON.stringify(fallbackFollows?.data || [], null, 2))
+                console.log("[DEBUG][insights] follows_and_unfollows days_28 raw:", JSON.stringify(fallbackFollows, null, 2))
               }
               totalFollows = sumFollowMetric('follows', fallbackFollows)
               totalUnfollows = sumFollowMetric('unfollows', fallbackFollows)
+              if (debug) {
+                console.log("[DEBUG][insights] totalFollows after days_28 fallback:", totalFollows)
+                console.log("[DEBUG][insights] totalUnfollows after days_28 fallback:", totalUnfollows)
+              }
             } catch {}
           }
           // Compute net growth from follower_count series if available (last - first)
@@ -727,6 +887,7 @@ export async function GET(request: NextRequest) {
           const instagramAccountId = await resolveInstagramBusinessAccountId()
 
           // Fetch engaged audience demographics (country, city, age/gender)
+          // Note: API uses "breakdown" parameter (singular), not "breakdowns"
           const [countryRes, cityRes, ageGenderRes] = await Promise.all([
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "engaged_audience_demographics",
@@ -734,29 +895,55 @@ export async function GET(request: NextRequest) {
               timeframe: "last_90_days",
               breakdown: "country",
               metric_type: "total_value",
-            }).catch(() => null),
+            }).catch((e) => { console.error("[Demographics] Country fetch error:", e); return null }),
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "engaged_audience_demographics",
               period: "lifetime",
               timeframe: "last_90_days",
               breakdown: "city",
               metric_type: "total_value",
-            }).catch(() => null),
+            }).catch((e) => { console.error("[Demographics] City fetch error:", e); return null }),
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "engaged_audience_demographics",
               period: "lifetime",
               timeframe: "last_90_days",
               breakdown: "age,gender",
               metric_type: "total_value",
-            }).catch(() => null),
+            }).catch((e) => { console.error("[Demographics] Age/Gender fetch error:", e); return null }),
           ])
 
-          // Parse demographics data
+          if (debug) {
+            console.log("[DEBUG][demographics] countryRes:", JSON.stringify(countryRes, null, 2))
+            console.log("[DEBUG][demographics] cityRes:", JSON.stringify(cityRes, null, 2))
+            console.log("[DEBUG][demographics] ageGenderRes:", JSON.stringify(ageGenderRes, null, 2))
+          }
+
+          // Parse demographics data - handle multiple possible response structures
           const parseBreakdownResults = (response: any, dimensionKey: string) => {
-            if (!response?.data?.[0]?.total_value?.breakdowns?.[0]?.results) return []
-            return response.data[0].total_value.breakdowns[0].results
+            if (!response?.data?.[0]) return []
+            const metricData = response.data[0]
+            
+            // Try total_value.breakdowns structure first
+            let results = metricData?.total_value?.breakdowns?.[0]?.results
+            
+            // Fallback to values array structure
+            if (!results && metricData?.values) {
+              results = metricData.values.flatMap((v: any) => {
+                if (v.value && typeof v.value === 'object') {
+                  return Object.entries(v.value).map(([key, val]) => ({
+                    dimension_values: [key],
+                    value: val,
+                  }))
+                }
+                return []
+              })
+            }
+            
+            if (!results || !Array.isArray(results)) return []
+            
+            return results
               .map((r: any) => ({
-                dimension: r.dimension_values?.find((v: string) => v !== "LAST_90_DAYS") || r.dimension_values?.[1] || r.dimension_values?.[0],
+                dimension: r.dimension_values?.find((v: string) => v !== "LAST_90_DAYS" && !v.includes("LAST_")) || r.dimension_values?.[1] || r.dimension_values?.[0],
                 value: r.value || 0,
               }))
               .filter((r: any) => r.dimension && r.value > 0)
@@ -766,13 +953,32 @@ export async function GET(request: NextRequest) {
           const countries = parseBreakdownResults(countryRes, "country")
           const cities = parseBreakdownResults(cityRes, "city")
           
-          // Parse age/gender (comes as combined like "18-24, M")
-          const ageGenderRaw = ageGenderRes?.data?.[0]?.total_value?.breakdowns?.[0]?.results || []
+          if (debug) {
+            console.log("[DEBUG][demographics] parsed countries:", countries.length, countries.slice(0, 3))
+            console.log("[DEBUG][demographics] parsed cities:", cities.length, cities.slice(0, 3))
+          }
+          
+          // Parse age/gender (comes as combined like "18-24, M") - handle multiple response structures
+          let ageGenderRaw = ageGenderRes?.data?.[0]?.total_value?.breakdowns?.[0]?.results || []
+          
+          // Fallback to values array structure
+          if (ageGenderRaw.length === 0 && ageGenderRes?.data?.[0]?.values) {
+            ageGenderRaw = ageGenderRes.data[0].values.flatMap((v: any) => {
+              if (v.value && typeof v.value === 'object') {
+                return Object.entries(v.value).map(([key, val]) => ({
+                  dimension_values: key.split(',').map((s: string) => s.trim()),
+                  value: val,
+                }))
+              }
+              return []
+            })
+          }
+          
           const ageGender = ageGenderRaw
             .map((r: any) => {
               const dims = r.dimension_values || []
               // Filter out timeframe dimension
-              const filtered = dims.filter((d: string) => !d.includes("LAST_"))
+              const filtered = dims.filter((d: string) => d && !String(d).includes("LAST_"))
               return {
                 age: filtered[0] || "Unknown",
                 gender: filtered[1] || "U",
@@ -781,6 +987,10 @@ export async function GET(request: NextRequest) {
             })
             .filter((r: any) => r.value > 0)
             .sort((a: any, b: any) => b.value - a.value)
+          
+          if (debug) {
+            console.log("[DEBUG][demographics] parsed ageGender:", ageGender.length, ageGender.slice(0, 3))
+          }
 
           // Fetch follower demographics if available
           let followerDemographics = null
