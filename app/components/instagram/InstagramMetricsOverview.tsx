@@ -110,9 +110,8 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
   ]
 
   return (
-    <div className="overflow-hidden w-full max-w-full">
-      <div className="relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {metrics.map((metric) => (
             <div
               key={metric.title}
@@ -163,7 +162,6 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
             </div>
           </div>
         )}
-      </div>
     </div>
   )
 }

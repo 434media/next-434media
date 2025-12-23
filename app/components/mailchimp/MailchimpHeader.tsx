@@ -90,9 +90,9 @@ export function MailchimpHeader({
   }
 
   return (
-    <div className="bg-black border-b border-white/10 overflow-hidden w-full max-w-full">
+    <div className="bg-black border-b border-white/10 overflow-x-hidden w-full pt-20">
       {/* Top Row: Title, Audience Info, Actions */}
-      <div className="mx-auto px-3 sm:px-4 max-w-7xl overflow-hidden w-full">
+      <div className="px-3 sm:px-4 lg:px-6 overflow-x-hidden w-full">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">
           {/* Left: Title and Audience Info */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
@@ -140,8 +140,8 @@ export function MailchimpHeader({
       </div>
 
       {/* Bottom Row: Date Range and Download */}
-      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-hidden w-full">
-        <div className="mx-auto px-3 sm:px-4 max-w-7xl py-2 sm:py-3 overflow-hidden w-full">
+      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-x-hidden w-full">
+        <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 overflow-x-hidden w-full">
           <div className="flex flex-col gap-2 sm:gap-3">
             {/* Date Range Options */}
             <div className="flex flex-wrap items-center gap-2">
@@ -214,7 +214,7 @@ export function MailchimpHeader({
             transition={{ duration: 0.2 }}
             className="overflow-hidden border-t border-white/5"
           >
-            <div className="container mx-auto px-4 max-w-7xl py-4">
+            <div className="px-4 lg:px-6 py-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 max-w-xl">
                 <div className="flex-1 space-y-1.5 w-full sm:w-auto">
                   <label className="text-white/60 text-xs font-medium">Start Date</label>

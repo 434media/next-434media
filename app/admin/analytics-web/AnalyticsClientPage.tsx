@@ -607,9 +607,9 @@ export default function AnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black pt-[56px] md:pt-[64px] overflow-hidden w-full max-w-full">
-      {/* Unified Sticky Analytics Header */}
-      <div className="sticky top-[56px] md:top-[64px] z-40 overflow-hidden">
+    <div className="bg-black w-full overflow-x-hidden">
+      {/* Analytics Header */}
+      <div className="w-full overflow-x-hidden">
         <AnalyticsHeader
           onRefresh={handleRefresh}
           onLogout={handleLogout}
@@ -630,8 +630,8 @@ export default function AnalyticsClientPage() {
         />
       </div>
       
-      <div className="py-4 sm:py-6 overflow-hidden w-full">
-        <div className="mx-auto px-3 sm:px-4 max-w-7xl overflow-hidden w-full">
+      <div className="py-4 sm:py-6 w-full overflow-x-hidden">
+        <div className="px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
           {/* Error Display */}
           {error && (
             <div className="mb-4">
@@ -651,7 +651,7 @@ export default function AnalyticsClientPage() {
           {/* Analytics Dashboard - Always show components */}
           <>
             {/* Metrics Overview */}
-            <div className="py-16 md:py-20">
+            <div className="py-6">
               <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
                 <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
                 <InfoTooltip content="High-level overview of your website's performance. Users are unique visitors, Sessions are visits, Page Views are total pages loaded, and Bounce Rate is the percentage of single-page visits." />

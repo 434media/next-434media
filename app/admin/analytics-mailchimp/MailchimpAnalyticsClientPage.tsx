@@ -560,9 +560,9 @@ export default function MailchimpAnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-black pt-16 overflow-hidden w-full max-w-full">
-      {/* Header - with padding to clear fixed navbar */}
-      <div className="border-b border-white/10 overflow-hidden">
+    <div className="bg-black w-full overflow-x-hidden">
+      {/* Header */}
+      <div className="border-b border-white/10 w-full overflow-x-hidden">
         <MailchimpHeader
           isLoading={isLoading}
           onRefresh={fetchAllData}
@@ -577,7 +577,7 @@ export default function MailchimpAnalyticsClientPage() {
       </div>
 
       {/* Main Content */}
-      <div ref={contentRef} className="mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-8 sm:space-y-10 max-w-7xl overflow-hidden w-full">
+      <div ref={contentRef} className="px-3 sm:px-4 lg:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10 w-full overflow-x-hidden">
         {/* Metrics Overview */}
         <div>
           <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">

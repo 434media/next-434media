@@ -5,12 +5,18 @@ import { InstagramAnalyticsHeader } from "../../components/instagram/InstagramAn
 import { InstagramMetricsOverview } from "../../components/instagram/InstagramMetricsOverview"
 import { InstagramTopPostsTable } from "../../components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "../../components/instagram/InstagramAccountInfo"
+import { InstagramDemographics } from "../../components/instagram/InstagramDemographics"
+import { InstagramBestTimeToPost } from "../../components/instagram/InstagramBestTimeToPost"
+import { InstagramReachBreakdown } from "../../components/instagram/InstagramReachBreakdown"
 import { InfoTooltip } from "../../components/analytics/InfoTooltip"
 import type {
   InstagramTimeRange,
   InstagramAccount,
   InstagramMedia,
   InstagramMediaInsights,
+  InstagramDemographics as InstagramDemographicsType,
+  InstagramOnlineFollowers,
+  InstagramReachBreakdown as InstagramReachBreakdownType,
 } from "../../types/instagram-insights"
 
 interface InstagramInsightsData {
@@ -279,11 +285,24 @@ export default function InstagramAnalyticsClientPage() {
     message?: string
     account?: any
   } | null>(null)
+  
+  // New analytics data states
+  const [demographicsData, setDemographicsData] = useState<InstagramDemographicsType | null>(null)
+  const [onlineFollowersData, setOnlineFollowersData] = useState<InstagramOnlineFollowers | null>(null)
+  const [reachBreakdownData, setReachBreakdownData] = useState<InstagramReachBreakdownType | null>(null)
+  const [isLoadingSecondary, setIsLoadingSecondary] = useState(false)
 
   // Load Instagram data on component mount and when date range changes
   useEffect(() => {
     loadInstagramData()
   }, [dateRange])
+  
+  // Load secondary data (demographics, online followers) - less frequently needed
+  useEffect(() => {
+    if (connectionStatus?.success) {
+      loadSecondaryData()
+    }
+  }, [connectionStatus?.success])
 
   const loadInstagramData = async () => {
     setIsLoading(true)
@@ -298,13 +317,20 @@ export default function InstagramAnalyticsClientPage() {
           return
         }
         // Try to surface server error details if available
+        let errorMessage = "Failed to connect to Instagram API"
         try {
           const errJson = await connectionResponse.json()
-          const message = errJson?.error || errJson?.details || "Failed to connect to Instagram API"
-          throw new Error(message)
+          errorMessage = errJson?.details || errJson?.error || errorMessage
+          if (errJson?.missingVariables?.length) {
+            errorMessage += `. Missing: ${errJson.missingVariables.join(", ")}`
+          }
+          if (errJson?.missingPermissions?.length) {
+            errorMessage += `. Missing permissions: ${errJson.missingPermissions.join(", ")}`
+          }
         } catch {
-          throw new Error("Failed to connect to Instagram API")
+          // JSON parsing failed, use default message
         }
+        throw new Error(errorMessage)
       }
       const connectionData = await connectionResponse.json()
       setConnectionStatus(connectionData)
@@ -313,69 +339,128 @@ export default function InstagramAnalyticsClientPage() {
       const startDate = getStartDateForRange(dateRange)
       const endDate = "today"
 
+      // Fetch data with individual error handling - don't fail entirely if one request fails
       const [accountRes, insightsRes, mediaRes] = await Promise.all([
-        fetch("/api/instagram/txmx?endpoint=account-info"),
-        fetch(`/api/instagram/txmx?endpoint=insights&startDate=${startDate}&endDate=${endDate}`),
-        fetch("/api/instagram/txmx?endpoint=media"),
+        fetch("/api/instagram/txmx?endpoint=account-info").catch(() => null),
+        fetch(`/api/instagram/txmx?endpoint=insights&startDate=${startDate}&endDate=${endDate}`).catch(() => null),
+        fetch("/api/instagram/txmx?endpoint=media").catch(() => null),
       ])
 
-      const [accountResult, insightsResult, mediaResult] = await Promise.all([
-        (async () => {
-          if (!accountRes.ok) throw new Error((await accountRes.json()).details || "Failed to fetch account info")
-          return accountRes.json()
-        })(),
-        (async () => {
-          if (!insightsRes.ok) throw new Error((await insightsRes.json()).details || "Failed to fetch insights")
-          return insightsRes.json()
-        })(),
-        (async () => {
-          if (!mediaRes.ok) throw new Error((await mediaRes.json()).details || "Failed to fetch media")
-          return mediaRes.json()
-        })(),
-      ])
-
-      if (accountResult.data) {
-        setAccountData(accountResult.data)
+      // Process account data
+      if (accountRes?.ok) {
+        try {
+          const accountResult = await accountRes.json()
+          if (accountResult.data) {
+            setAccountData(accountResult.data)
+          }
+        } catch {
+          console.warn("Failed to parse account data")
+        }
       }
 
-      if (insightsResult.data) {
-        setInsightsData(insightsResult.data)
+      // Process insights data
+      if (insightsRes?.ok) {
+        try {
+          const insightsResult = await insightsRes.json()
+          if (insightsResult.data) {
+            setInsightsData(insightsResult.data)
+          }
+        } catch {
+          console.warn("Failed to parse insights data")
+        }
       }
 
-      if (mediaResult.data) {
-        const transformedMedia: InstagramMediaWithInsights[] = (mediaResult.data || []).map((media: any) => ({
-          id: media.id,
-          media_type: media.media_type,
-          media_url: media.media_url,
-          thumbnail_url: media.thumbnail_url,
-          permalink: media.permalink,
-          caption: media.caption || "",
-          timestamp: media.timestamp,
-          username: accountResult.data?.username || "txmxboxing", // Use fetched account username
-          like_count: media.like_count || 0,
-          comments_count: media.comments_count || 0,
-          insights: {
-            mediaId: media.id,
-            impressions: media.insights?.impressions || 0,
-            reach: media.insights?.reach || 0,
-            engagement: media.insights?.engagement || 0,
-            likes: media.like_count || 0,
-            comments: media.comments_count || 0,
-            shares: media.insights?.shares || 0,
-            saves: media.insights?.saves || 0,
-            videoViews: media.insights?.video_views || 0,
-            _source: "instagram_api",
-          },
-          engagement_rate: media.engagement_rate || 0,
-          hashtags: media.hashtags || [],
-        }))
-        setMediaData(transformedMedia)
+      // Process media data
+      if (mediaRes?.ok) {
+        try {
+          const mediaResult = await mediaRes.json()
+          if (mediaResult.data) {
+            const transformedMedia: InstagramMediaWithInsights[] = (mediaResult.data || []).map((media: any) => ({
+              id: media.id,
+              media_type: media.media_type,
+              media_url: media.media_url,
+              thumbnail_url: media.thumbnail_url,
+              permalink: media.permalink,
+              caption: media.caption || "",
+              timestamp: media.timestamp,
+              username: accountData?.username || "txmxboxing",
+              like_count: media.like_count || 0,
+              comments_count: media.comments_count || 0,
+              insights: {
+                mediaId: media.id,
+                impressions: media.insights?.impressions || 0,
+                reach: media.insights?.reach || 0,
+                engagement: media.insights?.engagement || 0,
+                likes: media.like_count || 0,
+                comments: media.comments_count || 0,
+                shares: media.insights?.shares || 0,
+                saves: media.insights?.saves || 0,
+                videoViews: media.insights?.video_views || 0,
+                _source: "instagram_api",
+              },
+              engagement_rate: media.engagement_rate || 0,
+              hashtags: media.hashtags || [],
+            }))
+            setMediaData(transformedMedia)
+          }
+        } catch {
+          console.warn("Failed to parse media data")
+        }
+      } else if (mediaRes && !mediaRes.ok) {
+        // Log media fetch failure but don't throw - other data may still be useful
+        console.warn("Media fetch returned error, continuing with other data")
+      }
+      
+      // Fetch reach breakdown by media type
+      try {
+        const reachStartDate = getStartDateForRange(dateRange)
+        const reachBreakdownRes = await fetch(`/api/instagram/txmx?endpoint=reach-breakdown&startDate=${reachStartDate}&endDate=today`)
+        if (reachBreakdownRes.ok) {
+          const reachBreakdownResult = await reachBreakdownRes.json()
+          if (reachBreakdownResult.data) {
+            setReachBreakdownData(reachBreakdownResult.data)
+          }
+        }
+      } catch {
+        // Reach breakdown is optional
       }
     } catch (err) {
       console.error("Error loading Instagram data:", err)
       setError(err instanceof Error ? err.message : "Failed to load Instagram data")
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  // Load secondary data that doesn't need to refresh with date range
+  const loadSecondaryData = async () => {
+    setIsLoadingSecondary(true)
+    
+    try {
+      // Fetch demographics and online followers in parallel
+      const [demographicsRes, onlineFollowersRes] = await Promise.all([
+        fetch("/api/instagram/txmx?endpoint=demographics").catch(() => null),
+        fetch("/api/instagram/txmx?endpoint=online-followers").catch(() => null),
+      ])
+      
+      if (demographicsRes?.ok) {
+        const demographicsResult = await demographicsRes.json()
+        if (demographicsResult.data) {
+          setDemographicsData(demographicsResult.data)
+        }
+      }
+      
+      if (onlineFollowersRes?.ok) {
+        const onlineFollowersResult = await onlineFollowersRes.json()
+        if (onlineFollowersResult.data) {
+          setOnlineFollowersData(onlineFollowersResult.data)
+        }
+      }
+    } catch (err) {
+      // Secondary data is optional, don't show error
+      console.warn("Failed to load secondary Instagram data:", err)
+    } finally {
+      setIsLoadingSecondary(false)
     }
   }
 
@@ -393,9 +478,25 @@ export default function InstagramAnalyticsClientPage() {
         return "30daysAgo"
     }
   }
+  
+  const getDateRangeLabel = (range: InstagramTimeRange): string => {
+    switch (range) {
+      case "1d":
+        return "Last 24 hours"
+      case "7d":
+        return "Last 7 days"
+      case "30d":
+        return "Last 30 days"
+      case "90d":
+        return "Last 90 days"
+      default:
+        return "Selected period"
+    }
+  }
 
   const handleRefresh = () => {
     loadInstagramData()
+    loadSecondaryData()
   }
 
   const handleLogout = async () => {
@@ -412,9 +513,9 @@ export default function InstagramAnalyticsClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black pt-[56px] md:pt-[64px] overflow-hidden w-full max-w-full">
-      {/* Unified Sticky Instagram Header */}
-      <div className="sticky top-[56px] md:top-[64px] z-40 overflow-hidden">
+    <div className="bg-black w-full overflow-x-hidden">
+      {/* Instagram Header */}
+      <div className="w-full overflow-x-hidden">
         <InstagramAnalyticsHeader
           onRefresh={handleRefresh}
           onLogout={handleLogout}
@@ -428,8 +529,8 @@ export default function InstagramAnalyticsClientPage() {
         />
       </div>
 
-      <div className="py-4 sm:py-6 overflow-hidden w-full">
-        <div className="mx-auto px-3 sm:px-4 max-w-7xl overflow-hidden w-full">
+      <div className="py-4 sm:py-6 w-full overflow-x-hidden">
+        <div className="px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
           {/* Error Display */}
           {error && (
             <div className="mb-4">
@@ -506,6 +607,46 @@ export default function InstagramAnalyticsClientPage() {
                   }
                   dateRange={dateRange}
                   connectionStatus={connectionStatus}
+                />
+              </div>
+
+              {/* Content Performance & Audience Insights - Two Column Layout */}
+              <div className="mb-10 sm:mb-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Reach Breakdown by Content Type */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <h2 className="text-sm sm:text-lg font-semibold text-white">Content Performance</h2>
+                    <InfoTooltip content="See how your reach is distributed across different content types: Feed posts, Reels, Stories, and Promoted content." />
+                  </div>
+                  <InstagramReachBreakdown
+                    breakdown={reachBreakdownData}
+                    isLoading={isLoading}
+                    dateRange={getDateRangeLabel(dateRange)}
+                  />
+                </div>
+
+                {/* Best Time to Post */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <h2 className="text-sm sm:text-lg font-semibold text-white">Best Time to Post</h2>
+                    <InfoTooltip content="Shows when your followers are most active online. Post 30-60 minutes before peak times for best reach." />
+                  </div>
+                  <InstagramBestTimeToPost
+                    onlineFollowers={onlineFollowersData}
+                    isLoading={isLoadingSecondary}
+                  />
+                </div>
+              </div>
+
+              {/* Audience Demographics */}
+              <div className="mb-10 sm:mb-12">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Audience Demographics</h2>
+                  <InfoTooltip content="Demographics of your engaged audience over the last 90 days, including top countries, cities, and age/gender breakdown." />
+                </div>
+                <InstagramDemographics
+                  demographics={demographicsData}
+                  isLoading={isLoadingSecondary}
                 />
               </div>
             </>

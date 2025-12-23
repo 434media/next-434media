@@ -99,7 +99,7 @@ export default function UnifiedAnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 text-neutral-900">
+    <div className="min-h-screen text-neutral-900">
       {/* Mobile Tab Bar - Fixed at bottom on mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-black border-t border-white/10 safe-area-pb">
         <nav className="flex justify-around py-1.5">
@@ -170,7 +170,7 @@ export default function UnifiedAnalyticsPage() {
         </aside>
 
         {/* Content */}
-        <main className="flex-1 pb-16 md:pb-0">
+        <main className="flex-1 pb-16 md:pb-0 overflow-x-hidden">
           {/* Animating tab transitions */}
           <motion.div
             key={activeTab}
@@ -178,6 +178,7 @@ export default function UnifiedAnalyticsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
+            className="overflow-x-hidden"
           >
             {ActiveComponent}
           </motion.div>

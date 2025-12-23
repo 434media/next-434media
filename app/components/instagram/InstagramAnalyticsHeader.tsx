@@ -1,15 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "motion/react"
 import { Button } from "../analytics/Button"
 import { 
   RefreshCw, 
   LogOut, 
   Loader2, 
-  ChevronDown, 
   Calendar,
-  CalendarDays,
   FileText,
   Image,
   Instagram
@@ -56,9 +52,9 @@ export function InstagramAnalyticsHeader({
   const isConnected = connectionStatus?.success
 
   return (
-    <div className="bg-black border-b border-white/10 overflow-hidden w-full max-w-full">
+    <div className="bg-black border-b border-white/10 pt-20 overflow-x-hidden">
       {/* Top Row: Title, Account Info, Actions */}
-      <div className="mx-auto px-3 sm:px-4 max-w-7xl overflow-hidden w-full">
+      <div className="px-3 sm:px-4 lg:px-6 overflow-x-hidden">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">
           {/* Left: Title and Account */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
@@ -122,8 +118,8 @@ export function InstagramAnalyticsHeader({
       </div>
 
       {/* Bottom Row: Date Range and Download */}
-      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-hidden w-full">
-        <div className="mx-auto px-3 sm:px-4 max-w-7xl py-2 sm:py-3 overflow-hidden w-full">
+      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-x-hidden">
+        <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 overflow-x-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
             {/* Date Range Options - Wrap on mobile */}
             <div className="flex flex-wrap items-center gap-2">

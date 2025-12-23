@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "../../../lib/auth"
-import { validateInstagramConfig, getInstagramConfigurationStatus } from "../../../lib/instagram-config"
+import { getInstagramConfigurationStatus } from "../../../lib/instagram-config"
 import { calculateEngagementRate, extractHashtags } from "../../../lib/instagram-utils"
 
 // Helper function to convert relative dates to YYYY-MM-DD format
@@ -36,7 +36,21 @@ function formatDateForInstagram(dateString: string): string {
   }
 }
 
-async function fetchInstagramData(endpoint: string, accessToken: string, params: Record<string, string> = {}) {
+// Retry configuration for transient failures
+const MAX_RETRIES = 3
+const INITIAL_RETRY_DELAY = 1000 // 1 second
+const FETCH_TIMEOUT = 30000 // 30 seconds
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchInstagramData(
+  endpoint: string,
+  accessToken: string,
+  params: Record<string, string> = {},
+  retries = MAX_RETRIES
+): Promise<any> {
   const url = new URL(`https://graph.facebook.com/v23.0/${endpoint}`)
 
   // Add access token
@@ -49,14 +63,61 @@ async function fetchInstagramData(endpoint: string, accessToken: string, params:
 
   console.log(`[Instagram API] Fetching: ${url.toString().replace(accessToken, "HIDDEN_TOKEN")}`)
 
-  const response = await fetch(url.toString())
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // Create abort controller for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(`Instagram API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        
+        // Check for rate limiting
+        if (response.status === 429) {
+          if (attempt < retries) {
+            const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1)
+            console.log(`[Instagram API] Rate limited, retrying in ${delay}ms (attempt ${attempt}/${retries})`)
+            await sleep(delay)
+            continue
+          }
+        }
+        
+        throw new Error(`Instagram API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      const isTimeout =
+        error instanceof Error &&
+        (error.name === "AbortError" ||
+          error.message.includes("timeout") ||
+          error.message.includes("ETIMEDOUT") ||
+          error.message.includes("UND_ERR_CONNECT_TIMEOUT"))
+      
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.includes("fetch failed") ||
+          error.message.includes("ECONNREFUSED") ||
+          error.message.includes("ENOTFOUND"))
+
+      if ((isTimeout || isNetworkError) && attempt < retries) {
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1)
+        console.log(`[Instagram API] Network error, retrying in ${delay}ms (attempt ${attempt}/${retries}): ${error instanceof Error ? error.message : error}`)
+        await sleep(delay)
+        continue
+      }
+
+      throw error
+    }
   }
 
-  return response.json()
+  throw new Error("Max retries exceeded")
 }
 
 export async function GET(request: NextRequest) {
@@ -76,7 +137,7 @@ export async function GET(request: NextRequest) {
       facebookPageId: configStatus.facebookPageId ? "Present" : "Missing",
     })
 
-    if (!validateInstagramConfig()) {
+    if (!configStatus.configured) {
       console.error("[Instagram API] Configuration validation failed")
 
       // Get missing variables from environment check
@@ -660,6 +721,205 @@ export async function GET(request: NextRequest) {
           )
         }
 
+      case "demographics":
+        console.log("[Instagram API] Fetching demographics...")
+        try {
+          const instagramAccountId = await resolveInstagramBusinessAccountId()
+
+          // Fetch engaged audience demographics (country, city, age/gender)
+          const [countryRes, cityRes, ageGenderRes] = await Promise.all([
+            fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
+              metric: "engaged_audience_demographics",
+              period: "lifetime",
+              timeframe: "last_90_days",
+              breakdown: "country",
+              metric_type: "total_value",
+            }).catch(() => null),
+            fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
+              metric: "engaged_audience_demographics",
+              period: "lifetime",
+              timeframe: "last_90_days",
+              breakdown: "city",
+              metric_type: "total_value",
+            }).catch(() => null),
+            fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
+              metric: "engaged_audience_demographics",
+              period: "lifetime",
+              timeframe: "last_90_days",
+              breakdown: "age,gender",
+              metric_type: "total_value",
+            }).catch(() => null),
+          ])
+
+          // Parse demographics data
+          const parseBreakdownResults = (response: any, dimensionKey: string) => {
+            if (!response?.data?.[0]?.total_value?.breakdowns?.[0]?.results) return []
+            return response.data[0].total_value.breakdowns[0].results
+              .map((r: any) => ({
+                dimension: r.dimension_values?.find((v: string) => v !== "LAST_90_DAYS") || r.dimension_values?.[1] || r.dimension_values?.[0],
+                value: r.value || 0,
+              }))
+              .filter((r: any) => r.dimension && r.value > 0)
+              .sort((a: any, b: any) => b.value - a.value)
+          }
+
+          const countries = parseBreakdownResults(countryRes, "country")
+          const cities = parseBreakdownResults(cityRes, "city")
+          
+          // Parse age/gender (comes as combined like "18-24, M")
+          const ageGenderRaw = ageGenderRes?.data?.[0]?.total_value?.breakdowns?.[0]?.results || []
+          const ageGender = ageGenderRaw
+            .map((r: any) => {
+              const dims = r.dimension_values || []
+              // Filter out timeframe dimension
+              const filtered = dims.filter((d: string) => !d.includes("LAST_"))
+              return {
+                age: filtered[0] || "Unknown",
+                gender: filtered[1] || "U",
+                value: r.value || 0,
+              }
+            })
+            .filter((r: any) => r.value > 0)
+            .sort((a: any, b: any) => b.value - a.value)
+
+          // Fetch follower demographics if available
+          let followerDemographics = null
+          try {
+            const followerRes = await fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
+              metric: "follower_demographics",
+              period: "lifetime",
+              timeframe: "last_90_days",
+              breakdown: "country",
+              metric_type: "total_value",
+            })
+            if (followerRes?.data?.[0]?.total_value?.breakdowns?.[0]?.results) {
+              followerDemographics = {
+                countries: parseBreakdownResults(followerRes, "country"),
+              }
+            }
+          } catch {
+            // Follower demographics may not be available for all accounts
+          }
+
+          return NextResponse.json({
+            success: true,
+            data: {
+              engaged_audience: {
+                countries: countries.slice(0, 15),
+                cities: cities.slice(0, 15),
+                age_gender: ageGender.slice(0, 20),
+              },
+              follower_demographics: followerDemographics,
+            },
+            period: "last_90_days",
+            timestamp: new Date().toISOString(),
+          })
+        } catch (error) {
+          console.error("[Instagram API] Demographics fetch failed:", error)
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Failed to fetch demographics",
+              details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 },
+          )
+        }
+
+      case "online-followers":
+        console.log("[Instagram API] Fetching online followers...")
+        try {
+          const instagramAccountId = await resolveInstagramBusinessAccountId()
+
+          const onlineRes = await fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
+            metric: "online_followers",
+            period: "lifetime",
+          })
+
+          // Parse online followers by hour
+          const onlineFollowers = onlineRes?.data?.[0]?.values?.[0]?.value || {}
+          const hourlyData = Object.entries(onlineFollowers)
+            .map(([hour, count]) => ({
+              hour: parseInt(hour, 10),
+              count: count as number,
+            }))
+            .sort((a, b) => a.hour - b.hour)
+
+          // Find best times (top 3 hours)
+          const bestTimes = [...hourlyData]
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3)
+            .map((t) => t.hour)
+
+          return NextResponse.json({
+            success: true,
+            data: {
+              hourly: hourlyData,
+              best_times: bestTimes,
+              timezone: "UTC", // Note: IG returns in account timezone
+            },
+            timestamp: new Date().toISOString(),
+          })
+        } catch (error) {
+          console.error("[Instagram API] Online followers fetch failed:", error)
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Failed to fetch online followers data",
+              details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 },
+          )
+        }
+
+      case "reach-breakdown":
+        console.log("[Instagram API] Fetching reach breakdown by media type...")
+        try {
+          const instagramAccountId = await resolveInstagramBusinessAccountId()
+
+          const reachBreakdown = await fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
+            metric: "reach",
+            period: "day",
+            breakdown: "media_product_type",
+            metric_type: "total_value",
+            since: sinceTs,
+            until: untilTs,
+          })
+
+          // Parse by media type
+          const mediaTypeBreakdown: Record<string, number> = {
+            FEED: 0,
+            REELS: 0,
+            STORY: 0,
+            AD: 0,
+          }
+
+          const results = reachBreakdown?.data?.[0]?.total_value?.breakdowns?.[0]?.results || []
+          results.forEach((r: any) => {
+            const type = r.dimension_values?.[0]
+            if (type && mediaTypeBreakdown.hasOwnProperty(type)) {
+              mediaTypeBreakdown[type] = r.value || 0
+            }
+          })
+
+          return NextResponse.json({
+            success: true,
+            data: mediaTypeBreakdown,
+            period: { startDate, endDate },
+            timestamp: new Date().toISOString(),
+          })
+        } catch (error) {
+          console.error("[Instagram API] Reach breakdown fetch failed:", error)
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Failed to fetch reach breakdown",
+              details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 },
+          )
+        }
+
   case "media":
       case "posts":
         console.log("[Instagram API] Fetching media...")
@@ -723,37 +983,42 @@ export async function GET(request: NextRequest) {
           })
 
           // Fallback: For any media missing reach/impressions, fetch individually
-          const needsFallback = mediaWithInsights.filter((m: any) => !m.insights || (m.insights.impressions === 0 && m.insights.reach === 0))
+          // Limit to first 5 to avoid rate limiting and timeouts
+          const needsFallback = mediaWithInsights
+            .filter((m: any) => !m.insights || (m.insights.impressions === 0 && m.insights.reach === 0))
+            .slice(0, 5)
+          
           if (needsFallback.length) {
-            await Promise.all(
-              needsFallback.map(async (m: any) => {
-                try {
-                  const per = await fetchInstagramData(`${m.id}/insights`, accessToken, {
-                    metric: "impressions,reach,total_interactions,shares,saved",
-                    period: "lifetime",
+            // Fetch sequentially to avoid overwhelming the connection
+            for (const m of needsFallback) {
+              try {
+                const per = await fetchInstagramData(`${m.id}/insights`, accessToken, {
+                  metric: "impressions,reach,total_interactions,shares,saved",
+                  period: "lifetime",
+                }, 2) // Reduce retries for fallback
+                if (debug) {
+                  console.log("[DEBUG][media] per-media insights", m.id, JSON.stringify(per?.data || [], null, 2))
+                }
+                if (Array.isArray(per?.data)) {
+                  const map: Record<string, number> = {}
+                  per.data.forEach((d: any) => {
+                    const v = d?.values?.[0]?.value
+                    map[d.name] = typeof v === 'number' ? v : 0
                   })
-                  if (debug) {
-                    console.log("[DEBUG][media] per-media insights", m.id, JSON.stringify(per?.data || [], null, 2))
-                  }
-                  if (Array.isArray(per?.data)) {
-                    const map: Record<string, number> = {}
-                    per.data.forEach((d: any) => {
-                      const v = d?.values?.[0]?.value
-                      map[d.name] = typeof v === 'number' ? v : 0
-                    })
-                    m.insights.impressions = map.impressions || m.insights.impressions
-                    m.insights.reach = map.reach || m.insights.reach
-                    m.insights.engagement = map.total_interactions || m.insights.engagement
-                    m.insights.shares = map.shares || m.insights.shares
-                    m.insights.saves = (map as any).saved || m.insights.saves
-                    m.engagement_rate = calculateEngagementRate(
-                      (m.like_count || 0) + (m.comments_count || 0),
-                      m.insights.reach || 1,
-                    )
-                  }
-                } catch {}
-              })
-            )
+                  m.insights.impressions = map.impressions || m.insights.impressions
+                  m.insights.reach = map.reach || m.insights.reach
+                  m.insights.engagement = map.total_interactions || m.insights.engagement
+                  m.insights.shares = map.shares || m.insights.shares
+                  m.insights.saves = (map as any).saved || m.insights.saves
+                  m.engagement_rate = calculateEngagementRate(
+                    (m.like_count || 0) + (m.comments_count || 0),
+                    m.insights.reach || 1,
+                  )
+                }
+              } catch (err) {
+                console.warn(`[Instagram API] Failed to fetch insights for media ${m.id}:`, err)
+              }
+            }
           }
 
           return NextResponse.json({

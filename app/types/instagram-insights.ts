@@ -113,6 +113,33 @@ export interface InstagramInsightsResponse {
   _source: string
 }
 
+// Demographics Types
+export interface InstagramDemographics {
+  engaged_audience: {
+    countries: Array<{ dimension: string; value: number }>
+    cities: Array<{ dimension: string; value: number }>
+    age_gender: Array<{ age: string; gender: string; value: number }>
+  }
+  follower_demographics?: {
+    countries: Array<{ dimension: string; value: number }>
+  } | null
+}
+
+// Online Followers (Best Time to Post)
+export interface InstagramOnlineFollowers {
+  hourly: Array<{ hour: number; count: number }>
+  best_times: number[]
+  timezone: string
+}
+
+// Reach Breakdown by Media Type
+export interface InstagramReachBreakdown {
+  FEED: number
+  REELS: number
+  STORY: number
+  AD: number
+}
+
 export interface InstagramAccountResponse {
   data: InstagramAccount
   error?: {
