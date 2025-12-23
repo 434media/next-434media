@@ -15,11 +15,11 @@ import type { InstagramTimeRange, InstagramAccount } from "../../types/instagram
 
 // Instagram accounts available for selection
 const instagramAccounts = [
-  { id: "txmx", label: "TXMX Boxing", value: "txmxboxing" },
-  { id: "vemos", label: "Vemos Vamos", value: "vemosvamos" },
-  { id: "digitalcanvas", label: "Digital Canvas", value: "digitalcanvas" },
-  { id: "ampd", label: "AMPD Project", value: "ampdproject" },
-  { id: "milcity", label: "MilCityUSA", value: "milcityusa" },
+  { id: "txmx", label: "TXMX Boxing", value: "txmxboxing", available: true },
+  { id: "vemos", label: "Vemos Vamos", value: "vemosvamos", available: false },
+  { id: "digitalcanvas", label: "Digital Canvas", value: "digitalcanvas", available: false },
+  { id: "ampd", label: "AMPD Project", value: "ampdproject", available: false },
+  { id: "milcity", label: "MilCityUSA", value: "milcityusa", available: false },
 ]
 
 interface InstagramAnalyticsHeaderProps {
@@ -104,13 +104,23 @@ export function InstagramAnalyticsHeader({
             <div className="relative">
               <select
                 value={selectedAccount}
-                onChange={(e) => onAccountChange?.(e.target.value)}
+                onChange={(e) => {
+                  const account = instagramAccounts.find(a => a.id === e.target.value)
+                  if (account?.available) {
+                    onAccountChange?.(e.target.value)
+                  }
+                }}
                 disabled={isLoading}
                 className="appearance-none bg-white/5 border border-white/10 text-white text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-white/10 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {instagramAccounts.map((account) => (
-                  <option key={account.id} value={account.id} className="bg-neutral-900 text-white">
-                    {account.label}
+                  <option 
+                    key={account.id} 
+                    value={account.id} 
+                    className="bg-neutral-900 text-white"
+                    disabled={!account.available}
+                  >
+                    {account.label}{!account.available ? " (Coming Soon)" : ""}
                   </option>
                 ))}
               </select>

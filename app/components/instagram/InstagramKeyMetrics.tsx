@@ -131,7 +131,7 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
     {
       title: "New Followers",
       value: isConnected ? formatNumber(insights.follows) : "--",
-      subtitle: `${formatNumber(insights.unfollows)} unfollows`,
+      subtitle: "Gained this period",
       color: "text-green-400",
     },
     {

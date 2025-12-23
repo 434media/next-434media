@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../..
 import { Badge } from "../../components/analytics/Badge"
 
 import { useToast } from "../../hooks/use-toast"
-import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, Star } from "lucide-react"
+import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, Star, Pencil } from "lucide-react"
 import Link from "next/link"
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
@@ -96,6 +96,82 @@ function CollapsibleSection({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// Preview Field Component - shows value in preview mode with ability to edit individual fields
+interface PreviewFieldProps {
+  label: string
+  value: string
+  isPreview: boolean
+  required?: boolean
+  children: React.ReactNode
+  isRichText?: boolean
+}
+
+function PreviewField({ label, value, isPreview, required, children, isRichText }: PreviewFieldProps) {
+  const [isEditing, setIsEditing] = useState(false)
+
+  // If not in preview mode globally, or if this field is being edited, show the edit form
+  if (!isPreview || isEditing) {
+    return (
+      <div className="relative">
+        {isPreview && isEditing && (
+          <div className="flex justify-end mb-1">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-700 px-2 py-1 bg-green-50 hover:bg-green-100 rounded-md transition-colors"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              Done Editing
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    )
+  }
+
+  // For rich text, render HTML
+  const renderValue = () => {
+    if (!value) {
+      return <span className="text-gray-400 italic">Click to add content</span>
+    }
+    if (isRichText) {
+      // Simple markdown-like rendering for preview
+      const htmlContent = value
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br />')
+      return (
+        <div 
+          className="prose prose-sm max-w-none text-gray-700"
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
+      )
+    }
+    return <span className="text-gray-700">{value}</span>
+  }
+
+  return (
+    <div 
+      className="group cursor-pointer"
+      onClick={() => setIsEditing(true)}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-gray-500 group-hover:text-blue-600 transition-colors">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-blue-600 px-2 py-1 rounded-md group-hover:bg-blue-50 transition-all">
+          <Pencil className="h-3 w-3" />
+          <span className="hidden group-hover:inline">Click to edit</span>
+        </span>
+      </div>
+      <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[44px] group-hover:border-blue-300 group-hover:bg-blue-50/30 transition-all">
+        {renderValue()}
+      </div>
     </div>
   )
 }
@@ -242,6 +318,7 @@ export default function FeedFormPage() {
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hasDraft, setHasDraft] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
   
   // Collapsible section states - all collapsed by default
   const [openSections, setOpenSections] = useState<Set<string>>(new Set())
@@ -684,6 +761,7 @@ export default function FeedFormPage() {
   // Start editing a feed item
   const handleEdit = (item: FeedItem) => {
     setEditingId(item.id || null)
+    setPreviewMode(true) // Enable preview mode by default when editing
     setFormData({
       title: item.title,
       type: item.type,
@@ -731,6 +809,7 @@ export default function FeedFormPage() {
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingId(null)
+    setPreviewMode(false)
     setFormData({
       title: "",
       type: "newsletter",
@@ -1207,31 +1286,6 @@ export default function FeedFormPage() {
               </div>
             )}
 
-            {/* Editing Banner */}
-            {editingId && (
-              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Edit className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-blue-900">Editing Mode</p>
-                    <p className="text-sm text-blue-700">Updating: {formData.title || "Untitled"}</p>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCancelEdit}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Cancel
-                </Button>
-              </div>
-            )}
-
             {/* Section Toggle Controls */}
             {formData.type === "newsletter" && (
               <div className="flex items-center justify-between mb-4">
@@ -1271,75 +1325,85 @@ export default function FeedFormPage() {
                 isComplete={isSectionComplete("basic")}
               >
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Title <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => handleInputChange("title", e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-                      placeholder="Enter feed item title"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <PreviewField label="Title" value={formData.title} isPreview={previewMode && !!editingId} required>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Type</label>
-                      <select
-                        value={formData.type}
-                        onChange={(e) => handleInputChange("type", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="video">🎬 Video</option>
-                        <option value="article">📄 Article</option>
-                        <option value="podcast">🎙️ Podcast</option>
-                        <option value="newsletter">📰 Newsletter</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <Calendar className="h-4 w-4" />
-                        Published Date
+                      <label className="block text-sm font-medium mb-2">
+                        Title <span className="text-red-500">*</span>
                       </label>
                       <input
-                        type="date"
-                        value={formData.published_date}
-                        onChange={(e) => handleInputChange("published_date", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        type="text"
+                        value={formData.title}
+                        onChange={(e) => handleInputChange("title", e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                        placeholder="Enter feed item title"
+                        required
                       />
                     </div>
+                  </PreviewField>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <PreviewField label="Type" value={`${formData.type === 'video' ? '🎬' : formData.type === 'article' ? '📄' : formData.type === 'podcast' ? '🎙️' : '📰'} ${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}`} isPreview={previewMode && !!editingId}>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Type</label>
+                        <select
+                          value={formData.type}
+                          onChange={(e) => handleInputChange("type", e.target.value)}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="video">🎬 Video</option>
+                          <option value="article">📄 Article</option>
+                          <option value="podcast">🎙️ Podcast</option>
+                          <option value="newsletter">📰 Newsletter</option>
+                        </select>
+                      </div>
+                    </PreviewField>
+
+                    <PreviewField label="Published Date" value={formData.published_date} isPreview={previewMode && !!editingId}>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                          <Calendar className="h-4 w-4" />
+                          Published Date
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.published_date}
+                          onChange={(e) => handleInputChange("published_date", e.target.value)}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </PreviewField>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Summary <span className="text-red-500">*</span>
-                    </label>
-                    <RichTextEditor
-                      value={formData.summary}
-                      onChange={(value) => handleInputChange("summary", value)}
-                      placeholder="Enter a brief summary (supports Markdown)"
-                      minRows={4}
-                    />
-                  </div>
+                  <PreviewField label="Summary" value={formData.summary} isPreview={previewMode && !!editingId} required isRichText>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Summary <span className="text-red-500">*</span>
+                      </label>
+                      <RichTextEditor
+                        value={formData.summary}
+                        onChange={(value) => handleInputChange("summary", value)}
+                        placeholder="Enter a brief summary (supports Markdown)"
+                        minRows={4}
+                      />
+                    </div>
+                  </PreviewField>
 
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                      <LinkIcon className="h-4 w-4" />
-                      Slug
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.slug}
-                      onChange={(e) => handleInputChange("slug", e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-                      placeholder="auto-generated-from-title"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Auto-generated from title if left empty</p>
-                  </div>
+                  <PreviewField label="Slug" value={formData.slug} isPreview={previewMode && !!editingId}>
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                        <LinkIcon className="h-4 w-4" />
+                        Slug
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.slug}
+                        onChange={(e) => handleInputChange("slug", e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                        placeholder="auto-generated-from-title"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Auto-generated from title if left empty</p>
+                    </div>
+                  </PreviewField>
                 </div>
               </CollapsibleSection>
 
@@ -1458,15 +1522,17 @@ export default function FeedFormPage() {
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Founder's Note</label>
-                        <RichTextEditor
-                          value={formData.founders_note_text || ""}
-                          onChange={(value) => handleInputChange("founders_note_text", value)}
-                          placeholder="Enter founder's note content (supports Markdown)"
-                          minRows={4}
-                        />
-                      </div>
+                      <PreviewField label="Founder's Note" value={formData.founders_note_text || ""} isPreview={previewMode && !!editingId} isRichText>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Founder's Note</label>
+                          <RichTextEditor
+                            value={formData.founders_note_text || ""}
+                            onChange={(value) => handleInputChange("founders_note_text", value)}
+                            placeholder="Enter founder's note content (supports Markdown)"
+                            minRows={4}
+                          />
+                        </div>
+                      </PreviewField>
 
                       <ImageUpload
                         value={formData.founders_note_image || ""}
@@ -1509,31 +1575,35 @@ export default function FeedFormPage() {
                           Featured Post
                         </h4>
                         <div className="space-y-4 bg-purple-50/50 rounded-lg p-4 border border-purple-100">
-                          <div>
-                            <label className="block text-sm font-medium mb-2">Title</label>
-                            <input
-                              type="text"
-                              value={formData.featured_post_title || ""}
-                              onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                              placeholder="Featured post title"
-                            />
-                          </div>
+                          <PreviewField label="Title" value={formData.featured_post_title || ""} isPreview={previewMode && !!editingId}>
+                            <div>
+                              <label className="block text-sm font-medium mb-2">Title</label>
+                              <input
+                                type="text"
+                                value={formData.featured_post_title || ""}
+                                onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                placeholder="Featured post title"
+                              />
+                            </div>
+                          </PreviewField>
                           <ImageUpload
                             value={formData.featured_post_image || ""}
                             onChange={(value) => handleInputChange("featured_post_image", value)}
                             label="Image"
                             hideUrl
                           />
-                          <div>
-                            <label className="block text-sm font-medium mb-2">Content</label>
-                            <RichTextEditor
-                              value={formData.featured_post_content || ""}
-                              onChange={(value) => handleInputChange("featured_post_content", value)}
-                              placeholder="Featured post content (supports Markdown)"
-                              minRows={3}
-                            />
-                          </div>
+                          <PreviewField label="Content" value={formData.featured_post_content || ""} isPreview={previewMode && !!editingId} isRichText>
+                            <div>
+                              <label className="block text-sm font-medium mb-2">Content</label>
+                              <RichTextEditor
+                                value={formData.featured_post_content || ""}
+                                onChange={(value) => handleInputChange("featured_post_content", value)}
+                                placeholder="Featured post content (supports Markdown)"
+                                minRows={3}
+                              />
+                            </div>
+                          </PreviewField>
                         </div>
                       </div>
                     </div>
@@ -1550,25 +1620,29 @@ export default function FeedFormPage() {
                     isComplete={isSectionComplete("event")}
                   >
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Event Title</label>
-                        <input
-                          type="text"
-                          value={formData.upcoming_event_title || ""}
-                          onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Event title"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Event Description</label>
-                        <RichTextEditor
-                          value={formData.upcoming_event_description || ""}
-                          onChange={(value) => handleInputChange("upcoming_event_description", value)}
-                          placeholder="Event description (supports Markdown)"
-                          minRows={3}
-                        />
-                      </div>
+                      <PreviewField label="Event Title" value={formData.upcoming_event_title || ""} isPreview={previewMode && !!editingId}>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Event Title</label>
+                          <input
+                            type="text"
+                            value={formData.upcoming_event_title || ""}
+                            onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Event title"
+                          />
+                        </div>
+                      </PreviewField>
+                      <PreviewField label="Event Description" value={formData.upcoming_event_description || ""} isPreview={previewMode && !!editingId} isRichText>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Event Description</label>
+                          <RichTextEditor
+                            value={formData.upcoming_event_description || ""}
+                            onChange={(value) => handleInputChange("upcoming_event_description", value)}
+                            placeholder="Event description (supports Markdown)"
+                            minRows={3}
+                          />
+                        </div>
+                      </PreviewField>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ImageUpload
                           value={formData.upcoming_event_image_desktop || ""}
@@ -1584,26 +1658,30 @@ export default function FeedFormPage() {
                         />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 rounded-lg p-4 border border-blue-100">
-                        <div>
-                          <label className="block text-sm font-medium mb-2">CTA Button Text</label>
-                          <input
-                            type="text"
-                            value={formData.upcoming_event_cta_text || ""}
-                            onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Register Now"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">CTA Link</label>
-                          <input
-                            type="url"
-                            value={formData.upcoming_event_cta_link || ""}
-                            onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="https://example.com/register"
-                          />
-                        </div>
+                        <PreviewField label="CTA Button Text" value={formData.upcoming_event_cta_text || ""} isPreview={previewMode && !!editingId}>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">CTA Button Text</label>
+                            <input
+                              type="text"
+                              value={formData.upcoming_event_cta_text || ""}
+                              onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Register Now"
+                            />
+                          </div>
+                        </PreviewField>
+                        <PreviewField label="CTA Link" value={formData.upcoming_event_cta_link || ""} isPreview={previewMode && !!editingId}>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">CTA Link</label>
+                            <input
+                              type="url"
+                              value={formData.upcoming_event_cta_link || ""}
+                              onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="https://example.com/register"
+                            />
+                          </div>
+                        </PreviewField>
                       </div>
                     </div>
                   </CollapsibleSection>
@@ -1621,25 +1699,29 @@ export default function FeedFormPage() {
                       isComplete={isSectionComplete(`spotlight${num}`)}
                     >
                       <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Title</label>
-                          <input
-                            type="text"
-                            value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
-                            onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder={`Spotlight ${num} title`}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Description</label>
-                          <RichTextEditor
-                            value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""}
-                            onChange={(value) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
-                            placeholder={`Spotlight ${num} description`}
-                            minRows={2}
-                          />
-                        </div>
+                        <PreviewField label="Title" value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Title</label>
+                            <input
+                              type="text"
+                              value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
+                              onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
+                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder={`Spotlight ${num} title`}
+                            />
+                          </div>
+                        </PreviewField>
+                        <PreviewField label="Description" value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId} isRichText>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Description</label>
+                            <RichTextEditor
+                              value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""}
+                              onChange={(value) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
+                              placeholder={`Spotlight ${num} description`}
+                              minRows={2}
+                            />
+                          </div>
+                        </PreviewField>
                         <ImageUpload
                           value={formData[`spotlight_${num}_image` as keyof FeedFormData] as string || ""}
                           onChange={(value) => handleInputChange(`spotlight_${num}_image` as keyof FeedFormData, value)}
@@ -1647,26 +1729,30 @@ export default function FeedFormPage() {
                           hideUrl
                         />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <div>
-                            <label className="block text-sm font-medium mb-2">CTA Text</label>
-                            <input
-                              type="text"
-                              value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
-                              onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Learn More"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">CTA Link</label>
-                            <input
-                              type="url"
-                              value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
-                              onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="https://example.com/link"
-                            />
-                          </div>
+                          <PreviewField label="CTA Text" value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                            <div>
+                              <label className="block text-sm font-medium mb-2">CTA Text</label>
+                              <input
+                                type="text"
+                                value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
+                                onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Learn More"
+                              />
+                            </div>
+                          </PreviewField>
+                          <PreviewField label="CTA Link" value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                            <div>
+                              <label className="block text-sm font-medium mb-2">CTA Link</label>
+                              <input
+                                type="url"
+                                value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
+                                onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="https://example.com/link"
+                              />
+                            </div>
+                          </PreviewField>
                         </div>
                       </div>
                     </CollapsibleSection>
@@ -1689,9 +1775,6 @@ export default function FeedFormPage() {
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 italic">
-                  💾 Your work is auto-saved to browser storage
-                </p>
               </div>
             </form>
           </div>

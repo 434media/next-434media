@@ -99,14 +99,7 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
       bgColor: "bg-yellow-900/20",
       borderColor: "border-yellow-500/30",
     },
-    {
-      title: "Unfollows",
-      value: insights.unfollows ?? 0,
-      description: "Accounts that unfollowed",
-      color: "text-red-300",
-      bgColor: "bg-red-900/20",
-      borderColor: "border-red-500/30",
-    },
+
   ]
 
   return (

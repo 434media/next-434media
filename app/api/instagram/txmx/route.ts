@@ -490,10 +490,13 @@ export async function GET(request: NextRequest) {
           }
 
           // Total value metrics (object payload): follows_and_unfollows
+          // breakdown=follow_type returns FOLLOWER/NON_FOLLOWER which are both new follows
+          // (FOLLOWER = users who refollowed, NON_FOLLOWER = new followers)
           const fetchTotalsFollows = async (period: "day" | "days_28") =>
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, paramsWithWindow({
               metric: "follows_and_unfollows",
               metric_type: "total_value",
+              breakdown: "follow_type",
             }, period))
           let insightsTotalsFollows: any = null
           let aggregatedFollows = { follows: 0, unfollows: 0 }
@@ -520,14 +523,26 @@ export async function GET(request: NextRequest) {
                     if (typeof tv.value.follows === 'number') aggregatedFollows.follows += tv.value.follows
                     if (typeof tv.value.unfollows === 'number') aggregatedFollows.unfollows += tv.value.unfollows
                   }
-                  // Check breakdowns
+                  // Check breakdowns - handle dimension_values format ["FOLLOWS"] / ["UNFOLLOWS"]
                   if (tv.breakdowns) {
                     for (const bd of tv.breakdowns) {
                       for (const r of (bd.results || [])) {
-                        const val = r.value
-                        if (val && typeof val === 'object') {
-                          if (typeof val.follows === 'number') aggregatedFollows.follows += val.follows
-                          if (typeof val.unfollows === 'number') aggregatedFollows.unfollows += val.unfollows
+                        const dims = r.dimension_values || []
+                        const val = typeof r.value === 'number' ? r.value : 0
+                        // Check dimension_values - FOLLOWER/NON_FOLLOWER both count as new follows
+                        for (const d of dims) {
+                          const dLower = String(d).toLowerCase().replace(/-/g, '_')
+                          // FOLLOWER and NON_FOLLOWER are both new followers
+                          if (dLower === 'follower' || dLower === 'non_follower' || dLower === 'nonfollower' || 
+                              dLower === 'follows' || dLower === 'follow') {
+                            aggregatedFollows.follows += val
+                          }
+                          if (dLower === 'unfollows' || dLower === 'unfollow') aggregatedFollows.unfollows += val
+                        }
+                        // Also check if the result.value is an object with follows/unfollows
+                        if (r.value && typeof r.value === 'object') {
+                          if (typeof r.value.follows === 'number') aggregatedFollows.follows += r.value.follows
+                          if (typeof r.value.unfollows === 'number') aggregatedFollows.unfollows += r.value.unfollows
                         }
                       }
                     }
@@ -541,6 +556,24 @@ export async function GET(request: NextRequest) {
                       aggregatedFollows.follows += typeof v.follows === 'number' ? v.follows : 0
                       aggregatedFollows.unfollows += typeof v.unfollows === 'number' ? v.unfollows : 0
                     }
+                    // Also check for breakdowns within each value entry
+                    if (e?.breakdowns) {
+                      for (const bd of e.breakdowns) {
+                        for (const r of (bd.results || [])) {
+                          const dims = r.dimension_values || []
+                          const val = typeof r.value === 'number' ? r.value : 0
+                          for (const d of dims) {
+                            const dLower = String(d).toLowerCase().replace(/-/g, '_')
+                            // FOLLOWER and NON_FOLLOWER are both new followers
+                            if (dLower === 'follower' || dLower === 'non_follower' || dLower === 'nonfollower' || 
+                                dLower === 'follows' || dLower === 'follow') {
+                              aggregatedFollows.follows += val
+                            }
+                            if (dLower === 'unfollows' || dLower === 'unfollow') aggregatedFollows.unfollows += val
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -548,6 +581,8 @@ export async function GET(request: NextRequest) {
           } else {
             try {
               insightsTotalsFollows = await fetchTotalsFollows("day")
+              // Always log the follows response to diagnose the issue
+              console.log("[Instagram API] follows_and_unfollows response:", JSON.stringify(insightsTotalsFollows, null, 2))
               if (debug) {
                 console.log("[DEBUG][insights] follows day raw response:", JSON.stringify(insightsTotalsFollows, null, 2))
                 // Log the structure of the follows metric
@@ -747,13 +782,34 @@ export async function GET(request: NextRequest) {
               if (tv.breakdowns) {
                 let sum = 0
                 for (const bd of tv.breakdowns) {
+                  console.log(`[Instagram API] Checking breakdown for ${field}:`, JSON.stringify(bd, null, 2))
                   for (const r of (bd.results || [])) {
-                    // Check dimension_values for the field name
                     const dims = r.dimension_values || []
                     const val = typeof r.value === 'number' ? r.value : 0
-                    for (const d of dims) {
-                      if (String(d).toLowerCase() === field) sum += val
+                    console.log(`[Instagram API] Result: dims=${JSON.stringify(dims)}, val=${val}, field=${field}`)
+                    
+                    // For "follows" field: FOLLOWER and NON_FOLLOWER both represent new followers
+                    if (field === 'follows') {
+                      for (const d of dims) {
+                        const dLower = String(d).toLowerCase()
+                        if (dLower === 'follower' || dLower === 'non_follower' || dLower === 'nonfollower' ||
+                            dLower === 'follow' || dLower === 'follows') {
+                          console.log(`[Instagram API] Matched follows with dimension "${d}", value: ${val}`)
+                          sum += val
+                        }
+                      }
                     }
+                    // For "unfollows" field - API doesn't provide this directly, will be calculated later
+                    if (field === 'unfollows') {
+                      for (const d of dims) {
+                        const dLower = String(d).toLowerCase()
+                        if (dLower === 'unfollow' || dLower === 'unfollows') {
+                          console.log(`[Instagram API] Matched unfollows with dimension "${d}", value: ${val}`)
+                          sum += val
+                        }
+                      }
+                    }
+                    
                     // Also check if the result has direct follows/unfollows
                     if (r.value && typeof r.value === 'object' && typeof r.value[field] === 'number') {
                       sum += r.value[field]
@@ -764,16 +820,40 @@ export async function GET(request: NextRequest) {
               }
             }
             
-            // Fallback to values array structure
-            if (!Array.isArray(m.values)) return 0
-            return m.values.reduce((sum: number, entry: any) => {
-              const val = entry?.value
-              if (val && typeof val === 'object') {
-                const v = typeof val[field] === 'number' ? val[field] : 0
-                return sum + v
+            // Fallback to values array structure (time-series response)
+            if (Array.isArray(m.values)) {
+              const result = m.values.reduce((sum: number, entry: any) => {
+                const val = entry?.value
+                if (val && typeof val === 'object') {
+                  const v = typeof val[field] === 'number' ? val[field] : 0
+                  return sum + v
+                }
+                return sum
+              }, 0)
+              if (result > 0) return result
+            }
+            
+            // Additional fallback: check for values array with breakdown structure
+            if (Array.isArray(m.values)) {
+              let sum = 0
+              for (const entry of m.values) {
+                // Check if entry has breakdowns
+                if (entry?.breakdowns) {
+                  for (const bd of entry.breakdowns) {
+                    for (const r of (bd.results || [])) {
+                      const dims = r.dimension_values || []
+                      const val = typeof r.value === 'number' ? r.value : 0
+                      for (const d of dims) {
+                        if (matchesDimension(d)) sum += val
+                      }
+                    }
+                  }
+                }
               }
-              return sum
-            }, 0)
+              if (sum > 0) return sum
+            }
+            
+            return 0
           }
           let totalFollows = totalDays > 30 ? aggregatedFollows.follows : sumFollowMetric('follows')
           let totalUnfollows = totalDays > 30 ? aggregatedFollows.unfollows : sumFollowMetric('unfollows')
@@ -783,6 +863,16 @@ export async function GET(request: NextRequest) {
             console.log("[DEBUG][insights] aggregatedFollows:", aggregatedFollows)
             console.log("[DEBUG][insights] totalFollows before fallback:", totalFollows)
             console.log("[DEBUG][insights] totalUnfollows before fallback:", totalUnfollows)
+            // Log detailed structure of follows_and_unfollows metric
+            if (insightsTotalsFollows?.data) {
+              const followsMetric = insightsTotalsFollows.data.find((d: any) => d.name === 'follows_and_unfollows')
+              if (followsMetric) {
+                console.log("[DEBUG][insights] follows_and_unfollows metric found:", JSON.stringify(followsMetric, null, 2))
+              } else {
+                console.log("[DEBUG][insights] follows_and_unfollows metric NOT found in response")
+                console.log("[DEBUG][insights] Available metrics:", insightsTotalsFollows.data.map((d: any) => d.name))
+              }
+            }
           }
           
           if (!aggregatedTotalsNumeric && totalFollows === 0 && totalUnfollows === 0) {
@@ -821,6 +911,11 @@ export async function GET(request: NextRequest) {
                 const delta = all[all.length - 1] - all[0]
                 if (netFollowerGrowth === 0 || Math.abs(delta) > Math.abs(netFollowerGrowth)) {
                   netFollowerGrowth = delta
+                  // Calculate unfollows from follows and net growth
+                  // unfollows = follows - net_growth
+                  if (totalFollows > 0 && totalUnfollows === 0) {
+                    totalUnfollows = Math.max(0, totalFollows - netFollowerGrowth)
+                  }
                 }
               }
             } else if (followerCountSeries?.data?.length) {
@@ -833,6 +928,12 @@ export async function GET(request: NextRequest) {
                 // If follows/unfollows are zero or clearly undercounted, prefer delta
                 if (netFollowerGrowth === 0 || Math.abs(delta) > Math.abs(netFollowerGrowth)) {
                   netFollowerGrowth = delta
+                  // Calculate unfollows from follows and net growth
+                  // unfollows = follows - net_growth
+                  if (totalFollows > 0 && totalUnfollows === 0) {
+                    totalUnfollows = Math.max(0, totalFollows - netFollowerGrowth)
+                    console.log(`[Instagram API] Calculated unfollows: ${totalUnfollows} (follows: ${totalFollows}, netGrowth: ${netFollowerGrowth})`)
+                  }
                 }
               }
             }
