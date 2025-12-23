@@ -886,29 +886,42 @@ export async function GET(request: NextRequest) {
         try {
           const instagramAccountId = await resolveInstagramBusinessAccountId()
 
+          // Calculate 90 days ago for demographics
+          const ninetyDaysAgo = new Date()
+          ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+          const demographicsSince = Math.floor(ninetyDaysAgo.getTime() / 1000).toString()
+          const demographicsUntil = Math.floor(Date.now() / 1000).toString()
+
+          if (debug) {
+            console.log("[DEBUG][demographics] since:", demographicsSince, "until:", demographicsUntil)
+          }
+
           // Fetch engaged audience demographics (country, city, age/gender)
-          // Note: API uses "breakdown" parameter (singular), not "breakdowns"
+          // Note: timeframe parameter is deprecated in v20+, use since/until instead
           const [countryRes, cityRes, ageGenderRes] = await Promise.all([
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "engaged_audience_demographics",
               period: "lifetime",
-              timeframe: "last_90_days",
               breakdown: "country",
               metric_type: "total_value",
+              since: demographicsSince,
+              until: demographicsUntil,
             }).catch((e) => { console.error("[Demographics] Country fetch error:", e); return null }),
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "engaged_audience_demographics",
               period: "lifetime",
-              timeframe: "last_90_days",
               breakdown: "city",
               metric_type: "total_value",
+              since: demographicsSince,
+              until: demographicsUntil,
             }).catch((e) => { console.error("[Demographics] City fetch error:", e); return null }),
             fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "engaged_audience_demographics",
               period: "lifetime",
-              timeframe: "last_90_days",
               breakdown: "age,gender",
               metric_type: "total_value",
+              since: demographicsSince,
+              until: demographicsUntil,
             }).catch((e) => { console.error("[Demographics] Age/Gender fetch error:", e); return null }),
           ])
 
@@ -958,10 +971,19 @@ export async function GET(request: NextRequest) {
             console.log("[DEBUG][demographics] parsed cities:", cities.length, cities.slice(0, 3))
           }
           
-          // Parse age/gender (comes as combined like "18-24, M") - handle multiple response structures
+          // Parse age/gender - Meta returns dimension_values like ["LAST_90_DAYS", "18-24", "M"]
+          // or ["18-24", "M"] depending on the API version
           let ageGenderRaw = ageGenderRes?.data?.[0]?.total_value?.breakdowns?.[0]?.results || []
           
-          // Fallback to values array structure
+          if (debug) {
+            console.log("[DEBUG][demographics] ageGenderRaw count:", ageGenderRaw.length)
+            console.log("[DEBUG][demographics] ageGenderRaw sample:", JSON.stringify(ageGenderRaw.slice(0, 3), null, 2))
+            // Also log the dimension_keys to understand structure
+            const dimensionKeys = ageGenderRes?.data?.[0]?.total_value?.breakdowns?.[0]?.dimension_keys
+            console.log("[DEBUG][demographics] dimension_keys:", dimensionKeys)
+          }
+          
+          // Fallback to values array structure (older API format)
           if (ageGenderRaw.length === 0 && ageGenderRes?.data?.[0]?.values) {
             ageGenderRaw = ageGenderRes.data[0].values.flatMap((v: any) => {
               if (v.value && typeof v.value === 'object') {
@@ -974,33 +996,55 @@ export async function GET(request: NextRequest) {
             })
           }
           
+          // Get dimension_keys to understand what order the values are in
+          const dimensionKeys = ageGenderRes?.data?.[0]?.total_value?.breakdowns?.[0]?.dimension_keys || []
+          const ageIndex = dimensionKeys.findIndex((k: string) => k === "age")
+          const genderIndex = dimensionKeys.findIndex((k: string) => k === "gender")
+          
           const ageGender = ageGenderRaw
             .map((r: any) => {
               const dims = r.dimension_values || []
-              // Filter out timeframe dimension
-              const filtered = dims.filter((d: string) => d && !String(d).includes("LAST_"))
+              
+              // If we know the dimension order from dimension_keys, use that
+              if (ageIndex !== -1 && genderIndex !== -1) {
+                return {
+                  age: dims[ageIndex] || "Unknown",
+                  gender: dims[genderIndex] || "U",
+                  value: r.value || 0,
+                }
+              }
+              
+              // Otherwise, filter out timeframe and try to detect age vs gender
+              const filtered = dims.filter((d: string) => d && !String(d).includes("LAST_") && d !== "LAST_90_DAYS")
+              
+              // Age ranges contain "-" like "18-24", "25-34", etc.
+              const ageValue = filtered.find((d: string) => /^\d+[-–]\d+$/.test(d) || /^\d+\+$/.test(d)) || filtered[0] || "Unknown"
+              // Gender is typically M, F, or U
+              const genderValue = filtered.find((d: string) => ["M", "F", "U"].includes(d?.toUpperCase?.())) || filtered[1] || "U"
+              
               return {
-                age: filtered[0] || "Unknown",
-                gender: filtered[1] || "U",
+                age: ageValue,
+                gender: genderValue?.toUpperCase?.() || "U",
                 value: r.value || 0,
               }
             })
-            .filter((r: any) => r.value > 0)
+            .filter((r: any) => r.value > 0 && r.age !== "Unknown")
             .sort((a: any, b: any) => b.value - a.value)
           
           if (debug) {
             console.log("[DEBUG][demographics] parsed ageGender:", ageGender.length, ageGender.slice(0, 3))
           }
 
-          // Fetch follower demographics if available
+          // Fetch follower demographics if available (using since/until instead of deprecated timeframe)
           let followerDemographics = null
           try {
             const followerRes = await fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
               metric: "follower_demographics",
               period: "lifetime",
-              timeframe: "last_90_days",
               breakdown: "country",
               metric_type: "total_value",
+              since: demographicsSince,
+              until: demographicsUntil,
             })
             if (followerRes?.data?.[0]?.total_value?.breakdowns?.[0]?.results) {
               followerDemographics = {
@@ -1046,8 +1090,17 @@ export async function GET(request: NextRequest) {
             period: "lifetime",
           })
 
-          // Parse online followers by hour
-          const onlineFollowers = onlineRes?.data?.[0]?.values?.[0]?.value || {}
+          if (debug) {
+            console.log("[DEBUG][online-followers] Raw response:", JSON.stringify(onlineRes, null, 2))
+          }
+
+          // Parse online followers by hour - check multiple possible response structures
+          let onlineFollowers = onlineRes?.data?.[0]?.values?.[0]?.value || {}
+          
+          // Fallback to total_value structure if values is empty
+          if (Object.keys(onlineFollowers).length === 0 && onlineRes?.data?.[0]?.total_value?.value) {
+            onlineFollowers = onlineRes.data[0].total_value.value
+          }
           const hourlyData = Object.entries(onlineFollowers)
             .map(([hour, count]) => ({
               hour: parseInt(hour, 10),
@@ -1087,16 +1140,29 @@ export async function GET(request: NextRequest) {
         try {
           const instagramAccountId = await resolveInstagramBusinessAccountId()
 
+          // Calculate timestamps for reach breakdown
+          const reachSinceTs = Math.floor(new Date(startDate).getTime() / 1000).toString()
+          const reachUntilTs = Math.floor(new Date(endDate).getTime() / 1000).toString()
+
+          if (debug) {
+            console.log("[DEBUG][reach-breakdown] startDate:", startDate, "endDate:", endDate)
+            console.log("[DEBUG][reach-breakdown] sinceTs:", reachSinceTs, "untilTs:", reachUntilTs)
+          }
+
           const reachBreakdown = await fetchInstagramData(`${instagramAccountId}/insights`, accessToken, {
             metric: "reach",
             period: "day",
             breakdown: "media_product_type",
             metric_type: "total_value",
-            since: sinceTs,
-            until: untilTs,
+            since: reachSinceTs,
+            until: reachUntilTs,
           })
 
-          // Parse by media type
+          if (debug) {
+            console.log("[DEBUG][reach-breakdown] Raw response:", JSON.stringify(reachBreakdown, null, 2))
+          }
+
+          // Parse by media type - handle various content types
           const mediaTypeBreakdown: Record<string, number> = {
             FEED: 0,
             REELS: 0,
@@ -1105,10 +1171,30 @@ export async function GET(request: NextRequest) {
           }
 
           const results = reachBreakdown?.data?.[0]?.total_value?.breakdowns?.[0]?.results || []
+          
+          if (debug) {
+            console.log("[DEBUG][reach-breakdown] Parsed results:", results.length, "items")
+          }
+          
           results.forEach((r: any) => {
             const type = r.dimension_values?.[0]
-            if (type && mediaTypeBreakdown.hasOwnProperty(type)) {
-              mediaTypeBreakdown[type] = r.value || 0
+            // Map various content type names to our categories
+            // API returns: POST, CAROUSEL_CONTAINER, REEL, STORY, AD, LIVE
+            if (type === "POST" || type === "CAROUSEL_CONTAINER" || type === "IMAGE" || type === "CAROUSEL_ALBUM") {
+              mediaTypeBreakdown.FEED += r.value || 0
+            } else if (type === "REEL" || type === "REELS" || type === "VIDEO") {
+              mediaTypeBreakdown.REELS += r.value || 0
+            } else if (type === "STORY") {
+              mediaTypeBreakdown.STORY += r.value || 0
+            } else if (type === "AD") {
+              mediaTypeBreakdown.AD += r.value || 0
+            } else if (type === "LIVE") {
+              // Add LIVE to FEED for now, or could be separate category
+              mediaTypeBreakdown.FEED += r.value || 0
+            }
+            
+            if (debug) {
+              console.log(`[DEBUG][reach-breakdown] Type: ${type}, Value: ${r.value}`)
             }
           })
 
@@ -1152,15 +1238,32 @@ export async function GET(request: NextRequest) {
 
           // Batch fetch insights for all media items
           const mediaIds = mediaData.data.map((media: any) => media.id)
-          // Fetch insights for all media IDs in one request via Graph root using ids
-          const batchedInsights = await fetchInstagramData("", accessToken, {
-            ids: mediaIds.join(","),
-            // 'engagement' is not a valid media metric; use total_interactions instead
-            fields: `insights.metric(impressions,reach,total_interactions,shares,saved).period(lifetime){values}`,
-          })
+          // Note: In v22.0+, 'impressions' and 'plays' are deprecated - use 'views' instead
+          // Different media types support different metrics - we'll fetch individually for VIDEO/CAROUSEL
+          // since batch often fails for mixed media types
+          let batchedInsights: any = null
+          
+          // Separate IMAGE posts (which work well with batch) from VIDEO/CAROUSEL (which often fail)
+          const imagePosts = mediaData.data.filter((m: any) => m.media_type === "IMAGE")
+          const videoPosts = mediaData.data.filter((m: any) => m.media_type === "VIDEO" || m.media_type === "CAROUSEL_ALBUM")
+          
+          // Batch fetch for IMAGE posts only
+          if (imagePosts.length > 0) {
+            try {
+              const imageIds = imagePosts.map((m: any) => m.id)
+              batchedInsights = await fetchInstagramData("", accessToken, {
+                ids: imageIds.join(","),
+                fields: `insights.metric(reach,total_interactions,shares,saved).period(lifetime){values}`,
+              })
+            } catch (batchErr) {
+              console.warn("[Instagram API] Batch insights for images failed:", batchErr)
+            }
+          }
+          
           if (debug) {
             const sampleId = mediaIds[0]
             console.log("[DEBUG][media] batched insights sample", sampleId, JSON.stringify(batchedInsights?.[sampleId]?.insights?.data || [], null, 2))
+            console.log("[DEBUG][media] batched insights keys:", batchedInsights ? Object.keys(batchedInsights) : "null")
           }
 
           const insightsMap = new Map()
@@ -1178,9 +1281,9 @@ export async function GET(request: NextRequest) {
           }
 
           const mediaWithInsights = mediaData.data.map((media: any) => {
-            const raw = insightsMap.get(media.id) || { impressions: 0, reach: 0, total_interactions: 0, shares: 0, saved: 0 }
-            // Normalize to keep existing downstream usage: map total_interactions -> engagement
-            const insights = { impressions: raw.impressions || 0, reach: raw.reach || 0, engagement: raw.total_interactions || 0, shares: raw.shares || 0, saves: (raw as any).saved || 0 }
+            const raw = insightsMap.get(media.id) || { views: 0, reach: 0, total_interactions: 0, shares: 0, saved: 0 }
+            // Normalize to keep existing downstream usage: map views -> impressions (for backwards compat), total_interactions -> engagement
+            const insights = { impressions: raw.views || 0, reach: raw.reach || 0, engagement: raw.total_interactions || 0, shares: raw.shares || 0, saves: (raw as any).saved || 0 }
             return {
               ...media,
               insights,
@@ -1192,18 +1295,49 @@ export async function GET(request: NextRequest) {
             }
           })
 
-          // Fallback: For any media missing reach/impressions, fetch individually
-          // Limit to first 5 to avoid rate limiting and timeouts
+          // Fallback: Fetch insights for VIDEO/CAROUSEL individually (batch often fails for these)
+          // Also fetch for any IMAGE posts that didn't get data from batch
           const needsFallback = mediaWithInsights
-            .filter((m: any) => !m.insights || (m.insights.impressions === 0 && m.insights.reach === 0))
-            .slice(0, 5)
+            .filter((m: any) => {
+              // Always fetch VIDEO and CAROUSEL_ALBUM individually
+              if (m.media_type === "VIDEO" || m.media_type === "CAROUSEL_ALBUM") return true
+              // Also fetch if missing reach or saves
+              return !m.insights || m.insights.reach === 0 || m.insights.saves === 0
+            })
+            .slice(0, 20) // Increased limit to cover more posts
+          
+          if (debug) {
+            console.log("[DEBUG][media] needsFallback count:", needsFallback.length)
+          }
           
           if (needsFallback.length) {
             // Fetch sequentially to avoid overwhelming the connection
             for (const m of needsFallback) {
               try {
+                // Valid metrics per API error: impressions, reach, replies, saved, video_views, likes, 
+                // comments, shares, total_interactions, follows, profile_visits, profile_activity, 
+                // navigation, ig_reels_video_view_total_time, ig_reels_avg_watch_time, 
+                // clips_replays_count, ig_reels_aggregated_all_plays_count, views
+                // 
+                // NOTE: 'plays' is DEPRECATED in v22.0+
+                // NOTE: 'carousel_album_*' metrics are NOT supported - use standard metrics
+                let metrics = "reach,saved,total_interactions,shares"
+                
+                if (m.media_type === "VIDEO") {
+                  // For VIDEO/REEL - avoid deprecated 'plays' metric
+                  // Use: reach, saved, shares, total_interactions, likes, comments
+                  metrics = "reach,saved,shares,total_interactions"
+                } else if (m.media_type === "CAROUSEL_ALBUM") {
+                  // CAROUSEL_ALBUM uses standard metrics (not carousel_album_* prefix)
+                  metrics = "reach,saved,total_interactions"
+                }
+                
+                if (debug) {
+                  console.log("[DEBUG][media] Fetching for", m.id, "type:", m.media_type, "metrics:", metrics)
+                }
+                
                 const per = await fetchInstagramData(`${m.id}/insights`, accessToken, {
-                  metric: "impressions,reach,total_interactions,shares,saved",
+                  metric: metrics,
                   period: "lifetime",
                 }, 2) // Reduce retries for fallback
                 if (debug) {
@@ -1215,18 +1349,37 @@ export async function GET(request: NextRequest) {
                     const v = d?.values?.[0]?.value
                     map[d.name] = typeof v === 'number' ? v : 0
                   })
-                  m.insights.impressions = map.impressions || m.insights.impressions
-                  m.insights.reach = map.reach || m.insights.reach
+                  
+                  // All media types now use standard metric names
+                  const reachValue = map.reach || 0
+                  m.insights.impressions = reachValue || m.insights.impressions
+                  m.insights.reach = reachValue || m.insights.reach
                   m.insights.engagement = map.total_interactions || m.insights.engagement
                   m.insights.shares = map.shares || m.insights.shares
-                  m.insights.saves = (map as any).saved || m.insights.saves
+                  m.insights.saves = map.saved || m.insights.saves
+                  
                   m.engagement_rate = calculateEngagementRate(
                     (m.like_count || 0) + (m.comments_count || 0),
                     m.insights.reach || 1,
                   )
                 }
               } catch (err) {
-                console.warn(`[Instagram API] Failed to fetch insights for media ${m.id}:`, err)
+                console.warn(`[Instagram API] Failed to fetch insights for media ${m.id} (${m.media_type}):`, err)
+                // If the first attempt failed, try with just reach metric
+                try {
+                  const per2 = await fetchInstagramData(`${m.id}/insights`, accessToken, {
+                    metric: "reach",
+                    period: "lifetime",
+                  }, 1)
+                  if (Array.isArray(per2?.data) && per2.data.length > 0) {
+                    const v = per2.data[0]?.values?.[0]?.value
+                    if (typeof v === 'number') {
+                      m.insights.reach = v
+                    }
+                  }
+                } catch (err2) {
+                  console.warn(`[Instagram API] Fallback for ${m.media_type} ${m.id} also failed:`, err2)
+                }
               }
             }
           }
@@ -1255,7 +1408,7 @@ export async function GET(request: NextRequest) {
           {
             error: "Invalid endpoint parameter",
             endpoint: endpoint,
-            availableEndpoints: ["test-connection", "account-info", "insights", "summary", "media", "posts"],
+            availableEndpoints: ["test-connection", "account-info", "insights", "summary", "media", "posts", "demographics", "online-followers", "reach-breakdown"],
           },
           { status: 400 },
         )

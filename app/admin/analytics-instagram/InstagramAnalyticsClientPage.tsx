@@ -5,8 +5,6 @@ import { InstagramAnalyticsHeader } from "../../components/instagram/InstagramAn
 import { InstagramKeyMetrics } from "../../components/instagram/InstagramKeyMetrics"
 import { InstagramTopPostsTable } from "../../components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "../../components/instagram/InstagramAccountInfo"
-import { InstagramDemographics } from "../../components/instagram/InstagramDemographics"
-import { InstagramBestTimeToPost } from "../../components/instagram/InstagramBestTimeToPost"
 import { InstagramReachBreakdown } from "../../components/instagram/InstagramReachBreakdown"
 import { InfoTooltip } from "../../components/analytics/InfoTooltip"
 import type {
@@ -14,8 +12,6 @@ import type {
   InstagramAccount,
   InstagramMedia,
   InstagramMediaInsights,
-  InstagramDemographics as InstagramDemographicsType,
-  InstagramOnlineFollowers,
   InstagramReachBreakdown as InstagramReachBreakdownType,
 } from "../../types/instagram-insights"
 
@@ -66,18 +62,59 @@ function downloadInstagramCSV(
   csvContent += `Date Range: Last ${dateRange === '1d' ? '24 hours' : dateRange === '7d' ? '7 days' : dateRange === '30d' ? '30 days' : '90 days'}\n`
   csvContent += `Generated: ${new Date().toLocaleString()}\n\n`
   
-  // Key Metrics
-  csvContent += "=== KEY METRICS ===\n"
+  // Primary KPIs
+  csvContent += "=== PRIMARY KPIs ===\n"
+  csvContent += "Metric,Value,Notes\n"
+  if (insightsData) {
+    const engagementRate = insightsData.followers_count > 0 
+      ? ((insightsData.content_interactions / insightsData.followers_count) * 100).toFixed(2)
+      : "0.00"
+    const reachRate = insightsData.followers_count > 0
+      ? ((insightsData.reach / insightsData.followers_count) * 100).toFixed(1)
+      : "0.0"
+    const followerGrowthRate = insightsData.followers_count > 0
+      ? ((insightsData.net_follower_growth / insightsData.followers_count) * 100).toFixed(2)
+      : "0.00"
+    const profileToWebsite = insightsData.profile_views > 0
+      ? ((insightsData.website_clicks / insightsData.profile_views) * 100).toFixed(2)
+      : "0.00"
+    const reachToProfile = insightsData.reach > 0
+      ? ((insightsData.profile_views / insightsData.reach) * 100).toFixed(2)
+      : "0.00"
+    
+    csvContent += `Total Followers,${insightsData.followers_count},Current audience size\n`
+    csvContent += `Accounts Reached,${insightsData.reach},${reachRate}% of followers\n`
+    csvContent += `Engagement Rate,${engagementRate}%,Industry avg: 1-3%\n`
+    csvContent += `Website Clicks,${insightsData.website_clicks},Key conversion metric\n`
+  }
+  
+  // Secondary Metrics
+  csvContent += "\n=== SECONDARY METRICS ===\n"
   csvContent += "Metric,Value\n"
   if (insightsData) {
-    csvContent += `Followers,${insightsData.followers_count}\n`
-    csvContent += `Reach,${insightsData.reach}\n`
     csvContent += `Profile Views,${insightsData.profile_views}\n`
     csvContent += `Content Interactions,${insightsData.content_interactions}\n`
-    csvContent += `Website Clicks,${insightsData.website_clicks}\n`
     csvContent += `New Followers,${insightsData.follows}\n`
     csvContent += `Unfollows,${insightsData.unfollows}\n`
-    csvContent += `Net Growth,${insightsData.net_follower_growth}\n`
+    csvContent += `Net Follower Growth,${insightsData.net_follower_growth}\n`
+    csvContent += `Posts Published,${insightsData.media_count}\n`
+  }
+  
+  // Marketing Funnel
+  csvContent += "\n=== MARKETING FUNNEL ===\n"
+  csvContent += "Stage,Value,Conversion Rate\n"
+  if (insightsData) {
+    const reachToProfile = insightsData.reach > 0
+      ? ((insightsData.profile_views / insightsData.reach) * 100).toFixed(2)
+      : "0.00"
+    const profileToWebsite = insightsData.profile_views > 0
+      ? ((insightsData.website_clicks / insightsData.profile_views) * 100).toFixed(2)
+      : "0.00"
+    
+    csvContent += `Reach,${insightsData.reach},Top of funnel\n`
+    csvContent += `Profile Views,${insightsData.profile_views},${reachToProfile}% from reach\n`
+    csvContent += `Website Clicks,${insightsData.website_clicks},${profileToWebsite}% from profile\n`
+    csvContent += `New Followers,${insightsData.follows},Conversions\n`
   }
   
   // Top Posts
@@ -114,7 +151,7 @@ function downloadInstagramPNG(
   }
   
   canvas.width = 1200
-  canvas.height = 800
+  canvas.height = 1000
   
   // Background
   ctx.fillStyle = '#0a0a0a'
@@ -154,57 +191,176 @@ function downloadInstagramPNG(
   ctx.lineTo(canvas.width - 60, 160)
   ctx.stroke()
   
-  // Metrics cards
-  const metrics = insightsData ? [
-    { label: 'Followers', value: formatNumber(insightsData.followers_count) },
-    { label: 'Reach', value: formatNumber(insightsData.reach) },
-    { label: 'Profile Views', value: formatNumber(insightsData.profile_views) },
-    { label: 'Interactions', value: formatNumber(insightsData.content_interactions) },
-    { label: 'Website Clicks', value: formatNumber(insightsData.website_clicks) },
-    { label: 'New Followers', value: formatNumber(insightsData.follows) },
-    { label: 'Unfollows', value: formatNumber(insightsData.unfollows) },
-    { label: 'Net Growth', value: (insightsData.net_follower_growth >= 0 ? '+' : '') + formatNumber(insightsData.net_follower_growth) },
+  // Calculate derived metrics
+  const engagementRate = insightsData && insightsData.followers_count > 0 
+    ? ((insightsData.content_interactions / insightsData.followers_count) * 100).toFixed(2)
+    : "0.00"
+  const reachRate = insightsData && insightsData.followers_count > 0
+    ? ((insightsData.reach / insightsData.followers_count) * 100).toFixed(1)
+    : "0.0"
+  const reachToProfile = insightsData && insightsData.reach > 0
+    ? ((insightsData.profile_views / insightsData.reach) * 100).toFixed(2)
+    : "0.00"
+  const profileToWebsite = insightsData && insightsData.profile_views > 0
+    ? ((insightsData.website_clicks / insightsData.profile_views) * 100).toFixed(2)
+    : "0.00"
+  
+  // Primary KPIs section
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('PRIMARY KPIs', 60, 200)
+  
+  const primaryMetrics = insightsData ? [
+    { label: 'Total Followers', value: formatNumber(insightsData.followers_count), trend: insightsData.net_follower_growth >= 0 ? `+${formatNumber(insightsData.net_follower_growth)}` : formatNumber(insightsData.net_follower_growth), trendColor: insightsData.net_follower_growth >= 0 ? '#22c55e' : '#ef4444' },
+    { label: 'Accounts Reached', value: formatNumber(insightsData.reach), trend: `${reachRate}% of followers`, trendColor: '#ec4899' },
+    { label: 'Engagement Rate', value: `${engagementRate}%`, trend: parseFloat(engagementRate) >= 3 ? 'Above avg' : parseFloat(engagementRate) >= 1 ? 'Average' : 'Below avg', trendColor: parseFloat(engagementRate) >= 3 ? '#22c55e' : parseFloat(engagementRate) >= 1 ? '#eab308' : '#ef4444' },
+    { label: 'Website Clicks', value: formatNumber(insightsData.website_clicks), trend: `${profileToWebsite}% conversion`, trendColor: '#ec4899' },
   ] : []
   
   const cardWidth = 250
   const cardHeight = 100
-  const cardsPerRow = 4
   const startX = 60
-  const startY = 200
+  const startY = 220
   const gapX = 30
-  const gapY = 20
   
-  metrics.forEach((metric, index) => {
-    const row = Math.floor(index / cardsPerRow)
-    const col = index % cardsPerRow
-    const x = startX + col * (cardWidth + gapX)
-    const y = startY + row * (cardHeight + gapY)
+  primaryMetrics.forEach((metric, index) => {
+    const x = startX + index * (cardWidth + gapX)
+    const y = startY
     
-    ctx.fillStyle = '#1f2937'
+    // Card background with gradient
+    const cardGradient = ctx.createLinearGradient(x, y, x + cardWidth, y + cardHeight)
+    cardGradient.addColorStop(0, '#1f2937')
+    cardGradient.addColorStop(1, '#111827')
+    ctx.fillStyle = cardGradient
     ctx.beginPath()
     ctx.roundRect(x, y, cardWidth, cardHeight, 12)
     ctx.fill()
     
+    // Border
+    ctx.strokeStyle = '#374151'
+    ctx.lineWidth = 1
+    ctx.stroke()
+    
     ctx.fillStyle = '#9ca3af'
-    ctx.font = '12px system-ui, -apple-system, sans-serif'
+    ctx.font = '11px system-ui, -apple-system, sans-serif'
     ctx.textAlign = 'left'
-    ctx.fillText(metric.label.toUpperCase(), x + 20, y + 30)
+    ctx.fillText(metric.label.toUpperCase(), x + 20, y + 25)
     
     ctx.fillStyle = '#ffffff'
     ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
-    ctx.fillText(metric.value, x + 20, y + 70)
+    ctx.fillText(metric.value, x + 20, y + 60)
+    
+    ctx.fillStyle = metric.trendColor
+    ctx.font = '12px system-ui, -apple-system, sans-serif'
+    ctx.fillText(metric.trend, x + 20, y + 85)
   })
   
+  // Secondary Metrics row
+  let currentY = startY + cardHeight + 40
+  
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('SECONDARY METRICS', 60, currentY)
+  currentY += 20
+  
+  const secondaryMetrics = insightsData ? [
+    { label: 'Profile Views', value: formatNumber(insightsData.profile_views), color: '#3b82f6' },
+    { label: 'Interactions', value: formatNumber(insightsData.content_interactions), color: '#ec4899' },
+    { label: 'New Followers', value: formatNumber(insightsData.follows), color: '#22c55e' },
+    { label: 'Unfollows', value: formatNumber(insightsData.unfollows), color: '#ef4444' },
+  ] : []
+  
+  const smallCardWidth = 180
+  const smallCardHeight = 70
+  
+  secondaryMetrics.forEach((metric, index) => {
+    const x = startX + index * (smallCardWidth + 20)
+    const y = currentY
+    
+    ctx.fillStyle = '#1f293780'
+    ctx.beginPath()
+    ctx.roundRect(x, y, smallCardWidth, smallCardHeight, 8)
+    ctx.fill()
+    
+    ctx.fillStyle = metric.color
+    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(metric.value, x + smallCardWidth / 2, y + 35)
+    
+    ctx.fillStyle = '#9ca3af'
+    ctx.font = '11px system-ui, -apple-system, sans-serif'
+    ctx.fillText(metric.label, x + smallCardWidth / 2, y + 55)
+  })
+  
+  // Marketing Funnel
+  currentY += smallCardHeight + 50
+  
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('MARKETING FUNNEL', 60, currentY)
+  currentY += 30
+  
+  if (insightsData) {
+    const funnelData = [
+      { label: 'Reach', value: insightsData.reach, color: '#ffffff' },
+      { label: 'Profile Views', value: insightsData.profile_views, rate: reachToProfile, color: '#3b82f6' },
+      { label: 'Website Clicks', value: insightsData.website_clicks, rate: profileToWebsite, color: '#ec4899' },
+      { label: 'New Followers', value: insightsData.follows, color: '#22c55e' },
+    ]
+    
+    const funnelWidth = 200
+    const funnelSpacing = 80
+    
+    funnelData.forEach((stage, index) => {
+      const x = 100 + index * (funnelWidth + funnelSpacing)
+      const y = currentY
+      
+      // Value
+      ctx.fillStyle = stage.color
+      ctx.font = 'bold 24px system-ui, -apple-system, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(formatNumber(stage.value), x + funnelWidth / 2, y + 20)
+      
+      // Label
+      ctx.fillStyle = '#9ca3af'
+      ctx.font = '12px system-ui, -apple-system, sans-serif'
+      ctx.fillText(stage.label, x + funnelWidth / 2, y + 45)
+      
+      // Conversion rate arrow
+      if (stage.rate && index > 0) {
+        ctx.fillStyle = '#6b7280'
+        ctx.font = '11px system-ui, -apple-system, sans-serif'
+        ctx.fillText(`${stage.rate}%`, x - funnelSpacing / 2 + funnelWidth / 2, y + 10)
+        
+        // Arrow
+        ctx.strokeStyle = '#4b5563'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(x - funnelSpacing + 20, y + 20)
+        ctx.lineTo(x - 20, y + 20)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(x - 25, y + 15)
+        ctx.lineTo(x - 15, y + 20)
+        ctx.lineTo(x - 25, y + 25)
+        ctx.stroke()
+      }
+    })
+  }
+  
   // Top Posts section
-  let currentY = startY + 2 * (cardHeight + gapY) + 40
+  currentY += 80
   
   if (mediaData.length > 0) {
     ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
+    ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
     ctx.textAlign = 'left'
-    ctx.fillText('Top Posts', 60, currentY)
+    ctx.fillText('TOP POSTS', 60, currentY)
     
-    currentY += 40
+    currentY += 30
     
     const tableX = 60
     const tableWidth = canvas.width - 120
@@ -216,6 +372,7 @@ function downloadInstagramPNG(
     
     ctx.fillStyle = '#9ca3af'
     ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
+    ctx.textAlign = 'left'
     ctx.fillText('CAPTION', tableX + 15, currentY + 22)
     ctx.textAlign = 'center'
     ctx.fillText('LIKES', tableX + tableWidth * 0.6, currentY + 22)
@@ -275,6 +432,7 @@ export default function InstagramAnalyticsClientPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<InstagramTimeRange>("30d")
+  const [selectedAccount, setSelectedAccount] = useState("txmx")
 
   // Data states
   const [insightsData, setInsightsData] = useState<InstagramInsightsData | null>(null)
@@ -287,22 +445,18 @@ export default function InstagramAnalyticsClientPage() {
   } | null>(null)
   
   // New analytics data states
-  const [demographicsData, setDemographicsData] = useState<InstagramDemographicsType | null>(null)
-  const [onlineFollowersData, setOnlineFollowersData] = useState<InstagramOnlineFollowers | null>(null)
   const [reachBreakdownData, setReachBreakdownData] = useState<InstagramReachBreakdownType | null>(null)
-  const [isLoadingSecondary, setIsLoadingSecondary] = useState(false)
 
-  // Load Instagram data on component mount and when date range changes
+  // Load Instagram data on component mount and when date range or account changes
   useEffect(() => {
     loadInstagramData()
-  }, [dateRange])
-  
-  // Load secondary data (demographics, online followers) - less frequently needed
-  useEffect(() => {
-    if (connectionStatus?.success) {
-      loadSecondaryData()
-    }
-  }, [connectionStatus?.success])
+  }, [dateRange, selectedAccount])
+
+  // Handle account change
+  const handleAccountChange = (accountId: string) => {
+    setSelectedAccount(accountId)
+    // Note: Currently only txmx is connected. Other accounts would need their own API routes.
+  }
 
   const loadInstagramData = async () => {
     setIsLoading(true)
@@ -414,53 +568,25 @@ export default function InstagramAnalyticsClientPage() {
       // Fetch reach breakdown by media type
       try {
         const reachStartDate = getStartDateForRange(dateRange)
-        const reachBreakdownRes = await fetch(`/api/instagram/txmx?endpoint=reach-breakdown&startDate=${reachStartDate}&endDate=today`)
+        const reachBreakdownRes = await fetch(`/api/instagram/txmx?endpoint=reach-breakdown&startDate=${reachStartDate}&endDate=today&debug=true`)
+        console.log("[ReachBreakdown] Fetching for range:", reachStartDate)
         if (reachBreakdownRes.ok) {
           const reachBreakdownResult = await reachBreakdownRes.json()
+          console.log("[ReachBreakdown] API Response:", reachBreakdownResult)
           if (reachBreakdownResult.data) {
             setReachBreakdownData(reachBreakdownResult.data)
           }
+        } else {
+          console.warn("[ReachBreakdown] API returned:", reachBreakdownRes.status, await reachBreakdownRes.text().catch(() => ""))
         }
-      } catch {
-        // Reach breakdown is optional
+      } catch (err) {
+        console.warn("[ReachBreakdown] Fetch error:", err)
       }
     } catch (err) {
       console.error("Error loading Instagram data:", err)
       setError(err instanceof Error ? err.message : "Failed to load Instagram data")
     } finally {
       setIsLoading(false)
-    }
-  }
-  
-  // Load secondary data that doesn't need to refresh with date range
-  const loadSecondaryData = async () => {
-    setIsLoadingSecondary(true)
-    
-    try {
-      // Fetch demographics and online followers in parallel
-      const [demographicsRes, onlineFollowersRes] = await Promise.all([
-        fetch("/api/instagram/txmx?endpoint=demographics").catch(() => null),
-        fetch("/api/instagram/txmx?endpoint=online-followers").catch(() => null),
-      ])
-      
-      if (demographicsRes?.ok) {
-        const demographicsResult = await demographicsRes.json()
-        if (demographicsResult.data) {
-          setDemographicsData(demographicsResult.data)
-        }
-      }
-      
-      if (onlineFollowersRes?.ok) {
-        const onlineFollowersResult = await onlineFollowersRes.json()
-        if (onlineFollowersResult.data) {
-          setOnlineFollowersData(onlineFollowersResult.data)
-        }
-      }
-    } catch (err) {
-      // Secondary data is optional, don't show error
-      console.warn("Failed to load secondary Instagram data:", err)
-    } finally {
-      setIsLoadingSecondary(false)
     }
   }
 
@@ -496,7 +622,6 @@ export default function InstagramAnalyticsClientPage() {
 
   const handleRefresh = () => {
     loadInstagramData()
-    loadSecondaryData()
   }
 
   const handleLogout = async () => {
@@ -526,6 +651,8 @@ export default function InstagramAnalyticsClientPage() {
           onRangeChange={setDateRange}
           onDownloadCSV={handleDownloadCSV}
           onDownloadPNG={handleDownloadPNG}
+          selectedAccount={selectedAccount}
+          onAccountChange={handleAccountChange}
         />
       </div>
 
@@ -593,44 +720,17 @@ export default function InstagramAnalyticsClientPage() {
                 />
               </div>
 
-              {/* Audience Demographics */}
+              {/* Content Performance */}
               <div className="mb-10 sm:mb-12">
-                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Audience Demographics</h2>
-                  <InfoTooltip content="Demographics of your engaged audience over the last 90 days, including top countries, cities, and age/gender breakdown." />
+                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                  <h2 className="text-sm sm:text-lg font-semibold text-white">Content Performance</h2>
+                  <InfoTooltip content="See how your reach is distributed across different content types: Feed posts, Reels, Stories, and Promoted content." />
                 </div>
-                <InstagramDemographics
-                  demographics={demographicsData}
-                  isLoading={isLoadingSecondary}
+                <InstagramReachBreakdown
+                  breakdown={reachBreakdownData}
+                  isLoading={isLoading}
+                  dateRange={getDateRangeLabel(dateRange)}
                 />
-              </div>
-
-              {/* Content Performance & Best Time - Two Column Layout */}
-              <div className="mb-10 sm:mb-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Reach Breakdown by Content Type */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                    <h2 className="text-sm sm:text-lg font-semibold text-white">Content Performance</h2>
-                    <InfoTooltip content="See how your reach is distributed across different content types: Feed posts, Reels, Stories, and Promoted content." />
-                  </div>
-                  <InstagramReachBreakdown
-                    breakdown={reachBreakdownData}
-                    isLoading={isLoading}
-                    dateRange={getDateRangeLabel(dateRange)}
-                  />
-                </div>
-
-                {/* Best Time to Post */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                    <h2 className="text-sm sm:text-lg font-semibold text-white">Best Time to Post</h2>
-                    <InfoTooltip content="Shows when your followers are most active online. Post 30-60 minutes before peak times for best reach." />
-                  </div>
-                  <InstagramBestTimeToPost
-                    onlineFollowers={onlineFollowersData}
-                    isLoading={isLoadingSecondary}
-                  />
-                </div>
               </div>
 
               {/* Top Posts */}

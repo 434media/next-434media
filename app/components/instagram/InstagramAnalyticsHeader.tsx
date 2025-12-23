@@ -8,9 +8,19 @@ import {
   Calendar,
   FileText,
   Image,
-  Instagram
+  Instagram,
+  ChevronDown
 } from "lucide-react"
 import type { InstagramTimeRange, InstagramAccount } from "../../types/instagram-insights"
+
+// Instagram accounts available for selection
+const instagramAccounts = [
+  { id: "txmx", label: "TXMX Boxing", value: "txmxboxing" },
+  { id: "vemos", label: "Vemos Vamos", value: "vemosvamos" },
+  { id: "digitalcanvas", label: "Digital Canvas", value: "digitalcanvas" },
+  { id: "ampd", label: "AMPD Project", value: "ampdproject" },
+  { id: "milcity", label: "MilCityUSA", value: "milcityusa" },
+]
 
 interface InstagramAnalyticsHeaderProps {
   // Dashboard controls
@@ -29,6 +39,9 @@ interface InstagramAnalyticsHeaderProps {
   // Download options
   onDownloadCSV?: () => void
   onDownloadPNG?: () => void
+  // Account selection
+  selectedAccount?: string
+  onAccountChange?: (accountId: string) => void
 }
 
 const dateRangeOptions: Array<{ value: InstagramTimeRange; label: string }> = [
@@ -48,8 +61,11 @@ export function InstagramAnalyticsHeader({
   onRangeChange,
   onDownloadCSV,
   onDownloadPNG,
+  selectedAccount = "txmx",
+  onAccountChange,
 }: InstagramAnalyticsHeaderProps) {
   const isConnected = connectionStatus?.success
+  const currentAccount = instagramAccounts.find(a => a.id === selectedAccount) || instagramAccounts[0]
 
   return (
     <div className="bg-black border-b border-white/10 pt-20 overflow-x-hidden">
@@ -64,11 +80,8 @@ export function InstagramAnalyticsHeader({
               </div>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg font-bold text-white truncate">
-                  {accountData?.name || "Instagram Insights"}
+                  Instagram Insights
                 </h1>
-                <p className="text-white/50 text-[10px] sm:text-xs truncate">
-                  {accountData?.username ? `@${accountData.username}` : "Meta Business Suite"}
-                </p>
               </div>
             </div>
 
@@ -82,17 +95,28 @@ export function InstagramAnalyticsHeader({
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-pink-400" : "bg-red-400"}`} />
                 <span>{isConnected ? "Connected" : "Disconnected"}</span>
               </div>
-              {accountData?.followers_count && (
-                <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-xs text-white/60">
-                  <span className="font-semibold text-white">{accountData.followers_count.toLocaleString()}</span>
-                  <span>followers</span>
-                </div>
-              )}
             </div>
           </div>
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
+            {/* Account Dropdown */}
+            <div className="relative">
+              <select
+                value={selectedAccount}
+                onChange={(e) => onAccountChange?.(e.target.value)}
+                disabled={isLoading}
+                className="appearance-none bg-white/5 border border-white/10 text-white text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-white/10 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {instagramAccounts.map((account) => (
+                  <option key={account.id} value={account.id} className="bg-neutral-900 text-white">
+                    {account.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
+            </div>
+
             <Button
               onClick={onRefresh}
               disabled={isLoading}
