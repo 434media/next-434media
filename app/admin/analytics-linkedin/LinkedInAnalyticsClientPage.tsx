@@ -379,7 +379,7 @@ export default function LinkedInAnalyticsClientPage() {
   }
 
   return (
-    <div className="bg-black w-full overflow-x-hidden">
+    <div className="bg-black w-full overflow-x-hidden py-16">
       {/* LinkedIn Header */}
       <div className="w-full overflow-x-hidden">
         <LinkedInAnalyticsHeader

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { LinkedInPostWithInsights } from "../../types/linkedin-insights"
 
 interface LinkedInTopPostsTableProps {
@@ -9,6 +10,8 @@ interface LinkedInTopPostsTableProps {
     message?: string
   } | null
 }
+
+const INITIAL_POSTS_COUNT = 5
 
 function formatNumber(num: number): string {
   if (num >= 1000000) {
@@ -26,6 +29,8 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 export function LinkedInTopPostsTable({ posts, connectionStatus }: LinkedInTopPostsTableProps) {
+  const [showAll, setShowAll] = useState(false)
+
   if (!connectionStatus?.success) {
     return (
       <div className="p-4 rounded-xl bg-white/5 border border-white/10">
@@ -55,10 +60,14 @@ export function LinkedInTopPostsTable({ posts, connectionStatus }: LinkedInTopPo
     )
   }
 
-  // Sort posts by engagement
+  // Sort posts by engagement (or impressions as fallback)
   const sortedPosts = [...posts].sort(
-    (a, b) => (b.insights?.engagement || 0) - (a.insights?.engagement || 0)
+    (a, b) => (b.insights?.impressions || 0) - (a.insights?.impressions || 0)
   )
+
+  // Show limited posts unless "Show All" is clicked
+  const displayedPosts = showAll ? sortedPosts : sortedPosts.slice(0, INITIAL_POSTS_COUNT)
+  const hasMorePosts = sortedPosts.length > INITIAL_POSTS_COUNT
 
   return (
     <div className="overflow-hidden rounded-xl border border-white/10">
@@ -91,7 +100,7 @@ export function LinkedInTopPostsTable({ posts, connectionStatus }: LinkedInTopPo
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {sortedPosts.map((post, index) => (
+            {displayedPosts.map((post, index) => (
               <tr
                 key={post.id}
                 className="hover:bg-white/5 transition-colors"
@@ -169,7 +178,7 @@ export function LinkedInTopPostsTable({ posts, connectionStatus }: LinkedInTopPo
 
       {/* Mobile Cards */}
       <div className="md:hidden divide-y divide-white/5">
-        {sortedPosts.map((post, index) => (
+        {displayedPosts.map((post, index) => (
           <div key={post.id} className="p-4 hover:bg-white/5 transition-colors">
             <div className="flex items-start gap-3 mb-3">
               <span className="text-xs text-white/30 font-medium">#{index + 1}</span>
@@ -226,6 +235,32 @@ export function LinkedInTopPostsTable({ posts, connectionStatus }: LinkedInTopPo
           </div>
         ))}
       </div>
+
+      {/* Show More/Less Button */}
+      {hasMorePosts && (
+        <div className="p-4 border-t border-white/5">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="w-full py-2 px-4 text-sm font-medium text-[#0077B5] hover:text-[#00a0dc] transition-colors flex items-center justify-center gap-2"
+          >
+            {showAll ? (
+              <>
+                Show Less
+                <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            ) : (
+              <>
+                Show More ({sortedPosts.length - INITIAL_POSTS_COUNT} more posts)
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

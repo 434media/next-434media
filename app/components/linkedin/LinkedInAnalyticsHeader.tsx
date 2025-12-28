@@ -1,6 +1,14 @@
 "use client"
 
+import { ChevronDown } from "lucide-react"
 import type { LinkedInTimeRange } from "../../types/linkedin-insights"
+
+// LinkedIn pages available for selection
+const linkedinPages = [
+  { id: "devsa", label: "DEVSA", value: "devsa", available: true },
+  { id: "434media", label: "434 MEDIA", value: "434media", available: false },
+  { id: "vemosvamos", label: "Vemos Vamos", value: "vemosvamos", available: false },
+]
 
 interface LinkedInAnalyticsHeaderProps {
   onRefresh: () => void
@@ -20,6 +28,8 @@ interface LinkedInAnalyticsHeaderProps {
   onRangeChange: (range: LinkedInTimeRange) => void
   onDownloadCSV?: () => void
   onDownloadPNG?: () => void
+  selectedPage?: string
+  onPageChange?: (pageId: string) => void
 }
 
 const timeRanges: { value: LinkedInTimeRange; label: string }[] = [
@@ -39,7 +49,11 @@ export function LinkedInAnalyticsHeader({
   onRangeChange,
   onDownloadCSV,
   onDownloadPNG,
+  selectedPage = "devsa",
+  onPageChange,
 }: LinkedInAnalyticsHeaderProps) {
+  const currentPage = linkedinPages.find(p => p.id === selectedPage) || linkedinPages[0]
+
   return (
     <div className="bg-gradient-to-r from-[#0077B5]/20 via-black to-black border-b border-white/10">
       <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
@@ -69,6 +83,33 @@ export function LinkedInAnalyticsHeader({
 
           {/* Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Page Dropdown */}
+            <div className="relative">
+              <select
+                value={selectedPage}
+                onChange={(e) => {
+                  const page = linkedinPages.find(p => p.id === e.target.value)
+                  if (page?.available) {
+                    onPageChange?.(e.target.value)
+                  }
+                }}
+                disabled={isLoading}
+                className="appearance-none bg-white/5 border border-white/10 text-white text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-white/10 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0077B5]/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {linkedinPages.map((page) => (
+                  <option 
+                    key={page.id} 
+                    value={page.id} 
+                    className="bg-neutral-900 text-white"
+                    disabled={!page.available}
+                  >
+                    {page.label}{!page.available ? " (Coming Soon)" : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
+            </div>
+
             {/* Download Buttons */}
             {onDownloadCSV && (
               <button

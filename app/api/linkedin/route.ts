@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
           const orgData = await fetchLinkedInData(
             `organizations/${organizationId}`,
             accessToken,
-            { projection: "(id,name,vanityName,localizedName,logoV2,coverPhotoV2)" }
+            {} // No projection - not supported in versioned REST API
           )
 
           return NextResponse.json({
@@ -169,11 +169,8 @@ export async function GET(request: NextRequest) {
 
       case "organization-info": {
         // Get organization details including follower count
-        const [orgData, followerData] = await Promise.all([
-          fetchLinkedInData(`organizations/${organizationId}`, accessToken, {
-            projection:
-              "(id,name,vanityName,localizedName,localizedDescription,localizedWebsite,staffCountRange,industries,logoV2,coverPhotoV2)",
-          }),
+        const [orgData, followerData, networkSize] = await Promise.all([
+          fetchLinkedInData(`organizations/${organizationId}`, accessToken, {}),
           fetchLinkedInData(
             `organizationalEntityFollowerStatistics`,
             accessToken,
@@ -182,11 +179,57 @@ export async function GET(request: NextRequest) {
               organizationalEntity: organizationUrn,
             }
           ).catch(() => null),
+          // Use networkSizes endpoint for more reliable follower count
+          fetchLinkedInData(
+            `networkSizes/${organizationUrn}`,
+            accessToken,
+            {
+              edgeType: "COMPANY_FOLLOWED_BY_MEMBER",
+            }
+          ).catch(() => null),
         ])
 
-        const followersCount =
-          followerData?.elements?.[0]?.followerCounts?.organicFollowerCount +
-            followerData?.elements?.[0]?.followerCounts?.paidFollowerCount || 0
+        // Log raw organization data for debugging
+        console.log("[LinkedIn API] Org data keys:", Object.keys(orgData || {}))
+        console.log("[LinkedIn API] Has logoV2:", !!orgData.logoV2)
+        console.log("[LinkedIn API] Description field:", orgData.localizedDescription || orgData.description || "(none)")
+
+        // Prefer networkSizes data, fallback to follower statistics
+        let followersCount = networkSize?.firstDegreeSize || 0
+        if (!followersCount) {
+          followersCount =
+            (followerData?.elements?.[0]?.followerCounts?.organicFollowerCount || 0) +
+              (followerData?.elements?.[0]?.followerCounts?.paidFollowerCount || 0)
+        }
+
+        // Extract logo URL from logoV2 object - LinkedIn returns URNs or complex nested structure
+        // logoV2.original/cropped can be: URN string OR object with vectorImage
+        let logoUrl: string | undefined
+        try {
+          console.log("[LinkedIn API] logoV2 structure:", JSON.stringify(orgData.logoV2, null, 2)?.substring(0, 500))
+          
+          // Check if logoV2 contains direct vectorImage data
+          if (orgData.logoV2?.original && typeof orgData.logoV2.original === 'object') {
+            // New format: logoV2.original is an object with vectorImage
+            const vectorImage = orgData.logoV2.original.vectorImage
+            if (vectorImage?.rootUrl && vectorImage?.artifacts?.[0]?.fileIdentifyingUrlPathSegment) {
+              logoUrl = `${vectorImage.rootUrl}${vectorImage.artifacts[0].fileIdentifyingUrlPathSegment}`
+            }
+          } else if (orgData.logoV2?.cropped && typeof orgData.logoV2.cropped === 'object') {
+            const vectorImage = orgData.logoV2.cropped.vectorImage
+            if (vectorImage?.rootUrl && vectorImage?.artifacts?.[0]?.fileIdentifyingUrlPathSegment) {
+              logoUrl = `${vectorImage.rootUrl}${vectorImage.artifacts[0].fileIdentifyingUrlPathSegment}`
+            }
+          }
+          
+          // If logoV2 contains URN strings, we can't resolve them without additional API calls
+          // Log for debugging
+          if (!logoUrl && orgData.logoV2) {
+            console.log("[LinkedIn API] logoV2 appears to be URN-based, cannot resolve to URL directly")
+          }
+        } catch (e) {
+          console.log("[LinkedIn API] Logo parsing error:", e)
+        }
 
         return NextResponse.json({
           data: {
@@ -194,11 +237,12 @@ export async function GET(request: NextRequest) {
             name: orgData.localizedName || orgData.name,
             vanityName: orgData.vanityName,
             localizedName: orgData.localizedName,
-            description: orgData.localizedDescription,
-            websiteUrl: orgData.localizedWebsite,
-            industry: orgData.industries?.[0],
+            description: orgData.localizedDescription || orgData.description,
+            websiteUrl: orgData.localizedWebsite || orgData.website,
+            industry: orgData.localizedIndustry || orgData.industries?.[0],
             staffCountRange: orgData.staffCountRange,
             followersCount,
+            logoUrl,
             pageUrl: `https://www.linkedin.com/company/${orgData.vanityName}`,
           },
         })
@@ -208,20 +252,42 @@ export async function GET(request: NextRequest) {
         // Get organization page statistics
         const { startDate, endDate } = getLinkedInDateRange(range)
 
-        // Fetch page statistics
-        const pageStatsData = await fetchLinkedInData(
-          `organizationPageStatistics`,
-          accessToken,
-          {
-            q: "organization",
-            organization: organizationUrn,
-            "timeIntervals.timeGranularityType": "DAY",
-            "timeIntervals.timeRange.start": startDate.toString(),
-            "timeIntervals.timeRange.end": endDate.toString(),
+        // Try lifetime stats first (no time range) - more reliable and doesn't require special formatting
+        // Then fall back to time-bound if needed
+        let pageStatsData: any = { elements: [] }
+        
+        // First try lifetime stats (simpler, more reliable)
+        try {
+          pageStatsData = await fetchLinkedInData(
+            `organizationPageStatistics`,
+            accessToken,
+            {
+              q: "organization",
+              organization: organizationUrn,
+            }
+          )
+          console.log("[LinkedIn API] Lifetime page stats fetched successfully")
+        } catch (e: any) {
+          console.log("[LinkedIn API] Lifetime page stats failed:", e.message)
+          // Try time-bound with Restli 2.0 format
+          try {
+            const timeIntervalsParam = `(timeRange:(start:${startDate},end:${endDate}),timeGranularityType:DAY)`
+            pageStatsData = await fetchLinkedInData(
+              `organizationPageStatistics`,
+              accessToken,
+              {
+                q: "organization",
+                organization: organizationUrn,
+                timeIntervals: timeIntervalsParam,
+              }
+            )
+            console.log("[LinkedIn API] Time-bound page stats fetched successfully")
+          } catch (e2: any) {
+            console.log("[LinkedIn API] Time-bound page stats also failed:", e2.message)
           }
-        ).catch(() => ({ elements: [] }))
+        }
 
-        // Fetch follower statistics
+        // Fetch follower statistics (less API-intensive, just one call)
         const followerStatsData = await fetchLinkedInData(
           `organizationalEntityFollowerStatistics`,
           accessToken,
@@ -229,20 +295,50 @@ export async function GET(request: NextRequest) {
             q: "organizationalEntity",
             organizationalEntity: organizationUrn,
           }
-        ).catch(() => ({ elements: [] }))
+        ).catch((e) => {
+          console.log("[LinkedIn API] Follower stats fetch failed:", e.message)
+          return { elements: [] }
+        })
 
-        // Fetch share (post) statistics
-        const shareStatsData = await fetchLinkedInData(
-          `organizationalEntityShareStatistics`,
-          accessToken,
-          {
-            q: "organizationalEntity",
-            organizationalEntity: organizationUrn,
-            "timeIntervals.timeGranularityType": "DAY",
-            "timeIntervals.timeRange.start": startDate.toString(),
-            "timeIntervals.timeRange.end": endDate.toString(),
-          }
-        ).catch(() => ({ elements: [] }))
+        // Fetch share (post) statistics - try lifetime first
+        let shareStatsData: any = { elements: [] }
+        try {
+          shareStatsData = await fetchLinkedInData(
+            `organizationalEntityShareStatistics`,
+            accessToken,
+            {
+              q: "organizationalEntity",
+              organizationalEntity: organizationUrn,
+            }
+          )
+          console.log("[LinkedIn API] Lifetime share stats fetched successfully")
+        } catch (e: any) {
+          console.log("[LinkedIn API] Share stats fetch failed:", e.message)
+        }
+
+        // Log raw responses for debugging
+        console.log("[LinkedIn API] Page stats elements count:", pageStatsData.elements?.length || 0)
+        if (pageStatsData.elements?.length > 0) {
+          console.log("[LinkedIn API] Page stats first element keys:", Object.keys(pageStatsData.elements[0]))
+          console.log("[LinkedIn API] Total page stats:", JSON.stringify(pageStatsData.elements[0]?.totalPageStatistics?.views || {}).substring(0, 500))
+        }
+        console.log("[LinkedIn API] Follower stats raw:", JSON.stringify(followerStatsData.elements?.[0] || {}))
+        console.log("[LinkedIn API] Share stats raw:", JSON.stringify(shareStatsData.elements?.[0]?.totalShareStatistics || {}))
+
+        // Also fetch network size for more reliable follower count
+        let networkSize: any = null
+        try {
+          networkSize = await fetchLinkedInData(
+            `networkSizes/${organizationUrn}`,
+            accessToken,
+            {
+              edgeType: "COMPANY_FOLLOWED_BY_MEMBER",
+            }
+          )
+          console.log("[LinkedIn API] Network size:", networkSize?.firstDegreeSize)
+        } catch (e: any) {
+          console.log("[LinkedIn API] Network size fetch failed:", e.message)
+        }
 
         // Aggregate statistics
         const pageStats = pageStatsData.elements || []
@@ -264,6 +360,9 @@ export async function GET(request: NextRequest) {
 
         const organicFollowers = followerStats.followerCounts?.organicFollowerCount || 0
         const paidFollowers = followerStats.followerCounts?.paidFollowerCount || 0
+        
+        // Prefer networkSizes data for total followers
+        const totalFollowers = networkSize?.firstDegreeSize || (organicFollowers + paidFollowers)
 
         return NextResponse.json({
           data: {
@@ -280,7 +379,7 @@ export async function GET(request: NextRequest) {
             careersPageViews: totalCareersPageViews,
 
             // Follower Statistics
-            totalFollowers: organicFollowers + paidFollowers,
+            totalFollowers,
             organicFollowers,
             paidFollowers,
             followerGains: followerStats.followerGains?.organicFollowerGain || 0,
@@ -313,57 +412,78 @@ export async function GET(request: NextRequest) {
           }
         ).catch(() => ({ elements: [] }))
 
-        // Get share statistics for each post
         const posts = postsData.elements || []
-        const postsWithInsights = await Promise.all(
-          posts.map(async (post: any) => {
-            const shareUrn = post.activity || `urn:li:share:${post.id}`
-
-            // Try to get individual share statistics
-            const shareStats = await fetchLinkedInData(
-              `organizationalEntityShareStatistics`,
-              accessToken,
-              {
-                q: "organizationalEntity",
-                organizationalEntity: organizationUrn,
-                shares: shareUrn,
+        console.log("[LinkedIn API] Posts fetched:", posts.length)
+        
+        // Process posts - only fetch stats for first 3 posts SEQUENTIALLY to avoid rate limiting
+        const postsWithInsights = []
+        for (let index = 0; index < posts.length; index++) {
+          const post = posts[index]
+          
+          // The post ID may already be a URN like "urn:li:share:123" or "urn:li:ugcPost:123"
+          let shareUrn = post.id
+          
+          // If id doesn't start with urn:, construct it based on the content type
+          if (!post.id.startsWith('urn:li:')) {
+            shareUrn = post.activity || `urn:li:share:${post.id}`
+          }
+          
+          // Only fetch stats for first 3 posts SEQUENTIALLY to avoid rate limiting
+          let stats: Record<string, number> = {}
+          if (index < 3) {
+            try {
+              console.log(`[LinkedIn API] Fetching stats for post ${index + 1}/3`)
+              const shareStats = await fetchLinkedInData(
+                `organizationalEntityShareStatistics`,
+                accessToken,
+                {
+                  q: "organizationalEntity",
+                  organizationalEntity: organizationUrn,
+                  shares: shareUrn,
+                }
+              )
+              stats = shareStats?.elements?.[0]?.totalShareStatistics || {}
+              console.log(`[LinkedIn API] Post ${index + 1} stats:`, stats)
+            } catch (e: any) {
+              console.log(`[LinkedIn API] Post ${index + 1} stats failed:`, e.message)
+              // If rate limited, skip remaining stats
+              if (e.message.includes('429') || e.message.includes('throttle')) {
+                console.log("[LinkedIn API] Rate limited, skipping remaining post stats")
               }
-            ).catch(() => null)
-
-            const stats = shareStats?.elements?.[0]?.totalShareStatistics || {}
-
-            return {
-              id: post.id,
-              author: post.owner,
-              commentary: post.text?.text || post.specificContent?.["com.linkedin.ugc.ShareContent"]?.shareCommentary?.text || "",
-              createdAt: post.created?.time
-                ? new Date(post.created.time).toISOString()
-                : new Date().toISOString(),
-              lastModifiedAt: post.lastModified?.time
-                ? new Date(post.lastModified.time).toISOString()
-                : new Date().toISOString(),
-              visibility: post.visibility?.["com.linkedin.ugc.MemberNetworkVisibility"] || "PUBLIC",
-              lifecycleState: "PUBLISHED",
-              permalink: `https://www.linkedin.com/feed/update/${shareUrn}`,
-              insights: {
-                postId: post.id,
-                impressions: stats.impressionCount || 0,
-                uniqueImpressions: stats.uniqueImpressionsCount || 0,
-                clicks: stats.clickCount || 0,
-                likes: stats.likeCount || 0,
-                comments: stats.commentCount || 0,
-                shares: stats.shareCount || 0,
-                engagement: stats.engagement || 0,
-                engagementRate:
-                  stats.impressionCount > 0
-                    ? ((stats.likeCount + stats.commentCount + stats.shareCount) /
-                        stats.impressionCount) *
-                      100
-                    : 0,
-              },
             }
+          }
+
+          postsWithInsights.push({
+            id: post.id,
+            author: post.owner || post.author,
+            commentary: post.commentary || post.text?.text || post.specificContent?.["com.linkedin.ugc.ShareContent"]?.shareCommentary?.text || "",
+            createdAt: post.createdAt || (post.created?.time
+              ? new Date(post.created.time).toISOString()
+              : new Date().toISOString()),
+            lastModifiedAt: post.lastModifiedAt || (post.lastModified?.time
+              ? new Date(post.lastModified.time).toISOString()
+              : new Date().toISOString()),
+            visibility: post.visibility || "PUBLIC",
+            lifecycleState: post.lifecycleState || "PUBLISHED",
+            permalink: `https://www.linkedin.com/feed/update/${shareUrn}`,
+            insights: {
+              postId: post.id,
+              impressions: stats.impressionCount || 0,
+              uniqueImpressions: stats.uniqueImpressionsCount || 0,
+              clicks: stats.clickCount || 0,
+              likes: stats.likeCount || 0,
+              comments: stats.commentCount || 0,
+              shares: stats.shareCount || 0,
+              engagement: stats.engagement || 0,
+              engagementRate:
+                stats.impressionCount > 0
+                  ? (((stats.likeCount || 0) + (stats.commentCount || 0) + (stats.shareCount || 0)) /
+                      stats.impressionCount) *
+                    100
+                  : 0,
+            },
           })
-        )
+        }
 
         return NextResponse.json({
           data: postsWithInsights,
