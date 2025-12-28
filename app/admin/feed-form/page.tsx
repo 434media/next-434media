@@ -40,7 +40,7 @@ function CollapsibleSection({
         ? 'border-blue-300 shadow-lg shadow-blue-100/50 bg-white' 
         : isComplete 
           ? 'border-green-200 bg-green-50/30 hover:border-green-300' 
-          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+          : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'
     }`}>
       <button
         type="button"
@@ -53,17 +53,17 @@ function CollapsibleSection({
               ? 'bg-blue-100 text-blue-600' 
               : isComplete 
                 ? 'bg-green-100 text-green-600' 
-                : 'bg-gray-100 text-gray-500'
+                : 'bg-neutral-100 text-neutral-500'
           }`}>
             {icon}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className={`font-semibold ${isOpen ? 'text-blue-900' : 'text-gray-900'}`}>
+              <h3 className={`font-semibold ${isOpen ? 'text-blue-900' : 'text-neutral-900'}`}>
                 {title}
               </h3>
             </div>
-            <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+            <p className="text-sm text-neutral-500 mt-0.5">{description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -71,12 +71,12 @@ function CollapsibleSection({
             <CheckCircle2 className="h-5 w-5 text-green-500" />
           )}
           <div className={`p-1 rounded-full transition-colors ${
-            isOpen ? 'bg-blue-100' : 'bg-gray-100'
+            isOpen ? 'bg-blue-100' : 'bg-neutral-100'
           }`}>
             {isOpen ? (
-              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'text-blue-600' : 'text-gray-400'}`} />
+              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'text-blue-600' : 'text-neutral-400'}`} />
             ) : (
-              <ChevronRight className={`h-5 w-5 ${isComplete ? 'text-green-500' : 'text-gray-400'}`} />
+              <ChevronRight className={`h-5 w-5 ${isComplete ? 'text-green-500' : 'text-neutral-400'}`} />
             )}
           </div>
         </div>
@@ -89,7 +89,7 @@ function CollapsibleSection({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
           >
-            <div className="px-5 pb-5 pt-2 border-t border-gray-100">
+            <div className="px-5 pb-5 pt-2 border-t border-neutral-100">
               {children}
             </div>
           </motion.div>
@@ -136,7 +136,7 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
   // For rich text, render HTML
   const renderValue = () => {
     if (!value) {
-      return <span className="text-gray-400 italic">Click to add content</span>
+      return <span className="text-neutral-400 italic">Click to add content</span>
     }
     if (isRichText) {
       // Simple markdown-like rendering for preview
@@ -146,12 +146,12 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
         .replace(/\n/g, '<br />')
       return (
         <div 
-          className="prose prose-sm max-w-none text-gray-700"
+          className="prose prose-sm max-w-none text-neutral-700"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       )
     }
-    return <span className="text-gray-700">{value}</span>
+    return <span className="text-neutral-700">{value}</span>
   }
 
   return (
@@ -160,15 +160,15 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
       onClick={() => setIsEditing(true)}
     >
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-500 group-hover:text-blue-600 transition-colors">
+        <label className="text-sm font-medium text-neutral-500 group-hover:text-blue-600 transition-colors">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-blue-600 px-2 py-1 rounded-md group-hover:bg-blue-50 transition-all">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 group-hover:text-blue-600 px-2 py-1 rounded-md group-hover:bg-blue-50 transition-all">
           <Pencil className="h-3 w-3" />
           <span className="hidden group-hover:inline">Click to edit</span>
         </span>
       </div>
-      <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[44px] group-hover:border-blue-300 group-hover:bg-blue-50/30 transition-all">
+      <div className="px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-lg min-h-[44px] group-hover:border-blue-300 group-hover:bg-blue-50/30 transition-all">
         {renderValue()}
       </div>
     </div>
@@ -486,9 +486,9 @@ export default function FeedFormPage() {
       case "draft":
         return "bg-yellow-100 text-yellow-800"
       case "archived":
-        return "bg-gray-100 text-gray-800"
+        return "bg-neutral-100 text-neutral-800"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-neutral-100 text-neutral-800"
     }
   }
 
@@ -504,7 +504,7 @@ export default function FeedFormPage() {
       case "newsletter":
         return "bg-orange-100 text-orange-800"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-neutral-100 text-neutral-800"
     }
   }
 
@@ -869,16 +869,18 @@ export default function FeedFormPage() {
         {/* Header */}
         <div className="mb-8">
           <Link href="/admin">
-            <Button variant="outline" className="mb-6 hover:bg-gray-50">
+            <Button variant="outline" className="mb-6 hover:bg-neutral-50">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Admin
             </Button>
           </Link>
-          <div>
-            <h1 className="text-5xl md:text-6xl font-black mb-3 tracking-tight" style={{ fontFamily: 'var(--font-menda-black)' }}>
-              THE FEED
+          <div className="">
+            <h1 className="max-w-3xl uppercase text-5xl md:text-6xl font-black mb-3 tracking-tight" style={{ fontFamily: 'var(--font-menda-black)' }}>
+              Brand Content Management
             </h1>
-            <p className="text-lg text-gray-600 mb-6">Manage content across all brand channels</p>
+            <p className="max-w-xl text-lg text-neutral-600 mb-6">
+              Manage and schedule content for <span className="font-semibold text-neutral-900">The Feed (Digital Canvas), Culture Deck (Vemos Vamos), and 8 Count (TXMX Boxing)</span> all in one place.
+            </p>
             
             {/* Brand Selector - Hero Element with Custom Gradients */}
             <div className={`rounded-xl p-6 shadow-lg transition-all ${
@@ -907,7 +909,7 @@ export default function FeedFormPage() {
                   setSelectedBrand(e.target.value)
                   setActiveTab("view")
                 }}
-                className="w-full px-4 py-3 text-lg font-bold rounded-lg border-2 border-white bg-white text-gray-900 focus:ring-4 focus:ring-white/50 focus:outline-none"
+                className="w-full px-4 py-3 text-lg font-bold rounded-lg border-2 border-white bg-white text-neutral-900 focus:ring-4 focus:ring-white/50 focus:outline-none"
               >
                 {BRAND_FEEDS.map((brand) => (
                   <option key={brand.id} value={brand.id}>
@@ -924,11 +926,11 @@ export default function FeedFormPage() {
 
         {/* Filter Tags - Only show when viewing */}
         {activeTab === "view" && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+            <div className="bg-white border border-neutral-200 rounded-lg p-4 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Status Filter */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Status</label>
+                  <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-wide">Status</label>
                   <div className="flex flex-wrap gap-2">
                     {["all", "draft", "published", "archived"].map((status) => (
                       <button
@@ -941,9 +943,9 @@ export default function FeedFormPage() {
                               : status === "draft"
                               ? "bg-yellow-500 text-white shadow-sm"
                               : status === "archived"
-                              ? "bg-gray-600 text-white shadow-sm"
+                              ? "bg-neutral-600 text-white shadow-sm"
                               : "bg-blue-600 text-white shadow-sm"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                         }`}
                       >
                         {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
@@ -954,7 +956,7 @@ export default function FeedFormPage() {
 
                 {/* Type Filter */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Type</label>
+                  <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-wide">Type</label>
                   <div className="flex flex-wrap gap-2">
                     {["all", "newsletter", "video", "article", "podcast"].map((type) => (
                       <button
@@ -970,8 +972,8 @@ export default function FeedFormPage() {
                               ? "bg-blue-600 text-white shadow-sm"
                               : type === "podcast"
                               ? "bg-pink-600 text-white shadow-sm"
-                              : "bg-gray-900 text-white shadow-sm"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              : "bg-neutral-900 text-white shadow-sm"
+                            : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                         }`}
                       >
                         {type === "all" ? "All" : type.charAt(0).toUpperCase() + type.slice(1)}
@@ -982,19 +984,19 @@ export default function FeedFormPage() {
 
                 {/* Date Range */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Date Range</label>
+                  <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-wide">Date Range</label>
                   <div className="flex gap-2">
                     <input
                       type="date"
                       value={dateFilter.start}
                       onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-gray-300 text-xs focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     />
                     <input
                       type="date"
                       value={dateFilter.end}
                       onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-gray-300 text-xs focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   {(dateFilter.start || dateFilter.end) && (
@@ -1010,9 +1012,9 @@ export default function FeedFormPage() {
               
               {/* Active Filter Summary */}
               {(filterStatus !== "all" || filterType !== "all" || dateFilter.start || dateFilter.end) && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-600">
-                    Showing <span className="font-bold text-gray-900">{filteredFeedItems.length}</span> of <span className="font-bold text-gray-900">{feedItems.length}</span> feeds
+                <div className="mt-3 pt-3 border-t border-neutral-200">
+                  <p className="text-xs text-neutral-600">
+                    Showing <span className="font-bold text-neutral-900">{filteredFeedItems.length}</span> of <span className="font-bold text-neutral-900">{feedItems.length}</span> feeds
                   </p>
                 </div>
               )}
@@ -1049,17 +1051,17 @@ export default function FeedFormPage() {
           <div className="space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                <span className="ml-3 text-gray-500">Loading feeds...</span>
+                <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
+                <span className="ml-3 text-neutral-500">Loading feeds...</span>
               </div>
             ) : (
               <>
                 {/* Feed Items Grid */}
                 {filteredFeedItems.length === 0 ? (
-                  <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
-                    <Eye className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">No feed items found</h3>
-                    <p className="text-gray-500 text-sm">
+                  <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center shadow-sm">
+                    <Eye className="h-12 w-12 text-neutral-300 mx-auto mb-3" />
+                    <h3 className="text-xl font-bold text-neutral-900 mb-1">No feed items found</h3>
+                    <p className="text-neutral-500 text-sm">
                       {feedItems.length === 0
                         ? "Get started by using the Create New button above."
                         : "No items match your current filters."}
@@ -1073,11 +1075,11 @@ export default function FeedFormPage() {
                       return (
                         <div
                           key={item.id}
-                          className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-gray-300 hover:shadow-md transition-all duration-150 group"
+                          className="bg-white border border-neutral-200 rounded-lg overflow-hidden hover:border-neutral-300 hover:shadow-md transition-all duration-150 group"
                         >
                           {/* Image - Desktop only */}
                           {displayImage && (
-                            <div className="hidden md:block h-24 relative overflow-hidden bg-gray-100">
+                            <div className="hidden md:block h-24 relative overflow-hidden bg-neutral-100">
                               <img
                                 src={displayImage}
                                 alt={item.title}
@@ -1086,7 +1088,7 @@ export default function FeedFormPage() {
                               {/* Status indicator dot */}
                               <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full shadow-sm ${
                                 item.status === "published" ? "bg-green-500" :
-                                item.status === "draft" ? "bg-amber-500" : "bg-gray-400"
+                                item.status === "draft" ? "bg-amber-500" : "bg-neutral-400"
                               }`} title={item.status} />
                             </div>
                           )}
@@ -1106,17 +1108,17 @@ export default function FeedFormPage() {
                               {/* Mobile status dot */}
                               <div className={`md:hidden w-2 h-2 rounded-full ${
                                 item.status === "published" ? "bg-green-500" :
-                                item.status === "draft" ? "bg-amber-500" : "bg-gray-400"
+                                item.status === "draft" ? "bg-amber-500" : "bg-neutral-400"
                               }`} title={item.status} />
                             </div>
                             
                             {/* Title */}
-                            <h3 className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
+                            <h3 className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
                               {item.title}
                             </h3>
                             
                             {/* Date */}
-                            <p className="text-[11px] text-gray-400 mb-2">
+                            <p className="text-[11px] text-neutral-400 mb-2">
                               {formatDate(item.published_date)}
                             </p>
                             
@@ -1124,13 +1126,13 @@ export default function FeedFormPage() {
                             <div className="flex gap-1.5">
                               <button
                                 onClick={() => handleEdit(item)}
-                                className="flex-1 px-2 py-1.5 text-[11px] font-medium text-gray-600 bg-gray-50 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors"
+                                className="flex-1 px-2 py-1.5 text-[11px] font-medium text-neutral-600 bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDelete(item.id!)}
-                                className="px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
+                                className="px-2 py-1.5 text-[11px] font-medium text-neutral-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>
@@ -1150,12 +1152,12 @@ export default function FeedFormPage() {
         {activeTab === "create" && (
           <div className="relative">
             {/* Sticky Header Bar - Always visible while scrolling */}
-            <div className="sticky top-16 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm mb-6">
+            <div className="sticky top-16 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur-sm border-b border-neutral-200 shadow-sm mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 {/* Left: Status & Info */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status:</label>
+                    <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Status:</label>
                     <select
                       value={formData.status}
                       onChange={(e) => handleInputChange("status", e.target.value)}
@@ -1164,7 +1166,7 @@ export default function FeedFormPage() {
                           ? "bg-green-50 border-green-300 text-green-700 focus:ring-green-500"
                           : formData.status === "draft"
                           ? "bg-amber-50 border-amber-300 text-amber-700 focus:ring-amber-500"
-                          : "bg-gray-50 border-gray-300 text-gray-700 focus:ring-gray-500"
+                          : "bg-neutral-50 border-neutral-300 text-neutral-700 focus:ring-neutral-500"
                       }`}
                     >
                       <option value="draft">📝 Draft</option>
@@ -1176,7 +1178,7 @@ export default function FeedFormPage() {
                   {/* Completion Indicator */}
                   {formData.type === "newsletter" && (
                     <div className="hidden sm:flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="w-24 h-2 bg-neutral-200 rounded-full overflow-hidden">
                         <div 
                           className={`h-full rounded-full transition-all duration-300 ${
                             getCompletionPercentage() === 100 
@@ -1188,7 +1190,7 @@ export default function FeedFormPage() {
                           style={{ width: `${getCompletionPercentage()}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-gray-500">
+                      <span className="text-xs font-medium text-neutral-500">
                         {getCompletionPercentage()}%
                       </span>
                     </div>
@@ -1213,7 +1215,7 @@ export default function FeedFormPage() {
                       if (editingId) handleCancelEdit()
                       setActiveTab("view")
                     }}
-                    className="text-gray-600"
+                    className="text-neutral-600"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Cancel
@@ -1290,7 +1292,7 @@ export default function FeedFormPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm font-medium text-gray-600">Newsletter Sections</span>
+                  <span className="text-sm font-medium text-neutral-600">Newsletter Sections</span>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1300,11 +1302,11 @@ export default function FeedFormPage() {
                   >
                     Expand All
                   </button>
-                  <span className="text-gray-300">|</span>
+                  <span className="text-neutral-300">|</span>
                   <button
                     type="button"
                     onClick={collapseAllSections}
-                    className="text-xs text-gray-500 hover:text-gray-700 font-medium px-2 py-1 hover:bg-gray-100 rounded transition-colors"
+                    className="text-xs text-neutral-500 hover:text-neutral-700 font-medium px-2 py-1 hover:bg-neutral-100 rounded transition-colors"
                   >
                     Collapse All
                   </button>
@@ -1333,7 +1335,7 @@ export default function FeedFormPage() {
                         type="text"
                         value={formData.title}
                         onChange={(e) => handleInputChange("title", e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
                         placeholder="Enter feed item title"
                         required
                       />
@@ -1347,7 +1349,7 @@ export default function FeedFormPage() {
                         <select
                           value={formData.type}
                           onChange={(e) => handleInputChange("type", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                           <option value="video">🎬 Video</option>
                           <option value="article">📄 Article</option>
@@ -1367,7 +1369,7 @@ export default function FeedFormPage() {
                           type="date"
                           value={formData.published_date}
                           onChange={(e) => handleInputChange("published_date", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
                     </PreviewField>
@@ -1397,10 +1399,10 @@ export default function FeedFormPage() {
                         type="text"
                         value={formData.slug}
                         onChange={(e) => handleInputChange("slug", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                         placeholder="auto-generated-from-title"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Auto-generated from title if left empty</p>
+                      <p className="text-xs text-neutral-500 mt-1">Auto-generated from title if left empty</p>
                     </div>
                   </PreviewField>
                 </div>
@@ -1423,13 +1425,13 @@ export default function FeedFormPage() {
                         <Users className="h-4 w-4" />
                         Authors
                       </label>
-                      <p className="text-xs text-gray-500 mb-2">
+                      <p className="text-xs text-neutral-500 mb-2">
                         Comma-separated: Digital Canvas Team, Dev Team, Creative Team
                       </p>
                       <input
                         type="text"
                         onChange={(e) => handleArrayInput("authors", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Digital Canvas Team, Dev Team"
                       />
                       {formData.authors.length > 0 && (
@@ -1455,11 +1457,11 @@ export default function FeedFormPage() {
                         <Tag className="h-4 w-4" />
                         Topics
                       </label>
-                      <p className="text-xs text-gray-500 mb-2">Comma-separated tags</p>
+                      <p className="text-xs text-neutral-500 mb-2">Comma-separated tags</p>
                       <input
                         type="text"
                         onChange={(e) => handleArrayInput("topics", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Technology, Design, Business"
                       />
                       {formData.topics.length > 0 && (
@@ -1568,8 +1570,8 @@ export default function FeedFormPage() {
                         />
                       </div>
 
-                      <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <div className="border-t border-neutral-200 pt-4">
+                        <h4 className="font-semibold text-neutral-900 mb-4 flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-purple-500" />
                           Featured Post
                         </h4>
@@ -1581,7 +1583,7 @@ export default function FeedFormPage() {
                                 type="text"
                                 value={formData.featured_post_title || ""}
                                 onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                 placeholder="Featured post title"
                               />
                             </div>
@@ -1626,7 +1628,7 @@ export default function FeedFormPage() {
                             type="text"
                             value={formData.upcoming_event_title || ""}
                             onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Event title"
                           />
                         </div>
@@ -1664,7 +1666,7 @@ export default function FeedFormPage() {
                               type="text"
                               value={formData.upcoming_event_cta_text || ""}
                               onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder="Register Now"
                             />
                           </div>
@@ -1676,7 +1678,7 @@ export default function FeedFormPage() {
                               type="url"
                               value={formData.upcoming_event_cta_link || ""}
                               onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder="https://example.com/register"
                             />
                           </div>
@@ -1705,7 +1707,7 @@ export default function FeedFormPage() {
                               type="text"
                               value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
                               onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               placeholder={`Spotlight ${num} title`}
                             />
                           </div>
@@ -1727,7 +1729,7 @@ export default function FeedFormPage() {
                           label="Image"
                           hideUrl
                         />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-neutral-50 rounded-lg p-4 border border-neutral-200">
                           <PreviewField label="CTA Text" value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
                             <div>
                               <label className="block text-sm font-medium mb-2">CTA Text</label>
@@ -1735,7 +1737,7 @@ export default function FeedFormPage() {
                                 type="text"
                                 value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
                                 onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Learn More"
                               />
                             </div>
@@ -1747,7 +1749,7 @@ export default function FeedFormPage() {
                                 type="url"
                                 value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
                                 onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="https://example.com/link"
                               />
                             </div>
@@ -1760,7 +1762,7 @@ export default function FeedFormPage() {
               )}
 
               {/* Bottom Action Bar - For additional options */}
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-4 mt-6 border-t border-gray-200">
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-4 mt-6 border-t border-neutral-200">
                 <div className="flex flex-wrap gap-2">
                   {!editingId && (
                     <Button

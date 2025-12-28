@@ -2,9 +2,7 @@
 
 import type React from "react"
 
-import { motion } from "motion/react"
 import Link from "next/link"
-import Image from "next/image"
 import { useState, useEffect } from "react"
 import { ChevronRight, ChevronLeft, Bot } from "lucide-react"
 
@@ -14,7 +12,6 @@ interface AdminSection {
   subtitle: string
   href: string
   icon: React.ReactNode
-  delay: number
   size: "large" | "medium"
   description: string
 }
@@ -23,22 +20,20 @@ const adminSections: AdminSection[] = [
   {
     id: "analytics-hub",
     title: "ANALYTICS HUB",
-    subtitle: "GA4 • Instagram • Mailchimp",
+    subtitle: "Web • Instagram • Mailchimp • LinkedIn",
     href: "/admin/analytics",
-    icon: <GA4Icon className="w-8 h-8" />,
-    delay: 0.1,
+    icon: <GA4Icon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
-    description: "Unified dashboards for website traffic, social engagement, and email marketing performance in one place",
+    description: "Unified dashboards for website traffic, social engagement, email campaigns, and LinkedIn performance metrics",
   },
   {
     id: "feed-form",
-    title: "THE FEED",
-    subtitle: "Submit Feed Items",
+    title: "CONTENT MANAGEMENT HUB",
+    subtitle: "The Feed • Culture Deck • 8 COUNT",
     href: "/admin/feed-form",
-    icon: <FileTextIcon className="w-8 h-8" />,
-    delay: 0.15,
+    icon: <FileTextIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
-    description: "Submit new feed items that will be sent to Airtable for Digital Canvas distribution",
+    description: "Manage and schedule content for The Feed (Digital Canvas), The Culture Deck (Vemos Vamos), and The 8 COUNT (TXMX Boxing) from a single interface.",
   },
 ]
 
@@ -48,32 +43,19 @@ const testingSections: AdminSection[] = [
     title: "AI ASSISTANT",
     subtitle: "RAG Chatbot Testing",
     href: "/admin/ai-assistant",
-    icon: <Bot className="w-8 h-8" />,
-    delay: 0.1,
+    icon: <Bot className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Test and interact with the AI assistant powered by retrieval-augmented generation for accurate responses",
   },
 ]
 
 export default function AdminPage() {
-  const [hoveredSection, setHoveredSection] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [activeView, setActiveView] = useState<'admin' | 'testing'>('admin')
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  const getSquareClasses = (size: string) => {
-    switch (size) {
-      case "large":
-        return "col-span-1 sm:col-span-2 lg:row-span-2 h-32 sm:h-36 md:h-40 lg:h-48"
-      case "medium":
-        return "col-span-1 row-span-1 h-28 sm:h-32 md:h-36"
-      default:
-        return "col-span-1 sm:col-span-2 row-span-1 h-24 sm:h-28"
-    }
-  }
 
   if (!mounted) {
     return (
@@ -87,237 +69,118 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-24 sm:pt-28 md:pt-24">
-        {/* Top Navigation - Mobile First Design */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col gap-6 mb-12 md:flex-row md:items-center md:justify-between"
-        >
-          {/* Back to Home - Above tabs on mobile, top left on desktop */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pt-24 sm:pt-28 md:pt-24">
+        {/* Top Navigation */}
+        <div className="flex flex-col gap-6 mb-10 md:mb-12 md:flex-row md:items-center md:justify-between">
+          {/* Back to Home */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors duration-300 text-lg group justify-start"
+            className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors duration-200 text-base font-medium"
           >
-            <motion.span className="group-hover:-translate-x-1 transition-transform duration-300">
-              <ChevronLeft className="inline-block" />
-            </motion.span>
+            <ChevronLeft className="w-5 h-5" />
             Back to Home
           </Link>
 
-          {/* Navigation Tabs - Full width on mobile, centered on desktop */}
-          <div className="flex items-center gap-4 md:gap-8 justify-start md:justify-center">
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-6 md:gap-8">
             <button
               onClick={() => setActiveView('admin')}
-              className={`text-lg md:text-xl lg:text-2xl font-ggx88 transition-all duration-300 relative ${
+              className={`text-base md:text-lg font-ggx88 tracking-wide transition-colors duration-200 relative pb-2 ${
                 activeView === 'admin' 
                   ? 'text-white' 
-                  : 'text-gray-500 hover:text-gray-300'
+                  : 'text-neutral-500 hover:text-neutral-300'
               }`}
             >
               ADMIN PANEL
               {activeView === 'admin' && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute -bottom-2 left-0 right-0 h-0.5 bg-white"
-                  transition={{ duration: 0.3 }}
-                />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
               )}
             </button>
             <button
               onClick={() => setActiveView('testing')}
-              className={`text-lg md:text-xl lg:text-2xl font-ggx88 transition-all duration-300 relative ${
+              className={`text-base md:text-lg font-ggx88 tracking-wide transition-colors duration-200 relative pb-2 ${
                 activeView === 'testing' 
                   ? 'text-white' 
-                  : 'text-gray-500 hover:text-gray-300'
+                  : 'text-neutral-500 hover:text-neutral-300'
               }`}
             >
               TESTING PLAYGROUND
               {activeView === 'testing' && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute -bottom-2 left-0 right-0 h-0.5 bg-white"
-                  transition={{ duration: 0.3 }}
-                />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
               )}
             </button>
           </div>
 
           {/* Spacer for balance - hidden on mobile */}
-          <div className="hidden md:block md:w-32"></div>
-        </motion.div>
+          <div className="hidden md:block md:w-32" />
+        </div>
 
         {/* Header Section */}
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-8 text-left md:text-center"
-        >
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-white mb-3 md:mb-4 leading-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-300 to-white">
-              {activeView === 'admin' ? 'ADMIN PANEL' : 'TESTING PLAYGROUND'}
-            </span>
+        <div className="mb-10 md:mb-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-white mb-3 tracking-tight leading-none">
+            {activeView === 'admin' ? 'ADMIN PANEL' : 'TESTING PLAYGROUND'}
           </h1>
-          <motion.p
-            className="text-gray-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed text-left md:text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-          >
+          <p className="text-neutral-400 text-sm sm:text-base leading-relaxed max-w-2xl">
             {activeView === 'admin' 
-              ? 'Access to 434 Analytics and Content Management Tools'
+              ? 'Access to 434 Analytics and Content Management for all channels in one place'
               : 'Explore concept workflows built with different AI Models and integrations'
             }
-          </motion.p>
-        </motion.div>
+          </p>
+        </div>
 
         {/* Sections Grid */}
-        <motion.div 
-          key={activeView}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className={`grid gap-3 sm:gap-4 md:gap-6 lg:gap-8 auto-rows-min max-w-full mb-12 ${
-            activeView === 'admin' 
-              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' 
-              : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4'
-          }`}
-        >
+        <div className={`grid gap-4 sm:gap-5 md:gap-6 ${
+          activeView === 'admin' 
+            ? 'grid-cols-1 sm:grid-cols-2' 
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+        }`}>
           {currentSections.map((section) => (
-            <motion.div
+            <Link
               key={section.id}
-              initial={{ opacity: 0, scale: 0.8, rotateY: -15 }}
-              animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-              transition={{
-                duration: 0.7,
-                delay: section.delay,
-                type: "spring",
-                stiffness: 120,
-                damping: 15,
-              }}
-              className={`group relative overflow-hidden rounded-xl ${getSquareClasses(section.size)} border border-gray-800`}
-              onMouseEnter={() => setHoveredSection(section.id)}
-              onMouseLeave={() => setHoveredSection(null)}
+              href={section.href}
+              className="group relative block rounded-xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 transition-colors duration-200 hover:border-neutral-700 hover:bg-neutral-900"
             >
-              <Link href={section.href} className="block relative w-full h-full">
-                {/* Background */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900"
-                  animate={{
-                    scale: hoveredSection === section.id ? 1.02 : 1,
-                  }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                />
+              {/* 434 Media Logo Background Pattern */}
+              <div
+                className="absolute inset-0 opacity-[0.03] rounded-xl"
+                style={{
+                  backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
+                  backgroundSize: "48px 48px",
+                  backgroundRepeat: "repeat",
+                  backgroundPosition: "center",
+                }}
+              />
 
-                {/* 434 Media Logo Background Pattern */}
-                <div
-                  className="absolute inset-0 opacity-5"
-                  style={{
-                    backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
-                    backgroundSize: "60px 60px",
-                    backgroundRepeat: "repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-
-                {/* Hover glow effect */}
-                <motion.div
-                  className="absolute inset-0 bg-white/3 rounded-xl"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: hoveredSection === section.id ? 1 : 0 }}
-                  transition={{ duration: 0.3 }}
-                />
-
-                {/* Content Container */}
-                <div className="relative h-full flex flex-col justify-center items-start sm:items-center p-3 sm:p-4 md:p-5 z-10 text-left sm:text-center">
-                  <div className="flex flex-col items-start sm:items-center justify-center space-y-1.5 sm:space-y-2 w-full">
-                    {/* Icon */}
-                    <motion.div
-                      className="text-white mb-0.5 sm:mb-1"
-                      animate={{
-                        y: hoveredSection === section.id ? -2 : 0,
-                        scale: hoveredSection === section.id ? 1.05 : 1,
-                      }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                    >
-                      {section.icon}
-                    </motion.div>
-
-                    {/* Title */}
-                    <motion.h3
-                      className="font-ggx88 text-sm sm:text-base md:text-lg lg:text-xl text-white leading-tight"
-                      animate={{
-                        y: hoveredSection === section.id ? -1 : 0,
-                      }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                    >
-                      {section.title}
-                    </motion.h3>
-
-                    {/* Subtitle */}
-                    <motion.p
-                      className="font-geist-sans text-xs sm:text-sm text-gray-400 leading-relaxed"
-                      initial={{ opacity: 0.8 }}
-                      animate={{
-                        opacity: hoveredSection === section.id ? 1 : 0.8,
-                      }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                    >
-                      {section.subtitle}
-                    </motion.p>
-
-                    {/* Description - only show on large cards when hovered */}
-                    {section.size === "large" && (
-                      <motion.p
-                        className="font-geist-sans text-[10px] sm:text-xs text-gray-500 leading-relaxed max-w-xs hidden md:block"
-                        initial={{ opacity: 0 }}
-                        animate={{
-                          opacity: hoveredSection === section.id ? 0.7 : 0,
-                        }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                      >
-                        {section.description}
-                      </motion.p>
-                    )}
-                  </div>
+              {/* Content */}
+              <div className="relative z-10">
+                {/* Icon */}
+                <div className="text-white mb-4">
+                  {section.icon}
                 </div>
 
-                {/* Animated border */}
-                <motion.div
-                  className="absolute inset-0 border border-gray-700 rounded-xl"
-                  animate={{
-                    borderColor: hoveredSection === section.id ? "rgba(255,255,255,0.2)" : "rgba(55,65,81,1)",
-                  }}
-                  transition={{ duration: 0.3 }}
-                />
+                {/* Title */}
+                <h3 className="font-ggx88 text-base sm:text-lg text-white leading-tight tracking-wide mb-2">
+                  {section.title}
+                </h3>
+
+                {/* Subtitle */}
+                <p className="text-xs sm:text-sm text-neutral-400 font-medium leading-relaxed mb-3">
+                  {section.subtitle}
+                </p>
+
+                {/* Description */}
+                <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">
+                  {section.description}
+                </p>
 
                 {/* Arrow indicator */}
-                <motion.div
-                  className="absolute top-4 right-4"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{
-                    opacity: hoveredSection === section.id ? 1 : 0,
-                    x: hoveredSection === section.id ? 0 : -10,
-                  }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <ChevronRight className="w-5 h-5 text-white" />
-                </motion.div>
-
-                {/* Shimmer effect on hover */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full"
-                  animate={{
-                    translateX: hoveredSection === section.id ? "200%" : "-100%",
-                  }}
-                  transition={{ duration: 0.8, ease: "easeInOut" }}
-                />
-              </Link>
-            </motion.div>
+                <div className="absolute top-5 sm:top-6 right-5 sm:right-6 text-neutral-600 group-hover:text-neutral-400 transition-colors duration-200">
+                  <ChevronRight className="w-5 h-5" />
+                </div>
+              </div>
+            </Link>
           ))}
-        </motion.div>
+        </div>
       </div>
     </div>
   )
