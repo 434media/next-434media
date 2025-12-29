@@ -864,7 +864,7 @@ export default function FeedFormPage() {
   }
 
   return (
-    <div className="container mx-auto py-10 px-4 sm:px-6 pt-32 md:pt-24 max-w-7xl">
+    <div className="container mx-auto py-10 px-4 sm:px-6 pt-32 md:pt-24 max-w-7xl overflow-hidden">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
         <div className="mb-8">
@@ -875,7 +875,7 @@ export default function FeedFormPage() {
             </Button>
           </Link>
           <div className="">
-            <h1 className="max-w-3xl uppercase text-5xl md:text-6xl font-black mb-3 tracking-tight" style={{ fontFamily: 'var(--font-menda-black)' }}>
+            <h1 className="max-w-3xl uppercase text-5xl md:text-6xl mb-3 font-black md:font-menda-black tracking-tight">
               Brand Content Management
             </h1>
             <p className="max-w-xl text-lg text-neutral-600 mb-6">
