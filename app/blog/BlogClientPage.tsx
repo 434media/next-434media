@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { BookOpen, ChevronDown } from "lucide-react"
-import { getBlogCategoriesAction } from "@/app/actions/blog"
 import BlogCard from "../components/blog/BlogCard"
 import ScrollSpinLogo from "../components/blog/ScrollSpinLogo"
 import type { BlogPost, BlogCategory } from "../types/blog-types"

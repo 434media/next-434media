@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronLeft, Bot } from "lucide-react"
+import { ChevronRight, ChevronLeft, Bot, FileText, Calendar } from "lucide-react"
 
 interface AdminSection {
   id: string
@@ -12,7 +12,7 @@ interface AdminSection {
   subtitle: string
   href: string
   icon: React.ReactNode
-  size: "large" | "medium"
+  size: "large" | "medium" | "default"
   description: string
 }
 
@@ -34,6 +34,24 @@ const adminSections: AdminSection[] = [
     icon: <FileTextIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Manage and schedule content for The Feed (Digital Canvas), The Culture Deck (Vemos Vamos), and The 8 COUNT (TXMX Boxing) from a single interface.",
+  },
+  {
+    id: "blog",
+    title: "BLOG MANAGEMENT",
+    subtitle: "Create • Edit • Publish",
+    href: "/admin/blog",
+    icon: <FileText className="w-6 h-6 sm:w-7 sm:h-7" />,
+    size: "large",
+    description: "Create and manage blog posts with rich text editing, images, and meta optimization",
+  },
+  {
+    id: "events",
+    title: "EVENTS CALENDAR",
+    subtitle: "Manual • Meetup • Eventbrite • Lu.ma",
+    href: "/admin/events",
+    icon: <Calendar className="w-6 h-6 sm:w-7 sm:h-7" />,
+    size: "large",
+    description: "Add events manually or import from Meetup, Eventbrite, and Lu.ma URLs",
   },
 ]
 
@@ -131,8 +149,8 @@ export default function AdminPage() {
         {/* Sections Grid */}
         <div className={`grid gap-4 sm:gap-5 md:gap-6 ${
           activeView === 'admin' 
-            ? 'grid-cols-1 sm:grid-cols-2' 
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            ? 'grid-cols-1 sm:grid-cols-3' 
+            : 'grid-cols-1 sm:grid-cols-3'
         }`}>
           {currentSections.map((section) => (
             <Link

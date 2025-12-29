@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache"
 import type { Event } from "../types/event-types"
 import {
-  getEventsFromAirtable,
-  createEventInAirtable,
-  updateEventInAirtable,
-  deleteEventFromAirtable,
-  getEventByIdFromAirtable,
-  testAirtableConnection,
-  markPastEvents,
-} from "../lib/airtable-events"
+  getEventsFromFirestore,
+  createEventInFirestore,
+  updateEventInFirestore,
+  deleteEventFromFirestore,
+  getEventByIdFromFirestore,
+  testFirestoreEventsConnection,
+  markPastEventsInFirestore,
+} from "../lib/firestore-events"
 
 // Rate limiting store (in production, use Redis/KV)
 const attempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -83,19 +83,19 @@ export async function deleteEventAction(id: string, adminPassword: string, turns
     // Reset attempts on successful verification
     attempts.delete(clientIP)
 
-    // Test Airtable connection
-    const isConnected = await testAirtableConnection()
+    // Test Firestore connection
+    const isConnected = await testFirestoreEventsConnection()
     if (!isConnected) {
-      throw new Error("Airtable connection failed")
+      throw new Error("Firestore connection failed")
     }
 
     // Proceed with deletion
-    await deleteEventFromAirtable(id)
+    await deleteEventFromFirestore(id)
     revalidatePath("/events")
 
     return {
       success: true,
-      message: "Event deleted successfully from Airtable!",
+      message: "Event deleted successfully!",
     }
   } catch (error) {
     console.error("Error deleting event:", error)
@@ -116,18 +116,18 @@ export async function addEventAction(eventData: Omit<Event, "id">, adminPassword
       }
     }
 
-    const isConnected = await testAirtableConnection()
+    const isConnected = await testFirestoreEventsConnection()
     if (!isConnected) {
-      throw new Error("Airtable connection failed")
+      throw new Error("Firestore connection failed")
     }
 
-    const newEvent = await createEventInAirtable(eventData)
+    const newEvent = await createEventInFirestore(eventData)
     revalidatePath("/events")
 
     return {
       success: true,
       event: newEvent,
-      message: "Event added successfully to Airtable!",
+      message: "Event added successfully!",
     }
   } catch (error) {
     console.error("Error adding event:", error)
@@ -140,13 +140,13 @@ export async function addEventAction(eventData: Omit<Event, "id">, adminPassword
 
 export async function updateEventAction(id: string, updates: Partial<Event>) {
   try {
-    const updatedEvent = await updateEventInAirtable(id, updates)
+    const updatedEvent = await updateEventInFirestore(id, updates)
     revalidatePath("/events")
 
     return {
       success: true,
       event: updatedEvent,
-      message: "Event updated successfully in Airtable!",
+      message: "Event updated successfully!",
     }
   } catch (error) {
     console.error("Error updating event:", error)
@@ -159,28 +159,28 @@ export async function updateEventAction(id: string, updates: Partial<Event>) {
 
 export async function getEventsAction() {
   try {
-    const isConnected = await testAirtableConnection()
+    const isConnected = await testFirestoreEventsConnection()
     if (!isConnected) {
-      throw new Error("Airtable connection failed")
+      throw new Error("Firestore connection failed")
     }
 
     // Mark past events automatically
-    await markPastEvents()
+    await markPastEventsInFirestore()
 
-    const allEvents = await getEventsFromAirtable()
+    const allEvents = await getEventsFromFirestore()
     
 
 
     return {
       success: true,
       events: allEvents,
-      message: `Loaded ${allEvents.length} events from Airtable`,
+      message: `Loaded ${allEvents.length} events from Firestore`,
     }
   } catch (error) {
     console.error("Error fetching events:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch events from Airtable",
+      error: error instanceof Error ? error.message : "Failed to fetch events from Firestore",
       events: [],
     }
   }
@@ -188,12 +188,12 @@ export async function getEventsAction() {
 
 export async function getEventByIdAction(id: string) {
   try {
-    const isConnected = await testAirtableConnection()
+    const isConnected = await testFirestoreEventsConnection()
     if (!isConnected) {
-      throw new Error("Airtable connection failed")
+      throw new Error("Firestore connection failed")
     }
 
-    const event = await getEventByIdFromAirtable(id)
+    const event = await getEventByIdFromFirestore(id)
 
     if (!event) {
       return {
@@ -206,7 +206,7 @@ export async function getEventByIdAction(id: string) {
     return {
       success: true,
       event,
-      message: "Event retrieved successfully from Airtable",
+      message: "Event retrieved successfully from Firestore",
     }
   } catch (error) {
     console.error("Error fetching event by ID:", error)
@@ -220,19 +220,19 @@ export async function getEventByIdAction(id: string) {
 
 export async function cleanupPastEventsAction() {
   try {
-    const isConnected = await testAirtableConnection()
+    const isConnected = await testFirestoreEventsConnection()
     if (!isConnected) {
-      throw new Error("Airtable connection failed")
+      throw new Error("Firestore connection failed")
     }
 
-    // Mark events as past (Airtable will handle this automatically)
-    const markedCount = await markPastEvents()
+    // Mark events as past
+    const markedCount = await markPastEventsInFirestore()
 
     revalidatePath("/events")
 
     return {
       success: true,
-      message: `Marked ${markedCount} events as past in Airtable`,
+      message: `Marked ${markedCount} events as past`,
       markedCount,
     }
   } catch (error) {
