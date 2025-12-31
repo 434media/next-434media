@@ -171,9 +171,9 @@ export function DashboardView({ stats, pipeline, onViewChange, onShowClientForm,
           </div>
         </div>
 
-        {/* Brand-wise breakdown */}
+        {/* Platform-wise breakdown */}
         <div className="p-4 rounded-xl bg-white shadow-sm border border-gray-200">
-          <h4 className="text-sm font-semibold text-gray-900 mb-4">Brand Wise</h4>
+          <h4 className="text-sm font-semibold text-gray-900 mb-4">Platform Wise</h4>
           <div className="space-y-3">
             {BRAND_GOALS.map((brandGoal) => {
               const brandStat = stats.brandStats?.find(b => b.brand === brandGoal.brand)

@@ -258,6 +258,9 @@ export async function PUT(request: NextRequest) {
       if (taskUpdates.brand !== undefined) {
         masterListUpdates.team = taskUpdates.brand ? [taskUpdates.brand] : []
       }
+      if (taskUpdates.is_opportunity !== undefined) {
+        masterListUpdates.is_opportunity = taskUpdates.is_opportunity
+      }
       
       return masterListUpdates
     }

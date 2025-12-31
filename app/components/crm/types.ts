@@ -57,6 +57,11 @@ export interface ClientContact {
   phone?: string
   role?: string
   is_primary?: boolean
+  address?: string
+  city?: string
+  state?: string
+  zipcode?: string
+  date_of_birth?: string
 }
 
 export interface Client {
@@ -67,6 +72,8 @@ export interface Client {
   phone?: string  // Primary contact phone (for backwards compatibility)
   contacts?: ClientContact[]  // Additional contacts
   status: string
+  source?: string  // Lead source: web, cold_call, event, inbound_call, referral, warm_intro
+  is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
   industry?: string  // Deprecated: use brand instead
   brand?: Brand  // Which brand this client is associated with
   website?: string
@@ -149,6 +156,7 @@ export interface Task {
   client_id?: string
   client_name?: string
   opportunity_id?: string
+  is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
   category?: string
   estimated_hours?: number
   actual_hours?: number

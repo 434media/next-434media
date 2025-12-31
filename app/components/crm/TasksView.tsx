@@ -278,7 +278,7 @@ export function TasksView({
             onChange={(e) => onBrandFilterChange(e.target.value)}
             className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:outline-none focus:border-gray-400 min-w-[140px]"
           >
-            <option value="all">All Brands</option>
+            <option value="all">All Platforms</option>
             {BRANDS.map((brand) => (
               <option key={brand} value={brand}>{brand}</option>
             ))}
@@ -333,7 +333,7 @@ export function TasksView({
                     Assignee
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
-                    Brand
+                    Platform
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell bg-gray-50">
                     Due Date

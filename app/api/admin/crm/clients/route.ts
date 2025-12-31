@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
       monthly_retainer: body.monthly_retainer || 0,
       instagram_handle: body.instagram_handle || "",
       linkedin_url: body.linkedin_url || "",
+      source: body.source || "",
+      is_opportunity: body.is_opportunity || false,
     })
 
     return NextResponse.json({ success: true, client }, { status: 201 })

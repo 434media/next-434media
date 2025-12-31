@@ -69,6 +69,11 @@ export default function SalesCRMPage() {
       phone: string
       role: string
       is_primary: boolean
+      address: string
+      city: string
+      state: string
+      zipcode: string
+      date_of_birth: string
     }>,
     status: "prospect",
     brand: "" as Brand | "",
@@ -76,6 +81,8 @@ export default function SalesCRMPage() {
     next_followup_date: "",
     assigned_to: "",
     notes: "",
+    source: "",
+    is_opportunity: false,
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -93,6 +100,7 @@ export default function SalesCRMPage() {
     notes: "",
     web_links: [] as string[],
     tagged_users: [] as string[],
+    is_opportunity: false,
   })
   const [newLink, setNewLink] = useState("")
   const [newComment, setNewComment] = useState("")
@@ -211,6 +219,7 @@ export default function SalesCRMPage() {
       notes: task.notes || "",
       web_links: task.web_links || [],
       tagged_users: task.tagged_users || [],
+      is_opportunity: task.is_opportunity || false,
     })
     setTaskAttachments(task.attachments || [])
     setShowTaskModal(true)
@@ -590,7 +599,7 @@ export default function SalesCRMPage() {
     }
 
     if (!clientForm.brand) {
-      setToast({ message: "Please select a brand", type: "error" })
+      setToast({ message: "Please select a platform", type: "error" })
       return
     }
 
@@ -612,6 +621,11 @@ export default function SalesCRMPage() {
           phone: c.phone,
           role: c.role,
           is_primary: c.is_primary,
+          address: c.address || "",
+          city: c.city || "",
+          state: c.state || "",
+          zipcode: c.zipcode || "",
+          date_of_birth: c.date_of_birth || "",
         })),
         status: clientForm.status,
         brand: clientForm.brand,
@@ -619,6 +633,8 @@ export default function SalesCRMPage() {
         next_followup_date: clientForm.next_followup_date || undefined,
         assigned_to: clientForm.assigned_to,
         notes: clientForm.notes,
+        source: clientForm.source || undefined,
+        is_opportunity: clientForm.is_opportunity,
       }
 
       const method = editingClient ? "PUT" : "POST"
@@ -637,7 +653,7 @@ export default function SalesCRMPage() {
       setToast({ message: `Client ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "" })
+      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false })
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to save client", type: "error" })
@@ -672,6 +688,11 @@ export default function SalesCRMPage() {
       phone: string
       role: string
       is_primary: boolean
+      address: string
+      city: string
+      state: string
+      zipcode: string
+      date_of_birth: string
     }> = []
     
     // Check if client has contacts array
@@ -684,6 +705,11 @@ export default function SalesCRMPage() {
           phone: c.phone || "",
           role: c.role || "",
           is_primary: c.is_primary || false,
+          address: c.address || "",
+          city: c.city || "",
+          state: c.state || "",
+          zipcode: c.zipcode || "",
+          date_of_birth: c.date_of_birth || "",
         })
       })
     } else if (client.name || client.email || client.phone) {
@@ -695,6 +721,11 @@ export default function SalesCRMPage() {
         phone: client.phone || "",
         role: "",
         is_primary: true,
+        address: "",
+        city: "",
+        state: "",
+        zipcode: "",
+        date_of_birth: "",
       })
     }
     
@@ -707,6 +738,8 @@ export default function SalesCRMPage() {
       next_followup_date: client.next_followup_date || "",
       assigned_to: client.assigned_to || "",
       notes: client.notes || "",
+      source: client.source || "",
+      is_opportunity: client.is_opportunity || false,
     })
     setShowClientForm(true)
   }
@@ -762,7 +795,7 @@ export default function SalesCRMPage() {
         <div className="flex flex-wrap gap-2 mb-8 border-b border-gray-200 pb-4">
           {[
             { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-            { id: "pipeline", label: "Pipeline", icon: Target },
+            { id: "pipeline", label: "Opportunities", icon: Target },
             { id: "clients", label: "Clients", icon: Users },
             { id: "tasks", label: "Tasks", icon: CheckCircle2 },
           ].map(({ id, label, icon: Icon }) => (
@@ -827,7 +860,7 @@ export default function SalesCRMPage() {
             onBrandFilterChange={setClientBrandFilter}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "" })
+              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}

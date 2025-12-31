@@ -44,6 +44,7 @@ interface TaskFormData {
   notes: string
   web_links: string[]
   tagged_users: string[]
+  is_opportunity: boolean
 }
 
 interface TaskModalProps {
@@ -362,18 +363,16 @@ export function TaskModal({
                       <option value="not_started">Not Started</option>
                       <option value="in_progress">In Progress</option>
                       <option value="completed">Completed</option>
-                      <option value="blocked">Blocked</option>
-                      <option value="deferred">Deferred</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Platform</label>
                     <select
                       value={formData.brand}
                       onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
                       className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                     >
-                      <option value="">No brand</option>
+                      <option value="">No platform</option>
                       {BRANDS.map((brand) => (
                         <option key={brand} value={brand}>{brand}</option>
                       ))}
@@ -738,6 +737,19 @@ export function TaskModal({
                     </AnimatePresence>
                   </div>
                 </div>
+              </div>
+
+              {/* Opportunity */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Opportunity</label>
+                <select
+                  value={formData.is_opportunity ? "yes" : "no"}
+                  onChange={(e) => onFormChange({ ...formData, is_opportunity: e.target.value === "yes" })}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
               </div>
 
               {/* Web Links Section */}

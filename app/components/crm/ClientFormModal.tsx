@@ -31,6 +31,11 @@ interface ContactFormData {
   phone: string
   role: string
   is_primary: boolean
+  address: string
+  city: string
+  state: string
+  zipcode: string
+  date_of_birth: string
 }
 
 interface ClientFormData {
@@ -42,6 +47,8 @@ interface ClientFormData {
   next_followup_date: string
   assigned_to: string
   notes: string
+  source: string
+  is_opportunity: boolean
 }
 
 interface ClientFormModalProps {
@@ -272,6 +279,11 @@ export function ClientFormModal({
       phone: "",
       role: "",
       is_primary: formData.contacts.length === 0, // First contact is primary
+      address: "",
+      city: "",
+      state: "",
+      zipcode: "",
+      date_of_birth: "",
     }
     const newContacts = [...formData.contacts, newContact]
     onFormChange({ ...formData, contacts: newContacts })
@@ -485,6 +497,63 @@ export function ClientFormModal({
                                     />
                                   </div>
 
+                                  {/* Date of Birth */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Date of Birth</label>
+                                    <input
+                                      type="date"
+                                      value={contact.date_of_birth || ""}
+                                      onChange={(e) => updateContact(contact.id, "date_of_birth", e.target.value)}
+                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                    />
+                                  </div>
+
+                                  {/* Address */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+                                    <input
+                                      type="text"
+                                      value={contact.address || ""}
+                                      onChange={(e) => updateContact(contact.id, "address", e.target.value)}
+                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      placeholder="Street address"
+                                    />
+                                  </div>
+
+                                  {/* City, State, Zipcode */}
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                                      <input
+                                        type="text"
+                                        value={contact.city || ""}
+                                        onChange={(e) => updateContact(contact.id, "city", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        placeholder="City"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                                      <input
+                                        type="text"
+                                        value={contact.state || ""}
+                                        onChange={(e) => updateContact(contact.id, "state", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        placeholder="State"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Zipcode</label>
+                                      <input
+                                        type="text"
+                                        value={contact.zipcode || ""}
+                                        onChange={(e) => updateContact(contact.id, "zipcode", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        placeholder="Zipcode"
+                                      />
+                                    </div>
+                                  </div>
+
                                   <div className="flex items-center justify-between pt-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                       <input
@@ -518,30 +587,32 @@ export function ClientFormModal({
                 )}
               </div>
 
-              {/* Status & Brand */}
+              {/* Source & Platform */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Source</label>
                   <select
-                    value={formData.status}
-                    onChange={(e) => onFormChange({ ...formData, status: e.target.value })}
+                    value={formData.source || ""}
+                    onChange={(e) => onFormChange({ ...formData, source: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
-                    <option value="prospect">Prospect</option>
-                    <option value="active">Active Client</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="churned">Churned</option>
-                    <option value="on_hold">On Hold</option>
+                    <option value="">Select source...</option>
+                    <option value="web">Web</option>
+                    <option value="cold_call">Cold Call</option>
+                    <option value="event">Event</option>
+                    <option value="inbound_call">Inbound Call</option>
+                    <option value="referral">Referral</option>
+                    <option value="warm_intro">Warm Intro</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Platform *</label>
                   <select
                     value={formData.brand}
                     onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
                     className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
-                    <option value="">Select brand...</option>
+                    <option value="">Select platform...</option>
                     {BRANDS.map((brand) => {
                       const brandGoal = BRAND_GOALS.find(b => b.brand === brand)
                       return (
@@ -587,15 +658,16 @@ export function ClientFormModal({
                 </div>
               </div>
 
-              {/* Assigned To */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Assigned To</label>
-                <div className="relative">
-                  {/* Custom dropdown button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+              {/* Assigned To & Opportunity */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Assigned To</label>
+                  <div className="relative">
+                    {/* Custom dropdown button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
                   >
                     <span className={formData.assigned_to ? "text-gray-900" : "text-gray-400"}>
                       {formData.assigned_to || "Select team member..."}
@@ -714,8 +786,23 @@ export function ClientFormModal({
                     />
                   )}
                 </div>
+              </div>
+
+              {/* Opportunity */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Opportunity</label>
+                <select
+                  value={formData.is_opportunity ? "yes" : "no"}
+                  onChange={(e) => onFormChange({ ...formData, is_opportunity: e.target.value === "yes" })}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+            </div>
                 
-                {/* Add new member form */}
+              {/* Add new member form */}
                 <AnimatePresence>
                   {showAddMember && (
                     <motion.div
@@ -930,7 +1017,6 @@ export function ClientFormModal({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
 
               {/* Notes */}
               <div>

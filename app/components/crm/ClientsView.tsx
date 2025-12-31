@@ -92,14 +92,14 @@ export function ClientsView({
               className="w-full pl-10 pr-4 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 shadow-sm"
             />
           </div>
-          {/* Brand Filter */}
+          {/* Platform Filter */}
           {onBrandFilterChange && (
             <select
               value={brandFilter}
               onChange={(e) => onBrandFilterChange(e.target.value)}
               className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-700 focus:outline-none focus:border-gray-400 shadow-sm"
             >
-              <option value="all">All Brands</option>
+              <option value="all">All Platforms</option>
               {BRANDS.map(brand => (
                 <option key={brand} value={brand}>{brand}</option>
               ))}
@@ -128,31 +128,31 @@ export function ClientsView({
         </button>
       </div>
 
-      {/* Clients Table - Updated to show Brand instead of Industry */}
+      {/* Clients Table - Updated to show Platform instead of Brand */}
       <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[calc(100vh-320px)]">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Company
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell bg-gray-50">
                   Primary Contact
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                  Source
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                  Brand
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
+                  Platform
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                  Pitch Value
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell bg-gray-50">
+                  Opportunity
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell bg-gray-50">
                   Follow Up
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Actions
                 </th>
               </tr>
@@ -209,9 +209,13 @@ export function ClientsView({
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[client.status] || STATUS_COLORS.prospect}`}>
-                          {(client.status || "prospect").replace("_", " ")}
-                        </span>
+                        {client.source ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            {client.source.replace("_", " ")}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 hidden md:table-cell">
                         {client.brand ? (
@@ -231,13 +235,14 @@ export function ClientsView({
                         )}
                       </td>
                       <td className="px-4 py-4 hidden lg:table-cell">
-                        {client.pitch_value ? (
-                          <span className="flex items-center gap-1 text-sm text-emerald-600 font-medium">
-                            <DollarSign className="w-3 h-3" />
-                            {formatCurrency(client.pitch_value).replace("$", "")}
+                        {client.is_opportunity ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Yes
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-400">—</span>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-500 border border-gray-200">
+                            No
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-4 hidden xl:table-cell">
