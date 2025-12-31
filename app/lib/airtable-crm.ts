@@ -62,8 +62,8 @@ export async function getRecordsFromTable(
       airtable_created_time: record._rawJson?.createdTime,
     }))
   } catch (error) {
-    console.error(`Error fetching records from ${tableName}:`, error)
-    throw new Error(`Failed to fetch records from Airtable table: ${tableName}`)
+    console.error("Error fetching records from table:", tableName, error)
+    throw new Error("Failed to fetch records from Airtable table: " + String(tableName))
   }
 }
 
@@ -121,7 +121,7 @@ export async function getMigrationStatus(): Promise<{
         recordCount: records.length,
       })
     } catch (error) {
-      console.error(`Error getting status for ${tableName}:`, error)
+      console.error("Error getting status for table:", tableName, error)
       status.push({
         tableName,
         firestoreCollection: AIRTABLE_TO_FIRESTORE_MAP[tableName] || "unknown",

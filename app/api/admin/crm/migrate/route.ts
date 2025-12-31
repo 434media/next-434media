@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Fetch records from Airtable
-        console.log(`[Migration] Fetching records from: ${tableName}`)
+        console.log("[Migration] Fetching records from table:", tableName)
         const records = await getRecordsFromTable(tableName)
 
         if (records.length === 0) {
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Write to Firestore
-        console.log(`[Migration] Writing ${mappedRecords.length} records to: ${collectionName}`)
+        console.log("[Migration] Writing", mappedRecords.length, "records to collection:", collectionName)
         const writtenCount = await batchWrite(collectionName, mappedRecords)
 
         results.push({
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
           status: "success",
         })
       } catch (error) {
-        console.error(`[Migration] Error migrating ${tableName}:`, error)
+        console.error("[Migration] Error migrating table:", tableName, error)
         results.push({
           table: tableName,
           collection: AIRTABLE_TO_FIRESTORE_MAP[tableName] || "unknown",

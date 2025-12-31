@@ -95,7 +95,7 @@ async function getAllFromCollection<T>(
   const cacheKey = `collection:${collectionName}`
   const cached = getCached<T[]>(cacheKey)
   if (cached) {
-    console.log(`[Firestore] Cache hit for ${collectionName}`)
+    console.log("[Firestore] Cache hit for collection:", collectionName)
     return cached
   }
 
@@ -108,7 +108,7 @@ async function getAllFromCollection<T>(
     
     // Cache the results
     setCache(cacheKey, results)
-    console.log(`[Firestore] Fetched ${results.length} docs from ${collectionName}`)
+    console.log("[Firestore] Fetched", results.length, "docs from collection:", collectionName)
     
     return results
   } catch (error: unknown) {
@@ -116,11 +116,11 @@ async function getAllFromCollection<T>(
     const errorCode = (error as { code?: number })?.code
     const errorDetails = (error as { details?: string })?.details
     if (errorCode === 8 || errorDetails?.includes('Quota exceeded')) {
-      console.warn(`[Firestore] Quota exceeded for ${collectionName} - returning empty array`)
+      console.warn("[Firestore] Quota exceeded for collection:", collectionName, "- returning empty array")
       return []
     }
-    console.error(`Error fetching from ${collectionName}:`, error)
-    throw new Error(`Failed to fetch from ${collectionName}`)
+    console.error("Error fetching from collection:", collectionName, error)
+    throw new Error("Failed to fetch from collection: " + String(collectionName))
   }
 }
 
@@ -134,7 +134,7 @@ async function getById<T>(
     const doc = await db.collection(collectionName).doc(id).get()
     return docToData<T>(doc)
   } catch (error) {
-    console.error(`Error fetching ${id} from ${collectionName}:`, error)
+    console.error("Error fetching document:", id, "from collection:", collectionName, error)
     return null
   }
 }
@@ -163,8 +163,8 @@ async function createDocument<T>(
     if (!result) throw new Error("Failed to retrieve created document")
     return result
   } catch (error) {
-    console.error(`Error creating in ${collectionName}:`, error)
-    throw new Error(`Failed to create in ${collectionName}`)
+    console.error("Error creating document in collection:", collectionName, error)
+    throw new Error("Failed to create in collection: " + String(collectionName))
   }
 }
 
@@ -198,8 +198,8 @@ async function updateDocument<T>(
     if (!result) throw new Error("Failed to retrieve updated document")
     return result
   } catch (error) {
-    console.error(`Error updating ${id} in ${collectionName}:`, error)
-    throw new Error(`Failed to update in ${collectionName}`)
+    console.error("Error updating document:", id, "in collection:", collectionName, error)
+    throw new Error("Failed to update in collection: " + String(collectionName))
   }
 }
 
@@ -215,8 +215,8 @@ async function deleteDocument(
     // Invalidate cache for this collection
     invalidateCache(collectionName)
   } catch (error) {
-    console.error(`Error deleting ${id} from ${collectionName}:`, error)
-    throw new Error(`Failed to delete from ${collectionName}`)
+    console.error("Error deleting document:", id, "from collection:", collectionName, error)
+    throw new Error("Failed to delete from collection: " + String(collectionName))
   }
 }
 
@@ -664,7 +664,7 @@ export async function getAllTasks(): Promise<Task[]> {
   
   // Cache the combined result
   setCache(cacheKey, allTasks)
-  console.log(`[Firestore] Fetched ${allTasks.length} total tasks (${tasksFromMasterList.length} from master list, ${tasksFromCollections.length} from collections)`)
+  console.log("[Firestore] Fetched", allTasks.length, "total tasks (", tasksFromMasterList.length, "from master list,", tasksFromCollections.length, "from collections)")
   
   return allTasks
 }
