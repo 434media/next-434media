@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   ChevronLeft,
-  RefreshCw,
   Loader2,
   BarChart3,
   Target,
@@ -56,6 +55,7 @@ export default function SalesCRMPage() {
   const [brandFilter, setBrandFilter] = useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [clientStatusFilter, setClientStatusFilter] = useState<string>("all")
+  const [clientBrandFilter, setClientBrandFilter] = useState<string>("all")
 
   // Client form state
   const [showClientForm, setShowClientForm] = useState(false)
@@ -71,7 +71,9 @@ export default function SalesCRMPage() {
       is_primary: boolean
     }>,
     status: "prospect",
-    industry: "",
+    brand: "" as Brand | "",
+    pitch_value: "",
+    next_followup_date: "",
     assigned_to: "",
     notes: "",
   })
@@ -189,8 +191,9 @@ export default function SalesCRMPage() {
       loadClients()
     } else if (viewMode === "tasks" && tasks.length === 0) {
       loadTasks()
-    } else if (viewMode === "pipeline" && pipeline.length === 0) {
-      loadPipeline()
+    } else if (viewMode === "pipeline") {
+      if (pipeline.length === 0) loadPipeline()
+      if (clients.length === 0) loadClients()
     }
   }, [viewMode])
 
@@ -541,6 +544,11 @@ export default function SalesCRMPage() {
       return
     }
 
+    if (!clientForm.brand) {
+      setToast({ message: "Please select a brand", type: "error" })
+      return
+    }
+
     setIsSaving(true)
     try {
       // Get primary contact info for backwards compatibility
@@ -561,7 +569,9 @@ export default function SalesCRMPage() {
           is_primary: c.is_primary,
         })),
         status: clientForm.status,
-        industry: clientForm.industry,
+        brand: clientForm.brand,
+        pitch_value: clientForm.pitch_value ? parseFloat(clientForm.pitch_value) : undefined,
+        next_followup_date: clientForm.next_followup_date || undefined,
         assigned_to: clientForm.assigned_to,
         notes: clientForm.notes,
       }
@@ -582,7 +592,7 @@ export default function SalesCRMPage() {
       setToast({ message: `Client ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", industry: "", assigned_to: "", notes: "" })
+      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "" })
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to save client", type: "error" })
@@ -647,7 +657,9 @@ export default function SalesCRMPage() {
       company_name: client.company_name || client.name || "",
       contacts,
       status: client.status,
-      industry: client.industry || "",
+      brand: client.brand || "",
+      pitch_value: client.pitch_value ? String(client.pitch_value) : "",
+      next_followup_date: client.next_followup_date || "",
       assigned_to: client.assigned_to || "",
       notes: client.notes || "",
     })
@@ -683,13 +695,11 @@ export default function SalesCRMPage() {
             </Link>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => loadDashboard()}
-              className="p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
+            {currentUser && (
+              <span className="text-sm text-emerald-400 font-medium">
+                Keep killing it, {currentUser.name}! 🔥
+              </span>
+            )}
           </div>
         </div>
 
@@ -743,14 +753,20 @@ export default function SalesCRMPage() {
             pipeline={pipeline} 
             onViewChange={setViewMode}
             onShowClientForm={() => setShowClientForm(true)}
+            currentUser={currentUser}
           />
         )}
 
         {/* Pipeline View */}
         {viewMode === "pipeline" && (
           <PipelineView 
-            pipeline={pipeline} 
-            onRefresh={loadPipeline} 
+            pipeline={pipeline}
+            clients={clients}
+            onRefresh={() => {
+              loadPipeline()
+              loadClients()
+            }}
+            onClientClick={handleEditClient}
           />
         )}
 
@@ -760,11 +776,13 @@ export default function SalesCRMPage() {
             clients={clients}
             searchQuery={searchQuery}
             statusFilter={clientStatusFilter}
+            brandFilter={clientBrandFilter}
             onSearchChange={setSearchQuery}
             onStatusFilterChange={setClientStatusFilter}
+            onBrandFilterChange={setClientBrandFilter}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", industry: "", assigned_to: "", notes: "" })
+              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "" })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}

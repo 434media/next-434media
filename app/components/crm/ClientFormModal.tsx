@@ -12,9 +12,12 @@ import {
   ChevronUp,
   User,
   Mail,
-  Phone
+  Phone,
+  DollarSign,
+  Calendar
 } from "lucide-react"
-import { TEAM_MEMBERS } from "./types"
+import { TEAM_MEMBERS, BRANDS, BRAND_GOALS } from "./types"
+import type { Brand } from "./types"
 
 interface ContactFormData {
   id: string
@@ -29,7 +32,9 @@ interface ClientFormData {
   company_name: string
   contacts: ContactFormData[]
   status: string
-  industry: string
+  brand: Brand | ""
+  pitch_value: string
+  next_followup_date: string
   assigned_to: string
   notes: string
 }
@@ -326,7 +331,7 @@ export function ClientFormModal({
                 )}
               </div>
 
-              {/* Status & Industry */}
+              {/* Status & Brand */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-neutral-300 mb-1.5">Status</label>
@@ -336,20 +341,61 @@ export function ClientFormModal({
                     className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm focus:outline-none focus:border-blue-500"
                   >
                     <option value="prospect">Prospect</option>
-                    <option value="active">Active</option>
+                    <option value="active">Active Client</option>
                     <option value="inactive">Inactive</option>
                     <option value="churned">Churned</option>
                     <option value="on_hold">On Hold</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">Industry</label>
-                  <input
-                    type="text"
-                    value={formData.industry}
-                    onChange={(e) => onFormChange({ ...formData, industry: e.target.value })}
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">Brand *</label>
+                  <select
+                    value={formData.brand}
+                    onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
                     className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm focus:outline-none focus:border-blue-500"
-                    placeholder="e.g., Technology"
+                  >
+                    <option value="">Select brand...</option>
+                    {BRANDS.map((brand) => {
+                      const brandGoal = BRAND_GOALS.find(b => b.brand === brand)
+                      return (
+                        <option key={brand} value={brand}>
+                          {brand} {brandGoal ? `(${brandGoal.description})` : ""}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              {/* Pitch Value & Follow-up Date */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                      Pitch Value
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.pitch_value}
+                    onChange={(e) => onFormChange({ ...formData, pitch_value: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm focus:outline-none focus:border-blue-500"
+                    placeholder="e.g., 50000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-blue-400" />
+                      Follow-up Date
+                    </span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.next_followup_date}
+                    onChange={(e) => onFormChange({ ...formData, next_followup_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>

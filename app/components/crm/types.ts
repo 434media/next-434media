@@ -7,9 +7,23 @@ export interface DashboardStats {
   pipelineValue: number
   closedWonThisMonth: number
   closedWonRevenue: number
+  closedLostRevenue: number
   tasksToday: number
   tasksOverdue: number
   conversionRate: number
+  // Brand-specific stats
+  brandStats: {
+    brand: string
+    totalPitched: number
+    wonRevenue: number
+    lostRevenue: number
+    activeOpportunities: number
+  }[]
+  // Monthly revenue for chart
+  monthlyRevenue: {
+    month: string
+    value: number
+  }[]
 }
 
 export interface PipelineColumn {
@@ -53,7 +67,8 @@ export interface Client {
   phone?: string  // Primary contact phone (for backwards compatibility)
   contacts?: ClientContact[]  // Additional contacts
   status: string
-  industry?: string
+  industry?: string  // Deprecated: use brand instead
+  brand?: Brand  // Which brand this client is associated with
   website?: string
   address?: string
   city?: string
@@ -63,6 +78,7 @@ export interface Client {
   assigned_to?: string
   lifetime_value?: number
   monthly_retainer?: number
+  pitch_value?: number  // Value pitched to this client
   last_contact_date?: string
   next_followup_date?: string
   instagram_handle?: string
@@ -74,6 +90,22 @@ export interface Client {
 
 // Brand type
 export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing"
+
+// Brand Sales Goals (annual targets)
+export interface BrandGoal {
+  brand: Brand
+  annualGoal: number
+  color: string
+  description: string
+}
+
+export const BRAND_GOALS: BrandGoal[] = [
+  { brand: "TXMX Boxing", annualGoal: 1000000, color: "#ef4444", description: "Sports & Entertainment" },
+  { brand: "Vemos Vamos", annualGoal: 250000, color: "#f97316", description: "Media & Content" },
+  { brand: "DEVSA TV", annualGoal: 250000, color: "#8b5cf6", description: "Digital Broadcasting" },
+  { brand: "434 Media", annualGoal: 300000, color: "#3b82f6", description: "Marketing Agency" },
+  { brand: "Digital Canvas", annualGoal: 200000, color: "#10b981", description: "Creative Services" },
+]
 
 // Task attachment interface
 export interface TaskAttachment {
