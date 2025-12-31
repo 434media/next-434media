@@ -16,12 +16,12 @@ export function Toast({ toast }: ToastProps) {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className={`fixed top-20 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border ${
+          className={`fixed top-20 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${
             toast.type === "success"
-              ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
               : toast.type === "error"
-              ? "bg-red-500/20 border-red-500/30 text-red-400"
-              : "bg-amber-500/20 border-amber-500/30 text-amber-400"
+              ? "bg-red-50 border-red-200 text-red-700"
+              : "bg-amber-50 border-amber-200 text-amber-700"
           }`}
         >
           {toast.type === "success" ? (

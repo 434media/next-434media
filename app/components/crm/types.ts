@@ -101,10 +101,9 @@ export interface BrandGoal {
 
 export const BRAND_GOALS: BrandGoal[] = [
   { brand: "TXMX Boxing", annualGoal: 1000000, color: "#ef4444", description: "Sports & Entertainment" },
-  { brand: "Vemos Vamos", annualGoal: 250000, color: "#f97316", description: "Media & Content" },
-  { brand: "DEVSA TV", annualGoal: 250000, color: "#8b5cf6", description: "Digital Broadcasting" },
-  { brand: "434 Media", annualGoal: 300000, color: "#3b82f6", description: "Marketing Agency" },
-  { brand: "Digital Canvas", annualGoal: 200000, color: "#10b981", description: "Creative Services" },
+  { brand: "Vemos Vamos", annualGoal: 250000, color: "#f97316", description: "Bilingual Studio & Agency" },
+  { brand: "DEVSA TV", annualGoal: 250000, color: "#8b5cf6", description: "Documentary & Video Production" },
+  { brand: "Digital Canvas", annualGoal: 50000, color: "#10b981", description: "Creative Tools & Services" },
 ]
 
 // Task attachment interface
@@ -196,39 +195,104 @@ export type ViewMode = "dashboard" | "pipeline" | "clients" | "tasks"
 
 // Status color mappings
 export const STATUS_COLORS: Record<string, string> = {
-  active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  inactive: "bg-neutral-500/20 text-neutral-400 border-neutral-500/30",
-  prospect: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  churned: "bg-red-500/20 text-red-400 border-red-500/30",
-  on_hold: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  active: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  inactive: "bg-gray-100 text-gray-600 border-gray-200",
+  prospect: "bg-blue-100 text-blue-700 border-blue-200",
+  churned: "bg-red-100 text-red-700 border-red-200",
+  on_hold: "bg-amber-100 text-amber-700 border-amber-200",
 }
 
 export const TASK_STATUS_COLORS: Record<string, string> = {
-  not_started: "bg-neutral-500/20 text-neutral-400",
-  in_progress: "bg-blue-500/20 text-blue-400",
-  completed: "bg-emerald-500/20 text-emerald-400",
-  blocked: "bg-red-500/20 text-red-400",
-  deferred: "bg-amber-500/20 text-amber-400",
+  not_started: "bg-gray-100 text-gray-600",
+  in_progress: "bg-blue-100 text-blue-700",
+  completed: "bg-emerald-100 text-emerald-700",
+  blocked: "bg-red-100 text-red-700",
+  deferred: "bg-amber-100 text-amber-700",
 }
 
 // Brand options
 export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA TV", "Digital Canvas", "TXMX Boxing"]
 
-// Team members for tagging
+// Team members for tagging and assignment
+// Full names from Airtable migration
+// Note: This is a fallback list. Team members are now managed in Firestore (crm_team_members collection)
 export const TEAM_MEMBERS = [
-  { name: "Jake", email: "jake@434media.com" },
-  { name: "Marc", email: "marc@434media.com" },
-  { name: "Stacy", email: "stacy@434media.com" },
-  { name: "Jesse", email: "jesse@434media.com" },
-  { name: "Barb", email: "barb@434media.com" },
+  { name: "Jacob Lee Miles", email: "jake@434media.com" },
+  { name: "Marcos Resendez", email: "marcos@434media.com" },
+  { name: "Stacy Carrizales", email: "stacy@434media.com" },
+  { name: "Jesse Hernandez", email: "jesse@434media.com" },
+  { name: "Barbara Carreon", email: "barb@434media.com" },
+  { name: "Nichole Snow", email: "nichole@434media.com" },
 ]
+
+// TeamMember type for Firestore
+export interface TeamMember {
+  id: string
+  name: string
+  email: string
+  isActive: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Helper to normalize assignee names (maps short names to full names)
+export function normalizeAssigneeName(name: string): string {
+  if (!name) return "Unassigned"
+  
+  const nameMap: Record<string, string> = {
+    "jake": "Jacob Lee Miles",
+    "Jake": "Jacob Lee Miles",
+    "marc": "Marcos Resendez",
+    "Marc": "Marcos Resendez",
+    "marcos": "Marcos Resendez",
+    "Marcos": "Marcos Resendez",
+    "jesse": "Jesse Hernandez",
+    "Jesse": "Jesse Hernandez",
+    "barb": "Barbara Carreon",
+    "Barb": "Barbara Carreon",
+    "nichole": "Nichole Snow",
+    "Nichole": "Nichole Snow",
+    "stacy": "Stacy Carrizales",
+    "Stacy": "Stacy Carrizales",
+    "pm": "Unassigned",
+    "PM": "Unassigned",
+    "teams": "Unassigned",
+    "Teams": "Unassigned",
+    "Team": "Unassigned",
+  }
+  
+  return nameMap[name] || name
+}
+
+// Check if an assignee name is a valid full name (not a short name)
+export function isValidAssigneeName(name: string): boolean {
+  if (!name || name === "Unassigned") return true
+  
+  const shortNames = ["jake", "marc", "marcos", "jesse", "barb", "nichole", "stacy", "pm", "teams", "team"]
+  return !shortNames.includes(name.toLowerCase())
+}
+
+// Helper to parse a date string, handling YYYY-MM-DD format as local time
+export function parseLocalDate(date: string): Date {
+  // Check if the date is in YYYY-MM-DD format (from date input)
+  // If so, parse it as local time to avoid timezone shifts
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split("-").map(Number)
+    return new Date(year, month - 1, day) // month is 0-indexed
+  }
+  // For ISO strings with time component, use the date as-is
+  return new Date(date)
+}
 
 // Helper function to check due date status
 export function getDueDateStatus(dueDate: string | undefined, status: string): "overdue" | "approaching" | "normal" | null {
   if (!dueDate || status === "completed") return null
   
   const now = new Date()
-  const due = new Date(dueDate)
+  now.setHours(0, 0, 0, 0) // Start of today
+  const due = parseLocalDate(dueDate)
+  due.setHours(0, 0, 0, 0) // Start of due date
+  
   const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   
   if (diffDays < 0) return "overdue"
@@ -237,7 +301,15 @@ export function getDueDateStatus(dueDate: string | undefined, status: string): "
 }
 
 // Helper to format currency
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number, compact = false): string {
+  if (compact) {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`
+    }
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 0)}K`
+    }
+  }
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -247,9 +319,12 @@ export function formatCurrency(value: number): string {
 }
 
 // Helper to format date
+// Handles YYYY-MM-DD format strings correctly to avoid timezone shifts
 export function formatDate(date: string): string {
   if (!date) return "—"
-  return new Date(date).toLocaleDateString("en-US", {
+  
+  const parsedDate = parseLocalDate(date)
+  return parsedDate.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

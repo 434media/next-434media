@@ -253,6 +253,27 @@ export default function SalesCRMPage() {
     }
   }
 
+  // Delete all tasks assigned to Team
+  const handleDeleteTeamTasks = async () => {
+    if (!confirm("Are you sure you want to delete ALL tasks assigned to Team? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/admin/crm/tasks/delete-team", {
+        method: "DELETE",
+      })
+
+      if (!response.ok) throw new Error("Failed to delete team tasks")
+
+      const data = await response.json()
+      setToast({ message: data.message || "Team tasks deleted", type: "success" })
+      loadTasks()
+    } catch (err) {
+      setToast({ message: "Failed to delete team tasks", type: "error" })
+    }
+  }
+
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -397,13 +418,27 @@ export default function SalesCRMPage() {
     try {
       const ownerMap: Record<string, string> = {
         "Jake": "jake",
+        "Jacob Lee Miles": "jake",
         "Marc": "marc",
+        "Marcos Resendez": "marc",
         "Stacy": "stacy",
+        "Stacy Ramirez": "stacy",
         "Jesse": "jesse",
+        "Jesse Hernandez": "jesse",
         "Barb": "barb",
-        "Nichole": "nichole",
+        "Barbara Carreon": "barb",
+        "Nichole": "teams",
+        "Nichole Snow": "teams",
       }
-      const owner = ownerMap[taskForm.assigned_to] || "teams"
+      
+      // If the task was completed, use "completed" as owner so the API can handle reactivation
+      // Otherwise, determine owner from assignee
+      let owner: string
+      if (selectedTask.status === "completed") {
+        owner = "completed"
+      } else {
+        owner = ownerMap[taskForm.assigned_to] || "teams"
+      }
       
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
@@ -417,7 +452,17 @@ export default function SalesCRMPage() {
 
       if (!response.ok) throw new Error("Failed to update task")
 
-      setToast({ message: "Task updated successfully", type: "success" })
+      const result = await response.json()
+      
+      // Show appropriate message based on whether task was reactivated
+      if (result.reactivated) {
+        setToast({ message: "Task reactivated and moved back to active tasks", type: "success" })
+      } else if (result.moved) {
+        setToast({ message: "Task marked as completed", type: "success" })
+      } else {
+        setToast({ message: "Task updated successfully", type: "success" })
+      }
+      
       setShowTaskModal(false)
       setSelectedTask(null)
       loadTasks()
@@ -668,17 +713,17 @@ export default function SalesCRMPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="flex items-center gap-3 text-white">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-700">
           <Loader2 className="w-5 h-5 animate-spin" />
-          <span>Loading CRM...</span>
+          <span className="font-medium">Loading CRM...</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* Toast */}
       <Toast toast={toast} />
 
@@ -688,7 +733,7 @@ export default function SalesCRMPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/admin"
-              className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
               Back
@@ -696,7 +741,7 @@ export default function SalesCRMPage() {
           </div>
           <div className="flex items-center gap-3">
             {currentUser && (
-              <span className="text-sm text-emerald-400 font-medium">
+              <span className="text-sm text-emerald-600 font-medium">
                 Keep killing it, {currentUser.name}! 🔥
               </span>
             )}
@@ -705,16 +750,16 @@ export default function SalesCRMPage() {
 
         {/* Title */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-white mb-2 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-gray-900 mb-2 tracking-tight">
             SALES CRM
           </h1>
-          <p className="text-neutral-400 text-sm sm:text-base">
+          <p className="text-gray-500 text-sm sm:text-base">
             Manage clients, opportunities, and sales pipeline
           </p>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-800 pb-4">
+        <div className="flex flex-wrap gap-2 mb-8 border-b border-gray-200 pb-4">
           {[
             { id: "dashboard", label: "Dashboard", icon: BarChart3 },
             { id: "pipeline", label: "Pipeline", icon: Target },
@@ -726,8 +771,8 @@ export default function SalesCRMPage() {
               onClick={() => setViewMode(id as ViewMode)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 viewMode === id
-                  ? "bg-white text-black"
-                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                  ? "bg-gray-900 text-white shadow-sm"
+                  : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -738,10 +783,10 @@ export default function SalesCRMPage() {
 
         {/* Error State */}
         {error && (
-          <div className="mb-8 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+          <div className="mb-8 p-4 rounded-lg bg-red-50 border border-red-200 text-red-600">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
-              <span>{error}</span>
+              <span className="font-medium">{error}</span>
             </div>
           </div>
         )}

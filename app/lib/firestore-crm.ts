@@ -1,4 +1,5 @@
 import { getDb, admin } from "./firebase-admin"
+import { normalizeAssigneeName } from "../components/crm/types"
 import type {
   ClientRecord,
   Opportunity,
@@ -305,7 +306,7 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     // Relationship
     status: (rawData.status || rawData.Status || "prospect") as ClientRecord["status"],
     lead_source: (rawData.lead_source || rawData.source || rawData["Lead Source"] || "") as string,
-    assigned_to: (rawData.assigned_to || rawData.sales_poc || rawData.sales_rep || rawData["Assigned To"] || rawData["Sales Rep"] || rawData["Sales POC"] || "") as string,
+    assigned_to: normalizeAssigneeName((rawData.assigned_to || rawData.sales_poc || rawData.sales_rep || rawData["Assigned To"] || rawData["Sales Rep"] || rawData["Sales POC"] || "") as string),
     // Contact title/role (for legacy single-contact data)
     // Engagement
     last_contact_date: (rawData.last_contact_date || rawData.last_contact || rawData["Last Contact"] || "") as string,
@@ -613,6 +614,41 @@ export async function deleteTask(owner: TaskOwner, id: string): Promise<void> {
   return deleteDocument(TASK_COLLECTIONS[owner], id)
 }
 
+// Delete all tasks from a specific owner's collection
+export async function deleteAllTasksFromOwner(owner: TaskOwner): Promise<number> {
+  const db = getDb()
+  const collectionRef = db.collection(TASK_COLLECTIONS[owner])
+  const snapshot = await collectionRef.get()
+  
+  if (snapshot.empty) {
+    return 0
+  }
+  
+  // Delete in batches of 500 (Firestore limit)
+  const batchSize = 500
+  let deleted = 0
+  
+  const docs = snapshot.docs
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const batch = db.batch()
+    const batchDocs = docs.slice(i, i + batchSize)
+    
+    for (const doc of batchDocs) {
+      batch.delete(doc.ref)
+    }
+    
+    await batch.commit()
+    deleted += batchDocs.length
+  }
+  
+  // Invalidate cache
+  invalidateCache(TASK_COLLECTIONS[owner])
+  cache.delete("all_tasks_combined")
+  
+  console.log(`[Firestore] Deleted ${deleted} tasks from ${owner}`)
+  return deleted
+}
+
 // Get all tasks across all owners (parallel fetch for efficiency)
 // Also includes tasks from the master list
 export async function getAllTasks(): Promise<Task[]> {
@@ -635,27 +671,92 @@ export async function getAllTasks(): Promise<Task[]> {
   const tasksFromCollections = taskArrays.flat()
   
   // Convert master list items of type "task" to Task format
-  // Note: Cast to unknown first for flexible field access since Firestore docs may have extra fields
+  // Based on Airtable migration data structure
   const tasksFromMasterList: Task[] = masterList
     .filter((item) => item.type === "task")
     .map((item) => {
       const rawItem = item as unknown as Record<string, unknown>
+      
+      // Extract title - primary field is "task", fallback to "name" or "production_name"
+      const title = (rawItem.task as string) 
+        || item.name 
+        || (rawItem.production_name as string)
+        || "Untitled Task"
+      
+      // Extract due date - primary field is "task_due_date", fallback to "due_date"
+      const dueDate = (rawItem.task_due_date as string)
+        || item.due_date 
+        || undefined
+      
+      // Extract status - primary field is "task_status", fallback to "status"
+      const rawStatus = (rawItem.task_status as string)
+        || item.status 
+        || "To Do"
+      
+      // Extract assignee - it's an array of {name, email, id} objects
+      const assigneeArray = rawItem.assignee as Array<{ name?: string; email?: string; id?: string }> | undefined
+      let assignedTo = "Unassigned"
+      if (Array.isArray(assigneeArray) && assigneeArray.length > 0) {
+        // Get first assignee's name and normalize it to full name
+        const rawName = assigneeArray[0]?.name || "Unassigned"
+        assignedTo = normalizeAssigneeName(rawName)
+      } else if (item.owner && typeof item.owner === "string") {
+        assignedTo = normalizeAssigneeName(item.owner)
+      }
+      
+      // Extract description from notes field
+      const description = (rawItem.notes as string) || ""
+      
+      // Extract web links - could be a string or undefined
+      const links = rawItem.links as string | undefined
+      const webLinks: string[] = []
+      if (links && typeof links === "string") {
+        // Split by newlines or commas if multiple links
+        const linkParts = links.split(/[\n,]/).map(l => l.trim()).filter(Boolean)
+        webLinks.push(...linkParts)
+      }
+      
+      // Extract brand from production_name or team
+      const productionName = rawItem.production_name as string | undefined
+      let brand: Task["brand"] | undefined = undefined
+      if (productionName) {
+        // Map production names to brand types
+        if (productionName.includes("434")) brand = "434 Media"
+        else if (productionName.includes("TXMX") || productionName.includes("Boxing")) brand = "TXMX Boxing"
+        else if (productionName.includes("Vemos") || productionName.includes("Vamos")) brand = "Vemos Vamos"
+        else if (productionName.includes("DEVSA")) brand = "DEVSA TV"
+        else if (productionName.includes("Digital Canvas")) brand = "Digital Canvas"
+      }
+      // Fallback to team array
+      if (!brand && item.team && Array.isArray(item.team) && item.team.length > 0) {
+        brand = item.team[0] as Task["brand"]
+      }
+      
+      // Extract category as a tag
+      const category = rawItem.category as string | undefined
+      const tags = [...(item.tags || [])]
+      if (category && !tags.includes(category)) {
+        tags.push(category)
+      }
+      
+      // Extract client name from production_name
+      const clientName = productionName || (rawItem.client_name as string) || undefined
+      
       return {
         id: item.id,
-        // Use name as title, fall back to any other name-like field
-        title: item.name || (rawItem.title as string) || "Untitled Task",
-        description: (rawItem.description as string) || "", 
-        assigned_to: item.owner || (rawItem.assigned_to as string) || "Unassigned",
-        status: mapMasterListStatusToTaskStatus(item.status) as Task["status"],
+        title,
+        description,
+        assigned_to: assignedTo,
+        status: mapMasterListStatusToTaskStatus(rawStatus) as Task["status"],
         priority: (item.priority || "medium") as Task["priority"],
-        due_date: item.due_date || (rawItem.dueDate as string),
-        client_name: item.reference_type === "client" ? item.reference_id : (rawItem.client_name as string),
-        tags: item.tags || [],
+        due_date: dueDate,
+        client_name: clientName,
+        tags,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        notes: item.color_code || (rawItem.notes as string) || undefined,
-        // Use team[0] as brand, or check for brand field directly
-        brand: ((rawItem.brand as Task["brand"]) || (item.team && item.team[0])) as Task["brand"] || undefined,
+        notes: description,
+        brand,
+        web_links: webLinks.length > 0 ? webLinks : undefined,
       }
     })
   
@@ -671,16 +772,55 @@ export async function getAllTasks(): Promise<Task[]> {
 
 // Helper to map master list status to task status
 function mapMasterListStatusToTaskStatus(status: string): string {
+  if (!status) return "not_started"
+  
+  const normalizedStatus = status.toLowerCase().trim().replace(/[_-]/g, " ")
+  
   const statusMap: Record<string, string> = {
-    "active": "in_progress",
-    "pending": "not_started",
+    // Airtable statuses
+    "to do": "not_started",
+    "todo": "not_started",
+    "complete": "completed",
     "completed": "completed",
+    "ready for review": "in_progress",
+    "in progress": "in_progress",
+    "inprogress": "in_progress",
+    
+    // Active/In Progress
+    "active": "in_progress",
+    "in_progress": "in_progress",
+    "working": "in_progress",
+    "started": "in_progress",
+    "ongoing": "in_progress",
+    
+    // Not Started/Pending
+    "pending": "not_started",
+    "not started": "not_started",
+    "notstarted": "not_started",
+    "not_started": "not_started",
+    "new": "not_started",
+    "open": "not_started",
+    
+    // Completed/Done
     "done": "completed",
+    "finished": "completed",
+    "closed": "completed",
+    
+    // Blocked
     "blocked": "blocked",
+    "stuck": "blocked",
+    "waiting": "blocked",
+    
+    // Deferred
+    "on hold": "deferred",
     "on_hold": "deferred",
+    "onhold": "deferred",
     "deferred": "deferred",
+    "postponed": "deferred",
+    "paused": "deferred",
   }
-  return statusMap[status?.toLowerCase()] || status || "not_started"
+  
+  return statusMap[normalizedStatus] || "not_started"
 }
 
 // Move task to completed
@@ -703,6 +843,29 @@ export async function completeTask(
   await deleteTask(owner, id)
 
   return completedTask
+}
+
+// Move task from completed back to owner collection (reactivate)
+export async function uncompleteTask(
+  id: string,
+  newOwner: TaskOwner,
+  newStatus: string
+): Promise<Task> {
+  // Get the task from completed collection
+  const task = await getTaskById("completed", id)
+  if (!task) throw new Error("Completed task not found")
+
+  // Create in the new owner's collection with updated status
+  const reactivatedTask = await createTask(newOwner, {
+    ...task,
+    status: newStatus,
+    completed_date: "", // Clear the completed date
+  } as Omit<Task, "id" | "created_at" | "updated_at">)
+
+  // Delete from completed collection
+  await deleteTask("completed", id)
+
+  return reactivatedTask
 }
 
 // ============================================

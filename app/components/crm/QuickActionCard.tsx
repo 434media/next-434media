@@ -13,16 +13,16 @@ export function QuickActionCard({ title, description, icon: Icon, onClick }: Qui
   return (
     <button
       onClick={onClick}
-      className="flex items-start gap-4 p-4 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors text-left w-full group"
+      className="flex items-start gap-4 p-4 rounded-xl bg-white shadow-sm border border-gray-200 hover:border-gray-300 hover:shadow transition-all text-left w-full group"
     >
-      <div className="p-2 rounded-lg bg-neutral-800 group-hover:bg-neutral-700 transition-colors">
-        <Icon className="w-5 h-5 text-neutral-300" />
+      <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-gray-200 transition-colors">
+        <Icon className="w-5 h-5 text-gray-600" />
       </div>
       <div>
-        <p className="font-medium text-sm mb-0.5">{title}</p>
-        <p className="text-xs text-neutral-500">{description}</p>
+        <p className="font-medium text-sm text-gray-900 mb-0.5">{title}</p>
+        <p className="text-xs text-gray-500">{description}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-neutral-600 ml-auto self-center group-hover:text-neutral-400 transition-colors" />
+      <ChevronRight className="w-4 h-4 text-gray-400 ml-auto self-center group-hover:text-gray-600 transition-colors" />
     </button>
   )
 }

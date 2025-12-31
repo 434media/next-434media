@@ -8,6 +8,9 @@ import {
   deleteTask,
   getAllTasks,
   completeTask,
+  uncompleteTask,
+  getMasterListItemById,
+  updateMasterListItem,
 } from "@/app/lib/firestore-crm"
 
 // Task owner types
@@ -172,15 +175,123 @@ export async function PUT(request: NextRequest) {
 
     const { id, owner, ...updates } = body
 
-    // If marking as completed, move to completed collection
-    if (updates.status === "completed" && owner !== "completed") {
+    // Owner map for determining task collection based on assignee
+    const ownerMap: Record<string, TaskOwner> = {
+      "Jake": "jake",
+      "Jacob Lee Miles": "jake",
+      "Marc": "marc",
+      "Marcos Resendez": "marc",
+      "Stacy": "stacy",
+      "Stacy Ramirez": "stacy",
+      "Jesse": "jesse",
+      "Jesse Hernandez": "jesse",
+      "Barb": "barb",
+      "Barbara Carreon": "barb",
+      "Nichole": "teams",
+      "Nichole Snow": "teams",
+    }
+
+    // STEP 1: Find where the task actually exists
+    // Check owner's collection first
+    let existingTask = await getTaskById(owner, id)
+    let taskSource: "owner_collection" | "completed_collection" | "master_list" | null = null
+    
+    if (existingTask) {
+      taskSource = owner === "completed" ? "completed_collection" : "owner_collection"
+    }
+    
+    // If not found and owner is "completed", the task might be in master list
+    if (!existingTask && owner === "completed") {
+      const masterListItem = await getMasterListItemById(id)
+      if (masterListItem) {
+        taskSource = "master_list"
+      }
+    }
+    
+    // If still not found, check master list (for any owner)
+    if (!taskSource) {
+      const masterListItem = await getMasterListItemById(id)
+      if (masterListItem) {
+        taskSource = "master_list"
+      }
+    }
+    
+    // Task not found anywhere
+    if (!taskSource) {
+      return NextResponse.json(
+        { error: "Task not found in any collection" },
+        { status: 404 }
+      )
+    }
+
+    // STEP 2: Handle the update based on task source and requested changes
+    
+    // Helper function to map task fields to master list fields
+    const mapToMasterListUpdates = (taskUpdates: Record<string, unknown>): Record<string, unknown> => {
+      const masterListUpdates: Record<string, unknown> = {}
+      
+      if (taskUpdates.title !== undefined) masterListUpdates.task = taskUpdates.title
+      if (taskUpdates.description !== undefined) masterListUpdates.notes = taskUpdates.description
+      if (taskUpdates.due_date !== undefined) masterListUpdates.task_due_date = taskUpdates.due_date
+      if (taskUpdates.status !== undefined) {
+        // Map task status back to master list status
+        const statusMap: Record<string, string> = {
+          not_started: "To Do",
+          in_progress: "In Progress", 
+          completed: "Complete",
+          blocked: "Blocked",
+        }
+        masterListUpdates.task_status = statusMap[taskUpdates.status as string] || taskUpdates.status
+      }
+      if (taskUpdates.priority !== undefined) masterListUpdates.priority = taskUpdates.priority
+      if (taskUpdates.notes !== undefined) masterListUpdates.notes = taskUpdates.notes
+      if (taskUpdates.tags !== undefined) masterListUpdates.tags = taskUpdates.tags
+      if (taskUpdates.web_links !== undefined) {
+        masterListUpdates.links = Array.isArray(taskUpdates.web_links) 
+          ? (taskUpdates.web_links as string[]).join("\n") 
+          : taskUpdates.web_links
+      }
+      if (taskUpdates.assigned_to !== undefined) {
+        masterListUpdates.assignee = [{ name: taskUpdates.assigned_to }]
+      }
+      if (taskUpdates.brand !== undefined) {
+        masterListUpdates.team = taskUpdates.brand ? [taskUpdates.brand] : []
+      }
+      
+      return masterListUpdates
+    }
+
+    // Handle MASTER LIST tasks
+    if (taskSource === "master_list") {
+      const masterListUpdates = mapToMasterListUpdates(updates)
+      await updateMasterListItem(id, masterListUpdates)
+      
+      return NextResponse.json({ 
+        success: true, 
+        task: { id, ...updates },
+        source: "master_list"
+      })
+    }
+
+    // Handle COMPLETED COLLECTION tasks being reactivated
+    if (taskSource === "completed_collection" && updates.status && updates.status !== "completed") {
+      const assignedTo = updates.assigned_to || existingTask?.assigned_to || ""
+      const newOwner: TaskOwner = ownerMap[assignedTo] || "teams"
+      
+      const task = await uncompleteTask(id, newOwner, updates.status)
+      return NextResponse.json({ success: true, task, reactivated: true })
+    }
+
+    // Handle OWNER COLLECTION tasks being marked as completed
+    if (taskSource === "owner_collection" && updates.status === "completed") {
       const task = await completeTask(owner, id)
       return NextResponse.json({ success: true, task, moved: true })
     }
 
+    // Handle regular updates to owner collection or completed collection
     const task = await updateTask(owner, id, updates)
-
     return NextResponse.json({ success: true, task })
+    
   } catch (error) {
     console.error("Error updating task:", error)
     return NextResponse.json(
