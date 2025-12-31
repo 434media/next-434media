@@ -140,17 +140,17 @@ export function ClientsView({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell bg-gray-50">
                   Primary Contact
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Source
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
                   Platform
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell bg-gray-50">
-                  Opportunity
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell bg-gray-50">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell bg-gray-50">
                   Follow Up
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell bg-gray-50">
+                  Opportunity
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Actions
@@ -208,33 +208,43 @@ export function ClientsView({
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-4">
                         {client.source ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
                             {client.source.replace("_", " ")}
                           </span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-4 hidden md:table-cell">
+                      <td className="px-3 py-4 hidden md:table-cell">
                         {client.brand ? (
                           <span 
-                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium"
+                            className="inline-flex items-center whitespace-nowrap gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                             style={{ 
                               backgroundColor: `${brandColor}15`,
                               color: brandColor,
                               border: `1px solid ${brandColor}30`
                             }}
                           >
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: brandColor }} />
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: brandColor }} />
                             {client.brand}
                           </span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-4 hidden lg:table-cell">
+                      <td className="px-3 py-4 hidden lg:table-cell">
+                        {client.next_followup_date ? (
+                          <span className="inline-flex items-center whitespace-nowrap gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
+                            <Calendar className="w-3 h-3 shrink-0" />
+                            {formatDate(client.next_followup_date)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-4 hidden xl:table-cell">
                         {client.is_opportunity ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Yes
@@ -243,16 +253,6 @@ export function ClientsView({
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-500 border border-gray-200">
                             No
                           </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 hidden xl:table-cell">
-                        {client.next_followup_date ? (
-                          <span className="flex items-center gap-1 text-sm text-gray-600">
-                            <Calendar className="w-3 h-3" />
-                            {formatDate(client.next_followup_date)}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400">—</span>
                         )}
                       </td>
                       <td className="px-4 py-4 text-right">

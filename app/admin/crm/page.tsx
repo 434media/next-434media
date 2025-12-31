@@ -202,7 +202,11 @@ export default function SalesCRMPage() {
 
   // Handle view changes
   useEffect(() => {
-    if (viewMode === "clients" && clients.length === 0) {
+    if (viewMode === "dashboard") {
+      // Dashboard needs clients and tasks for the new integrated view
+      if (clients.length === 0) loadClients()
+      if (tasks.length === 0) loadTasks()
+    } else if (viewMode === "clients" && clients.length === 0) {
       loadClients()
     } else if (viewMode === "tasks" && tasks.length === 0) {
       loadTasks()
@@ -822,8 +826,8 @@ export default function SalesCRMPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-700">
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-neutral-700">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span className="font-medium">Loading CRM...</span>
         </div>
@@ -832,7 +836,7 @@ export default function SalesCRMPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900">
       {/* Toast */}
       <Toast toast={toast} />
 
@@ -842,33 +846,26 @@ export default function SalesCRMPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/admin"
-              className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors"
+              className="inline-flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
               Back
             </Link>
           </div>
-          <div className="flex items-center gap-3">
-            {currentUser && (
-              <span className="text-sm text-emerald-600 font-medium">
-                Keep killing it, {currentUser.name}! 🔥
-              </span>
-            )}
-          </div>
         </div>
 
         {/* Title */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-gray-900 mb-2 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-neutral-900 mb-2 tracking-tight">
             PLATFORM CRM
           </h1>
-          <p className="text-gray-500 text-sm sm:text-base">
+          <p className="text-neutral-500 text-sm sm:text-base">
             Manage tasks, clients, opportunities, and sales pipeline
           </p>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8 border-b border-gray-200 pb-4">
+        <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-200 pb-4">
           {[
             { id: "dashboard", label: "Dashboard", icon: BarChart3 },
             { id: "pipeline", label: "Opportunities", icon: Target },
@@ -880,8 +877,8 @@ export default function SalesCRMPage() {
               onClick={() => setViewMode(id as ViewMode)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 viewMode === id
-                  ? "bg-gray-900 text-white shadow-sm"
-                  : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                  ? "bg-neutral-900 text-white shadow-sm"
+                  : "bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -904,9 +901,18 @@ export default function SalesCRMPage() {
         {viewMode === "dashboard" && stats && (
           <DashboardView 
             stats={stats} 
-            pipeline={pipeline} 
+            pipeline={pipeline}
+            clients={clients}
+            tasks={tasks}
             onViewChange={setViewMode}
             onShowClientForm={() => setShowClientForm(true)}
+            onClientClick={handleEditClient}
+            onTaskClick={openTaskModal}
+            onRefresh={() => {
+              loadDashboard()
+              loadClients()
+              loadTasks()
+            }}
             currentUser={currentUser}
           />
         )}
