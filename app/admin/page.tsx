@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronLeft, Bot, FileText, Calendar } from "lucide-react"
+import { ChevronRight, ChevronLeft, Bot, FileText, Calendar, Users } from "lucide-react"
 
 interface AdminSection {
   id: string
@@ -17,6 +17,15 @@ interface AdminSection {
 }
 
 const adminSections: AdminSection[] = [
+  {
+    id: "crm",
+    title: "SALES CRM",
+    subtitle: "Clients • Pipeline • Tasks",
+    href: "/admin/crm",
+    icon: <Users className="w-6 h-6 sm:w-7 sm:h-7" />,
+    size: "large",
+    description: "Manage client relationships, sales pipeline, opportunities, and team tasks",
+  },
   {
     id: "analytics-hub",
     title: "ANALYTICS HUB",
@@ -38,7 +47,7 @@ const adminSections: AdminSection[] = [
   {
     id: "blog",
     title: "BLOG MANAGEMENT",
-    subtitle: "Create • Edit • Publish",
+    subtitle: "Create, edit, delete, and publish blog posts displayed on the 434 MEDIA blog page",
     href: "/admin/blog",
     icon: <FileText className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
@@ -46,8 +55,8 @@ const adminSections: AdminSection[] = [
   },
   {
     id: "events",
-    title: "EVENTS CALENDAR",
-    subtitle: "Manual • Meetup • Eventbrite • Lu.ma",
+    title: "EVENTS CALENDAR HUB",
+    subtitle: "Manage the events listed on the AIM, and 434 MEDIA event pages",
     href: "/admin/events",
     icon: <Calendar className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",

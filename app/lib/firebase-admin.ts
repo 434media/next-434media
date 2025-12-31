@@ -74,9 +74,13 @@ export function getDb(): admin.firestore.Firestore {
   getFirebaseApp()
   db = admin.firestore()
   
-  // Ignore undefined properties when writing documents
-  // This is important for Airtable data which may have missing fields
-  db.settings({ ignoreUndefinedProperties: true })
+  // Settings can only be called once, before any other operation
+  // Using try-catch to handle if already initialized
+  try {
+    db.settings({ ignoreUndefinedProperties: true })
+  } catch {
+    // Settings already applied, continue
+  }
   
   return db
 }
@@ -89,6 +93,28 @@ export const COLLECTIONS = {
   FEED_CULTUREDECK: "feed_culturedeck", // CULTUREDECK table
   BLOG_POSTS: "blog_posts",
   BLOG_CATEGORIES: "blog_categories",
+  // CRM Collections
+  CRM_CLIENTS: "crm_clients",
+  CRM_OPPORTUNITIES: "crm_opportunities",
+  CRM_PM_RECORDS: "crm_pm_records",
+  CRM_BUDGET_VIEW: "crm_budget_view",
+  CRM_MASTER_LIST: "crm_master_list",
+  CRM_DAILY_SUMMARY: "crm_daily_summary",
+  CRM_TASKS_JAKE: "crm_tasks_jake",
+  CRM_TASKS_PM: "crm_tasks_pm",
+  CRM_TASKS_MARC: "crm_tasks_marc",
+  CRM_TASKS_STACY: "crm_tasks_stacy",
+  CRM_TASKS_JESSE: "crm_tasks_jesse",
+  CRM_TASKS_BARB: "crm_tasks_barb",
+  CRM_TASKS_TEAMS: "crm_tasks_teams",
+  CRM_TASKS_COMPLETED: "crm_tasks_completed",
+  CRM_CLOSED_LOST_LEADS: "crm_closed_lost_leads",
+  CRM_CLOSED_WON_LEADS: "crm_closed_won_leads",
+  CRM_ARCHIVED_LEADS: "crm_archived_leads",
+  CRM_PLATFORMS: "crm_platforms",
+  CRM_SALES_REPS: "crm_sales_reps",
+  CRM_BARB_PIE_CHART: "crm_barb_pie_chart",
+  CRM_PIE_SLICES: "crm_pie_slices",
 } as const
 
 // Map table names to Firestore collections

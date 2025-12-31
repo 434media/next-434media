@@ -1,6 +1,40 @@
 import { getDb, COLLECTIONS, admin } from "./firebase-admin"
 import type { Event } from "../types/event-types"
 
+// ============================================
+// SIMPLE IN-MEMORY CACHE (reduces Firestore reads)
+// ============================================
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+const cache = new Map<string, CacheEntry<unknown>>()
+const CACHE_TTL = 30 * 1000 // 30 seconds cache
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key)
+    return null
+  }
+  return entry.data as T
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() })
+}
+
+// Invalidate cache for events
+export function invalidateEventsCache(): void {
+  for (const key of cache.keys()) {
+    if (key.includes("events")) {
+      cache.delete(key)
+    }
+  }
+}
+
 // Convert Firestore document to Event interface
 function mapFirestoreToEvent(doc: admin.firestore.DocumentSnapshot): Event {
   const data = doc.data()
@@ -35,8 +69,15 @@ function mapFirestoreToEvent(doc: admin.firestore.DocumentSnapshot): Event {
   }
 }
 
-// Get all events from Firestore
+// Get all events from Firestore (with caching)
 export async function getEventsFromFirestore(): Promise<Event[]> {
+  const cacheKey = "events:all"
+  const cached = getCached<Event[]>(cacheKey)
+  if (cached) {
+    console.log("[Firestore] Cache hit for events")
+    return cached
+  }
+
   try {
     const db = getDb()
     const snapshot = await db
@@ -44,15 +85,28 @@ export async function getEventsFromFirestore(): Promise<Event[]> {
       .orderBy("date", "asc")
       .get()
 
-    return snapshot.docs.map(mapFirestoreToEvent)
+    const events = snapshot.docs.map(mapFirestoreToEvent)
+    console.log(`[Firestore] Fetched ${events.length} events`)
+    
+    // Cache the results
+    setCache(cacheKey, events)
+    
+    return events
   } catch (error) {
     console.error("Error fetching events from Firestore:", error)
     throw new Error("Failed to fetch events from Firestore")
   }
 }
 
-// Get upcoming events (not past)
+// Get upcoming events (not past) - with caching
 export async function getUpcomingEventsFromFirestore(): Promise<Event[]> {
+  const cacheKey = "events:upcoming"
+  const cached = getCached<Event[]>(cacheKey)
+  if (cached) {
+    console.log("[Firestore] Cache hit for upcoming events")
+    return cached
+  }
+
   try {
     const db = getDb()
     const snapshot = await db
@@ -61,7 +115,13 @@ export async function getUpcomingEventsFromFirestore(): Promise<Event[]> {
       .orderBy("date", "asc")
       .get()
 
-    return snapshot.docs.map(mapFirestoreToEvent)
+    const events = snapshot.docs.map(mapFirestoreToEvent)
+    console.log(`[Firestore] Fetched ${events.length} upcoming events`)
+    
+    // Cache the results
+    setCache(cacheKey, events)
+    
+    return events
   } catch (error) {
     console.error("Error fetching upcoming events from Firestore:", error)
     throw new Error("Failed to fetch upcoming events from Firestore")
@@ -100,6 +160,9 @@ export async function createEventInFirestore(
       updated_at: now,
     })
 
+    // Invalidate events cache
+    invalidateEventsCache()
+
     // Fetch the created document
     const doc = await docRef.get()
     return mapFirestoreToEvent(doc)
@@ -131,6 +194,9 @@ export async function updateEventInFirestore(
 
     await docRef.update(cleanUpdates)
 
+    // Invalidate events cache
+    invalidateEventsCache()
+
     // Fetch updated document
     const doc = await docRef.get()
     return mapFirestoreToEvent(doc)
@@ -145,6 +211,9 @@ export async function deleteEventFromFirestore(id: string): Promise<void> {
   try {
     const db = getDb()
     await db.collection(COLLECTIONS.EVENTS).doc(id).delete()
+    
+    // Invalidate events cache
+    invalidateEventsCache()
   } catch (error) {
     console.error("Error deleting event from Firestore:", error)
     throw new Error("Failed to delete event from Firestore")

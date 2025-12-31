@@ -420,7 +420,7 @@ export default function FeedFormPage() {
     loadFeedItems()
   }, [selectedBrand])
 
-  // Load feed items from Airtable
+  // Load feed items from Firestore
   const loadFeedItems = async () => {
     setIsLoading(true)
     try {
@@ -443,7 +443,7 @@ export default function FeedFormPage() {
       console.error("Error loading feeds:", error)
       toast({
         title: "Error",
-        description: "Failed to load feed items from Airtable",
+        description: "Failed to load feed items from database",
         variant: "destructive",
       })
     } finally {
@@ -667,7 +667,7 @@ export default function FeedFormPage() {
     setFormData(mockData)
     toast({
       title: "Mock Data Loaded",
-      description: "Test data has been loaded into the form. You can now test the Airtable connection.",
+      description: "Test data has been loaded into the form. You can now test the database connection.",
       variant: "default",
     })
   }
@@ -715,7 +715,7 @@ export default function FeedFormPage() {
           title: "Success!",
           description: isEditing 
             ? "Feed item has been updated successfully." 
-            : "Feed item has been submitted to Airtable successfully.",
+            : "Feed item has been created successfully.",
           variant: "default",
         })
         

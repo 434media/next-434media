@@ -1,5 +1,43 @@
 import { getDb, COLLECTIONS, TABLE_TO_COLLECTION, admin } from "./firebase-admin"
 
+// ============================================
+// SIMPLE IN-MEMORY CACHE (reduces Firestore reads)
+// ============================================
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+const cache = new Map<string, CacheEntry<unknown>>()
+const CACHE_TTL = 30 * 1000 // 30 seconds cache
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key)
+    return null
+  }
+  return entry.data as T
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() })
+}
+
+// Invalidate cache for feed items
+export function invalidateFeedCache(tableName?: string): void {
+  for (const key of cache.keys()) {
+    if (tableName) {
+      if (key.includes(tableName) || key.includes("feed")) {
+        cache.delete(key)
+      }
+    } else if (key.includes("feed")) {
+      cache.delete(key)
+    }
+  }
+}
+
 // Get the correct Firestore collection for a table name
 function getCollectionForTable(tableName?: string): string {
   if (!tableName) return COLLECTIONS.FEED
@@ -126,17 +164,23 @@ function mapFirestoreToFeedItem(doc: admin.firestore.DocumentSnapshot): FeedItem
   }
 }
 
-// Get all feed items from Firestore
+// Get all feed items from Firestore (with caching)
 export async function getFeedItems(filters?: { 
   status?: string
   type?: string
   tableName?: string 
 }): Promise<FeedItem[]> {
+  // Generate cache key from filters
+  const cacheKey = `feed:${JSON.stringify(filters || {})}`
+  const cached = getCached<FeedItem[]>(cacheKey)
+  if (cached) {
+    console.log(`[Firestore] Cache hit for feed items`)
+    return cached
+  }
+
   try {
     const db = getDb()
     const collectionName = getCollectionForTable(filters?.tableName)
-    
-    console.log(`[Firestore] Fetching from collection: ${collectionName}`)
     
     let query: admin.firestore.Query = db.collection(collectionName)
 
@@ -153,10 +197,14 @@ export async function getFeedItems(filters?: {
     query = query.orderBy("published_date", "desc")
 
     const snapshot = await query.get()
+    const items = snapshot.docs.map(mapFirestoreToFeedItem)
     
-    console.log(`[Firestore] Found ${snapshot.docs.length} items in ${collectionName}`)
+    console.log(`[Firestore] Fetched ${items.length} feed items from ${collectionName}`)
     
-    return snapshot.docs.map(mapFirestoreToFeedItem)
+    // Cache the results
+    setCache(cacheKey, items)
+    
+    return items
   } catch (error) {
     console.error("[Firestore] Error fetching feed items:", error)
     return []
@@ -226,6 +274,10 @@ export async function createFeedItem(item: Partial<FeedItem>, tableName?: string
     cleanItem._source_table = tableName || "THEFEED"
 
     const docRef = await db.collection(collectionName).add(cleanItem)
+    
+    // Invalidate feed cache
+    invalidateFeedCache(tableName)
+    
     const doc = await docRef.get()
 
     console.log(`[Firestore] Created feed item in ${collectionName}: ${docRef.id}`)
@@ -257,6 +309,9 @@ export async function updateFeedItem(id: string, updates: Partial<FeedItem>, tab
 
     await docRef.update(cleanUpdates)
 
+    // Invalidate feed cache
+    invalidateFeedCache(tableName)
+
     const doc = await docRef.get()
     
     console.log(`[Firestore] Updated feed item in ${collectionName}: ${id}`)
@@ -275,6 +330,9 @@ export async function deleteFeedItem(id: string, tableName?: string): Promise<vo
     const collectionName = getCollectionForTable(tableName)
     
     await db.collection(collectionName).doc(id).delete()
+    
+    // Invalidate feed cache
+    invalidateFeedCache(tableName)
     
     console.log(`[Firestore] Deleted feed item from ${collectionName}: ${id}`)
   } catch (error) {

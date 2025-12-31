@@ -1,0 +1,12 @@
+// CRM Components - Export all
+export * from "./types"
+export { Toast } from "./Toast"
+export { StatCard } from "./StatCard"
+export { QuickActionCard } from "./QuickActionCard"
+export { DashboardView } from "./DashboardView"
+export { PipelineView } from "./PipelineView"
+export { ClientsView } from "./ClientsView"
+export { TasksView } from "./TasksView"
+export { MigrationView } from "./MigrationView"
+export { ClientFormModal } from "./ClientFormModal"
+export { TaskModal } from "./TaskModal"

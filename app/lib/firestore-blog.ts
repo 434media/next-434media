@@ -1,6 +1,40 @@
 import { getDb, COLLECTIONS, admin } from "./firebase-admin"
 import type { BlogPost, BlogCategory, CreateBlogPostData, UpdateBlogPostData, BlogFilters } from "../types/blog-types"
 
+// ============================================
+// SIMPLE IN-MEMORY CACHE (reduces Firestore reads)
+// ============================================
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+const cache = new Map<string, CacheEntry<unknown>>()
+const CACHE_TTL = 30 * 1000 // 30 seconds cache
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key)
+    return null
+  }
+  return entry.data as T
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() })
+}
+
+// Invalidate cache for blog posts
+export function invalidateBlogCache(): void {
+  for (const key of cache.keys()) {
+    if (key.includes("blog")) {
+      cache.delete(key)
+    }
+  }
+}
+
 // Generate slug from title
 function generateSlug(title: string): string {
   return title
@@ -52,8 +86,16 @@ function mapFirestoreToBlogPost(doc: admin.firestore.DocumentSnapshot): BlogPost
   }
 }
 
-// Get all blog posts from Firestore
+// Get all blog posts from Firestore (with caching)
 export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Promise<BlogPost[]> {
+  // Generate cache key from filters
+  const cacheKey = `blog_posts:${JSON.stringify(filters)}`
+  const cached = getCached<BlogPost[]>(cacheKey)
+  if (cached) {
+    console.log("[Firestore] Cache hit for blog posts")
+    return cached
+  }
+
   try {
     const db = getDb()
     let query: admin.firestore.Query = db.collection(COLLECTIONS.BLOG_POSTS)
@@ -77,6 +119,8 @@ export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Prom
 
     const snapshot = await query.get()
     let posts = snapshot.docs.map(mapFirestoreToBlogPost)
+    
+    console.log(`[Firestore] Fetched ${posts.length} blog posts`)
 
     // Apply tag filter (Firestore doesn't support array-contains with other where clauses easily)
     if (filters.tag) {
@@ -96,6 +140,9 @@ export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Prom
     if (filters.offset) {
       posts = posts.slice(filters.offset)
     }
+
+    // Cache the results
+    setCache(cacheKey, posts)
 
     return posts
   } catch (error) {
@@ -180,6 +227,10 @@ export async function createBlogPostInFirestore(postData: CreateBlogPostData): P
     }
 
     const docRef = await db.collection(COLLECTIONS.BLOG_POSTS).add(docData)
+    
+    // Invalidate blog cache
+    invalidateBlogCache()
+    
     const doc = await docRef.get()
 
     return mapFirestoreToBlogPost(doc)
@@ -223,6 +274,9 @@ export async function updateBlogPostInFirestore(id: string, updates: UpdateBlogP
 
     await docRef.update(cleanUpdates)
 
+    // Invalidate blog cache
+    invalidateBlogCache()
+
     const doc = await docRef.get()
     return mapFirestoreToBlogPost(doc)
   } catch (error) {
@@ -236,6 +290,9 @@ export async function deleteBlogPostFromFirestore(id: string): Promise<void> {
   try {
     const db = getDb()
     await db.collection(COLLECTIONS.BLOG_POSTS).doc(id).delete()
+    
+    // Invalidate blog cache
+    invalidateBlogCache()
   } catch (error) {
     console.error("Error deleting blog post from Firestore:", error)
     throw new Error("Failed to delete blog post from Firestore")
