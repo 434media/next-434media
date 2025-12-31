@@ -2,21 +2,21 @@
 
 import { revalidatePath } from "next/cache"
 import {
-  createBlogPostInAirtable,
-  updateBlogPostInAirtable,
-  deleteBlogPostFromAirtable,
-  getBlogPostsFromAirtable,
-  getBlogPostBySlugFromAirtable,
-  getBlogCategoriesFromAirtable,
-  testAirtableBlogConnection,
-} from "../lib/airtable-blog"
+  createBlogPostInFirestore,
+  updateBlogPostInFirestore,
+  deleteBlogPostFromFirestore,
+  getBlogPostsFromFirestore,
+  getBlogPostBySlugFromFirestore,
+  getBlogCategoriesFromFirestore,
+  testFirestoreBlogConnection,
+} from "../lib/firestore-blog"
 import type { CreateBlogPostData, UpdateBlogPostData, BlogFilters } from "../types/blog-types"
 
-// Airtable connection verification
-async function ensureAirtableConnected() {
-  const isConnected = await testAirtableBlogConnection()
+// Firestore connection verification
+async function ensureFirestoreConnected() {
+  const isConnected = await testFirestoreBlogConnection()
   if (!isConnected) {
-    throw new Error("Airtable blog connection failed")
+    throw new Error("Firestore blog connection failed")
   }
 }
 
@@ -55,7 +55,7 @@ function calculateReadTime(content: string): number {
 
 export async function createBlogPostAction(formData: FormData) {
   try {
-    await ensureAirtableConnected()
+    await ensureFirestoreConnected()
 
     const adminPassword = formData.get("adminPassword") as string
 
@@ -81,7 +81,7 @@ export async function createBlogPostAction(formData: FormData) {
       read_time: calculateReadTime(content),
     }
 
-    const post = await createBlogPostInAirtable(postData)
+    const post = await createBlogPostInFirestore(postData)
 
     revalidatePath("/blog")
     revalidatePath("/admin/blog")
@@ -95,7 +95,7 @@ export async function createBlogPostAction(formData: FormData) {
 
 export async function updateBlogPostAction(formData: FormData) {
   try {
-    await ensureAirtableConnected()
+    await ensureFirestoreConnected()
 
     const id = formData.get("id") as string
     const title = formData.get("title") as string
@@ -116,7 +116,7 @@ export async function updateBlogPostAction(formData: FormData) {
       read_time: content ? calculateReadTime(content) : undefined,
     }
 
-    const post = await updateBlogPostInAirtable(id, updates)
+    const post = await updateBlogPostInFirestore(id, updates)
 
     revalidatePath("/blog")
     revalidatePath("/admin/blog")
@@ -131,14 +131,14 @@ export async function updateBlogPostAction(formData: FormData) {
 
 export async function deleteBlogPostAction(id: string, adminPassword: string) {
   try {
-    await ensureAirtableConnected()
+    await ensureFirestoreConnected()
 
     // Verify admin password
     if (!verifyAdminPassword(adminPassword)) {
       return { success: false, error: "Invalid admin password" }
     }
 
-    await deleteBlogPostFromAirtable(id)
+    await deleteBlogPostFromFirestore(id)
 
     revalidatePath("/blog")
     revalidatePath("/admin/blog")
@@ -152,9 +152,9 @@ export async function deleteBlogPostAction(id: string, adminPassword: string) {
 
 export async function getBlogPostsAction(filters: BlogFilters = {}) {
   try {
-    await ensureAirtableConnected()
+    await ensureFirestoreConnected()
 
-    const posts = await getBlogPostsFromAirtable(filters)
+    const posts = await getBlogPostsFromFirestore(filters)
     return { success: true, posts }
   } catch (error) {
     console.error("Error fetching blog posts:", error)
@@ -164,9 +164,9 @@ export async function getBlogPostsAction(filters: BlogFilters = {}) {
 
 export async function getBlogPostBySlugAction(slug: string) {
   try {
-    await ensureAirtableConnected()
+    await ensureFirestoreConnected()
 
-    const post = await getBlogPostBySlugFromAirtable(slug)
+    const post = await getBlogPostBySlugFromFirestore(slug)
     return { success: true, post }
   } catch (error) {
     console.error("Error fetching blog post:", error)
@@ -176,9 +176,9 @@ export async function getBlogPostBySlugAction(slug: string) {
 
 export async function getBlogCategoriesAction() {
   try {
-    await ensureAirtableConnected()
+    await ensureFirestoreConnected()
 
-    const categories = await getBlogCategoriesFromAirtable()
+    const categories = await getBlogCategoriesFromFirestore()
     return { success: true, categories }
   } catch (error) {
     console.error("Error fetching blog categories:", error)

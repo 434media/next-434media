@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createFeedItem } from "../../lib/airtable-feed"
+import { 
+  createFeedItem, 
+  getFeedItems, 
+  updateFeedItem, 
+  deleteFeedItem 
+} from "../../lib/firestore-feed"
 import { getSession } from "../../lib/auth"
 
 export async function POST(request: NextRequest) {
@@ -29,12 +34,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create feed item in Airtable
+    // Create feed item in Firestore
     const createdItem = await createFeedItem(feedData, tableName)
 
     return NextResponse.json({
       success: true,
-      message: "Feed item successfully created in Airtable",
+      message: "Feed item successfully created",
       data: createdItem,
     })
   } catch (error) {
@@ -50,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint to retrieve feed items (optional - for viewing existing items)
+// GET endpoint to retrieve feed items
 export async function GET(request: NextRequest) {
   try {
     // Check admin authentication using session
@@ -69,23 +74,16 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type") || undefined
     const tableName = searchParams.get("table") || undefined
 
-    console.log(`[API] Fetching feed items - table: ${tableName || 'default'}`)
+    console.log(`[API] Fetching feed items from Firestore - table: ${tableName || 'default'}`)
 
-    // Import getFeedItems dynamically to avoid circular dependencies
-    const { getFeedItems } = await import("../../lib/airtable-feed")
-    
     const items = await getFeedItems({ status, type, tableName })
-
-    // If no items returned, it could be an authorization issue
-    if (items.length === 0) {
-      console.log(`[API] No items returned for table: ${tableName || 'default'}. This could indicate an authorization issue or empty table.`)
-    }
 
     return NextResponse.json({
       success: true,
       data: items,
       count: items.length,
       table: tableName || 'thefeed',
+      source: 'firestore',
     })
   } catch (error) {
     console.error("Error fetching feed items:", error)
@@ -94,7 +92,6 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch feed items",
-        hint: "Check server logs for detailed Airtable authorization error messages",
       },
       { status: 500 }
     )
@@ -129,15 +126,12 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Import updateFeedItem dynamically
-    const { updateFeedItem } = await import("../../lib/airtable-feed")
-    
-    // Update feed item in Airtable
+    // Update feed item in Firestore
     const updatedItem = await updateFeedItem(id, updates, tableName)
 
     return NextResponse.json({
       success: true,
-      message: "Feed item successfully updated in Airtable",
+      message: "Feed item successfully updated",
       data: updatedItem,
     })
   } catch (error) {
@@ -178,15 +172,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Import deleteFeedItem dynamically
-    const { deleteFeedItem } = await import("../../lib/airtable-feed")
-    
-    // Delete feed item from Airtable
+    // Delete feed item from Firestore
     await deleteFeedItem(id, tableName)
 
     return NextResponse.json({
       success: true,
-      message: "Feed item successfully deleted from Airtable",
+      message: "Feed item successfully deleted",
     })
   } catch (error) {
     console.error("Error deleting feed item:", error)
