@@ -29,9 +29,11 @@ import {
   BRANDS, 
   TEAM_MEMBERS, 
   getDueDateStatus, 
-  formatDate 
+  formatDate,
+  DISPOSITION_OPTIONS,
+  DOC_OPTIONS
 } from "./types"
-import type { Task, TaskAttachment, TaskComment, CurrentUser, Brand, TeamMember } from "./types"
+import type { Task, TaskAttachment, TaskComment, CurrentUser, Brand, TeamMember, Disposition, DOC } from "./types"
 
 interface TaskFormData {
   title: string
@@ -45,6 +47,8 @@ interface TaskFormData {
   web_links: string[]
   tagged_users: string[]
   is_opportunity: boolean
+  disposition: Disposition | ""
+  doc: DOC | ""
 }
 
 interface TaskModalProps {
@@ -744,13 +748,71 @@ export function TaskModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Opportunity</label>
                 <select
                   value={formData.is_opportunity ? "yes" : "no"}
-                  onChange={(e) => onFormChange({ ...formData, is_opportunity: e.target.value === "yes" })}
+                  onChange={(e) => onFormChange({ 
+                    ...formData, 
+                    is_opportunity: e.target.value === "yes",
+                    // Set default disposition when enabling opportunity
+                    disposition: e.target.value === "yes" && !formData.disposition ? "open" : formData.disposition
+                  })}
                   className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
                 </select>
               </div>
+
+              {/* Disposition & DOC - Only show when is_opportunity is true */}
+              <AnimatePresence>
+                {formData.is_opportunity && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-4 overflow-hidden"
+                  >
+                    {/* Disposition */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Disposition <span className="text-gray-400 font-normal">(Pipeline Stage)</span>
+                      </label>
+                      <select
+                        value={formData.disposition || "open"}
+                        onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      >
+                        {DISPOSITION_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* DOC (Degree of Confidence) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        DOC <span className="text-gray-400 font-normal">(Degree of Confidence)</span>
+                      </label>
+                      <select
+                        value={formData.doc || ""}
+                        onChange={(e) => onFormChange({ ...formData, doc: e.target.value as DOC })}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      >
+                        <option value="">Select probability...</option>
+                        {DOC_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Used for pacing calculations in dashboard
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Web Links Section */}
               <div className="pt-4 border-t border-gray-200">

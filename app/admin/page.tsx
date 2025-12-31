@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronLeft, Bot, FileText, Calendar, Users } from "lucide-react"
+import { ChevronRight, ChevronLeft, Bot, PencilIcon, Calendar, RssIcon, RocketIcon } from "lucide-react"
 
 interface AdminSection {
   id: string
@@ -19,12 +19,12 @@ interface AdminSection {
 const adminSections: AdminSection[] = [
   {
     id: "crm",
-    title: "SALES CRM",
-    subtitle: "Clients • Pipeline • Tasks",
+    title: "PLATFORM CRM",
+    subtitle: "Opportunities • Tasks • Clients • Pipeline",
     href: "/admin/crm",
-    icon: <Users className="w-6 h-6 sm:w-7 sm:h-7" />,
+    icon: <RocketIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
-    description: "Manage client relationships, sales pipeline, opportunities, and team tasks",
+    description: "Manage client relationships, sales pipeline, platform opportunities, and team tasks",
   },
   {
     id: "analytics-hub",
@@ -40,7 +40,7 @@ const adminSections: AdminSection[] = [
     title: "CONTENT MANAGEMENT HUB",
     subtitle: "The Feed • Culture Deck • 8 COUNT",
     href: "/admin/feed-form",
-    icon: <FileTextIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
+    icon: <RssIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Manage and schedule content for The Feed (Digital Canvas), The Culture Deck (Vemos Vamos), and The 8 COUNT (TXMX Boxing) from a single interface.",
   },
@@ -49,7 +49,7 @@ const adminSections: AdminSection[] = [
     title: "BLOG MANAGEMENT",
     subtitle: "Create, edit, delete, and publish blog posts displayed on the 434 MEDIA blog page",
     href: "/admin/blog",
-    icon: <FileText className="w-6 h-6 sm:w-7 sm:h-7" />,
+    icon: <PencilIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Create and manage blog posts with rich text editing, images, and meta optimization",
   },

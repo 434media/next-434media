@@ -318,6 +318,13 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     // Social
     instagram_handle: (rawData.instagram_handle || rawData.instagram || rawData.Instagram || "") as string,
     linkedin_url: (rawData.linkedin_url || rawData.linkedin || rawData.LinkedIn || "") as string,
+    // Sales/Opportunity fields
+    brand: (rawData.brand || rawData.platform || "") as ClientRecord["brand"],
+    pitch_value: (rawData.pitch_value || rawData.deal_value || 0) as number,
+    source: (rawData.source || rawData.lead_source || "") as string,
+    is_opportunity: (rawData.is_opportunity || false) as boolean,
+    disposition: (rawData.disposition || undefined) as ClientRecord["disposition"],
+    doc: (rawData.doc || undefined) as ClientRecord["doc"],
     // Timestamps
     created_at: (rawData.created_at || new Date().toISOString()) as string,
     updated_at: (rawData.updated_at || new Date().toISOString()) as string,
@@ -599,7 +606,10 @@ export async function createTask(
   owner: TaskOwner,
   data: Omit<Task, "id" | "created_at" | "updated_at">
 ): Promise<Task> {
-  return createDocument<Task>(TASK_COLLECTIONS[owner], data)
+  const result = await createDocument<Task>(TASK_COLLECTIONS[owner], data)
+  // Also invalidate combined tasks cache
+  cache.delete("all_tasks_combined")
+  return result
 }
 
 export async function updateTask(
@@ -607,11 +617,16 @@ export async function updateTask(
   id: string,
   updates: Partial<Task>
 ): Promise<Task> {
-  return updateDocument<Task>(TASK_COLLECTIONS[owner], id, updates)
+  const result = await updateDocument<Task>(TASK_COLLECTIONS[owner], id, updates)
+  // Also invalidate combined tasks cache
+  cache.delete("all_tasks_combined")
+  return result
 }
 
 export async function deleteTask(owner: TaskOwner, id: string): Promise<void> {
-  return deleteDocument(TASK_COLLECTIONS[owner], id)
+  await deleteDocument(TASK_COLLECTIONS[owner], id)
+  // Also invalidate combined tasks cache
+  cache.delete("all_tasks_combined")
 }
 
 // Delete all tasks from a specific owner's collection
@@ -757,6 +772,9 @@ export async function getAllTasks(): Promise<Task[]> {
         notes: description,
         brand,
         web_links: webLinks.length > 0 ? webLinks : undefined,
+        is_opportunity: rawItem.is_opportunity as boolean | undefined,
+        disposition: rawItem.disposition as Task["disposition"] | undefined,
+        doc: rawItem.doc as Task["doc"] | undefined,
       }
     })
   

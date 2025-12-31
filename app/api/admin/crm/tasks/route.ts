@@ -261,6 +261,12 @@ export async function PUT(request: NextRequest) {
       if (taskUpdates.is_opportunity !== undefined) {
         masterListUpdates.is_opportunity = taskUpdates.is_opportunity
       }
+      if (taskUpdates.disposition !== undefined) {
+        masterListUpdates.disposition = taskUpdates.disposition
+      }
+      if (taskUpdates.doc !== undefined) {
+        masterListUpdates.doc = taskUpdates.doc
+      }
       
       return masterListUpdates
     }

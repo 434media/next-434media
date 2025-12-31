@@ -74,6 +74,8 @@ export interface Client {
   status: string
   source?: string  // Lead source: web, cold_call, event, inbound_call, referral, warm_intro
   is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
+  disposition?: Disposition  // Opportunity stage: open, pitched, closed_won, closed_lost
+  doc?: DOC  // Degree of Confidence: 25, 50, 75, 90 (percentage probability)
   industry?: string  // Deprecated: use brand instead
   brand?: Brand  // Which brand this client is associated with
   website?: string
@@ -98,19 +100,57 @@ export interface Client {
 // Brand type
 export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing"
 
+// Disposition (opportunity stage) type - used in kanban columns
+export type Disposition = "open" | "pitched" | "closed_won" | "closed_lost"
+
+// DOC (Degree of Confidence) - stage probability values
+export type DOC = "25" | "50" | "75" | "90"
+
+// Disposition options for UI
+export const DISPOSITION_OPTIONS: { value: Disposition; label: string; color: string }[] = [
+  { value: "open", label: "Open", color: "#3b82f6" },
+  { value: "pitched", label: "Pitched", color: "#8b5cf6" },
+  { value: "closed_won", label: "Closed Won", color: "#10b981" },
+  { value: "closed_lost", label: "Closed Lost", color: "#ef4444" },
+]
+
+// DOC options for UI
+export const DOC_OPTIONS: { value: DOC; label: string }[] = [
+  { value: "25", label: "25%" },
+  { value: "50", label: "50%" },
+  { value: "75", label: "75%" },
+  { value: "90", label: "90%" },
+]
+
 // Brand Sales Goals (annual targets)
 export interface BrandGoal {
   brand: Brand
   annualGoal: number
   color: string
   description: string
+  // Optional: array of brands that share this goal (for combined tracking)
+  includedBrands?: Brand[]
 }
+
+// Helper to check if a brand belongs to the 434 Media group (parent company)
+export function is434MediaGroup(brand: Brand | undefined): boolean {
+  return brand === "434 Media" || brand === "Digital Canvas"
+}
+
+// Brands that belong to the 434 Media parent company
+export const MEDIA_434_BRANDS: Brand[] = ["434 Media", "Digital Canvas"]
 
 export const BRAND_GOALS: BrandGoal[] = [
   { brand: "TXMX Boxing", annualGoal: 1000000, color: "#ef4444", description: "Sports & Entertainment" },
   { brand: "Vemos Vamos", annualGoal: 250000, color: "#f97316", description: "Bilingual Studio & Agency" },
   { brand: "DEVSA TV", annualGoal: 250000, color: "#8b5cf6", description: "Documentary & Video Production" },
-  { brand: "Digital Canvas", annualGoal: 50000, color: "#10b981", description: "Creative Tools & Services" },
+  { 
+    brand: "434 Media", 
+    annualGoal: 50000, 
+    color: "#10b981", 
+    description: "Parent Company & Digital Canvas",
+    includedBrands: ["434 Media", "Digital Canvas"]
+  },
 ]
 
 // Task attachment interface
@@ -157,6 +197,8 @@ export interface Task {
   client_name?: string
   opportunity_id?: string
   is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
+  disposition?: Disposition  // Opportunity stage: open, pitched, closed_won, closed_lost
+  doc?: DOC  // Degree of Confidence: 25, 50, 75, 90 (percentage probability)
   category?: string
   estimated_hours?: number
   actual_hours?: number

@@ -17,6 +17,7 @@ import {
   Toast,
   DashboardView,
   PipelineView,
+  OpportunitiesKanbanView,
   ClientsView,
   TasksView,
   ClientFormModal,
@@ -35,6 +36,8 @@ import type {
   TaskAttachment,
   TaskComment,
   Brand,
+  Disposition,
+  DOC,
 } from "../../components/crm/types"
 
 export default function SalesCRMPage() {
@@ -83,6 +86,8 @@ export default function SalesCRMPage() {
     notes: "",
     source: "",
     is_opportunity: false,
+    disposition: "" as Disposition | "",
+    doc: "" as DOC | "",
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -101,6 +106,8 @@ export default function SalesCRMPage() {
     web_links: [] as string[],
     tagged_users: [] as string[],
     is_opportunity: false,
+    disposition: "" as Disposition | "",
+    doc: "" as DOC | "",
   })
   const [newLink, setNewLink] = useState("")
   const [newComment, setNewComment] = useState("")
@@ -202,6 +209,7 @@ export default function SalesCRMPage() {
     } else if (viewMode === "pipeline") {
       if (pipeline.length === 0) loadPipeline()
       if (clients.length === 0) loadClients()
+      if (tasks.length === 0) loadTasks()
     }
   }, [viewMode])
 
@@ -220,6 +228,8 @@ export default function SalesCRMPage() {
       web_links: task.web_links || [],
       tagged_users: task.tagged_users || [],
       is_opportunity: task.is_opportunity || false,
+      disposition: task.disposition || "",
+      doc: task.doc || "",
     })
     setTaskAttachments(task.attachments || [])
     setShowTaskModal(true)
@@ -635,6 +645,8 @@ export default function SalesCRMPage() {
         notes: clientForm.notes,
         source: clientForm.source || undefined,
         is_opportunity: clientForm.is_opportunity,
+        disposition: clientForm.is_opportunity ? (clientForm.disposition || "open") : undefined,
+        doc: clientForm.is_opportunity ? clientForm.doc || undefined : undefined,
       }
 
       const method = editingClient ? "PUT" : "POST"
@@ -653,7 +665,7 @@ export default function SalesCRMPage() {
       setToast({ message: `Client ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false })
+      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "" })
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to save client", type: "error" })
@@ -673,6 +685,68 @@ export default function SalesCRMPage() {
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to delete client", type: "error" })
+    }
+  }
+
+  // Update client disposition via drag-and-drop in Kanban
+  const handleUpdateClientDisposition = async (clientId: string, disposition: Disposition) => {
+    try {
+      const response = await fetch("/api/admin/crm/clients", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: clientId, disposition }),
+      })
+
+      if (!response.ok) throw new Error("Failed to update client")
+
+      // Optimistically update the local state
+      setClients(prevClients => 
+        prevClients.map(c => c.id === clientId ? { ...c, disposition } : c)
+      )
+      setToast({ message: "Client moved", type: "success" })
+    } catch (err) {
+      setToast({ message: "Failed to move client", type: "error" })
+    }
+  }
+
+  // Update task disposition via drag-and-drop in Kanban
+  const handleUpdateTaskDisposition = async (taskId: string, disposition: Disposition) => {
+    // Find the task to get the owner
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    const ownerMap: Record<string, string> = {
+      "Jake": "jake",
+      "Jacob Lee Miles": "jake",
+      "Marc": "marc",
+      "Marcos Resendez": "marc",
+      "Stacy": "stacy",
+      "Stacy Carrizales": "stacy",
+      "Jesse": "jesse",
+      "Jesse Hernandez": "jesse",
+      "Barb": "barb",
+      "Barbara Carreon": "barb",
+      "Nichole": "teams",
+      "Nichole Snow": "teams",
+    }
+    const owner = ownerMap[task.assigned_to] || "teams"
+
+    try {
+      const response = await fetch("/api/admin/crm/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: taskId, owner, disposition }),
+      })
+
+      if (!response.ok) throw new Error("Failed to update task")
+
+      // Optimistically update the local state
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === taskId ? { ...t, disposition } : t)
+      )
+      setToast({ message: "Task moved", type: "success" })
+    } catch (err) {
+      setToast({ message: "Failed to move task", type: "error" })
     }
   }
 
@@ -740,6 +814,8 @@ export default function SalesCRMPage() {
       notes: client.notes || "",
       source: client.source || "",
       is_opportunity: client.is_opportunity || false,
+      disposition: client.disposition || "",
+      doc: client.doc || "",
     })
     setShowClientForm(true)
   }
@@ -784,10 +860,10 @@ export default function SalesCRMPage() {
         {/* Title */}
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-gray-900 mb-2 tracking-tight">
-            SALES CRM
+            PLATFORM CRM
           </h1>
           <p className="text-gray-500 text-sm sm:text-base">
-            Manage clients, opportunities, and sales pipeline
+            Manage tasks, clients, opportunities, and sales pipeline
           </p>
         </div>
 
@@ -835,16 +911,19 @@ export default function SalesCRMPage() {
           />
         )}
 
-        {/* Pipeline View */}
+        {/* Opportunities Kanban View */}
         {viewMode === "pipeline" && (
-          <PipelineView 
-            pipeline={pipeline}
+          <OpportunitiesKanbanView 
             clients={clients}
+            tasks={tasks}
             onRefresh={() => {
-              loadPipeline()
               loadClients()
+              loadTasks()
             }}
             onClientClick={handleEditClient}
+            onTaskClick={openTaskModal}
+            onUpdateClientDisposition={handleUpdateClientDisposition}
+            onUpdateTaskDisposition={handleUpdateTaskDisposition}
           />
         )}
 
@@ -860,7 +939,7 @@ export default function SalesCRMPage() {
             onBrandFilterChange={setClientBrandFilter}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false })
+              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "" })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}
