@@ -11,6 +11,7 @@ import {
   uncompleteTask,
   getMasterListItemById,
   updateMasterListItem,
+  deleteMasterListItem,
 } from "@/app/lib/firestore-crm"
 
 // Task owner types
@@ -330,9 +331,30 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await deleteTask(owner, id)
-
+    // First, check where the task actually exists
+    // Check owner's collection first
+    const existingTask = await getTaskById(owner, id)
+    
+    if (existingTask) {
+      // Task exists in owner's collection, delete it there
+      await deleteTask(owner, id)
+      return NextResponse.json({ success: true, message: "Task deleted" })
+    }
+    
+    // Task not found in owner's collection, check master list
+    const masterListItem = await getMasterListItemById(id)
+    
+    if (masterListItem) {
+      // Task is from master list, delete it there
+      await deleteMasterListItem(id)
+      return NextResponse.json({ success: true, message: "Task deleted", source: "master_list" })
+    }
+    
+    // Task not found anywhere - still return success since the end result is the same
+    // (task doesn't exist)
+    console.log(`Task ${id} not found in any collection, treating as already deleted`)
     return NextResponse.json({ success: true, message: "Task deleted" })
+    
   } catch (error) {
     console.error("Error deleting task:", error)
     return NextResponse.json(
