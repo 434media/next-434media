@@ -71,7 +71,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
     >
       {/* Main Date Range Selector */}
       <div
-        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl"
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-6 bg-gradient-to-r from-pink-50 to-white rounded-xl border border-neutral-200 shadow-sm"
         style={{
           willChange: "auto",
           backfaceVisibility: "hidden",
@@ -80,14 +80,14 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
       >
         <div className="flex items-center gap-3">
           <div
-            className="p-3 bg-pink-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+            className="p-3 bg-pink-100 rounded-xl shadow-sm transition-transform duration-200 hover:scale-105"
             style={{ willChange: "transform" }}
           >
-            <Calendar className="h-6 w-6 text-pink-400" />
+            <Calendar className="h-6 w-6 text-pink-600" />
           </div>
           <div>
-            <h3 className="text-white text-xl font-bold mb-1">Date Range</h3>
-            <p className="text-white/60 text-sm font-medium">Select your Instagram analytics period</p>
+            <h3 className="text-neutral-900 text-xl font-bold mb-1">Date Range</h3>
+            <p className="text-neutral-500 text-sm font-medium">Select your Instagram analytics period</p>
           </div>
         </div>
 
@@ -105,7 +105,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
                 className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 ${
                   selectedRange === option.value
                     ? "bg-pink-500 hover:bg-pink-600 text-white border-0 shadow-lg"
-                    : "bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:border-white/30 hover:text-white"
+                    : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900"
                 }`}
                 style={{ willChange: "transform" }}
               >
@@ -133,7 +133,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 ${
                 showCustom
                   ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0"
-                  : "bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:border-white/30 hover:text-white"
+                  : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900"
               }`}
               style={{ willChange: "transform" }}
             >
@@ -156,7 +156,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
             style={{ willChange: "height, transform" }}
           >
             <div
-              className="p-6 bg-gradient-to-r from-white/5 to-white/10 rounded-xl border border-white/10"
+              className="p-6 bg-gradient-to-r from-neutral-50 to-white rounded-xl border border-neutral-200"
               style={{
                 willChange: "auto",
                 backfaceVisibility: "hidden",
@@ -165,21 +165,21 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
                 <div className="flex-1 space-y-2">
-                  <label className="text-white/80 text-sm font-medium">Start Date</label>
+                  <label className="text-neutral-700 text-sm font-medium">Start Date</label>
                   <input
                     type="date"
                     value={customStartDate || formatDateForInput(selectedRange)}
                     onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
                 <div className="flex-1 space-y-2">
-                  <label className="text-white/80 text-sm font-medium">End Date</label>
+                  <label className="text-neutral-700 text-sm font-medium">End Date</label>
                   <input
                     type="date"
                     value={customEndDate || new Date().toISOString().split("T")[0]}
                     onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
+                    className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -192,7 +192,7 @@ export function InstagramDateRangeSelector({ selectedRange, onRangeChange }: Ins
                   </button>
                   <button
                     onClick={() => setShowCustom(false)}
-                    className="px-4 py-2 bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200 rounded-lg text-sm font-medium"
+                    className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-all duration-200 rounded-lg text-sm font-medium"
                   >
                     Cancel
                   </button>

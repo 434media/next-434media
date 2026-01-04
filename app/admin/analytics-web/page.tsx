@@ -8,14 +8,16 @@ export const metadata = {
 
 export default function AnalyticsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-900 flex items-center justify-center">
-          <div className="text-white">Loading Analytics Dashboard...</div>
-        </div>
-      }
-    >
-      <AnalyticsClientPage />
-    </Suspense>
+    <div className="w-full max-w-full overflow-x-hidden">
+      <Suspense
+        fallback={
+          <div className="bg-neutral-50 flex items-center justify-center min-h-screen">
+            <div className="text-neutral-600">Loading Analytics Dashboard...</div>
+          </div>
+        }
+      >
+        <AnalyticsClientPage />
+      </Suspense>
+    </div>
   )
 }

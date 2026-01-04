@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { Globe, Loader2, Users, MousePointer, TrendingUp } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
@@ -147,28 +146,19 @@ export function TrafficSourcesChart({
   const totalSessions = data.reduce((sum, item) => sum + item.sessions, 0)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="h-full"
-    >
-      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl h-full overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 via-transparent to-cyan-500/5 rounded-lg" />
+    <div className="h-full w-full max-w-full min-w-0 overflow-hidden">
+      <Card className="border border-neutral-200 bg-white shadow-lg h-full overflow-hidden w-full max-w-full">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50/50 via-transparent to-cyan-50/50 rounded-lg" />
 
-        <CardHeader className="relative pb-4 sm:pb-6">
+        <CardHeader className="relative pb-4 sm:pb-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <motion.div
-                className="p-2 sm:p-3 bg-gradient-to-br from-sky-500/20 to-cyan-500/20 rounded-lg sm:rounded-xl shadow-lg shrink-0"
-                whileHover={{ scale: 1.05 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
-              >
-                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-sky-400" />
-              </motion.div>
-              <div className="min-w-0">
-                <CardTitle className="text-white text-base sm:text-xl font-bold mb-0.5 sm:mb-1">Traffic Sources</CardTitle>
-                <p className="text-white/60 text-xs sm:text-sm font-medium truncate">
+            <div className="flex items-center gap-3">
+              <div className="p-2 sm:p-3 bg-gradient-to-br from-sky-100 to-cyan-100 rounded-lg sm:rounded-xl shadow-sm shrink-0 transition-transform hover:scale-105">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-sky-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-neutral-900 text-base sm:text-lg font-bold mb-0.5 leading-tight">Traffic Sources</CardTitle>
+                <p className="text-neutral-600 text-xs sm:text-sm font-medium truncate">
                   {totalSessions.toLocaleString()} sessions • {data.length} sources
                 </p>
               </div>
@@ -179,69 +169,59 @@ export function TrafficSourcesChart({
         <CardContent className="relative pt-0">
           {isLoading || parentLoading ? (
             <div className="flex items-center justify-center h-48">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-              >
-                <Loader2 className="h-6 w-6 text-sky-400" />
-              </motion.div>
+              <Loader2 className="h-6 w-6 text-sky-600 animate-spin" />
             </div>
           ) : (
-            <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {data.map((source, index) => {
                 const percentage = totalSessions > 0 ? (source.sessions / totalSessions) * 100 : 0
                 const iconConfig = getSourceIconConfig(source.source)
                 const displayName = source.source === "(direct)" ? "Direct Traffic" : source.source
 
                 return (
-                  <motion.div
+                  <div
                     key={source.source}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`group p-3 sm:p-4 rounded-xl bg-gradient-to-r ${iconConfig.gradientFrom} ${iconConfig.gradientTo} border border-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}
+                    className={`group p-3 sm:p-4 rounded-xl bg-gradient-to-r from-neutral-50 to-white border border-neutral-200 hover:border-neutral-300 transition-all duration-300 hover:shadow-md`}
                   >
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className={`p-2 sm:p-3 rounded-lg bg-white/10 ${iconConfig.color} flex-shrink-0`}>
+                    <div className="flex items-start gap-2.5 sm:gap-3">
+                      <div className={`p-2 sm:p-2.5 rounded-lg bg-neutral-100 ${iconConfig.color} flex-shrink-0`}>
                         {iconConfig.icon}
                       </div>
 
-                      <div className="min-w-0 flex-1 overflow-hidden">
-                        <h3 className="text-white font-medium text-sm sm:text-base capitalize truncate">{displayName}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-neutral-900 font-semibold text-sm capitalize truncate leading-tight">{displayName}</h3>
 
-                        <div className="mt-3 w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${percentage}%` }}
-                            transition={{ duration: 1, delay: index * 0.1, type: "spring", stiffness: 100 }}
-                            className={`h-full bg-gradient-to-r from-white/40 to-white/20 rounded-full`}
+                        <div className="mt-2.5 w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
+                          <div
+                            style={{ width: `${percentage}%` }}
+                            className={`h-full bg-gradient-to-r from-sky-500 to-cyan-500 rounded-full transition-all duration-700`}
                           />
                         </div>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-1 sm:gap-0">
-                          <p className="text-white/60 text-[10px] sm:text-xs font-medium">{percentage.toFixed(1)}% of traffic</p>
+                        <div className="flex flex-wrap items-center justify-between mt-2 gap-1">
+                          <p className="text-neutral-600 text-[11px] sm:text-xs font-semibold">{percentage.toFixed(1)}% of traffic</p>
 
-                          <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="flex items-center gap-1 sm:gap-1.5">
-                              <MousePointer className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white/60" />
-                              <p className="text-white font-semibold text-xs sm:text-sm">{source.sessions.toLocaleString()}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
+                              <MousePointer className="h-3 w-3 text-neutral-400" />
+                              <p className="text-neutral-900 font-bold text-xs sm:text-sm">{source.sessions.toLocaleString()}</p>
                             </div>
 
-                            <div className="flex items-center gap-1 sm:gap-1.5">
-                              <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white/60" />
-                              <p className="text-white font-semibold text-xs sm:text-sm">{source.users.toLocaleString()}</p>
+                            <div className="flex items-center gap-1">
+                              <Users className="h-3 w-3 text-neutral-400" />
+                              <p className="text-neutral-900 font-bold text-xs sm:text-sm">{source.users.toLocaleString()}</p>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )
               })}
             </div>
           )}
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   )
 }

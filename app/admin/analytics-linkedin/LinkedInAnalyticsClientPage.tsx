@@ -379,7 +379,7 @@ export default function LinkedInAnalyticsClientPage() {
   }
 
   return (
-    <div className="bg-black w-full overflow-x-hidden py-16">
+    <div className="bg-neutral-50 w-full overflow-x-hidden py-16">
       {/* LinkedIn Header */}
       <div className="w-full overflow-x-hidden">
         <LinkedInAnalyticsHeader
@@ -400,12 +400,12 @@ export default function LinkedInAnalyticsClientPage() {
           {/* Error Display */}
           {error && (
             <div className="mb-4">
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                <p className="text-sm font-medium text-red-400">Error</p>
-                <p className="text-xs text-white/60 mt-1">{error}</p>
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                <p className="text-sm font-medium text-red-600">Error</p>
+                <p className="text-xs text-red-500 mt-1">{error}</p>
                 <button
                   onClick={() => setError(null)}
-                  className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md transition-colors mt-2 text-white"
+                  className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-md transition-colors mt-2"
                 >
                   Dismiss
                 </button>
@@ -417,7 +417,7 @@ export default function LinkedInAnalyticsClientPage() {
           {!isLoading && organizationData && (
             <div className="mb-10 sm:mb-12">
               <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                <h2 className="text-sm sm:text-lg font-semibold text-white">Organization Overview</h2>
+                <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Organization Overview</h2>
                 <InfoTooltip content="Your LinkedIn Company Page information including follower count and company details." />
               </div>
               <LinkedInOrganizationInfo organization={organizationData} />
@@ -427,14 +427,14 @@ export default function LinkedInAnalyticsClientPage() {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="w-8 h-8 border-2 border-[#0077B5] border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-white/60 text-sm">Loading LinkedIn analytics...</p>
+              <p className="text-neutral-500 text-sm">Loading LinkedIn analytics...</p>
             </div>
           ) : (
             <>
               {/* Key Metrics */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Key Metrics</h2>
                   <InfoTooltip content="Core performance indicators: followers, impressions, engagement rate, and click-through performance." />
                 </div>
                 <LinkedInKeyMetrics
@@ -447,7 +447,7 @@ export default function LinkedInAnalyticsClientPage() {
               {/* Top Posts */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Posts</h2>
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Top Performing Posts</h2>
                   <InfoTooltip content="Your most engaging LinkedIn posts ranked by impressions, reactions, and engagement rate." />
                 </div>
                 <LinkedInTopPostsTable posts={postsData} connectionStatus={connectionStatus} />
@@ -456,7 +456,7 @@ export default function LinkedInAnalyticsClientPage() {
           )}
 
           {/* Footer */}
-          <div className="text-center text-white/40 text-sm pt-8 pb-4">
+          <div className="text-center text-neutral-400 text-sm pt-8 pb-4">
             <p>
               Powered by LinkedIn Marketing API <span className="hidden md:inline">•</span>{" "}
               <span className="block md:inline">Last updated: {new Date().toLocaleString()}</span>

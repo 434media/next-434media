@@ -607,12 +607,10 @@ export default function AnalyticsClientPage() {
   }
 
   return (
-    <div className="bg-black w-full overflow-x-hidden">
+    <div className="w-full max-w-full min-w-0 bg-neutral-50">
       {/* Analytics Header */}
-      <div className="w-full overflow-x-hidden">
+      <div className="w-full max-w-full">
         <AnalyticsHeader
-          onRefresh={handleRefresh}
-          onLogout={handleLogout}
           isLoading={isLoading}
           availableProperties={availableProperties}
           selectedPropertyId={selectedPropertyId}
@@ -630,17 +628,17 @@ export default function AnalyticsClientPage() {
         />
       </div>
       
-      <div className="py-4 sm:py-6 w-full overflow-x-hidden">
-        <div className="px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
+      <div className="py-4 sm:py-6 w-full max-w-full">
+        <div className="px-4 sm:px-5 lg:px-6 w-full max-w-full min-w-0">
           {/* Error Display */}
           {error && (
             <div className="mb-4">
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                <p className="text-sm font-medium text-red-400">Error</p>
-                <p className="text-xs text-white/60 mt-1">{error}</p>
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                <p className="text-sm font-medium text-red-600">Error</p>
+                <p className="text-xs text-red-500 mt-1">{error}</p>
                 <button
                   onClick={() => setError(null)}
-                  className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md transition-colors mt-2"
+                  className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-md transition-colors mt-2"
                 >
                   Dismiss
                 </button>
@@ -651,9 +649,9 @@ export default function AnalyticsClientPage() {
           {/* Analytics Dashboard - Always show components */}
           <>
             {/* Metrics Overview */}
-            <div className="py-6">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
+            <div className="py-4 sm:py-6 relative z-10">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Key Metrics</h2>
                 <InfoTooltip content="High-level overview of your website's performance. Users are unique visitors, Sessions are visits, Page Views are total pages loaded, and Bounce Rate is the percentage of single-page visits." />
               </div>
               <MetricsOverview
@@ -665,24 +663,26 @@ export default function AnalyticsClientPage() {
             </div>
 
             {/* Page Views Chart */}
-            <div className="">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                <h2 className="text-sm sm:text-lg font-semibold text-white">Traffic Trend</h2>
+            <div className="mt-2 sm:mt-4 w-full max-w-full min-w-0 relative z-10">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Traffic Trend</h2>
                 <InfoTooltip content="Daily page view trends showing traffic patterns over time. Use this to identify peak traffic days and overall growth trends." />
               </div>
-              <PageViewsChart
-                dateRange={selectedDateRange}
-                isLoading={isLoading}
-                setError={setError}
-                propertyId={selectedPropertyId}
-              />
+              <div className="w-full max-w-full">
+                <PageViewsChart
+                  dateRange={selectedDateRange}
+                  isLoading={isLoading}
+                  setError={setError}
+                  propertyId={selectedPropertyId}
+                />
+              </div>
             </div>
 
             {/* Top Pages and Traffic Sources - Stack on mobile */}
-            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 py-12 md:py-16">
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Pages</h2>
+            <div className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 py-8 sm:py-12 w-full max-w-full overflow-hidden">
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Top Performing Pages</h2>
                   <InfoTooltip content="Your most visited pages ranked by views. This helps identify your most valuable content and where users spend their time." />
                 </div>
                 <TopPagesTable
@@ -693,9 +693,9 @@ export default function AnalyticsClientPage() {
                 />
               </div>
 
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Traffic Sources</h2>
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Traffic Sources</h2>
                   <InfoTooltip content="Where your visitors are coming from. Referral traffic comes from other websites, organic is from search engines, and direct is when users type your URL directly." />
                 </div>
                 <TrafficSourcesChart
@@ -708,10 +708,10 @@ export default function AnalyticsClientPage() {
             </div>
 
             {/* Geographic Distribution and Device Types - Stack on mobile */}
-            <div className="space-y-10 sm:space-y-0 sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-6 lg:gap-8 py-2 md:py-16">
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Geographic Distribution</h2>
+            <div className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 py-6 sm:py-12 w-full max-w-full overflow-hidden">
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Geographic Distribution</h2>
                   <InfoTooltip content="Where your visitors are located geographically. This helps understand your audience's location and can inform regional content strategies." />
                 </div>
                 <GeographicMap
@@ -722,9 +722,9 @@ export default function AnalyticsClientPage() {
                 />
               </div>
 
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Device Types</h2>
+              <div className="min-w-0 max-w-full overflow-hidden">
+                <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Device Types</h2>
                   <InfoTooltip content="The types of devices visitors use to access your site. This helps ensure your site is optimized for the most common device types." />
                 </div>
                 <DeviceBreakdown
@@ -738,10 +738,11 @@ export default function AnalyticsClientPage() {
           </>
 
           {/* Footer */}
-          <div className="text-center text-white/40 text-sm pt-8 pb-4">
-            <p>
-              Powered by Google Analytics 4 <span className="hidden md:inline">•</span>{" "}
-              <span className="block md:inline">Last updated: {new Date().toLocaleString()}</span>
+          <div className="text-center text-neutral-500 text-xs sm:text-sm pt-8 pb-6 border-t border-neutral-200 mt-8">
+            <p className="leading-relaxed">
+              Powered by Google Analytics 4{" "}
+              <span className="hidden sm:inline">•</span>
+              <span className="block sm:inline sm:ml-1">Last updated: {new Date().toLocaleString()}</span>
             </p>
           </div>
         </div>

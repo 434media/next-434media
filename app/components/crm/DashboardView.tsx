@@ -1020,25 +1020,6 @@ export function DashboardView({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          {currentUser && (
-            <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">
-              Welcome back, {currentUser.name}!
-            </h2>
-          )}
-          <p className="text-sm text-neutral-500 mt-1">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </p>
-        </div>
-      </div>
-
       {/* Top KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <KPICard label="Budget" value={formatCurrency(totalBudget, true)} subLabel="Annual sales goal" icon={RocketIcon} color="neutral" />

@@ -28,8 +28,8 @@ function formatPercent(num: number): string {
 export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: LinkedInKeyMetricsProps) {
   if (!connectionStatus?.success) {
     return (
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-        <p className="text-white/60 text-sm">
+      <div className="p-4 rounded-xl bg-white border border-neutral-200">
+        <p className="text-neutral-500 text-sm">
           Connect to LinkedIn API to view metrics.
         </p>
       </div>
@@ -88,8 +88,8 @@ export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: Li
           />
         </svg>
       ),
-      color: "text-emerald-400",
-      bgColor: "bg-emerald-400/10",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100",
     },
     {
       label: "Engagement Rate",
@@ -106,8 +106,8 @@ export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: Li
           />
         </svg>
       ),
-      color: "text-yellow-400",
-      bgColor: "bg-yellow-400/10",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
     },
     {
       label: "Clicks",
@@ -124,8 +124,8 @@ export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: Li
           />
         </svg>
       ),
-      color: "text-purple-400",
-      bgColor: "bg-purple-400/10",
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
     },
   ]
 
@@ -145,21 +145,21 @@ export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: Li
         {metrics.map((metric) => (
           <div
             key={metric.label}
-            className="p-4 rounded-xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 hover:border-white/20 transition-colors"
+            className="p-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-300 transition-colors"
           >
             <div className="flex items-center gap-2 mb-3">
               <span className={`p-2 rounded-lg ${metric.bgColor} ${metric.color}`}>
                 {metric.icon}
               </span>
             </div>
-            <p className="text-xs uppercase tracking-wider text-white/40 mb-1">
+            <p className="text-xs uppercase tracking-wider text-neutral-500 mb-1">
               {metric.label}
             </p>
-            <p className="text-2xl sm:text-3xl font-bold text-white mb-1">{metric.value}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-1">{metric.value}</p>
             {metric.change && (
               <p
                 className={`text-xs ${
-                  metric.changePositive ? "text-emerald-400" : "text-red-400"
+                  metric.changePositive ? "text-emerald-600" : "text-red-600"
                 }`}
               >
                 {metric.change}
@@ -174,10 +174,10 @@ export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: Li
         {secondaryMetrics.map((metric) => (
           <div
             key={metric.label}
-            className="p-3 rounded-lg bg-white/5 border border-white/5 text-center"
+            className="p-3 rounded-lg bg-neutral-50 border border-neutral-100 text-center"
           >
-            <p className="text-lg sm:text-xl font-semibold text-white">{metric.value}</p>
-            <p className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider">
+            <p className="text-lg sm:text-xl font-semibold text-neutral-900">{metric.value}</p>
+            <p className="text-[10px] sm:text-xs text-neutral-500 uppercase tracking-wider">
               {metric.label}
             </p>
           </div>

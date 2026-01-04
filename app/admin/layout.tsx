@@ -143,5 +143,5 @@ export default function AdminLayout({
     )
   }
 
-  return <>{children}</>
+  return <div className="w-full max-w-full">{children}</div>
 }

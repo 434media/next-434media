@@ -51,9 +51,9 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
       title: "Views",
       value: insights.profile_views ?? 0,
       description: "Times your profile was viewed",
-      color: "text-blue-400",
-      bgColor: "bg-blue-900/20",
-      borderColor: "border-blue-500/30",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      borderColor: "border-blue-200",
       breakdown: {
         followers: insights.profile_views_followers ?? null,
         non_followers: insights.profile_views_non_followers ?? null,
@@ -63,9 +63,9 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
       title: "Reach",
       value: insights.reach ?? 0,
       description: "Unique accounts that saw your content",
-      color: "text-green-400",
-      bgColor: "bg-green-900/20",
-      borderColor: "border-green-500/30",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+      borderColor: "border-emerald-200",
       breakdown: {
         followers: insights.reach_followers ?? null,
         non_followers: insights.reach_non_followers ?? null,
@@ -75,9 +75,9 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
       title: "Content Interactions",
       value: insights.content_interactions ?? 0,
       description: "Total interactions on your posts",
-      color: "text-pink-400",
-      bgColor: "bg-pink-900/20",
-      borderColor: "border-pink-500/30",
+      color: "text-pink-600",
+      bgColor: "bg-pink-50",
+      borderColor: "border-pink-200",
       breakdown: {
         followers: insights.content_interactions_followers ?? null,
         non_followers: insights.content_interactions_non_followers ?? null,
@@ -87,17 +87,17 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
       title: "Website Clicks",
       value: insights.website_clicks ?? 0,
       description: "Clicks to your website link",
-      color: "text-orange-400",
-      bgColor: "bg-orange-900/20",
-      borderColor: "border-orange-500/30",
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+      borderColor: "border-orange-200",
     },
     {
       title: "Follows",
       value: insights.follows ?? 0,
       description: "New follows during period",
-      color: "text-yellow-300",
-      bgColor: "bg-yellow-900/20",
-      borderColor: "border-yellow-500/30",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-50",
+      borderColor: "border-yellow-200",
     },
 
   ]
@@ -108,12 +108,12 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
           {metrics.map((metric) => (
             <div
               key={metric.title}
-              className={`${metric.bgColor} ${metric.borderColor} backdrop-blur-sm rounded-xl border p-4 sm:p-6 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg`}
+              className={`${metric.bgColor} ${metric.borderColor} rounded-xl border p-4 sm:p-6 transition-all duration-200 hover:scale-[1.02] hover:shadow-md`}
             >
               <div className="flex items-center justify-between mb-2 sm:mb-3 relative">
-                <h3 className="text-sm sm:text-base font-semibold text-slate-200 peer cursor-help">{metric.title}</h3>
+                <h3 className="text-sm sm:text-base font-semibold text-neutral-800 peer cursor-help">{metric.title}</h3>
                 {/* Desktop-only tooltip shown on hover over title */}
-                <div className="hidden md:block absolute left-0 top-full mt-1 w-64 rounded-md bg-slate-900/90 border border-slate-700 px-3 py-2 text-xs text-slate-200 opacity-0 transition-opacity duration-150 pointer-events-none peer-hover:opacity-100 z-10">
+                <div className="hidden md:block absolute left-0 top-full mt-1 w-64 rounded-md bg-white border border-neutral-200 px-3 py-2 text-xs text-neutral-700 opacity-0 transition-opacity duration-150 pointer-events-none peer-hover:opacity-100 z-10 shadow-lg">
                   {metric.description}
                 </div>
               </div>
@@ -121,20 +121,20 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
                 {connectionStatus?.success ? formatNumber(metric.value) : "--"}
               </div>
               {/* Show description on mobile */}
-              <p className="text-xs text-slate-400 sm:hidden">{metric.description}</p>
+              <p className="text-xs text-neutral-500 sm:hidden">{metric.description}</p>
               {connectionStatus?.success &&
                 metric.breakdown &&
                 (metric.breakdown.followers != null || metric.breakdown.non_followers != null) && (
-                  <div className="hidden sm:grid mt-3 text-xs text-slate-400 grid-cols-1 gap-1">
+                  <div className="hidden sm:grid mt-3 text-xs text-neutral-500 grid-cols-1 gap-1">
                     {metric.breakdown.followers != null && (
                       <div>
-                        <span className="text-slate-300 font-medium">Followers:</span>
+                        <span className="text-neutral-700 font-medium">Followers:</span>
                         <span className="ml-1 font-semibold">{formatNumber(metric.breakdown.followers)}</span>
                       </div>
                     )}
                     {metric.breakdown.non_followers != null && (
                       <div>
-                        <span className="text-slate-300 font-medium">Non-followers:</span>
+                        <span className="text-neutral-700 font-medium">Non-followers:</span>
                         <span className="ml-1 font-semibold">{formatNumber(metric.breakdown.non_followers)}</span>
                       </div>
                     )}
@@ -146,10 +146,10 @@ export function InstagramMetricsOverview({ insights, dateRange, connectionStatus
 
         {/* Not Connected Overlay */}
         {!connectionStatus?.success && (
-          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-xl flex items-center justify-center">
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-xl flex items-center justify-center">
             <div className="text-center px-4">
-              <div className="text-red-400 text-lg sm:text-xl font-bold mb-2 sm:mb-3">Not Connected</div>
-              <div className="text-slate-300 text-sm sm:text-base font-medium">
+              <div className="text-red-600 text-lg sm:text-xl font-bold mb-2 sm:mb-3">Not Connected</div>
+              <div className="text-neutral-700 text-sm sm:text-base font-medium">
                 {connectionStatus?.message || "Instagram API connection required"}
               </div>
             </div>

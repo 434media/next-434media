@@ -146,11 +146,11 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
     <div className="space-y-6">
       {/* Period Badge */}
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pink-500/20 text-pink-300 border border-pink-500/30">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-700 border border-pink-200">
           {getRangeLabel(dateRange)} Performance
         </span>
         {!isConnected && (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-300 border border-red-500/30">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
             Not Connected
           </span>
         )}
@@ -161,35 +161,35 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
         {primaryMetrics.map((metric) => (
           <div
             key={metric.title}
-            className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-5 hover:border-pink-500/30 transition-all duration-300"
+            className="bg-white rounded-xl border border-neutral-200 p-5 hover:border-pink-300 hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-start justify-between mb-3">
-              <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
+              <div className="p-2 rounded-lg bg-pink-100 text-pink-600">
                 {metric.icon}
               </div>
               {metric.trend !== undefined && (
-                <div className={`text-xs font-medium ${metric.trend >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <div className={`text-xs font-medium ${metric.trend >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                   {metric.trendLabel}
                 </div>
               )}
               {metric.benchmark && (
-                <div className={`text-xs font-medium ${metric.benchmarkColor}`}>
+                <div className={`text-xs font-medium ${metric.benchmarkColor?.replace('-400', '-600')}`}>
                   {metric.benchmark}
                 </div>
               )}
             </div>
-            <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
+            <div className="text-2xl sm:text-3xl font-bold text-neutral-900 mb-1">
               {metric.value}
             </div>
-            <div className="text-sm font-medium text-slate-300 mb-1">
+            <div className="text-sm font-medium text-neutral-700 mb-1">
               {metric.title}
             </div>
             {metric.subtitle && (
-              <div className="text-xs text-pink-400 font-medium">
+              <div className="text-xs text-pink-600 font-medium">
                 {metric.subtitle}
               </div>
             )}
-            <div className="text-xs text-slate-500 mt-2">
+            <div className="text-xs text-neutral-500 mt-2">
               {metric.description}
             </div>
           </div>
@@ -201,15 +201,15 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
         {secondaryMetrics.map((metric) => (
           <div
             key={metric.title}
-            className="bg-slate-800/30 backdrop-blur-sm rounded-lg border border-slate-700/30 p-4 text-center"
+            className="bg-neutral-50 rounded-lg border border-neutral-200 p-4 text-center"
           >
-            <div className={`text-xl sm:text-2xl font-bold ${metric.color} mb-1`}>
+            <div className={`text-xl sm:text-2xl font-bold ${metric.color.replace('-400', '-600')} mb-1`}>
               {metric.value}
             </div>
-            <div className="text-xs font-medium text-slate-300">
+            <div className="text-xs font-medium text-neutral-700">
               {metric.title}
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-xs text-neutral-500 mt-1">
               {metric.subtitle}
             </div>
           </div>
@@ -218,9 +218,9 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
 
       {/* Funnel Visualization for Sales/Marketing */}
       {isConnected && (
-        <div className="bg-gradient-to-r from-slate-800/30 via-slate-800/50 to-slate-800/30 backdrop-blur-sm rounded-xl border border-slate-700/30 p-5">
-          <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-            <svg className="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-gradient-to-r from-pink-50 via-white to-pink-50 rounded-xl border border-neutral-200 p-5">
+          <h3 className="text-sm font-semibold text-neutral-700 mb-4 flex items-center gap-2">
+            <svg className="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             Marketing Funnel
@@ -228,31 +228,31 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2">
             {/* Reach */}
             <div className="flex-1 text-center">
-              <div className="text-lg sm:text-xl font-bold text-white">{formatNumber(insights.reach)}</div>
-              <div className="text-xs text-slate-400">Reach</div>
+              <div className="text-lg sm:text-xl font-bold text-neutral-900">{formatNumber(insights.reach)}</div>
+              <div className="text-xs text-neutral-500">Reach</div>
             </div>
-            <div className="hidden sm:block text-slate-600">→</div>
-            <div className="block sm:hidden text-slate-600">↓</div>
+            <div className="hidden sm:block text-neutral-300">→</div>
+            <div className="block sm:hidden text-neutral-300">↓</div>
             {/* Profile Views */}
             <div className="flex-1 text-center">
-              <div className="text-lg sm:text-xl font-bold text-blue-400">{formatNumber(insights.profile_views)}</div>
-              <div className="text-xs text-slate-400">Profile Views</div>
-              <div className="text-xs text-slate-500">{conversionToProfile}%</div>
+              <div className="text-lg sm:text-xl font-bold text-blue-600">{formatNumber(insights.profile_views)}</div>
+              <div className="text-xs text-neutral-500">Profile Views</div>
+              <div className="text-xs text-neutral-400">{conversionToProfile}%</div>
             </div>
-            <div className="hidden sm:block text-slate-600">→</div>
-            <div className="block sm:hidden text-slate-600">↓</div>
+            <div className="hidden sm:block text-neutral-300">→</div>
+            <div className="block sm:hidden text-neutral-300">↓</div>
             {/* Website Clicks */}
             <div className="flex-1 text-center">
-              <div className="text-lg sm:text-xl font-bold text-pink-400">{formatNumber(insights.website_clicks)}</div>
-              <div className="text-xs text-slate-400">Website Clicks</div>
-              <div className="text-xs text-slate-500">{profileToWebsite}%</div>
+              <div className="text-lg sm:text-xl font-bold text-pink-600">{formatNumber(insights.website_clicks)}</div>
+              <div className="text-xs text-neutral-500">Website Clicks</div>
+              <div className="text-xs text-neutral-400">{profileToWebsite}%</div>
             </div>
-            <div className="hidden sm:block text-slate-600">→</div>
-            <div className="block sm:hidden text-slate-600">↓</div>
+            <div className="hidden sm:block text-neutral-300">→</div>
+            <div className="block sm:hidden text-neutral-300">↓</div>
             {/* New Followers */}
             <div className="flex-1 text-center">
-              <div className="text-lg sm:text-xl font-bold text-green-400">+{formatNumber(insights.follows)}</div>
-              <div className="text-xs text-slate-400">New Followers</div>
+              <div className="text-lg sm:text-xl font-bold text-emerald-600">+{formatNumber(insights.follows)}</div>
+              <div className="text-xs text-neutral-500">New Followers</div>
             </div>
           </div>
         </div>

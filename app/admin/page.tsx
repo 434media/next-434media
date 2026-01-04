@@ -4,7 +4,13 @@ import type React from "react"
 
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronLeft, Bot, PencilIcon, Calendar, RssIcon, RocketIcon } from "lucide-react"
+import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon } from "lucide-react"
+
+interface CurrentUser {
+  email: string
+  name: string
+  picture?: string
+}
 
 interface AdminSection {
   id: string
@@ -64,114 +70,90 @@ const adminSections: AdminSection[] = [
   },
 ]
 
-const testingSections: AdminSection[] = [
-  {
-    id: "ai-assistant",
-    title: "AI ASSISTANT",
-    subtitle: "RAG Chatbot Testing",
-    href: "/admin/ai-assistant",
-    icon: <Bot className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Test and interact with the AI assistant powered by retrieval-augmented generation for accurate responses",
-  },
-]
+// Get greeting based on time of day
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good morning"
+  if (hour < 17) return "Good afternoon"
+  return "Good evening"
+}
 
 export default function AdminPage() {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [activeView, setActiveView] = useState<'admin' | 'testing'>('admin')
 
   useEffect(() => {
     setMounted(true)
+    loadCurrentUser()
   }, [])
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/session")
+      if (response.ok) {
+        const data = await response.json()
+        if (data.user) {
+          setCurrentUser(data.user)
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load current user:", err)
+    }
+  }
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-neutral-600">Loading...</div>
       </div>
     )
   }
 
-  const currentSections = activeView === 'admin' ? adminSections : testingSections
-
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pt-24 sm:pt-28 md:pt-24">
         {/* Top Navigation */}
-        <div className="flex flex-col gap-6 mb-10 md:mb-12 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center justify-between mb-10 md:mb-12">
           {/* Back to Home */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors duration-200 text-base font-medium"
+            className="inline-flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors duration-200 text-base font-medium"
           >
             <ChevronLeft className="w-5 h-5" />
             Back to Home
           </Link>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-6 md:gap-8">
-            <button
-              onClick={() => setActiveView('admin')}
-              className={`text-base md:text-lg font-ggx88 tracking-wide transition-colors duration-200 relative pb-2 ${
-                activeView === 'admin' 
-                  ? 'text-white' 
-                  : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              ADMIN PANEL
-              {activeView === 'admin' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveView('testing')}
-              className={`text-base md:text-lg font-ggx88 tracking-wide transition-colors duration-200 relative pb-2 ${
-                activeView === 'testing' 
-                  ? 'text-white' 
-                  : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              TESTING PLAYGROUND
-              {activeView === 'testing' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white" />
-              )}
-            </button>
-          </div>
-
-          {/* Spacer for balance - hidden on mobile */}
-          <div className="hidden md:block md:w-32" />
+          {/* Welcome Greeting */}
+          {currentUser && (
+            <p className="text-sm sm:text-base text-neutral-600">
+              {getGreeting()}, <span className="font-semibold text-neutral-900">{currentUser.name}</span>
+            </p>
+          )}
         </div>
 
         {/* Header Section */}
         <div className="mb-10 md:mb-12">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-white mb-3 tracking-tight leading-none">
-            {activeView === 'admin' ? 'ADMIN PANEL' : 'TESTING PLAYGROUND'}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-neutral-900 mb-3 tracking-tight leading-none">
+            ADMIN PANEL
           </h1>
-          <p className="text-neutral-400 text-sm sm:text-base leading-relaxed max-w-2xl">
-            {activeView === 'admin' 
-              ? 'Access to 434 Analytics and Content Management for all channels in one place'
-              : 'Explore concept workflows built with different AI Models and integrations'
-            }
+          <p className="text-neutral-500 text-sm sm:text-base leading-relaxed max-w-2xl">
+            Access to 434 Analytics and Content Management for all channels in one place
           </p>
         </div>
 
         {/* Sections Grid */}
-        <div className={`grid gap-4 sm:gap-5 md:gap-6 ${
-          activeView === 'admin' 
-            ? 'grid-cols-1 sm:grid-cols-3' 
-            : 'grid-cols-1 sm:grid-cols-3'
-        }`}>
-          {currentSections.map((section) => (
+        <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 sm:grid-cols-3">
+          {adminSections.map((section) => (
             <Link
               key={section.id}
               href={section.href}
-              className="group relative block rounded-xl border border-neutral-800 bg-neutral-900/50 p-5 sm:p-6 transition-colors duration-200 hover:border-neutral-700 hover:bg-neutral-900"
+              className="group relative block rounded-xl border border-neutral-200 bg-white p-5 sm:p-6 transition-all duration-200 hover:border-neutral-300 hover:shadow-md"
             >
               {/* 434 Media Logo Background Pattern */}
               <div
-                className="absolute inset-0 opacity-[0.03] rounded-xl"
+                className="absolute inset-0 opacity-[0.02] rounded-xl"
                 style={{
-                  backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png')`,
+                  backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK.png')`,
                   backgroundSize: "48px 48px",
                   backgroundRepeat: "repeat",
                   backgroundPosition: "center",
@@ -181,27 +163,27 @@ export default function AdminPage() {
               {/* Content */}
               <div className="relative z-10">
                 {/* Icon */}
-                <div className="text-white mb-4">
+                <div className="text-neutral-700 mb-4">
                   {section.icon}
                 </div>
 
                 {/* Title */}
-                <h3 className="font-ggx88 text-base sm:text-lg text-white leading-tight tracking-wide mb-2">
+                <h3 className="font-ggx88 text-base sm:text-lg text-neutral-900 leading-tight tracking-wide mb-2">
                   {section.title}
                 </h3>
 
                 {/* Subtitle */}
-                <p className="text-xs sm:text-sm text-neutral-400 font-medium leading-relaxed mb-3">
+                <p className="text-xs sm:text-sm text-neutral-500 font-medium leading-relaxed mb-3">
                   {section.subtitle}
                 </p>
 
                 {/* Description */}
-                <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">
+                <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2">
                   {section.description}
                 </p>
 
                 {/* Arrow indicator */}
-                <div className="absolute top-5 sm:top-6 right-5 sm:right-6 text-neutral-600 group-hover:text-neutral-400 transition-colors duration-200">
+                <div className="absolute top-5 sm:top-6 right-5 sm:right-6 text-neutral-300 group-hover:text-neutral-500 transition-colors duration-200">
                   <ChevronRight className="w-5 h-5" />
                 </div>
               </div>

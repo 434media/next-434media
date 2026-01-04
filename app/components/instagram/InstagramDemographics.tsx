@@ -40,14 +40,14 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
 
   if (isLoading) {
     return (
-      <div className="bg-white/5 rounded-xl border border-white/10 p-6">
+      <div className="bg-white rounded-xl border border-neutral-200 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-pink-500/20 animate-pulse" />
-          <div className="h-6 w-40 bg-white/10 rounded animate-pulse" />
+          <div className="w-10 h-10 rounded-lg bg-pink-100 animate-pulse" />
+          <div className="h-6 w-40 bg-neutral-200 rounded animate-pulse" />
         </div>
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-12 bg-white/5 rounded-lg animate-pulse" />
+            <div key={i} className="h-12 bg-neutral-100 rounded-lg animate-pulse" />
           ))}
         </div>
       </div>
@@ -56,10 +56,10 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
 
   if (!demographics) {
     return (
-      <div className="bg-white/5 rounded-xl border border-white/10 p-6 text-center">
-        <Globe className="w-12 h-12 text-pink-400/50 mx-auto mb-3" />
-        <p className="text-white/60 text-sm">Demographics data not available</p>
-        <p className="text-white/40 text-xs mt-1">Requires 100+ followers</p>
+      <div className="bg-white rounded-xl border border-neutral-200 p-6 text-center">
+        <Globe className="w-12 h-12 text-pink-300 mx-auto mb-3" />
+        <p className="text-neutral-500 text-sm">Demographics data not available</p>
+        <p className="text-neutral-400 text-xs mt-1">Requires 100+ followers</p>
       </div>
     )
   }
@@ -84,9 +84,9 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
   const totalValue = currentData.reduce((sum: number, d: any) => sum + d.value, 0)
 
   return (
-    <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+    <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
       {/* Header with Tabs */}
-      <div className="border-b border-white/10 px-4 py-3">
+      <div className="border-b border-neutral-200 px-4 py-3">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => (
             <button
@@ -97,8 +97,8 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
               }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                 activeTab === tab.id
-                  ? "bg-pink-500/20 text-pink-400 border border-pink-500/30"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
+                  ? "bg-pink-100 text-pink-600 border border-pink-200"
+                  : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -124,20 +124,20 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
                 transition={{ delay: index * 0.05 }}
                 className="relative"
               >
-                <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors relative overflow-hidden">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 hover:bg-neutral-100 transition-colors relative overflow-hidden">
                   {/* Progress bar background */}
                   <div
-                    className="absolute left-0 top-0 bottom-0 bg-pink-500/10"
+                    className="absolute left-0 top-0 bottom-0 bg-pink-100"
                     style={{ width: `${barWidth}%` }}
                   />
 
                   <div className="flex items-center gap-3 relative z-10">
-                    <span className="text-white/40 text-sm font-mono w-6">{index + 1}</span>
+                    <span className="text-neutral-400 text-sm font-mono w-6">{index + 1}</span>
                     {activeTab === "countries" && (
                       <span className="text-lg">{getCountryFlag(item.dimension)}</span>
                     )}
                     {activeTab === "cities" && (
-                      <MapPin className="w-4 h-4 text-pink-400" />
+                      <MapPin className="w-4 h-4 text-pink-600" />
                     )}
                     {activeTab === "age_gender" && (
                       <span className="text-sm">
@@ -145,7 +145,7 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
                       </span>
                     )}
                     <div>
-                      <span className="text-white font-medium text-sm">
+                      <span className="text-neutral-900 font-medium text-sm">
                         {activeTab === "age_gender"
                           ? `${item.age} • ${formatGender(item.gender)}`
                           : item.dimension}
@@ -154,8 +154,8 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
                   </div>
 
                   <div className="flex items-center gap-3 relative z-10">
-                    <span className="text-white/40 text-xs">{percentage}%</span>
-                    <span className="text-pink-400 font-bold text-sm tabular-nums">
+                    <span className="text-neutral-500 text-xs">{percentage}%</span>
+                    <span className="text-pink-600 font-bold text-sm tabular-nums">
                       {item.value.toLocaleString()}
                     </span>
                   </div>
@@ -169,7 +169,7 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
         {currentData.length > 5 && (
           <button
             onClick={() => setShowAll(!showAll)}
-            className="w-full mt-3 py-2 text-sm text-pink-400 hover:text-pink-300 flex items-center justify-center gap-1 transition-colors"
+            className="w-full mt-3 py-2 text-sm text-pink-600 hover:text-pink-500 flex items-center justify-center gap-1 transition-colors"
           >
             {showAll ? "Show Less" : `Show All (${currentData.length})`}
             <ChevronDown className={`w-4 h-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
@@ -177,8 +177,8 @@ export function InstagramDemographics({ demographics, isLoading }: InstagramDemo
         )}
 
         {/* Summary */}
-        <div className="mt-4 pt-4 border-t border-white/10 text-center">
-          <p className="text-white/40 text-xs">
+        <div className="mt-4 pt-4 border-t border-neutral-200 text-center">
+          <p className="text-neutral-500 text-xs">
             Based on engaged audience over the last 90 days • Total: {totalValue.toLocaleString()}
           </p>
         </div>

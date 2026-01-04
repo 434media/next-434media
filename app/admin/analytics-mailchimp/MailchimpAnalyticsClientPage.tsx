@@ -560,9 +560,9 @@ export default function MailchimpAnalyticsClientPage() {
   }
 
   return (
-    <div className="bg-black w-full overflow-x-hidden">
+    <div className="bg-neutral-50 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="border-b border-white/10 w-full overflow-x-hidden">
+      <div className="border-b border-neutral-200 w-full overflow-x-hidden">
         <MailchimpHeader
           isLoading={isLoading}
           onRefresh={fetchAllData}
@@ -581,7 +581,7 @@ export default function MailchimpAnalyticsClientPage() {
         {/* Metrics Overview */}
         <div>
           <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-            <h2 className="text-sm sm:text-lg font-semibold text-white">Performance Metrics</h2>
+            <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Performance Metrics</h2>
           </div>
           {data.summary && (
             <MailchimpMetricsOverview
@@ -597,7 +597,7 @@ export default function MailchimpAnalyticsClientPage() {
         {/* Tags Section - Full Width */}
         <div>
           <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-            <h2 className="text-sm sm:text-lg font-semibold text-white">Audience Tags</h2>
+            <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Audience Tags</h2>
           </div>
           <MailchimpTagsOverview
             tags={data.tags?.tags || []}
@@ -610,7 +610,7 @@ export default function MailchimpAnalyticsClientPage() {
         {/* Recent Campaigns - Full Width */}
         <div>
           <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-            <h2 className="text-sm sm:text-lg font-semibold text-white">Recent Campaigns</h2>
+            <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Recent Campaigns</h2>
           </div>
           {data.allCampaigns && <MailchimpTopCampaignsTable data={data.allCampaigns} />}
         </div>

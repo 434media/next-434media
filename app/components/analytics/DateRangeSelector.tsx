@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { motion, AnimatePresence } from "motion/react"
 import { Button } from "./Button"
 import { Calendar, Clock, CalendarDays, FileText, Image } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
@@ -50,45 +49,28 @@ export function DateRangeSelector({ selectedRange, onRangeChange, onDownloadCSV,
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-3"
-      style={{ willChange: "transform" }}
-    >
+    <div className="space-y-3">
       {/* Main Date Range Selector */}
       <div
-        className="p-6 bg-gradient-to-r from-white/10 to-white/5 rounded-xl border border-white/10 shadow-xl"
-        style={{
-          willChange: "auto",
-          backfaceVisibility: "hidden",
-          transform: "translateZ(0)",
-        }}
+        className="p-6 bg-gradient-to-r from-emerald-50 to-white rounded-xl border border-neutral-200 shadow-sm"
       >
         <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="p-3 bg-gradient-to-br from-emerald-500/20 to-emerald-500/20 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105"
+              className="p-3 bg-emerald-100 rounded-xl shadow-sm transition-transform duration-200 hover:scale-105"
               style={{ willChange: "transform" }}
             >
-              <Calendar className="h-6 w-6 text-emerald-400" />
+              <Calendar className="h-6 w-6 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-white text-xl font-bold mb-1">Date Range</h3>
-              <p className="text-white/60 text-sm font-medium">Select your analytics period</p>
+              <h3 className="text-neutral-900 text-xl font-bold mb-1">Date Range</h3>
+              <p className="text-neutral-500 text-sm font-medium">Select your analytics period</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 flex-1">
           {dateRangeOptions.map((option, index) => (
-            <motion.div
-              key={option.label}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: index * 0.05 }}
-              style={{ willChange: "transform" }}
-            >
+            <div key={option.label}>
               <Button
                 onClick={() => onRangeChange(option)}
                 variant={selectedRange.label === option.label ? "default" : "outline"}
@@ -96,29 +78,15 @@ export function DateRangeSelector({ selectedRange, onRangeChange, onDownloadCSV,
                 className={`relative transition-all duration-300 hover:scale-105 ${
                   selectedRange.label === option.label
                     ? "bg-gradient-to-r from-emerald-600 to-emerald-600 hover:from-emerald-700 hover:to-emerald-700 text-white border-0 shadow-lg"
-                    : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20 hover:border-white/30 hover:text-white"
+                    : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900"
                 }`}
-                style={{ willChange: "transform" }}
               >
                 {option.label}
-                {selectedRange.label === option.label && (
-                  <motion.div
-                    layoutId="activeRange"
-                    className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-emerald-500/20 rounded-md -z-10"
-                    style={{ willChange: "transform" }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
               </Button>
-            </motion.div>
+            </div>
           ))}
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            style={{ willChange: "transform" }}
-          >
+          <div>
             <Button
               onClick={() => setShowCustom(!showCustom)}
               variant="outline"
@@ -126,33 +94,32 @@ export function DateRangeSelector({ selectedRange, onRangeChange, onDownloadCSV,
               className={`transition-all duration-300 hover:scale-105 ${
                 showCustom
                   ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0"
-                  : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20 hover:border-white/30 hover:text-white"
+                  : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900"
               }`}
-              style={{ willChange: "transform" }}
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               Custom Range
             </Button>
-          </motion.div>
+          </div>
         </div>
 
-          <div className="flex items-center gap-2 text-white/60 text-sm">
+          <div className="flex items-center gap-2 text-neutral-500 text-sm">
             <Clock className="h-4 w-4" />
             <span>Auto-refresh: 30s</span>
-            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
           </div>
         </div>
 
         {/* Download Options - Below date range as a subtle row */}
         {(onDownloadCSV || onDownloadPNG) && (
-          <div className="mt-4 pt-4 border-t border-white/10">
+          <div className="mt-4 pt-4 border-t border-neutral-200">
             <div className="flex items-center gap-4">
-              <span className="text-white/50 text-sm">Export:</span>
+              <span className="text-neutral-500 text-sm">Export:</span>
               {onDownloadCSV && (
                 <button
                   onClick={onDownloadCSV}
                   disabled={isLoading}
-                  className="flex items-center gap-2 text-sm text-white/70 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 text-sm text-neutral-600 hover:text-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Download CSV"
                 >
                   <FileText className="h-4 w-4" />
@@ -163,7 +130,7 @@ export function DateRangeSelector({ selectedRange, onRangeChange, onDownloadCSV,
                 <button
                   onClick={onDownloadPNG}
                   disabled={isLoading}
-                  className="flex items-center gap-2 text-sm text-white/70 hover:text-emerald-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 text-sm text-neutral-600 hover:text-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Download PNG"
                 >
                   <Image className="h-4 w-4" />
@@ -176,66 +143,52 @@ export function DateRangeSelector({ selectedRange, onRangeChange, onDownloadCSV,
       </div>
 
       {/* Custom Date Range Picker */}
-      <AnimatePresence>
-        {showCustom && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: -10 }}
-            animate={{ opacity: 1, height: "auto", y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-            style={{ willChange: "height, transform" }}
-          >
-            <div
-              className="p-6 bg-gradient-to-r from-white/5 to-white/10 rounded-xl border border-white/10"
-              style={{
-                willChange: "auto",
-                backfaceVisibility: "hidden",
-                transform: "translateZ(0)",
-              }}
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                <div className="flex-1 space-y-2">
-                  <label className="text-white/80 text-sm font-medium">Start Date</label>
-                  <input
-                    type="date"
-                    value={customStartDate || formatDateForInput(selectedRange.startDate)}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-                  />
-                </div>
-
-                <div className="flex-1 space-y-2">
-                  <label className="text-white/80 text-sm font-medium">End Date</label>
-                  <input
-                    type="date"
-                    value={customEndDate || formatDateForInput(selectedRange.endDate)}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleCustomDateApply}
-                    disabled={!customStartDate || !customEndDate}
-                    className="bg-gradient-to-r from-emerald-600 to-emerald-600 hover:from-emerald-700 hover:to-emerald-700 text-white border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    Apply
-                  </Button>
-                  <Button
-                    onClick={() => setShowCustom(false)}
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white/80 hover:bg-white/20 transition-all duration-200"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+      <div
+        className={`overflow-hidden transition-all duration-300 ${
+          showCustom ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="p-6 bg-gradient-to-r from-neutral-50 to-white rounded-xl border border-neutral-200">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <label className="text-neutral-700 text-sm font-medium">Start Date</label>
+              <input
+                type="date"
+                value={customStartDate || formatDateForInput(selectedRange.startDate)}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
+              />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+
+            <div className="flex-1 space-y-2">
+              <label className="text-neutral-700 text-sm font-medium">End Date</label>
+              <input
+                type="date"
+                value={customEndDate || formatDateForInput(selectedRange.endDate)}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCustomDateApply}
+                disabled={!customStartDate || !customEndDate}
+                className="bg-gradient-to-r from-emerald-600 to-emerald-600 hover:from-emerald-700 hover:to-emerald-700 text-white border-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                Apply
+              </Button>
+              <Button
+                onClick={() => setShowCustom(false)}
+                variant="outline"
+                className="bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-all duration-200"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

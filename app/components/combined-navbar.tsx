@@ -39,7 +39,7 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
 
   // Check if we're in the shop section
   const isInShop = pathname?.startsWith("/shop") || pathname?.startsWith("/product") || pathname?.startsWith("/search")
-
+  
   // Handle scroll events with throttling for performance
   useEffect(() => {
     let ticking = false

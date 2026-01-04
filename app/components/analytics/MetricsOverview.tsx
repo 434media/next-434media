@@ -121,9 +121,9 @@ export function MetricsOverview({
       value: data?.totalUsers || 0,
       change: data?.usersChange || 0,
       icon: Users,
-      color: "from-blue-500 to-cyan-500",
-      bgColor: "bg-blue-500/10",
-      iconColor: "text-blue-400",
+      color: "from-blue-600 to-cyan-600",
+      bgColor: "bg-blue-100",
+      iconColor: "text-blue-600",
     },
     {
       title: "Sessions",
@@ -131,9 +131,9 @@ export function MetricsOverview({
       value: data?.totalSessions || 0,
       change: data?.sessionsChange || 0,
       icon: MousePointer,
-      color: "from-emerald-500 to-teal-500",
-      bgColor: "bg-emerald-500/10",
-      iconColor: "text-emerald-400",
+      color: "from-emerald-600 to-teal-600",
+      bgColor: "bg-emerald-100",
+      iconColor: "text-emerald-600",
     },
     {
       title: "Page Views",
@@ -141,9 +141,9 @@ export function MetricsOverview({
       value: data?.totalPageViews || 0,
       change: data?.pageViewsChange || 0,
       icon: Eye,
-      color: "from-violet-500 to-purple-500",
-      bgColor: "bg-violet-500/10",
-      iconColor: "text-violet-400",
+      color: "from-violet-600 to-purple-600",
+      bgColor: "bg-violet-100",
+      iconColor: "text-violet-600",
     },
     {
       title: "Bounce Rate",
@@ -152,8 +152,8 @@ export function MetricsOverview({
       change: data?.bounceRateChange || 0,
       icon: Clock,
       color: "from-amber-500 to-orange-500",
-      bgColor: "bg-amber-500/10",
-      iconColor: "text-amber-400",
+      bgColor: "bg-amber-100",
+      iconColor: "text-amber-600",
       isPercentage: true,
       invertChange: true, // Lower bounce rate is better
     },
@@ -162,7 +162,7 @@ export function MetricsOverview({
   const loading = isLoading || parentLoading
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 w-full overflow-hidden">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full max-w-full min-w-0 overflow-hidden">
       {metrics.map((metric) => {
         const changeValue = metric.change || 0
         const isPositive = metric.invertChange ? changeValue < 0 : changeValue > 0
@@ -172,41 +172,41 @@ export function MetricsOverview({
         return (
           <div
             key={metric.title}
-            className="relative group min-w-0"
+            className="relative min-w-0 max-w-full overflow-hidden"
           >
             {/* Card */}
-            <div className="relative overflow-hidden rounded-lg sm:rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-2.5 sm:p-5 transition-all duration-300 hover:border-white/20 hover:from-white/[0.12] hover:to-white/[0.04]">
+            <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-neutral-200 bg-white p-3 sm:p-5 transition-all duration-300 hover:border-neutral-300 hover:shadow-lg h-full">
               {/* Gradient accent line */}
-              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${metric.color} opacity-60`} />
+              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${metric.color} opacity-80`} />
               
               {/* Loading state */}
               {loading ? (
-                <div className="flex flex-col items-center justify-center h-[80px] sm:h-[100px]">
-                  <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-white/40 animate-spin" />
-                  <span className="text-[10px] sm:text-xs text-white/40 mt-2">Loading...</span>
+                <div className="flex flex-col items-center justify-center h-[90px] sm:h-[110px]">
+                  <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-neutral-400 animate-spin" />
+                  <span className="text-xs text-neutral-500 mt-2 font-medium">Loading...</span>
                 </div>
               ) : (
                 <>
                   {/* Header: Icon and Change Badge */}
-                  <div className="flex items-start justify-between mb-2 sm:mb-4">
-                    <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl ${metric.bgColor}`}>
+                  <div className="flex items-start justify-between mb-3 sm:mb-4">
+                    <div className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl ${metric.bgColor}`}>
                       <metric.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${metric.iconColor}`} />
                     </div>
                     
                     {hasChange && (
                       <div
-                        className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
+                        className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 rounded-full text-[10px] sm:text-xs font-semibold ${
                           isPositive
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                            ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                             : isNegative
-                            ? "bg-red-500/15 text-red-400 border border-red-500/20"
-                            : "bg-white/10 text-white/60 border border-white/10"
+                            ? "bg-red-100 text-red-700 border border-red-200"
+                            : "bg-neutral-100 text-neutral-600 border border-neutral-200"
                         }`}
                       >
                         {isPositive ? (
-                          <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          <ArrowUpRight className="h-3 w-3" />
                         ) : (
-                          <ArrowDownRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          <ArrowDownRight className="h-3 w-3" />
                         )}
                         <span>{Math.abs(changeValue).toFixed(1)}%</span>
                       </div>
@@ -214,8 +214,8 @@ export function MetricsOverview({
                   </div>
 
                   {/* Value */}
-                  <div className="mb-0.5 sm:mb-1">
-                    <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
+                  <div className="mb-1 sm:mb-2">
+                    <span className="text-xl sm:text-2xl md:text-3xl font-bold text-neutral-900 tracking-tight leading-none">
                       {metric.isPercentage 
                         ? `${(metric.value * 100).toFixed(1)}%`
                         : formatNumber(metric.value)
@@ -224,9 +224,9 @@ export function MetricsOverview({
                   </div>
 
                   {/* Title and Subtitle */}
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-white/90">{metric.title}</p>
-                    <p className="text-[10px] sm:text-xs text-white/50 hidden sm:block">{metric.subtitle}</p>
+                  <div className="">
+                    <p className="text-xs sm:text-sm font-semibold text-neutral-800 leading-tight">{metric.title}</p>
+                    <p className="text-[11px] sm:text-xs text-neutral-500 font-medium mt-0.5 hidden sm:block">{metric.subtitle}</p>
                   </div>
                 </>
               )}

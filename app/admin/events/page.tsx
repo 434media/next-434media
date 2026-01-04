@@ -397,8 +397,8 @@ export default function EventsAdminPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Events Calendar</h1>
-          <p className="text-neutral-400 text-sm mt-1">Create and manage events</p>
+          <h1 className="text-2xl font-bold text-neutral-900">Events Calendar</h1>
+          <p className="text-neutral-500 text-sm mt-1">Create and manage events</p>
         </div>
         <button
           onClick={handleCreateNew}
@@ -418,13 +418,13 @@ export default function EventsAdminPage() {
             placeholder="Search events..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+          className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
         >
           <option value="all">All Events</option>
           <option value="upcoming">Upcoming</option>
@@ -433,7 +433,7 @@ export default function EventsAdminPage() {
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+          className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
         >
           <option value="all">All Categories</option>
           {EVENT_CATEGORIES.map(cat => (
@@ -445,23 +445,23 @@ export default function EventsAdminPage() {
       {/* Events List */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-neutral-400 animate-spin" />
+          <Loader2 className="w-8 h-8 text-neutral-500 animate-spin" />
         </div>
       ) : error ? (
         <div className="text-center py-12">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-red-400">{error}</p>
-          <button onClick={loadEvents} className="mt-4 text-neutral-400 hover:text-white">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600">{error}</p>
+          <button onClick={loadEvents} className="mt-4 text-neutral-500 hover:text-neutral-900">
             Try again
           </button>
         </div>
       ) : sortedEvents.length === 0 ? (
         <div className="text-center py-12">
-          <Calendar className="w-12 h-12 text-neutral-600 mx-auto mb-4" />
-          <p className="text-neutral-400">No events found</p>
+          <Calendar className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
+          <p className="text-neutral-500">No events found</p>
           <button
             onClick={handleCreateNew}
-            className="mt-4 text-emerald-400 hover:text-emerald-300"
+            className="mt-4 text-emerald-600 hover:text-emerald-700"
           >
             Add your first event
           </button>
@@ -473,15 +473,15 @@ export default function EventsAdminPage() {
               key={event.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 hover:border-neutral-700 transition-colors"
+              className="bg-white border border-neutral-200 rounded-xl p-4 hover:border-neutral-300 hover:shadow-sm transition-all"
             >
               <div className="flex items-start gap-4">
                 {/* Date Badge */}
-                <div className="w-16 h-16 rounded-lg bg-neutral-800 flex-shrink-0 flex flex-col items-center justify-center">
-                  <span className="text-xs text-neutral-400 uppercase">
+                <div className="w-16 h-16 rounded-lg bg-neutral-100 flex-shrink-0 flex flex-col items-center justify-center">
+                  <span className="text-xs text-neutral-500 uppercase">
                     {new Date(event.start_date).toLocaleDateString('en-US', { month: 'short' })}
                   </span>
-                  <span className="text-2xl font-bold text-white">
+                  <span className="text-2xl font-bold text-neutral-900">
                     {new Date(event.start_date).getDate()}
                   </span>
                 </div>
@@ -490,17 +490,17 @@ export default function EventsAdminPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="font-semibold text-white truncate">{event.title}</h3>
-                      <p className="text-sm text-neutral-400 line-clamp-1 mt-1">
+                      <h3 className="font-semibold text-neutral-900 truncate">{event.title}</h3>
+                      <p className="text-sm text-neutral-500 line-clamp-1 mt-1">
                         {event.description}
                       </p>
                     </div>
                     <span className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${
                       event.status === "upcoming" 
-                        ? "bg-emerald-900/50 text-emerald-400" 
+                        ? "bg-emerald-100 text-emerald-700" 
                         : event.status === "past"
-                        ? "bg-neutral-800 text-neutral-400"
-                        : "bg-red-900/50 text-red-400"
+                        ? "bg-neutral-100 text-neutral-600"
+                        : "bg-red-100 text-red-700"
                     }`}>
                       {event.status}
                     </span>
@@ -517,11 +517,11 @@ export default function EventsAdminPage() {
                         {event.start_time}
                       </span>
                     )}
-                    <span className="flex items-center gap-1 px-2 py-0.5 bg-neutral-800 rounded">
+                    <span className="flex items-center gap-1 px-2 py-0.5 bg-neutral-100 rounded">
                       {event.category}
                     </span>
                     {event.is_free ? (
-                      <span className="flex items-center gap-1 text-emerald-500">
+                      <span className="flex items-center gap-1 text-emerald-600">
                         Free
                       </span>
                     ) : event.price && (
@@ -540,7 +540,7 @@ export default function EventsAdminPage() {
                       href={event.event_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+                      className="p-2 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
                       title="View event"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -548,7 +548,7 @@ export default function EventsAdminPage() {
                   )}
                   <button
                     onClick={() => handleEdit(event)}
-                    className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+                    className="p-2 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
                     title="Edit event"
                   >
                     <Edit className="w-4 h-4" />
@@ -558,13 +558,13 @@ export default function EventsAdminPage() {
                       <button
                         onClick={() => handleDelete(event.id)}
                         disabled={isDeleting}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-lg transition-colors"
+                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                       </button>
                       <button
                         onClick={() => setDeleteConfirmId(null)}
-                        className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+                        className="p-2 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -572,7 +572,7 @@ export default function EventsAdminPage() {
                   ) : (
                     <button
                       onClick={() => setDeleteConfirmId(event.id)}
-                      className="p-2 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded-lg transition-colors"
+                      className="p-2 text-neutral-500 hover:text-red-600 hover:bg-neutral-100 rounded-lg transition-colors"
                       title="Delete event"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -595,15 +595,15 @@ export default function EventsAdminPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => { setView("list"); resetForm() }}
-            className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+            className="p-2 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="text-xl font-bold text-neutral-900">
               {view === "edit" ? "Edit Event" : "Add New Event"}
             </h1>
-            <p className="text-neutral-400 text-sm">
+            <p className="text-neutral-500 text-sm">
               {view === "edit" ? `Editing: ${selectedEvent?.title}` : "Fill in the event details"}
             </p>
           </div>
@@ -611,14 +611,14 @@ export default function EventsAdminPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setView("list"); resetForm() }}
-            className="px-4 py-2 text-neutral-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-neutral-500 hover:text-neutral-900 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-700 text-white rounded-lg transition-colors font-medium"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white rounded-lg transition-colors font-medium"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {isSaving ? "Saving..." : "Save Event"}
@@ -628,44 +628,44 @@ export default function EventsAdminPage() {
 
       {/* Import from URL option (only for create) */}
       {view === "create" && (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+        <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-5 h-5 text-amber-400" />
-            <h3 className="font-medium text-white">Import from URL</h3>
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            <h3 className="font-medium text-neutral-900">Import from URL</h3>
           </div>
-          <p className="text-sm text-neutral-400 mb-4">
+          <p className="text-sm text-neutral-500 mb-4">
             Paste a URL from Meetup, Eventbrite, or Lu.ma to automatically fill in event details
           </p>
           <div className="flex gap-3">
             <div className="relative flex-1">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
               <input
                 type="url"
                 value={parseUrl}
                 onChange={(e) => { setParseUrl(e.target.value); setParseError(null) }}
                 placeholder="https://meetup.com/... or lu.ma/... or eventbrite.com/..."
-                className="w-full pl-10 pr-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+                className="w-full pl-10 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
               />
             </div>
             <button
               onClick={handleParseUrl}
               disabled={isParsing || !parseUrl.trim()}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-neutral-700 text-white rounded-lg transition-colors font-medium"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-300 text-white rounded-lg transition-colors font-medium"
             >
               {isParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
               {isParsing ? "Parsing..." : "Parse URL"}
             </button>
           </div>
           {parseError && (
-            <p className="text-sm text-red-400 mt-2 flex items-center gap-1">
+            <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
               <AlertCircle className="w-4 h-4" />
               {parseError}
             </p>
           )}
           <div className="flex gap-2 mt-3">
-            <span className="text-xs text-neutral-500 px-2 py-1 bg-neutral-800 rounded">Meetup</span>
-            <span className="text-xs text-neutral-500 px-2 py-1 bg-neutral-800 rounded">Eventbrite</span>
-            <span className="text-xs text-neutral-500 px-2 py-1 bg-neutral-800 rounded">Lu.ma</span>
+            <span className="text-xs text-neutral-500 px-2 py-1 bg-neutral-100 rounded">Meetup</span>
+            <span className="text-xs text-neutral-500 px-2 py-1 bg-neutral-100 rounded">Eventbrite</span>
+            <span className="text-xs text-neutral-500 px-2 py-1 bg-neutral-100 rounded">Lu.ma</span>
           </div>
         </div>
       )}
@@ -676,21 +676,21 @@ export default function EventsAdminPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-neutral-300 mb-2">
-              Event Title <span className="text-red-400">*</span>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Event Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               placeholder="Enter event title"
-              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+              className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-neutral-300 mb-2">
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
               Description
             </label>
             <textarea
@@ -698,54 +698,54 @@ export default function EventsAdminPage() {
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Describe the event..."
               rows={6}
-              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 resize-none"
+              className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 resize-none"
             />
           </div>
 
           {/* Date and Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
-                Start Date <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
+                Start Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 value={formData.start_date}
                 onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 End Date
               </label>
               <input
                 type="date"
                 value={formData.end_date}
                 onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Start Time
               </label>
               <input
                 type="time"
                 value={formData.start_time}
                 onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 End Time
               </label>
               <input
                 type="time"
                 value={formData.end_time}
                 onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
               />
             </div>
           </div>
@@ -753,19 +753,19 @@ export default function EventsAdminPage() {
           {/* Location */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
-                Location <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
+                Location <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="City, State or Online"
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Venue Name
               </label>
               <input
@@ -773,11 +773,11 @@ export default function EventsAdminPage() {
                 value={formData.venue_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, venue_name: e.target.value }))}
                 placeholder="e.g., Tech Hub Conference Center"
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Venue Address
               </label>
               <input
@@ -785,7 +785,7 @@ export default function EventsAdminPage() {
                 value={formData.venue_address}
                 onChange={(e) => setFormData(prev => ({ ...prev, venue_address: e.target.value }))}
                 placeholder="Full street address"
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
               />
             </div>
           </div>
@@ -794,8 +794,8 @@ export default function EventsAdminPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Status */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-            <label className="block text-sm font-medium text-neutral-300 mb-3">
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
+            <label className="block text-sm font-medium text-neutral-700 mb-3">
               Status
             </label>
             <div className="flex gap-2">
@@ -804,8 +804,8 @@ export default function EventsAdminPage() {
                 onClick={() => setFormData(prev => ({ ...prev, status: "upcoming" }))}
                 className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
                   formData.status === "upcoming"
-                    ? "bg-emerald-900/50 text-emerald-400 border border-emerald-700"
-                    : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600"
+                    ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                    : "bg-neutral-50 text-neutral-600 border border-neutral-200 hover:border-neutral-300"
                 }`}
               >
                 Upcoming
@@ -815,8 +815,8 @@ export default function EventsAdminPage() {
                 onClick={() => setFormData(prev => ({ ...prev, status: "past" }))}
                 className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
                   formData.status === "past"
-                    ? "bg-neutral-700 text-neutral-300 border border-neutral-600"
-                    : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600"
+                    ? "bg-neutral-200 text-neutral-700 border border-neutral-300"
+                    : "bg-neutral-50 text-neutral-600 border border-neutral-200 hover:border-neutral-300"
                 }`}
               >
                 Past
@@ -826,8 +826,8 @@ export default function EventsAdminPage() {
                 onClick={() => setFormData(prev => ({ ...prev, status: "cancelled" }))}
                 className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
                   formData.status === "cancelled"
-                    ? "bg-red-900/50 text-red-400 border border-red-700"
-                    : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600"
+                    ? "bg-red-100 text-red-700 border border-red-300"
+                    : "bg-neutral-50 text-neutral-600 border border-neutral-200 hover:border-neutral-300"
                 }`}
               >
                 Cancelled
@@ -836,8 +836,8 @@ export default function EventsAdminPage() {
           </div>
 
           {/* Event Image */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-            <label className="block text-sm font-medium text-neutral-300 mb-3">
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
+            <label className="block text-sm font-medium text-neutral-700 mb-3">
               Event Image
             </label>
             <ImageUpload
@@ -848,14 +848,14 @@ export default function EventsAdminPage() {
           </div>
 
           {/* Category */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-            <label className="block text-sm font-medium text-neutral-300 mb-3">
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
+            <label className="block text-sm font-medium text-neutral-700 mb-3">
               Category
             </label>
             <select
               value={formData.category}
               onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-              className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-neutral-500"
+              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:border-neutral-400"
             >
               {EVENT_CATEGORIES.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -864,8 +864,8 @@ export default function EventsAdminPage() {
           </div>
 
           {/* Event Options */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 space-y-4">
-            <label className="block text-sm font-medium text-neutral-300">
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm space-y-4">
+            <label className="block text-sm font-medium text-neutral-700">
               Event Options
             </label>
             
@@ -875,9 +875,9 @@ export default function EventsAdminPage() {
                 type="checkbox"
                 checked={formData.is_virtual}
                 onChange={(e) => setFormData(prev => ({ ...prev, is_virtual: e.target.checked }))}
-                className="w-4 h-4 rounded bg-neutral-800 border-neutral-600 text-emerald-600 focus:ring-emerald-500"
+                className="w-4 h-4 rounded bg-neutral-50 border-neutral-300 text-emerald-600 focus:ring-emerald-500"
               />
-              <span className="text-sm text-neutral-300">Virtual Event</span>
+              <span className="text-sm text-neutral-700">Virtual Event</span>
             </label>
 
             {/* Free Toggle */}
@@ -886,29 +886,29 @@ export default function EventsAdminPage() {
                 type="checkbox"
                 checked={formData.is_free}
                 onChange={(e) => setFormData(prev => ({ ...prev, is_free: e.target.checked }))}
-                className="w-4 h-4 rounded bg-neutral-800 border-neutral-600 text-emerald-600 focus:ring-emerald-500"
+                className="w-4 h-4 rounded bg-neutral-50 border-neutral-300 text-emerald-600 focus:ring-emerald-500"
               />
-              <span className="text-sm text-neutral-300">Free Event</span>
+              <span className="text-sm text-neutral-700">Free Event</span>
             </label>
 
             {/* Price (if not free) */}
             {!formData.is_free && (
               <div>
-                <label className="block text-xs text-neutral-400 mb-1">Price</label>
+                <label className="block text-xs text-neutral-500 mb-1">Price</label>
                 <input
                   type="text"
                   value={formData.price}
                   onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
                   placeholder="e.g., $25"
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 text-sm placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
                 />
               </div>
             )}
           </div>
 
           {/* Organizer */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-            <label className="block text-sm font-medium text-neutral-300 mb-3">
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
+            <label className="block text-sm font-medium text-neutral-700 mb-3">
               Organizer
             </label>
             <input
@@ -916,13 +916,13 @@ export default function EventsAdminPage() {
               value={formData.organizer}
               onChange={(e) => setFormData(prev => ({ ...prev, organizer: e.target.value }))}
               placeholder="Organization or host name"
-              className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
             />
           </div>
 
           {/* Event URL */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-            <label className="block text-sm font-medium text-neutral-300 mb-3">
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm">
+            <label className="block text-sm font-medium text-neutral-700 mb-3">
               Event URL
             </label>
             <input
@@ -930,7 +930,7 @@ export default function EventsAdminPage() {
               value={formData.event_url}
               onChange={(e) => setFormData(prev => ({ ...prev, event_url: e.target.value }))}
               placeholder="https://..."
-              className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+              className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 text-sm placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
             />
           </div>
         </div>
@@ -939,12 +939,12 @@ export default function EventsAdminPage() {
   )
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
         {/* Back to Admin */}
         <Link
           href="/admin"
-          className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors mb-6"
+          className="inline-flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors mb-6"
         >
           <ChevronLeft className="w-4 h-4" />
           Back to Admin
@@ -958,9 +958,9 @@ export default function EventsAdminPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
-                toast.type === "success" ? "bg-emerald-900 text-emerald-200" :
-                toast.type === "error" ? "bg-red-900 text-red-200" :
-                "bg-yellow-900 text-yellow-200"
+                toast.type === "success" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
+                toast.type === "error" ? "bg-red-100 text-red-800 border border-red-200" :
+                "bg-yellow-100 text-yellow-800 border border-yellow-200"
               }`}
             >
               {toast.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}

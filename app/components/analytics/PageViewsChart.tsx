@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { ChartContainer, ChartTooltip } from "./Chart"
 import { XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart } from "recharts"
@@ -157,46 +156,35 @@ export function PageViewsChart({
   }, [dateRange.startDate, dateRange.endDate, dateRange.label, setError, propertyId])
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="w-full"
-    >
-      <Card className="border-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-xl overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-emerald-500/5" />
-        <CardHeader className="relative pb-4">
-          <CardTitle className="text-white flex items-center gap-2 sm:gap-3 text-base sm:text-lg md:text-xl">
-            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500/20 to-emerald-500/20 rounded-lg shrink-0">
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+    <div className="w-full max-w-full min-w-0">
+      <Card className="border border-neutral-200 bg-white shadow-lg w-full max-w-full rounded-xl">
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-neutral-900 flex items-center gap-2 sm:gap-3 text-base sm:text-lg">
+            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-100 to-emerald-100 rounded-lg shrink-0">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
             </div>
-            <span className="flex-1 min-w-0 truncate">Page Views Over Time</span>
-            <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-white/60 shrink-0">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="flex-1 min-w-0 font-bold leading-tight">Page Views Over Time</span>
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-neutral-600 font-medium shrink-0">
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline">{dateRange.label}</span>
             </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="relative p-3 sm:p-4 md:p-6">
           {isLoading || parentLoading ? (
-            <div className="flex items-center justify-center h-64 md:h-96">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-              >
-                <Loader2 className="h-8 w-8 text-blue-400" />
-              </motion.div>
+            <div className="flex items-center justify-center h-52 sm:h-64 md:h-80">
+              <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
             </div>
           ) : data.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 md:h-96 text-white/60">
-              <p className="text-lg mb-2">No data available</p>
-              <p className="text-sm text-center max-w-md">
+            <div className="flex flex-col items-center justify-center h-52 sm:h-64 md:h-80 text-neutral-500">
+              <p className="text-base sm:text-lg font-semibold mb-2">No data available</p>
+              <p className="text-xs sm:text-sm text-center max-w-md px-4 leading-relaxed">
                 No page view data was found for the selected date range. Try selecting a different date range or check
                 your Google Analytics configuration.
               </p>
             </div>
           ) : (
-            <div className="w-full overflow-hidden">
+            <div className="w-full max-w-full min-w-0 overflow-hidden">
               <ChartContainer
                 config={{
                   pageViews: {
@@ -204,15 +192,15 @@ export function PageViewsChart({
                     color: "#3B82F6",
                   },
                 }}
-                className="h-64 md:h-96 w-full"
+                className="h-52 sm:h-64 md:h-80 w-full max-w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={data}
                     margin={{
                       top: 10,
-                      right: 10,
-                      left: 0,
+                      right: 5,
+                      left: -15,
                       bottom: 0,
                     }}
                   >
@@ -225,39 +213,39 @@ export function PageViewsChart({
                     </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="rgba(255,255,255,0.1)"
+                      stroke="#e5e7eb"
                       horizontal={true}
                       vertical={false}
                     />
                     <XAxis
                       dataKey="date"
-                      stroke="rgba(255,255,255,0.6)"
-                      fontSize={11}
-                      tick={{ fill: "rgba(255,255,255,0.6)" }}
+                      stroke="#6b7280"
+                      fontSize={10}
+                      tick={{ fill: "#374151", fontWeight: 500 }}
                       tickLine={false}
                       axisLine={false}
                       interval="preserveStartEnd"
-                      angle={data.length > 10 ? -45 : 0}
-                      textAnchor={data.length > 10 ? "end" : "middle"}
-                      height={data.length > 10 ? 60 : 30}
+                      angle={data.length > 7 ? -45 : 0}
+                      textAnchor={data.length > 7 ? "end" : "middle"}
+                      height={data.length > 7 ? 50 : 25}
                     />
                     <YAxis
-                      stroke="rgba(255,255,255,0.6)"
-                      fontSize={11}
-                      tick={{ fill: "rgba(255,255,255,0.6)" }}
+                      stroke="#6b7280"
+                      fontSize={10}
+                      tick={{ fill: "#374151", fontWeight: 500 }}
                       tickLine={false}
                       axisLine={false}
-                      width={40}
+                      width={35}
                     />
                     <ChartTooltip
                       content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="bg-black/80 backdrop-blur-sm border border-white/10 rounded-lg p-3 shadow-xl">
-                              <p className="text-white/80 text-sm font-medium mb-1">{label}</p>
+                            <div className="bg-white border border-neutral-200 rounded-lg p-3 shadow-lg">
+                              <p className="text-neutral-700 text-sm font-medium mb-1">{label}</p>
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                                <span className="text-white text-sm">
+                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                <span className="text-neutral-900 text-sm">
                                   {payload[0].value?.toLocaleString()} page views
                                 </span>
                               </div>
@@ -289,28 +277,29 @@ export function PageViewsChart({
 
           {/* Chart Summary */}
           {!isLoading && !parentLoading && data.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mt-4 pt-4 border-t border-white/10"
-            >
-              <div className="flex flex-col gap-2 text-xs sm:text-sm text-white/60">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span>Total: {data.reduce((sum, item) => sum + item.pageViews, 0).toLocaleString()} views</span>
-                  <span>
-                    Avg: {Math.round(data.reduce((sum, item) => sum + item.pageViews, 0) / data.length).toLocaleString()}/day
-                  </span>
+            <div className="mt-4 pt-4 border-t border-neutral-200">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-neutral-500 text-xs font-medium">Total:</span>
+                    <span className="text-neutral-900 text-sm font-bold">{data.reduce((sum, item) => sum + item.pageViews, 0).toLocaleString()} views</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-neutral-500 text-xs font-medium">Avg:</span>
+                    <span className="text-neutral-900 text-sm font-bold">
+                      {Math.round(data.reduce((sum, item) => sum + item.pageViews, 0) / data.length).toLocaleString()}/day
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
-                  <span className="text-[10px] sm:text-xs">Source: {dataSource}</span>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                  <span className="text-xs text-neutral-500 font-medium">Source: {dataSource}</span>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   )
 }

@@ -1,11 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { motion, AnimatePresence } from "motion/react"
 import { Button } from "./Button"
 import { 
-  RefreshCw, 
-  LogOut, 
   Loader2, 
   ChevronDown, 
   Globe, 
@@ -19,8 +16,6 @@ import type { AnalyticsProperty, DateRange } from "../../types/analytics"
 
 interface AnalyticsHeaderProps {
   // Dashboard controls
-  onRefresh: () => void
-  onLogout: () => void
   isLoading?: boolean
   availableProperties?: AnalyticsProperty[]
   selectedPropertyId?: string
@@ -41,8 +36,6 @@ const dateRangeOptions: DateRange[] = [
 ]
 
 export function AnalyticsHeader({
-  onRefresh,
-  onLogout,
   isLoading = false,
   availableProperties = [],
   selectedPropertyId = "",
@@ -83,204 +76,180 @@ export function AnalyticsHeader({
   }
 
   return (
-    <div className="bg-black border-b border-white/10 overflow-x-hidden w-full pt-20">
-      {/* Top Row: Title, Property Selector, Actions */}
-      <div className="px-3 sm:px-4 lg:px-6 overflow-x-hidden w-full">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">
-          {/* Left: Title and Property */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg sm:rounded-xl border border-white/10 shrink-0">
-                <GA4Icon className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400" />
+    <div className="bg-white border-b border-neutral-200 w-full pt-20 relative z-10">
+      {/* Main Header Row */}
+      <div className="px-4 sm:px-5 lg:px-6 w-full">
+        <div className="flex flex-col gap-4 py-4 sm:py-5">
+          {/* Top section: Title and Export Actions */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Left: Title with GA4 Icon */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
+                <GA4Icon className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold text-white truncate">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-lg font-bold text-neutral-900 truncate leading-tight">
                   {selectedProperty?.name || "Analytics Dashboard"}
                 </h1>
-                <p className="text-white/50 text-[10px] sm:text-xs truncate">
-                  {selectedPropertyId ? `ID: ${selectedPropertyId}` : "Select a property"}
+                <p className="text-neutral-500 text-xs sm:text-sm font-medium truncate leading-snug mt-0.5">
+                  {selectedRange.label} • {selectedPropertyId ? `ID: ${selectedPropertyId}` : "Select a property"}
                 </p>
               </div>
             </div>
 
-            {/* Property Selector */}
-            {onPropertyChange && (
-              <div className="relative w-full sm:w-auto sm:min-w-[160px]">
-                {isPropertiesLoading ? (
-                  <div className="bg-white/5 border border-white/10 text-white rounded-lg px-3 py-2 text-sm flex items-center">
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    <span className="text-white/50">Loading...</span>
-                  </div>
-                ) : availableProperties.length > 0 ? (
-                  <div className="relative">
-                    <Globe className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-400 pointer-events-none z-10" />
-                    <select
-                      value={selectedPropertyId}
-                      onChange={(e) => onPropertyChange(e.target.value)}
-                      className="bg-white/5 border border-white/10 text-white rounded-lg pl-9 pr-8 py-2 text-sm hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer w-full transition-colors"
-                    >
-                      {!selectedPropertyId && (
-                        <option value="" className="bg-neutral-900 text-white/50">
-                          Select Property
-                        </option>
-                      )}
-                      {availableProperties.map((property) => (
-                        <option key={property.id} value={property.id} className="bg-neutral-900 text-white">
-                          {property.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={onRefresh}
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10 transition-colors"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              Refresh
-            </Button>
-
-            <Button
-              onClick={onLogout}
-              variant="outline"
-              size="sm"
-              className="bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Row: Date Range and Download - This is the sticky part */}
-      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-x-hidden w-full">
-        <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 overflow-x-hidden w-full">
-          <div className="flex flex-col gap-2 sm:gap-3">
-            {/* Date Range Options - Wrap on mobile, no horizontal scroll */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Calendar className="h-4 w-4 text-emerald-400 hidden sm:block shrink-0" />
-              {dateRangeOptions.map((option) => (
-                <button
-                  key={option.label}
-                  onClick={() => onRangeChange(option)}
-                  className={`px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-sm rounded-lg transition-all whitespace-nowrap ${
-                    selectedRange.label === option.label
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "bg-white/5 text-white/70 border border-transparent hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowCustom(!showCustom)}
-                className={`px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-sm rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                  showCustom
-                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                    : "bg-white/5 text-white/70 border border-transparent hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <CalendarDays className="h-3.5 w-3.5" />
-                Custom
-              </button>
-            </div>
-
-            {/* Download Options */}
+            {/* Right: Export Actions */}
             {(onDownloadCSV || onDownloadPNG) && (
-              <div className="flex items-center gap-3">
-                <span className="text-white/40 text-xs hidden sm:block">Export:</span>
+              <div className="flex items-center gap-2 shrink-0">
                 {onDownloadCSV && (
                   <button
                     onClick={onDownloadCSV}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/60 hover:text-emerald-400 bg-white/5 hover:bg-emerald-500/10 rounded-lg border border-white/10 hover:border-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Download CSV"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-600 bg-neutral-100 hover:bg-emerald-50 rounded-lg border border-neutral-200 hover:border-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Export as CSV"
                   >
-                    <FileText className="h-3.5 w-3.5" />
-                    <span>CSV</span>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">CSV</span>
                   </button>
                 )}
                 {onDownloadPNG && (
                   <button
                     onClick={onDownloadPNG}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/60 hover:text-emerald-400 bg-white/5 hover:bg-emerald-500/10 rounded-lg border border-white/10 hover:border-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Download PNG"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg border border-emerald-600 hover:border-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Export as PNG"
                   >
-                    <Image className="h-3.5 w-3.5" />
-                    <span>PNG</span>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">PNG</span>
                   </button>
                 )}
               </div>
             )}
           </div>
+
+          {/* Property Selector - Full width */}
+          {onPropertyChange && (
+            <div className="w-full">
+              {isPropertiesLoading ? (
+                <div className="bg-neutral-100 border border-neutral-200 text-neutral-900 rounded-lg px-3 py-2.5 text-sm flex items-center">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <span className="text-neutral-500 font-medium">Loading properties...</span>
+                </div>
+              ) : availableProperties.length > 0 ? (
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-emerald-600 pointer-events-none z-10" />
+                  <select
+                    value={selectedPropertyId}
+                    onChange={(e) => onPropertyChange(e.target.value)}
+                    className="bg-neutral-100 border border-neutral-200 text-neutral-900 rounded-lg pl-10 pr-10 py-2.5 text-sm font-medium hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none cursor-pointer w-full transition-colors"
+                  >
+                    {!selectedPropertyId && (
+                      <option value="" className="bg-white text-neutral-500">
+                        Select Property
+                      </option>
+                    )}
+                    {availableProperties.map((property) => (
+                      <option key={property.id} value={property.id} className="bg-white text-neutral-900">
+                        {property.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-500 pointer-events-none" />
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Custom Date Range Picker - Expandable */}
-      <AnimatePresence>
-        {showCustom && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-white/5"
-          >
-            <div className="px-4 lg:px-6 py-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 max-w-xl">
-                <div className="flex-1 space-y-1.5 w-full sm:w-auto">
-                  <label className="text-white/60 text-xs font-medium">Start Date</label>
-                  <input
-                    type="date"
-                    value={customStartDate || formatDateForInput(selectedRange.startDate)}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-                  />
-                </div>
-                <div className="flex-1 space-y-1.5 w-full sm:w-auto">
-                  <label className="text-white/60 text-xs font-medium">End Date</label>
-                  <input
-                    type="date"
-                    value={customEndDate || formatDateForInput(selectedRange.endDate)}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleCustomDateApply}
-                    disabled={!customStartDate || !customEndDate}
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Apply
-                  </Button>
-                  <Button
-                    onClick={() => setShowCustom(false)}
-                    variant="outline"
-                    size="sm"
-                    className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+      {/* Bottom Row: Date Range Options */}
+      <div className="border-t border-neutral-100 bg-neutral-50 w-full">
+        <div className="px-4 sm:px-5 lg:px-6 py-3 w-full">
+          {/* Date Range Options - Wrap on mobile */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
+            {dateRangeOptions.map((option) => (
+              <button
+                key={option.label}
+                onClick={() => onRangeChange(option)}
+                className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+                  selectedRange.label === option.label
+                    ? "bg-emerald-600 text-white border border-emerald-600"
+                    : "bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-100 hover:text-neutral-900"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowCustom(!showCustom)}
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                showCustom
+                  ? "bg-emerald-600 text-white border border-emerald-600"
+                  : "bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-100 hover:text-neutral-900"
+              }`}
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Custom
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Custom Date Range Picker - Expandable with CSS transition */}
+      <div
+        className={`overflow-hidden border-t border-neutral-100 transition-all duration-200 ease-in-out ${
+          showCustom ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="px-4 lg:px-6 py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 max-w-xl">
+            <div className="flex-1 space-y-1.5 w-full sm:w-auto">
+              <label className="text-neutral-500 text-xs font-medium">Start Date</label>
+              <input
+                type="date"
+                value={customStartDate || formatDateForInput(selectedRange.startDate)}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full px-3 py-2 bg-neutral-100 border border-neutral-200 rounded-lg text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
+              />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="flex-1 space-y-1.5 w-full sm:w-auto">
+              <label className="text-neutral-500 text-xs font-medium">End Date</label>
+              <input
+                type="date"
+                value={customEndDate || formatDateForInput(selectedRange.endDate)}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full px-3 py-2 bg-neutral-100 border border-neutral-200 rounded-lg text-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCustomDateApply}
+                disabled={!customStartDate || !customEndDate}
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Apply
+              </Button>
+              <Button
+                onClick={() => setShowCustom(false)}
+                variant="outline"
+                size="sm"
+                className="bg-neutral-100 border-neutral-200 text-neutral-600 hover:bg-neutral-200"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

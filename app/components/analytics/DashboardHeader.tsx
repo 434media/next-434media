@@ -1,6 +1,5 @@
 "use client"
 
-import { motion } from "motion/react"
 import { Button } from "./Button"
 import { RefreshCw, LogOut, Loader2, ChevronDown, Globe } from "lucide-react"
 import type { AnalyticsProperty } from "../../types/analytics"
@@ -58,46 +57,22 @@ export function DashboardHeader({
       {/* Mobile Layout (< sm) */}
       <div className="relative z-10 flex flex-col gap-6 p-4 sm:hidden">
         {/* Title Section */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex items-center gap-4"
-        >
-          <motion.div
-            className="p-3 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          >
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg transition-transform hover:scale-105">
             <GA4Icon className="h-6 w-6 text-emerald-400" />
-          </motion.div>
-          <div>
-            <motion.h1
-              className="text-lg font-bold text-white mb-1"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              Analytics Dashboard
-            </motion.h1>
-            <motion.p
-              className="text-white/60 text-xs"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              Real-time insights and performance metrics
-            </motion.p>
           </div>
-        </motion.div>
+          <div>
+            <h1 className="text-lg font-bold text-white mb-1">
+              Analytics Dashboard
+            </h1>
+            <p className="text-white/60 text-xs">
+              Real-time insights and performance metrics
+            </p>
+          </div>
+        </div>
 
         {/* Controls Section - Stacked on mobile */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="flex flex-col gap-3"
-        >
+        <div className="flex flex-col gap-3">
           {/* Property Selector Dropdown - Full width on mobile */}
           {onPropertyChange && (
             <div className="relative w-full">
@@ -165,50 +140,26 @@ export function DashboardHeader({
               <span className="xs:hidden">Exit</span>
             </Button>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Desktop Layout (>= sm) - Original Layout Preserved */}
       <div className="relative z-10 hidden sm:flex sm:flex-row sm:items-center sm:justify-between gap-4 p-6 sm:p-8">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex items-center gap-4"
-        >
-          <motion.div
-            className="p-3 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg"
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          >
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 rounded-xl backdrop-blur-sm border border-white/20 shadow-lg transition-transform hover:scale-105">
             <GA4Icon className="h-8 w-8 text-emerald-400" />
-          </motion.div>
-          <div>
-            <motion.h1
-              className="text-xl font-bold text-white mb-2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              Analytics Dashboard
-            </motion.h1>
-            <motion.p
-              className="text-white/60 text-sm"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              Real-time insights and performance metrics
-            </motion.p>
           </div>
-        </motion.div>
+          <div>
+            <h1 className="text-xl font-bold text-white mb-2">
+              Analytics Dashboard
+            </h1>
+            <p className="text-white/60 text-sm">
+              Real-time insights and performance metrics
+            </p>
+          </div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="flex items-center gap-3"
-        >
+        <div className="flex items-center gap-3">
           {/* Property Selector Dropdown - Always render container */}
           {onPropertyChange && (
             <div className="relative min-w-[180px]">
@@ -270,16 +221,11 @@ export function DashboardHeader({
             <LogOut className="h-4 w-4 mr-2" />
             Logout
           </Button>
-        </motion.div>
+        </div>
       </div>
 
       {/* Animated gradient line at bottom */}
-      <motion.div
-        className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500"
-        initial={{ scaleX: 0 }}
-        animate={{ scaleX: 1 }}
-        transition={{ duration: 1.5, delay: 0.5 }}
-      />
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500" />
     </div>
   )
 }

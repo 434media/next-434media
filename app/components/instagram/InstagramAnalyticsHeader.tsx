@@ -68,18 +68,18 @@ export function InstagramAnalyticsHeader({
   const currentAccount = instagramAccounts.find(a => a.id === selectedAccount) || instagramAccounts[0]
 
   return (
-    <div className="bg-black border-b border-white/10 pt-20 overflow-x-hidden">
+    <div className="bg-white border-b border-neutral-200 pt-20 overflow-x-hidden">
       {/* Top Row: Title, Account Info, Actions */}
       <div className="px-3 sm:px-4 lg:px-6 overflow-x-hidden">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">
           {/* Left: Title and Account */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-lg sm:rounded-xl border border-white/10 shrink-0">
-                <Instagram className="h-5 w-5 sm:h-6 sm:w-6 text-pink-400" />
+              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
+                <Instagram className="h-5 w-5 sm:h-6 sm:w-6 text-pink-600" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold text-white truncate">
+                <h1 className="text-base sm:text-lg font-bold text-neutral-900 truncate">
                   Instagram Insights
                 </h1>
               </div>
@@ -89,10 +89,10 @@ export function InstagramAnalyticsHeader({
             <div className="flex items-center gap-2">
               <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium ${
                 isConnected 
-                  ? "bg-pink-500/15 text-pink-400 border border-pink-500/20" 
-                  : "bg-red-500/15 text-red-400 border border-red-500/20"
+                  ? "bg-pink-100 text-pink-700 border border-pink-200" 
+                  : "bg-red-100 text-red-700 border border-red-200"
               }`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-pink-400" : "bg-red-400"}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-pink-500" : "bg-red-500"}`} />
                 <span>{isConnected ? "Connected" : "Disconnected"}</span>
               </div>
             </div>
@@ -111,20 +111,20 @@ export function InstagramAnalyticsHeader({
                   }
                 }}
                 disabled={isLoading}
-                className="appearance-none bg-white/5 border border-white/10 text-white text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-white/10 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="appearance-none bg-neutral-100 border border-neutral-200 text-neutral-900 text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-neutral-200 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {instagramAccounts.map((account) => (
                   <option 
                     key={account.id} 
                     value={account.id} 
-                    className="bg-neutral-900 text-white"
+                    className="bg-white text-neutral-900"
                     disabled={!account.available}
                   >
                     {account.label}{!account.available ? " (Coming Soon)" : ""}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
             </div>
 
             <Button
@@ -132,7 +132,7 @@ export function InstagramAnalyticsHeader({
               disabled={isLoading}
               variant="outline"
               size="sm"
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10 transition-colors"
+              className="bg-neutral-100 border-neutral-200 text-neutral-700 hover:bg-neutral-200 transition-colors"
             >
               {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Refresh
@@ -142,7 +142,7 @@ export function InstagramAnalyticsHeader({
               onClick={onLogout}
               variant="outline"
               size="sm"
-              className="bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
+              className="bg-red-50 border-red-200 text-red-600 hover:bg-red-100 transition-colors"
             >
               <LogOut className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Logout</span>
@@ -152,20 +152,20 @@ export function InstagramAnalyticsHeader({
       </div>
 
       {/* Bottom Row: Date Range and Download */}
-      <div className="border-t border-white/5 bg-neutral-950/80 backdrop-blur-md overflow-x-hidden">
+      <div className="border-t border-neutral-100 bg-neutral-50 overflow-x-hidden">
         <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 overflow-x-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
             {/* Date Range Options - Wrap on mobile */}
             <div className="flex flex-wrap items-center gap-2">
-              <Calendar className="h-4 w-4 text-pink-400 hidden sm:block shrink-0" />
+              <Calendar className="h-4 w-4 text-pink-600 hidden sm:block shrink-0" />
               {dateRangeOptions.map((option) => (
                 <button
                   key={option.label}
                   onClick={() => onRangeChange(option.value)}
                   className={`px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-sm rounded-lg transition-all whitespace-nowrap ${
                     selectedRange === option.value
-                      ? "bg-pink-500/20 text-pink-400 border border-pink-500/30"
-                      : "bg-white/5 text-white/70 border border-transparent hover:bg-white/10 hover:text-white"
+                      ? "bg-pink-100 text-pink-700 border border-pink-200"
+                      : "bg-neutral-100 text-neutral-600 border border-transparent hover:bg-neutral-200 hover:text-neutral-900"
                   }`}
                 >
                   {option.label}
@@ -176,12 +176,12 @@ export function InstagramAnalyticsHeader({
             {/* Download Options */}
             {(onDownloadCSV || onDownloadPNG) && (
               <div className="flex items-center gap-2 sm:gap-3">
-                <span className="text-white/40 text-xs hidden sm:block">Export:</span>
+                <span className="text-neutral-400 text-xs hidden sm:block">Export:</span>
                 {onDownloadCSV && (
                   <button
                     onClick={onDownloadCSV}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/60 hover:text-pink-400 bg-white/5 hover:bg-pink-500/10 rounded-lg border border-white/10 hover:border-pink-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-neutral-600 hover:text-pink-600 bg-neutral-100 hover:bg-pink-50 rounded-lg border border-neutral-200 hover:border-pink-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Download CSV"
                   >
                     <FileText className="h-3.5 w-3.5" />
@@ -192,7 +192,7 @@ export function InstagramAnalyticsHeader({
                   <button
                     onClick={onDownloadPNG}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white/60 hover:text-pink-400 bg-white/5 hover:bg-pink-500/10 rounded-lg border border-white/10 hover:border-pink-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-neutral-600 hover:text-pink-600 bg-neutral-100 hover:bg-pink-50 rounded-lg border border-neutral-200 hover:border-pink-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Download PNG"
                   >
                     <Image className="h-3.5 w-3.5" />

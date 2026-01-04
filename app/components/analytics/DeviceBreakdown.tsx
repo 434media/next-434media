@@ -28,13 +28,13 @@ const getDeviceIcon = (device: string) => {
 }
 
 const getDeviceColor = (device: string, index: number) => {
-  // Using distinct shades of white/gray for black/white theme
+  // Using distinct colors for light theme
   const colors = [
-    "#FFFFFF", // White for first device
-    "#A0A0A0", // Medium gray for second
-    "#606060", // Darker gray for third
+    "#3B82F6", // Blue for first device
+    "#10B981", // Emerald for second
+    "#8B5CF6", // Purple for third
   ]
-  return colors[index] || "#808080"
+  return colors[index] || "#6B7280"
 }
 
 export function DeviceBreakdown({
@@ -128,17 +128,17 @@ export function DeviceBreakdown({
   const pieSegments = createPieChart()
 
   return (
-    <Card className="border border-white/10 bg-white/5 transition-colors duration-300">
-      <CardContent className="p-6">
+    <Card className="border border-neutral-200 bg-white shadow-lg transition-colors duration-300 w-full max-w-full overflow-hidden">
+      <CardContent className="p-4 sm:p-6 w-full max-w-full overflow-hidden">
         {isLoading || parentLoading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 text-white/60 animate-spin" />
+            <Loader2 className="h-8 w-8 text-neutral-400 animate-spin" />
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12">
-            {/* Pie Chart */}
+          <div className="flex flex-col items-center gap-6">
+            {/* Pie Chart - Smaller on mobile */}
             <div className="flex-shrink-0 relative">
-              <svg width="200" height="200" viewBox="0 0 200 200" className="drop-shadow-lg">
+              <svg width="160" height="160" viewBox="0 0 200 200" className="drop-shadow-lg sm:w-[200px] sm:h-[200px]">
                 {pieSegments.map((segment, index) => (
                   <g key={segment.device}>
                     <path
@@ -146,7 +146,7 @@ export function DeviceBreakdown({
                       fill={segment.color}
                       className="transition-all duration-200 cursor-pointer"
                       strokeWidth="2"
-                      stroke="#000"
+                      stroke="#fff"
                       style={{
                         opacity: hoveredDevice === null || hoveredDevice === segment.device ? 1 : 0.3,
                         transform: hoveredDevice === segment.device ? 'scale(1.05)' : 'scale(1)',
@@ -162,12 +162,12 @@ export function DeviceBreakdown({
               {/* Hover Tooltip */}
               {hoveredDevice && (
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                  <div className="bg-black border border-white/20 rounded-lg px-4 py-3 shadow-xl">
+                  <div className="bg-white border border-neutral-200 rounded-lg px-3 py-2 shadow-xl">
                     {pieSegments.filter(s => s.device === hoveredDevice).map(segment => (
                       <div key={segment.device} className="text-center whitespace-nowrap">
-                        <div className="text-white font-bold text-2xl">{segment.percentage.toFixed(1)}%</div>
-                        <div className="text-white/70 text-sm capitalize">{segment.device}</div>
-                        <div className="text-white/50 text-xs mt-1">{segment.sessions.toLocaleString()} sessions</div>
+                        <div className="text-neutral-900 font-bold text-xl">{segment.percentage.toFixed(1)}%</div>
+                        <div className="text-neutral-600 text-sm font-medium capitalize">{segment.device}</div>
+                        <div className="text-neutral-500 text-xs mt-0.5">{segment.sessions.toLocaleString()} sessions</div>
                       </div>
                     ))}
                   </div>
@@ -175,34 +175,34 @@ export function DeviceBreakdown({
               )}
             </div>
 
-            {/* Legend */}
-            <div className="flex-1 space-y-4 w-full lg:w-auto">
+            {/* Legend - Full width */}
+            <div className="w-full space-y-2.5">
               {pieSegments.map((segment, index) => (
                 <div 
                   key={segment.device}
-                  className={`flex items-center justify-between gap-4 p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+                  className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
                     hoveredDevice === segment.device
-                      ? 'bg-white/20 border-white/30 scale-105'
+                      ? 'bg-neutral-100 border-neutral-300 scale-[1.02]'
                       : hoveredDevice === null
-                      ? 'bg-white/5 border-white/10 hover:bg-white/10'
-                      : 'bg-white/5 border-white/10 opacity-40'
+                      ? 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'
+                      : 'bg-neutral-50 border-neutral-200 opacity-40'
                   }`}
                   onMouseEnter={() => setHoveredDevice(segment.device)}
                   onMouseLeave={() => setHoveredDevice(null)}
                 >
-                  <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div 
-                      className="w-4 h-4 rounded-sm flex-shrink-0"
+                      className="w-4 h-4 rounded flex-shrink-0"
                       style={{ backgroundColor: segment.color }}
                     />
                     <div className="flex items-center gap-2">
-                      <span className="text-white/60">{getDeviceIcon(segment.device)}</span>
-                      <span className="text-white font-medium capitalize">{segment.device}</span>
+                      <span className="text-neutral-500">{getDeviceIcon(segment.device)}</span>
+                      <span className="text-neutral-900 font-semibold capitalize text-sm">{segment.device}</span>
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-white font-bold text-lg">{segment.percentage.toFixed(1)}%</div>
-                    <div className="text-white/50 text-xs">{segment.sessions.toLocaleString()} sessions</div>
+                    <div className="text-neutral-900 font-bold text-base sm:text-lg">{segment.percentage.toFixed(1)}%</div>
+                    <div className="text-neutral-500 text-xs font-medium">{segment.sessions.toLocaleString()} sessions</div>
                   </div>
                 </div>
               ))}

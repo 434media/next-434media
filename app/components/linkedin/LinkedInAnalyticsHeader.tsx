@@ -55,7 +55,7 @@ export function LinkedInAnalyticsHeader({
   const currentPage = linkedinPages.find(p => p.id === selectedPage) || linkedinPages[0]
 
   return (
-    <div className="bg-gradient-to-r from-[#0077B5]/20 via-black to-black border-b border-white/10">
+    <div className="bg-white border-b border-neutral-200">
       <div className="px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         {/* Top Row: Title and Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -67,11 +67,11 @@ export function LinkedInAnalyticsHeader({
               </svg>
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-neutral-900">
                 LinkedIn Analytics
               </h1>
               {organizationData && (
-                <p className="text-xs sm:text-sm text-white/60">
+                <p className="text-xs sm:text-sm text-neutral-500">
                   {organizationData.name}{" "}
                   <span className="text-[#0077B5]">
                     • {organizationData.followersCount.toLocaleString()} followers
@@ -94,20 +94,20 @@ export function LinkedInAnalyticsHeader({
                   }
                 }}
                 disabled={isLoading}
-                className="appearance-none bg-white/5 border border-white/10 text-white text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-white/10 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0077B5]/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="appearance-none bg-neutral-100 border border-neutral-200 text-neutral-900 text-xs sm:text-sm rounded-lg px-3 py-2 pr-8 hover:bg-neutral-200 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0077B5]/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {linkedinPages.map((page) => (
                   <option 
                     key={page.id} 
                     value={page.id} 
-                    className="bg-neutral-900 text-white"
+                    className="bg-white text-neutral-900"
                     disabled={!page.available}
                   >
                     {page.label}{!page.available ? " (Coming Soon)" : ""}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
             </div>
 
             {/* Download Buttons */}
@@ -115,7 +115,7 @@ export function LinkedInAnalyticsHeader({
               <button
                 onClick={onDownloadCSV}
                 disabled={isLoading}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-medium transition-colors disabled:opacity-50"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-xs font-medium transition-colors disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -133,7 +133,7 @@ export function LinkedInAnalyticsHeader({
               <button
                 onClick={onDownloadPNG}
                 disabled={isLoading}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-medium transition-colors disabled:opacity-50"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-xs font-medium transition-colors disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -151,7 +151,7 @@ export function LinkedInAnalyticsHeader({
             <button
               onClick={onRefresh}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-xs font-medium transition-colors disabled:opacity-50"
             >
               <svg
                 className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
@@ -175,12 +175,12 @@ export function LinkedInAnalyticsHeader({
         {connectionStatus && (
           <div
             className={`flex items-center gap-2 text-xs mb-4 ${
-              connectionStatus.success ? "text-emerald-400" : "text-red-400"
+              connectionStatus.success ? "text-emerald-600" : "text-red-600"
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                connectionStatus.success ? "bg-emerald-400" : "bg-red-400"
+                connectionStatus.success ? "bg-emerald-500" : "bg-red-500"
               }`}
             />
             {connectionStatus.success ? "Connected to LinkedIn API" : connectionStatus.message}
@@ -189,7 +189,7 @@ export function LinkedInAnalyticsHeader({
 
         {/* Date Range Selector */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-white/40 mr-1">Period:</span>
+          <span className="text-xs text-neutral-400 mr-1">Period:</span>
           {timeRanges.map((range) => (
             <button
               key={range.value}
@@ -197,7 +197,7 @@ export function LinkedInAnalyticsHeader({
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 selectedRange === range.value
                   ? "bg-[#0077B5] text-white shadow-lg shadow-[#0077B5]/20"
-                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                  : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
               }`}
             >
               {range.label}

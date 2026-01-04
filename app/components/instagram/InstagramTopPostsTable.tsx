@@ -63,13 +63,13 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
       <div className="w-full">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-xl overflow-hidden bg-slate-900/60 border border-slate-700">
-              <div className="w-full aspect-video bg-slate-800 animate-pulse" />
+            <div key={i} className="rounded-xl overflow-hidden bg-neutral-50 border border-neutral-200">
+              <div className="w-full aspect-video bg-neutral-200 animate-pulse" />
               <div className="p-4 space-y-3">
-                <div className="h-5 w-2/3 bg-slate-800 rounded animate-pulse" />
+                <div className="h-5 w-2/3 bg-neutral-200 rounded animate-pulse" />
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="h-8 bg-slate-800 rounded animate-pulse" />
-                  <div className="h-8 bg-slate-800 rounded animate-pulse" />
+                  <div className="h-8 bg-neutral-200 rounded animate-pulse" />
+                  <div className="h-8 bg-neutral-200 rounded animate-pulse" />
                 </div>
               </div>
             </div>
@@ -81,7 +81,7 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
 
   if (sortedMedia.length === 0) {
     return (
-      <div className="w-full rounded-xl bg-slate-900/60 border border-slate-700 p-6 sm:p-8 text-center text-slate-400">
+      <div className="w-full rounded-xl bg-neutral-50 border border-neutral-200 p-6 sm:p-8 text-center text-neutral-500">
         No posts found
       </div>
     )
@@ -90,43 +90,43 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
   return (
     <div className="w-full space-y-4">
       {/* Performance Summary for Sales/Marketing */}
-      <div className="bg-white/5 rounded-xl border border-white/10 p-4">
+      <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
-          <BarChart3 className="w-4 h-4 text-pink-400" />
-          <h3 className="text-white font-semibold text-sm">Top Content Performance Summary</h3>
+          <BarChart3 className="w-4 h-4 text-pink-600" />
+          <h3 className="text-neutral-900 font-semibold text-sm">Top Content Performance Summary</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-white/5 rounded-lg">
+          <div className="text-center p-3 bg-neutral-50 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Eye className="w-3 h-3 text-blue-400" />
-              <span className="text-white/60 text-xs">Total Reach</span>
+              <Eye className="w-3 h-3 text-blue-600" />
+              <span className="text-neutral-500 text-xs">Total Reach</span>
             </div>
-            <div className="text-white font-bold text-lg">{formatNumber(totalReach)}</div>
-            <div className="text-white/40 text-xs">potential customers</div>
+            <div className="text-neutral-900 font-bold text-lg">{formatNumber(totalReach)}</div>
+            <div className="text-neutral-400 text-xs">potential customers</div>
           </div>
-          <div className="text-center p-3 bg-white/5 rounded-lg">
+          <div className="text-center p-3 bg-neutral-50 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Zap className="w-3 h-3 text-yellow-400" />
-              <span className="text-white/60 text-xs">Engagements</span>
+              <Zap className="w-3 h-3 text-yellow-600" />
+              <span className="text-neutral-500 text-xs">Engagements</span>
             </div>
-            <div className="text-white font-bold text-lg">{formatNumber(totalEngagement)}</div>
-            <div className="text-white/40 text-xs">interested leads</div>
+            <div className="text-neutral-900 font-bold text-lg">{formatNumber(totalEngagement)}</div>
+            <div className="text-neutral-400 text-xs">interested leads</div>
           </div>
-          <div className="text-center p-3 bg-white/5 rounded-lg">
+          <div className="text-center p-3 bg-neutral-50 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Share2 className="w-3 h-3 text-green-400" />
-              <span className="text-white/60 text-xs">Shares</span>
+              <Share2 className="w-3 h-3 text-emerald-600" />
+              <span className="text-neutral-500 text-xs">Shares</span>
             </div>
-            <div className="text-white font-bold text-lg">{formatNumber(totalShares)}</div>
-            <div className="text-white/40 text-xs">organic referrals</div>
+            <div className="text-neutral-900 font-bold text-lg">{formatNumber(totalShares)}</div>
+            <div className="text-neutral-400 text-xs">organic referrals</div>
           </div>
-          <div className="text-center p-3 bg-white/5 rounded-lg">
+          <div className="text-center p-3 bg-neutral-50 rounded-lg">
             <div className="flex items-center justify-center gap-1 mb-1">
-              <Target className="w-3 h-3 text-pink-400" />
-              <span className="text-white/60 text-xs">Avg Rate</span>
+              <Target className="w-3 h-3 text-pink-600" />
+              <span className="text-neutral-500 text-xs">Avg Rate</span>
             </div>
-            <div className="text-white font-bold text-lg">{avgEngagementRate.toFixed(2)}%</div>
-            <div className="text-white/40 text-xs">{avgEngagementRate >= 3 ? "above" : "below"} industry avg</div>
+            <div className="text-neutral-900 font-bold text-lg">{avgEngagementRate.toFixed(2)}%</div>
+            <div className="text-neutral-400 text-xs">{avgEngagementRate >= 3 ? "above" : "below"} industry avg</div>
           </div>
         </div>
       </div>
@@ -150,10 +150,10 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="rounded-xl overflow-hidden bg-slate-900/60 border border-pink-500/20 hover:border-pink-500/40 transition-all hover:shadow-lg hover:shadow-pink-500/10"
+              className="rounded-xl overflow-hidden bg-white border border-neutral-200 hover:border-pink-300 transition-all hover:shadow-lg"
             >
               {/* Media with Rank Badge */}
-              <div className="relative w-full aspect-video bg-slate-800">
+              <div className="relative w-full aspect-video bg-neutral-100">
                 <img
                   src={post.thumbnail_url || post.media_url}
                   alt={getMediaTypeDisplayName(post.media_type)}
@@ -167,7 +167,7 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
                 
                 {/* Media Type & Performance Tier */}
                 <div className="absolute top-2 left-2 flex gap-1">
-                  <span className="inline-flex items-center px-2 py-1 rounded bg-pink-500/90 text-white text-xs font-semibold uppercase tracking-wide">
+                  <span className="inline-flex items-center px-2 py-1 rounded bg-pink-500 text-white text-xs font-semibold uppercase tracking-wide">
                     {getMediaTypeDisplayName(post.media_type)}
                   </span>
                 </div>
@@ -201,33 +201,33 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
                     href={post.permalink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-white hover:text-pink-300 transition-colors line-clamp-2 break-words"
+                    className="text-sm font-semibold text-neutral-900 hover:text-pink-600 transition-colors line-clamp-2 break-words"
                   >
                     {truncateCaption(post.caption, 80) || "View on Instagram"}
                   </a>
-                  <div className="mt-1 text-slate-400 text-xs">
+                  <div className="mt-1 text-neutral-500 text-xs">
                     {formatInstagramDate(post.timestamp)}
                   </div>
                 </div>
 
                 {/* Marketing Metrics Grid */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="text-center p-2 bg-white/5 rounded-lg">
-                    <div className="text-white/60 text-[10px] uppercase">{primaryMetricLabel}</div>
-                    <div className="text-white font-bold text-sm">{formatNumber(primaryMetricValue)}</div>
+                  <div className="text-center p-2 bg-neutral-50 rounded-lg">
+                    <div className="text-neutral-500 text-[10px] uppercase">{primaryMetricLabel}</div>
+                    <div className="text-neutral-900 font-bold text-sm">{formatNumber(primaryMetricValue)}</div>
                   </div>
-                  <div className="text-center p-2 bg-white/5 rounded-lg">
-                    <div className="text-white/60 text-[10px] uppercase">{saves > 0 ? "Saves" : "Likes"}</div>
-                    <div className="text-white font-bold text-sm">{formatNumber(saves > 0 ? saves : post.like_count || 0)}</div>
+                  <div className="text-center p-2 bg-neutral-50 rounded-lg">
+                    <div className="text-neutral-500 text-[10px] uppercase">{saves > 0 ? "Saves" : "Likes"}</div>
+                    <div className="text-neutral-900 font-bold text-sm">{formatNumber(saves > 0 ? saves : post.like_count || 0)}</div>
                   </div>
-                  <div className="text-center p-2 bg-white/5 rounded-lg">
-                    <div className="text-white/60 text-[10px] uppercase">Eng Rate</div>
-                    <div className="text-pink-400 font-bold text-sm">{engagementRate.toFixed(1)}%</div>
+                  <div className="text-center p-2 bg-neutral-50 rounded-lg">
+                    <div className="text-neutral-500 text-[10px] uppercase">Eng Rate</div>
+                    <div className="text-pink-600 font-bold text-sm">{engagementRate.toFixed(1)}%</div>
                   </div>
                 </div>
 
                 {/* Action Footer */}
-                <div className="flex justify-end pt-2 border-t border-white/10">
+                <div className="flex justify-end pt-2 border-t border-neutral-100">
                   <a
                     href={post.permalink}
                     target="_blank"

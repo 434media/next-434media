@@ -654,7 +654,7 @@ export default function InstagramAnalyticsClientPage() {
   }
 
   return (
-    <div className="bg-black w-full overflow-x-hidden">
+    <div className="bg-neutral-50 w-full overflow-x-hidden">
       {/* Instagram Header */}
       <div className="w-full overflow-x-hidden">
         <InstagramAnalyticsHeader
@@ -677,12 +677,12 @@ export default function InstagramAnalyticsClientPage() {
           {/* Error Display */}
           {error && (
             <div className="mb-4">
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                <p className="text-sm font-medium text-red-400">Error</p>
-                <p className="text-xs text-white/60 mt-1">{error}</p>
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                <p className="text-sm font-medium text-red-600">Error</p>
+                <p className="text-xs text-red-500 mt-1">{error}</p>
                 <button
                   onClick={() => setError(null)}
-                  className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md transition-colors mt-2 text-white"
+                  className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded-md transition-colors mt-2"
                 >
                   Dismiss
                 </button>
@@ -694,7 +694,7 @@ export default function InstagramAnalyticsClientPage() {
           {!isLoading && accountData && (
             <div className="mb-10 sm:mb-12">
               <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                <h2 className="text-sm sm:text-lg font-semibold text-white">Account Overview</h2>
+                <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Account Overview</h2>
                 <InfoTooltip content="Your Instagram Business account information including follower count, posts, and profile details." />
               </div>
               <InstagramAccountInfo account={accountData} />
@@ -704,14 +704,14 @@ export default function InstagramAnalyticsClientPage() {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-white/60 text-sm">Loading Instagram analytics...</p>
+              <p className="text-neutral-500 text-sm">Loading Instagram analytics...</p>
             </div>
           ) : (
             <>
               {/* Key Metrics - Primary KPIs for Sales & Marketing */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Key Metrics</h2>
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Key Metrics</h2>
                   <InfoTooltip content="Core performance indicators for sales and marketing: audience size, reach, engagement rate, and website conversions." />
                 </div>
                 <InstagramKeyMetrics
@@ -739,7 +739,7 @@ export default function InstagramAnalyticsClientPage() {
               {/* Content Performance */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Content Performance</h2>
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Content Performance</h2>
                   <InfoTooltip content="See how your reach is distributed across different content types: Feed posts, Reels, Stories, and Promoted content." />
                 </div>
                 <InstagramReachBreakdown
@@ -752,7 +752,7 @@ export default function InstagramAnalyticsClientPage() {
               {/* Top Posts */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-                  <h2 className="text-sm sm:text-lg font-semibold text-white">Top Performing Posts</h2>
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Top Performing Posts</h2>
                   <InfoTooltip content="Your most engaging posts ranked by likes, comments, and overall engagement rate. Engagement rate is calculated as (likes + comments) / followers." />
                 </div>
                 <InstagramTopPostsTable
@@ -765,7 +765,7 @@ export default function InstagramAnalyticsClientPage() {
           )}
 
           {/* Footer */}
-          <div className="text-center text-white/40 text-sm pt-8 pb-4">
+          <div className="text-center text-neutral-400 text-sm pt-8 pb-4">
             <p>
               Powered by Meta Business Suite <span className="hidden md:inline">•</span>{" "}
               <span className="block md:inline">Last updated: {new Date().toLocaleString()}</span>
