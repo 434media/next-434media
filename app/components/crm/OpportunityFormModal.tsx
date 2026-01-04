@@ -20,17 +20,11 @@ import {
   Check,
   Pencil,
   Settings,
-  Tag,
+  Building2,
+  Target
 } from "lucide-react"
 import { TEAM_MEMBERS, BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
-import type { Brand, TeamMember, Disposition, DOC } from "./types"
-
-// CRM Tag interface
-interface CRMTag {
-  id: string
-  name: string
-  color?: string
-}
+import type { Brand, TeamMember, Disposition, DOC, Client } from "./types"
 
 interface ContactFormData {
   id: string
@@ -46,8 +40,9 @@ interface ContactFormData {
   date_of_birth: string
 }
 
-interface ClientFormData {
+interface OpportunityFormData {
   company_name: string
+  existing_company_id: string | null // null = new company, string = existing company ID
   contacts: ContactFormData[]
   status: string
   brand: Brand | ""
@@ -56,22 +51,19 @@ interface ClientFormData {
   assigned_to: string
   notes: string
   source: string
-  tags: string[]
   is_opportunity: boolean
   disposition: Disposition | ""
   doc: DOC | ""
 }
 
-interface ClientFormModalProps {
+interface OpportunityFormModalProps {
   isOpen: boolean
-  isEditing: boolean
   isSaving: boolean
-  formData: ClientFormData
-  availableTags?: CRMTag[]
-  onFormChange: (data: ClientFormData) => void
+  existingClients: Client[]
+  formData: OpportunityFormData
+  onFormChange: (data: OpportunityFormData) => void
   onSave: () => void
   onClose: () => void
-  onCreateTag?: (name: string) => Promise<CRMTag | null>
 }
 
 // Generate unique ID for new contacts
@@ -79,63 +71,18 @@ function generateContactId(): string {
   return `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
-export function ClientFormModal({
+export function OpportunityFormModal({
   isOpen,
-  isEditing,
   isSaving,
+  existingClients,
   formData,
-  availableTags = [],
   onFormChange,
   onSave,
   onClose,
-  onCreateTag,
-}: ClientFormModalProps) {
+}: OpportunityFormModalProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
-  
-  // State for tag management
-  const [showTagDropdown, setShowTagDropdown] = useState(false)
-  const [newTagName, setNewTagName] = useState("")
-  const [isCreatingTag, setIsCreatingTag] = useState(false)
-  const [tagError, setTagError] = useState("")
-
-  // Handle creating a new tag
-  const handleCreateTag = async () => {
-    if (!newTagName.trim()) {
-      setTagError("Tag name is required")
-      return
-    }
-    
-    // Check if tag already exists
-    const existingTag = availableTags.find(
-      t => t.name.toLowerCase() === newTagName.trim().toLowerCase()
-    )
-    if (existingTag) {
-      // Just add the existing tag to the client
-      if (!formData.tags?.includes(existingTag.name)) {
-        onFormChange({ ...formData, tags: [...(formData.tags || []), existingTag.name] })
-      }
-      setNewTagName("")
-      setTagError("")
-      return
-    }
-    
-    setIsCreatingTag(true)
-    setTagError("")
-    
-    try {
-      const createdTag = await onCreateTag(newTagName.trim())
-      if (createdTag) {
-        // Add the new tag to the client's tags
-        onFormChange({ ...formData, tags: [...(formData.tags || []), createdTag.name] })
-        setNewTagName("")
-      }
-    } catch (error) {
-      console.error("Error creating tag:", error)
-      setTagError("Failed to create tag")
-    } finally {
-      setIsCreatingTag(false)
-    }
-  }
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
+  const [companySearchQuery, setCompanySearchQuery] = useState("")
   
   // State for team member management
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -153,6 +100,23 @@ export function ClientFormModal({
   const [editMemberName, setEditMemberName] = useState("")
   const [editMemberEmail, setEditMemberEmail] = useState("")
   const [isSavingMember, setIsSavingMember] = useState(false)
+
+  // Get unique company names from existing clients
+  const uniqueCompanies = existingClients
+    .filter(client => client.company_name || client.name)
+    .reduce((acc, client) => {
+      const name = client.company_name || client.name
+      if (!acc.find(c => c.name === name)) {
+        acc.push({ id: client.id, name })
+      }
+      return acc
+    }, [] as { id: string; name: string }[])
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  // Filter companies based on search query
+  const filteredCompanies = uniqueCompanies.filter(company =>
+    company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
+  )
 
   // Fetch team members from Firestore
   const fetchTeamMembers = useCallback(async () => {
@@ -338,7 +302,7 @@ export function ClientFormModal({
       email: "",
       phone: "",
       role: "",
-      is_primary: formData.contacts.length === 0, // First contact is primary
+      is_primary: formData.contacts.length === 0,
       address: "",
       city: "",
       state: "",
@@ -347,14 +311,12 @@ export function ClientFormModal({
     }
     const newContacts = [...formData.contacts, newContact]
     onFormChange({ ...formData, contacts: newContacts })
-    // Auto-expand the new contact
     setExpandedContacts(new Set([...expandedContacts, newContact.id]))
   }
 
   // Remove a contact
   const removeContact = (contactId: string) => {
     const newContacts = formData.contacts.filter(c => c.id !== contactId)
-    // If we removed the primary contact, make the first remaining one primary
     if (newContacts.length > 0 && !newContacts.some(c => c.is_primary)) {
       newContacts[0].is_primary = true
     }
@@ -367,13 +329,49 @@ export function ClientFormModal({
       if (c.id === contactId) {
         return { ...c, [field]: value }
       }
-      // If setting a new primary, unset others
       if (field === "is_primary" && value === true) {
         return { ...c, is_primary: false }
       }
       return c
     })
     onFormChange({ ...formData, contacts: newContacts })
+  }
+
+  // Handle selecting an existing company
+  const handleSelectCompany = (company: { id: string; name: string } | null) => {
+    if (company) {
+      // Find the client data to pre-populate some fields
+      const existingClient = existingClients.find(c => c.id === company.id)
+      onFormChange({
+        ...formData,
+        company_name: company.name,
+        existing_company_id: company.id,
+        // Pre-populate brand if available
+        brand: existingClient?.brand || formData.brand,
+        // Pre-populate contacts if available
+        contacts: existingClient?.contacts?.map(c => ({
+          id: c.id || generateContactId(),
+          name: c.name || "",
+          email: c.email || "",
+          phone: c.phone || "",
+          role: c.role || "",
+          is_primary: c.is_primary || false,
+          address: c.address || "",
+          city: c.city || "",
+          state: c.state || "",
+          zipcode: c.zipcode || "",
+          date_of_birth: c.date_of_birth || "",
+        })) || formData.contacts,
+      })
+    } else {
+      // Creating new company
+      onFormChange({
+        ...formData,
+        existing_company_id: null,
+      })
+    }
+    setShowCompanyDropdown(false)
+    setCompanySearchQuery("")
   }
 
   return (
@@ -390,14 +388,20 @@ export function ClientFormModal({
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-lg md:max-w-2xl max-h-[90vh] overflow-hidden bg-white rounded-xl border border-gray-200 shadow-2xl flex flex-col"
+            className="w-full max-w-lg max-h-[90vh] overflow-hidden bg-white rounded-xl border border-gray-200 shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {isEditing ? "Edit Client" : "Add Client"}
-              </h3>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Add Opportunity</h3>
+                  <p className="text-xs text-gray-500">Create a new sales opportunity</p>
+                </div>
+              </div>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
@@ -408,18 +412,115 @@ export function ClientFormModal({
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              {/* Company Name - Primary Field */}
+              {/* Company Name - Dropdown with search */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Company Name *
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-gray-500" />
+                    Company Name *
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.company_name}
-                  onChange={(e) => onFormChange({ ...formData, company_name: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
-                  placeholder="e.g., Velocity TX"
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
+                    className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-left focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                  >
+                    <span className={formData.company_name ? "text-gray-900" : "text-gray-400"}>
+                      {formData.company_name || "Select or create company..."}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`} />
+                  </button>
+
+                  <AnimatePresence>
+                    {showCompanyDropdown && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                      >
+                        {/* Search input */}
+                        <div className="p-2 border-b border-gray-100">
+                          <input
+                            type="text"
+                            value={companySearchQuery}
+                            onChange={(e) => {
+                              setCompanySearchQuery(e.target.value)
+                              onFormChange({ ...formData, company_name: e.target.value })
+                            }}
+                            placeholder="Search or type new company name..."
+                            className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                            autoFocus
+                          />
+                        </div>
+
+                        <div className="max-h-64 overflow-y-auto">
+                          {/* Create new company option */}
+                          {companySearchQuery && !filteredCompanies.find(c => c.name.toLowerCase() === companySearchQuery.toLowerCase()) && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onFormChange({
+                                    ...formData,
+                                    company_name: companySearchQuery,
+                                    existing_company_id: null,
+                                    contacts: [], // Clear contacts for new company
+                                  })
+                                  setShowCompanyDropdown(false)
+                                  setCompanySearchQuery("")
+                                }}
+                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-600 font-medium"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Create new: "{companySearchQuery}"
+                              </button>
+                              <div className="border-t border-gray-100" />
+                            </>
+                          )}
+
+                          {/* Existing companies */}
+                          {filteredCompanies.length > 0 ? (
+                            filteredCompanies.map((company) => (
+                              <button
+                                key={company.id}
+                                type="button"
+                                onClick={() => handleSelectCompany(company)}
+                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                              >
+                                <span className="text-gray-900">{company.name}</span>
+                                {formData.existing_company_id === company.id && (
+                                  <Check className="w-4 h-4 text-blue-600" />
+                                )}
+                              </button>
+                            ))
+                          ) : !companySearchQuery ? (
+                            <div className="px-3 py-4 text-center text-sm text-gray-500">
+                              No existing companies. Type to create one.
+                            </div>
+                          ) : null}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {showCompanyDropdown && (
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => {
+                        setShowCompanyDropdown(false)
+                        setCompanySearchQuery("")
+                      }}
+                    />
+                  )}
+                </div>
+                {formData.existing_company_id && (
+                  <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Linked to existing company
+                  </p>
+                )}
               </div>
 
               {/* Contacts Section */}
@@ -453,7 +554,7 @@ export function ClientFormModal({
                           key={contact.id}
                           className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
                         >
-                          {/* Contact Header - Always Visible */}
+                          {/* Contact Header */}
                           <button
                             type="button"
                             onClick={() => toggleContact(contact.id)}
@@ -557,7 +658,6 @@ export function ClientFormModal({
                                     />
                                   </div>
 
-                                  {/* Date of Birth */}
                                   <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Date of Birth</label>
                                     <input
@@ -568,7 +668,6 @@ export function ClientFormModal({
                                     />
                                   </div>
 
-                                  {/* Address */}
                                   <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
                                     <input
@@ -580,7 +679,6 @@ export function ClientFormModal({
                                     />
                                   </div>
 
-                                  {/* City, State, Zipcode */}
                                   <div className="grid grid-cols-3 gap-2">
                                     <div>
                                       <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
@@ -685,143 +783,6 @@ export function ClientFormModal({
                 </div>
               </div>
 
-              {/* Tags Section */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Tag className="w-4 h-4 text-purple-600" />
-                    Tags
-                  </span>
-                </label>
-                <div className="space-y-2">
-                  {/* Selected Tags Display */}
-                  <div className="flex flex-wrap gap-2 min-h-[32px] p-2 rounded-lg bg-gray-50 border border-gray-200">
-                    {(formData.tags || []).length === 0 ? (
-                      <span className="text-sm text-gray-400">No tags selected</span>
-                    ) : (
-                      formData.tags.map((tagName) => {
-                        const tagInfo = availableTags.find(t => t.name === tagName)
-                        const tagColor = tagInfo?.color || "#6b7280"
-                        return (
-                          <span
-                            key={tagName}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium"
-                            style={{ 
-                              backgroundColor: `${tagColor}15`,
-                              color: tagColor,
-                            }}
-                          >
-                            {tagName}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newTags = formData.tags.filter(t => t !== tagName)
-                                onFormChange({ ...formData, tags: newTags })
-                              }}
-                              className="ml-0.5 hover:opacity-70"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        )
-                      })
-                    )}
-                  </div>
-
-                  {/* Tag Dropdown */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowTagDropdown(!showTagDropdown)}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-left text-gray-500 hover:bg-white focus:outline-none focus:border-blue-500 flex items-center justify-between"
-                    >
-                      <span>Add tags...</span>
-                      <ChevronDown className={`w-4 h-4 transition-transform ${showTagDropdown ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    <AnimatePresence>
-                      {showTagDropdown && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8 }}
-                          className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
-                        >
-                          <div className="max-h-48 overflow-y-auto">
-                            {availableTags.filter(t => !formData.tags?.includes(t.name)).map((tag) => (
-                              <button
-                                key={tag.id}
-                                type="button"
-                                onClick={() => {
-                                  const newTags = [...(formData.tags || []), tag.name]
-                                  onFormChange({ ...formData, tags: newTags })
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <span 
-                                  className="w-2 h-2 rounded-full" 
-                                  style={{ backgroundColor: tag.color || "#6b7280" }}
-                                />
-                                {tag.name}
-                              </button>
-                            ))}
-                            {availableTags.filter(t => !formData.tags?.includes(t.name)).length === 0 && (
-                              <div className="px-3 py-2 text-sm text-gray-400">
-                                No more tags to add
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Create New Tag */}
-                          <div className="border-t border-gray-100 p-2">
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={newTagName}
-                                onChange={(e) => setNewTagName(e.target.value)}
-                                placeholder="Create new tag..."
-                                className="flex-1 px-2 py-1.5 rounded border border-gray-200 text-sm focus:outline-none focus:border-blue-500"
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && newTagName.trim() && onCreateTag) {
-                                    e.preventDefault()
-                                    handleCreateTag()
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={handleCreateTag}
-                                disabled={isCreatingTag || !newTagName.trim() || !onCreateTag}
-                                className="px-2 py-1.5 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1"
-                              >
-                                {isCreatingTag ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Plus className="w-3 h-3" />
-                                )}
-                                Add
-                              </button>
-                            </div>
-                            {tagError && (
-                              <p className="text-xs text-red-500 mt-1">{tagError}</p>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Click outside to close */}
-                    {showTagDropdown && (
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setShowTagDropdown(false)}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Pitch Value & Follow-up Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -859,19 +820,17 @@ export function ClientFormModal({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Assigned To</label>
                 <div className="relative">
-                  {/* Custom dropdown button */}
                   <button
                     type="button"
                     onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
                     className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
-                >
-                  <span className={formData.assigned_to ? "text-gray-900" : "text-gray-400"}>
-                    {formData.assigned_to || "Select team member..."}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showAssigneeDropdown ? "rotate-180" : ""}`} />
+                  >
+                    <span className={formData.assigned_to ? "text-gray-900" : "text-gray-400"}>
+                      {formData.assigned_to || "Select team member..."}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showAssigneeDropdown ? "rotate-180" : ""}`} />
                   </button>
                   
-                  {/* Dropdown menu */}
                   <AnimatePresence>
                     {showAssigneeDropdown && (
                       <motion.div
@@ -881,7 +840,6 @@ export function ClientFormModal({
                         className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
                       >
                         <div className="max-h-64 overflow-y-auto">
-                          {/* Unassigned option */}
                           <button
                             type="button"
                             onClick={() => {
@@ -896,7 +854,6 @@ export function ClientFormModal({
                           
                           <div className="border-t border-gray-100" />
                           
-                          {/* Team members */}
                           {isLoadingMembers ? (
                             <div className="px-3 py-4 text-center">
                               <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
@@ -944,7 +901,6 @@ export function ClientFormModal({
                           
                           <div className="border-t border-gray-100" />
                           
-                          {/* Add new member button */}
                           <button
                             type="button"
                             onClick={() => {
@@ -957,7 +913,6 @@ export function ClientFormModal({
                             Add new team member
                           </button>
                           
-                          {/* Manage members button */}
                           <button
                             type="button"
                             onClick={() => {
@@ -974,7 +929,6 @@ export function ClientFormModal({
                     )}
                   </AnimatePresence>
                   
-                  {/* Click outside to close dropdown */}
                   {showAssigneeDropdown && (
                     <div
                       className="fixed inset-0 z-10"
@@ -984,302 +938,255 @@ export function ClientFormModal({
                 </div>
               </div>
 
-              {/* Opportunity Section */}
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900">Track as Opportunity</label>
-                    <p className="text-xs text-gray-500 mt-0.5">Enable to track in pipeline with disposition and confidence</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onFormChange({ 
-                      ...formData, 
-                      is_opportunity: !formData.is_opportunity,
-                      disposition: !formData.is_opportunity && !formData.disposition ? "open" : formData.disposition
-                    })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      formData.is_opportunity ? "bg-blue-600" : "bg-gray-300"
-                    }`}
+              {/* Disposition & DOC */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Disposition <span className="text-gray-400 font-normal">(Stage)</span>
+                  </label>
+                  <select
+                    value={formData.disposition || "open"}
+                    onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
+                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                        formData.is_opportunity ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
+                    {DISPOSITION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-
-                {/* Disposition & DOC - Only show when is_opportunity is true */}
-                <AnimatePresence>
-                  {formData.is_opportunity && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-gray-200">
-                        {/* Disposition */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Disposition
-                          </label>
-                          <select
-                            value={formData.disposition || "open"}
-                            onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                          >
-                            {DISPOSITION_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-gray-500 mt-1">Pipeline stage</p>
-                        </div>
-
-                        {/* DOC (Degree of Confidence) */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Confidence (DOC)
-                          </label>
-                          <select
-                            value={formData.doc || ""}
-                            onChange={(e) => onFormChange({ ...formData, doc: e.target.value as DOC })}
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                          >
-                            <option value="">Select probability...</option>
-                            {DOC_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-gray-500 mt-1">Used for pacing</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    DOC <span className="text-gray-400 font-normal">(Confidence)</span>
+                  </label>
+                  <select
+                    value={formData.doc || ""}
+                    onChange={(e) => onFormChange({ ...formData, doc: e.target.value as DOC })}
+                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="">Select probability...</option>
+                    {DOC_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-                
+
               {/* Add new member form */}
-                <AnimatePresence>
-                  {showAddMember && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-medium text-blue-900">Add New Team Member</h4>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAddMember(false)
-                            setNewMemberName("")
-                            setNewMemberEmail("")
-                            setMemberError("")
-                          }}
-                          className="text-blue-400 hover:text-blue-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={newMemberName}
-                          onChange={(e) => setNewMemberName(e.target.value)}
-                          placeholder="Full name (required)"
-                          className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                        />
-                        <input
-                          type="email"
-                          value={newMemberEmail}
-                          onChange={(e) => setNewMemberEmail(e.target.value)}
-                          placeholder="Email (optional)"
-                          className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                        />
-                        {memberError && (
-                          <p className="text-xs text-red-600">{memberError}</p>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleAddMember}
-                          disabled={isAddingMember || !newMemberName.trim()}
-                          className="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {isAddingMember ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus className="w-4 h-4" />
-                              Add Team Member
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                {/* Team Management Panel */}
-                <AnimatePresence>
-                  {showManageMembers && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                          <Settings className="w-4 h-4" />
-                          Manage Team Members
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowManageMembers(false)
-                            handleCancelEdit()
-                          }}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      
-                      {memberError && showManageMembers && (
-                        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
-                          {memberError}
-                        </div>
+              <AnimatePresence>
+                {showAddMember && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-3 bg-blue-50 border border-blue-100 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-blue-900">Add New Team Member</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddMember(false)
+                          setNewMemberName("")
+                          setNewMemberEmail("")
+                          setMemberError("")
+                        }}
+                        className="text-blue-400 hover:text-blue-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={newMemberName}
+                        onChange={(e) => setNewMemberName(e.target.value)}
+                        placeholder="Full name (required)"
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="email"
+                        value={newMemberEmail}
+                        onChange={(e) => setNewMemberEmail(e.target.value)}
+                        placeholder="Email (optional)"
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                      />
+                      {memberError && (
+                        <p className="text-xs text-red-600">{memberError}</p>
                       )}
-                      
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {isLoadingMembers ? (
-                          <div className="py-4 text-center">
-                            <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
-                            <p className="text-xs text-gray-500 mt-2">Loading team members...</p>
-                          </div>
-                        ) : teamMembers.length === 0 ? (
-                          <p className="text-sm text-gray-500 text-center py-4">
-                            No team members yet. Add one using the dropdown above.
-                          </p>
+                      <button
+                        type="button"
+                        onClick={handleAddMember}
+                        disabled={isAddingMember || !newMemberName.trim()}
+                        className="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isAddingMember ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Adding...
+                          </>
                         ) : (
-                          teamMembers.map((member) => (
-                            <div
-                              key={member.id}
-                              className="p-3 bg-white border border-gray-200 rounded-lg"
-                            >
-                              {editingMemberId === member.id ? (
-                                // Edit mode
-                                <div className="space-y-2">
-                                  <input
-                                    type="text"
-                                    value={editMemberName}
-                                    onChange={(e) => setEditMemberName(e.target.value)}
-                                    placeholder="Full name"
-                                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                  />
-                                  <input
-                                    type="email"
-                                    value={editMemberEmail}
-                                    onChange={(e) => setEditMemberEmail(e.target.value)}
-                                    placeholder="Email address"
-                                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                  />
-                                  <div className="flex gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveMember(member.id)}
-                                      disabled={isSavingMember || !editMemberName.trim()}
-                                      className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
-                                    >
-                                      {isSavingMember ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                      ) : (
-                                        <Check className="w-3 h-3" />
-                                      )}
-                                      Save
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleCancelEdit}
-                                      className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                // View mode
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">
-                                      {member.name}
-                                    </p>
-                                    {member.email && (
-                                      <p className="text-xs text-gray-500 truncate">
-                                        {member.email}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1 ml-2">
-                                    {!member.id.startsWith("default-") && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleStartEdit(member)}
-                                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                          title="Edit member"
-                                        >
-                                          <Pencil className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteMember(member)}
-                                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                          title="Remove member"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </>
-                                    )}
-                                    {member.id.startsWith("default-") && (
-                                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                                        Default
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))
+                          <>
+                            <UserPlus className="w-4 h-4" />
+                            Add Team Member
+                          </>
                         )}
-                      </div>
-                      
-                      {/* Add new member shortcut */}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Team Management Panel */}
+              <AnimatePresence>
+                {showManageMembers && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-4 bg-gray-50 border border-gray-200 rounded-lg"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                        <Settings className="w-4 h-4" />
+                        Manage Team Members
+                      </h4>
                       <button
                         type="button"
                         onClick={() => {
                           setShowManageMembers(false)
-                          setShowAddMember(true)
+                          handleCancelEdit()
                         }}
-                        className="w-full mt-3 px-3 py-2 border border-dashed border-gray-300 text-gray-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+                        className="text-gray-400 hover:text-gray-600"
                       >
-                        <UserPlus className="w-4 h-4" />
-                        Add new team member
+                        <X className="w-4 h-4" />
                       </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </div>
+                    
+                    {memberError && showManageMembers && (
+                      <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+                        {memberError}
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {isLoadingMembers ? (
+                        <div className="py-4 text-center">
+                          <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
+                          <p className="text-xs text-gray-500 mt-2">Loading team members...</p>
+                        </div>
+                      ) : teamMembers.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-4">
+                          No team members yet. Add one using the dropdown above.
+                        </p>
+                      ) : (
+                        teamMembers.map((member) => (
+                          <div
+                            key={member.id}
+                            className="p-3 bg-white border border-gray-200 rounded-lg"
+                          >
+                            {editingMemberId === member.id ? (
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={editMemberName}
+                                  onChange={(e) => setEditMemberName(e.target.value)}
+                                  placeholder="Full name"
+                                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                />
+                                <input
+                                  type="email"
+                                  value={editMemberEmail}
+                                  onChange={(e) => setEditMemberEmail(e.target.value)}
+                                  placeholder="Email address"
+                                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveMember(member.id)}
+                                    disabled={isSavingMember || !editMemberName.trim()}
+                                    className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                                  >
+                                    {isSavingMember ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Check className="w-3 h-3" />
+                                    )}
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                    {member.name}
+                                  </p>
+                                  {member.email && (
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {member.email}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  {!member.id.startsWith("default-") && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEdit(member)}
+                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                        title="Edit member"
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteMember(member)}
+                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        title="Remove member"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                  {member.id.startsWith("default-") && (
+                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                                      Default
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowManageMembers(false)
+                        setShowAddMember(true)
+                      }}
+                      className="w-full mt-3 px-3 py-2 border border-dashed border-gray-300 text-gray-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Add new team member
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Notes */}
               <div>
@@ -1289,7 +1196,7 @@ export function ClientFormModal({
                   onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
-                  placeholder="Additional notes about this client..."
+                  placeholder="Additional notes about this opportunity..."
                 />
               </div>
             </div>
@@ -1304,18 +1211,18 @@ export function ClientFormModal({
               </button>
               <button
                 onClick={onSave}
-                disabled={isSaving || !formData.company_name}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                disabled={isSaving || !formData.company_name || !formData.brand}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
+                    Creating...
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    {isEditing ? "Update" : "Create"}
+                    Create Opportunity
                   </>
                 )}
               </button>

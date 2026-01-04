@@ -1,5 +1,13 @@
 // CRM Types & Constants
 
+export interface CRMTag {
+  id: string
+  name: string
+  color?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface DashboardStats {
   totalClients: number
   activeClients: number
@@ -73,6 +81,7 @@ export interface Client {
   contacts?: ClientContact[]  // Additional contacts
   status: string
   source?: string  // Lead source: web, cold_call, event, inbound_call, referral, warm_intro
+  tags?: string[]  // CRM tags for categorization and filtering
   is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
   disposition?: Disposition  // Opportunity stage: open, pitched, closed_won, closed_lost
   doc?: DOC  // Degree of Confidence: 25, 50, 75, 90 (percentage probability)

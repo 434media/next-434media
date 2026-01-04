@@ -3,14 +3,14 @@
 import { useState, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { 
-  RefreshCw, 
   GripVertical, 
   Target, 
   ChevronDown, 
   ChevronUp,
   Users,
   CheckSquare,
-  TrendingUp
+  TrendingUp,
+  Plus
 } from "lucide-react"
 import { 
   formatCurrency, 
@@ -45,11 +45,12 @@ interface KanbanItem {
 interface OpportunitiesKanbanViewProps {
   clients: Client[]
   tasks: Task[]
-  onRefresh: () => void
+  onRefresh?: () => void
   onClientClick: (client: Client) => void
   onTaskClick: (task: Task) => void
   onUpdateClientDisposition?: (clientId: string, disposition: Disposition) => void
   onUpdateTaskDisposition?: (taskId: string, disposition: Disposition) => void
+  onAddOpportunity?: () => void
 }
 
 // Helper to check if a brand matches a goal (supports combined brands like 434 Media + Digital Canvas)
@@ -385,7 +386,8 @@ export function OpportunitiesKanbanView({
   onClientClick,
   onTaskClick,
   onUpdateClientDisposition,
-  onUpdateTaskDisposition
+  onUpdateTaskDisposition,
+  onAddOpportunity
 }: OpportunitiesKanbanViewProps) {
   const [showGoals, setShowGoals] = useState(false)
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: "client" | "task" } | null>(null)
@@ -500,13 +502,16 @@ export function OpportunitiesKanbanView({
               <p className="text-sm font-semibold text-emerald-600">{formatCurrency(totalWonValue, true)}</p>
             </div>
           </div>
-          <button
-            onClick={onRefresh}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors shadow-sm"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
+          {/* Add Opportunity Button */}
+          {onAddOpportunity && (
+            <button
+              onClick={onAddOpportunity}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Add Opportunity
+            </button>
+          )}
         </div>
       </div>
 
@@ -545,29 +550,6 @@ export function OpportunitiesKanbanView({
           </p>
         </div>
       )}
-
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <span className="text-xs font-medium text-gray-500">Legend:</span>
-        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-          <div className="w-4 h-4 rounded bg-blue-100 flex items-center justify-center">
-            <Users className="w-2.5 h-2.5 text-blue-700" />
-          </div>
-          <span>Client</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-          <div className="w-4 h-4 rounded bg-purple-100 flex items-center justify-center">
-            <CheckSquare className="w-2.5 h-2.5 text-purple-700" />
-          </div>
-          <span>Task</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-          <div className="w-4 h-4 rounded bg-amber-100 flex items-center justify-center text-[8px] font-bold text-amber-700">
-            %
-          </div>
-          <span>DOC (Confidence)</span>
-        </div>
-      </div>
     </div>
   )
 }

@@ -139,18 +139,20 @@ export async function getAvailableMailchimpProperties(): Promise<MailchimpProper
 }
 
 // Make authenticated request to Mailchimp API
-async function makeMailchimpRequest<T>(endpoint: string): Promise<T> {
+async function makeMailchimpRequest<T>(endpoint: string, options?: { method?: string; body?: object }): Promise<T> {
   const client = getMailchimpClient()
   const url = `${client.baseUrl}${endpoint}`
+  const method = options?.method || "GET"
 
-  console.log(`[Mailchimp] Making request to: ${url}`)
+  console.log(`[Mailchimp] Making ${method} request to: ${url}`)
 
   const response = await fetch(url, {
-    method: "GET",
+    method,
     headers: {
       Authorization: `Bearer ${client.apiKey}`,
       "Content-Type": "application/json",
     },
+    ...(options?.body && { body: JSON.stringify(options.body) }),
   })
 
   if (!response.ok) {
@@ -767,5 +769,44 @@ export async function getMailchimpTags(audienceId?: string): Promise<MailchimpTa
       listId: audienceId || '',
       _source: "mailchimp",
     }
+  }
+}
+
+// Create a new tag (static segment) in Mailchimp
+export async function createMailchimpTag(name: string, audienceId?: string): Promise<MailchimpTag | null> {
+  console.log("[Mailchimp] createMailchimpTag called with name:", name, "audienceId:", audienceId)
+  
+  try {
+    const targetAudienceId = getAudienceId(audienceId)
+    
+    // Create a static segment (which acts as a tag in Mailchimp)
+    const segmentData = await makeMailchimpRequest<{
+      id: number
+      name: string
+      member_count: number
+      type: string
+      created_at: string
+      updated_at: string
+    }>(`/lists/${targetAudienceId}/segments`, {
+      method: "POST",
+      body: {
+        name: name,
+        static_segment: [], // Empty array - we'll add members later
+      },
+    })
+    
+    console.log("[Mailchimp] Tag created successfully:", segmentData)
+    
+    return {
+      id: String(segmentData.id),
+      name: segmentData.name,
+      member_count: segmentData.member_count || 0,
+      type: segmentData.type || "static",
+      created_at: segmentData.created_at,
+      updated_at: segmentData.updated_at,
+    }
+  } catch (error) {
+    console.error("[Mailchimp] Error creating tag:", error)
+    return null
   }
 }

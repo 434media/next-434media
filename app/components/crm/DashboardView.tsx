@@ -17,7 +17,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Plus,
-  RefreshCw,
+  Search,
 } from "lucide-react"
 import {
   formatCurrency,
@@ -46,7 +46,6 @@ interface DashboardViewProps {
   onShowClientForm: () => void
   onClientClick: (client: Client) => void
   onTaskClick: (task: Task) => void
-  onRefresh: () => void
   currentUser?: CurrentUser | null
 }
 
@@ -232,16 +231,37 @@ function OpportunityProgressChart({
   )
 }
 
-// Pipeline Confidence - Shows opportunity close likelihood
-function PipelineConfidence({ clients, tasks }: { clients: Client[]; tasks: Task[] }) {
+// Pipeline Confidence - Shows opportunity close likelihood with accordion
+function PipelineConfidence({ 
+  clients, 
+  tasks,
+  onClientClick,
+  onTaskClick 
+}: { 
+  clients: Client[]
+  tasks: Task[]
+  onClientClick: (client: Client) => void
+  onTaskClick: (task: Task) => void
+}) {
+  const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
+  
   const opportunityClients = clients.filter(c => c.is_opportunity && c.disposition !== "closed_won" && c.disposition !== "closed_lost")
   const opportunityTasks = tasks.filter(t => t.is_opportunity && t.disposition !== "closed_won" && t.disposition !== "closed_lost")
 
-  const docData: Array<{ label: string; value: string; count: number; amount: number; color: string; description: string }> = [
-    { label: "Low", value: "25", count: 0, amount: 0, color: "#fbbf24", description: "Early stage, needs nurturing" },
-    { label: "Medium", value: "50", count: 0, amount: 0, color: "#f97316", description: "Engaged, building relationship" },
-    { label: "High", value: "75", count: 0, amount: 0, color: "#8b5cf6", description: "Strong interest, likely to close" },
-    { label: "Very High", value: "90", count: 0, amount: 0, color: "#10b981", description: "Ready to close" },
+  // Group clients and tasks by DOC
+  const docData: Array<{ 
+    label: string
+    value: string
+    count: number
+    amount: number
+    color: string
+    description: string
+    items: Array<{ type: "client" | "task"; data: Client | Task; name: string; value?: number }>
+  }> = [
+    { label: "Low", value: "25", count: 0, amount: 0, color: "#fbbf24", description: "Early stage, needs nurturing", items: [] },
+    { label: "Medium", value: "50", count: 0, amount: 0, color: "#f97316", description: "Engaged, building relationship", items: [] },
+    { label: "High", value: "75", count: 0, amount: 0, color: "#8b5cf6", description: "Strong interest, likely to close", items: [] },
+    { label: "Very High", value: "90", count: 0, amount: 0, color: "#10b981", description: "Ready to close", items: [] },
   ]
 
   opportunityClients.forEach(c => {
@@ -249,6 +269,12 @@ function PipelineConfidence({ clients, tasks }: { clients: Client[]; tasks: Task
     if (doc) {
       doc.count++
       doc.amount += c.pitch_value || 0
+      doc.items.push({ 
+        type: "client", 
+        data: c, 
+        name: c.company_name || c.name,
+        value: c.pitch_value 
+      })
     }
   })
 
@@ -256,11 +282,20 @@ function PipelineConfidence({ clients, tasks }: { clients: Client[]; tasks: Task
     const doc = docData.find(d => d.value === t.doc)
     if (doc) {
       doc.count++
+      doc.items.push({ 
+        type: "task", 
+        data: t, 
+        name: t.title 
+      })
     }
   })
 
   const totalActive = opportunityClients.length + opportunityTasks.length
   const expectedValue = docData.reduce((sum, d) => sum + (d.amount * (parseInt(d.value) / 100)), 0)
+
+  const toggleDoc = (value: string) => {
+    setExpandedDoc(prev => prev === value ? null : value)
+  }
 
   return (
     <div className="p-4 md:p-5 rounded-xl bg-white border border-neutral-200 shadow-sm">
@@ -271,27 +306,68 @@ function PipelineConfidence({ clients, tasks }: { clients: Client[]; tasks: Task
           </div>
           <div>
             <h3 className="text-sm font-semibold text-neutral-900">Pipeline Confidence</h3>
-            <p className="text-[10px] text-neutral-500">Close likelihood by opportunity</p>
+            <p className="text-[10px] text-neutral-500">Click to view deals by confidence</p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-1">
         {docData.map(doc => (
-          <div key={doc.value} className="space-y-1">
-            <div className="flex items-center justify-between">
+          <div key={doc.value} className="rounded-lg overflow-hidden border border-neutral-100">
+            {/* Accordion Header */}
+            <button
+              onClick={() => doc.count > 0 && toggleDoc(doc.value)}
+              className={`w-full p-3 flex items-center justify-between transition-colors ${
+                doc.count > 0 ? "hover:bg-neutral-50 cursor-pointer" : "cursor-default opacity-60"
+              } ${expandedDoc === doc.value ? "bg-neutral-50" : ""}`}
+            >
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: doc.color }} />
                 <span className="text-xs font-medium text-neutral-700">{doc.label} ({doc.value}%)</span>
               </div>
-              <div className="text-right">
-                <span className="text-xs font-semibold text-neutral-900">{doc.count} deals</span>
-                {doc.amount > 0 && (
-                  <span className="text-xs text-neutral-400 ml-1">• {formatCurrency(doc.amount, true)}</span>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-neutral-900">{doc.count} deals</span>
+                  {doc.amount > 0 && (
+                    <span className="text-xs text-neutral-400 ml-1">• {formatCurrency(doc.amount, true)}</span>
+                  )}
+                </div>
+                {doc.count > 0 && (
+                  <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedDoc === doc.value ? "rotate-180" : ""}`} />
                 )}
               </div>
-            </div>
-            <p className="text-[10px] text-neutral-400 ml-4">{doc.description}</p>
+            </button>
+
+            {/* Accordion Content - List of deals */}
+            {expandedDoc === doc.value && doc.count > 0 && (
+              <div className="border-t border-neutral-100 divide-y divide-neutral-50 bg-neutral-25">
+                {doc.items.map((item, idx) => (
+                  <button
+                    key={`${item.type}-${idx}`}
+                    onClick={() => {
+                      if (item.type === "client") {
+                        onClientClick(item.data as Client)
+                      } else {
+                        onTaskClick(item.data as Task)
+                      }
+                    }}
+                    className="w-full p-2.5 pl-7 hover:bg-neutral-100 transition-colors text-left flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`shrink-0 px-1.5 py-0.5 text-[9px] font-medium rounded ${
+                        item.type === "client" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                      }`}>
+                        {item.type === "client" ? "Client" : "Task"}
+                      </span>
+                      <span className="text-xs font-medium text-neutral-800 truncate">{item.name}</span>
+                    </div>
+                    {item.value !== undefined && item.value > 0 && (
+                      <span className="shrink-0 text-xs font-medium text-neutral-600">{formatCurrency(item.value, true)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -353,7 +429,7 @@ function DispositionSummary({ clients, tasks }: { clients: Client[]; tasks: Task
   )
 }
 
-// Active Opportunities List Component
+// Active Opportunities List Component with disposition filter
 function ActiveOpportunitiesList({
   clients,
   tasks,
@@ -367,6 +443,27 @@ function ActiveOpportunitiesList({
   onTaskClick: (task: Task) => void
   onViewAll: () => void
 }) {
+  const [dispositionFilter, setDispositionFilter] = useState<Disposition | "all">("all")
+
+  // Get counts for filter pills
+  const opportunityClients = clients.filter(c => c.is_opportunity)
+  const opportunityTasks = tasks.filter(t => t.is_opportunity)
+
+  const getCounts = (disp: Disposition | "all") => {
+    if (disp === "all") {
+      return opportunityClients.filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost").length +
+        opportunityTasks.filter(t => t.disposition !== "closed_won" && t.disposition !== "closed_lost").length
+    }
+    return opportunityClients.filter(c => (c.disposition || "open") === disp).length +
+      opportunityTasks.filter(t => (t.disposition || "open") === disp).length
+  }
+
+  const getValue = (disp: Disposition) => {
+    return opportunityClients
+      .filter(c => (c.disposition || "open") === disp)
+      .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
+  }
+
   // Combine clients and tasks that are active opportunities
   const activeOpportunities: Array<{
     id: string
@@ -375,6 +472,7 @@ function ActiveOpportunitiesList({
     contactName: string
     followUpDate?: string
     disposition: string
+    dispositionValue: Disposition
     dispositionColor: string
     value?: number
     brand?: Brand
@@ -383,7 +481,13 @@ function ActiveOpportunitiesList({
 
   // Add clients
   clients
-    .filter(c => c.is_opportunity && c.disposition !== "closed_won" && c.disposition !== "closed_lost")
+    .filter(c => c.is_opportunity)
+    .filter(c => {
+      if (dispositionFilter === "all") {
+        return c.disposition !== "closed_won" && c.disposition !== "closed_lost"
+      }
+      return (c.disposition || "open") === dispositionFilter
+    })
     .forEach(c => {
       const primaryContact = c.contacts?.find(contact => contact.is_primary) || c.contacts?.[0]
       activeOpportunities.push({
@@ -393,6 +497,7 @@ function ActiveOpportunitiesList({
         contactName: primaryContact?.name || c.name || "No contact",
         followUpDate: c.next_followup_date,
         disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "open"))?.label || "Open",
+        dispositionValue: c.disposition || "open",
         dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "open"))?.color || "#3b82f6",
         value: c.pitch_value,
         brand: c.brand,
@@ -402,7 +507,13 @@ function ActiveOpportunitiesList({
 
   // Add tasks
   tasks
-    .filter(t => t.is_opportunity && t.disposition !== "closed_won" && t.disposition !== "closed_lost")
+    .filter(t => t.is_opportunity)
+    .filter(t => {
+      if (dispositionFilter === "all") {
+        return t.disposition !== "closed_won" && t.disposition !== "closed_lost"
+      }
+      return (t.disposition || "open") === dispositionFilter
+    })
     .forEach(t => {
       activeOpportunities.push({
         id: t.id,
@@ -411,6 +522,7 @@ function ActiveOpportunitiesList({
         contactName: t.assigned_to || "Unassigned",
         followUpDate: t.due_date,
         disposition: DISPOSITION_OPTIONS.find(d => d.value === (t.disposition || "open"))?.label || "Open",
+        dispositionValue: t.disposition || "open",
         dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (t.disposition || "open"))?.color || "#3b82f6",
         brand: t.brand,
         original: t,
@@ -425,31 +537,81 @@ function ActiveOpportunitiesList({
     return new Date(a.followUpDate).getTime() - new Date(b.followUpDate).getTime()
   })
 
+  // Filter options with "Active" as default view
+  const filterOptions: Array<{ value: Disposition | "all"; label: string; color?: string }> = [
+    { value: "all", label: "Active" },
+    ...DISPOSITION_OPTIONS.map(opt => ({ value: opt.value, label: opt.label, color: opt.color })),
+  ]
+
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-neutral-500" />
-          <h3 className="text-sm font-semibold text-neutral-900">Active Opportunities</h3>
-          <span className="text-xs text-neutral-400">({activeOpportunities.length})</span>
+      <div className="p-4 border-b border-neutral-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-neutral-500" />
+            <h3 className="text-sm font-semibold text-neutral-900">Active Opportunities</h3>
+            <span className="text-xs text-neutral-400">({activeOpportunities.length})</span>
+          </div>
+          <button
+            onClick={() => {
+              onViewAll()
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          >
+            View All
+            <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
-        <button
-          onClick={() => {
-            onViewAll()
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
-          className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
-        >
-          View All
-          <ChevronRight className="w-3 h-3" />
-        </button>
+
+        {/* Disposition Filter Pills */}
+        <div className="flex flex-wrap gap-2">
+          {filterOptions.map(opt => {
+            const count = getCounts(opt.value)
+            const value = opt.value !== "all" ? getValue(opt.value as Disposition) : 0
+            const isActive = dispositionFilter === opt.value
+
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setDispositionFilter(opt.value)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isActive
+                    ? "bg-neutral-900 text-white shadow-sm"
+                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {opt.color && (
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: isActive ? "white" : opt.color }} 
+                  />
+                )}
+                <span>{opt.label}</span>
+                <span className={`${isActive ? "text-neutral-300" : "text-neutral-400"}`}>
+                  {count}
+                </span>
+                {value > 0 && opt.value !== "all" && (
+                  <span className={`${isActive ? "text-neutral-300" : "text-neutral-400"}`}>
+                    • {formatCurrency(value, true)}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="divide-y divide-neutral-100">
+      <div className="divide-y divide-neutral-100 max-h-[400px] overflow-y-auto">
         {activeOpportunities.length === 0 ? (
-          <div className="p-6 text-center text-sm text-neutral-400">No active opportunities. Add clients or tasks as opportunities to track them here.</div>
+          <div className="p-6 text-center text-sm text-neutral-400">
+            {dispositionFilter === "all" 
+              ? "No active opportunities. Add clients or tasks as opportunities to track them here."
+              : `No opportunities with "${filterOptions.find(f => f.value === dispositionFilter)?.label}" status.`
+            }
+          </div>
         ) : (
-          activeOpportunities.slice(0, 6).map((item) => (
+          activeOpportunities.slice(0, 10).map((item) => (
             <button
               key={`${item.type}-${item.id}`}
               onClick={() => {
@@ -516,41 +678,75 @@ function RecentClientsList({
   onViewAll: () => void
   onAdd: () => void
 }) {
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const isSearching = searchQuery.trim().length > 0
+
   const recentClients = clients
-    .filter(c => !c.is_opportunity)
+    // When searching, include ALL clients (including opportunities)
+    // When not searching, only show non-opportunity clients
+    .filter(c => isSearching ? true : !c.is_opportunity)
+    .filter(c => {
+      if (!isSearching) return true
+      const query = searchQuery.toLowerCase()
+      const companyName = (c.company_name || "").toLowerCase()
+      const name = (c.name || "").toLowerCase()
+      const contactName = (c.contacts?.[0]?.name || "").toLowerCase()
+      const email = (c.email || "").toLowerCase()
+      return companyName.includes(query) || name.includes(query) || contactName.includes(query) || email.includes(query)
+    })
     .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
-    .slice(0, 5)
+    .slice(0, isSearching ? 15 : 5)
 
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-neutral-500" />
-          <h3 className="text-sm font-semibold text-neutral-900">Recent Clients</h3>
+      <div className="p-4 border-b border-neutral-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-neutral-500" />
+            <h3 className="text-sm font-semibold text-neutral-900">Recent Clients</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onAdd}
+              className="p-1.5 rounded-lg hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                onViewAll()
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              View All
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onAdd}
-            className="p-1.5 rounded-lg hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              onViewAll()
-              window.scrollTo({ top: 0, behavior: 'smooth' })
-            }}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
-          >
-            View All
-            <ChevronRight className="w-3 h-3" />
-          </button>
+
+        {/* Search Field */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <input
+            type="text"
+            placeholder="Search clients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+          />
         </div>
       </div>
 
-      <div className="divide-y divide-neutral-100">
+      <div className="divide-y divide-neutral-100 max-h-[300px] overflow-y-auto">
         {recentClients.length === 0 ? (
-          <div className="p-6 text-center text-sm text-neutral-400">No clients yet. Add your first client to get started.</div>
+          <div className="p-6 text-center text-sm text-neutral-400">
+            {searchQuery.trim() 
+              ? `No clients matching "${searchQuery}".`
+              : "No clients yet. Add your first client to get started."
+            }
+          </div>
         ) : (
           recentClients.map((client) => (
             <button
@@ -559,7 +755,14 @@ function RecentClientsList({
               className="w-full p-3 hover:bg-neutral-50 transition-colors text-left flex items-center gap-3"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-900 truncate">{client.company_name || client.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-neutral-900 truncate">{client.company_name || client.name}</p>
+                  {client.is_opportunity && (
+                    <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700">
+                      Opportunity
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-neutral-500 truncate">
                   {client.contacts?.[0]?.name || client.name || "No contact"}
                 </p>
@@ -794,7 +997,6 @@ export function DashboardView({
   onShowClientForm,
   onClientClick,
   onTaskClick,
-  onRefresh,
   currentUser,
 }: DashboardViewProps) {
   const totalBudget = BRAND_GOALS.reduce((sum, b) => sum + b.annualGoal, 0)
@@ -835,13 +1037,6 @@ export function DashboardView({
             })}
           </p>
         </div>
-        <button
-          onClick={onRefresh}
-          className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
       </div>
 
       {/* Top KPI Cards */}
@@ -855,15 +1050,6 @@ export function DashboardView({
         <div className="col-span-2 md:col-span-4 xl:col-span-1">
           <OpportunityProgressChart clients={clients} tasks={tasks} />
         </div>
-      </div>
-
-      {/* Disposition Summary */}
-      <div>
-        <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-          <Target className="w-4 h-4 text-neutral-500" />
-          Opportunities Overview
-        </h3>
-        <DispositionSummary clients={clients} tasks={tasks} />
       </div>
 
       {/* Main Content Grid - 70/30 split on desktop */}
@@ -896,7 +1082,12 @@ export function DashboardView({
         <div className="space-y-6">
           <PlatformGoalsProgress clients={clients} tasks={tasks} />
 
-          <PipelineConfidence clients={clients} tasks={tasks} />
+          <PipelineConfidence 
+            clients={clients} 
+            tasks={tasks} 
+            onClientClick={onClientClick}
+            onTaskClick={onTaskClick}
+          />
         </div>
       </div>
     </div>

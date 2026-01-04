@@ -98,6 +98,14 @@ export interface ClientRecord extends BaseRecord {
   instagram_handle?: string
   linkedin_url?: string
   
+  // Sales/Opportunity fields
+  brand?: "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing"
+  pitch_value?: number
+  source?: string
+  is_opportunity?: boolean
+  disposition?: "open" | "pitched" | "closed_won" | "closed_lost"
+  doc?: "25" | "50" | "75" | "90"
+  
   // Linked records
   opportunity_ids?: string[]
   pm_record_ids?: string[]

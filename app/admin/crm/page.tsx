@@ -21,6 +21,7 @@ import {
   ClientsView,
   TasksView,
   ClientFormModal,
+  OpportunityFormModal,
   TaskModal,
   TEAM_MEMBERS,
 } from "../../components/crm"
@@ -38,6 +39,7 @@ import type {
   Brand,
   Disposition,
   DOC,
+  CRMTag,
 } from "../../components/crm/types"
 
 export default function SalesCRMPage() {
@@ -57,8 +59,13 @@ export default function SalesCRMPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [brandFilter, setBrandFilter] = useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
-  const [clientStatusFilter, setClientStatusFilter] = useState<string>("all")
+  const [clientSourceFilter, setClientSourceFilter] = useState<string>("all")
   const [clientBrandFilter, setClientBrandFilter] = useState<string>("all")
+  const [clientTagFilter, setClientTagFilter] = useState<string>("all")
+  
+  // Tags state
+  const [availableTags, setAvailableTags] = useState<CRMTag[]>([])
+  const [isLoadingTags, setIsLoadingTags] = useState(false)
 
   // Client form state
   const [showClientForm, setShowClientForm] = useState(false)
@@ -88,8 +95,40 @@ export default function SalesCRMPage() {
     is_opportunity: false,
     disposition: "" as Disposition | "",
     doc: "" as DOC | "",
+    tags: [] as string[],
   })
   const [isSaving, setIsSaving] = useState(false)
+
+  // Opportunity form state
+  const [showOpportunityForm, setShowOpportunityForm] = useState(false)
+  const [opportunityForm, setOpportunityForm] = useState({
+    company_name: "",
+    existing_company_id: null as string | null,
+    contacts: [] as Array<{
+      id: string
+      name: string
+      email: string
+      phone: string
+      role: string
+      is_primary: boolean
+      address: string
+      city: string
+      state: string
+      zipcode: string
+      date_of_birth: string
+    }>,
+    status: "prospect",
+    brand: "" as Brand | "",
+    pitch_value: "",
+    next_followup_date: "",
+    assigned_to: "",
+    notes: "",
+    source: "",
+    is_opportunity: true,
+    disposition: "open" as Disposition | "",
+    doc: "" as DOC | "",
+  })
+  const [isSavingOpportunity, setIsSavingOpportunity] = useState(false)
 
   // Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false)
@@ -120,6 +159,7 @@ export default function SalesCRMPage() {
   useEffect(() => {
     loadDashboard()
     loadCurrentUser()
+    loadTags()
   }, [])
 
   // Load current user from session
@@ -189,6 +229,74 @@ export default function SalesCRMPage() {
     }
   }
 
+  // Load tags from both Mailchimp and CRM Firestore
+  const loadTags = async () => {
+    setIsLoadingTags(true)
+    try {
+      // Fetch Mailchimp tags
+      const mailchimpResponse = await fetch("/api/mailchimp?endpoint=tags")
+      let mailchimpTags: CRMTag[] = []
+      if (mailchimpResponse.ok) {
+        const mailchimpData = await mailchimpResponse.json()
+        if (mailchimpData.success && mailchimpData.data?.tags) {
+          mailchimpTags = mailchimpData.data.tags.map((tag: { id: string; name: string }) => ({
+            id: `mailchimp_${tag.id}`,
+            name: tag.name,
+            color: "#f59e0b", // amber for Mailchimp tags
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }))
+        }
+      }
+      
+      // Fetch CRM-specific tags from Firestore
+      const crmResponse = await fetch("/api/admin/crm/tags")
+      let crmTags: CRMTag[] = []
+      if (crmResponse.ok) {
+        const crmData = await crmResponse.json()
+        crmTags = crmData.tags || []
+      }
+      
+      // Combine and deduplicate by name (prefer CRM tags if duplicate names)
+      const tagMap = new Map<string, CRMTag>()
+      mailchimpTags.forEach(tag => tagMap.set(tag.name.toLowerCase(), tag))
+      crmTags.forEach(tag => tagMap.set(tag.name.toLowerCase(), tag)) // CRM overwrites Mailchimp
+      
+      const combinedTags = Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+      setAvailableTags(combinedTags)
+    } catch (err) {
+      console.error("Failed to load tags:", err)
+    } finally {
+      setIsLoadingTags(false)
+    }
+  }
+
+  // Create a new tag
+  const handleCreateTag = async (name: string): Promise<CRMTag | null> => {
+    try {
+      const response = await fetch("/api/admin/crm/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      if (!response.ok) throw new Error("Failed to create tag")
+      const data = await response.json()
+      if (data.tag) {
+        // Add new tag to available tags if it's not already there
+        setAvailableTags(prev => {
+          const exists = prev.some(t => t.id === data.tag.id)
+          if (exists) return prev
+          return [...prev, data.tag]
+        })
+        return data.tag
+      }
+      return null
+    } catch (err) {
+      console.error("Failed to create tag:", err)
+      setToast({ message: "Failed to create tag", type: "error" })
+      return null
+    }
+  }
   const loadPipeline = async () => {
     try {
       const response = await fetch("/api/admin/crm/opportunities?view=pipeline")
@@ -651,6 +759,7 @@ export default function SalesCRMPage() {
         is_opportunity: clientForm.is_opportunity,
         disposition: clientForm.is_opportunity ? (clientForm.disposition || "open") : undefined,
         doc: clientForm.is_opportunity ? clientForm.doc || undefined : undefined,
+        tags: clientForm.tags || [],
       }
 
       const method = editingClient ? "PUT" : "POST"
@@ -669,12 +778,102 @@ export default function SalesCRMPage() {
       setToast({ message: `Client ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "" })
+      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "", tags: [] })
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to save client", type: "error" })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  // Save opportunity (creates or updates client with is_opportunity=true)
+  const handleSaveOpportunity = async () => {
+    if (!opportunityForm.company_name.trim()) {
+      setToast({ message: "Company name is required", type: "error" })
+      return
+    }
+
+    if (!opportunityForm.brand) {
+      setToast({ message: "Please select a platform", type: "error" })
+      return
+    }
+
+    setIsSavingOpportunity(true)
+    try {
+      // Get primary contact info for backwards compatibility
+      const primaryContact = opportunityForm.contacts.find(c => c.is_primary) || opportunityForm.contacts[0]
+      
+      // Build the opportunity data
+      const opportunityData = {
+        name: primaryContact?.name || opportunityForm.company_name,
+        company_name: opportunityForm.company_name,
+        email: primaryContact?.email || "",
+        phone: primaryContact?.phone || "",
+        contacts: opportunityForm.contacts.map(c => ({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          phone: c.phone,
+          role: c.role,
+          is_primary: c.is_primary,
+          address: c.address || "",
+          city: c.city || "",
+          state: c.state || "",
+          zipcode: c.zipcode || "",
+          date_of_birth: c.date_of_birth || "",
+        })),
+        status: opportunityForm.status,
+        brand: opportunityForm.brand,
+        pitch_value: opportunityForm.pitch_value ? parseFloat(opportunityForm.pitch_value) : undefined,
+        next_followup_date: opportunityForm.next_followup_date || undefined,
+        assigned_to: opportunityForm.assigned_to,
+        notes: opportunityForm.notes,
+        source: opportunityForm.source || undefined,
+        is_opportunity: true, // Always true for opportunities
+        disposition: opportunityForm.disposition || "open",
+        doc: opportunityForm.doc || undefined,
+      }
+
+      // If updating an existing company, use PUT; otherwise POST
+      const method = opportunityForm.existing_company_id ? "PUT" : "POST"
+      const body = opportunityForm.existing_company_id 
+        ? { ...opportunityData, id: opportunityForm.existing_company_id }
+        : opportunityData
+
+      const response = await fetch("/api/admin/crm/clients", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) throw new Error("Failed to save opportunity")
+
+      setToast({ message: "Opportunity created successfully", type: "success" })
+      setShowOpportunityForm(false)
+      // Reset the form
+      setOpportunityForm({
+        company_name: "",
+        existing_company_id: null,
+        contacts: [],
+        status: "prospect",
+        brand: "",
+        pitch_value: "",
+        next_followup_date: "",
+        assigned_to: "",
+        notes: "",
+        source: "",
+        is_opportunity: true,
+        disposition: "open",
+        doc: "",
+      })
+      // Reload both clients (for syncing) and refresh dashboard
+      loadClients()
+      loadDashboard()
+    } catch (err) {
+      setToast({ message: "Failed to save opportunity", type: "error" })
+    } finally {
+      setIsSavingOpportunity(false)
     }
   }
 
@@ -820,6 +1019,7 @@ export default function SalesCRMPage() {
       is_opportunity: client.is_opportunity || false,
       disposition: client.disposition || "",
       doc: client.doc || "",
+      tags: client.tags || [],
     })
     setShowClientForm(true)
   }
@@ -908,11 +1108,6 @@ export default function SalesCRMPage() {
             onShowClientForm={() => setShowClientForm(true)}
             onClientClick={handleEditClient}
             onTaskClick={openTaskModal}
-            onRefresh={() => {
-              loadDashboard()
-              loadClients()
-              loadTasks()
-            }}
             currentUser={currentUser}
           />
         )}
@@ -930,6 +1125,25 @@ export default function SalesCRMPage() {
             onTaskClick={openTaskModal}
             onUpdateClientDisposition={handleUpdateClientDisposition}
             onUpdateTaskDisposition={handleUpdateTaskDisposition}
+            onAddOpportunity={() => {
+              // Reset the opportunity form and show modal
+              setOpportunityForm({
+                company_name: "",
+                existing_company_id: null,
+                contacts: [],
+                status: "prospect",
+                brand: "",
+                pitch_value: "",
+                next_followup_date: "",
+                assigned_to: "",
+                notes: "",
+                source: "",
+                is_opportunity: true,
+                disposition: "open",
+                doc: "",
+              })
+              setShowOpportunityForm(true)
+            }}
           />
         )}
 
@@ -938,14 +1152,18 @@ export default function SalesCRMPage() {
           <ClientsView
             clients={clients}
             searchQuery={searchQuery}
-            statusFilter={clientStatusFilter}
+            sourceFilter={clientSourceFilter}
             brandFilter={clientBrandFilter}
+            tagFilter={clientTagFilter}
+            availableTags={availableTags}
             onSearchChange={setSearchQuery}
-            onStatusFilterChange={setClientStatusFilter}
+            onSourceFilterChange={setClientSourceFilter}
             onBrandFilterChange={setClientBrandFilter}
+            onTagFilterChange={setClientTagFilter}
+            onCreateTag={handleCreateTag}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "" })
+              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "", tags: [] })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}
@@ -975,9 +1193,22 @@ export default function SalesCRMPage() {
         isEditing={!!editingClient}
         isSaving={isSaving}
         formData={clientForm}
+        availableTags={availableTags}
         onFormChange={setClientForm}
+        onCreateTag={handleCreateTag}
         onSave={handleSaveClient}
         onClose={() => setShowClientForm(false)}
+      />
+
+      {/* Opportunity Form Modal */}
+      <OpportunityFormModal
+        isOpen={showOpportunityForm}
+        isSaving={isSavingOpportunity}
+        existingClients={clients}
+        formData={opportunityForm}
+        onFormChange={setOpportunityForm}
+        onSave={handleSaveOpportunity}
+        onClose={() => setShowOpportunityForm(false)}
       />
 
       {/* Task Modal */}

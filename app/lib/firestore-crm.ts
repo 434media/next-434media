@@ -325,6 +325,8 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     is_opportunity: (rawData.is_opportunity || false) as boolean,
     disposition: (rawData.disposition || undefined) as ClientRecord["disposition"],
     doc: (rawData.doc || undefined) as ClientRecord["doc"],
+    // Tags
+    tags: (rawData.tags || []) as string[],
     // Timestamps
     created_at: (rawData.created_at || new Date().toISOString()) as string,
     updated_at: (rawData.updated_at || new Date().toISOString()) as string,

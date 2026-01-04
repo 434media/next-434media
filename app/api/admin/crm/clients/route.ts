@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
       company_name: body.company_name || "",
       email: body.email || "",
       phone: body.phone || "",
+      contacts: body.contacts || [],
       industry: body.industry || "",
       website: body.website || "",
       address: body.address || "",
@@ -109,10 +110,15 @@ export async function POST(request: NextRequest) {
       notes: body.notes || "",
       lifetime_value: body.lifetime_value || 0,
       monthly_retainer: body.monthly_retainer || 0,
+      pitch_value: body.pitch_value || 0,
       instagram_handle: body.instagram_handle || "",
       linkedin_url: body.linkedin_url || "",
       source: body.source || "",
+      brand: body.brand || "",
       is_opportunity: body.is_opportunity || false,
+      disposition: body.disposition || undefined,
+      doc: body.doc || undefined,
+      tags: body.tags || [],
     })
 
     return NextResponse.json({ success: true, client }, { status: 201 })

@@ -1,17 +1,29 @@
 "use client"
 
-import { Search, Plus, Edit, Trash2, Mail, Phone, Users, Calendar, DollarSign } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { Search, Plus, Edit, Trash2, Mail, Phone, Users, Calendar, DollarSign, Tag, X, Check, ChevronDown } from "lucide-react"
 import { STATUS_COLORS, formatDate, formatCurrency, BRANDS, BRAND_GOALS } from "./types"
 import type { Client, Brand } from "./types"
+
+// CRM Tag interface
+interface CRMTag {
+  id: string
+  name: string
+  color?: string
+}
 
 interface ClientsViewProps {
   clients: Client[]
   searchQuery: string
-  statusFilter: string
+  sourceFilter: string
   brandFilter?: string
+  tagFilter?: string
+  availableTags?: CRMTag[]
   onSearchChange: (query: string) => void
-  onStatusFilterChange: (status: string) => void
+  onSourceFilterChange: (source: string) => void
   onBrandFilterChange?: (brand: string) => void
+  onTagFilterChange?: (tag: string) => void
+  onCreateTag?: (name: string) => Promise<CRMTag | null>
   onAddClient: () => void
   onEditClient: (client: Client) => void
   onDeleteClient: (id: string) => void
@@ -26,15 +38,53 @@ const getBrandColor = (brand?: Brand) => {
 export function ClientsView({
   clients,
   searchQuery,
-  statusFilter,
+  sourceFilter,
   brandFilter = "all",
+  tagFilter = "all",
+  availableTags = [],
   onSearchChange,
-  onStatusFilterChange,
+  onSourceFilterChange,
   onBrandFilterChange,
+  onTagFilterChange,
+  onCreateTag,
   onAddClient,
   onEditClient,
   onDeleteClient,
 }: ClientsViewProps) {
+  // State for tag dropdown
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const [newTagName, setNewTagName] = useState("")
+  const [isCreatingTag, setIsCreatingTag] = useState(false)
+  const tagDropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(event.target as Node)) {
+        setShowTagDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+  
+  // Handle creating a new tag
+  const handleCreateTag = async () => {
+    if (!newTagName.trim() || !onCreateTag) return
+    setIsCreatingTag(true)
+    try {
+      const tag = await onCreateTag(newTagName.trim())
+      if (tag) {
+        setNewTagName("")
+        // Optionally filter by the new tag
+        if (onTagFilterChange) {
+          onTagFilterChange(tag.name)
+        }
+      }
+    } finally {
+      setIsCreatingTag(false)
+    }
+  }
   // Filter clients - using brand-based filtering
   const filteredClients = clients.filter((client) => {
     const searchLower = searchQuery.toLowerCase()
@@ -46,9 +96,10 @@ export function ClientsView({
         c.name?.toLowerCase().includes(searchLower) ||
         c.email?.toLowerCase().includes(searchLower)
       )
-    const matchesStatus = statusFilter === "all" || client.status === statusFilter
+    const matchesSource = sourceFilter === "all" || client.source === sourceFilter
     const matchesBrand = brandFilter === "all" || client.brand === brandFilter
-    return matchesSearch && matchesStatus && matchesBrand
+    const matchesTag = tagFilter === "all" || client.tags?.includes(tagFilter)
+    return matchesSearch && matchesSource && matchesBrand && matchesTag
   })
 
   // Sort by follow-up date (oldest first) - following the mockup's default sorting
@@ -105,19 +156,92 @@ export function ClientsView({
               ))}
             </select>
           )}
-          {/* Status Filter - Updated with industry-standard sales pipeline statuses */}
-          <select
-            value={statusFilter}
-            onChange={(e) => onStatusFilterChange(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-700 focus:outline-none focus:border-gray-400 shadow-sm"
-          >
-            <option value="all">All Status</option>
-            <option value="prospect">Prospect</option>
-            <option value="active">Active Client</option>
-            <option value="inactive">Inactive</option>
-            <option value="churned">Churned</option>
-            <option value="on_hold">On Hold</option>
-          </select>
+          {/* Tags Filter - Custom dropdown with create option */}
+          {onTagFilterChange && (
+            <div className="relative" ref={tagDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-700 focus:outline-none focus:border-gray-400 shadow-sm min-w-[120px]"
+              >
+                <Tag className="w-3.5 h-3.5 text-gray-400" />
+                <span className="flex-1 text-left truncate">
+                  {tagFilter === "all" ? "All Tags" : tagFilter}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showTagDropdown ? "rotate-180" : ""}`} />
+              </button>
+              
+              {showTagDropdown && (
+                <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                  {/* Create new tag input */}
+                  {onCreateTag && (
+                    <div className="p-2 border-b border-gray-100">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                          placeholder="Create new tag..."
+                          className="flex-1 px-2.5 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCreateTag}
+                          disabled={!newTagName.trim() || isCreatingTag}
+                          className="px-2.5 py-1.5 bg-gray-900 text-white text-sm rounded hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isCreatingTag ? "..." : <Plus className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Tags list */}
+                  <div className="max-h-48 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onTagFilterChange("all")
+                        setShowTagDropdown(false)
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 ${tagFilter === "all" ? "bg-gray-50 font-medium" : ""}`}
+                    >
+                      {tagFilter === "all" && <Check className="w-4 h-4 text-gray-600" />}
+                      <span className={tagFilter === "all" ? "" : "ml-6"}>All Tags</span>
+                    </button>
+                    {availableTags.map(tag => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          onTagFilterChange(tag.name)
+                          setShowTagDropdown(false)
+                        }}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 ${tagFilter === tag.name ? "bg-gray-50 font-medium" : ""}`}
+                      >
+                        {tagFilter === tag.name && <Check className="w-4 h-4 text-gray-600" />}
+                        <span 
+                          className={`flex items-center gap-1.5 ${tagFilter === tag.name ? "" : "ml-6"}`}
+                        >
+                          <span 
+                            className="w-2 h-2 rounded-full shrink-0" 
+                            style={{ backgroundColor: tag.color || "#6b7280" }} 
+                          />
+                          {tag.name}
+                        </span>
+                      </button>
+                    ))}
+                    {availableTags.length === 0 && (
+                      <div className="px-3 py-4 text-center text-sm text-gray-400">
+                        No tags yet. Create one above.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <button
           onClick={onAddClient}
@@ -140,17 +264,17 @@ export function ClientsView({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell bg-gray-50">
                   Primary Contact
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                  Source
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
+                  Tags
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
                   Platform
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell bg-gray-50">
-                  Follow Up
+                  Opportunity
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell bg-gray-50">
-                  Opportunity
+                  Follow Up
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                   Actions
@@ -172,6 +296,7 @@ export function ClientsView({
                   
                   return (
                     <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                      {/* Company */}
                       <td className="px-4 py-4">
                         <div>
                           <p className="font-medium text-sm text-gray-900">{client.company_name || client.name || "Unnamed Client"}</p>
@@ -183,6 +308,7 @@ export function ClientsView({
                           )}
                         </div>
                       </td>
+                      {/* Primary Contact */}
                       <td className="px-4 py-4 hidden sm:table-cell">
                         <div className="space-y-1">
                           {primaryContact ? (
@@ -208,15 +334,36 @@ export function ClientsView({
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-4">
-                        {client.source ? (
-                          <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                            {client.source.replace("_", " ")}
-                          </span>
+                      {/* Tags */}
+                      <td className="px-3 py-4 hidden md:table-cell">
+                        {client.tags && client.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 max-w-[150px]">
+                            {client.tags.slice(0, 2).map((tagName, idx) => {
+                              const tagInfo = availableTags.find(t => t.name === tagName)
+                              const tagColor = tagInfo?.color || "#6b7280"
+                              return (
+                                <span 
+                                  key={idx}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                  style={{ 
+                                    backgroundColor: `${tagColor}15`,
+                                    color: tagColor,
+                                  }}
+                                >
+                                  <Tag className="w-2.5 h-2.5" />
+                                  {tagName}
+                                </span>
+                              )
+                            })}
+                            {client.tags.length > 2 && (
+                              <span className="text-[10px] text-gray-400">+{client.tags.length - 2}</span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
+                      {/* Platform */}
                       <td className="px-3 py-4 hidden md:table-cell">
                         {client.brand ? (
                           <span 
@@ -234,17 +381,8 @@ export function ClientsView({
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
+                      {/* Opportunity */}
                       <td className="px-3 py-4 hidden lg:table-cell">
-                        {client.next_followup_date ? (
-                          <span className="inline-flex items-center whitespace-nowrap gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
-                            <Calendar className="w-3 h-3 shrink-0" />
-                            {formatDate(client.next_followup_date)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-4 hidden xl:table-cell">
                         {client.is_opportunity ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Yes
@@ -255,6 +393,18 @@ export function ClientsView({
                           </span>
                         )}
                       </td>
+                      {/* Follow Up */}
+                      <td className="px-3 py-4 hidden xl:table-cell">
+                        {client.next_followup_date ? (
+                          <span className="inline-flex items-center whitespace-nowrap gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
+                            <Calendar className="w-3 h-3 shrink-0" />
+                            {formatDate(client.next_followup_date)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      {/* Actions */}
                       <td className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
