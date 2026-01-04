@@ -641,15 +641,17 @@ export default function SalesCRMPage() {
   const handleAddComment = async () => {
     if (!newComment.trim() || !selectedTask || !currentUser) return
     
-    // Extract mentions from comment (format: @name)
-    const mentionRegex = /@(\w+)/g
+    // Extract mentions from comment (format: @name or @FirstName)
+    const mentionRegex = /@(\w+(?:\s+\w+)?)/g
     const mentions: string[] = []
     let match: RegExpExecArray | null
     while ((match = mentionRegex.exec(newComment)) !== null) {
+      const mentionName = match[1].toLowerCase()
       const mentionedMember = TEAM_MEMBERS.find(m => 
-        m.name.toLowerCase() === match![1].toLowerCase()
+        m.name.toLowerCase() === mentionName ||
+        m.name.split(' ')[0].toLowerCase() === mentionName
       )
-      if (mentionedMember) {
+      if (mentionedMember && !mentions.includes(mentionedMember.email)) {
         mentions.push(mentionedMember.email)
       }
     }
@@ -705,6 +707,23 @@ export default function SalesCRMPage() {
       )
 
       setToast({ message: "Comment added", type: "success" })
+
+      // Send notifications to mentioned users (async, don't block UI)
+      if (mentions.length > 0) {
+        fetch("/api/admin/crm/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId: selectedTask.id,
+            taskTitle: selectedTask.title,
+            comment,
+            mentionedEmails: mentions,
+          }),
+        }).catch(err => {
+          console.error("Failed to send notifications:", err)
+          // Don't show error to user - notifications are non-critical
+        })
+      }
     } catch (err) {
       console.error("Failed to save comment:", err)
       setToast({ message: "Failed to save comment", type: "error" })

@@ -2,7 +2,7 @@ import { getDb, COLLECTIONS, admin } from "./firebase-admin"
 import type { Event } from "../types/event-types"
 
 // ============================================
-// AIMS EVENTS - Firestore Functions
+// AIM SATX EVENTS - Firestore Functions
 // ============================================
 
 // Simple in-memory cache for AIMS events
@@ -28,7 +28,7 @@ function setCache<T>(key: string, data: T): void {
   aimsCache.set(key, { data, timestamp: Date.now() })
 }
 
-// Invalidate cache for AIMS events
+// Invalidate cache for AIM SATX events
 export function invalidateAimsEventsCache(): void {
   for (const key of aimsCache.keys()) {
     if (key.includes("aims")) {

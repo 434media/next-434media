@@ -759,6 +759,15 @@ export async function getAllTasks(): Promise<Task[]> {
       // Extract client name from production_name
       const clientName = productionName || (rawItem.client_name as string) || undefined
       
+      // Extract comments from master list item
+      const comments = rawItem.comments as Task["comments"] | undefined
+      
+      // Extract attachments from master list item
+      const attachments = rawItem.attachments as Task["attachments"] | undefined
+      
+      // Extract tagged users from master list item
+      const taggedUsers = rawItem.tagged_users as string[] | undefined
+      
       return {
         id: item.id,
         title,
@@ -777,6 +786,9 @@ export async function getAllTasks(): Promise<Task[]> {
         is_opportunity: rawItem.is_opportunity as boolean | undefined,
         disposition: rawItem.disposition as Task["disposition"] | undefined,
         doc: rawItem.doc as Task["doc"] | undefined,
+        comments: comments || [],
+        attachments: attachments || [],
+        tagged_users: taggedUsers || [],
       }
     })
   

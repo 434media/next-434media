@@ -267,6 +267,18 @@ export async function PUT(request: NextRequest) {
       if (taskUpdates.doc !== undefined) {
         masterListUpdates.doc = taskUpdates.doc
       }
+      // Handle comments - store directly on master list item
+      if (taskUpdates.comments !== undefined) {
+        masterListUpdates.comments = taskUpdates.comments
+      }
+      // Handle attachments - store directly on master list item
+      if (taskUpdates.attachments !== undefined) {
+        masterListUpdates.attachments = taskUpdates.attachments
+      }
+      // Handle tagged users - store directly on master list item
+      if (taskUpdates.tagged_users !== undefined) {
+        masterListUpdates.tagged_users = taskUpdates.tagged_users
+      }
       
       return masterListUpdates
     }
