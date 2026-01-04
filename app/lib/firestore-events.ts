@@ -227,10 +227,10 @@ export async function markPastEventsInFirestore(): Promise<number> {
     const FieldValue = admin.firestore.FieldValue
     const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD format
 
-    // Get events that should be marked as past
+    // Get all events that are not marked as past yet
+    // We query only by isPast to avoid needing a composite index
     const snapshot = await db
       .collection(COLLECTIONS.EVENTS)
-      .where("date", "<", today)
       .where("isPast", "==", false)
       .get()
 
@@ -238,9 +238,19 @@ export async function markPastEventsInFirestore(): Promise<number> {
       return 0
     }
 
+    // Filter in memory for events with dates in the past
+    const pastEvents = snapshot.docs.filter((doc: admin.firestore.DocumentSnapshot) => {
+      const data = doc.data()
+      return data?.date && data.date < today
+    })
+
+    if (pastEvents.length === 0) {
+      return 0
+    }
+
     // Batch update
     const batch = db.batch()
-    snapshot.docs.forEach((doc: admin.firestore.DocumentSnapshot) => {
+    pastEvents.forEach((doc: admin.firestore.DocumentSnapshot) => {
       batch.update(doc.ref, {
         isPast: true,
         updated_at: FieldValue.serverTimestamp(),
@@ -248,10 +258,12 @@ export async function markPastEventsInFirestore(): Promise<number> {
     })
 
     await batch.commit()
-    return snapshot.size
+    return pastEvents.length
   } catch (error) {
-    console.error("Error marking past events:", error)
-    throw new Error("Failed to mark past events")
+    // Log but don't throw - this is a background operation
+    // Events should still load even if marking past events fails
+    console.error("Error marking past events (non-blocking):", error)
+    return 0
   }
 }
 

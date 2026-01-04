@@ -88,6 +88,7 @@ export function getDb(): admin.firestore.Firestore {
 // Collection names - maps to different Firestore collections
 export const COLLECTIONS = {
   EVENTS: "events",
+  EVENTS_AIMS: "events_aims",  // AIMS ATX events collection
   FEED: "feed",           // THEFEED table
   FEED_8COUNT: "feed_8count",      // 8COUNT table
   FEED_CULTUREDECK: "feed_culturedeck", // CULTUREDECK table

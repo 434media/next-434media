@@ -130,6 +130,9 @@ export function generateEventId(): string {
 
 // CLIENT-SIDE date comparison functions - now work with YYYY-MM-DD strings
 export function isEventUpcoming(event: Event): boolean {
+  // If explicitly marked as past, it's not upcoming
+  if (event.isPast === true) return false
+  
   if (!event.date) return false
 
   const eventDate = safeParseDate(event.date)
