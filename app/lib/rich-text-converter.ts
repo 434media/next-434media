@@ -1,5 +1,8 @@
-import { marked } from 'marked'
+import { marked, Marked } from 'marked'
 import sanitizeHtml from 'sanitize-html'
+
+// Configure a synchronous marked instance
+const syncMarked = new Marked({ async: false, gfm: true, breaks: false })
 
 /**
  * Secure HTML sanitization using sanitize-html library
@@ -108,17 +111,17 @@ export async function convertAirtableRichTextToHTML(content: any): Promise<strin
       return sanitizeHTML(content)
     }
     
-    // If it contains markdown syntax, convert to HTML
-    if (containsMarkdown(content)) {
+    // Parse as markdown - marked will handle plain text gracefully
+    try {
       const html = await marked.parse(content, { 
         gfm: true, // GitHub flavored markdown
         breaks: false // Disable breaks to prevent link interference
       })
       return sanitizeHTML(html)
+    } catch (error) {
+      console.error('Error parsing markdown:', error)
+      return sanitizeHTML(formatPlainText(content))
     }
-    
-    // Plain text - convert line breaks to paragraphs
-    return formatPlainText(content)
   }
 
   // If content is a rich text object (Airtable's collaborative rich text format)
@@ -145,14 +148,15 @@ export function convertAirtableRichTextToHTMLSync(content: any): string {
       return sanitizeHTML(content)
     }
     
-    // Always parse as markdown - marked will handle plain text gracefully
+    // Parse as markdown using the synchronous marked instance
     // This ensures any markdown syntax is properly converted
-    const html = marked.parse(content, { 
-      gfm: true, 
-      breaks: false, // Disable breaks to prevent link interference
-      async: false // Force synchronous mode
-    }) as string
-    return sanitizeHTML(html)
+    try {
+      const html = syncMarked.parse(content) as string
+      return sanitizeHTML(html)
+    } catch (error) {
+      console.error('Error parsing markdown:', error)
+      return sanitizeHTML(formatPlainText(content))
+    }
   }
 
   // If content is a rich text object (Airtable's collaborative rich text format)
