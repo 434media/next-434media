@@ -75,7 +75,7 @@ export default function BlogCard({ post }: BlogCardProps) {
                 </div>
               )}
               <span className="text-gray-400">·</span>
-              <span>{formatDate(post.published_at || post.created_at)}</span>
+              <span>{formatDate(post.created_at)}</span>
             </div>
           </div>
         </div>

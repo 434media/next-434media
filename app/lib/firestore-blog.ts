@@ -124,11 +124,12 @@ export async function getBlogPostsFromFirestore(filters: BlogFilters = {}, rawCo
     const snapshot = await query.get()
     let posts = snapshot.docs.map(doc => mapFirestoreToBlogPost(doc, rawContent))
     
-    // Sort by published_at client-side to avoid composite index requirement
+    // Sort by created_at client-side to avoid composite index requirement
+    // This ensures posts maintain their original order regardless of updates
     posts.sort((a, b) => {
-      const dateA = a.published_at ? new Date(a.published_at).getTime() : 0
-      const dateB = b.published_at ? new Date(b.published_at).getTime() : 0
-      return dateB - dateA // Descending order
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return dateB - dateA // Descending order (newest first)
     })
     
     console.log(`[Firestore] Fetched ${posts.length} blog posts`)
@@ -280,9 +281,16 @@ export async function updateBlogPostInFirestore(id: string, updates: UpdateBlogP
 
     cleanUpdates.updated_at = FieldValue.serverTimestamp()
 
-    // Set published_at if publishing
-    if (updates.status === "published" && !cleanUpdates.published_at) {
-      cleanUpdates.published_at = new Date().toISOString()
+    // Only set published_at if publishing for the first time (check existing doc)
+    if (updates.status === "published") {
+      const existingDoc = await docRef.get()
+      const existingData = existingDoc.data()
+      // Only set published_at if the document doesn't already have one
+      if (!existingData?.published_at) {
+        cleanUpdates.published_at = new Date().toISOString()
+      }
+      // If published_at was explicitly provided in updates, use that
+      // (but don't overwrite with new date if one already exists)
     }
 
     await docRef.update(cleanUpdates)
