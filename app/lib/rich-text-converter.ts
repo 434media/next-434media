@@ -104,14 +104,10 @@ export async function convertAirtableRichTextToHTML(content: any): Promise<strin
     return ''
   }
 
-  // If content is already a string, check if it's markdown or HTML
+  // If content is already a string
   if (typeof content === 'string') {
-    // If it contains HTML tags, sanitize and return
-    if (content.includes('<') && content.includes('>')) {
-      return sanitizeHTML(content)
-    }
-    
-    // Parse as markdown - marked will handle plain text gracefully
+    // Always parse as markdown - marked handles HTML passthrough gracefully
+    // This ensures any markdown syntax mixed with HTML is properly converted
     try {
       const html = await marked.parse(content, { 
         gfm: true, // GitHub flavored markdown
@@ -120,6 +116,10 @@ export async function convertAirtableRichTextToHTML(content: any): Promise<strin
       return sanitizeHTML(html)
     } catch (error) {
       console.error('Error parsing markdown:', error)
+      // Fallback: if content looks like HTML, sanitize it; otherwise format as plain text
+      if (content.includes('<') && content.includes('>')) {
+        return sanitizeHTML(content)
+      }
       return sanitizeHTML(formatPlainText(content))
     }
   }
@@ -141,20 +141,19 @@ export function convertAirtableRichTextToHTMLSync(content: any): string {
     return ''
   }
 
-  // If content is already a string, check if it's markdown or HTML
+  // If content is already a string
   if (typeof content === 'string') {
-    // If it contains HTML tags, sanitize and return (already converted)
-    if (content.includes('<') && content.includes('>')) {
-      return sanitizeHTML(content)
-    }
-    
-    // Parse as markdown using the synchronous marked instance
-    // This ensures any markdown syntax is properly converted
+    // Always parse as markdown first - marked handles HTML passthrough gracefully
+    // This ensures any markdown syntax mixed with HTML is properly converted
     try {
       const html = syncMarked.parse(content) as string
       return sanitizeHTML(html)
     } catch (error) {
       console.error('Error parsing markdown:', error)
+      // Fallback: if content looks like HTML, sanitize it; otherwise format as plain text
+      if (content.includes('<') && content.includes('>')) {
+        return sanitizeHTML(content)
+      }
       return sanitizeHTML(formatPlainText(content))
     }
   }
