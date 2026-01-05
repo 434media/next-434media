@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next"
-import { getBlogPosts } from "./lib/blog-db"
+import { getBlogPostsFromFirestore } from "./lib/firestore-blog"
 import { getProducts } from "./lib/shopify"
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -40,7 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Fetch dynamic content (in parallel)
   const [posts, products] = await Promise.all([
-    getBlogPosts({ status: "published" }).catch(() => []),
+    getBlogPostsFromFirestore({ status: "published" }).catch(() => []),
     getProducts({}).catch(() => []),
   ])
 
