@@ -16,6 +16,8 @@ import {
   Users,
   Globe,
   FileDown,
+  Database,
+  ArrowRight,
 } from "lucide-react"
 
 interface EmailSignup {
@@ -44,6 +46,7 @@ export default function EmailListsPage() {
   const [startDate, setStartDate] = useState<string>("")
   const [endDate, setEndDate] = useState<string>("")
   const [datePreset, setDatePreset] = useState<string>("")
+  const [isMigrating, setIsMigrating] = useState(false)
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -68,8 +71,8 @@ export default function EmailListsPage() {
   const fetchSourcesAndCounts = async () => {
     try {
       const [sourcesRes, countsRes] = await Promise.all([
-        fetch("/api/admin/email-lists?action=sources"),
-        fetch("/api/admin/email-lists?action=counts"),
+        fetch("/api/admin/email-lists-firestore?action=sources"),
+        fetch("/api/admin/email-lists-firestore?action=counts"),
       ])
 
       const sourcesData = await sourcesRes.json()
@@ -92,8 +95,8 @@ export default function EmailListsPage() {
       setError(null)
 
       const url = source 
-        ? `/api/admin/email-lists?source=${encodeURIComponent(source)}`
-        : "/api/admin/email-lists"
+        ? `/api/admin/email-lists-firestore?source=${encodeURIComponent(source)}`
+        : "/api/admin/email-lists-firestore"
       
       const res = await fetch(url)
       const data = await res.json()
@@ -111,14 +114,49 @@ export default function EmailListsPage() {
     }
   }
 
+  // Migration function
+  const handleMigrate = async () => {
+    if (!confirm("This will migrate all emails from Airtable to Firestore. Continue?")) {
+      return
+    }
+    
+    try {
+      setIsMigrating(true)
+      const res = await fetch("/api/admin/email-lists-firestore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "migrate" }),
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        setToast({ 
+          message: `Migration complete! ${data.result?.migrated || 0} emails migrated, ${data.result?.skipped || 0} skipped`, 
+          type: "success" 
+        })
+        // Refresh data
+        await fetchSourcesAndCounts()
+        await fetchSignups(selectedSource)
+      } else {
+        setToast({ message: data.error || "Migration failed", type: "error" })
+      }
+    } catch (err) {
+      setToast({ message: "Failed to run migration", type: "error" })
+      console.error(err)
+    } finally {
+      setIsMigrating(false)
+    }
+  }
+
   // Download all emails from selected source
   const handleDownloadAllCSV = async () => {
     try {
       setIsDownloading(true)
       
       const url = selectedSource 
-        ? `/api/admin/email-lists?source=${encodeURIComponent(selectedSource)}&format=csv`
-        : "/api/admin/email-lists?format=csv"
+        ? `/api/admin/email-lists-firestore?source=${encodeURIComponent(selectedSource)}&format=csv`
+        : "/api/admin/email-lists-firestore?format=csv"
       
       const res = await fetch(url)
       const blob = await res.blob()
@@ -330,6 +368,22 @@ export default function EmailListsPage() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={handleMigrate}
+                disabled={isMigrating}
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                title="Migrate from Airtable"
+              >
+                {isMigrating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Database className="w-4 h-4" />
+                    <ArrowRight className="w-3 h-3" />
+                  </>
+                )}
+                <span className="hidden lg:inline text-sm">Migrate</span>
+              </button>
               <button
                 onClick={() => fetchSignups(selectedSource)}
                 disabled={isLoading}

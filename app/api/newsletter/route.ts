@@ -3,6 +3,7 @@ import Airtable from "airtable"
 import axios from "axios"
 import crypto from "crypto"
 import { checkBotId } from "botid/server"
+import { saveEmailSignup } from "@/app/lib/firestore-email-signups"
 
 const airtableBaseId = process.env.AIRTABLE_BASE_ID
 const airtableApiKey = process.env.AIRTABLE_API_KEY
@@ -46,7 +47,15 @@ export async function POST(request: Request) {
       },
     ])
 
-    const promises: Promise<any>[] = [airtablePromise]
+    // Save to Firestore for centralized tracking
+    const firestorePromise = saveEmailSignup({
+      email: email.toLowerCase().trim(),
+      source: "434Media",
+      created_at: new Date().toISOString(),
+      mailchimp_tags: ["web-434media", "newsletter-signup"],
+    })
+
+    const promises: Promise<any>[] = [airtablePromise, firestorePromise]
 
     if (mailchimpEnabled) {
       console.log(
@@ -79,13 +88,21 @@ export async function POST(request: Request) {
     const results = await Promise.allSettled(promises)
 
     const airtableResult = results[0]
-    const mailchimpResult = mailchimpEnabled ? results[1] : null
+    const firestoreResult = results[1]
+    const mailchimpResult = mailchimpEnabled ? results[2] : null
 
     const errors = []
 
     if (airtableResult.status === "rejected") {
       console.error("Airtable error:", airtableResult.reason)
       errors.push("Airtable subscription failed")
+    }
+
+    if (firestoreResult.status === "rejected") {
+      console.error("Firestore error:", firestoreResult.reason)
+      // Don't add to errors - Firestore failure shouldn't fail the whole request
+    } else if (firestoreResult.status === "fulfilled" && !firestoreResult.value.success) {
+      console.error("Firestore save error:", firestoreResult.value.error)
     }
 
     if (mailchimpEnabled && mailchimpResult && mailchimpResult.status === "rejected") {
