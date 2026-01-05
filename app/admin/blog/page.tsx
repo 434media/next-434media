@@ -27,7 +27,6 @@ import {
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
 import type { BlogPost, BlogFilters } from "../../types/blog-types"
-import DOMPurify from "isomorphic-dompurify"
 
 // Blog categories
 const CATEGORIES = [
@@ -159,15 +158,10 @@ export default function BlogAdminPage() {
 
     setIsSaving(true)
     try {
-      // Sanitize content to prevent XSS
-      const sanitizedContent = DOMPurify.sanitize(formData.content, {
-        ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'code', 'pre', 'blockquote', 'img'],
-        ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class']
-      })
-
+      // Note: Content is stored as markdown and sanitized when converted to HTML on display
+      // Do NOT sanitize markdown content here as it strips markdown syntax like **bold**
       const payload = {
         ...formData,
-        content: sanitizedContent,
         tags: formData.tags
       }
 

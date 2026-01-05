@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getBlogPostBySlugFromAirtable } from "../../lib/airtable-blog"
+import { getBlogPostBySlugFromFirestore } from "../../lib/firestore-blog"
 import BlogPostPageClient from "./BlogPostPageClient"
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const post = await getBlogPostBySlugFromAirtable(slug)
+  const post = await getBlogPostBySlugFromFirestore(slug)
 
   if (!post) {
     return {
@@ -119,7 +119,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params
-  const post = await getBlogPostBySlugFromAirtable(slug)
+  const post = await getBlogPostBySlugFromFirestore(slug)
 
   if (!post) {
     notFound()

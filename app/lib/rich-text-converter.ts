@@ -140,23 +140,19 @@ export function convertAirtableRichTextToHTMLSync(content: any): string {
 
   // If content is already a string, check if it's markdown or HTML
   if (typeof content === 'string') {
-    // If it contains HTML tags, sanitize and return
+    // If it contains HTML tags, sanitize and return (already converted)
     if (content.includes('<') && content.includes('>')) {
       return sanitizeHTML(content)
     }
     
-    // If it contains markdown syntax, use synchronous parsing
-    if (containsMarkdown(content)) {
-      marked.setOptions({ 
-        gfm: true, 
-        breaks: false // Disable breaks to prevent link interference
-      })
-      const html = marked(content) as string
-      return sanitizeHTML(html)
-    }
-    
-    // Plain text - convert line breaks to paragraphs
-    return formatPlainText(content)
+    // Always parse as markdown - marked will handle plain text gracefully
+    // This ensures any markdown syntax is properly converted
+    const html = marked.parse(content, { 
+      gfm: true, 
+      breaks: false, // Disable breaks to prevent link interference
+      async: false // Force synchronous mode
+    }) as string
+    return sanitizeHTML(html)
   }
 
   // If content is a rich text object (Airtable's collaborative rich text format)
@@ -173,14 +169,15 @@ export function convertAirtableRichTextToHTMLSync(content: any): string {
  */
 function containsMarkdown(text: string): boolean {
   const markdownPatterns = [
-    /\*\*.*?\*\*/, // Bold
-    /\*.*?\*/, // Italic
-    /`.*?`/, // Code
-    /\[.*?\]\(.*?\)/, // Links
-    /^#{1,6}\s/, // Headers
-    /^-\s/, // Lists
-    /^\d+\.\s/, // Numbered lists
-    /^\>/, // Blockquotes
+    /\*\*[^*]+\*\*/, // Bold **text**
+    /(?<!\*)\*[^*]+\*(?!\*)/, // Italic *text* (not part of bold)
+    /`[^`]+`/, // Code `text`
+    /\[[^\]]+\]\([^)]+\)/, // Links [text](url)
+    /^#{1,6}\s/m, // Headers (multiline)
+    /^[-*+]\s/m, // Unordered lists (multiline)
+    /^\d+\.\s/m, // Ordered lists (multiline)
+    /^>\s/m, // Blockquotes (multiline)
+    /^```/m, // Code blocks
   ]
   
   return markdownPatterns.some(pattern => pattern.test(text))

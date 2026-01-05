@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getBlogPostsFromAirtable } from "../lib/airtable-blog"
+import { getBlogPostsFromFirestore } from "../lib/firestore-blog"
 import BlogClientPage from "./BlogClientPage"
 
 export const metadata: Metadata = {
@@ -52,8 +52,8 @@ export const metadata: Metadata = {
 
 export default async function BlogPage() {
   try {
-    console.log("🔍 Loading blog posts from Airtable...")
-    const publishedPosts = await getBlogPostsFromAirtable({ status: "published" })
+    console.log("🔍 Loading blog posts from Firestore...")
+    const publishedPosts = await getBlogPostsFromFirestore({ status: "published" })
     console.log(`✅ Successfully loaded ${publishedPosts.length} blog posts`)
 
     return <BlogClientPage initialPosts={publishedPosts} />

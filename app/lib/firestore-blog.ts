@@ -1,5 +1,6 @@
 import { getDb, COLLECTIONS, admin } from "./firebase-admin"
 import type { BlogPost, BlogCategory, CreateBlogPostData, UpdateBlogPostData, BlogFilters } from "../types/blog-types"
+import { convertAirtableRichTextToHTMLSync } from "./rich-text-converter"
 
 // ============================================
 // SIMPLE IN-MEMORY CACHE (reduces Firestore reads)
@@ -52,7 +53,7 @@ function calculateReadTime(content: string): number {
 }
 
 // Convert Firestore document to BlogPost interface
-function mapFirestoreToBlogPost(doc: admin.firestore.DocumentSnapshot): BlogPost {
+function mapFirestoreToBlogPost(doc: admin.firestore.DocumentSnapshot, rawContent: boolean = false): BlogPost {
   const data = doc.data()
   if (!data) {
     throw new Error(`Document ${doc.id} has no data`)
@@ -60,11 +61,16 @@ function mapFirestoreToBlogPost(doc: admin.firestore.DocumentSnapshot): BlogPost
 
   const Timestamp = admin.firestore.Timestamp
 
+  // Convert markdown content to HTML for display, unless raw content is requested (for admin editing)
+  const processedContent = rawContent 
+    ? (data.content || "") 
+    : convertAirtableRichTextToHTMLSync(data.content || "")
+
   return {
     id: doc.id,
     title: data.title || "",
     slug: data.slug || generateSlug(data.title || ""),
-    content: data.content || "",
+    content: processedContent,
     excerpt: data.excerpt || undefined,
     featured_image: data.featured_image || undefined,
     meta_description: data.meta_description || undefined,
@@ -87,9 +93,10 @@ function mapFirestoreToBlogPost(doc: admin.firestore.DocumentSnapshot): BlogPost
 }
 
 // Get all blog posts from Firestore (with caching)
-export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Promise<BlogPost[]> {
-  // Generate cache key from filters
-  const cacheKey = `blog_posts:${JSON.stringify(filters)}`
+// Set rawContent=true for admin editing (returns markdown), false for display (returns HTML)
+export async function getBlogPostsFromFirestore(filters: BlogFilters = {}, rawContent: boolean = false): Promise<BlogPost[]> {
+  // Generate cache key from filters and rawContent flag
+  const cacheKey = `blog_posts:${JSON.stringify(filters)}:raw=${rawContent}`
   const cached = getCached<BlogPost[]>(cacheKey)
   if (cached) {
     console.log("[Firestore] Cache hit for blog posts")
@@ -100,7 +107,7 @@ export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Prom
     const db = getDb()
     let query: admin.firestore.Query = db.collection(COLLECTIONS.BLOG_POSTS)
 
-    // Apply filters
+    // Apply status filter
     if (filters.status) {
       query = query.where("status", "==", filters.status)
     }
@@ -109,16 +116,20 @@ export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Prom
       query = query.where("category", "==", filters.category)
     }
 
-    // Order by published_at descending
-    query = query.orderBy("published_at", "desc")
-
     // Apply limit if specified
     if (filters.limit) {
       query = query.limit(filters.limit)
     }
 
     const snapshot = await query.get()
-    let posts = snapshot.docs.map(mapFirestoreToBlogPost)
+    let posts = snapshot.docs.map(doc => mapFirestoreToBlogPost(doc, rawContent))
+    
+    // Sort by published_at client-side to avoid composite index requirement
+    posts.sort((a, b) => {
+      const dateA = a.published_at ? new Date(a.published_at).getTime() : 0
+      const dateB = b.published_at ? new Date(b.published_at).getTime() : 0
+      return dateB - dateA // Descending order
+    })
     
     console.log(`[Firestore] Fetched ${posts.length} blog posts`)
 
@@ -152,7 +163,8 @@ export async function getBlogPostsFromFirestore(filters: BlogFilters = {}): Prom
 }
 
 // Get a specific blog post by slug from Firestore
-export async function getBlogPostBySlugFromFirestore(slug: string): Promise<BlogPost | null> {
+// Set rawContent=true for admin editing (returns markdown), false for display (returns HTML)
+export async function getBlogPostBySlugFromFirestore(slug: string, rawContent: boolean = false): Promise<BlogPost | null> {
   try {
     const db = getDb()
     const snapshot = await db
@@ -166,7 +178,7 @@ export async function getBlogPostBySlugFromFirestore(slug: string): Promise<Blog
       return null
     }
 
-    return mapFirestoreToBlogPost(snapshot.docs[0])
+    return mapFirestoreToBlogPost(snapshot.docs[0], rawContent)
   } catch (error) {
     console.error("Error fetching blog post by slug from Firestore:", error)
     return null
@@ -174,7 +186,8 @@ export async function getBlogPostBySlugFromFirestore(slug: string): Promise<Blog
 }
 
 // Get a specific blog post by ID from Firestore
-export async function getBlogPostByIdFromFirestore(id: string): Promise<BlogPost | null> {
+// Set rawContent=true for admin editing (returns markdown), false for display (returns HTML)
+export async function getBlogPostByIdFromFirestore(id: string, rawContent: boolean = false): Promise<BlogPost | null> {
   try {
     const db = getDb()
     const doc = await db.collection(COLLECTIONS.BLOG_POSTS).doc(id).get()
@@ -183,7 +196,7 @@ export async function getBlogPostByIdFromFirestore(id: string): Promise<BlogPost
       return null
     }
 
-    return mapFirestoreToBlogPost(doc)
+    return mapFirestoreToBlogPost(doc, rawContent)
   } catch (error) {
     console.error("Error fetching blog post by ID from Firestore:", error)
     return null
@@ -278,6 +291,7 @@ export async function updateBlogPostInFirestore(id: string, updates: UpdateBlogP
     invalidateBlogCache()
 
     const doc = await docRef.get()
+    // Return with processed HTML content for display
     return mapFirestoreToBlogPost(doc)
   } catch (error) {
     console.error("Error updating blog post in Firestore:", error)

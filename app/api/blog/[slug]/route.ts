@@ -30,13 +30,15 @@ export async function GET(
 ) {
   try {
     const { slug } = await params
+    const { searchParams } = new URL(request.url)
+    const rawContent = searchParams.get("rawContent") === "true"
     
     // First try to get by slug (published posts)
-    let post = await getBlogPostBySlugFromFirestore(slug)
+    let post = await getBlogPostBySlugFromFirestore(slug, rawContent)
     
     // If not found by slug, try by ID (for admin access)
     if (!post) {
-      post = await getBlogPostByIdFromFirestore(slug)
+      post = await getBlogPostByIdFromFirestore(slug, true) // Admin access, return raw content
       
       // If found by ID but it's a draft, require admin access
       if (post && post.status === "draft") {

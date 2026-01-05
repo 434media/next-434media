@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     if (search) filters.search = search
     if (limit) filters.limit = parseInt(limit, 10)
 
-    const posts = await getBlogPostsFromFirestore(filters)
+    const posts = await getBlogPostsFromFirestore(filters, includeAll)
     
     return NextResponse.json({ 
       posts,
