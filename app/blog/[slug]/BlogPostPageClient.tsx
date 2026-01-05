@@ -224,8 +224,8 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 <span className="font-semibold text-gray-900">{post.author}</span>
                 <span className="text-gray-300">·</span>
-                <time dateTime={post.published_at || post.created_at}>
-                  {formatDate(post.published_at || post.created_at)}
+                <time dateTime={post.created_at}>
+                  {formatDate(post.created_at)}
                 </time>
                 {post.read_time && (
                   <>
@@ -245,18 +245,18 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
           </div>
         </header>
 
-        {/* Featured Image - Natural Aspect Ratio */}
+        {/* Featured Image - Constrained Height */}
         {post.featured_image && (
           <section className="relative pt-8 md:pt-12">
             <div className="max-w-4xl mx-auto px-6">
-              <figure className="relative">
+              <figure className="relative flex justify-center">
                 <Image
                   src={post.featured_image || "/placeholder.svg"}
                   alt={post.title}
                   width={1200}
                   height={800}
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 896px"
-                  className={`w-full h-auto rounded-lg transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+                  className={`w-auto h-auto max-w-full max-h-[70vh] object-contain rounded-lg transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                   priority
                   onLoad={() => setImageLoaded(true)}
                 />
