@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon } from "lucide-react"
+import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon, Mail } from "lucide-react"
 
 interface CurrentUser {
   email: string
@@ -67,6 +67,15 @@ const adminSections: AdminSection[] = [
     icon: <Calendar className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Add events manually or import from Meetup, Eventbrite, and Lu.ma URLs",
+  },
+  {
+    id: "email-lists",
+    title: "EMAIL LISTS",
+    subtitle: "AIM • 434 MEDIA • All Sites",
+    href: "/admin/email-lists",
+    icon: <Mail className="w-6 h-6 sm:w-7 sm:h-7" />,
+    size: "large",
+    description: "View and export email signups from all websites. Filter by source and download CSV for Mailchimp import.",
   },
 ]
 
