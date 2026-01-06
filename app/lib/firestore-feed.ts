@@ -55,6 +55,8 @@ export interface FeedItem {
   topics: string[]
   slug: string
   og_image?: string
+  og_title?: string
+  og_description?: string
   status: "draft" | "published" | "archived"
   
   // Newsletter-specific fields
@@ -117,6 +119,8 @@ function mapFirestoreToFeedItem(doc: admin.firestore.DocumentSnapshot): FeedItem
     topics: data.topics || [],
     slug: data.slug || "",
     og_image: data.og_image || undefined,
+    og_title: data.og_title || undefined,
+    og_description: data.og_description || undefined,
     status: data.status || "draft",
     
     // Newsletter-specific fields

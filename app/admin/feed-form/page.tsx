@@ -35,11 +35,11 @@ function CollapsibleSection({
   children
 }: CollapsibleSectionProps) {
   return (
-    <div className={`border rounded-xl overflow-hidden transition-all duration-200 ${
+    <div className={`border-2 rounded-xl overflow-hidden transition-all duration-200 ${
       isOpen 
-        ? 'border-blue-300 shadow-lg shadow-blue-100/50 bg-white' 
+        ? 'border-sky-400 shadow-lg shadow-sky-100/50 bg-white' 
         : isComplete 
-          ? 'border-green-200 bg-green-50/30 hover:border-green-300' 
+          ? 'border-green-300 bg-green-50/30 hover:border-green-400' 
           : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'
     }`}>
       <button
@@ -47,10 +47,10 @@ function CollapsibleSection({
         onClick={onToggle}
         className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${
+        <div className="flex items-center gap-4">
+          <div className={`p-2.5 rounded-xl transition-all ${
             isOpen 
-              ? 'bg-blue-100 text-blue-600' 
+              ? 'bg-sky-100 text-sky-600 shadow-sm' 
               : isComplete 
                 ? 'bg-green-100 text-green-600' 
                 : 'bg-neutral-100 text-neutral-500'
@@ -59,22 +59,27 @@ function CollapsibleSection({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className={`font-semibold ${isOpen ? 'text-blue-900' : 'text-neutral-900'}`}>
+              <h3 className={`text-base font-bold tracking-tight ${
+                isOpen ? 'text-sky-900' : isComplete ? 'text-green-800' : 'text-neutral-900'
+              }`}>
                 {title}
               </h3>
             </div>
-            <p className="text-sm text-neutral-500 mt-0.5">{description}</p>
+            <p className="text-sm text-neutral-500 mt-0.5 leading-relaxed">{description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {isComplete && !isOpen && (
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Complete
+            </span>
           )}
-          <div className={`p-1 rounded-full transition-colors ${
-            isOpen ? 'bg-blue-100' : 'bg-neutral-100'
+          <div className={`p-1.5 rounded-full transition-all ${
+            isOpen ? 'bg-sky-100 rotate-0' : 'bg-neutral-100'
           }`}>
             {isOpen ? (
-              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'text-blue-600' : 'text-neutral-400'}`} />
+              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'text-sky-600' : 'text-neutral-400'}`} />
             ) : (
               <ChevronRight className={`h-5 w-5 ${isComplete ? 'text-green-500' : 'text-neutral-400'}`} />
             )}
@@ -89,7 +94,7 @@ function CollapsibleSection({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
           >
-            <div className="px-5 pb-5 pt-2 border-t border-neutral-100">
+            <div className="px-5 pb-6 pt-3 border-t border-sky-100 bg-gradient-to-b from-sky-50/30 to-transparent">
               {children}
             </div>
           </motion.div>
@@ -117,13 +122,13 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
     return (
       <div className="relative">
         {isPreview && isEditing && (
-          <div className="flex justify-end mb-1">
+          <div className="flex justify-end mb-2">
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-700 px-2 py-1 bg-green-50 hover:bg-green-100 rounded-md transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-600 hover:text-green-700 px-3 py-1.5 bg-green-50 hover:bg-green-100 rounded-lg transition-all border border-green-200"
             >
-              <CheckCircle2 className="h-3 w-3" />
+              <CheckCircle2 className="h-3.5 w-3.5" />
               Done Editing
             </button>
           </div>
@@ -136,7 +141,7 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
   // For rich text, render HTML
   const renderValue = () => {
     if (!value) {
-      return <span className="text-neutral-400 italic">Click to add content</span>
+      return <span className="text-neutral-400 italic text-sm">Click to add content</span>
     }
     if (isRichText) {
       // Simple markdown-like rendering for preview
@@ -146,12 +151,12 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
         .replace(/\n/g, '<br />')
       return (
         <div 
-          className="prose prose-sm max-w-none text-neutral-700"
+          className="prose prose-sm max-w-none text-neutral-700 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       )
     }
-    return <span className="text-neutral-700">{value}</span>
+    return <span className="text-neutral-800 font-medium">{value}</span>
   }
 
   return (
@@ -160,15 +165,15 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
       onClick={() => setIsEditing(true)}
     >
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-neutral-500 group-hover:text-blue-600 transition-colors">
+        <label className="text-sm font-semibold text-neutral-600 group-hover:text-sky-600 transition-colors tracking-tight">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-neutral-400 group-hover:text-blue-600 px-2 py-1 rounded-md group-hover:bg-blue-50 transition-all">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-400 group-hover:text-sky-600 px-2.5 py-1 rounded-lg group-hover:bg-sky-50 transition-all border border-transparent group-hover:border-sky-200">
           <Pencil className="h-3 w-3" />
           <span className="hidden group-hover:inline">Click to edit</span>
         </span>
       </div>
-      <div className="px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-lg min-h-[44px] group-hover:border-blue-300 group-hover:bg-blue-50/30 transition-all">
+      <div className="px-4 py-3 bg-neutral-50 border-2 border-neutral-200 rounded-xl min-h-[52px] group-hover:border-sky-300 group-hover:bg-sky-50/30 transition-all flex items-center">
         {renderValue()}
       </div>
     </div>
@@ -217,6 +222,8 @@ interface FeedItem {
   topics: string[]
   slug: string
   og_image?: string
+  og_title?: string
+  og_description?: string
   status: FeedStatus
   
   // Newsletter-specific fields
@@ -266,6 +273,8 @@ interface FeedFormData {
   published_date: string
   status: FeedStatus
   og_image?: string
+  og_title?: string
+  og_description?: string
   
   // Newsletter-specific fields
   hero_image_desktop?: string
@@ -498,7 +507,7 @@ export default function FeedFormPage() {
       case "video":
         return "bg-purple-100 text-purple-800"
       case "article":
-        return "bg-blue-100 text-blue-800"
+        return "bg-sky-100 text-sky-800"
       case "podcast":
         return "bg-pink-100 text-pink-800"
       case "newsletter":
@@ -771,6 +780,8 @@ export default function FeedFormPage() {
       published_date: item.published_date,
       status: item.status,
       og_image: item.og_image,
+      og_title: item.og_title,
+      og_description: item.og_description,
       hero_image_desktop: item.hero_image_desktop,
       hero_image_mobile: item.hero_image_mobile,
       founders_note_text: item.founders_note_text,
@@ -944,7 +955,7 @@ export default function FeedFormPage() {
                               ? "bg-yellow-500 text-white shadow-sm"
                               : status === "archived"
                               ? "bg-neutral-600 text-white shadow-sm"
-                              : "bg-blue-600 text-white shadow-sm"
+                              : "bg-sky-600 text-white shadow-sm"
                             : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                         }`}
                       >
@@ -969,7 +980,7 @@ export default function FeedFormPage() {
                               : type === "video"
                               ? "bg-purple-600 text-white shadow-sm"
                               : type === "article"
-                              ? "bg-blue-600 text-white shadow-sm"
+                              ? "bg-sky-600 text-white shadow-sm"
                               : type === "podcast"
                               ? "bg-pink-600 text-white shadow-sm"
                               : "bg-neutral-900 text-white shadow-sm"
@@ -990,19 +1001,19 @@ export default function FeedFormPage() {
                       type="date"
                       value={dateFilter.start}
                       onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-sky-500 focus:border-transparent"
                     />
                     <input
                       type="date"
                       value={dateFilter.end}
                       onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-sky-500 focus:border-transparent"
                     />
                   </div>
                   {(dateFilter.start || dateFilter.end) && (
                     <button
                       onClick={() => setDateFilter({ start: "", end: "" })}
-                      className="text-xs text-blue-600 hover:text-blue-700 mt-1 font-medium"
+                      className="text-xs text-sky-600 hover:text-sky-700 mt-1 font-medium"
                     >
                       Clear dates
                     </button>
@@ -1022,27 +1033,41 @@ export default function FeedFormPage() {
           )}
 
         {/* Action Buttons - Below Filters */}
-        <div className="flex gap-3 py-2">
+        <div className="flex gap-2 py-3 mb-6">
           <button
             onClick={() => setActiveTab("view")}
-            className={`flex-1 md:flex-initial px-6 py-3 text-base font-semibold rounded-lg border-2 bg-white text-black transition-all flex items-center justify-center ${
-              activeTab === "view" ? "border-black" : "border-transparent hover:border-black"
+            className={`flex-1 md:flex-initial px-6 py-3.5 text-base font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
+              activeTab === "view" 
+                ? "bg-neutral-900 text-white shadow-lg shadow-neutral-900/25 scale-[1.02]" 
+                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
             }`}
           >
-            <List className="mr-2 h-5 w-5" />
-            View Feeds ({feedItems.length})
+            <List className={`h-5 w-5 ${activeTab === "view" ? "text-white" : "text-neutral-500"}`} />
+            <span>View Feeds</span>
+            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+              activeTab === "view" 
+                ? "bg-white/20 text-white" 
+                : "bg-neutral-300 text-neutral-700"
+            }`}>
+              {feedItems.length}
+            </span>
           </button>
           <button
             onClick={() => {
               setActiveTab("create")
               setEditingId(null)
             }}
-            className={`flex-1 md:flex-initial px-6 py-3 text-base font-semibold rounded-lg bg-white text-black border-2 transition-all flex items-center justify-center ${
-              activeTab === "create" ? "border-black" : "border-transparent hover:border-black"
+            className={`flex-1 md:flex-initial px-6 py-3.5 text-base font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
+              activeTab === "create" 
+                ? "bg-gradient-to-r from-sky-600 to-sky-600 text-white shadow-lg shadow-sky-600/25 scale-[1.02]" 
+                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
             }`}
           >
-            <FileText className="mr-2 h-5 w-5" />
-            Create New
+            <FileText className={`h-5 w-5 ${activeTab === "create" ? "text-white" : "text-neutral-500"}`} />
+            <span>{editingId ? "Edit Feed" : "Create New"}</span>
+            {activeTab === "create" && (
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+            )}
           </button>
         </div>
 
@@ -1100,7 +1125,7 @@ export default function FeedFormPage() {
                               <span className={`text-[10px] font-bold uppercase tracking-wide ${
                                 item.type === "newsletter" ? "text-orange-600" :
                                 item.type === "video" ? "text-purple-600" :
-                                item.type === "article" ? "text-blue-600" :
+                                item.type === "article" ? "text-sky-600" :
                                 "text-pink-600"
                               }`}>
                                 {item.type}
@@ -1113,7 +1138,7 @@ export default function FeedFormPage() {
                             </div>
                             
                             {/* Title */}
-                            <h3 className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-2 mb-1 group-hover:text-blue-600 transition-colors">
+                            <h3 className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-2 mb-1 group-hover:text-sky-600 transition-colors">
                               {item.title}
                             </h3>
                             
@@ -1126,7 +1151,7 @@ export default function FeedFormPage() {
                             <div className="flex gap-1.5">
                               <button
                                 onClick={() => handleEdit(item)}
-                                className="flex-1 px-2 py-1.5 text-[11px] font-medium text-neutral-600 bg-neutral-50 hover:bg-blue-50 hover:text-blue-600 rounded transition-colors"
+                                className="flex-1 px-2 py-1.5 text-[11px] font-medium text-neutral-600 bg-neutral-50 hover:bg-sky-50 hover:text-sky-600 rounded transition-colors"
                               >
                                 Edit
                               </button>
@@ -1184,7 +1209,7 @@ export default function FeedFormPage() {
                             getCompletionPercentage() === 100 
                               ? 'bg-green-500' 
                               : getCompletionPercentage() >= 50 
-                                ? 'bg-blue-500' 
+                                ? 'bg-sky-500' 
                                 : 'bg-amber-500'
                           }`}
                           style={{ width: `${getCompletionPercentage()}%` }}
@@ -1227,7 +1252,7 @@ export default function FeedFormPage() {
                     disabled={isSubmitting}
                     className={`font-semibold transition-all ${
                       editingId 
-                        ? 'bg-blue-600 hover:bg-blue-700' 
+                        ? 'bg-sky-600 hover:bg-sky-700' 
                         : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
                     } text-white shadow-md hover:shadow-lg`}
                   >
@@ -1289,32 +1314,62 @@ export default function FeedFormPage() {
 
             {/* Section Toggle Controls */}
             {formData.type === "newsletter" && (
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-purple-500" />
-                  <span className="text-sm font-medium text-neutral-600">Newsletter Sections</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={expandAllSections}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 hover:bg-blue-50 rounded transition-colors"
-                  >
-                    Expand All
-                  </button>
-                  <span className="text-neutral-300">|</span>
-                  <button
-                    type="button"
-                    onClick={collapseAllSections}
-                    className="text-xs text-neutral-500 hover:text-neutral-700 font-medium px-2 py-1 hover:bg-neutral-100 rounded transition-colors"
-                  >
-                    Collapse All
-                  </button>
+              <div className="mb-6">
+                {/* Intro Panel for New Feeds */}
+                {!editingId && !formData.title && (
+                  <div className="mb-4 p-5 bg-gradient-to-br from-sky-50 to-sky-50 border-2 border-sky-200 rounded-xl">
+                    <h3 className="text-base font-bold text-sky-900 mb-2 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-sky-600" />
+                      Creating a New Newsletter
+                    </h3>
+                    <p className="text-sm text-sky-700 leading-relaxed mb-3">
+                      Fill out each section below to create your newsletter. Click on any section header to expand it. 
+                      <strong>Required fields are marked with a red asterisk (*)</strong>.
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-sky-700 border border-sky-200">
+                        <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                        Active section
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-green-700 border border-green-200">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Completed section
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-neutral-600 border border-neutral-200">
+                        <ChevronRight className="h-3 w-3" />
+                        Collapsed section
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm font-semibold text-neutral-700">Newsletter Sections</span>
+                    <span className="text-xs text-neutral-500">({openSections.size} expanded)</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={expandAllSections}
+                      className="text-xs text-sky-600 hover:text-sky-700 font-semibold px-3 py-1.5 hover:bg-sky-100 rounded-lg transition-all border border-transparent hover:border-sky-200"
+                    >
+                      Expand All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={collapseAllSections}
+                      className="text-xs text-neutral-500 hover:text-neutral-700 font-semibold px-3 py-1.5 hover:bg-neutral-200 rounded-lg transition-all border border-transparent hover:border-neutral-300"
+                    >
+                      Collapse All
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* Basic Information - Collapsible */}
               <CollapsibleSection
                 id="basic"
@@ -1335,7 +1390,7 @@ export default function FeedFormPage() {
                         type="text"
                         value={formData.title}
                         onChange={(e) => handleInputChange("title", e.target.value)}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent text-lg"
                         placeholder="Enter feed item title"
                         required
                       />
@@ -1349,7 +1404,7 @@ export default function FeedFormPage() {
                         <select
                           value={formData.type}
                           onChange={(e) => handleInputChange("type", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                         >
                           <option value="video">🎬 Video</option>
                           <option value="article">📄 Article</option>
@@ -1369,7 +1424,7 @@ export default function FeedFormPage() {
                           type="date"
                           value={formData.published_date}
                           onChange={(e) => handleInputChange("published_date", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                         />
                       </div>
                     </PreviewField>
@@ -1399,7 +1454,7 @@ export default function FeedFormPage() {
                         type="text"
                         value={formData.slug}
                         onChange={(e) => handleInputChange("slug", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-sm"
                         placeholder="auto-generated-from-title"
                       />
                       <p className="text-xs text-neutral-500 mt-1">Auto-generated from title if left empty</p>
@@ -1411,40 +1466,40 @@ export default function FeedFormPage() {
               {/* Metadata - Collapsible */}
               <CollapsibleSection
                 id="metadata"
-                title="Metadata"
-                description="Authors, topics, and social image"
+                title="Metadata & Social Sharing"
+                description="Authors, topics, and Open Graph settings for social previews"
                 icon={<Tag className="h-5 w-5" />}
                 isOpen={openSections.has("metadata")}
                 onToggle={() => toggleSection("metadata")}
                 isComplete={isSectionComplete("metadata")}
               >
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <Users className="h-4 w-4" />
+                      <label className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
+                        <Users className="h-4 w-4 text-neutral-500" />
                         Authors
                       </label>
-                      <p className="text-xs text-neutral-500 mb-2">
-                        Comma-separated: Digital Canvas Team, Dev Team, Creative Team
+                      <p className="text-xs text-neutral-500 mb-2 leading-relaxed">
+                        Enter names separated by commas (e.g., Digital Canvas Team, Dev Team)
                       </p>
                       <input
                         type="text"
                         onChange={(e) => handleArrayInput("authors", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all"
                         placeholder="Digital Canvas Team, Dev Team"
                       />
                       {formData.authors.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-3">
                           {formData.authors.map((author, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                            <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-100 text-sky-800 text-sm font-medium rounded-full">
                               {author}
                               <button
                                 type="button"
                                 onClick={() => removeArrayItem("authors", idx)}
-                                className="ml-1 hover:text-blue-900"
+                                className="ml-0.5 hover:text-sky-900 transition-colors"
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-3.5 w-3.5" />
                               </button>
                             </span>
                           ))}
@@ -1453,28 +1508,28 @@ export default function FeedFormPage() {
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <Tag className="h-4 w-4" />
+                      <label className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
+                        <Tag className="h-4 w-4 text-neutral-500" />
                         Topics
                       </label>
-                      <p className="text-xs text-neutral-500 mb-2">Comma-separated tags</p>
+                      <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Enter tags separated by commas for categorization</p>
                       <input
                         type="text"
                         onChange={(e) => handleArrayInput("topics", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all"
                         placeholder="Technology, Design, Business"
                       />
                       {formData.topics.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-3">
                           {formData.topics.map((topic, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 text-sm rounded-full">
+                            <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-800 text-sm font-medium rounded-full">
                               {topic}
                               <button
                                 type="button"
                                 onClick={() => removeArrayItem("topics", idx)}
-                                className="ml-1 hover:text-emerald-900"
+                                className="ml-0.5 hover:text-emerald-900 transition-colors"
                               >
-                                <X className="h-3 w-3" />
+                                <X className="h-3.5 w-3.5" />
                               </button>
                             </span>
                           ))}
@@ -1483,13 +1538,96 @@ export default function FeedFormPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <ImageUpload
-                      value={formData.og_image || ""}
-                      onChange={(value) => handleInputChange("og_image", value)}
-                      label="OG Image (Social Share)"
-                      hideUrl
-                    />
+                  {/* Open Graph Settings */}
+                  <div className="pt-4 border-t border-neutral-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 bg-gradient-to-br from-sky-500 to-sky-600 rounded-lg">
+                        <LinkIcon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-neutral-800">Open Graph Settings</h4>
+                        <p className="text-xs text-neutral-500">Customize how this content appears when shared on social media</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl p-5 border-2 border-sky-100 space-y-5">
+                      {/* OG Title */}
+                      <PreviewField label="OG Title" value={formData.og_title || ""} isPreview={previewMode && !!editingId}>
+                        <div>
+                          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
+                            Social Title
+                          </label>
+                          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Custom title for social sharing. Leave empty to use the main title.</p>
+                          <input
+                            type="text"
+                            value={formData.og_title || ""}
+                            onChange={(e) => handleInputChange("og_title", e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all"
+                            placeholder={formData.title || "Enter social title..."}
+                          />
+                        </div>
+                      </PreviewField>
+                      
+                      {/* OG Description */}
+                      <PreviewField label="OG Description" value={formData.og_description || ""} isPreview={previewMode && !!editingId}>
+                        <div>
+                          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
+                            Social Description
+                          </label>
+                          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Custom description for social sharing. Leave empty to use the summary. (Max 160 characters recommended)</p>
+                          <textarea
+                            value={formData.og_description || ""}
+                            onChange={(e) => handleInputChange("og_description", e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all resize-y min-h-[80px]"
+                            placeholder={formData.summary ? formData.summary.substring(0, 160) : "Enter social description..."}
+                            maxLength={200}
+                          />
+                          <p className="text-xs text-neutral-400 mt-1 text-right">
+                            {(formData.og_description || "").length}/200 characters
+                          </p>
+                        </div>
+                      </PreviewField>
+                      
+                      {/* OG Image */}
+                      <div>
+                        <ImageUpload
+                          value={formData.og_image || ""}
+                          onChange={(value) => handleInputChange("og_image", value)}
+                          label="Social Share Image (1200×630px)"
+                          hideUrl
+                        />
+                        <p className="text-xs text-sky-600 mt-2 leading-relaxed">
+                          <strong>Recommended:</strong> 1200×630 pixels (1.91:1 ratio). This image appears when your content is shared on Facebook, Twitter/X, LinkedIn, and other social platforms.
+                        </p>
+                      </div>
+                      
+                      {/* Preview Card */}
+                      {(formData.og_image || formData.og_title || formData.title) && (
+                        <div className="mt-4 pt-4 border-t border-sky-200">
+                          <p className="text-xs font-semibold text-neutral-600 mb-3 uppercase tracking-wide">Social Preview</p>
+                          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm max-w-md">
+                            {formData.og_image && (
+                              <div className="aspect-[1.91/1] bg-neutral-100 overflow-hidden">
+                                <img 
+                                  src={formData.og_image} 
+                                  alt="OG Preview" 
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="p-3">
+                              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-1">digitalcanvas.community</p>
+                              <h5 className="text-sm font-bold text-neutral-900 line-clamp-2 mb-1">
+                                {formData.og_title || formData.title || "Your title here"}
+                              </h5>
+                              <p className="text-xs text-neutral-500 line-clamp-2">
+                                {formData.og_description || formData.summary || "Your description will appear here..."}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CollapsibleSection>
@@ -1507,40 +1645,55 @@ export default function FeedFormPage() {
                     onToggle={() => toggleSection("hero")}
                     isComplete={isSectionComplete("hero")}
                   >
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ImageUpload
-                          value={formData.hero_image_desktop || ""}
-                          onChange={(value) => handleInputChange("hero_image_desktop", value)}
-                          label="Hero Image Desktop"
-                          hideUrl
-                        />
-                        <ImageUpload
-                          value={formData.hero_image_mobile || ""}
-                          onChange={(value) => handleInputChange("hero_image_mobile", value)}
-                          label="Hero Image Mobile"
-                          hideUrl
-                        />
-                      </div>
-
-                      <PreviewField label="Founder's Note" value={formData.founders_note_text || ""} isPreview={previewMode && !!editingId} isRichText>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Founder's Note</label>
-                          <RichTextEditor
-                            value={formData.founders_note_text || ""}
-                            onChange={(value) => handleInputChange("founders_note_text", value)}
-                            placeholder="Enter founder's note content (supports Markdown)"
-                            minRows={4}
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4 text-neutral-500" />
+                          Hero Images
+                        </h4>
+                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Upload separate hero images optimized for desktop and mobile devices.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <ImageUpload
+                            value={formData.hero_image_desktop || ""}
+                            onChange={(value) => handleInputChange("hero_image_desktop", value)}
+                            label="Desktop Hero (Recommended: 1920x1080)"
+                            hideUrl
+                          />
+                          <ImageUpload
+                            value={formData.hero_image_mobile || ""}
+                            onChange={(value) => handleInputChange("hero_image_mobile", value)}
+                            label="Mobile Hero (Recommended: 1080x1350)"
+                            hideUrl
                           />
                         </div>
-                      </PreviewField>
+                      </div>
 
-                      <ImageUpload
-                        value={formData.founders_note_image || ""}
-                        onChange={(value) => handleInputChange("founders_note_image", value)}
-                        label="Founder's Note Image"
-                        hideUrl
-                      />
+                      <div className="border-t border-neutral-200 pt-6">
+                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+                          <Edit className="h-4 w-4 text-neutral-500" />
+                          Founder's Note
+                        </h4>
+                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">A personal message from the founders. This appears prominently in the newsletter.</p>
+                        <PreviewField label="Founder's Note Content" value={formData.founders_note_text || ""} isPreview={previewMode && !!editingId} isRichText>
+                          <div>
+                            <RichTextEditor
+                              value={formData.founders_note_text || ""}
+                              onChange={(value) => handleInputChange("founders_note_text", value)}
+                              placeholder="Enter founder's note content (supports Markdown)"
+                              minRows={6}
+                            />
+                          </div>
+                        </PreviewField>
+
+                        <div className="mt-4">
+                          <ImageUpload
+                            value={formData.founders_note_image || ""}
+                            onChange={(value) => handleInputChange("founders_note_image", value)}
+                            label="Founder's Photo or Signature"
+                            hideUrl
+                          />
+                        </div>
+                      </div>
                     </div>
                   </CollapsibleSection>
 
@@ -1555,53 +1708,62 @@ export default function FeedFormPage() {
                     isComplete={isSectionComplete("sections")}
                   >
                     <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ImageUpload
-                          value={formData.last_month_gif || ""}
-                          onChange={(value) => handleInputChange("last_month_gif", value)}
-                          label="Last Month GIF"
-                          hideUrl
-                        />
-                        <ImageUpload
-                          value={formData.the_drop_gif || ""}
-                          onChange={(value) => handleInputChange("the_drop_gif", value)}
-                          label="The Drop GIF"
-                          hideUrl
-                        />
+                      <div>
+                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4 text-neutral-500" />
+                          GIF Animations
+                        </h4>
+                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Add animated GIFs for the "Last Month" and "The Drop" sections.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <ImageUpload
+                            value={formData.last_month_gif || ""}
+                            onChange={(value) => handleInputChange("last_month_gif", value)}
+                            label="Last Month GIF"
+                            hideUrl
+                          />
+                          <ImageUpload
+                            value={formData.the_drop_gif || ""}
+                            onChange={(value) => handleInputChange("the_drop_gif", value)}
+                            label="The Drop GIF"
+                            hideUrl
+                          />
+                        </div>
                       </div>
 
-                      <div className="border-t border-neutral-200 pt-4">
-                        <h4 className="font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                      <div className="border-t border-neutral-200 pt-6">
+                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-purple-500" />
                           Featured Post
                         </h4>
-                        <div className="space-y-4 bg-purple-50/50 rounded-lg p-4 border border-purple-100">
-                          <PreviewField label="Title" value={formData.featured_post_title || ""} isPreview={previewMode && !!editingId}>
+                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Highlight your most important content with a featured post section.</p>
+                        <div className="space-y-5 bg-purple-50/50 rounded-xl p-5 border-2 border-purple-100">
+                          <PreviewField label="Featured Post Title" value={formData.featured_post_title || ""} isPreview={previewMode && !!editingId}>
                             <div>
-                              <label className="block text-sm font-medium mb-2">Title</label>
+                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
                               <input
                                 type="text"
                                 value={formData.featured_post_title || ""}
                                 onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
-                                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                placeholder="Featured post title"
+                                className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-400 text-base font-medium transition-all"
+                                placeholder="Enter featured post title"
                               />
                             </div>
                           </PreviewField>
                           <ImageUpload
                             value={formData.featured_post_image || ""}
                             onChange={(value) => handleInputChange("featured_post_image", value)}
-                            label="Image"
+                            label="Featured Post Image"
                             hideUrl
                           />
-                          <PreviewField label="Content" value={formData.featured_post_content || ""} isPreview={previewMode && !!editingId} isRichText>
+                          <PreviewField label="Featured Post Content" value={formData.featured_post_content || ""} isPreview={previewMode && !!editingId} isRichText>
                             <div>
-                              <label className="block text-sm font-medium mb-2">Content</label>
+                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Content</label>
+                              <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Write the main content for your featured post. Supports Markdown.</p>
                               <RichTextEditor
                                 value={formData.featured_post_content || ""}
                                 onChange={(value) => handleInputChange("featured_post_content", value)}
                                 placeholder="Featured post content (supports Markdown)"
-                                minRows={3}
+                                minRows={6}
                               />
                             </div>
                           </PreviewField>
@@ -1620,69 +1782,94 @@ export default function FeedFormPage() {
                     onToggle={() => toggleSection("event")}
                     isComplete={isSectionComplete("event")}
                   >
-                    <div className="space-y-4">
-                      <PreviewField label="Event Title" value={formData.upcoming_event_title || ""} isPreview={previewMode && !!editingId}>
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Event Title</label>
-                          <input
-                            type="text"
-                            value={formData.upcoming_event_title || ""}
-                            onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
-                            className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Event title"
-                          />
-                        </div>
-                      </PreviewField>
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-neutral-500" />
+                          Event Details
+                        </h4>
+                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Promote your upcoming event with details and a clear call-to-action.</p>
+                        
+                        <PreviewField label="Event Title" value={formData.upcoming_event_title || ""} isPreview={previewMode && !!editingId}>
+                          <div>
+                            <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Event Title</label>
+                            <input
+                              type="text"
+                              value={formData.upcoming_event_title || ""}
+                              onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
+                              className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
+                              placeholder="Enter event title"
+                            />
+                          </div>
+                        </PreviewField>
+                      </div>
+                      
                       <PreviewField label="Event Description" value={formData.upcoming_event_description || ""} isPreview={previewMode && !!editingId} isRichText>
                         <div>
-                          <label className="block text-sm font-medium mb-2">Event Description</label>
+                          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Event Description</label>
+                          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Describe the event details, schedule, and what attendees can expect.</p>
                           <RichTextEditor
                             value={formData.upcoming_event_description || ""}
                             onChange={(value) => handleInputChange("upcoming_event_description", value)}
                             placeholder="Event description (supports Markdown)"
-                            minRows={3}
+                            minRows={6}
                           />
                         </div>
                       </PreviewField>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ImageUpload
-                          value={formData.upcoming_event_image_desktop || ""}
-                          onChange={(value) => handleInputChange("upcoming_event_image_desktop", value)}
-                          label="Event Image Desktop"
-                          hideUrl
-                        />
-                        <ImageUpload
-                          value={formData.upcoming_event_image_mobile || ""}
-                          onChange={(value) => handleInputChange("upcoming_event_image_mobile", value)}
-                          label="Event Image Mobile"
-                          hideUrl
-                        />
+                      
+                      <div>
+                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4 text-neutral-500" />
+                          Event Images
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <ImageUpload
+                            value={formData.upcoming_event_image_desktop || ""}
+                            onChange={(value) => handleInputChange("upcoming_event_image_desktop", value)}
+                            label="Desktop Image (1920x1080)"
+                            hideUrl
+                          />
+                          <ImageUpload
+                            value={formData.upcoming_event_image_mobile || ""}
+                            onChange={(value) => handleInputChange("upcoming_event_image_mobile", value)}
+                            label="Mobile Image (1080x1350)"
+                            hideUrl
+                          />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 rounded-lg p-4 border border-blue-100">
-                        <PreviewField label="CTA Button Text" value={formData.upcoming_event_cta_text || ""} isPreview={previewMode && !!editingId}>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">CTA Button Text</label>
-                            <input
-                              type="text"
-                              value={formData.upcoming_event_cta_text || ""}
-                              onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Register Now"
-                            />
-                          </div>
-                        </PreviewField>
-                        <PreviewField label="CTA Link" value={formData.upcoming_event_cta_link || ""} isPreview={previewMode && !!editingId}>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">CTA Link</label>
-                            <input
-                              type="url"
-                              value={formData.upcoming_event_cta_link || ""}
-                              onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="https://example.com/register"
-                            />
-                          </div>
-                        </PreviewField>
+                      
+                      <div className="bg-sky-50/50 rounded-xl p-5 border-2 border-sky-100">
+                        <h4 className="text-sm font-bold text-sky-800 mb-3 flex items-center gap-2">
+                          <LinkIcon className="h-4 w-4" />
+                          Call-to-Action Button
+                        </h4>
+                        <p className="text-xs text-sky-600 mb-4 leading-relaxed">Add a button that links to your event registration or details page.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <PreviewField label="Button Text" value={formData.upcoming_event_cta_text || ""} isPreview={previewMode && !!editingId}>
+                            <div>
+                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Text</label>
+                              <input
+                                type="text"
+                                value={formData.upcoming_event_cta_text || ""}
+                                onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
+                                placeholder="Register Now"
+                              />
+                            </div>
+                          </PreviewField>
+                          <PreviewField label="Button Link" value={formData.upcoming_event_cta_link || ""} isPreview={previewMode && !!editingId}>
+                            <div>
+                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Link</label>
+                              <input
+                                type="url"
+                                value={formData.upcoming_event_cta_link || ""}
+                                onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium font-mono transition-all"
+                                placeholder="https://example.com/register"
+                              />
+                            </div>
+                          </PreviewField>
+                        </div>
                       </div>
                     </div>
                   </CollapsibleSection>
@@ -1693,67 +1880,81 @@ export default function FeedFormPage() {
                       key={num}
                       id={`spotlight${num}`}
                       title={`Spotlight ${num}`}
-                      description={`Highlight section ${num} with image and CTA`}
+                      description={`Highlight section ${num} with image and call-to-action`}
                       icon={<Sparkles className="h-5 w-5" />}
                       isOpen={openSections.has(`spotlight${num}`)}
                       onToggle={() => toggleSection(`spotlight${num}`)}
                       isComplete={isSectionComplete(`spotlight${num}`)}
                     >
-                      <div className="space-y-4">
-                        <PreviewField label="Title" value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                      <div className="space-y-5">
+                        <div>
+                          <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Create a spotlight section to highlight specific content, products, or features.</p>
+                          
+                          <PreviewField label={`Spotlight ${num} Title`} value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                            <div>
+                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
+                              <input
+                                type="text"
+                                value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
+                                onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
+                                placeholder={`Enter spotlight ${num} title`}
+                              />
+                            </div>
+                          </PreviewField>
+                        </div>
+                        
+                        <PreviewField label={`Spotlight ${num} Description`} value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId} isRichText>
                           <div>
-                            <label className="block text-sm font-medium mb-2">Title</label>
-                            <input
-                              type="text"
-                              value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
-                              onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
-                              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder={`Spotlight ${num} title`}
-                            />
-                          </div>
-                        </PreviewField>
-                        <PreviewField label="Description" value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId} isRichText>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">Description</label>
+                            <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Description</label>
+                            <p className="text-xs text-neutral-500 mb-2 leading-relaxed">A brief description of what you're spotlighting. Supports Markdown.</p>
                             <RichTextEditor
                               value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""}
                               onChange={(value) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
                               placeholder={`Spotlight ${num} description`}
-                              minRows={2}
+                              minRows={4}
                             />
                           </div>
                         </PreviewField>
+                        
                         <ImageUpload
                           value={formData[`spotlight_${num}_image` as keyof FeedFormData] as string || ""}
                           onChange={(value) => handleInputChange(`spotlight_${num}_image` as keyof FeedFormData, value)}
-                          label="Image"
+                          label={`Spotlight ${num} Image`}
                           hideUrl
                         />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-neutral-50 rounded-lg p-4 border border-neutral-200">
-                          <PreviewField label="CTA Text" value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">CTA Text</label>
-                              <input
-                                type="text"
-                                value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
-                                onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
-                                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Learn More"
-                              />
-                            </div>
-                          </PreviewField>
-                          <PreviewField label="CTA Link" value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">CTA Link</label>
-                              <input
-                                type="url"
-                                value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
-                                onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
-                                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="https://example.com/link"
-                              />
-                            </div>
-                          </PreviewField>
+                        
+                        <div className="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200">
+                          <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+                            <LinkIcon className="h-4 w-4 text-neutral-500" />
+                            Call-to-Action Button
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <PreviewField label="Button Text" value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                              <div>
+                                <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Text</label>
+                                <input
+                                  type="text"
+                                  value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
+                                  onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
+                                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
+                                  placeholder="Learn More"
+                                />
+                              </div>
+                            </PreviewField>
+                            <PreviewField label="Button Link" value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
+                              <div>
+                                <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Link</label>
+                                <input
+                                  type="url"
+                                  value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
+                                  onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
+                                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-mono transition-all"
+                                  placeholder="https://example.com/link"
+                                />
+                              </div>
+                            </PreviewField>
+                          </div>
                         </div>
                       </div>
                     </CollapsibleSection>

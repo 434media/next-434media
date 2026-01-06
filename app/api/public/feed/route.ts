@@ -5,23 +5,87 @@ import { getFeedItems, getFeedItemBySlug } from "@/app/lib/firestore-feed"
  * Public Feed API Endpoint
  * 
  * This endpoint provides read-only access to feed items for external sites
- * like Digital Canvas. No authentication required for reading published content.
+ * like Digital Canvas. Supports optional API key authentication.
  * 
  * Usage from Digital Canvas:
- *   fetch('https://434media.com/api/public/feed?table=THEFEED')
+ *   fetch('https://434media.com/api/public/feed?table=THEFEED', {
+ *     headers: { 'X-API-Key': 'your-api-key' }
+ *   })
  *   fetch('https://434media.com/api/public/feed?table=THEFEED&slug=my-article')
+ * 
+ * Security:
+ *   - API key required when PUBLIC_FEED_REQUIRE_KEY=true
+ *   - Origin restriction when PUBLIC_FEED_ALLOWED_ORIGINS is set
+ *   - Rate limiting via Vercel's built-in protection
  */
 
 // Cache for 5 minutes (300 seconds)
 export const revalidate = 300
 
+// Allowed origins for CORS (comma-separated in env var)
+const ALLOWED_ORIGINS = process.env.FEED_API_ALLOWED_ORIGINS
+  ? process.env.FEED_API_ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['*'] // Default to all origins if not configured
+
+// API key for protected access
+const API_KEY = process.env.FEED_API_SECRET
+const REQUIRE_API_KEY = process.env.FEED_API_REQUIRE_KEY === 'true'
+
+// Validate origin
+function isAllowedOrigin(origin: string | null): boolean {
+  if (ALLOWED_ORIGINS.includes('*')) return true
+  if (!origin) return false
+  return ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || 
+    origin.endsWith(allowed.replace('*', '')) ||
+    allowed === '*'
+  )
+}
+
+// Get CORS origin header
+function getCorsOrigin(request: NextRequest): string {
+  const origin = request.headers.get('origin')
+  if (ALLOWED_ORIGINS.includes('*')) return '*'
+  if (origin && isAllowedOrigin(origin)) return origin
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+// Validate API key
+function isValidApiKey(request: NextRequest): boolean {
+  if (!REQUIRE_API_KEY || !API_KEY) return true
+  
+  const providedKey = request.headers.get('x-api-key') || 
+                      request.headers.get('authorization')?.replace('Bearer ', '')
+  
+  return providedKey === API_KEY
+}
+
 export async function GET(request: NextRequest) {
   try {
+    // Check origin restriction
+    const origin = request.headers.get('origin')
+    if (!isAllowedOrigin(origin) && ALLOWED_ORIGINS[0] !== '*') {
+      return NextResponse.json(
+        { success: false, error: "Origin not allowed" },
+        { status: 403 }
+      )
+    }
+
+    // Check API key if required
+    if (!isValidApiKey(request)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or missing API key" },
+        { status: 401, headers: { 'WWW-Authenticate': 'Bearer' } }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const tableName = searchParams.get("table") || "THEFEED"
     const slug = searchParams.get("slug")
     const status = searchParams.get("status") || "published" // Default to published only
     const limit = searchParams.get("limit")
+
+    const corsOrigin = getCorsOrigin(request)
 
     // If slug is provided, return single item
     if (slug) {
@@ -48,7 +112,7 @@ export async function GET(request: NextRequest) {
       }, {
         headers: {
           'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-          'Access-Control-Allow-Origin': '*', // Allow cross-origin requests
+          'Access-Control-Allow-Origin': corsOrigin,
         }
       })
     }
@@ -71,7 +135,7 @@ export async function GET(request: NextRequest) {
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-        'Access-Control-Allow-Origin': '*', // Allow cross-origin requests
+        'Access-Control-Allow-Origin': corsOrigin,
       }
     })
   } catch (error) {
@@ -88,13 +152,15 @@ export async function GET(request: NextRequest) {
 }
 
 // Handle CORS preflight requests
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const corsOrigin = getCorsOrigin(request)
+  
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, Authorization',
     },
   })
 }

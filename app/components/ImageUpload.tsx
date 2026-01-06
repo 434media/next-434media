@@ -3,7 +3,6 @@
 import { useState, useRef } from "react"
 import { upload } from "@vercel/blob/client"
 import { Upload, X, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react"
-import { Button } from "./analytics/Button"
 
 interface ImageUploadProps {
   value: string
@@ -117,37 +116,54 @@ export function ImageUpload({
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium">{label}</label>
+      <label className="block text-sm font-semibold text-neutral-800 tracking-tight leading-none">{label}</label>
       
-      {/* Method Toggle */}
+      {/* Method Toggle - Enhanced Visual Feedback */}
       <div className="flex gap-2">
-        <Button
+        <button
           type="button"
-          variant={uploadMethod === "url" ? "default" : "outline"}
-          size="sm"
           onClick={() => setUploadMethod("url")}
-          className="flex items-center gap-2"
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border-2 transition-all duration-200 ${
+            uploadMethod === "url" 
+              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200" 
+              : "bg-white border-neutral-200 text-neutral-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+          }`}
         >
           <LinkIcon className="h-4 w-4" />
-          URL
-        </Button>
-        <Button
+          <span>Paste URL</span>
+          {uploadMethod === "url" && (
+            <span className="hidden sm:inline-flex w-2 h-2 bg-white rounded-full animate-pulse" />
+          )}
+        </button>
+        <button
           type="button"
-          variant={uploadMethod === "file" ? "default" : "outline"}
-          size="sm"
           onClick={() => setUploadMethod("file")}
-          className="flex items-center gap-2"
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border-2 transition-all duration-200 ${
+            uploadMethod === "file" 
+              ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200" 
+              : "bg-white border-neutral-200 text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600"
+          }`}
         >
           <Upload className="h-4 w-4" />
-          Upload
-        </Button>
+          <span>Upload File</span>
+          {uploadMethod === "file" && (
+            <span className="hidden sm:inline-flex w-2 h-2 bg-white rounded-full animate-pulse" />
+          )}
+        </button>
       </div>
+      
+      {/* Method Description Helper */}
+      <p className="text-xs text-neutral-500 leading-relaxed">
+        {uploadMethod === "url" 
+          ? "Paste an image URL from the web (e.g., from Unsplash, Google Drive, or any public image link)"
+          : "Upload an image from your device (JPG, PNG, GIF, WebP • Max 10MB)"}
+      </p>
 
       {/* URL Input */}
       {uploadMethod === "url" && (
         <div className="flex gap-2">
           {hideUrl && value ? (
-            <div className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 text-sm flex items-center gap-2">
+            <div className="flex-1 px-4 py-3 border-2 border-green-200 rounded-lg bg-green-50 text-green-700 text-sm font-medium flex items-center gap-2">
               <LinkIcon className="h-4 w-4 text-green-500" />
               <span>Image URL added</span>
             </div>
@@ -156,20 +172,18 @@ export function ImageUpload({
               type="url"
               value={value}
               onChange={(e) => handleUrlChange(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 border-2 border-neutral-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-400 text-sm font-medium placeholder:text-neutral-400 transition-all"
               placeholder="https://example.com/image.jpg"
             />
           )}
           {value && (
-            <Button
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               onClick={handleClear}
-              className="flex items-center gap-2"
+              className="px-3 py-2 border-2 border-neutral-200 rounded-lg text-neutral-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all"
             >
               <X className="h-4 w-4" />
-            </Button>
+            </button>
           )}
         </div>
       )}
@@ -185,49 +199,67 @@ export function ImageUpload({
             className="hidden"
             disabled={isUploading}
           />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="flex items-center gap-2 flex-1"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Choose File
-                </>
-              )}
-            </Button>
-            {value && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleClear}
-                disabled={isUploading}
-                className="flex items-center gap-2"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+          <div 
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            className={`relative flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
+              isUploading 
+                ? "bg-emerald-50 border-emerald-300" 
+                : value 
+                  ? "bg-green-50 border-green-300 hover:bg-green-100"
+                  : "bg-neutral-50 border-neutral-300 hover:border-emerald-400 hover:bg-emerald-50"
+            }`}
+          >
+            {isUploading ? (
+              <>
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
+                </div>
+                <span className="text-sm font-medium text-emerald-700">Uploading your file...</span>
+              </>
+            ) : (
+              <>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  value ? "bg-green-100" : "bg-neutral-200"
+                }`}>
+                  <Upload className={`h-5 w-5 ${value ? "text-green-600" : "text-neutral-500"}`} />
+                </div>
+                <div className="text-center">
+                  <span className={`text-sm font-semibold ${
+                    value ? "text-green-700" : "text-neutral-700"
+                  }`}>
+                    {value ? "File uploaded! Click to replace" : "Click to upload a file"}
+                  </span>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Drag & drop or click to browse
+                  </p>
+                </div>
+              </>
             )}
           </div>
-          <p className="text-xs text-gray-500">
-            Max size: {maxSize}MB • Formats: JPG, PNG, GIF, WebP
-          </p>
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleClear(); }}
+              disabled={isUploading}
+              className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
+            >
+              <X className="h-3 w-3" />
+              Remove file
+            </button>
+          )}
         </div>
       )}
 
       {/* Preview */}
       {preview && getSafeImageUrl(preview) && (
-        <div className="relative border border-gray-300 rounded-lg overflow-hidden bg-gray-50 p-2">
-          <div className="relative w-full h-48 flex items-center justify-center">
+        <div className="relative border-2 border-neutral-200 rounded-xl overflow-hidden bg-neutral-50 p-3">
+          <div className="absolute top-3 right-3 z-10">
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+              Image ready
+            </span>
+          </div>
+          <div className="relative w-full h-48 flex items-center justify-center bg-white rounded-lg">
             <img
               src={getSafeImageUrl(preview) || ''}
               alt="Preview"
@@ -236,19 +268,24 @@ export function ImageUpload({
             />
           </div>
           {value && !hideUrl && (
-            <div className="mt-2 p-2 bg-white rounded text-xs text-gray-600 break-all">
+            <div className="mt-3 p-2 bg-white rounded-lg border border-neutral-200 text-xs text-neutral-600 break-all font-mono">
               {value}
             </div>
           )}
         </div>
       )}
 
-      {/* Empty State */}
-      {!preview && (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">
-            {uploadMethod === "url" ? "Enter image URL above" : "Click 'Choose File' to upload"}
+      {/* Empty State - Only show for URL method when no preview */}
+      {!preview && uploadMethod === "url" && (
+        <div className="border-2 border-dashed border-neutral-200 rounded-xl p-8 text-center bg-neutral-50/50">
+          <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-3">
+            <ImageIcon className="h-6 w-6 text-neutral-400" />
+          </div>
+          <p className="text-sm font-medium text-neutral-600">
+            No image added yet
+          </p>
+          <p className="text-xs text-neutral-400 mt-1">
+            Paste an image URL in the field above
           </p>
         </div>
       )}

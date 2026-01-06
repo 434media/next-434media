@@ -262,16 +262,28 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
           />
         </div>
       ) : (
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder || "Write your content here...\n\nUse the toolbar buttons or markdown syntax:\n**bold**, *italic*, [link](url)"}
-          rows={minRows}
-          className="w-full px-4 py-4 focus:outline-none resize-y font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400"
-          style={{ minHeight: `${minRows * 1.75}rem` }}
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder || "Write your content here...\n\nUse the toolbar buttons or markdown syntax:\n**bold**, *italic*, [link](url)"}
+            rows={minRows}
+            className="w-full px-4 py-4 focus:outline-none resize-y font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400 min-h-[200px]"
+            style={{ minHeight: `${Math.max(minRows * 1.75, 12)}rem` }}
+          />
+          {/* Resize Indicator */}
+          <div className="absolute bottom-0 right-0 p-2 pointer-events-none">
+            <div className="flex flex-col items-center gap-1 text-neutral-300">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M7 17L17 7" />
+                <path d="M11 17L17 11" />
+                <path d="M15 17L17 15" />
+              </svg>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Status bar */}
@@ -279,9 +291,18 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
         <span>
           {value.length} characters · {value.split(/\s+/).filter(Boolean).length} words
         </span>
-        <span className="text-gray-400">
-          Markdown supported
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:flex items-center gap-1.5 text-neutral-400">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M7 17L17 7" />
+              <path d="M15 17L17 15" />
+            </svg>
+            Drag corner to resize
+          </span>
+          <span className="text-gray-400">
+            Markdown supported
+          </span>
+        </div>
       </div>
     </div>
   )
