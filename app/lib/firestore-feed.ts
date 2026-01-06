@@ -197,11 +197,19 @@ export async function getFeedItems(filters?: {
       query = query.where("type", "==", filters.type)
     }
 
-    // Order by published_date descending
-    query = query.orderBy("published_date", "desc")
+    // NOTE: We do NOT use orderBy here to avoid requiring a composite index
+    // Firestore requires a composite index for where + orderBy on different fields
+    // Instead, we sort client-side after fetching
 
     const snapshot = await query.get()
-    const items = snapshot.docs.map(mapFirestoreToFeedItem)
+    let items = snapshot.docs.map(mapFirestoreToFeedItem)
+    
+    // Sort by published_date client-side to avoid composite index requirement
+    items.sort((a, b) => {
+      const dateA = a.published_date ? new Date(a.published_date).getTime() : 0
+      const dateB = b.published_date ? new Date(b.published_date).getTime() : 0
+      return dateB - dateA // Descending order (newest first)
+    })
     
     console.log(`[Firestore] Fetched ${items.length} feed items from ${collectionName}`)
     
