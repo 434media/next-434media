@@ -13,11 +13,10 @@ import {
   AlertCircle,
   Search,
   Calendar,
-  Users,
-  Globe,
   FileDown,
-  Database,
-  ArrowRight,
+  Trash2,
+  Globe,
+  Users,
 } from "lucide-react"
 
 interface EmailSignup {
@@ -46,7 +45,7 @@ export default function EmailListsPage() {
   const [startDate, setStartDate] = useState<string>("")
   const [endDate, setEndDate] = useState<string>("")
   const [datePreset, setDatePreset] = useState<string>("")
-  const [isMigrating, setIsMigrating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -114,38 +113,38 @@ export default function EmailListsPage() {
     }
   }
 
-  // Migration function
-  const handleMigrate = async () => {
-    if (!confirm("This will migrate all emails from Airtable to Firestore. Continue?")) {
+  // Delete email function
+  const handleDeleteEmail = async (id: string, email: string) => {
+    if (!confirm(`Are you sure you want to delete ${email}? This action cannot be undone.`)) {
       return
     }
     
     try {
-      setIsMigrating(true)
+      setIsDeleting(id)
       const res = await fetch("/api/admin/email-lists-firestore", {
-        method: "POST",
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "migrate" }),
+        body: JSON.stringify({ id }),
       })
       
       const data = await res.json()
       
       if (data.success) {
         setToast({ 
-          message: `Migration complete! ${data.result?.migrated || 0} emails migrated, ${data.result?.skipped || 0} skipped`, 
+          message: `Deleted ${email}`, 
           type: "success" 
         })
         // Refresh data
         await fetchSourcesAndCounts()
         await fetchSignups(selectedSource)
       } else {
-        setToast({ message: data.error || "Migration failed", type: "error" })
+        setToast({ message: data.error || "Failed to delete email", type: "error" })
       }
     } catch (err) {
-      setToast({ message: "Failed to run migration", type: "error" })
+      setToast({ message: "Failed to delete email", type: "error" })
       console.error(err)
     } finally {
-      setIsMigrating(false)
+      setIsDeleting(null)
     }
   }
 
@@ -363,27 +362,11 @@ export default function EmailListsPage() {
               <div className="h-6 w-px bg-gray-200 hidden sm:block" />
               <div className="hidden sm:flex items-center gap-2">
                 <Mail className="w-5 h-5 text-gray-700" />
-                <h1 className="text-lg font-semibold text-gray-900">Email Lists</h1>
+                <h1 className="text-lg font-semibold text-gray-900">Email Lists Management</h1>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                onClick={handleMigrate}
-                disabled={isMigrating}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                title="Migrate from Airtable"
-              >
-                {isMigrating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Database className="w-4 h-4" />
-                    <ArrowRight className="w-3 h-3" />
-                  </>
-                )}
-                <span className="hidden lg:inline text-sm">Migrate</span>
-              </button>
               <button
                 onClick={() => fetchSignups(selectedSource)}
                 disabled={isLoading}
@@ -609,12 +592,15 @@ export default function EmailListsPage() {
                         <span className="hidden sm:inline">Signup</span> Date
                       </div>
                     </th>
+                    <th className="text-right px-4 sm:px-6 py-3 sm:py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredSignups.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
                         <Mail className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                         <p className="font-medium">No email signups found</p>
                         {searchQuery && <p className="text-sm mt-1">Try adjusting your search</p>}
@@ -635,6 +621,20 @@ export default function EmailListsPage() {
                         </td>
                         <td className="px-4 sm:px-6 py-3 sm:py-4 text-gray-500 text-xs sm:text-sm whitespace-nowrap">
                           {formatDate(signup.created_at)}
+                        </td>
+                        <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
+                          <button
+                            onClick={() => handleDeleteEmail(signup.id, signup.email)}
+                            disabled={isDeleting === signup.id}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            title={`Delete ${signup.email}`}
+                          >
+                            {isDeleting === signup.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
                         </td>
                       </tr>
                     ))

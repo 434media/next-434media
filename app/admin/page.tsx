@@ -70,12 +70,12 @@ const adminSections: AdminSection[] = [
   },
   {
     id: "email-lists",
-    title: "EMAIL LISTS",
-    subtitle: "AIM • 434 MEDIA • All Sites",
+    title: "EMAIL LISTS MANAGEMENT",
+    subtitle: "View and export email signups from all websites",
     href: "/admin/email-lists",
     icon: <Mail className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
-    description: "View and export email signups from all websites. Filter by source and download CSV for Mailchimp import.",
+    description: "Manage and export email signups from all 434 MEDIA websites and campaigns",
   },
 ]
 
