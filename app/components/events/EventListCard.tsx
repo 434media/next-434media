@@ -83,12 +83,12 @@ export function EventListCard({ event, onClick, className, onDeleteRequest, onEd
     >
       <div className="relative z-20 p-5 sm:p-6">
         {/* Header Section - Organizer and Date */}
-        <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start justify-between mb-6">
           {/* Organizer Badge - Enhanced */}
           {event.organizer && (
             <div
               className={cn(
-                "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-500",
+                "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium tracking-wide border transition-all duration-500",
                 categoryColors.bg,
                 categoryColors.text,
                 categoryColors.border,
@@ -98,7 +98,7 @@ export function EventListCard({ event, onClick, className, onDeleteRequest, onEd
             >
               <div
                 className={cn(
-                  "w-2 h-2 rounded-full mr-2 transition-all duration-500 group-hover:scale-125",
+                  "w-1.5 h-1.5 rounded-full mr-2 transition-all duration-500 group-hover:scale-125",
                   categoryColors.accent,
                 )}
               />
@@ -106,9 +106,9 @@ export function EventListCard({ event, onClick, className, onDeleteRequest, onEd
             </div>
           )}
           {/* Date Badge - Black and White */}
-          <div className="flex items-center text-black font-medium bg-white px-3 py-1.5 rounded-md border-2 border-black">
-            <Calendar className="h-4 w-4 mr-1.5" />
-            <span className="text-sm font-bold">{formattedDate}</span>
+          <div className="flex items-center text-black font-medium bg-white px-3 py-1.5 rounded-md border border-gray-200">
+            <Calendar className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+            <span className="text-sm font-medium tracking-wide">{formattedDate}</span>
           </div>
         </div>
 
@@ -117,63 +117,63 @@ export function EventListCard({ event, onClick, className, onDeleteRequest, onEd
           {/* Event Content */}
           <div className="flex-1 min-w-0 space-y-4 order-2 sm:order-1">
             {/* Event Title - Black and White */}
-            <h3 className="font-bold text-lg sm:text-xl text-black transition-colors duration-200 leading-tight line-clamp-2 inline-flex items-center gap-2">
-              <span className="flex-1">{event.title}</span>
+            <h3 className="font-semibold text-lg sm:text-xl text-gray-900 transition-colors duration-200 leading-snug line-clamp-2 tracking-tight">
+              {event.title}
             </h3>
 
             {/* Event Description */}
             {event.description && (
-              <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed transition-colors duration-200">
+              <p className="text-gray-500 text-sm line-clamp-2 leading-relaxed font-normal">
                 {event.description}
               </p>
             )}
 
             {/* Event Details Grid - Black and White */}
-            <div className="grid grid-cols-1 gap-3 text-sm">
+            <div className="grid grid-cols-1 gap-2.5 text-sm">
               <div className="flex items-center text-gray-600">
-                <div className="p-2 rounded-md bg-white border border-black mr-3 flex-shrink-0">
-                  <Clock className="h-4 w-4" />
+                <div className="p-1.5 rounded-md bg-gray-50 border border-gray-200 mr-3 flex-shrink-0">
+                  <Clock className="h-4 w-4 text-gray-500" />
                 </div>
-                <span className="font-medium truncate">{formatTime(event.time)}</span>
+                <span className="font-normal truncate">{formatTime(event.time)}</span>
               </div>
 
               {event.location && (
                 <div className="flex items-center text-gray-600">
-                  <div className="p-2 rounded-md bg-white border border-black mr-3 flex-shrink-0">
-                    <MapPin className="h-4 w-4" />
+                  <div className="p-1.5 rounded-md bg-gray-50 border border-gray-200 mr-3 flex-shrink-0">
+                    <MapPin className="h-4 w-4 text-gray-500" />
                   </div>
-                  <span className="truncate font-medium">{event.location}</span>
+                  <span className="truncate font-normal">{event.location}</span>
                 </div>
               )}
 
               {event.attendees && (
                 <div className="flex items-center text-gray-600">
-                  <div className="p-2 rounded-md bg-white border border-black mr-3 flex-shrink-0">
-                    <Users className="h-4 w-4" />
+                  <div className="p-1.5 rounded-md bg-gray-50 border border-gray-200 mr-3 flex-shrink-0">
+                    <Users className="h-4 w-4 text-gray-500" />
                   </div>
-                  <span className="font-medium truncate">{event.attendees} attendees</span>
+                  <span className="font-normal truncate">{event.attendees} attendees</span>
                 </div>
               )}
 
               {event.price && (
                 <div className="flex items-center text-gray-600">
-                  <div className="p-2 rounded-md bg-white border border-black mr-3 flex-shrink-0">
+                  <div className="p-1.5 rounded-md bg-gray-50 border border-gray-200 mr-3 flex-shrink-0">
                     <div className="h-4 w-4 flex items-center justify-center">
-                      <span className="text-xs font-bold">$</span>
+                      <span className="text-xs font-medium text-gray-500">$</span>
                     </div>
                   </div>
-                  <span className="font-bold truncate">{event.price}</span>
+                  <span className="font-medium truncate">{event.price}</span>
                 </div>
               )}
             </div>
 
             {/* Tags Section - New Airtable Feature */}
             {event.tags && (
-              <div className="flex flex-wrap gap-2 pt-3">
+              <div className="flex flex-wrap gap-1.5 pt-4 border-t border-gray-100">
                 {event.tags.split(',').map((tag, index) => (
                   <span
                     key={index}
-                    className="px-2 py-1 bg-white border border-black text-black text-xs font-medium rounded-md"
+                    className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-600 text-xs font-normal rounded-full tracking-wide"
                   >
                     {tag.trim()}
                   </span>

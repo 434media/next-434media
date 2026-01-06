@@ -168,8 +168,8 @@ export default function EventsPage() {
           >
             <div className="max-w-4xl mx-auto text-center">
               {/* Hero Title */}
-              <div className="mb-6 sm:mb-8">
-                <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight tracking-tight mb-3 sm:mb-4">
+              <div className="mb-8 sm:mb-10">
+                <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] tracking-tight mb-4 sm:mb-6">
                   <span className="text-white">Build Connections</span>
                   <br />
                   <span className="text-white">That Matter</span>
@@ -177,8 +177,8 @@ export default function EventsPage() {
               </div>
 
               {/* Description */}
-              <div className="mb-8 sm:mb-10">
-                <p className="text-lg md:text-xl text-gray-300 leading-relaxed mb-2 max-w-2xl mx-auto">
+              <div className="mb-10 sm:mb-12">
+                <p className="text-lg md:text-xl text-gray-300 leading-relaxed tracking-wide font-normal max-w-2xl mx-auto">
                   Discover meaningful events that bring communities together.
                 </p>
               </div>
@@ -208,12 +208,12 @@ export default function EventsPage() {
           {/* Mobile Calendar Section - Only visible on mobile */}
           <div className="lg:hidden mb-8 relative">
             <div className="bg-white rounded-lg border-2 border-black overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative z-10">
-              <div className="bg-black text-white px-4 py-3 border-b-2 border-black">
-                <h3 className="font-bold text-lg flex items-center gap-2">
+              <div className="bg-black text-white px-4 py-4 border-b-2 border-black">
+                <h3 className="font-semibold text-base tracking-wide flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
                   Select Event Date
                 </h3>
-                <p className="text-sm text-gray-300 mt-1">
+                <p className="text-sm text-gray-400 mt-1.5 leading-relaxed font-light">
                   Tap a date with events to see details, or scroll down to browse all events
                 </p>
               </div>
@@ -254,11 +254,11 @@ export default function EventsPage() {
               <div className="mb-6" id="events-list-section">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
                   <div className="flex-1">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-black mb-2 flex items-center gap-2">
-                      <Calendar className="h-6 w-6 text-black" />
+                    <h2 className="text-2xl sm:text-3xl font-bold text-black mb-3 flex items-center gap-3 tracking-tight leading-tight">
+                      <Calendar className="h-6 w-6 text-black flex-shrink-0" />
                       {selectedDate ? `Events on ${selectedDate.toLocaleDateString()}` : 'Upcoming Events'}
                     </h2>
-                    <p className="text-base text-gray-600">
+                    <p className="text-base text-gray-500 leading-relaxed font-normal">
                       {selectedDate 
                         ? (
                           <>
@@ -305,15 +305,14 @@ export default function EventsPage() {
                       </div>
                     ))
                 ) : (
-                  <div className="text-center py-16">
-                    <div className="mb-6">
-                      <div className="w-16 h-16 mx-auto border-4 border-black rounded-full flex items-center justify-center mb-4">
-                        <Calendar className="h-8 w-8 text-black" />
+                  <div className="text-center py-20">
+                    <div className="mb-8">
+                      <div className="w-20 h-20 mx-auto border-2 border-gray-200 rounded-full flex items-center justify-center mb-6">
+                        <Calendar className="h-9 w-9 text-gray-400" />
                       </div>
-                      <div className="w-full h-px bg-gradient-to-r from-transparent via-black to-transparent mb-6"></div>
                     </div>
-                    <h3 className="text-2xl font-bold text-black mb-3">No Upcoming Events</h3>
-                    <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                    <h3 className="text-2xl font-semibold text-gray-900 mb-3 tracking-tight">No Upcoming Events</h3>
+                    <p className="text-gray-500 text-base leading-relaxed max-w-sm mx-auto font-normal">
                       New events will appear here automatically.
                     </p>
                   </div>
@@ -325,8 +324,8 @@ export default function EventsPage() {
             <div className="hidden lg:block lg:w-1/3">
               <div className="sticky top-6">
                 <div className="bg-white rounded-lg border-2 border-black overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                  <div className="bg-black text-white px-4 py-3 border-b-2 border-black">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
+                  <div className="bg-black text-white px-4 py-4 border-b-2 border-black">
+                    <h3 className="font-semibold text-base tracking-wide flex items-center gap-2">
                       <Calendar className="h-5 w-5" />
                       Event Calendar
                     </h3>

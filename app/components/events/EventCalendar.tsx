@@ -136,34 +136,34 @@ export function EventCalendar({ events, onEventClick, onDateSelect }: EventCalen
   return (
     <div className="w-full relative">
       {/* Calendar Header - Black and White */}
-      <div className="flex items-center justify-between mb-4 md:mb-6 p-3 md:p-4 bg-white border-2 border-black relative">
+      <div className="flex items-center justify-between mb-4 md:mb-6 p-3 md:p-4 bg-white border border-gray-200 rounded-xl relative">
         <div className="flex-1">
-          <h2 className="text-lg md:text-xl font-bold text-black flex items-center gap-2 mb-2">
-            <CalendarIcon className="h-4 w-4 md:h-5 md:w-5 text-black" />
-            <span className="text-sm md:text-xl">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+          <h2 className="text-base md:text-lg font-semibold text-gray-900 flex items-center gap-2 mb-2 tracking-tight">
+            <CalendarIcon className="h-4 w-4 md:h-5 md:w-5 text-gray-500" />
+            <span>{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
           </h2>
-          <div className="text-xs md:text-sm text-gray-600 flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-black rounded-full" />
+          <div className="text-xs md:text-sm text-gray-500 flex items-center gap-2 mb-3 font-normal">
+            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
             {currentMonthEvents} event{currentMonthEvents !== 1 ? "s" : ""} this month
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={goToToday}
-              className="text-xs px-2 md:px-3 py-1 bg-white border border-black text-black rounded-md hover:bg-black hover:text-white active:bg-black active:text-white transition-all duration-200 font-medium touch-manipulation"
+              className="text-xs px-2.5 md:px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-all duration-200 font-medium touch-manipulation"
             >
               Today
             </button>
             <button
               onClick={() => navigateMonth("prev")}
-              className="h-8 w-8 border border-black rounded-md hover:bg-black hover:text-white active:bg-black active:text-white flex items-center justify-center transition-all duration-200 touch-manipulation"
+              className="h-8 w-8 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 flex items-center justify-center transition-all duration-200 touch-manipulation text-gray-600"
             >
-              <ChevronLeft className="h-3 w-3 md:h-4 md:w-4" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => navigateMonth("next")}
-              className="h-8 w-8 border border-black rounded-md hover:bg-black hover:text-white active:bg-black active:text-white flex items-center justify-center transition-all duration-200 touch-manipulation"
+              className="h-8 w-8 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 flex items-center justify-center transition-all duration-200 touch-manipulation text-gray-600"
             >
-              <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -179,18 +179,18 @@ export function EventCalendar({ events, onEventClick, onDateSelect }: EventCalen
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {/* Day Names Header - Black and White */}
-        <div className="grid grid-cols-7 bg-black text-white border-b-2 border-black">
+        <div className="grid grid-cols-7 bg-gray-900 text-white">
           {dayNames.map((day) => (
-            <div key={day} className="p-2 md:p-3 text-center text-xs md:text-sm font-bold">
+            <div key={day} className="p-2 md:p-3 text-center text-xs md:text-sm font-medium tracking-wide">
               {day}
             </div>
           ))}
         </div>
 
         {/* Calendar Days - Black and White */}
-        <div className="grid grid-cols-7 border-2 border-black border-t-0">
+        <div className="grid grid-cols-7">
           {calendarDays.map((day, index) => {
             const hasEvents = day.events.length > 0
             const isSelected = calendarSelectedDate && day.date.toDateString() === calendarSelectedDate.toDateString()
@@ -199,13 +199,13 @@ export function EventCalendar({ events, onEventClick, onDateSelect }: EventCalen
               <div
                 key={index}
                 className={cn(
-                  "min-h-[80px] md:min-h-[80px] p-2 border-r border-b border-black cursor-pointer transition-all duration-200 relative",
-                  "active:scale-95 active:bg-gray-200", // Mobile touch feedback
-                  !day.isCurrentMonth && "bg-gray-100 text-gray-400",
-                  day.isToday && "bg-black text-white font-bold",
-                  isSelected && "bg-gray-900 text-white",
-                  hasEvents && day.isCurrentMonth && "hover:bg-gray-100 active:bg-gray-200",
-                  !hasEvents && day.isCurrentMonth && "hover:bg-gray-50 active:bg-gray-100",
+                  "min-h-[80px] md:min-h-[80px] p-2 border-r border-b border-gray-100 cursor-pointer transition-all duration-200 relative",
+                  "active:scale-95 active:bg-gray-100", // Mobile touch feedback
+                  !day.isCurrentMonth && "bg-gray-50 text-gray-400",
+                  day.isToday && "bg-gray-900 text-white",
+                  isSelected && "bg-gray-800 text-white",
+                  hasEvents && day.isCurrentMonth && "hover:bg-gray-50 active:bg-gray-100",
+                  !hasEvents && day.isCurrentMonth && "hover:bg-gray-50/50 active:bg-gray-50",
                 )}
                 onClick={() => {
                   setCalendarSelectedDate(day.date)
@@ -218,10 +218,10 @@ export function EventCalendar({ events, onEventClick, onDateSelect }: EventCalen
                 <div className="flex justify-start mb-1">
                   <span
                     className={cn(
-                      "text-sm font-medium",
-                      day.isToday && "text-white font-bold",
+                      "text-sm font-normal",
+                      day.isToday && "text-white font-medium",
                       !day.isCurrentMonth && "text-gray-400",
-                      hasEvents && day.isCurrentMonth && "text-black font-bold",
+                      hasEvents && day.isCurrentMonth && !day.isToday && !isSelected && "text-gray-900 font-medium",
                     )}
                   >
                     {day.date.getDate()}
@@ -240,11 +240,11 @@ export function EventCalendar({ events, onEventClick, onDateSelect }: EventCalen
                     >
                       {day.events.length === 1 ? (
                         // Single event - black dot (larger on mobile)
-                        <div className="w-3 h-3 md:w-2 md:h-2 bg-black rounded-full transition-all duration-200 group-hover:scale-125 group-active:scale-110">
+                        <div className="w-2.5 h-2.5 md:w-2 md:h-2 bg-gray-800 rounded-full transition-all duration-200 group-hover:scale-125 group-active:scale-110">
                         </div>
                       ) : (
                         // Multiple events - black number badge (larger on mobile)
-                        <div className="bg-black text-white text-xs md:text-xs px-1.5 py-1 md:px-1 md:py-0.5 rounded-md md:rounded-sm transition-all duration-200 group-hover:scale-110 group-active:scale-95 font-bold min-w-[20px] md:min-w-[16px] text-center">
+                        <div className="bg-gray-800 text-white text-xs md:text-xs px-1.5 py-0.5 rounded-md transition-all duration-200 group-hover:scale-110 group-active:scale-95 font-medium min-w-[18px] md:min-w-[16px] text-center">
                           {day.events.length}
                         </div>
                       )}

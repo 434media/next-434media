@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
+import { Check, Loader2 } from "lucide-react"
 
 interface ContactFormProps {
   className?: string
@@ -134,7 +135,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
 
   return (
     <div
-      className={`bg-black/40 backdrop-blur-sm rounded-2xl lg:rounded-3xl p-6 lg:p-8 overflow-hidden border border-emerald-500/30 ${className}`}
+      className={`bg-white rounded-2xl lg:rounded-3xl p-6 lg:p-8 overflow-hidden border border-gray-200 shadow-sm ${className}`}
     >
       <AnimatePresence mode="wait">
         {hasSubmitted ? (
@@ -149,11 +150,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             role="status"
           >
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 text-emerald-400 flex items-center justify-center rounded-full bg-emerald-500/20">
-                <i className="ri-check-line text-2xl" aria-hidden="true" />
+              <div className="mx-auto h-12 w-12 text-gray-900 flex items-center justify-center rounded-full bg-gray-100">
+                <Check className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-xl font-semibold text-white">Thanks for Connecting!</h3>
-              <p className="mt-2 text-sm text-neutral-300">We&apos;ll be in touch soon.</p>
+              <h3 className="mt-4 text-xl font-semibold text-gray-900 tracking-tight">Thanks for Connecting!</h3>
+              <p className="mt-2 text-sm text-gray-500 font-normal">We&apos;ll be in touch soon.</p>
             </div>
           </motion.div>
         ) : (
@@ -165,13 +166,13 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             exit="exit"
             aria-live="polite"
           >
-            <p className="text-sm text-neutral-400 mb-6 lg:mb-8">
+            <p className="text-sm text-gray-500 mb-6 lg:mb-8 font-normal">
               All fields marked with an asterisk (*) are required.
             </p>
             <form className="space-y-6" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
               <div className="grid grid-cols-1 gap-x-4 lg:gap-x-8 gap-y-6 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-neutral-300">
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
                     First Name <span aria-hidden="true">*</span>
                   </label>
                   <input
@@ -183,11 +184,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-required="true"
                     aria-invalid={!!fieldErrors.firstName}
                     aria-describedby={fieldErrors.firstName ? "firstName-error" : undefined}
-                    className={`mt-2 block w-full rounded-lg bg-neutral-900/50 backdrop-blur-sm border ${
+                    className={`mt-2 block w-full rounded-lg bg-gray-50 border ${
                       fieldErrors.firstName
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-600 focus:ring-emerald-500 focus:border-emerald-500"
-                    } text-white placeholder-neutral-500 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3`}
+                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
+                    } text-gray-900 placeholder-gray-400 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3 transition-colors`}
                   />
                   {fieldErrors.firstName && (
                     <p className="mt-1 text-sm text-red-600" id="firstName-error">
@@ -196,7 +197,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-neutral-300">
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
                     Last Name <span aria-hidden="true">*</span>
                   </label>
                   <input
@@ -207,11 +208,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-required="true"
                     aria-invalid={!!fieldErrors.lastName}
                     aria-describedby={fieldErrors.lastName ? "lastName-error" : undefined}
-                    className={`mt-2 block w-full rounded-lg bg-neutral-900/50 backdrop-blur-sm border ${
+                    className={`mt-2 block w-full rounded-lg bg-gray-50 border ${
                       fieldErrors.lastName
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-600 focus:ring-emerald-500 focus:border-emerald-500"
-                    } text-white placeholder-neutral-500 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3`}
+                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
+                    } text-gray-900 placeholder-gray-400 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3 transition-colors`}
                   />
                   {fieldErrors.lastName && (
                     <p className="mt-1 text-sm text-red-600" id="lastName-error">
@@ -220,7 +221,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="company" className="block text-sm font-medium text-neutral-300">
+                  <label htmlFor="company" className="block text-sm font-medium text-gray-700">
                     Company <span aria-hidden="true">*</span>
                   </label>
                   <input
@@ -232,11 +233,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-invalid={!!fieldErrors.company}
                     aria-describedby={fieldErrors.company ? "company-error" : undefined}
                     placeholder="Enter your company name"
-                    className={`mt-2 block w-full rounded-lg bg-neutral-900/50 backdrop-blur-sm border ${
+                    className={`mt-2 block w-full rounded-lg bg-gray-50 border ${
                       fieldErrors.company
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-600 focus:ring-emerald-500 focus:border-emerald-500"
-                    } text-white placeholder-neutral-500 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3`}
+                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
+                    } text-gray-900 placeholder-gray-400 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3 transition-colors`}
                   />
                   {fieldErrors.company && (
                     <p className="mt-1 text-sm text-red-600" id="company-error">
@@ -245,7 +246,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="email" className="block text-sm font-medium text-neutral-300">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                     Work Email <span aria-hidden="true">*</span>
                   </label>
                   <input
@@ -257,11 +258,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-invalid={!!fieldErrors.email}
                     aria-describedby={fieldErrors.email ? "email-error" : undefined}
                     placeholder="Enter your email"
-                    className={`mt-2 block w-full rounded-lg bg-neutral-900/50 backdrop-blur-sm border ${
+                    className={`mt-2 block w-full rounded-lg bg-gray-50 border ${
                       fieldErrors.email
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-600 focus:ring-emerald-500 focus:border-emerald-500"
-                    } text-white placeholder-neutral-500 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3`}
+                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
+                    } text-gray-900 placeholder-gray-400 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3 transition-colors`}
                   />
                   {fieldErrors.email && (
                     <p className="mt-1 text-sm text-red-600" id="email-error">
@@ -270,7 +271,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-neutral-300">
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
                     Phone Number
                   </label>
                   <input
@@ -278,11 +279,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     name="phoneNumber"
                     id="phoneNumber"
                     placeholder="(123) 456-7890"
-                    className="mt-2 block w-full rounded-lg bg-neutral-900/50 backdrop-blur-sm border border-neutral-600 text-white placeholder-neutral-500 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3"
+                    className="mt-2 block w-full rounded-lg bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:ring-gray-900 focus:border-gray-900 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3 transition-colors"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="message" className="block text-sm font-medium text-neutral-300">
+                  <label htmlFor="message" className="block text-sm font-medium text-gray-700">
                     Message
                   </label>
                   <textarea
@@ -290,14 +291,14 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     id="message"
                     rows={4}
                     placeholder="How can we help you?"
-                    className="mt-2 block w-full rounded-lg bg-neutral-900/50 backdrop-blur-sm border border-neutral-600 text-white placeholder-neutral-500 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3"
+                    className="mt-2 block w-full rounded-lg bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:ring-gray-900 focus:border-gray-900 sm:text-sm px-3 py-2.5 lg:px-4 lg:py-3 transition-colors"
                   ></textarea>
                 </div>
               </div>
 
               {error && (
                 <div
-                  className="p-3 bg-red-900/50 border border-red-500/50 rounded-md text-red-300 text-sm"
+                  className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
                   role="alert"
                 >
                   {error}
@@ -307,33 +308,14 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               <div className="space-y-6">
                 <motion.button
                   type="submit"
-                  className="w-full rounded-full bg-emerald-600 py-3 lg:py-4 px-6 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="w-full rounded-xl bg-gray-900 py-3 lg:py-4 px-6 text-sm font-medium text-white shadow-sm hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center">
-                      <svg
-                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
+                      <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
                       Submitting...
                     </span>
                   ) : (

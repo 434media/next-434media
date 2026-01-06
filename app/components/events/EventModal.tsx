@@ -162,7 +162,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
                     {/* Title on Image */}
                     <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
-                      <h3 className="text-2xl sm:text-3xl font-bold text-white drop-shadow-md">{event.title}</h3>
+                      <h3 className="text-2xl sm:text-3xl font-semibold text-white drop-shadow-md tracking-tight leading-tight">{event.title}</h3>
                     </div>
                   </div>
                 </div>
@@ -173,34 +173,34 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                     {/* Left Column - Event Details */}
                     <div>
                       <div className="mb-6">
-                        <h4 className="text-lg font-semibold text-neutral-900 mb-3 flex items-center">
-                          <Calendar className="h-5 w-5 mr-2 text-neutral-500" />
+                        <h4 className="text-base font-medium text-gray-900 mb-4 flex items-center tracking-wide">
+                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
                           Event Details
                         </h4>
-                        <div className="space-y-3 pl-7">
+                        <div className="space-y-3 pl-6">
                           <div className="flex items-start">
-                            <Clock className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-neutral-700">{formatEventDate(event.date, event.time)}</span>
+                            <Clock className="h-4 w-4 mr-2.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <span className="text-gray-600 text-sm leading-relaxed">{formatEventDate(event.date, event.time)}</span>
                           </div>
                           {event.location && (
                             <div className="flex items-start">
-                              <MapPin className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-neutral-700">{event.location}</span>
+                              <MapPin className="h-4 w-4 mr-2.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-600 text-sm leading-relaxed">{event.location}</span>
                             </div>
                           )}
                           {event.organizer && (
                             <div className="flex items-start">
-                              <User className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-neutral-700">
-                                <span className="font-medium">Organized by:</span> {event.organizer}
+                              <User className="h-4 w-4 mr-2.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-600 text-sm leading-relaxed">
+                                <span className="font-medium text-gray-700">Organized by</span> {event.organizer}
                               </span>
                             </div>
                           )}
                           {event.attendees && (
                             <div className="flex items-start">
-                              <Users className="h-5 w-5 mr-2 text-neutral-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-neutral-700">
-                                <span className="font-medium">Attendees:</span> {event.attendees}
+                              <Users className="h-4 w-4 mr-2.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-600 text-sm leading-relaxed">
+                                <span className="font-medium text-gray-700">Attendees</span> {event.attendees}
                               </span>
                             </div>
                           )}
@@ -209,10 +209,10 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
                       {/* Price Info */}
                       {event.price && (
-                        <div className="mb-6 p-4 rounded-xl bg-neutral-50 border border-neutral-100">
+                        <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
                           <div className="flex justify-between items-center">
-                            <span className="text-neutral-700 font-medium">Price</span>
-                            <span className="text-neutral-600 font-bold">{event.price}</span>
+                            <span className="text-gray-500 text-sm font-normal">Price</span>
+                            <span className="text-gray-900 font-medium">{event.price}</span>
                           </div>
                         </div>
                       )}
@@ -222,23 +222,23 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                     <div>
                       {event.description && (
                         <div className="mb-6">
-                          <h4 className="text-lg font-semibold text-neutral-900 mb-3">Description</h4>
-                          <div className="text-neutral-700 leading-relaxed whitespace-pre-wrap">{event.description}</div>
+                          <h4 className="text-base font-medium text-gray-900 mb-4 tracking-wide">About This Event</h4>
+                          <div className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">{event.description}</div>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-between">
+                  <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:justify-between">
                     {event.url ? (
                       <a
                         href={event.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 bg-gradient-to-r from-neutral-500 to-neutral-500 hover:from-neutral-600 hover:to-neutral-600 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02]"
+                        className="flex-1 bg-gray-900 hover:bg-gray-800 text-white px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-lg transform hover:scale-[1.01] font-medium text-sm tracking-wide"
                       >
-                        <ExternalLink className="h-5 w-5" />
+                        <ExternalLink className="h-4 w-4" />
                         View Original Event
                       </a>
                     ) : (
@@ -246,7 +246,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                     )}
                     <button
                       onClick={onClose}
-                      className="flex-1 border-2 border-neutral-200 hover:border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-700 px-4 py-3 rounded-xl transition-colors duration-200"
+                      className="flex-1 border border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 text-gray-600 px-4 py-3 rounded-xl transition-colors duration-200 font-medium text-sm"
                     >
                       Close
                     </button>
@@ -265,7 +265,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
                 {/* Conditional Footer - Only show for imported events */}
                 {!isManualEvent && event.source && (
                   <div className="px-6 pb-4">
-                    <div className="text-center text-xs text-neutral-400 border-t border-neutral-100 pt-3">
+                    <div className="text-center text-xs text-gray-400 border-t border-gray-100 pt-4 font-normal tracking-wide">
                       Imported from {event.source.charAt(0).toUpperCase() + event.source.slice(1)}
                     </div>
                   </div>

@@ -149,7 +149,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                     />
                   </div>
                   <p
-                    className={`block font-geist-sans text-xs md:text-sm lg:text-base ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    className={`block font-geist-sans text-xs md:text-sm lg:text-base font-normal ${square.textColor}/80 leading-relaxed tracking-tight drop-shadow-sm relative z-20`}
                   >
                     {square.subtitle}
                   </p>
@@ -157,12 +157,12 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
               ) : (
                 <>
                   <h3
-                    className={`font-ggx88 text-lg md:text-xl lg:text-2xl ${square.textColor} leading-tight mb-1.5 md:mb-2 drop-shadow-md relative z-20`}
+                    className={`font-ggx88 text-lg md:text-xl lg:text-2xl font-bold ${square.textColor} leading-[1.15] tracking-tight mb-2 md:mb-2.5 drop-shadow-md relative z-20`}
                   >
                     {square.title}
                   </h3>
                   <p
-                    className={`block font-geist-sans text-xs md:text-sm ${square.textColor}/90 leading-relaxed drop-shadow-sm relative z-20`}
+                    className={`block font-geist-sans text-xs md:text-sm font-normal ${square.textColor}/70 leading-snug tracking-tight drop-shadow-sm relative z-20`}
                   >
                     {square.subtitle}
                   </p>
@@ -258,7 +258,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   className="mb-4 md:mb-6 lg:mb-8 flex-shrink-0"
                 >
                   <motion.p
-                    className="max-w-sm mx-auto md:mx-0 md:px-12 lg:px-16 text-gray-100 font-semibold text-2xl lg:text-4xl md:max-w-4xl leading-snug md:leading-snug lg:leading-snug tracking-wide"
+                    className="max-w-sm mx-auto md:mx-0 md:px-12 lg:px-16 text-gray-100 font-medium text-xl lg:text-3xl md:max-w-4xl leading-[1.35] md:leading-[1.35] lg:leading-[1.35] tracking-tight"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.6, delay: 0.4 }}
