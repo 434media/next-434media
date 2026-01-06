@@ -17,6 +17,7 @@ import {
   Trash2,
   Globe,
   Users,
+  Database,
 } from "lucide-react"
 
 interface EmailSignup {
@@ -46,6 +47,11 @@ export default function EmailListsPage() {
   const [endDate, setEndDate] = useState<string>("")
   const [datePreset, setDatePreset] = useState<string>("")
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [isMigrating, setIsMigrating] = useState<string | null>(null)
+  const [migrationResults, setMigrationResults] = useState<{
+    action: string
+    results: { total?: number; migrated?: number; skipped?: number; errors?: number }
+  } | null>(null)
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -325,6 +331,40 @@ export default function EmailListsPage() {
     setDatePreset("")
   }
 
+  // Migration function
+  const handleMigration = async (action: "migrate" | "migrate-mxr" | "migrate-txmx") => {
+    try {
+      setIsMigrating(action)
+      setMigrationResults(null)
+      
+      const res = await fetch("/api/admin/email-lists-firestore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        setMigrationResults({ action, results: data.results })
+        setToast({ 
+          message: data.message || `Migration complete: ${data.results?.migrated || 0} emails migrated`, 
+          type: "success" 
+        })
+        // Refresh data after migration
+        await fetchSourcesAndCounts()
+        await fetchSignups(selectedSource)
+      } else {
+        setToast({ message: data.error || "Migration failed", type: "error" })
+      }
+    } catch (err) {
+      setToast({ message: "Migration failed", type: "error" })
+      console.error(err)
+    } finally {
+      setIsMigrating(null)
+    }
+  }
+
   // Get total count for selected source
   const totalCount = selectedSource ? (counts[selectedSource] || 0) : Object.values(counts).reduce((a, b) => a + b, 0)
 
@@ -425,6 +465,91 @@ export default function EmailListsPage() {
                 <div className="text-xs opacity-60">emails</div>
               </button>
             ))}
+        </div>
+
+        {/* Migration Section */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Database className="w-5 h-5 text-gray-700" />
+            <h2 className="text-lg font-semibold text-gray-900">Airtable → Firestore Migration</h2>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Migrate email signups from Airtable bases to Firestore. Existing emails are skipped (no duplicates).
+          </p>
+          
+          <div className="flex flex-wrap gap-3">
+            {/* Standard Airtable Migration */}
+            <button
+              onClick={() => handleMigration("migrate")}
+              disabled={isMigrating !== null}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isMigrating === "migrate" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Database className="w-4 h-4" />
+              )}
+              <span>Migrate AIM Emails</span>
+            </button>
+
+            {/* MXR RSVP Migration */}
+            <button
+              onClick={() => handleMigration("migrate-mxr")}
+              disabled={isMigrating !== null}
+              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isMigrating === "migrate-mxr" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Database className="w-4 h-4" />
+              )}
+              <span>Migrate MXR → DigitalCanvas</span>
+            </button>
+
+            {/* TXMX Iconic Migration */}
+            <button
+              onClick={() => handleMigration("migrate-txmx")}
+              disabled={isMigrating !== null}
+              className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isMigrating === "migrate-txmx" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Database className="w-4 h-4" />
+              )}
+              <span>Migrate Iconic → TXMX</span>
+            </button>
+          </div>
+
+          {/* Migration Results */}
+          {migrationResults && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <span className="font-medium text-gray-900">
+                  Migration Complete: {migrationResults.action}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500">Total</div>
+                  <div className="font-semibold text-gray-900">{migrationResults.results.total || 0}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500">Migrated</div>
+                  <div className="font-semibold text-green-600">{migrationResults.results.migrated || 0}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500">Skipped</div>
+                  <div className="font-semibold text-yellow-600">{migrationResults.results.skipped || 0}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500">Errors</div>
+                  <div className="font-semibold text-red-600">{migrationResults.results.errors || 0}</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Filters Bar */}
