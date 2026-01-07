@@ -45,6 +45,7 @@ import type {
 export default function SalesCRMPage() {
   // State
   const [isLoading, setIsLoading] = useState(true)
+  const [isClientsLoaded, setIsClientsLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastType | null>(null)
 
@@ -242,8 +243,10 @@ export default function SalesCRMPage() {
       if (!response.ok) throw new Error("Failed to fetch clients")
       const data = await response.json()
       setClients(data.clients || [])
+      setIsClientsLoaded(true)
     } catch (err) {
       setToast({ message: "Failed to load clients", type: "error" })
+      setIsClientsLoaded(true) // Set loaded even on error to prevent infinite loading
     }
   }
 
@@ -443,11 +446,18 @@ export default function SalesCRMPage() {
     try {
       const ownerMap: Record<string, string> = {
         "Jake": "jake",
+        "Jacob Lee Miles": "jake",
         "Marc": "marc",
+        "Marcos Resendez": "marc",
         "Stacy": "stacy",
+        "Stacy Ramirez": "stacy",
+        "Stacy Carrizales": "stacy",
         "Jesse": "jesse",
+        "Jesse Hernandez": "jesse",
         "Barb": "barb",
-        "Nichole": "nichole",
+        "Barbara Carreon": "barb",
+        "Nichole": "teams",
+        "Nichole Snow": "teams",
       }
       const owner = ownerMap[selectedTask.assigned_to] || "teams"
       
@@ -558,11 +568,18 @@ export default function SalesCRMPage() {
         // Save to Firestore
         const ownerMap: Record<string, string> = {
           "Jake": "jake",
+          "Jacob Lee Miles": "jake",
           "Marc": "marc",
+          "Marcos Resendez": "marc",
           "Stacy": "stacy",
+          "Stacy Ramirez": "stacy",
+          "Stacy Carrizales": "stacy",
           "Jesse": "jesse",
+          "Jesse Hernandez": "jesse",
           "Barb": "barb",
-          "Nichole": "nichole",
+          "Barbara Carreon": "barb",
+          "Nichole": "teams",
+          "Nichole Snow": "teams",
         }
         const owner = ownerMap[selectedTask.assigned_to] || "teams"
         
@@ -611,11 +628,18 @@ export default function SalesCRMPage() {
       try {
         const ownerMap: Record<string, string> = {
           "Jake": "jake",
+          "Jacob Lee Miles": "jake",
           "Marc": "marc",
+          "Marcos Resendez": "marc",
           "Stacy": "stacy",
+          "Stacy Ramirez": "stacy",
+          "Stacy Carrizales": "stacy",
           "Jesse": "jesse",
+          "Jesse Hernandez": "jesse",
           "Barb": "barb",
-          "Nichole": "nichole",
+          "Barbara Carreon": "barb",
+          "Nichole": "teams",
+          "Nichole Snow": "teams",
         }
         const owner = ownerMap[selectedTask.assigned_to] || "teams"
         
@@ -804,11 +828,18 @@ export default function SalesCRMPage() {
     try {
       const ownerMap: Record<string, string> = {
         "Jake": "jake",
+        "Jacob Lee Miles": "jake",
         "Marc": "marc",
+        "Marcos Resendez": "marc",
         "Stacy": "stacy",
+        "Stacy Ramirez": "stacy",
+        "Stacy Carrizales": "stacy",
         "Jesse": "jesse",
+        "Jesse Hernandez": "jesse",
         "Barb": "barb",
-        "Nichole": "nichole",
+        "Barbara Carreon": "barb",
+        "Nichole": "teams",
+        "Nichole Snow": "teams",
       }
       const owner = ownerMap[selectedTask.assigned_to] || "teams"
       
@@ -1312,8 +1343,8 @@ export default function SalesCRMPage() {
           </div>
         )}
 
-        {/* Dashboard View */}
-        {viewMode === "dashboard" && stats && (
+        {/* Dashboard View - wait for clients to be loaded for accurate budget calculations */}
+        {viewMode === "dashboard" && stats && isClientsLoaded && (
           <DashboardView 
             stats={stats} 
             pipeline={pipeline}
@@ -1325,6 +1356,16 @@ export default function SalesCRMPage() {
             onTaskClick={openTaskModal}
             currentUser={currentUser}
           />
+        )}
+
+        {/* Dashboard loading state */}
+        {viewMode === "dashboard" && (!stats || !isClientsLoaded) && !isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center gap-3 text-neutral-500">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Loading dashboard data...</span>
+            </div>
+          </div>
         )}
 
         {/* Opportunities Kanban View */}
