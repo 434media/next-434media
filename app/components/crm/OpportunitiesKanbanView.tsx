@@ -7,8 +7,6 @@ import {
   Target, 
   ChevronDown, 
   ChevronUp,
-  Users,
-  CheckSquare,
   TrendingUp,
   Plus
 } from "lucide-react"
@@ -31,7 +29,8 @@ import type {
 interface KanbanItem {
   id: string
   type: "client" | "task"
-  name: string
+  name: string  // This will be the title for display
+  companyName?: string  // Company name to show below title
   brand?: Brand
   value?: number
   disposition?: Disposition
@@ -48,6 +47,7 @@ interface OpportunitiesKanbanViewProps {
   onRefresh?: () => void
   onClientClick: (client: Client) => void
   onTaskClick: (task: Task) => void
+  onOpportunityClick?: (client: Client) => void  // New: open opportunity modal instead of client modal
   onUpdateClientDisposition?: (clientId: string, disposition: Disposition) => void
   onUpdateTaskDisposition?: (taskId: string, disposition: Disposition) => void
   onAddOpportunity?: () => void
@@ -215,7 +215,6 @@ function KanbanCard({
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
 }) {
-  const isClient = item.type === "client"
   const docLabel = item.doc ? `${item.doc}%` : null
 
   return (
@@ -228,27 +227,26 @@ function KanbanCard({
       <div className="flex items-start gap-2">
         <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          {/* Header with type badge */}
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded ${
-              isClient 
-                ? "bg-blue-100 text-blue-700" 
-                : "bg-purple-100 text-purple-700"
-            }`}>
-              {isClient ? <Users className="w-3 h-3" /> : <CheckSquare className="w-3 h-3" />}
-              {isClient ? "Client" : "Task"}
-            </span>
-            {docLabel && (
+          {/* DOC badge only - no Client/Task type badges */}
+          {docLabel && (
+            <div className="flex items-center gap-2 mb-1.5">
               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700">
                 DOC: {docLabel}
               </span>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Name */}
+          {/* Title (opportunity title) */}
           <p className="text-sm font-medium text-gray-900 truncate leading-snug">
             {item.name}
           </p>
+
+          {/* Company Name */}
+          {item.companyName && (
+            <p className="text-xs text-gray-500 mt-0.5 truncate">
+              {item.companyName}
+            </p>
+          )}
 
           {/* Meta info */}
           <div className="flex items-center gap-3 mt-2">
@@ -267,7 +265,7 @@ function KanbanCard({
           {/* Due date or follow-up */}
           {item.dueDate && (
             <p className="text-xs text-gray-400 mt-1.5">
-              {isClient ? "Follow up" : "Due"}: {formatDate(item.dueDate)}
+              Follow up: {formatDate(item.dueDate)}
             </p>
           )}
 
@@ -385,6 +383,7 @@ export function OpportunitiesKanbanView({
   onRefresh,
   onClientClick,
   onTaskClick,
+  onOpportunityClick,
   onUpdateClientDisposition,
   onUpdateTaskDisposition,
   onAddOpportunity
@@ -401,7 +400,8 @@ export function OpportunitiesKanbanView({
     const clientItems: KanbanItem[] = opportunityClients.map(client => ({
       id: client.id,
       type: "client" as const,
-      name: client.company_name || client.name,
+      name: client.title || client.company_name || client.name,  // Show title first, then company name
+      companyName: client.title ? (client.company_name || client.name) : undefined,  // Show company below if title exists
       brand: client.brand,
       value: client.pitch_value,
       disposition: client.disposition || "pitched",
@@ -416,6 +416,7 @@ export function OpportunitiesKanbanView({
       id: task.id,
       type: "task" as const,
       name: task.title,
+      companyName: task.client_name,
       brand: task.brand,
       value: undefined,
       disposition: task.disposition || "pitched",
@@ -442,10 +443,15 @@ export function OpportunitiesKanbanView({
       .reduce((sum, item) => sum + (item.value || 0), 0)
   }
 
-  // Handle item click
+  // Handle item click - use opportunity modal for clients, task modal for tasks
   const handleItemClick = (item: KanbanItem) => {
     if (item.type === "client") {
-      onClientClick(item.originalData as Client)
+      // Use opportunity modal if available, otherwise fall back to client modal
+      if (onOpportunityClick) {
+        onOpportunityClick(item.originalData as Client)
+      } else {
+        onClientClick(item.originalData as Client)
+      }
     } else {
       onTaskClick(item.originalData as Task)
     }

@@ -1158,6 +1158,78 @@ export default function SalesCRMPage() {
     setShowClientForm(true)
   }
 
+  // Handler to edit an opportunity using the opportunity modal
+  const handleEditOpportunity = (client: Client) => {
+    // Convert existing client data to opportunity form format
+    const contacts: Array<{
+      id: string
+      name: string
+      email: string
+      phone: string
+      role: string
+      is_primary: boolean
+      address: string
+      city: string
+      state: string
+      zipcode: string
+      date_of_birth: string
+    }> = []
+    
+    // Check if client has contacts array
+    if (client.contacts && client.contacts.length > 0) {
+      client.contacts.forEach(c => {
+        contacts.push({
+          id: c.id || `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: c.name || "",
+          email: c.email || "",
+          phone: c.phone || "",
+          role: c.role || "",
+          is_primary: c.is_primary || false,
+          address: c.address || "",
+          city: c.city || "",
+          state: c.state || "",
+          zipcode: c.zipcode || "",
+          date_of_birth: c.date_of_birth || "",
+        })
+      })
+    } else if (client.name || client.email || client.phone) {
+      // Legacy: convert single contact fields to contacts array
+      contacts.push({
+        id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: client.name || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        role: "",
+        is_primary: true,
+        address: "",
+        city: "",
+        state: "",
+        zipcode: "",
+        date_of_birth: "",
+      })
+    }
+    
+    setOpportunityForm({
+      company_name: client.company_name || client.name || "",
+      existing_company_id: client.id, // Set the existing ID for update
+      contacts,
+      title: client.title || "",
+      status: client.status || "prospect",
+      brand: client.brand || "",
+      pitch_value: client.pitch_value ? String(client.pitch_value) : "",
+      next_followup_date: client.next_followup_date || "",
+      assigned_to: client.assigned_to || "",
+      notes: client.notes || "",
+      source: client.source || "",
+      is_opportunity: true,
+      disposition: client.disposition || "pitched",
+      doc: client.doc || "",
+      web_links: client.web_links || [],
+      docs: client.docs || [],
+    })
+    setShowOpportunityForm(true)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -1256,6 +1328,7 @@ export default function SalesCRMPage() {
               loadTasks()
             }}
             onClientClick={handleEditClient}
+            onOpportunityClick={handleEditOpportunity}
             onTaskClick={openTaskModal}
             onUpdateClientDisposition={handleUpdateClientDisposition}
             onUpdateTaskDisposition={handleUpdateTaskDisposition}

@@ -452,8 +452,8 @@ export function OpportunityFormModal({
                   <Target className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Add Opportunity</h3>
-                  <p className="text-xs text-gray-500">Create a new sales opportunity</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Opportunity</h3>
+                  <p className="text-xs text-gray-500">Get that money and close that business</p>
                 </div>
               </div>
               <button
@@ -826,6 +826,7 @@ export function OpportunityFormModal({
                     className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
                     <option value="">Select source...</option>
+                    <option value="existing">Existing</option>
                     <option value="web">Web</option>
                     <option value="cold_call">Cold Call</option>
                     <option value="event">Event</option>

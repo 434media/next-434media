@@ -158,7 +158,7 @@ export const BRAND_GOALS: BrandGoal[] = [
   { brand: "DEVSA TV", annualGoal: 250000, color: "#8b5cf6", description: "Documentary & Video Production" },
   { 
     brand: "434 Media", 
-    annualGoal: 50000, 
+    annualGoal: 250000, 
     color: "#10b981", 
     description: "Parent Company & Digital Canvas",
     includedBrands: ["434 Media", "Digital Canvas"]

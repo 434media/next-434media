@@ -292,6 +292,7 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     // Basic Info - handle both standard and Airtable field names
     name: fullName,
     company_name: (rawData.company_name || rawData.company || rawData.Company || rawData["Company Name"] || "") as string,
+    title: (rawData.title || "") as string,  // Opportunity title
     email,
     phone: (rawData.phone || rawData.phone_number || rawData.Phone || rawData["Phone Number"] || "") as string,
     // Multiple contacts
@@ -325,6 +326,8 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     is_opportunity: (rawData.is_opportunity || false) as boolean,
     disposition: (rawData.disposition || undefined) as ClientRecord["disposition"],
     doc: (rawData.doc || undefined) as ClientRecord["doc"],
+    web_links: (rawData.web_links || []) as string[],
+    docs: (rawData.docs || []) as string[],
     // Tags
     tags: (rawData.tags || []) as string[],
     // Timestamps

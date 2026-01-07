@@ -66,6 +66,7 @@ export interface ClientRecord extends BaseRecord {
   // Basic Info
   name: string
   company_name?: string
+  title?: string  // Opportunity title
   email?: string
   phone?: string
   
@@ -105,6 +106,8 @@ export interface ClientRecord extends BaseRecord {
   is_opportunity?: boolean
   disposition?: "open" | "pitched" | "closed_won" | "closed_lost"
   doc?: "25" | "50" | "75" | "90"
+  web_links?: string[]  // Array of URLs for opportunities
+  docs?: string[]  // Array of document URLs for opportunities
   
   // Linked records
   opportunity_ids?: string[]
