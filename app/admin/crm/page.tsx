@@ -59,6 +59,7 @@ export default function SalesCRMPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [brandFilter, setBrandFilter] = useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
+  const [clientAssigneeFilter, setClientAssigneeFilter] = useState<string>("all")
   const [clientSourceFilter, setClientSourceFilter] = useState<string>("all")
   
   // Tags state
@@ -89,6 +90,7 @@ export default function SalesCRMPage() {
     source: "",
     is_opportunity: false,
     opportunity_id: "",
+    assigned_to: "",
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -198,6 +200,7 @@ export default function SalesCRMPage() {
       const matchedName = emailToNameMap[currentUser.email.toLowerCase()]
       if (matchedName) {
         setAssigneeFilter(matchedName)
+        setClientAssigneeFilter(matchedName)
       }
     }
   }, [currentUser])
@@ -864,6 +867,7 @@ export default function SalesCRMPage() {
         source: clientForm.source || undefined,
         is_opportunity: clientForm.is_opportunity,
         opportunity_id: clientForm.opportunity_id || undefined,
+        assigned_to: clientForm.assigned_to || undefined,
       }
 
       const method = editingClient ? "PUT" : "POST"
@@ -883,7 +887,7 @@ export default function SalesCRMPage() {
       setToast({ message: `Contact ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "" })
+      setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "", assigned_to: "" })
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to save contact", type: "error" })
@@ -1129,6 +1133,7 @@ export default function SalesCRMPage() {
       source: client.source || "",
       is_opportunity: client.is_opportunity || false,
       opportunity_id: client.opportunity_id || "",
+      assigned_to: client.assigned_to || "",
     })
     setShowClientForm(true)
   }
@@ -1265,11 +1270,13 @@ export default function SalesCRMPage() {
             clients={clients}
             searchQuery={searchQuery}
             sourceFilter={clientSourceFilter}
+            assigneeFilter={clientAssigneeFilter}
             onSearchChange={setSearchQuery}
             onSourceFilterChange={setClientSourceFilter}
+            onAssigneeFilterChange={setClientAssigneeFilter}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "" })
+              setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "", assigned_to: currentUser?.name || "" })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}

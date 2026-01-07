@@ -327,7 +327,7 @@ export function TaskModal({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-gray-900">{task.id ? "Edit Task" : "Add Task"}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{task.id ? "Task" : "Add Task"}</h3>
                 {dueDateStatus === "overdue" && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-600 text-xs font-medium">
                     <AlertCircle className="w-3 h-3" />

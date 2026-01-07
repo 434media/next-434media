@@ -1,15 +1,17 @@
 "use client"
 
-import { Search, Plus, Edit, Trash2, Mail, Phone, Users, Calendar, Building2 } from "lucide-react"
-import { formatDate } from "./types"
+import { Search, Plus, Edit, Trash2, Mail, Phone, Users, Calendar, Building2, Filter } from "lucide-react"
+import { formatDate, normalizeAssigneeName, isValidAssigneeName, TEAM_MEMBERS } from "./types"
 import type { Client } from "./types"
 
 interface ClientsViewProps {
   clients: Client[]
   searchQuery: string
   sourceFilter: string
+  assigneeFilter: string
   onSearchChange: (query: string) => void
   onSourceFilterChange: (source: string) => void
+  onAssigneeFilterChange: (assignee: string) => void
   onAddClient: () => void
   onEditClient: (client: Client) => void
   onDeleteClient: (id: string) => void
@@ -19,12 +21,32 @@ export function ClientsView({
   clients,
   searchQuery,
   sourceFilter,
+  assigneeFilter,
   onSearchChange,
   onSourceFilterChange,
+  onAssigneeFilterChange,
   onAddClient,
   onEditClient,
   onDeleteClient,
 }: ClientsViewProps) {
+  // Get unique assignees from clients for the filter dropdown
+  const uniqueAssignees = Array.from(
+    new Set(
+      clients
+        .map(c => c.assigned_to)
+        .filter((assignee): assignee is string => 
+          typeof assignee === "string" && assignee.trim() !== ""
+        )
+        .map(normalizeAssigneeName)
+        .filter(name => isValidAssigneeName(name) && name !== "Unassigned")
+    )
+  ).sort()
+
+  // Also include team members who may not have any clients yet
+  const allAssignees = Array.from(
+    new Set([...uniqueAssignees, ...TEAM_MEMBERS.map(m => m.name)])
+  ).sort()
+
   // Filter clients
   const filteredClients = clients.filter((client) => {
     const searchLower = searchQuery.toLowerCase()
@@ -37,7 +59,9 @@ export function ClientsView({
         c.email?.toLowerCase().includes(searchLower)
       )
     const matchesSource = sourceFilter === "all" || client.source === sourceFilter
-    return matchesSearch && matchesSource
+    const normalizedAssignee = normalizeAssigneeName(client.assigned_to || "")
+    const matchesAssignee = assigneeFilter === "all" || normalizedAssignee === assigneeFilter
+    return matchesSearch && matchesSource && matchesAssignee
   })
 
   // Sort by follow-up date (oldest first) - following the mockup's default sorting
@@ -93,6 +117,22 @@ export function ClientsView({
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 shadow-sm"
             />
+          </div>
+          {/* Assignee Filter */}
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+              value={assigneeFilter}
+              onChange={(e) => onAssigneeFilterChange(e.target.value)}
+              className="pl-10 pr-8 py-2.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 shadow-sm appearance-none cursor-pointer min-w-[160px]"
+            >
+              <option value="all">All Assignees</option>
+              {allAssignees.map(assignee => (
+                <option key={assignee} value={assignee}>
+                  {assignee}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <button

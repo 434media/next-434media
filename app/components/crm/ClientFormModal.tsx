@@ -11,11 +11,12 @@ import {
   ChevronDown, 
   ChevronUp,
   User,
+  Users,
   Mail,
   Phone,
   Calendar,
-  Target,
 } from "lucide-react"
+import { TEAM_MEMBERS } from "./types"
 
 interface ContactFormData {
   id: string
@@ -40,13 +41,7 @@ interface ClientFormData {
   source: string
   is_opportunity: boolean
   opportunity_id: string
-}
-
-// Simplified opportunity type for selection
-interface OpportunityOption {
-  id: string
-  company_name?: string
-  title?: string
+  assigned_to: string
 }
 
 interface ClientFormModalProps {
@@ -54,7 +49,7 @@ interface ClientFormModalProps {
   isEditing: boolean
   isSaving: boolean
   formData: ClientFormData
-  opportunities: OpportunityOption[]
+  opportunities: { id: string; company_name?: string; title?: string }[]
   onFormChange: (data: ClientFormData) => void
   onSave: () => void
   onClose: () => void
@@ -159,7 +154,7 @@ export function ClientFormModal({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {isEditing ? "Edit Contact" : "New Contact"}
+                    {isEditing ? "Contact" : "New Contact"}
                   </h3>
                   <p className="text-xs text-gray-500">
                     {isEditing ? "Update contact information" : "Add a new point of contact"}
@@ -461,58 +456,26 @@ export function ClientFormModal({
                 />
               </div>
 
-              {/* Opportunity Toggle */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-purple-100' : 'bg-gray-200'}`}>
-                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-purple-600' : 'text-gray-500'}`} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Link to Opportunity</p>
-                      <p className="text-xs text-gray-500">Associate this contact with an opportunity</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onFormChange({ 
-                      ...formData, 
-                      is_opportunity: !formData.is_opportunity,
-                      opportunity_id: !formData.is_opportunity ? formData.opportunity_id : ""
-                    })}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      formData.is_opportunity ? 'bg-purple-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        formData.is_opportunity ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-                
-                {/* Opportunity Dropdown - shown when toggle is enabled */}
-                {formData.is_opportunity && (
-                  <div className="pl-12">
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Opportunity</label>
-                    <select
-                      value={formData.opportunity_id}
-                      onChange={(e) => onFormChange({ ...formData, opportunity_id: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-purple-500 focus:bg-white"
-                    >
-                      <option value="">Select an opportunity...</option>
-                      {opportunities.map((opp) => (
-                        <option key={opp.id} value={opp.id}>
-                          {opp.title || opp.company_name || 'Unnamed Opportunity'}
-                        </option>
-                      ))}
-                    </select>
-                    {opportunities.length === 0 && (
-                      <p className="text-xs text-gray-500 mt-1">No opportunities available. Create one first.</p>
-                    )}
-                  </div>
-                )}
+              {/* Assignee Dropdown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    Assigned To
+                  </span>
+                </label>
+                <select
+                  value={formData.assigned_to || ""}
+                  onChange={(e) => onFormChange({ ...formData, assigned_to: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="">Select assignee...</option>
+                  {TEAM_MEMBERS.map((member) => (
+                    <option key={member.email} value={member.name}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
