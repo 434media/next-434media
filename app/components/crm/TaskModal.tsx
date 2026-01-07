@@ -40,7 +40,7 @@ interface TaskFormData {
   title: string
   description: string
   assigned_to: string
-  secondary_assigned_to: string
+  secondary_assigned_to: string[]  // Changed to array for multi-select
   brand: Brand | ""
   status: string
   priority: string
@@ -196,7 +196,7 @@ export function TaskModal({
         // Add to local state and select the new member for the appropriate field
         setTeamMembers(prev => [...prev, data.data])
         if (forSecondary) {
-          onFormChange({ ...formData, secondary_assigned_to: data.data.name })
+          onFormChange({ ...formData, secondary_assigned_to: [...formData.secondary_assigned_to, data.data.name] })
           setShowAddSecondaryMember(false)
         } else {
           onFormChange({ ...formData, assigned_to: data.data.name })
@@ -542,22 +542,52 @@ export function TaskModal({
                       </div>
                     </div>
 
-                    {/* Secondary Assignee */}
+                    {/* Secondary Assignee - Multi-select */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Secondary</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Secondary (Multi-select)</label>
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => setShowSecondaryDropdown(!showSecondaryDropdown)}
-                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between min-h-[38px]"
                         >
-                          <span className={formData.secondary_assigned_to ? "text-gray-900 truncate" : "text-gray-400"}>
-                            {formData.secondary_assigned_to || "None"}
+                          <span className={formData.secondary_assigned_to.length > 0 ? "text-gray-900 truncate" : "text-gray-400"}>
+                            {formData.secondary_assigned_to.length > 0 
+                              ? formData.secondary_assigned_to.length === 1 
+                                ? formData.secondary_assigned_to[0]
+                                : `${formData.secondary_assigned_to.length} selected`
+                              : "None"}
                           </span>
                           <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showSecondaryDropdown ? "rotate-180" : ""}`} />
                         </button>
                         
-                        {/* Dropdown menu */}
+                        {/* Selected members chips */}
+                        {formData.secondary_assigned_to.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {formData.secondary_assigned_to.map((name) => (
+                              <span
+                                key={name}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+                              >
+                                {name}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onFormChange({
+                                      ...formData,
+                                      secondary_assigned_to: formData.secondary_assigned_to.filter(n => n !== name)
+                                    })
+                                  }}
+                                  className="hover:text-blue-900"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Dropdown menu - Multi-select */}
                         <AnimatePresence>
                           {showSecondaryDropdown && (
                             <motion.div
@@ -570,13 +600,13 @@ export function TaskModal({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    onFormChange({ ...formData, secondary_assigned_to: "" })
+                                    onFormChange({ ...formData, secondary_assigned_to: [] })
                                     setShowSecondaryDropdown(false)
                                   }}
                                   className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
                                 >
-                                  <span className="text-gray-500">None</span>
-                                  {!formData.secondary_assigned_to && <Check className="w-4 h-4 text-blue-600" />}
+                                  <span className="text-gray-500">Clear all</span>
+                                  {formData.secondary_assigned_to.length === 0 && <Check className="w-4 h-4 text-blue-600" />}
                                 </button>
                                 
                                 <div className="border-t border-gray-100" />
@@ -587,20 +617,32 @@ export function TaskModal({
                                   </div>
                                 ) : (
                                   <>
-                                    {teamMembers.map((member) => (
-                                      <button
-                                        key={member.id}
-                                        type="button"
-                                        onClick={() => {
-                                          onFormChange({ ...formData, secondary_assigned_to: member.name })
-                                          setShowSecondaryDropdown(false)
-                                        }}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
-                                      >
-                                        <span className="text-gray-900 truncate">{member.name}</span>
-                                        {formData.secondary_assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
-                                      </button>
-                                    ))}
+                                    {teamMembers.map((member) => {
+                                      const isSelected = formData.secondary_assigned_to.includes(member.name)
+                                      return (
+                                        <button
+                                          key={member.id}
+                                          type="button"
+                                          onClick={() => {
+                                            if (isSelected) {
+                                              onFormChange({
+                                                ...formData,
+                                                secondary_assigned_to: formData.secondary_assigned_to.filter(n => n !== member.name)
+                                              })
+                                            } else {
+                                              onFormChange({
+                                                ...formData,
+                                                secondary_assigned_to: [...formData.secondary_assigned_to, member.name]
+                                              })
+                                            }
+                                          }}
+                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? "bg-blue-50" : "hover:bg-gray-50"}`}
+                                        >
+                                          <span className="text-gray-900 truncate">{member.name}</span>
+                                          {isSelected && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                                        </button>
+                                      )
+                                    })}
                                   </>
                                 )}
                                 
@@ -617,6 +659,19 @@ export function TaskModal({
                                   <UserPlus className="w-4 h-4" />
                                   Add new member
                                 </button>
+                                
+                                {formData.secondary_assigned_to.length > 0 && (
+                                  <>
+                                    <div className="border-t border-gray-100" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowSecondaryDropdown(false)}
+                                      className="w-full px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2 font-medium"
+                                    >
+                                      Done
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </motion.div>
                           )}

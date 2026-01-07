@@ -122,7 +122,9 @@ export async function POST(request: NextRequest) {
       title: body.title.trim(),
       description: body.description || "",
       assigned_to: body.assigned_to || body.owner,
+      secondary_assigned_to: body.secondary_assigned_to || [],
       assigned_by: body.assigned_by || "",
+      brand: body.brand || undefined,
       status: body.status || "not_started",
       priority: body.priority || "medium",
       due_date: body.due_date || "",
@@ -131,10 +133,17 @@ export async function POST(request: NextRequest) {
       client_name: body.client_name || "",
       project_id: body.project_id || "",
       opportunity_id: body.opportunity_id || "",
+      is_opportunity: body.is_opportunity || false,
+      disposition: body.disposition || undefined,
+      doc: body.doc || undefined,
       estimated_hours: body.estimated_hours || 0,
       actual_hours: body.actual_hours || 0,
       notes: body.notes || "",
       tags: body.tags || [],
+      web_links: body.web_links || [],
+      attachments: body.attachments || [],
+      comments: body.comments || [],
+      tagged_users: body.tagged_users || [],
     })
 
     return NextResponse.json({ success: true, task }, { status: 201 })
@@ -254,6 +263,9 @@ export async function PUT(request: NextRequest) {
       }
       if (taskUpdates.assigned_to !== undefined) {
         masterListUpdates.assignee = [{ name: taskUpdates.assigned_to }]
+      }
+      if (taskUpdates.secondary_assigned_to !== undefined) {
+        masterListUpdates.secondary_assigned_to = taskUpdates.secondary_assigned_to
       }
       if (taskUpdates.brand !== undefined) {
         masterListUpdates.team = taskUpdates.brand ? [taskUpdates.brand] : []

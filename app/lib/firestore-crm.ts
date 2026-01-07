@@ -768,11 +768,15 @@ export async function getAllTasks(): Promise<Task[]> {
       // Extract tagged users from master list item
       const taggedUsers = rawItem.tagged_users as string[] | undefined
       
+      // Extract secondary assigned to from master list item
+      const secondaryAssignedTo = rawItem.secondary_assigned_to as string | string[] | undefined
+      
       return {
         id: item.id,
         title,
         description,
         assigned_to: assignedTo,
+        secondary_assigned_to: secondaryAssignedTo,
         status: mapMasterListStatusToTaskStatus(rawStatus) as Task["status"],
         priority: (item.priority || "medium") as Task["priority"],
         due_date: dueDate,

@@ -135,7 +135,7 @@ export default function SalesCRMPage() {
     title: "",
     description: "",
     assigned_to: "",
-    secondary_assigned_to: "",
+    secondary_assigned_to: [] as string[],
     brand: "" as Brand | "",
     status: "not_started",
     priority: "medium",
@@ -349,11 +349,17 @@ export default function SalesCRMPage() {
   // Open task modal for editing
   const openTaskModal = (task: Task) => {
     setSelectedTask(task)
+    // Convert secondary_assigned_to to array format for multi-select
+    const secondaryAssignees = task.secondary_assigned_to 
+      ? Array.isArray(task.secondary_assigned_to) 
+        ? task.secondary_assigned_to 
+        : [task.secondary_assigned_to]
+      : []
     setTaskForm({
       title: task.title,
       description: task.description || "",
       assigned_to: task.assigned_to || "",
-      secondary_assigned_to: task.secondary_assigned_to || "",
+      secondary_assigned_to: secondaryAssignees,
       brand: task.brand || "",
       status: task.status,
       priority: task.priority,
@@ -378,7 +384,7 @@ export default function SalesCRMPage() {
       title: "",
       description: "",
       assigned_to: currentUser?.name || assigneeFilter || "",
-      secondary_assigned_to: "",
+      secondary_assigned_to: [],
       brand: undefined,
       status: "not_started",
       priority: "medium",
@@ -399,7 +405,7 @@ export default function SalesCRMPage() {
       title: "",
       description: "",
       assigned_to: currentUser?.name || assigneeFilter || "",
-      secondary_assigned_to: "",
+      secondary_assigned_to: [],
       brand: "",
       status: "not_started",
       priority: "medium",
@@ -537,33 +543,40 @@ export default function SalesCRMPage() {
       const updatedAttachments = [...taskAttachments, newAttachment]
       setTaskAttachments(updatedAttachments)
 
-      // Save to Firestore
-      const ownerMap: Record<string, string> = {
-        "Jake": "jake",
-        "Marc": "marc",
-        "Stacy": "stacy",
-        "Jesse": "jesse",
-        "Barb": "barb",
-        "Nichole": "nichole",
-      }
-      const owner = ownerMap[selectedTask.assigned_to] || "teams"
-      
-      await fetch("/api/admin/crm/tasks", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          id: selectedTask.id,
-          owner,
-          attachments: updatedAttachments,
-        }),
-      })
+      // For NEW tasks (empty ID), don't save to Firestore yet - will be saved when task is created
+      // For existing tasks, save immediately
+      if (selectedTask.id) {
+        // Save to Firestore
+        const ownerMap: Record<string, string> = {
+          "Jake": "jake",
+          "Marc": "marc",
+          "Stacy": "stacy",
+          "Jesse": "jesse",
+          "Barb": "barb",
+          "Nichole": "nichole",
+        }
+        const owner = ownerMap[selectedTask.assigned_to] || "teams"
+        
+        await fetch("/api/admin/crm/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            id: selectedTask.id,
+            owner,
+            attachments: updatedAttachments,
+          }),
+        })
 
-      // Update local task state
-      setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
-      setTasks(prevTasks => 
-        prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t)
-      )
+        // Update local task state
+        setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
+        setTasks(prevTasks => 
+          prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t)
+        )
+      } else {
+        // For new tasks, just update local state - will save when task is created
+        setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
+      }
 
       setToast({ message: "File uploaded", type: "success" })
     } catch (err) {
@@ -583,35 +596,41 @@ export default function SalesCRMPage() {
     const updatedAttachments = taskAttachments.filter(a => a.id !== attachmentId)
     setTaskAttachments(updatedAttachments)
 
-    // Save to Firestore
-    try {
-      const ownerMap: Record<string, string> = {
-        "Jake": "jake",
-        "Marc": "marc",
-        "Stacy": "stacy",
-        "Jesse": "jesse",
-        "Barb": "barb",
-        "Nichole": "nichole",
-      }
-      const owner = ownerMap[selectedTask.assigned_to] || "teams"
-      
-      await fetch("/api/admin/crm/tasks", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          id: selectedTask.id,
-          owner,
-          attachments: updatedAttachments,
-        }),
-      })
+    // For NEW tasks (empty ID), don't save to Firestore yet - will be saved when task is created
+    // For existing tasks, save immediately
+    if (selectedTask.id) {
+      try {
+        const ownerMap: Record<string, string> = {
+          "Jake": "jake",
+          "Marc": "marc",
+          "Stacy": "stacy",
+          "Jesse": "jesse",
+          "Barb": "barb",
+          "Nichole": "nichole",
+        }
+        const owner = ownerMap[selectedTask.assigned_to] || "teams"
+        
+        await fetch("/api/admin/crm/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            id: selectedTask.id,
+            owner,
+            attachments: updatedAttachments,
+          }),
+        })
 
+        setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
+        setTasks(prevTasks => 
+          prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t)
+        )
+      } catch (err) {
+        console.error("Failed to remove attachment:", err)
+      }
+    } else {
+      // For new tasks, just update local state
       setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
-      setTasks(prevTasks => 
-        prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t)
-      )
-    } catch (err) {
-      console.error("Failed to remove attachment:", err)
     }
   }
 
@@ -643,7 +662,7 @@ export default function SalesCRMPage() {
       const isNewTask = !selectedTask.id
       
       if (isNewTask) {
-        // Create new task
+        // Create new task - include attachments
         const response = await fetch("/api/admin/crm/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -651,6 +670,7 @@ export default function SalesCRMPage() {
           body: JSON.stringify({
             owner,
             ...taskForm,
+            attachments: taskAttachments,
           }),
         })
 

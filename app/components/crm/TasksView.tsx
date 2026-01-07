@@ -256,6 +256,16 @@ export function TasksView({
               {completedCount} completed
             </span>
           </button>
+          {/* Clear urgency filter */}
+          {urgencyFilter !== "all" && (
+            <button
+              onClick={() => setUrgencyFilter("all")}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 border border-gray-300 hover:bg-gray-200 transition-all"
+            >
+              <Filter className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-xs font-medium text-gray-600">Clear filter</span>
+            </button>
+          )}
           <span className="text-sm text-gray-500">{sortedTasks.length} of {tasks.filter(isCompletedTaskVisible).length} tasks</span>
         </div>
       </div>
@@ -293,15 +303,6 @@ export function TasksView({
               <option key={assignee} value={assignee}>{assignee}</option>
             ))}
           </select>
-          {urgencyFilter !== "all" && (
-            <button
-              onClick={() => setUrgencyFilter("all")}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-600"
-            >
-              <Filter className="w-4 h-4" />
-              Clear filter
-            </button>
-          )}
         </div>
         <button
           onClick={onAddTask}
@@ -332,9 +333,6 @@ export function TasksView({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell bg-gray-50">
                     Assignee
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
-                    Platform
-                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell bg-gray-50">
                     Due Date
                   </th>
@@ -364,17 +362,6 @@ export function TasksView({
                           <p className={`font-medium text-sm line-clamp-1 ${task.status === "completed" ? "text-gray-500 line-through" : "text-gray-900"}`}>
                             {task.title || "Untitled Task"}
                           </p>
-                          {task.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                              {task.description}
-                            </p>
-                          )}
-                          {task.client_name && (
-                            <p className="flex items-center gap-1 text-xs text-gray-400 mt-1">
-                              <Building className="w-3 h-3" />
-                              {task.client_name}
-                            </p>
-                          )}
                         </div>
                       </td>
                       
@@ -420,17 +407,6 @@ export function TasksView({
                             )}
                           </span>
                         </div>
-                      </td>
-                      
-                      {/* Brand */}
-                      <td className="px-4 py-4 hidden md:table-cell">
-                        {task.brand && typeof task.brand === "string" ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-600">
-                            {task.brand}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
                       </td>
                       
                       {/* Due Date */}

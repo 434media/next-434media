@@ -199,7 +199,7 @@ export interface Task {
   title: string
   description?: string
   assigned_to: string
-  secondary_assigned_to?: string
+  secondary_assigned_to?: string | string[]  // Can be single name or array of names for multi-select
   assigned_by?: string
   brand?: Brand
   status: string
