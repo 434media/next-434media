@@ -184,15 +184,15 @@ function OpportunityProgressChart({
             )}
           </div>
 
-          {/* Legend */}
-          <div className="grid grid-cols-3 gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-violet-500" />
-              <span className="text-[10px] text-neutral-600">Pitched ({pitchedCount})</span>
-            </div>
+          {/* Legend - Won first, then Pitched, then Lost */}
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
               <span className="text-[10px] text-neutral-600">Won ({wonCount})</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded bg-violet-500" />
+              <span className="text-[10px] text-neutral-600">Pitched ({pitchedCount})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded bg-red-400" />
@@ -200,9 +200,9 @@ function OpportunityProgressChart({
             </div>
           </div>
 
-          <div className="mt-3 pt-2 border-t border-neutral-100 text-center">
+          <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-center gap-1">
             <span className="text-lg font-bold text-purple-600">{activeOpportunities}</span>
-            <span className="text-xs text-neutral-500 ml-1">active opportunities</span>
+            <span className="text-xs text-neutral-500">active opportunities</span>
           </div>
         </>
       ) : (
@@ -218,21 +218,16 @@ function OpportunityProgressChart({
 // Pipeline Confidence - Shows opportunity close likelihood with accordion
 function PipelineConfidence({ 
   clients, 
-  tasks,
   onClientClick,
-  onTaskClick 
 }: { 
   clients: Client[]
-  tasks: Task[]
   onClientClick: (client: Client) => void
-  onTaskClick: (task: Task) => void
 }) {
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
   
   const opportunityClients = clients.filter(c => c.is_opportunity && c.disposition !== "closed_won" && c.disposition !== "closed_lost")
-  const opportunityTasks = tasks.filter(t => t.is_opportunity && t.disposition !== "closed_won" && t.disposition !== "closed_lost")
 
-  // Group clients and tasks by DOC
+  // Group opportunities by DOC
   const docData: Array<{ 
     label: string
     value: string
@@ -240,7 +235,7 @@ function PipelineConfidence({
     amount: number
     color: string
     description: string
-    items: Array<{ type: "client" | "task"; data: Client | Task; name: string; value?: number }>
+    items: Array<{ data: Client; title: string; companyName: string; value?: number }>
   }> = [
     { label: "Low", value: "25", count: 0, amount: 0, color: "#fbbf24", description: "Early stage, needs nurturing", items: [] },
     { label: "Medium", value: "50", count: 0, amount: 0, color: "#f97316", description: "Engaged, building relationship", items: [] },
@@ -254,27 +249,15 @@ function PipelineConfidence({
       doc.count++
       doc.amount += c.pitch_value || 0
       doc.items.push({ 
-        type: "client", 
         data: c, 
-        name: c.company_name || c.name,
+        title: c.title || c.company_name || c.name,
+        companyName: c.company_name || c.name || "",
         value: c.pitch_value 
       })
     }
   })
 
-  opportunityTasks.forEach(t => {
-    const doc = docData.find(d => d.value === t.doc)
-    if (doc) {
-      doc.count++
-      doc.items.push({ 
-        type: "task", 
-        data: t, 
-        name: t.title 
-      })
-    }
-  })
-
-  const totalActive = opportunityClients.length + opportunityTasks.length
+  const totalActive = opportunityClients.length
   const expectedValue = docData.reduce((sum, d) => sum + (d.amount * (parseInt(d.value) / 100)), 0)
 
   const toggleDoc = (value: string) => {
@@ -327,23 +310,17 @@ function PipelineConfidence({
               <div className="border-t border-neutral-100 divide-y divide-neutral-50 bg-neutral-25">
                 {doc.items.map((item, idx) => (
                   <button
-                    key={`${item.type}-${idx}`}
-                    onClick={() => {
-                      if (item.type === "client") {
-                        onClientClick(item.data as Client)
-                      } else {
-                        onTaskClick(item.data as Task)
-                      }
-                    }}
+                    key={idx}
+                    onClick={() => onClientClick(item.data)}
                     className="w-full p-2.5 pl-7 hover:bg-neutral-100 transition-colors text-left flex items-center justify-between gap-2"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`shrink-0 px-1.5 py-0.5 text-[9px] font-medium rounded ${
-                        item.type === "client" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                      }`}>
-                        {item.type === "client" ? "Client" : "Task"}
-                      </span>
-                      <span className="text-xs font-medium text-neutral-800 truncate">{item.name}</span>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-xs font-semibold text-neutral-900 truncate">{item.title}</span>
+                      {item.companyName && item.title !== item.companyName && (
+                        <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium rounded bg-neutral-100 text-neutral-500">
+                          {item.companyName}
+                        </span>
+                      )}
                     </div>
                     {item.value !== undefined && item.value > 0 && (
                       <span className="shrink-0 text-xs font-medium text-neutral-600">{formatCurrency(item.value, true)}</span>
@@ -433,7 +410,8 @@ function ActiveOpportunitiesList({
   const activeOpportunities: Array<{
     id: string
     type: "client"
-    name: string
+    title: string
+    companyName: string
     contactName: string
     followUpDate?: string
     disposition: string
@@ -452,7 +430,8 @@ function ActiveOpportunitiesList({
       activeOpportunities.push({
         id: c.id,
         type: "client",
-        name: c.company_name || c.name,
+        title: c.title || c.company_name || c.name,
+        companyName: c.company_name || c.name || "",
         contactName: primaryContact?.name || c.name || "No contact",
         followUpDate: c.next_followup_date,
         disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.label || "Pitched",
@@ -504,37 +483,55 @@ function ActiveOpportunitiesList({
             <button
               key={`${item.type}-${item.id}`}
               onClick={() => onClientClick(item.original)}
-              className="w-full p-3 hover:bg-neutral-50 transition-colors text-left flex items-center gap-3"
+              className="w-full p-4 hover:bg-neutral-50 transition-colors text-left"
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-neutral-900 truncate">{item.name}</p>
-                  {item.brand && (
-                    <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-neutral-100 text-neutral-600">
-                      {item.brand}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-xs text-neutral-500">Contact: {item.contactName}</p>
+              <div className="flex items-start justify-between gap-3">
+                {/* Left side - Main content */}
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {/* Title row */}
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-neutral-900 truncate">{item.title}</h4>
+                    {item.brand && (
+                      <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-neutral-100 text-neutral-600">
+                        {item.brand}
+                      </span>
+                    )}
+                  </div>
+                  {/* Company and Contact row */}
+                  <p className="text-xs text-neutral-500">
+                    {item.companyName && item.title !== item.companyName && (
+                      <span className="font-medium text-neutral-600">{item.companyName}</span>
+                    )}
+                    {item.companyName && item.title !== item.companyName && item.contactName && (
+                      <span className="text-neutral-300"> · </span>
+                    )}
+                    {item.contactName && <span>{item.contactName}</span>}
+                  </p>
+                  {/* Due date row with emphasis */}
                   {item.followUpDate && (
-                    <span className="text-xs text-neutral-400">• Follow-up: {formatDate(item.followUpDate)}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="text-xs font-medium text-amber-600">
+                        Follow-up: {formatDate(item.followUpDate)}
+                      </span>
+                    </div>
                   )}
                 </div>
-              </div>
-              <div className="shrink-0 text-right">
-                <span
-                  className="inline-block px-2 py-0.5 text-[10px] font-medium rounded-full"
-                  style={{
-                    backgroundColor: `${item.dispositionColor}15`,
-                    color: item.dispositionColor,
-                  }}
-                >
-                  {item.disposition}
-                </span>
-                {item.value !== undefined && item.value > 0 && (
-                  <p className="text-xs font-medium text-neutral-900 mt-0.5">{formatCurrency(item.value, true)}</p>
-                )}
+                {/* Right side - Status and value */}
+                <div className="shrink-0 text-right space-y-1">
+                  <span
+                    className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full"
+                    style={{
+                      backgroundColor: `${item.dispositionColor}15`,
+                      color: item.dispositionColor,
+                    }}
+                  >
+                    {item.disposition}
+                  </span>
+                  {item.value !== undefined && item.value > 0 && (
+                    <p className="text-sm font-bold text-neutral-900">{formatCurrency(item.value, true)}</p>
+                  )}
+                </div>
               </div>
             </button>
           ))
@@ -877,7 +874,8 @@ export function DashboardView({
   onTaskClick,
   currentUser,
 }: DashboardViewProps) {
-  const totalBudget = BRAND_GOALS.reduce((sum, b) => sum + b.annualGoal, 0)
+  // Fixed annual budget target
+  const totalBudget = 1500000
   const opportunityClients = clients.filter(c => c.is_opportunity)
 
   const closedWonRevenue = opportunityClients
@@ -934,9 +932,7 @@ export function DashboardView({
         <div className="space-y-6">
           <PipelineConfidence 
             clients={clients} 
-            tasks={tasks} 
             onClientClick={onClientClick}
-            onTaskClick={onTaskClick}
           />
 
           <PlatformGoalsProgress clients={clients} tasks={tasks} />
