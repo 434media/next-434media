@@ -323,7 +323,7 @@ function KanbanColumn({
 
   return (
     <div 
-      className={`flex flex-col min-w-[280px] max-w-[320px] flex-1 rounded-xl transition-all ${
+      className={`flex flex-col min-w-[300px] flex-1 rounded-xl transition-all ${
         isDragOver ? "ring-2 ring-blue-400 ring-offset-2" : ""
       }`}
       onDragOver={handleDragOver}
@@ -369,7 +369,7 @@ function KanbanColumn({
               onDragStart={(e) => {
                 e.dataTransfer.setData("itemId", item.id)
                 e.dataTransfer.setData("itemType", item.type)
-                e.dataTransfer.setData("currentDisposition", item.disposition || "open")
+                e.dataTransfer.setData("currentDisposition", item.disposition || "pitched")
               }}
             />
           ))
@@ -404,7 +404,7 @@ export function OpportunitiesKanbanView({
       name: client.company_name || client.name,
       brand: client.brand,
       value: client.pitch_value,
-      disposition: client.disposition || "open",
+      disposition: client.disposition || "pitched",
       doc: client.doc,
       dueDate: client.next_followup_date,
       assignedTo: client.assigned_to,
@@ -418,7 +418,7 @@ export function OpportunitiesKanbanView({
       name: task.title,
       brand: task.brand,
       value: undefined,
-      disposition: task.disposition || "open",
+      disposition: task.disposition || "pitched",
       doc: task.doc,
       dueDate: task.due_date,
       assignedTo: task.assigned_to,
@@ -467,12 +467,8 @@ export function OpportunitiesKanbanView({
     }
   }
 
-  // Calculate totals
+  // Calculate total for empty state
   const totalOpportunities = allItems.length
-  const totalPipelineValue = allItems
-    .filter(item => item.disposition !== "closed_won" && item.disposition !== "closed_lost")
-    .reduce((sum, item) => sum + (item.value || 0), 0)
-  const totalWonValue = getColumnValue("closed_won")
 
   return (
     <div className="space-y-6">
@@ -484,35 +480,16 @@ export function OpportunitiesKanbanView({
             Drag items between columns to update their status
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Summary Stats */}
-          <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="text-center">
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-sm font-semibold text-gray-900">{totalOpportunities}</p>
-            </div>
-            <div className="w-px h-8 bg-gray-200" />
-            <div className="text-center">
-              <p className="text-xs text-gray-500">Pipeline</p>
-              <p className="text-sm font-semibold text-blue-600">{formatCurrency(totalPipelineValue, true)}</p>
-            </div>
-            <div className="w-px h-8 bg-gray-200" />
-            <div className="text-center">
-              <p className="text-xs text-gray-500">Won</p>
-              <p className="text-sm font-semibold text-emerald-600">{formatCurrency(totalWonValue, true)}</p>
-            </div>
-          </div>
-          {/* Add Opportunity Button */}
-          {onAddOpportunity && (
-            <button
-              onClick={onAddOpportunity}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Add Opportunity
-            </button>
-          )}
-        </div>
+        {/* Add Opportunity Button */}
+        {onAddOpportunity && (
+          <button
+            onClick={onAddOpportunity}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Add Opportunity
+          </button>
+        )}
       </div>
 
       {/* Platform Goals Section */}
@@ -524,7 +501,7 @@ export function OpportunitiesKanbanView({
       />
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4">
         {DISPOSITION_OPTIONS.map(({ value, label, color }) => (
           <KanbanColumn
             key={value}

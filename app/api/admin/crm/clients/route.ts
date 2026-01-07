@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     const client = await createClient({
       name: body.name.trim(),
       company_name: body.company_name || "",
+      title: body.title || "",
       email: body.email || "",
       phone: body.phone || "",
       contacts: body.contacts || [],
@@ -119,6 +120,8 @@ export async function POST(request: NextRequest) {
       disposition: body.disposition || undefined,
       doc: body.doc || undefined,
       tags: body.tags || [],
+      web_links: body.web_links || [],
+      docs: body.docs || [],
     })
 
     return NextResponse.json({ success: true, client }, { status: 201 })

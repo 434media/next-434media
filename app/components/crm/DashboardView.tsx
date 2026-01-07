@@ -123,23 +123,20 @@ function OpportunityProgressChart({
   const opportunityClients = clients.filter(c => c.is_opportunity)
   const opportunityTasks = tasks.filter(t => t.is_opportunity)
 
-  // Count by disposition
-  const openCount = opportunityClients.filter(c => c.disposition === "open" || !c.disposition).length +
-    opportunityTasks.filter(t => t.disposition === "open" || !t.disposition).length
-  const pitchedCount = opportunityClients.filter(c => c.disposition === "pitched").length +
-    opportunityTasks.filter(t => t.disposition === "pitched").length
+  // Count by disposition - items without disposition default to "pitched"
+  const pitchedCount = opportunityClients.filter(c => c.disposition === "pitched" || !c.disposition).length +
+    opportunityTasks.filter(t => t.disposition === "pitched" || !t.disposition).length
   const wonCount = opportunityClients.filter(c => c.disposition === "closed_won").length +
     opportunityTasks.filter(t => t.disposition === "closed_won").length
   const lostCount = opportunityClients.filter(c => c.disposition === "closed_lost").length +
     opportunityTasks.filter(t => t.disposition === "closed_lost").length
 
   const totalOpportunities = opportunityClients.length + opportunityTasks.length
-  const activeOpportunities = openCount + pitchedCount
+  const activeOpportunities = pitchedCount
 
   // Calculate percentages for visualization
   const wonPercent = totalOpportunities > 0 ? (wonCount / totalOpportunities) * 100 : 0
   const pitchedPercent = totalOpportunities > 0 ? (pitchedCount / totalOpportunities) * 100 : 0
-  const openPercent = totalOpportunities > 0 ? (openCount / totalOpportunities) * 100 : 0
   const lostPercent = totalOpportunities > 0 ? (lostCount / totalOpportunities) * 100 : 0
 
   return (
@@ -169,20 +166,11 @@ function OpportunityProgressChart({
             )}
             {pitchedPercent > 0 && (
               <div 
-                className="h-full bg-blue-500 flex items-center justify-center"
+                className="h-full bg-violet-500 flex items-center justify-center"
                 style={{ width: `${pitchedPercent}%` }}
                 title={`Pitched: ${pitchedCount}`}
               >
                 {pitchedPercent >= 12 && <span className="text-[9px] font-bold text-white">{pitchedCount}</span>}
-              </div>
-            )}
-            {openPercent > 0 && (
-              <div 
-                className="h-full bg-amber-400 flex items-center justify-center"
-                style={{ width: `${openPercent}%` }}
-                title={`Open: ${openCount}`}
-              >
-                {openPercent >= 12 && <span className="text-[9px] font-bold text-white">{openCount}</span>}
               </div>
             )}
             {lostPercent > 0 && (
@@ -197,18 +185,14 @@ function OpportunityProgressChart({
           </div>
 
           {/* Legend */}
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
-              <span className="text-[10px] text-neutral-600">Won ({wonCount})</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-blue-500" />
+              <div className="w-2.5 h-2.5 rounded bg-violet-500" />
               <span className="text-[10px] text-neutral-600">Pitched ({pitchedCount})</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-amber-400" />
-              <span className="text-[10px] text-neutral-600">Open ({openCount})</span>
+              <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
+              <span className="text-[10px] text-neutral-600">Won ({wonCount})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded bg-red-400" />
@@ -391,25 +375,24 @@ function DispositionSummary({ clients, tasks }: { clients: Client[]; tasks: Task
   const opportunityTasks = tasks.filter(t => t.is_opportunity)
 
   const counts: Record<Disposition, { count: number; value: number }> = {
-    open: { count: 0, value: 0 },
     pitched: { count: 0, value: 0 },
     closed_won: { count: 0, value: 0 },
     closed_lost: { count: 0, value: 0 },
   }
 
   opportunityClients.forEach(c => {
-    const disp = c.disposition || "open"
+    const disp = c.disposition || "pitched"
     counts[disp].count++
     counts[disp].value += c.pitch_value || 0
   })
 
   opportunityTasks.forEach(t => {
-    const disp = t.disposition || "open"
+    const disp = t.disposition || "pitched"
     counts[disp].count++
   })
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       {DISPOSITION_OPTIONS.map(opt => (
         <div
           key={opt.value}
@@ -429,7 +412,7 @@ function DispositionSummary({ clients, tasks }: { clients: Client[]; tasks: Task
   )
 }
 
-// Active Opportunities List Component with disposition filter
+// Active Opportunities List Component - shows client-based opportunities only
 function ActiveOpportunitiesList({
   clients,
   tasks,
@@ -443,31 +426,13 @@ function ActiveOpportunitiesList({
   onTaskClick: (task: Task) => void
   onViewAll: () => void
 }) {
-  const [dispositionFilter, setDispositionFilter] = useState<Disposition | "all">("all")
-
-  // Get counts for filter pills
+  // Get opportunity clients only (not tasks)
   const opportunityClients = clients.filter(c => c.is_opportunity)
-  const opportunityTasks = tasks.filter(t => t.is_opportunity)
 
-  const getCounts = (disp: Disposition | "all") => {
-    if (disp === "all") {
-      return opportunityClients.filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost").length +
-        opportunityTasks.filter(t => t.disposition !== "closed_won" && t.disposition !== "closed_lost").length
-    }
-    return opportunityClients.filter(c => (c.disposition || "open") === disp).length +
-      opportunityTasks.filter(t => (t.disposition || "open") === disp).length
-  }
-
-  const getValue = (disp: Disposition) => {
-    return opportunityClients
-      .filter(c => (c.disposition || "open") === disp)
-      .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-  }
-
-  // Combine clients and tasks that are active opportunities
+  // Combine clients that are active opportunities (exclude closed)
   const activeOpportunities: Array<{
     id: string
-    type: "client" | "task"
+    type: "client"
     name: string
     contactName: string
     followUpDate?: string
@@ -476,18 +441,12 @@ function ActiveOpportunitiesList({
     dispositionColor: string
     value?: number
     brand?: Brand
-    original: Client | Task
+    original: Client
   }> = []
 
-  // Add clients
-  clients
-    .filter(c => c.is_opportunity)
-    .filter(c => {
-      if (dispositionFilter === "all") {
-        return c.disposition !== "closed_won" && c.disposition !== "closed_lost"
-      }
-      return (c.disposition || "open") === dispositionFilter
-    })
+  // Add clients only
+  opportunityClients
+    .filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost")
     .forEach(c => {
       const primaryContact = c.contacts?.find(contact => contact.is_primary) || c.contacts?.[0]
       activeOpportunities.push({
@@ -496,36 +455,12 @@ function ActiveOpportunitiesList({
         name: c.company_name || c.name,
         contactName: primaryContact?.name || c.name || "No contact",
         followUpDate: c.next_followup_date,
-        disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "open"))?.label || "Open",
-        dispositionValue: c.disposition || "open",
-        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "open"))?.color || "#3b82f6",
+        disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.label || "Pitched",
+        dispositionValue: c.disposition || "pitched",
+        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.color || "#8b5cf6",
         value: c.pitch_value,
         brand: c.brand,
         original: c,
-      })
-    })
-
-  // Add tasks
-  tasks
-    .filter(t => t.is_opportunity)
-    .filter(t => {
-      if (dispositionFilter === "all") {
-        return t.disposition !== "closed_won" && t.disposition !== "closed_lost"
-      }
-      return (t.disposition || "open") === dispositionFilter
-    })
-    .forEach(t => {
-      activeOpportunities.push({
-        id: t.id,
-        type: "task",
-        name: t.title,
-        contactName: t.assigned_to || "Unassigned",
-        followUpDate: t.due_date,
-        disposition: DISPOSITION_OPTIONS.find(d => d.value === (t.disposition || "open"))?.label || "Open",
-        dispositionValue: t.disposition || "open",
-        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (t.disposition || "open"))?.color || "#3b82f6",
-        brand: t.brand,
-        original: t,
       })
     })
 
@@ -537,16 +472,10 @@ function ActiveOpportunitiesList({
     return new Date(a.followUpDate).getTime() - new Date(b.followUpDate).getTime()
   })
 
-  // Filter options with "Active" as default view
-  const filterOptions: Array<{ value: Disposition | "all"; label: string; color?: string }> = [
-    { value: "all", label: "Active" },
-    ...DISPOSITION_OPTIONS.map(opt => ({ value: opt.value, label: opt.label, color: opt.color })),
-  ]
-
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-neutral-100">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-neutral-500" />
             <h3 className="text-sm font-semibold text-neutral-900">Active Opportunities</h3>
@@ -563,73 +492,22 @@ function ActiveOpportunitiesList({
             <ChevronRight className="w-3 h-3" />
           </button>
         </div>
-
-        {/* Disposition Filter Pills */}
-        <div className="flex flex-wrap gap-2">
-          {filterOptions.map(opt => {
-            const count = getCounts(opt.value)
-            const value = opt.value !== "all" ? getValue(opt.value as Disposition) : 0
-            const isActive = dispositionFilter === opt.value
-
-            return (
-              <button
-                key={opt.value}
-                onClick={() => setDispositionFilter(opt.value)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? "bg-neutral-900 text-white shadow-sm"
-                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                }`}
-              >
-                {opt.color && (
-                  <div 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: isActive ? "white" : opt.color }} 
-                  />
-                )}
-                <span>{opt.label}</span>
-                <span className={`${isActive ? "text-neutral-300" : "text-neutral-400"}`}>
-                  {count}
-                </span>
-                {value > 0 && opt.value !== "all" && (
-                  <span className={`${isActive ? "text-neutral-300" : "text-neutral-400"}`}>
-                    • {formatCurrency(value, true)}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <div className="divide-y divide-neutral-100 max-h-[400px] overflow-y-auto">
         {activeOpportunities.length === 0 ? (
           <div className="p-6 text-center text-sm text-neutral-400">
-            {dispositionFilter === "all" 
-              ? "No active opportunities. Add clients or tasks as opportunities to track them here."
-              : `No opportunities with "${filterOptions.find(f => f.value === dispositionFilter)?.label}" status.`
-            }
+            No active opportunities. Add clients as opportunities to track them here.
           </div>
         ) : (
           activeOpportunities.slice(0, 10).map((item) => (
             <button
               key={`${item.type}-${item.id}`}
-              onClick={() => {
-                if (item.type === "client") {
-                  onClientClick(item.original as Client)
-                } else {
-                  onTaskClick(item.original as Task)
-                }
-              }}
+              onClick={() => onClientClick(item.original)}
               className="w-full p-3 hover:bg-neutral-50 transition-colors text-left flex items-center gap-3"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                    item.type === "client" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                  }`}>
-                    {item.type === "client" ? "Client" : "Task"}
-                  </span>
                   <p className="text-sm font-medium text-neutral-900 truncate">{item.name}</p>
                   {item.brand && (
                     <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-neutral-100 text-neutral-600">
@@ -1050,25 +928,18 @@ export function DashboardView({
             onTaskClick={onTaskClick}
             onViewAll={() => onViewChange("tasks")}
           />
-
-          <RecentClientsList
-            clients={clients}
-            onClientClick={onClientClick}
-            onViewAll={() => onViewChange("clients")}
-            onAdd={onShowClientForm}
-          />
         </div>
 
         {/* Right Column */}
         <div className="space-y-6">
-          <PlatformGoalsProgress clients={clients} tasks={tasks} />
-
           <PipelineConfidence 
             clients={clients} 
             tasks={tasks} 
             onClientClick={onClientClick}
             onTaskClick={onTaskClick}
           />
+
+          <PlatformGoalsProgress clients={clients} tasks={tasks} />
         </div>
       </div>
     </div>

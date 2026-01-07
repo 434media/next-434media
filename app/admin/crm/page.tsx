@@ -60,8 +60,6 @@ export default function SalesCRMPage() {
   const [brandFilter, setBrandFilter] = useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [clientSourceFilter, setClientSourceFilter] = useState<string>("all")
-  const [clientBrandFilter, setClientBrandFilter] = useState<string>("all")
-  const [clientTagFilter, setClientTagFilter] = useState<string>("all")
   
   // Tags state
   const [availableTags, setAvailableTags] = useState<CRMTag[]>([])
@@ -86,16 +84,11 @@ export default function SalesCRMPage() {
       date_of_birth: string
     }>,
     status: "prospect",
-    brand: "" as Brand | "",
-    pitch_value: "",
     next_followup_date: "",
-    assigned_to: "",
     notes: "",
     source: "",
     is_opportunity: false,
-    disposition: "" as Disposition | "",
-    doc: "" as DOC | "",
-    tags: [] as string[],
+    opportunity_id: "",
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -117,6 +110,7 @@ export default function SalesCRMPage() {
       zipcode: string
       date_of_birth: string
     }>,
+    title: "",
     status: "prospect",
     brand: "" as Brand | "",
     pitch_value: "",
@@ -125,8 +119,10 @@ export default function SalesCRMPage() {
     notes: "",
     source: "",
     is_opportunity: true,
-    disposition: "open" as Disposition | "",
+    disposition: "pitched" as Disposition | "",
     doc: "" as DOC | "",
+    web_links: [] as string[],
+    docs: [] as string[],
   })
   const [isSavingOpportunity, setIsSavingOpportunity] = useState(false)
 
@@ -137,6 +133,7 @@ export default function SalesCRMPage() {
     title: "",
     description: "",
     assigned_to: "",
+    secondary_assigned_to: "",
     brand: "" as Brand | "",
     status: "not_started",
     priority: "medium",
@@ -145,6 +142,7 @@ export default function SalesCRMPage() {
     web_links: [] as string[],
     tagged_users: [] as string[],
     is_opportunity: false,
+    opportunity_id: "",
     disposition: "" as Disposition | "",
     doc: "" as DOC | "",
   })
@@ -184,6 +182,25 @@ export default function SalesCRMPage() {
       return () => clearTimeout(timer)
     }
   }, [toast])
+
+  // Set default assignee filter based on logged-in user
+  useEffect(() => {
+    if (currentUser?.email) {
+      // Map email to full name for the assignee filter
+      const emailToNameMap: Record<string, string> = {
+        "jake@434media.com": "Jacob Lee Miles",
+        "marcos@434media.com": "Marcos Resendez",
+        "stacy@434media.com": "Stacy Carrizales",
+        "jesse@434media.com": "Jesse Hernandez",
+        "barb@434media.com": "Barbara Carreon",
+        "nichole@434media.com": "Nichole Snow",
+      }
+      const matchedName = emailToNameMap[currentUser.email.toLowerCase()]
+      if (matchedName) {
+        setAssigneeFilter(matchedName)
+      }
+    }
+  }, [currentUser])
 
   const loadDashboard = async () => {
     setIsLoading(true)
@@ -277,6 +294,7 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ name }),
       })
       if (!response.ok) throw new Error("Failed to create tag")
@@ -332,6 +350,7 @@ export default function SalesCRMPage() {
       title: task.title,
       description: task.description || "",
       assigned_to: task.assigned_to || "",
+      secondary_assigned_to: task.secondary_assigned_to || "",
       brand: task.brand || "",
       status: task.status,
       priority: task.priority,
@@ -340,10 +359,57 @@ export default function SalesCRMPage() {
       web_links: task.web_links || [],
       tagged_users: task.tagged_users || [],
       is_opportunity: task.is_opportunity || false,
+      opportunity_id: task.opportunity_id || "",
       disposition: task.disposition || "",
       doc: task.doc || "",
     })
     setTaskAttachments(task.attachments || [])
+    setShowTaskModal(true)
+  }
+
+  // Open task modal for creating a new task
+  const handleAddTask = () => {
+    // Create a new task object for the modal
+    const newTask: Task = {
+      id: "", // Empty id indicates new task
+      title: "",
+      description: "",
+      assigned_to: currentUser?.name || assigneeFilter || "",
+      secondary_assigned_to: "",
+      brand: undefined,
+      status: "not_started",
+      priority: "medium",
+      due_date: "",
+      notes: "",
+      web_links: [],
+      tagged_users: [],
+      is_opportunity: false,
+      disposition: undefined,
+      doc: undefined,
+      attachments: [],
+      comments: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    setSelectedTask(newTask)
+    setTaskForm({
+      title: "",
+      description: "",
+      assigned_to: currentUser?.name || assigneeFilter || "",
+      secondary_assigned_to: "",
+      brand: "",
+      status: "not_started",
+      priority: "medium",
+      due_date: "",
+      notes: "",
+      web_links: [],
+      tagged_users: [],
+      is_opportunity: false,
+      opportunity_id: "",
+      disposition: "",
+      doc: "",
+    })
+    setTaskAttachments([])
     setShowTaskModal(true)
   }
 
@@ -369,6 +435,7 @@ export default function SalesCRMPage() {
       
       const response = await fetch(`/api/admin/crm/tasks?id=${selectedTask.id}&owner=${owner}`, {
         method: "DELETE",
+        credentials: "include",
       })
 
       if (!response.ok) throw new Error("Failed to delete task")
@@ -393,6 +460,7 @@ export default function SalesCRMPage() {
     try {
       const response = await fetch("/api/admin/crm/tasks/delete-team", {
         method: "DELETE",
+        credentials: "include",
       })
 
       if (!response.ok) throw new Error("Failed to delete team tasks")
@@ -440,6 +508,7 @@ export default function SalesCRMPage() {
 
       const response = await fetch("/api/upload/crm", {
         method: "POST",
+        credentials: "include",
         body: formData,
       })
 
@@ -479,6 +548,7 @@ export default function SalesCRMPage() {
       await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           id: selectedTask.id,
           owner,
@@ -525,6 +595,7 @@ export default function SalesCRMPage() {
       await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           id: selectedTask.id,
           owner,
@@ -541,7 +612,7 @@ export default function SalesCRMPage() {
     }
   }
 
-  // Save task updates
+  // Save task (create or update)
   const handleSaveTask = async () => {
     if (!selectedTask) return
     
@@ -554,6 +625,7 @@ export default function SalesCRMPage() {
         "Marcos Resendez": "marc",
         "Stacy": "stacy",
         "Stacy Ramirez": "stacy",
+        "Stacy Carrizales": "stacy",
         "Jesse": "jesse",
         "Jesse Hernandez": "jesse",
         "Barb": "barb",
@@ -562,43 +634,64 @@ export default function SalesCRMPage() {
         "Nichole Snow": "teams",
       }
       
-      // If the task was completed, use "completed" as owner so the API can handle reactivation
-      // Otherwise, determine owner from assignee
-      let owner: string
-      if (selectedTask.status === "completed") {
-        owner = "completed"
-      } else {
-        owner = ownerMap[taskForm.assigned_to] || "teams"
-      }
+      const owner = ownerMap[taskForm.assigned_to] || "teams"
       
-      const response = await fetch("/api/admin/crm/tasks", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selectedTask.id,
-          owner,
-          ...taskForm,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to update task")
-
-      const result = await response.json()
+      // Check if this is a new task (empty id)
+      const isNewTask = !selectedTask.id
       
-      // Show appropriate message based on whether task was reactivated
-      if (result.reactivated) {
-        setToast({ message: "Task reactivated and moved back to active tasks", type: "success" })
-      } else if (result.moved) {
-        setToast({ message: "Task marked as completed", type: "success" })
+      if (isNewTask) {
+        // Create new task
+        const response = await fetch("/api/admin/crm/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            owner,
+            ...taskForm,
+          }),
+        })
+
+        if (!response.ok) throw new Error("Failed to create task")
+        
+        setToast({ message: "Task created successfully", type: "success" })
       } else {
-        setToast({ message: "Task updated successfully", type: "success" })
+        // Update existing task
+        // If the task was completed, use "completed" as owner so the API can handle reactivation
+        let updateOwner = owner
+        if (selectedTask.status === "completed") {
+          updateOwner = "completed"
+        }
+        
+        const response = await fetch("/api/admin/crm/tasks", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            id: selectedTask.id,
+            owner: updateOwner,
+            ...taskForm,
+          }),
+        })
+
+        if (!response.ok) throw new Error("Failed to update task")
+
+        const result = await response.json()
+        
+        // Show appropriate message based on whether task was reactivated
+        if (result.reactivated) {
+          setToast({ message: "Task reactivated and moved back to active tasks", type: "success" })
+        } else if (result.moved) {
+          setToast({ message: "Task marked as completed", type: "success" })
+        } else {
+          setToast({ message: "Task updated successfully", type: "success" })
+        }
       }
       
       setShowTaskModal(false)
       setSelectedTask(null)
       loadTasks()
     } catch (err) {
-      setToast({ message: "Failed to update task", type: "error" })
+      setToast({ message: `Failed to ${!selectedTask.id ? "create" : "update"} task`, type: "error" })
     } finally {
       setIsSavingTask(false)
     }
@@ -690,6 +783,7 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           id: selectedTask.id,
           owner,
@@ -713,6 +807,7 @@ export default function SalesCRMPage() {
         fetch("/api/admin/crm/notifications", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             taskId: selectedTask.id,
             taskTitle: selectedTask.title,
@@ -736,11 +831,6 @@ export default function SalesCRMPage() {
   const handleSaveClient = async () => {
     if (!clientForm.company_name.trim()) {
       setToast({ message: "Company name is required", type: "error" })
-      return
-    }
-
-    if (!clientForm.brand) {
-      setToast({ message: "Please select a platform", type: "error" })
       return
     }
 
@@ -769,16 +859,11 @@ export default function SalesCRMPage() {
           date_of_birth: c.date_of_birth || "",
         })),
         status: clientForm.status,
-        brand: clientForm.brand,
-        pitch_value: clientForm.pitch_value ? parseFloat(clientForm.pitch_value) : undefined,
         next_followup_date: clientForm.next_followup_date || undefined,
-        assigned_to: clientForm.assigned_to,
         notes: clientForm.notes,
         source: clientForm.source || undefined,
         is_opportunity: clientForm.is_opportunity,
-        disposition: clientForm.is_opportunity ? (clientForm.disposition || "open") : undefined,
-        doc: clientForm.is_opportunity ? clientForm.doc || undefined : undefined,
-        tags: clientForm.tags || [],
+        opportunity_id: clientForm.opportunity_id || undefined,
       }
 
       const method = editingClient ? "PUT" : "POST"
@@ -789,18 +874,19 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/clients", {
         method,
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(body),
       })
 
-      if (!response.ok) throw new Error("Failed to save client")
+      if (!response.ok) throw new Error("Failed to save contact")
 
-      setToast({ message: `Client ${editingClient ? "updated" : "created"} successfully`, type: "success" })
+      setToast({ message: `Contact ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "", tags: [] })
+      setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "" })
       loadClients()
     } catch (err) {
-      setToast({ message: "Failed to save client", type: "error" })
+      setToast({ message: "Failed to save contact", type: "error" })
     } finally {
       setIsSaving(false)
     }
@@ -827,6 +913,7 @@ export default function SalesCRMPage() {
       const opportunityData = {
         name: primaryContact?.name || opportunityForm.company_name,
         company_name: opportunityForm.company_name,
+        title: opportunityForm.title || "",
         email: primaryContact?.email || "",
         phone: primaryContact?.phone || "",
         contacts: opportunityForm.contacts.map(c => ({
@@ -850,8 +937,10 @@ export default function SalesCRMPage() {
         notes: opportunityForm.notes,
         source: opportunityForm.source || undefined,
         is_opportunity: true, // Always true for opportunities
-        disposition: opportunityForm.disposition || "open",
+        disposition: opportunityForm.disposition || "pitched",
         doc: opportunityForm.doc || undefined,
+        web_links: opportunityForm.web_links.filter(link => link.trim() !== ""),
+        docs: opportunityForm.docs.filter(doc => doc.trim() !== ""),
       }
 
       // If updating an existing company, use PUT; otherwise POST
@@ -863,6 +952,7 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/clients", {
         method,
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(body),
       })
 
@@ -875,6 +965,7 @@ export default function SalesCRMPage() {
         company_name: "",
         existing_company_id: null,
         contacts: [],
+        title: "",
         status: "prospect",
         brand: "",
         pitch_value: "",
@@ -883,8 +974,10 @@ export default function SalesCRMPage() {
         notes: "",
         source: "",
         is_opportunity: true,
-        disposition: "open",
+        disposition: "pitched",
         doc: "",
+        web_links: [],
+        docs: [],
       })
       // Reload both clients (for syncing) and refresh dashboard
       loadClients()
@@ -900,7 +993,7 @@ export default function SalesCRMPage() {
     if (!confirm("Are you sure you want to delete this client?")) return
 
     try {
-      const response = await fetch(`/api/admin/crm/clients?id=${id}`, { method: "DELETE" })
+      const response = await fetch(`/api/admin/crm/clients?id=${id}`, { method: "DELETE", credentials: "include" })
       if (!response.ok) throw new Error("Failed to delete client")
       
       setToast({ message: "Client deleted", type: "success" })
@@ -916,6 +1009,7 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/clients", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ id: clientId, disposition }),
       })
 
@@ -957,6 +1051,7 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ id: taskId, owner, disposition }),
       })
 
@@ -1029,16 +1124,11 @@ export default function SalesCRMPage() {
       company_name: client.company_name || client.name || "",
       contacts,
       status: client.status,
-      brand: client.brand || "",
-      pitch_value: client.pitch_value ? String(client.pitch_value) : "",
       next_followup_date: client.next_followup_date || "",
-      assigned_to: client.assigned_to || "",
       notes: client.notes || "",
       source: client.source || "",
       is_opportunity: client.is_opportunity || false,
-      disposition: client.disposition || "",
-      doc: client.doc || "",
-      tags: client.tags || [],
+      opportunity_id: client.opportunity_id || "",
     })
     setShowClientForm(true)
   }
@@ -1150,6 +1240,7 @@ export default function SalesCRMPage() {
                 company_name: "",
                 existing_company_id: null,
                 contacts: [],
+                title: "",
                 status: "prospect",
                 brand: "",
                 pitch_value: "",
@@ -1158,8 +1249,10 @@ export default function SalesCRMPage() {
                 notes: "",
                 source: "",
                 is_opportunity: true,
-                disposition: "open",
+                disposition: "pitched",
                 doc: "",
+                web_links: [],
+                docs: [],
               })
               setShowOpportunityForm(true)
             }}
@@ -1172,17 +1265,11 @@ export default function SalesCRMPage() {
             clients={clients}
             searchQuery={searchQuery}
             sourceFilter={clientSourceFilter}
-            brandFilter={clientBrandFilter}
-            tagFilter={clientTagFilter}
-            availableTags={availableTags}
             onSearchChange={setSearchQuery}
             onSourceFilterChange={setClientSourceFilter}
-            onBrandFilterChange={setClientBrandFilter}
-            onTagFilterChange={setClientTagFilter}
-            onCreateTag={handleCreateTag}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", brand: "", pitch_value: "", next_followup_date: "", assigned_to: "", notes: "", source: "", is_opportunity: false, disposition: "", doc: "", tags: [] })
+              setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "" })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}
@@ -1200,7 +1287,7 @@ export default function SalesCRMPage() {
             onSearchChange={setSearchQuery}
             onBrandFilterChange={setBrandFilter}
             onAssigneeFilterChange={setAssigneeFilter}
-            onRefresh={loadTasks}
+            onAddTask={handleAddTask}
             onOpenTask={openTaskModal}
           />
         )}
@@ -1212,9 +1299,8 @@ export default function SalesCRMPage() {
         isEditing={!!editingClient}
         isSaving={isSaving}
         formData={clientForm}
-        availableTags={availableTags}
+        opportunities={clients.filter(c => c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
         onFormChange={setClientForm}
-        onCreateTag={handleCreateTag}
         onSave={handleSaveClient}
         onClose={() => setShowClientForm(false)}
       />
@@ -1236,6 +1322,7 @@ export default function SalesCRMPage() {
         task={selectedTask}
         formData={taskForm}
         attachments={taskAttachments}
+        opportunities={clients.filter(c => c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
         currentUser={currentUser}
         isSaving={isSavingTask}
         isUploadingFile={isUploadingFile}

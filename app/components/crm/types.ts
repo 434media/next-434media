@@ -83,7 +83,8 @@ export interface Client {
   source?: string  // Lead source: web, cold_call, event, inbound_call, referral, warm_intro
   tags?: string[]  // CRM tags for categorization and filtering
   is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
-  disposition?: Disposition  // Opportunity stage: open, pitched, closed_won, closed_lost
+  opportunity_id?: string  // ID of linked opportunity (when this is a contact linked to an opportunity)
+  disposition?: Disposition  // Opportunity stage: pitched, closed_won, closed_lost
   doc?: DOC  // Degree of Confidence: 25, 50, 75, 90 (percentage probability)
   industry?: string  // Deprecated: use brand instead
   brand?: Brand  // Which brand this client is associated with
@@ -102,6 +103,9 @@ export interface Client {
   instagram_handle?: string
   linkedin_url?: string
   notes?: string
+  title?: string  // Opportunity title
+  web_links?: string[]  // Web links related to this opportunity
+  docs?: string[]  // Document URLs (external or uploaded)
   created_at: string
   updated_at: string
 }
@@ -110,14 +114,13 @@ export interface Client {
 export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing"
 
 // Disposition (opportunity stage) type - used in kanban columns
-export type Disposition = "open" | "pitched" | "closed_won" | "closed_lost"
+export type Disposition = "pitched" | "closed_won" | "closed_lost"
 
 // DOC (Degree of Confidence) - stage probability values
 export type DOC = "25" | "50" | "75" | "90"
 
 // Disposition options for UI
 export const DISPOSITION_OPTIONS: { value: Disposition; label: string; color: string }[] = [
-  { value: "open", label: "Open", color: "#3b82f6" },
   { value: "pitched", label: "Pitched", color: "#8b5cf6" },
   { value: "closed_won", label: "Closed Won", color: "#10b981" },
   { value: "closed_lost", label: "Closed Lost", color: "#ef4444" },
@@ -196,6 +199,7 @@ export interface Task {
   title: string
   description?: string
   assigned_to: string
+  secondary_assigned_to?: string
   assigned_by?: string
   brand?: Brand
   status: string
@@ -206,7 +210,7 @@ export interface Task {
   client_name?: string
   opportunity_id?: string
   is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
-  disposition?: Disposition  // Opportunity stage: open, pitched, closed_won, closed_lost
+  disposition?: Disposition  // Opportunity stage: pitched, closed_won, closed_lost
   doc?: DOC  // Degree of Confidence: 25, 50, 75, 90 (percentage probability)
   category?: string
   estimated_hours?: number

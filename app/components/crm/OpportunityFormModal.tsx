@@ -21,7 +21,11 @@ import {
   Pencil,
   Settings,
   Building2,
-  Target
+  Target,
+  Link2,
+  FileText,
+  Upload,
+  ExternalLink
 } from "lucide-react"
 import { TEAM_MEMBERS, BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
 import type { Brand, TeamMember, Disposition, DOC, Client } from "./types"
@@ -44,6 +48,7 @@ interface OpportunityFormData {
   company_name: string
   existing_company_id: string | null // null = new company, string = existing company ID
   contacts: ContactFormData[]
+  title: string
   status: string
   brand: Brand | ""
   pitch_value: string
@@ -54,6 +59,8 @@ interface OpportunityFormData {
   is_opportunity: boolean
   disposition: Disposition | ""
   doc: DOC | ""
+  web_links: string[]
+  docs: string[]
 }
 
 interface OpportunityFormModalProps {
@@ -83,6 +90,10 @@ export function OpportunityFormModal({
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
   const [companySearchQuery, setCompanySearchQuery] = useState("")
+  
+  // State for web links and file upload
+  const [newLink, setNewLink] = useState("")
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
   
   // State for team member management
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -117,6 +128,49 @@ export function OpportunityFormModal({
   const filteredCompanies = uniqueCompanies.filter(company =>
     company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
   )
+
+  // Handle adding a new link
+  const handleAddLink = () => {
+    if (newLink.trim()) {
+      onFormChange({ ...formData, web_links: [...formData.web_links, newLink.trim()] })
+      setNewLink("")
+    }
+  }
+
+  // Handle removing a link
+  const handleRemoveLink = (index: number) => {
+    const newLinks = formData.web_links.filter((_, i) => i !== index)
+    onFormChange({ ...formData, web_links: newLinks })
+  }
+
+  // Handle file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setIsUploadingFile(true)
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append("file", file)
+      formDataUpload.append("folder", "crm-opportunities")
+      
+      const response = await fetch("/api/upload/crm", {
+        method: "POST",
+        body: formDataUpload,
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        onFormChange({ ...formData, docs: [...formData.docs, data.url] })
+      }
+    } catch (err) {
+      console.error("Failed to upload file:", err)
+    } finally {
+      setIsUploadingFile(false)
+      // Reset the input
+      e.target.value = ""
+    }
+  }
 
   // Fetch team members from Firestore
   const fetchTeamMembers = useCallback(async () => {
@@ -521,6 +575,23 @@ export function OpportunityFormModal({
                     Linked to existing company
                   </p>
                 )}
+              </div>
+
+              {/* Title Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-gray-500" />
+                    Opportunity Title *
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => onFormChange({ ...formData, title: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  placeholder="Enter opportunity title..."
+                />
               </div>
 
               {/* Contacts Section */}
@@ -945,7 +1016,7 @@ export function OpportunityFormModal({
                     Disposition <span className="text-gray-400 font-normal">(Stage)</span>
                   </label>
                   <select
-                    value={formData.disposition || "open"}
+                    value={formData.disposition || "pitched"}
                     onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
                     className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
@@ -1187,6 +1258,121 @@ export function OpportunityFormModal({
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Web Links Section */}
+              <div className="pt-4 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <Link2 className="w-4 h-4 inline mr-2" />
+                  Web Links
+                </label>
+                <div className="space-y-2">
+                  {formData.web_links.map((link, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
+                      <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <a 
+                        href={link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-700 truncate flex-1"
+                      >
+                        {link}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLink(index)}
+                        className="p-1 rounded hover:bg-gray-200 transition-colors"
+                      >
+                        <X className="w-4 h-4 text-gray-400" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={newLink}
+                      onChange={(e) => setNewLink(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddLink())}
+                      placeholder="Add a link (https://...)"
+                      className="flex-1 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddLink}
+                      disabled={!newLink.trim()}
+                      className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition-colors disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4 text-gray-700" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* File Attachments Section */}
+              <div className="pt-4 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <Upload className="w-4 h-4 inline mr-2" />
+                  Attachments
+                </label>
+                
+                {/* Existing Attachments */}
+                {formData.docs.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {formData.docs.map((doc, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
+                        <FileText className={`w-4 h-4 flex-shrink-0 ${doc.startsWith("/uploads/") ? "text-emerald-600" : "text-blue-600"}`} />
+                        <a 
+                          href={doc} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:text-blue-700 truncate flex-1"
+                        >
+                          {doc.startsWith("/uploads/") 
+                            ? (doc.split("/").pop()?.split("-").slice(1).join("-") || doc)
+                            : doc
+                          }
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newDocs = formData.docs.filter((_, i) => i !== index)
+                            onFormChange({ ...formData, docs: newDocs })
+                          }}
+                          className="p-1 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          <X className="w-4 h-4 text-gray-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                <label className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 cursor-pointer transition-colors">
+                  {isUploadingFile ? (
+                    <>
+                      <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                      <span className="text-sm text-gray-500">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5 text-gray-400" />
+                      <span className="text-sm text-gray-500">
+                        Drop a file or click to upload
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    onChange={handleFileUpload}
+                    disabled={isUploadingFile}
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  Supports images, PDF, DOC, XLS, TXT (max 10MB)
+                </p>
+              </div>
 
               {/* Notes */}
               <div>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { 
   Search, 
-  RefreshCw, 
+  Plus, 
   Users, 
   Building, 
   Calendar, 
@@ -61,7 +61,7 @@ interface TasksViewProps {
   onSearchChange: (query: string) => void
   onBrandFilterChange: (brand: string) => void
   onAssigneeFilterChange: (assignee: string) => void
-  onRefresh: () => void
+  onAddTask: () => void
   onOpenTask: (task: Task) => void
 }
 
@@ -73,7 +73,7 @@ export function TasksView({
   onSearchChange,
   onBrandFilterChange,
   onAssigneeFilterChange,
-  onRefresh,
+  onAddTask,
   onOpenTask,
 }: TasksViewProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all")
@@ -304,11 +304,11 @@ export function TasksView({
           )}
         </div>
         <button
-          onClick={onRefresh}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-700"
+          onClick={onAddTask}
+          className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors text-white font-medium"
         >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
+          <Plus className="w-4 h-4" />
+          Add Task
         </button>
       </div>
 

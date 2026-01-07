@@ -9,7 +9,6 @@ import {
   AlertCircle, 
   Clock, 
   Link2, 
-  AtSign, 
   Upload, 
   FileText, 
   Image as ImageIcon,
@@ -20,10 +19,12 @@ import {
   Trash2,
   UserPlus,
   UserMinus,
+  Users,
   Check,
   ChevronDown,
   Pencil,
-  Settings
+  Settings,
+  Target
 } from "lucide-react"
 import { 
   BRANDS, 
@@ -39,6 +40,7 @@ interface TaskFormData {
   title: string
   description: string
   assigned_to: string
+  secondary_assigned_to: string
   brand: Brand | ""
   status: string
   priority: string
@@ -47,8 +49,16 @@ interface TaskFormData {
   web_links: string[]
   tagged_users: string[]
   is_opportunity: boolean
+  opportunity_id: string
   disposition: Disposition | ""
   doc: DOC | ""
+}
+
+// Simplified opportunity type for selection
+interface OpportunityOption {
+  id: string
+  company_name?: string
+  title?: string
 }
 
 interface TaskModalProps {
@@ -56,6 +66,7 @@ interface TaskModalProps {
   task: Task | null
   formData: TaskFormData
   attachments: TaskAttachment[]
+  opportunities: OpportunityOption[]
   currentUser: CurrentUser | null
   isSaving: boolean
   isUploadingFile: boolean
@@ -80,6 +91,7 @@ export function TaskModal({
   task,
   formData,
   attachments,
+  opportunities,
   currentUser,
   isSaving,
   isUploadingFile,
@@ -102,12 +114,14 @@ export function TaskModal({
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
+  const [showAddSecondaryMember, setShowAddSecondaryMember] = useState(false)
   const [showManageMembers, setShowManageMembers] = useState(false)
   const [newMemberName, setNewMemberName] = useState("")
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [memberError, setMemberError] = useState("")
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showSecondaryDropdown, setShowSecondaryDropdown] = useState(false)
   
   // State for editing existing team members
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
@@ -156,8 +170,8 @@ export function TaskModal({
     }
   }, [isOpen, fetchTeamMembers])
 
-  // Add new team member
-  const handleAddMember = async () => {
+  // Add new team member (for primary or secondary assignment)
+  const handleAddMember = async (forSecondary = false) => {
     if (!newMemberName.trim()) {
       setMemberError("Name is required")
       return
@@ -179,12 +193,17 @@ export function TaskModal({
       const data = await response.json()
       
       if (data.success) {
-        // Add to local state and select the new member
+        // Add to local state and select the new member for the appropriate field
         setTeamMembers(prev => [...prev, data.data])
-        onFormChange({ ...formData, assigned_to: data.data.name })
+        if (forSecondary) {
+          onFormChange({ ...formData, secondary_assigned_to: data.data.name })
+          setShowAddSecondaryMember(false)
+        } else {
+          onFormChange({ ...formData, assigned_to: data.data.name })
+          setShowAddMember(false)
+        }
         setNewMemberName("")
         setNewMemberEmail("")
-        setShowAddMember(false)
       } else {
         setMemberError(data.error || "Failed to add member")
       }
@@ -308,7 +327,7 @@ export function TaskModal({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Task</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{task.id ? "Edit Task" : "Add Task"}</h3>
                 {dueDateStatus === "overdue" && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-600 text-xs font-medium">
                     <AlertCircle className="w-3 h-3" />
@@ -384,435 +403,450 @@ export function TaskModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label>
-                    <input
-                      type="date"
-                      value={formData.due_date}
-                      onChange={(e) => onFormChange({ ...formData, due_date: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                    />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label>
+                  <input
+                    type="date"
+                    value={formData.due_date}
+                    onChange={(e) => onFormChange({ ...formData, due_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  />
+                </div>
+
+                {/* Assignment Section */}
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="w-4 h-4 text-gray-500" />
+                    <label className="text-sm font-medium text-gray-700">Assignment</label>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Assigned To</label>
-                    <div className="relative">
-                      {/* Custom dropdown button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowDropdown(!showDropdown)}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
-                      >
-                        <span className={formData.assigned_to ? "text-gray-900" : "text-gray-400"}>
-                          {formData.assigned_to || "Select assignee..."}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? "rotate-180" : ""}`} />
-                      </button>
-                      
-                      {/* Dropdown menu */}
-                      <AnimatePresence>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Primary Assignee */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Primary</label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowDropdown(!showDropdown)}
+                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                        >
+                          <span className={formData.assigned_to ? "text-gray-900 truncate" : "text-gray-400"}>
+                            {formData.assigned_to || "Select..."}
+                          </span>
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showDropdown ? "rotate-180" : ""}`} />
+                        </button>
+                        
+                        {/* Dropdown menu */}
+                        <AnimatePresence>
+                          {showDropdown && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                            >
+                              <div className="max-h-64 overflow-y-auto">
+                                {/* Unassigned option */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onFormChange({ ...formData, assigned_to: "Unassigned" })
+                                    setShowDropdown(false)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                >
+                                  <span className="text-gray-500">Unassigned</span>
+                                  {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-blue-600" />}
+                                </button>
+                                
+                                <div className="border-t border-gray-100" />
+                                
+                                {/* Team members */}
+                                {isLoadingMembers ? (
+                                  <div className="px-3 py-4 text-center">
+                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
+                                  </div>
+                                ) : (
+                                  <>
+                                    {teamMembers.map((member) => (
+                                      <div
+                                        key={member.id}
+                                        className="flex items-center justify-between hover:bg-gray-50 group"
+                                      >
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            onFormChange({ ...formData, assigned_to: member.name })
+                                            setShowDropdown(false)
+                                          }}
+                                          className="flex-1 px-3 py-2 text-left text-sm flex items-center justify-between"
+                                        >
+                                          <div className="truncate">
+                                            <span className="text-gray-900">{member.name}</span>
+                                          </div>
+                                          {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                                        </button>
+                                        {!member.id.startsWith("default-") && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleDeleteMember(member)
+                                            }}
+                                            className="px-2 py-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                                            title={`Remove ${member.name}`}
+                                          >
+                                            <UserMinus className="w-4 h-4" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </>
+                                )}
+                                
+                                <div className="border-t border-gray-100" />
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAddMember(true)
+                                    setShowDropdown(false)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+                                >
+                                  <UserPlus className="w-4 h-4" />
+                                  Add new member
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowManageMembers(!showManageMembers)
+                                    setShowDropdown(false)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Settings className="w-4 h-4" />
+                                  Manage members
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        
                         {showDropdown && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
-                          >
-                            <div className="max-h-64 overflow-y-auto">
-                              {/* Unassigned option */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onFormChange({ ...formData, assigned_to: "Unassigned" })
-                                  setShowDropdown(false)
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
-                              >
-                                <span className="text-gray-500">Unassigned</span>
-                                {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-blue-600" />}
-                              </button>
-                              
-                              {/* Divider */}
-                              <div className="border-t border-gray-100" />
-                              
-                              {/* Team members */}
-                              {isLoadingMembers ? (
-                                <div className="px-3 py-4 text-center">
-                                  <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
-                                </div>
-                              ) : (
-                                <>
-                                  {teamMembers.map((member) => (
-                                    <div
-                                      key={member.id}
-                                      className="flex items-center justify-between hover:bg-gray-50 group"
-                                    >
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowDropdown(false)}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Secondary Assignee */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Secondary</label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowSecondaryDropdown(!showSecondaryDropdown)}
+                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                        >
+                          <span className={formData.secondary_assigned_to ? "text-gray-900 truncate" : "text-gray-400"}>
+                            {formData.secondary_assigned_to || "None"}
+                          </span>
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showSecondaryDropdown ? "rotate-180" : ""}`} />
+                        </button>
+                        
+                        {/* Dropdown menu */}
+                        <AnimatePresence>
+                          {showSecondaryDropdown && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                            >
+                              <div className="max-h-64 overflow-y-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onFormChange({ ...formData, secondary_assigned_to: "" })
+                                    setShowSecondaryDropdown(false)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                >
+                                  <span className="text-gray-500">None</span>
+                                  {!formData.secondary_assigned_to && <Check className="w-4 h-4 text-blue-600" />}
+                                </button>
+                                
+                                <div className="border-t border-gray-100" />
+                                
+                                {isLoadingMembers ? (
+                                  <div className="px-3 py-4 text-center">
+                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
+                                  </div>
+                                ) : (
+                                  <>
+                                    {teamMembers.map((member) => (
                                       <button
+                                        key={member.id}
                                         type="button"
                                         onClick={() => {
-                                          onFormChange({ ...formData, assigned_to: member.name })
-                                          setShowDropdown(false)
+                                          onFormChange({ ...formData, secondary_assigned_to: member.name })
+                                          setShowSecondaryDropdown(false)
                                         }}
-                                        className="flex-1 px-3 py-2 text-left text-sm flex items-center justify-between"
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
                                       >
-                                        <div>
-                                          <span className="text-gray-900">{member.name}</span>
-                                          {member.email && (
-                                            <span className="text-gray-400 text-xs ml-2">{member.email}</span>
-                                          )}
-                                        </div>
-                                        {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600" />}
+                                        <span className="text-gray-900 truncate">{member.name}</span>
+                                        {formData.secondary_assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
                                       </button>
-                                      {/* Delete button - only show on hover and for non-default members */}
-                                      {!member.id.startsWith("default-") && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleDeleteMember(member)
-                                          }}
-                                          className="px-2 py-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-                                          title={`Remove ${member.name}`}
-                                        >
-                                          <UserMinus className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </>
-                              )}
-                              
-                              {/* Divider */}
-                              <div className="border-t border-gray-100" />
-                              
-                              {/* Add new member button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowAddMember(true)
-                                  setShowDropdown(false)
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
-                              >
-                                <UserPlus className="w-4 h-4" />
-                                Add new team member
-                              </button>
-                              
-                              {/* Manage members button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowManageMembers(!showManageMembers)
-                                  setShowDropdown(false)
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <Settings className="w-4 h-4" />
-                                Manage team members
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                      
-                      {/* Click outside to close dropdown */}
-                      {showDropdown && (
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setShowDropdown(false)}
-                        />
-                      )}
-                    </div>
-                    
-                    {/* Add new member form */}
-                    <AnimatePresence>
-                      {showAddMember && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-medium text-blue-900">Add New Team Member</h4>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddMember(false)
-                                setNewMemberName("")
-                                setNewMemberEmail("")
-                                setMemberError("")
-                              }}
-                              className="text-blue-400 hover:text-blue-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={newMemberName}
-                              onChange={(e) => setNewMemberName(e.target.value)}
-                              placeholder="Full name (required)"
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                            />
-                            <input
-                              type="email"
-                              value={newMemberEmail}
-                              onChange={(e) => setNewMemberEmail(e.target.value)}
-                              placeholder="Email (optional)"
-                              className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                            />
-                            {memberError && (
-                              <p className="text-xs text-red-600">{memberError}</p>
-                            )}
-                            <button
-                              type="button"
-                              onClick={handleAddMember}
-                              disabled={isAddingMember || !newMemberName.trim()}
-                              className="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                              {isAddingMember ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  Adding...
-                                </>
-                              ) : (
-                                <>
-                                  <UserPlus className="w-4 h-4" />
-                                  Add Team Member
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    
-                    {/* Team Management Panel */}
-                    <AnimatePresence>
-                      {showManageMembers && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                              <Settings className="w-4 h-4" />
-                              Manage Team Members
-                            </h4>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowManageMembers(false)
-                                handleCancelEdit()
-                              }}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          
-                          {memberError && showManageMembers && (
-                            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
-                              {memberError}
-                            </div>
-                          )}
-                          
-                          <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {isLoadingMembers ? (
-                              <div className="py-4 text-center">
-                                <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
-                                <p className="text-xs text-gray-500 mt-2">Loading team members...</p>
-                              </div>
-                            ) : teamMembers.length === 0 ? (
-                              <p className="text-sm text-gray-500 text-center py-4">
-                                No team members yet. Add one using the dropdown above.
-                              </p>
-                            ) : (
-                              teamMembers.map((member) => (
-                                <div
-                                  key={member.id}
-                                  className="p-3 bg-white border border-gray-200 rounded-lg"
+                                    ))}
+                                  </>
+                                )}
+                                
+                                <div className="border-t border-gray-100" />
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAddSecondaryMember(true)
+                                    setShowSecondaryDropdown(false)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
                                 >
-                                  {editingMemberId === member.id ? (
-                                    // Edit mode
-                                    <div className="space-y-2">
-                                      <input
-                                        type="text"
-                                        value={editMemberName}
-                                        onChange={(e) => setEditMemberName(e.target.value)}
-                                        placeholder="Full name"
-                                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                      />
-                                      <input
-                                        type="email"
-                                        value={editMemberEmail}
-                                        onChange={(e) => setEditMemberEmail(e.target.value)}
-                                        placeholder="Email address"
-                                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                      />
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleSaveMember(member.id)}
-                                          disabled={isSavingMember || !editMemberName.trim()}
-                                          className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
-                                        >
-                                          {isSavingMember ? (
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                          ) : (
-                                            <Check className="w-3 h-3" />
-                                          )}
-                                          Save
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={handleCancelEdit}
-                                          className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    // View mode
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">
-                                          {member.name}
-                                        </p>
-                                        {member.email && (
-                                          <p className="text-xs text-gray-500 truncate">
-                                            {member.email}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-1 ml-2">
-                                        {!member.id.startsWith("default-") && (
-                                          <>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleStartEdit(member)}
-                                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                              title="Edit member"
-                                            >
-                                              <Pencil className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => handleDeleteMember(member)}
-                                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                              title="Remove member"
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                            </button>
-                                          </>
-                                        )}
-                                        {member.id.startsWith("default-") && (
-                                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                                            Default
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))
+                                  <UserPlus className="w-4 h-4" />
+                                  Add new member
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        
+                        {showSecondaryDropdown && (
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowSecondaryDropdown(false)}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Add new member form (shared for both primary and secondary) */}
+                  <AnimatePresence>
+                    {(showAddMember || showAddSecondaryMember) && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-blue-900">Add New Team Member</h4>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddMember(false)
+                              setShowAddSecondaryMember(false)
+                              setNewMemberName("")
+                              setNewMemberEmail("")
+                              setMemberError("")
+                            }}
+                            className="text-blue-400 hover:text-blue-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={newMemberName}
+                            onChange={(e) => setNewMemberName(e.target.value)}
+                            placeholder="Full name (required)"
+                            className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                          />
+                          <input
+                            type="email"
+                            value={newMemberEmail}
+                            onChange={(e) => setNewMemberEmail(e.target.value)}
+                            placeholder="Email (optional)"
+                            className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                          />
+                          {memberError && (
+                            <p className="text-xs text-red-600">{memberError}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleAddMember(showAddSecondaryMember)}
+                            disabled={isAddingMember || !newMemberName.trim()}
+                            className="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {isAddingMember ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus className="w-4 h-4" />
+                                Add Team Member
+                              </>
                             )}
-                          </div>
-                          
-                          {/* Add new member shortcut */}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Team Management Panel */}
+                  <AnimatePresence>
+                    {showManageMembers && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                            <Settings className="w-4 h-4" />
+                            Manage Team Members
+                          </h4>
                           <button
                             type="button"
                             onClick={() => {
                               setShowManageMembers(false)
-                              setShowAddMember(true)
+                              handleCancelEdit()
                             }}
-                            className="w-full mt-3 px-3 py-2 border border-dashed border-gray-300 text-gray-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+                            className="text-gray-400 hover:text-gray-600"
                           >
-                            <UserPlus className="w-4 h-4" />
-                            Add new team member
+                            <X className="w-4 h-4" />
                           </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                        </div>
+                        
+                        {memberError && showManageMembers && (
+                          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+                            {memberError}
+                          </div>
+                        )}
+                        
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {isLoadingMembers ? (
+                            <div className="py-4 text-center">
+                              <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
+                              <p className="text-xs text-gray-500 mt-2">Loading team members...</p>
+                            </div>
+                          ) : teamMembers.length === 0 ? (
+                            <p className="text-sm text-gray-500 text-center py-4">
+                              No team members yet. Add one using the dropdown above.
+                            </p>
+                          ) : (
+                            teamMembers.map((member) => (
+                              <div
+                                key={member.id}
+                                className="p-3 bg-white border border-gray-200 rounded-lg"
+                              >
+                                {editingMemberId === member.id ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      value={editMemberName}
+                                      onChange={(e) => setEditMemberName(e.target.value)}
+                                      placeholder="Full name"
+                                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <input
+                                      type="email"
+                                      value={editMemberEmail}
+                                      onChange={(e) => setEditMemberEmail(e.target.value)}
+                                      placeholder="Email address"
+                                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveMember(member.id)}
+                                        disabled={isSavingMember || !editMemberName.trim()}
+                                        className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                                      >
+                                        {isSavingMember ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Check className="w-3 h-3" />
+                                        )}
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleCancelEdit}
+                                        className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        {member.name}
+                                      </p>
+                                      {member.email && (
+                                        <p className="text-xs text-gray-500 truncate">
+                                          {member.email}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1 ml-2">
+                                      {!member.id.startsWith("default-") && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleStartEdit(member)}
+                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                            title="Edit member"
+                                          >
+                                            <Pencil className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteMember(member)}
+                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                            title="Remove member"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </>
+                                      )}
+                                      {member.id.startsWith("default-") && (
+                                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                                          Default
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowManageMembers(false)
+                            setShowAddMember(true)
+                          }}
+                          className="w-full mt-3 px-3 py-2 border border-dashed border-gray-300 text-gray-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          Add new team member
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
-
-              {/* Opportunity */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Opportunity</label>
-                <select
-                  value={formData.is_opportunity ? "yes" : "no"}
-                  onChange={(e) => onFormChange({ 
-                    ...formData, 
-                    is_opportunity: e.target.value === "yes",
-                    // Set default disposition when enabling opportunity
-                    disposition: e.target.value === "yes" && !formData.disposition ? "open" : formData.disposition
-                  })}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </div>
-
-              {/* Disposition & DOC - Only show when is_opportunity is true */}
-              <AnimatePresence>
-                {formData.is_opportunity && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-4 overflow-hidden"
-                  >
-                    {/* Disposition */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        Disposition <span className="text-gray-400 font-normal">(Pipeline Stage)</span>
-                      </label>
-                      <select
-                        value={formData.disposition || "open"}
-                        onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                      >
-                        {DISPOSITION_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* DOC (Degree of Confidence) */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        DOC <span className="text-gray-400 font-normal">(Degree of Confidence)</span>
-                      </label>
-                      <select
-                        value={formData.doc || ""}
-                        onChange={(e) => onFormChange({ ...formData, doc: e.target.value as DOC })}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                      >
-                        <option value="">Select probability...</option>
-                        {DOC_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Used for pacing calculations in dashboard
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Web Links Section */}
               <div className="pt-4 border-t border-gray-200">
@@ -857,29 +891,6 @@ export function TaskModal({
                       <Plus className="w-4 h-4 text-gray-700" />
                     </button>
                   </div>
-                </div>
-              </div>
-
-              {/* Tag Team Members Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  <AtSign className="w-4 h-4 inline mr-2" />
-                  Tag Team Members
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {(teamMembers.length > 0 ? teamMembers : TEAM_MEMBERS.map((m, i) => ({ ...m, id: `default-${i}`, isActive: true, created_at: "", updated_at: "" }))).map((member) => (
-                    <button
-                      key={member.id || member.email}
-                      onClick={() => onToggleUserTag(member.email)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        formData.tagged_users.includes(member.email)
-                          ? "bg-blue-100 text-blue-700 border border-blue-300"
-                          : "bg-gray-100 text-gray-600 border border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      {member.name}
-                    </button>
-                  ))}
                 </div>
               </div>
 
@@ -950,19 +961,58 @@ export function TaskModal({
                 </p>
               </div>
 
-              {/* Notes Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Notes
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
-                  placeholder="Add notes..."
-                />
+              {/* Opportunity Link Section */}
+              <div className="pt-4 border-t border-gray-200 space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-purple-100' : 'bg-gray-200'}`}>
+                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-purple-600' : 'text-gray-500'}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Link to Opportunity</p>
+                      <p className="text-xs text-gray-500">Associate this task with an opportunity</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onFormChange({ 
+                      ...formData, 
+                      is_opportunity: !formData.is_opportunity,
+                      opportunity_id: !formData.is_opportunity ? formData.opportunity_id : ""
+                    })}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      formData.is_opportunity ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        formData.is_opportunity ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                
+                {/* Opportunity Dropdown - shown when toggle is enabled */}
+                {formData.is_opportunity && (
+                  <div className="pl-12">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Opportunity</label>
+                    <select
+                      value={formData.opportunity_id}
+                      onChange={(e) => onFormChange({ ...formData, opportunity_id: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-purple-500 focus:bg-white"
+                    >
+                      <option value="">Select an opportunity...</option>
+                      {opportunities.map((opp) => (
+                        <option key={opp.id} value={opp.id}>
+                          {opp.title || opp.company_name || 'Unnamed Opportunity'}
+                        </option>
+                      ))}
+                    </select>
+                    {opportunities.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">No opportunities available. Create one first.</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Comments Section */}
@@ -1075,14 +1125,18 @@ export function TaskModal({
 
             {/* Modal Footer */}
             <div className="flex justify-between p-4 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={onDelete}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Task
-              </button>
+              {task.id ? (
+                <button
+                  onClick={onDelete}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Task
+                </button>
+              ) : (
+                <div /> // Spacer when no delete button
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={onClose}
@@ -1098,12 +1152,12 @@ export function TaskModal({
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
+                      {task.id ? "Saving..." : "Creating..."}
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      Save Changes
+                      {task.id ? "Save Changes" : "Create Task"}
                     </>
                   )}
                 </button>
