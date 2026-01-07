@@ -112,26 +112,20 @@ function KPICard({
   )
 }
 
-// Opportunity Progress Chart - Visual representation of active opportunities
+// Opportunity Progress Chart - Visual representation of active opportunities (clients only)
 function OpportunityProgressChart({ 
   clients,
-  tasks
 }: { 
   clients: Client[]
-  tasks: Task[]
 }) {
   const opportunityClients = clients.filter(c => c.is_opportunity)
-  const opportunityTasks = tasks.filter(t => t.is_opportunity)
 
   // Count by disposition - items without disposition default to "pitched"
-  const pitchedCount = opportunityClients.filter(c => c.disposition === "pitched" || !c.disposition).length +
-    opportunityTasks.filter(t => t.disposition === "pitched" || !t.disposition).length
-  const wonCount = opportunityClients.filter(c => c.disposition === "closed_won").length +
-    opportunityTasks.filter(t => t.disposition === "closed_won").length
-  const lostCount = opportunityClients.filter(c => c.disposition === "closed_lost").length +
-    opportunityTasks.filter(t => t.disposition === "closed_lost").length
+  const pitchedCount = opportunityClients.filter(c => c.disposition === "pitched" || !c.disposition).length
+  const wonCount = opportunityClients.filter(c => c.disposition === "closed_won").length
+  const lostCount = opportunityClients.filter(c => c.disposition === "closed_lost").length
 
-  const totalOpportunities = opportunityClients.length + opportunityTasks.length
+  const totalOpportunities = opportunityClients.length
   const activeOpportunities = pitchedCount
 
   // Calculate percentages for visualization
@@ -347,9 +341,8 @@ function PipelineConfidence({
 }
 
 // Disposition Summary Pills
-function DispositionSummary({ clients, tasks }: { clients: Client[]; tasks: Task[] }) {
+function DispositionSummary({ clients }: { clients: Client[] }) {
   const opportunityClients = clients.filter(c => c.is_opportunity)
-  const opportunityTasks = tasks.filter(t => t.is_opportunity)
 
   const counts: Record<Disposition, { count: number; value: number }> = {
     pitched: { count: 0, value: 0 },
@@ -361,11 +354,6 @@ function DispositionSummary({ clients, tasks }: { clients: Client[]; tasks: Task
     const disp = c.disposition || "pitched"
     counts[disp].count++
     counts[disp].value += c.pitch_value || 0
-  })
-
-  opportunityTasks.forEach(t => {
-    const disp = t.disposition || "pitched"
-    counts[disp].count++
   })
 
   return (
@@ -660,8 +648,8 @@ function RecentClientsList({
   )
 }
 
-// Platform Goals Progress
-function PlatformGoalsProgress({ clients, tasks }: { clients: Client[]; tasks: Task[] }) {
+// Platform Goals Progress (uses opportunity clients only for budget tracking)
+function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
@@ -905,7 +893,7 @@ export function DashboardView({
 
         {/* Opportunity Flow Chart */}
         <div className="col-span-2 md:col-span-4 xl:col-span-1">
-          <OpportunityProgressChart clients={clients} tasks={tasks} />
+          <OpportunityProgressChart clients={clients} />
         </div>
       </div>
 
@@ -935,7 +923,7 @@ export function DashboardView({
             onClientClick={onClientClick}
           />
 
-          <PlatformGoalsProgress clients={clients} tasks={tasks} />
+          <PlatformGoalsProgress clients={clients} />
         </div>
       </div>
     </div>

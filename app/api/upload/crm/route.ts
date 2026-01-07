@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSession } from "../../../lib/auth"
-import { writeFile, mkdir } from "fs/promises"
-import path from "path"
+import { put } from "@vercel/blob"
 import crypto from "crypto"
 
 // Configure route segment for uploads
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // 60 seconds timeout for file uploads
 
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp",
@@ -48,30 +48,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 400 })
     }
 
-    // Generate unique filename
-    const ext = path.extname(file.name)
+    // Generate unique filename with folder prefix for organization
     const uniqueId = crypto.randomUUID()
     const sanitizedOriginalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
-    const filename = `${uniqueId}-${sanitizedOriginalName}`
+    const filename = `${folder}/${uniqueId}-${sanitizedOriginalName}`
     
-    // Create upload directory if it doesn't exist
-    const uploadDir = path.join(process.cwd(), "public", "uploads", folder)
-    await mkdir(uploadDir, { recursive: true })
+    // Upload to Vercel Blob (works in both development and production)
+    const blob = await put(filename, file, {
+      access: "public",
+      addRandomSuffix: false, // We already add a unique ID
+    })
     
-    // Write file to disk
-    const filePath = path.join(uploadDir, filename)
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
-    
-    // Return the public URL
-    const url = `/uploads/${folder}/${filename}`
-    
-    console.log("CRM file upload completed:", url)
+    console.log("CRM file upload completed:", blob.url)
     
     return NextResponse.json({ 
-      url,
-      filename,
+      url: blob.url,
+      filename: sanitizedOriginalName,
       originalName: file.name,
       size: file.size,
       type: file.type

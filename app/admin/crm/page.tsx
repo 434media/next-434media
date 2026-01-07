@@ -155,9 +155,18 @@ export default function SalesCRMPage() {
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([])
 
-  // Load data on mount
+  // Load data on mount - load all data needed for dashboard
   useEffect(() => {
-    loadDashboard()
+    const loadInitialData = async () => {
+      // Load dashboard stats and pipeline
+      await loadDashboard()
+      // Load clients and tasks needed for dashboard budget calculations
+      await Promise.all([
+        loadClients(),
+        loadTasks(),
+      ])
+    }
+    loadInitialData()
     loadCurrentUser()
     loadTags()
   }, [])
@@ -329,20 +338,20 @@ export default function SalesCRMPage() {
     }
   }
 
-  // Handle view changes
+  // Handle view changes - refresh data when switching views
   useEffect(() => {
     if (viewMode === "dashboard") {
-      // Dashboard needs clients and tasks for the new integrated view
-      if (clients.length === 0) loadClients()
-      if (tasks.length === 0) loadTasks()
-    } else if (viewMode === "clients" && clients.length === 0) {
+      // Dashboard needs fresh clients and tasks for budget calculations
       loadClients()
-    } else if (viewMode === "tasks" && tasks.length === 0) {
+      loadTasks()
+    } else if (viewMode === "clients") {
+      loadClients()
+    } else if (viewMode === "tasks") {
       loadTasks()
     } else if (viewMode === "pipeline") {
-      if (pipeline.length === 0) loadPipeline()
-      if (clients.length === 0) loadClients()
-      if (tasks.length === 0) loadTasks()
+      loadPipeline()
+      loadClients()
+      loadTasks()
     }
   }, [viewMode])
 
