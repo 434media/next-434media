@@ -241,7 +241,8 @@ export async function PUT(request: NextRequest) {
       const masterListUpdates: Record<string, unknown> = {}
       
       if (taskUpdates.title !== undefined) masterListUpdates.task = taskUpdates.title
-      if (taskUpdates.description !== undefined) masterListUpdates.notes = taskUpdates.description
+      // Map description to the master list's description field (not notes)
+      if (taskUpdates.description !== undefined) masterListUpdates.description = taskUpdates.description
       if (taskUpdates.due_date !== undefined) masterListUpdates.task_due_date = taskUpdates.due_date
       if (taskUpdates.status !== undefined) {
         // Map task status back to master list status

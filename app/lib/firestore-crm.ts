@@ -724,8 +724,8 @@ export async function getAllTasks(): Promise<Task[]> {
         assignedTo = normalizeAssigneeName(item.owner)
       }
       
-      // Extract description from notes field
-      const description = (rawItem.notes as string) || ""
+      // Extract description - check description field first, fallback to notes for backwards compatibility
+      const description = (rawItem.description as string) || (rawItem.notes as string) || ""
       
       // Extract web links - could be a string or undefined
       const links = rawItem.links as string | undefined
