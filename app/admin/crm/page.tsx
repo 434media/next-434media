@@ -242,7 +242,23 @@ export default function SalesCRMPage() {
       const response = await fetch("/api/admin/crm/clients")
       if (!response.ok) throw new Error("Failed to fetch clients")
       const data = await response.json()
-      setClients(data.clients || [])
+      const allClients = data.clients || []
+      
+      // Debug: Log opportunity data
+      const opportunities = allClients.filter((c: Client) => c.is_opportunity)
+      console.log("=== Clients Loaded ===")
+      console.log("Total clients:", allClients.length)
+      console.log("Opportunities (is_opportunity=true):", opportunities.length)
+      console.log("Opportunity details:", opportunities.map((c: Client) => ({
+        id: c.id,
+        company: c.company_name || c.name,
+        title: c.title,
+        is_opportunity: c.is_opportunity,
+        disposition: c.disposition,
+        pitch_value: c.pitch_value,
+      })))
+      
+      setClients(allClients)
       setIsClientsLoaded(true)
     } catch (err) {
       setToast({ message: "Failed to load clients", type: "error" })
@@ -344,7 +360,8 @@ export default function SalesCRMPage() {
   // Handle view changes - refresh data when switching views
   useEffect(() => {
     if (viewMode === "dashboard") {
-      // Dashboard needs fresh clients and tasks for budget calculations
+      // Dashboard uses clients.is_opportunity for budget calculations
+      // Loads fresh clients and tasks for accurate data
       loadClients()
       loadTasks()
     } else if (viewMode === "clients") {
@@ -501,118 +518,135 @@ export default function SalesCRMPage() {
     }
   }
 
-  // Handle file upload
+  // Handle file upload - supports multiple files
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0 || !selectedTask || !currentUser) return
 
-    const file = files[0]
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    
-    if (file.size > maxSize) {
-      setToast({ message: "File size must be less than 10MB", type: "error" })
-      return
-    }
-
-    // Validate file type
-    const allowedTypes = [
-      "image/jpeg", "image/png", "image/gif", "image/webp",
-      "application/pdf",
-      "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/plain", "text/csv"
-    ]
-    
-    if (!allowedTypes.includes(file.type)) {
-      setToast({ message: "File type not supported. Use images, PDF, DOC, XLS, or TXT.", type: "error" })
-      return
-    }
-
-    setIsUploadingFile(true)
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("folder", "crm-tasks")
-
-      const response = await fetch("/api/upload/crm", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      })
-
-      if (!response.ok) throw new Error("Upload failed")
-
-      const data = await response.json()
+    // Process each file (supports multiple uploads)
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const maxSize = 50 * 1024 * 1024 // 50MB - matches server limit
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
       
-      // Determine file type
-      let fileType: "image" | "document" | "link" = "document"
-      if (file.type.startsWith("image/")) {
-        fileType = "image"
+      if (file.size > maxSize) {
+        setToast({ message: `File "${file.name}" is too large (${fileSizeMB}MB). Maximum size is 50MB.`, type: "error" })
+        continue // Skip this file but continue with others
       }
 
-      const newAttachment: TaskAttachment = {
-        id: crypto.randomUUID(),
-        name: file.name,
-        type: fileType,
-        url: data.url,
-        uploaded_by: currentUser.name,
-        uploaded_at: new Date().toISOString(),
+      // Validate file type
+      const allowedTypes = [
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "application/pdf",
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain", "text/csv"
+      ]
+      
+      if (!allowedTypes.includes(file.type)) {
+        setToast({ message: `File "${file.name}" type not supported. Use images, PDF, DOC, XLS, or TXT.`, type: "error" })
+        continue // Skip this file but continue with others
       }
 
-      const updatedAttachments = [...taskAttachments, newAttachment]
-      setTaskAttachments(updatedAttachments)
+      setIsUploadingFile(true)
+      try {
+        const formData = new FormData()
+        formData.append("file", file)
+        formData.append("folder", "crm-tasks")
 
-      // For NEW tasks (empty ID), don't save to Firestore yet - will be saved when task is created
-      // For existing tasks, save immediately
-      if (selectedTask.id) {
-        // Save to Firestore
-        const ownerMap: Record<string, string> = {
-          "Jake": "jake",
-          "Jacob Lee Miles": "jake",
-          "Marc": "marc",
-          "Marcos Resendez": "marc",
-          "Stacy": "stacy",
-          "Stacy Ramirez": "stacy",
-          "Stacy Carrizales": "stacy",
-          "Jesse": "jesse",
-          "Jesse Hernandez": "jesse",
-          "Barb": "barb",
-          "Barbara Carreon": "barb",
-          "Nichole": "teams",
-          "Nichole Snow": "teams",
-        }
-        const owner = ownerMap[selectedTask.assigned_to] || "teams"
-        
-        await fetch("/api/admin/crm/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
+        const response = await fetch("/api/upload/crm", {
+          method: "POST",
           credentials: "include",
-          body: JSON.stringify({
-            id: selectedTask.id,
-            owner,
-            attachments: updatedAttachments,
-          }),
+          body: formData,
         })
 
-        // Update local task state
-        setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
-        setTasks(prevTasks => 
-          prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t)
-        )
-      } else {
-        // For new tasks, just update local state - will save when task is created
-        setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
-      }
+        // Handle error responses with detailed messages
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error || `Upload failed (${response.status})`
+          
+          // Show specific error for 413 (file too large)
+          if (response.status === 413) {
+            setToast({ message: `File "${file.name}" is too large. Maximum size is 50MB.`, type: "error" })
+          } else {
+            setToast({ message: errorMessage, type: "error" })
+          }
+          continue
+        }
 
-      setToast({ message: "File uploaded", type: "success" })
-    } catch (err) {
-      console.error("Upload error:", err)
-      setToast({ message: "Failed to upload file", type: "error" })
-    } finally {
-      setIsUploadingFile(false)
-      // Reset the input
-      e.target.value = ""
+        const data = await response.json()
+        
+        // Determine file type
+        let fileType: "image" | "document" | "link" = "document"
+        if (file.type.startsWith("image/")) {
+          fileType = "image"
+        }
+
+        const newAttachment: TaskAttachment = {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: fileType,
+          url: data.url,
+          uploaded_by: currentUser.name,
+          uploaded_at: new Date().toISOString(),
+        }
+
+        const updatedAttachments = [...taskAttachments, newAttachment]
+        setTaskAttachments(updatedAttachments)
+
+        // For NEW tasks (empty ID), don't save to Firestore yet - will be saved when task is created
+        // For existing tasks, save immediately
+        if (selectedTask.id) {
+          // Save to Firestore
+          const ownerMap: Record<string, string> = {
+            "Jake": "jake",
+            "Jacob Lee Miles": "jake",
+            "Marc": "marc",
+            "Marcos Resendez": "marc",
+            "Stacy": "stacy",
+            "Stacy Ramirez": "stacy",
+            "Stacy Carrizales": "stacy",
+            "Jesse": "jesse",
+            "Jesse Hernandez": "jesse",
+            "Barb": "barb",
+            "Barbara Carreon": "barb",
+            "Nichole": "teams",
+            "Nichole Snow": "teams",
+          }
+          const owner = ownerMap[selectedTask.assigned_to] || "teams"
+          
+          await fetch("/api/admin/crm/tasks", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              id: selectedTask.id,
+              owner,
+              attachments: updatedAttachments,
+            }),
+          })
+
+          // Update local task state
+          setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
+          setTasks(prevTasks => 
+            prevTasks.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t)
+          )
+        } else {
+          // For new tasks, just update local state - will save when task is created
+          setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
+        }
+
+        setToast({ message: `File "${file.name}" uploaded successfully`, type: "success" })
+      } catch (err) {
+        console.error("Upload error:", err)
+        setToast({ message: `Failed to upload "${file.name}"`, type: "error" })
+      }
     }
+    
+    // Reset state after all files processed
+    setIsUploadingFile(false)
+    // Reset the input
+    e.target.value = ""
   }
 
   // Remove attachment
@@ -1069,6 +1103,10 @@ export default function SalesCRMPage() {
 
   // Update client disposition via drag-and-drop in Kanban
   const handleUpdateClientDisposition = async (clientId: string, disposition: Disposition) => {
+    console.log("=== Updating Client Disposition ===")
+    console.log("Client ID:", clientId)
+    console.log("New Disposition:", disposition)
+    
     try {
       const response = await fetch("/api/admin/crm/clients", {
         method: "PUT",
@@ -1079,6 +1117,8 @@ export default function SalesCRMPage() {
 
       if (!response.ok) throw new Error("Failed to update client")
 
+      console.log("Disposition updated successfully")
+      
       // Optimistically update the local state
       setClients(prevClients => 
         prevClients.map(c => c.id === clientId ? { ...c, disposition } : c)

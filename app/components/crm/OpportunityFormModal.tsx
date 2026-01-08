@@ -145,31 +145,51 @@ export function OpportunityFormModal({
 
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
     
     setIsUploadingFile(true)
-    try {
-      const formDataUpload = new FormData()
-      formDataUpload.append("file", file)
-      formDataUpload.append("folder", "crm-opportunities")
-      
-      const response = await fetch("/api/upload/crm", {
-        method: "POST",
-        body: formDataUpload,
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        onFormChange({ ...formData, docs: [...formData.docs, data.url] })
+    const uploadedUrls: string[] = []
+    const errors: string[] = []
+    
+    for (const file of Array.from(files)) {
+      try {
+        const formDataUpload = new FormData()
+        formDataUpload.append("file", file)
+        formDataUpload.append("folder", "crm-opportunities")
+        
+        const response = await fetch("/api/upload/crm", {
+          method: "POST",
+          body: formDataUpload,
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          uploadedUrls.push(data.url)
+        } else {
+          const data = await response.json().catch(() => ({}))
+          const errorMsg = data.error || `Failed to upload ${file.name}`
+          errors.push(errorMsg)
+        }
+      } catch (err) {
+        console.error(`Failed to upload file ${file.name}:`, err)
+        errors.push(`Failed to upload ${file.name}`)
       }
-    } catch (err) {
-      console.error("Failed to upload file:", err)
-    } finally {
-      setIsUploadingFile(false)
-      // Reset the input
-      e.target.value = ""
     }
+    
+    // Add all successfully uploaded URLs
+    if (uploadedUrls.length > 0) {
+      onFormChange({ ...formData, docs: [...formData.docs, ...uploadedUrls] })
+    }
+    
+    // Show errors if any
+    if (errors.length > 0) {
+      alert(`Upload errors:\n${errors.join('\n')}`)
+    }
+    
+    setIsUploadingFile(false)
+    // Reset the input
+    e.target.value = ""
   }
 
   // Fetch team members from Firestore
@@ -1368,10 +1388,11 @@ export function OpportunityFormModal({
                     disabled={isUploadingFile}
                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
                     className="hidden"
+                    multiple
                   />
                 </label>
                 <p className="text-xs text-gray-500 mt-2">
-                  Supports images, PDF, DOC, XLS, TXT (max 10MB)
+                  Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
               </div>
 

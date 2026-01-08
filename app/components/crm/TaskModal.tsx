@@ -1009,10 +1009,11 @@ export function TaskModal({
                     disabled={isUploadingFile}
                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
                     className="hidden"
+                    multiple
                   />
                 </label>
                 <p className="text-xs text-gray-500 mt-2">
-                  Supports images, PDF, DOC, XLS, TXT (max 10MB)
+                  Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
               </div>
 

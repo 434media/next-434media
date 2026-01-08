@@ -864,8 +864,12 @@ export function DashboardView({
 }: DashboardViewProps) {
   // Fixed annual budget target
   const totalBudget = 1500000
+  
+  // Use clients with is_opportunity=true - same data source as the Kanban view
+  // This ensures Dashboard KPI calculations match what's shown in the Opportunities Kanban
   const opportunityClients = clients.filter(c => c.is_opportunity)
-
+  
+  // Calculate revenue by disposition from opportunity clients
   const closedWonRevenue = opportunityClients
     .filter(c => c.disposition === "closed_won")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
@@ -873,7 +877,8 @@ export function DashboardView({
   const closedLostRevenue = opportunityClients
     .filter(c => c.disposition === "closed_lost")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-
+  
+  // Pipeline value = opportunities that are not closed (pitched or no disposition)
   const pipelineValue = opportunityClients
     .filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
@@ -881,6 +886,24 @@ export function DashboardView({
   const totalPitched = closedWonRevenue + closedLostRevenue + pipelineValue
   const pacing = closedWonRevenue + pipelineValue
   const remaining = Math.max(0, totalBudget - closedWonRevenue)
+
+  // Debug: Log opportunity data from clients
+  console.log("=== Dashboard Budget Debug (using clients.is_opportunity) ===")
+  console.log("Total clients:", clients.length)
+  console.log("Opportunity clients:", opportunityClients.length)
+  console.log("Opportunity details:", opportunityClients.map(c => ({
+    id: c.id,
+    company: c.company_name || c.name,
+    disposition: c.disposition,
+    pitch_value: c.pitch_value,
+  })))
+  console.log("Closed Won Revenue:", closedWonRevenue)
+  console.log("Closed Lost Revenue:", closedLostRevenue)
+  console.log("Pipeline Value:", pipelineValue)
+  console.log("Total Pitched:", totalPitched)
+  console.log("Pacing:", pacing)
+  console.log("Remaining:", remaining)
+  console.log("============================================================")
 
   return (
     <div className="space-y-6 md:space-y-8">

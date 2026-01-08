@@ -155,7 +155,21 @@ export async function PUT(request: NextRequest) {
     }
 
     const { id, ...updates } = body
+    
+    // Debug: Log what's being updated
+    console.log("=== Client Update ===")
+    console.log("Client ID:", id)
+    console.log("Updates:", JSON.stringify(updates, null, 2))
+    
     const client = await updateClient(id, updates)
+    
+    console.log("Updated client result:", {
+      id: client.id,
+      disposition: client.disposition,
+      pitch_value: client.pitch_value,
+      is_opportunity: client.is_opportunity,
+    })
+    console.log("=====================")
 
     return NextResponse.json({ success: true, client })
   } catch (error) {

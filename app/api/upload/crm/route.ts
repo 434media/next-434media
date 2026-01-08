@@ -8,6 +8,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // 60 seconds timeout for file uploads
 
+// IMPORTANT: This config is needed to allow larger file uploads
+// Without this, Next.js defaults to 4MB body size limit causing 413 errors
+export const fetchCache = 'force-no-store'
+
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp",
   "application/pdf",
@@ -16,7 +20,10 @@ const ALLOWED_TYPES = [
   "text/plain", "text/csv"
 ]
 
-const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+// Vercel Blob on Pro plan supports up to 500MB
+// We'll allow 50MB for CRM attachments (reasonable for documents)
+const MAX_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_SIZE_DISPLAY = "50MB"
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -43,9 +50,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Validate file size
     if (file.size > MAX_SIZE) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
       return NextResponse.json({ 
-        error: "File size must be less than 10MB" 
-      }, { status: 400 })
+        error: `File too large (${fileSizeMB}MB). Maximum size is ${MAX_SIZE_DISPLAY}.` 
+      }, { status: 413 })
     }
 
     // Generate unique filename with folder prefix for organization
@@ -70,8 +78,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     })
   } catch (error) {
     console.error("Error in CRM upload handler:", error)
+    
+    // Handle specific error types
+    const errorMessage = error instanceof Error ? error.message : "Upload failed"
+    
+    // Check for body size limit errors
+    if (errorMessage.includes("body exceeded") || errorMessage.includes("too large")) {
+      return NextResponse.json(
+        { error: `File too large. Maximum size is ${MAX_SIZE_DISPLAY}.` },
+        { status: 413 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Upload failed" },
+      { error: errorMessage },
       { status: 500 }
     )
   }

@@ -5,10 +5,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Increase body size limit for file uploads (10MB)
+  // Increase body size limit for file uploads (App Router uses route config, not this)
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb',
+      bodySizeLimit: '50mb',
     },
   },
   images: {

@@ -367,10 +367,14 @@ export function getDueDateStatus(dueDate: string | undefined, status: string): "
 export function formatCurrency(value: number, compact = false): string {
   if (compact) {
     if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`
+      // Show 1 decimal place for millions if not a round number
+      const millions = value / 1000000
+      return `$${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)}M`
     }
     if (value >= 1000) {
-      return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 0)}K`
+      // Show 1 decimal place for thousands to avoid rounding (e.g., $2.5K instead of $3K)
+      const thousands = value / 1000
+      return `$${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}K`
     }
   }
   return new Intl.NumberFormat("en-US", {
