@@ -60,6 +60,11 @@ export interface ClientContact {
   phone?: string
   role?: string
   is_primary?: boolean
+  address?: string
+  city?: string
+  state?: string
+  zipcode?: string
+  date_of_birth?: string
 }
 
 export interface ClientRecord extends BaseRecord {

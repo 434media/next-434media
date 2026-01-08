@@ -45,6 +45,7 @@ interface DashboardViewProps {
   onViewChange: (view: ViewMode) => void
   onShowClientForm: () => void
   onClientClick: (client: Client) => void
+  onOpportunityClick?: (client: Client) => void  // New: open opportunity modal for opportunities
   onTaskClick: (task: Task) => void
   currentUser?: CurrentUser | null
 }
@@ -859,17 +860,33 @@ export function DashboardView({
   onViewChange,
   onShowClientForm,
   onClientClick,
+  onOpportunityClick,
   onTaskClick,
   currentUser,
 }: DashboardViewProps) {
   // Fixed annual budget target
   const totalBudget = 1500000
   
+  // Handler that opens opportunity modal for opportunities, contact modal for contacts
+  const handleClientClick = (client: Client) => {
+    if (client.is_opportunity && onOpportunityClick) {
+      onOpportunityClick(client)
+    } else {
+      onClientClick(client)
+    }
+  }
+  
   // Use clients with is_opportunity=true - same data source as the Kanban view
   // This ensures Dashboard KPI calculations match what's shown in the Opportunities Kanban
   const opportunityClients = clients.filter(c => c.is_opportunity)
   
   // Calculate revenue by disposition from opportunity clients
+  // CORRECTED: Closed Won at 100% DOC only counts towards Remaining and Pacing
+  const closedWon100DocRevenue = opportunityClients
+    .filter(c => c.disposition === "closed_won" && c.doc === "100")
+    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
+  
+  // All Closed Won revenue (for total pitched calculation)
   const closedWonRevenue = opportunityClients
     .filter(c => c.disposition === "closed_won")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
@@ -878,40 +895,72 @@ export function DashboardView({
     .filter(c => c.disposition === "closed_lost")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
   
+  // Pitched at 90% DOC for Pacing calculation
+  const pitched90DocValue = opportunityClients
+    .filter(c => c.disposition === "pitched" && c.doc === "90")
+    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
+  
   // Pipeline value = opportunities that are not closed (pitched or no disposition)
   const pipelineValue = opportunityClients
     .filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
 
   const totalPitched = closedWonRevenue + closedLostRevenue + pipelineValue
-  const pacing = closedWonRevenue + pipelineValue
-  const remaining = Math.max(0, totalBudget - closedWonRevenue)
+  
+  // CORRECTED: Pacing = Closed Won at 100% DOC + Pitched at 90% DOC
+  const pacing = closedWon100DocRevenue + pitched90DocValue
+  
+  // CORRECTED: Remaining = Total Budget - Closed Won at 100% DOC
+  const remaining = Math.max(0, totalBudget - closedWon100DocRevenue)
+  
+  // Find opportunities in Closed Won that are NOT at 100% DOC (exceptions)
+  const closedWonExceptions = opportunityClients
+    .filter(c => c.disposition === "closed_won" && c.doc !== "100")
 
   // Debug: Log opportunity data from clients
   console.log("=== Dashboard Budget Debug (using clients.is_opportunity) ===")
   console.log("Total clients:", clients.length)
   console.log("Opportunity clients:", opportunityClients.length)
-  console.log("Opportunity details:", opportunityClients.map(c => ({
-    id: c.id,
-    company: c.company_name || c.name,
-    disposition: c.disposition,
-    pitch_value: c.pitch_value,
-  })))
-  console.log("Closed Won Revenue:", closedWonRevenue)
-  console.log("Closed Lost Revenue:", closedLostRevenue)
-  console.log("Pipeline Value:", pipelineValue)
-  console.log("Total Pitched:", totalPitched)
-  console.log("Pacing:", pacing)
-  console.log("Remaining:", remaining)
+  console.log("Closed Won at 100% DOC:", closedWon100DocRevenue)
+  console.log("Pitched at 90% DOC:", pitched90DocValue)
+  console.log("Closed Won Exceptions (not 100% DOC):", closedWonExceptions.length)
   console.log("============================================================")
 
   return (
     <div className="space-y-6 md:space-y-8">
+      {/* Exceptions Warning - Show if there are Closed Won without 100% DOC */}
+      {closedWonExceptions.length > 0 && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-red-100">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-red-800 mb-1">
+                Exceptions Report: {closedWonExceptions.length} Closed Won {closedWonExceptions.length === 1 ? 'opportunity' : 'opportunities'} not at 100% DOC
+              </h4>
+              <ul className="text-xs text-red-700 space-y-1">
+                {closedWonExceptions.map(c => (
+                  <li key={c.id} className="flex items-center gap-2">
+                    <span className="font-medium">{c.title || c.company_name || c.name}</span>
+                    <span className="px-1.5 py-0.5 bg-red-100 rounded text-red-600">DOC: {c.doc || 'Not set'}%</span>
+                    {c.pitch_value && <span className="text-red-500">{formatCurrency(c.pitch_value, true)}</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-red-600 mt-2">
+                These opportunities are not counted in Remaining or Pacing. Set DOC to 100% to include them.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <KPICard label="Budget" value={formatCurrency(totalBudget, true)} subLabel="Annual sales goal" icon={RocketIcon} color="neutral" />
-        <KPICard label="Remaining" value={formatCurrency(remaining, true)} subLabel="To reach goal" icon={Target} color="amber" />
-        <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won + Pipeline" icon={TrendingUp} color="blue" />
+        <KPICard label="Remaining" value={formatCurrency(remaining, true)} subLabel="Budget - Won (100% DOC)" icon={Target} color="amber" />
+        <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won 100% + Pitched 90%" icon={TrendingUp} color="blue" />
         <KPICard label="Total Pitched" value={formatCurrency(totalPitched, true)} subLabel="All opportunities" icon={BarChart3} color="purple" />
 
         {/* Opportunity Flow Chart */}
@@ -927,7 +976,7 @@ export function DashboardView({
           <ActiveOpportunitiesList
             clients={clients}
             tasks={tasks}
-            onClientClick={onClientClick}
+            onClientClick={handleClientClick}
             onTaskClick={onTaskClick}
             onViewAll={() => onViewChange("pipeline")}
           />
@@ -943,7 +992,7 @@ export function DashboardView({
         <div className="space-y-6">
           <PipelineConfidence 
             clients={clients} 
-            onClientClick={onClientClick}
+            onClientClick={handleClientClick}
           />
 
           <PlatformGoalsProgress clients={clients} />

@@ -330,6 +330,9 @@ export function TasksView({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                     Status
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell bg-gray-50">
+                    Platform
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell bg-gray-50">
                     Assignee
                   </th>
@@ -356,12 +359,17 @@ export function TasksView({
                           : ""
                       }`}
                     >
-                      {/* Task Title & Description */}
+                      {/* Task Title with Opportunity/Client Info */}
                       <td className="px-4 py-4">
                         <div className="max-w-md">
                           <p className={`font-medium text-sm line-clamp-1 ${task.status === "completed" ? "text-gray-500 line-through" : "text-gray-900"}`}>
                             {task.title || "Untitled Task"}
                           </p>
+                          {(task.client_name) && (
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                              {task.client_name}
+                            </p>
+                          )}
                         </div>
                       </td>
                       
@@ -395,17 +403,39 @@ export function TasksView({
                         </div>
                       </td>
                       
-                      {/* Assignee */}
-                      <td className="px-4 py-4 hidden sm:table-cell">
-                        <div className="flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-sm text-gray-700 max-w-[150px] truncate">
-                            {normalizeAssigneeName(
-                              typeof task.assigned_to === "string" 
-                                ? task.assigned_to 
-                                : (task.assigned_to as { name?: string })?.name || "Unassigned"
-                            )}
+                      {/* Platform */}
+                      <td className="px-4 py-4 hidden md:table-cell">
+                        {task.brand ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            <Building className="w-3 h-3 mr-1" />
+                            {task.brand}
                           </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
+                      
+                      {/* Assignee with Secondary */}
+                      <td className="px-4 py-4 hidden sm:table-cell">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-gray-400" />
+                            <span className="text-sm text-gray-700 max-w-[150px] truncate">
+                              {normalizeAssigneeName(
+                                typeof task.assigned_to === "string" 
+                                  ? task.assigned_to 
+                                  : (task.assigned_to as { name?: string })?.name || "Unassigned"
+                              )}
+                            </span>
+                          </div>
+                          {task.secondary_assigned_to && (
+                            <span className="text-xs text-gray-500 pl-5 truncate max-w-[150px]">
+                              +{Array.isArray(task.secondary_assigned_to) 
+                                ? task.secondary_assigned_to.map(s => normalizeAssigneeName(s)).join(", ")
+                                : normalizeAssigneeName(task.secondary_assigned_to)
+                              }
+                            </span>
+                          )}
                         </div>
                       </td>
                       

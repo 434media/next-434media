@@ -46,7 +46,8 @@ interface ContactFormData {
 
 interface OpportunityFormData {
   company_name: string
-  existing_company_id: string | null // null = new company, string = existing company ID
+  existing_company_id: string | null // When editing: the opportunity's ID. When creating: null (even if linked to existing company)
+  linked_company_id: string | null // When creating: ID of existing company to link/inherit data from. When editing: unused
   contacts: ContactFormData[]
   title: string
   status: string
@@ -65,6 +66,7 @@ interface OpportunityFormData {
 
 interface OpportunityFormModalProps {
   isOpen: boolean
+  isEditing?: boolean  // true when editing existing opportunity, false when creating new
   isSaving: boolean
   existingClients: Client[]
   formData: OpportunityFormData
@@ -80,6 +82,7 @@ function generateContactId(): string {
 
 export function OpportunityFormModal({
   isOpen,
+  isEditing = false,
   isSaving,
   existingClients,
   formData,
@@ -456,7 +459,8 @@ export function OpportunityFormModal({
     onFormChange({ ...formData, contacts: newContacts })
   }
 
-  // Handle selecting an existing company
+  // Handle selecting an existing company (for NEW opportunities only - inherits company data)
+  // When editing an existing opportunity, this function is not used
   const handleSelectCompany = (company: { id: string; name: string } | null) => {
     if (company) {
       // Find the client data to pre-populate some fields
@@ -464,12 +468,14 @@ export function OpportunityFormModal({
       onFormChange({
         ...formData,
         company_name: company.name,
-        existing_company_id: company.id,
+        // Use linked_company_id for inheriting data, NOT existing_company_id
+        // This allows creating NEW opportunities for existing companies
+        linked_company_id: company.id,
         // Pre-populate brand if available
         brand: existingClient?.brand || formData.brand,
-        // Pre-populate contacts if available
+        // Pre-populate contacts if available (but don't share - copy them)
         contacts: existingClient?.contacts?.map(c => ({
-          id: c.id || generateContactId(),
+          id: generateContactId(), // Generate NEW IDs so contacts are independent
           name: c.name || "",
           email: c.email || "",
           phone: c.phone || "",
@@ -486,7 +492,7 @@ export function OpportunityFormModal({
       // Creating new company
       onFormChange({
         ...formData,
-        existing_company_id: null,
+        linked_company_id: null,
       })
     }
     setShowCompanyDropdown(false)
@@ -634,10 +640,10 @@ export function OpportunityFormModal({
                     />
                   )}
                 </div>
-                {formData.existing_company_id && (
+                {formData.linked_company_id && !isEditing && (
                   <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
                     <Check className="w-3 h-3" />
-                    Linked to existing company
+                    Linked to existing company (will create new opportunity)
                   </p>
                 )}
               </div>
@@ -1491,12 +1497,12 @@ export function OpportunityFormModal({
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating...
+                    {isEditing ? "Saving..." : "Creating..."}
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Create Opportunity
+                    {isEditing ? "Save Changes" : "Create Opportunity"}
                   </>
                 )}
               </button>

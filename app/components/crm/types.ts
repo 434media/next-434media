@@ -117,7 +117,7 @@ export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" 
 export type Disposition = "pitched" | "closed_won" | "closed_lost"
 
 // DOC (Degree of Confidence) - stage probability values
-export type DOC = "25" | "50" | "75" | "90"
+export type DOC = "25" | "50" | "75" | "90" | "100"
 
 // Disposition options for UI
 export const DISPOSITION_OPTIONS: { value: Disposition; label: string; color: string }[] = [
@@ -132,6 +132,7 @@ export const DOC_OPTIONS: { value: DOC; label: string }[] = [
   { value: "50", label: "50%" },
   { value: "75", label: "75%" },
   { value: "90", label: "90%" },
+  { value: "100", label: "100%" },
 ]
 
 // Brand Sales Goals (annual targets)
@@ -268,8 +269,10 @@ export const STATUS_COLORS: Record<string, string> = {
 export const TASK_STATUS_COLORS: Record<string, string> = {
   not_started: "bg-gray-100 text-gray-600",
   in_progress: "bg-blue-100 text-blue-700",
-  completed: "bg-emerald-100 text-emerald-700",
+  pending_review: "bg-purple-100 text-purple-700",
+  on_hold: "bg-amber-100 text-amber-700",
   blocked: "bg-red-100 text-red-700",
+  completed: "bg-emerald-100 text-emerald-700",
   deferred: "bg-amber-100 text-amber-700",
 }
 

@@ -269,6 +269,11 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     phone: (c.phone || "") as string,
     role: (c.role || "") as string,
     is_primary: (c.is_primary || false) as boolean,
+    address: (c.address || "") as string,
+    city: (c.city || "") as string,
+    state: (c.state || "") as string,
+    zipcode: (c.zipcode || "") as string,
+    date_of_birth: (c.date_of_birth || "") as string,
   }))
 
   // Build full name from first_name + last_name if available

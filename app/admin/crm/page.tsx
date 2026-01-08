@@ -97,9 +97,11 @@ export default function SalesCRMPage() {
 
   // Opportunity form state
   const [showOpportunityForm, setShowOpportunityForm] = useState(false)
+  const [isEditingOpportunity, setIsEditingOpportunity] = useState(false)  // Track if editing vs creating
   const [opportunityForm, setOpportunityForm] = useState({
     company_name: "",
-    existing_company_id: null as string | null,
+    existing_company_id: null as string | null,  // Only set when editing an existing opportunity
+    linked_company_id: null as string | null,     // Set when creating new opp linked to existing company
     contacts: [] as Array<{
       id: string
       name: string
@@ -148,6 +150,8 @@ export default function SalesCRMPage() {
     opportunity_id: "",
     disposition: "" as Disposition | "",
     doc: "" as DOC | "",
+    client_id: "",
+    client_name: "",
   })
   const [newLink, setNewLink] = useState("")
   const [newComment, setNewComment] = useState("")
@@ -400,6 +404,8 @@ export default function SalesCRMPage() {
       opportunity_id: task.opportunity_id || "",
       disposition: task.disposition || "",
       doc: task.doc || "",
+      client_id: task.client_id || "",
+      client_name: task.client_name || "",
     })
     setTaskAttachments(task.attachments || [])
     setShowTaskModal(true)
@@ -446,6 +452,8 @@ export default function SalesCRMPage() {
       opportunity_id: "",
       disposition: "",
       doc: "",
+      client_id: "",
+      client_name: "",
     })
     setTaskAttachments([])
     setShowTaskModal(true)
@@ -1017,6 +1025,18 @@ export default function SalesCRMPage() {
       return
     }
 
+    // Validation: Closed Won should have 100% DOC
+    if (opportunityForm.disposition === "closed_won" && opportunityForm.doc !== "100") {
+      const confirmProceed = confirm(
+        "Warning: This opportunity is being set to 'Closed Won' without 100% DOC.\n\n" +
+        "Opportunities must have 100% DOC to count towards Remaining and Pacing.\n\n" +
+        "Do you want to proceed anyway? (The opportunity will appear in the exceptions report)"
+      )
+      if (!confirmProceed) {
+        return
+      }
+    }
+
     setIsSavingOpportunity(true)
     try {
       // Get primary contact info for backwards compatibility
@@ -1056,9 +1076,10 @@ export default function SalesCRMPage() {
         docs: opportunityForm.docs.filter(doc => doc.trim() !== ""),
       }
 
-      // If updating an existing company, use PUT; otherwise POST
-      const method = opportunityForm.existing_company_id ? "PUT" : "POST"
-      const body = opportunityForm.existing_company_id 
+      // Only use PUT when EDITING an existing opportunity (existing_company_id is set AND isEditingOpportunity is true)
+      // Use POST for NEW opportunities (even if linked to an existing company)
+      const method = isEditingOpportunity && opportunityForm.existing_company_id ? "PUT" : "POST"
+      const body = isEditingOpportunity && opportunityForm.existing_company_id 
         ? { ...opportunityData, id: opportunityForm.existing_company_id }
         : opportunityData
 
@@ -1071,12 +1092,14 @@ export default function SalesCRMPage() {
 
       if (!response.ok) throw new Error("Failed to save opportunity")
 
-      setToast({ message: "Opportunity created successfully", type: "success" })
+      setToast({ message: isEditingOpportunity ? "Opportunity updated successfully" : "Opportunity created successfully", type: "success" })
       setShowOpportunityForm(false)
+      setIsEditingOpportunity(false)
       // Reset the form
       setOpportunityForm({
         company_name: "",
         existing_company_id: null,
+        linked_company_id: null,
         contacts: [],
         title: "",
         status: "prospect",
@@ -1307,6 +1330,7 @@ export default function SalesCRMPage() {
     setOpportunityForm({
       company_name: client.company_name || client.name || "",
       existing_company_id: client.id, // Set the existing ID for update
+      linked_company_id: null,
       contacts,
       title: client.title || "",
       status: client.status || "prospect",
@@ -1322,6 +1346,7 @@ export default function SalesCRMPage() {
       web_links: client.web_links || [],
       docs: client.docs || [],
     })
+    setIsEditingOpportunity(true)  // Mark as editing existing opportunity
     setShowOpportunityForm(true)
   }
 
@@ -1408,6 +1433,7 @@ export default function SalesCRMPage() {
             onViewChange={setViewMode}
             onShowClientForm={() => setShowClientForm(true)}
             onClientClick={handleEditClient}
+            onOpportunityClick={handleEditOpportunity}
             onTaskClick={openTaskModal}
             currentUser={currentUser}
           />
@@ -1438,10 +1464,12 @@ export default function SalesCRMPage() {
             onUpdateClientDisposition={handleUpdateClientDisposition}
             onUpdateTaskDisposition={handleUpdateTaskDisposition}
             onAddOpportunity={() => {
-              // Reset the opportunity form and show modal
+              // Reset the opportunity form and show modal for NEW opportunity
+              setIsEditingOpportunity(false)
               setOpportunityForm({
                 company_name: "",
                 existing_company_id: null,
+                linked_company_id: null,
                 contacts: [],
                 title: "",
                 status: "prospect",
@@ -1516,9 +1544,13 @@ export default function SalesCRMPage() {
         isSaving={isSavingOpportunity}
         existingClients={clients}
         formData={opportunityForm}
+        isEditing={isEditingOpportunity}
         onFormChange={setOpportunityForm}
         onSave={handleSaveOpportunity}
-        onClose={() => setShowOpportunityForm(false)}
+        onClose={() => {
+          setShowOpportunityForm(false)
+          setIsEditingOpportunity(false)
+        }}
       />
 
       {/* Task Modal */}
@@ -1527,7 +1559,8 @@ export default function SalesCRMPage() {
         task={selectedTask}
         formData={taskForm}
         attachments={taskAttachments}
-        opportunities={clients.filter(c => c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
+        opportunities={clients.filter(c => c.is_opportunity && c.disposition !== "closed_lost").map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
+        clients={clients.filter(c => !c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, name: c.name }))}
         currentUser={currentUser}
         isSaving={isSavingTask}
         isUploadingFile={isUploadingFile}

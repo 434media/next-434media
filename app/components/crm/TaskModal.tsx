@@ -52,6 +52,8 @@ interface TaskFormData {
   opportunity_id: string
   disposition: Disposition | ""
   doc: DOC | ""
+  client_id: string
+  client_name: string
 }
 
 // Simplified opportunity type for selection
@@ -61,12 +63,20 @@ interface OpportunityOption {
   title?: string
 }
 
+// Simplified client type for selection (non-opportunity contacts)
+interface ClientOption {
+  id: string
+  company_name?: string
+  name?: string
+}
+
 interface TaskModalProps {
   isOpen: boolean
   task: Task | null
   formData: TaskFormData
   attachments: TaskAttachment[]
   opportunities: OpportunityOption[]
+  clients: ClientOption[]
   currentUser: CurrentUser | null
   isSaving: boolean
   isUploadingFile: boolean
@@ -92,6 +102,7 @@ export function TaskModal({
   formData,
   attachments,
   opportunities,
+  clients,
   currentUser,
   isSaving,
   isUploadingFile,
@@ -385,6 +396,9 @@ export function TaskModal({
                     >
                       <option value="not_started">Not Started</option>
                       <option value="in_progress">In Progress</option>
+                      <option value="pending_review">Pending Review</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="blocked">Blocked</option>
                       <option value="completed">Completed</option>
                     </select>
                   </div>
@@ -1015,6 +1029,33 @@ export function TaskModal({
                 <p className="text-xs text-gray-500 mt-2">
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
+              </div>
+
+              {/* Client Link Section */}
+              <div className="pt-4 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <Users className="w-4 h-4 inline mr-2" />
+                  Link to Contact
+                </label>
+                <select
+                  value={formData.client_id}
+                  onChange={(e) => {
+                    const selectedClient = clients.find(c => c.id === e.target.value)
+                    onFormChange({ 
+                      ...formData, 
+                      client_id: e.target.value,
+                      client_name: selectedClient?.company_name || selectedClient?.name || ""
+                    })
+                  }}
+                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="">Select a contact...</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.company_name || client.name || 'Unnamed Contact'}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Opportunity Link Section */}
