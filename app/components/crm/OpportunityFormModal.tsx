@@ -94,6 +94,7 @@ export function OpportunityFormModal({
   // State for web links and file upload
   const [newLink, setNewLink] = useState("")
   const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   
   // State for team member management
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -149,10 +150,33 @@ export function OpportunityFormModal({
     if (!files || files.length === 0) return
     
     setIsUploadingFile(true)
+    setUploadError(null)
     const uploadedUrls: string[] = []
     const errors: string[] = []
     
+    // Allowed file types (same as server)
+    const allowedTypes = [
+      "image/jpeg", "image/png", "image/gif", "image/webp",
+      "application/pdf",
+      "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/plain", "text/csv"
+    ]
+    const maxSize = 50 * 1024 * 1024 // 50MB
+    
     for (const file of Array.from(files)) {
+      // Client-side validation for better UX
+      if (!allowedTypes.includes(file.type)) {
+        errors.push(`"${file.name}": File type not supported. Use images, PDF, DOC, XLS, or TXT.`)
+        continue
+      }
+      
+      if (file.size > maxSize) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+        errors.push(`"${file.name}": File too large (${sizeMB}MB). Maximum size is 50MB.`)
+        continue
+      }
+      
       try {
         const formDataUpload = new FormData()
         formDataUpload.append("file", file)
@@ -160,6 +184,7 @@ export function OpportunityFormModal({
         
         const response = await fetch("/api/upload/crm", {
           method: "POST",
+          credentials: "include",
           body: formDataUpload,
         })
         
@@ -167,13 +192,31 @@ export function OpportunityFormModal({
           const data = await response.json()
           uploadedUrls.push(data.url)
         } else {
+          // Parse error message from server
           const data = await response.json().catch(() => ({}))
-          const errorMsg = data.error || `Failed to upload ${file.name}`
+          let errorMsg = data.error || `Upload failed`
+          
+          // Add status code context for debugging
+          if (response.status === 401) {
+            errorMsg = `"${file.name}": Unauthorized - please sign in again`
+          } else if (response.status === 413) {
+            errorMsg = `"${file.name}": File too large. Maximum size is 50MB.`
+          } else if (response.status >= 500) {
+            errorMsg = `"${file.name}": Server error - please try again later`
+          } else {
+            errorMsg = `"${file.name}": ${errorMsg}`
+          }
           errors.push(errorMsg)
         }
       } catch (err) {
         console.error(`Failed to upload file ${file.name}:`, err)
-        errors.push(`Failed to upload ${file.name}`)
+        // Network or other errors
+        const errorMsg = err instanceof Error ? err.message : "Network error"
+        if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
+          errors.push(`"${file.name}": Network error - check your connection`)
+        } else {
+          errors.push(`"${file.name}": ${errorMsg}`)
+        }
       }
     }
     
@@ -182,9 +225,11 @@ export function OpportunityFormModal({
       onFormChange({ ...formData, docs: [...formData.docs, ...uploadedUrls] })
     }
     
-    // Show errors if any
+    // Show errors if any (using in-modal error display instead of alert)
     if (errors.length > 0) {
-      alert(`Upload errors:\n${errors.join('\n')}`)
+      setUploadError(errors.join('\n'))
+      // Auto-clear error after 10 seconds
+      setTimeout(() => setUploadError(null), 10000)
     }
     
     setIsUploadingFile(false)
@@ -1391,6 +1436,27 @@ export function OpportunityFormModal({
                     multiple
                   />
                 </label>
+                
+                {/* Upload Error Display */}
+                {uploadError && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-700">Upload Failed</p>
+                        <pre className="text-xs text-red-600 mt-1 whitespace-pre-wrap font-sans">{uploadError}</pre>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUploadError(null)}
+                        className="p-1 rounded hover:bg-red-100 transition-colors"
+                      >
+                        <X className="w-3 h-3 text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <p className="text-xs text-gray-500 mt-2">
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>

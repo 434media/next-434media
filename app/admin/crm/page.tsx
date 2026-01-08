@@ -639,7 +639,15 @@ export default function SalesCRMPage() {
         setToast({ message: `File "${file.name}" uploaded successfully`, type: "success" })
       } catch (err) {
         console.error("Upload error:", err)
-        setToast({ message: `Failed to upload "${file.name}"`, type: "error" })
+        // Provide more helpful error messages
+        const errorMsg = err instanceof Error ? err.message : "Unknown error"
+        if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
+          setToast({ message: `Network error uploading "${file.name}". Check your connection.`, type: "error" })
+        } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
+          setToast({ message: `Session expired. Please sign in again.`, type: "error" })
+        } else {
+          setToast({ message: `Failed to upload "${file.name}": ${errorMsg}`, type: "error" })
+        }
       }
     }
     
