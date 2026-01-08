@@ -737,7 +737,7 @@ export default function SalesCRMPage() {
       const isNewTask = !selectedTask.id
       
       if (isNewTask) {
-        // Create new task - include attachments
+        // Create new task - include attachments and comments
         const response = await fetch("/api/admin/crm/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -746,6 +746,7 @@ export default function SalesCRMPage() {
             owner,
             ...taskForm,
             attachments: taskAttachments,
+            comments: selectedTask.comments || [],
           }),
         })
 
@@ -866,7 +867,13 @@ export default function SalesCRMPage() {
     setSelectedTask(updatedTask)
     setNewComment("")
 
-    // Save to Firestore via API
+    // For NEW tasks (empty ID), don't save to Firestore yet - will be saved when task is created
+    if (!selectedTask.id) {
+      setToast({ message: "Comment added (will be saved with task)", type: "success" })
+      return
+    }
+
+    // Save to Firestore via API for existing tasks
     try {
       const ownerMap: Record<string, string> = {
         "Jake": "jake",
