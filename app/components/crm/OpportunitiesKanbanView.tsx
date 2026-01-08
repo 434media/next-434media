@@ -8,7 +8,8 @@ import {
   ChevronDown, 
   ChevronUp,
   TrendingUp,
-  Plus
+  Plus,
+  Layers
 } from "lucide-react"
 import { 
   formatCurrency, 
@@ -38,7 +39,14 @@ interface KanbanItem {
   dueDate?: string
   assignedTo?: string
   status?: string
+  opportunityId?: string  // For tasks linked to opportunities
   originalData: Client | Task
+}
+
+// Type for grouped/stacked kanban items (opportunity + linked tasks)
+interface StackedKanbanItem {
+  mainItem: KanbanItem  // The opportunity (client)
+  linkedItems: KanbanItem[]  // Tasks linked to this opportunity
 }
 
 interface OpportunitiesKanbanViewProps {
@@ -48,6 +56,7 @@ interface OpportunitiesKanbanViewProps {
   onClientClick: (client: Client) => void
   onTaskClick: (task: Task) => void
   onOpportunityClick?: (client: Client) => void  // New: open opportunity modal instead of client modal
+  onStackedItemsClick?: (opportunity: Client, linkedTasks: Task[]) => void  // New: open both opportunity and linked tasks
   onUpdateClientDisposition?: (clientId: string, disposition: Disposition) => void
   onUpdateTaskDisposition?: (taskId: string, disposition: Disposition) => void
   onAddOpportunity?: () => void
@@ -209,24 +218,61 @@ function PlatformGoalsSummary({
 function KanbanCard({ 
   item, 
   onClick,
-  onDragStart 
+  onDragStart,
+  isStacked = false,
+  stackIndex = 0,
+  isHovered = false
 }: { 
   item: KanbanItem
   onClick: () => void
   onDragStart: (e: React.DragEvent) => void
+  isStacked?: boolean
+  stackIndex?: number
+  isHovered?: boolean
 }) {
   const docLabel = item.doc ? `${item.doc}%` : null
 
+  // Calculate offset for stacked cards
+  const stackOffset = isStacked ? stackIndex * 8 : 0
+  const stackRotation = isStacked ? stackIndex * 2 : 0
+  const hoverOffset = isHovered ? stackIndex * 85 : 0 // Fan out when hovered
+
   return (
-    <div
-      draggable
+    <motion.div
+      draggable={!isStacked || stackIndex === 0}
       onDragStart={onDragStart}
       onClick={onClick}
-      className="group p-3 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all cursor-grab active:cursor-grabbing hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.98]"
+      initial={false}
+      animate={{
+        x: hoverOffset,
+        y: isStacked && !isHovered ? stackOffset : 0,
+        rotate: isStacked && !isHovered ? stackRotation : 0,
+        scale: isStacked && !isHovered ? 1 - (stackIndex * 0.02) : 1,
+      }}
+      transition={{ 
+        type: "spring", 
+        stiffness: 400, 
+        damping: 25 
+      }}
+      className={`group p-3 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:shadow-md transition-colors cursor-grab active:cursor-grabbing ${
+        isStacked && stackIndex > 0 ? "absolute inset-0" : "relative"
+      } ${isStacked && stackIndex > 0 && !isHovered ? "pointer-events-none" : ""}`}
+      style={{
+        zIndex: isStacked ? 10 - stackIndex : 1,
+      }}
     >
       <div className="flex items-start gap-2">
         <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
+          {/* Type badge for linked tasks */}
+          {isStacked && stackIndex > 0 && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700">
+                Linked Task
+              </span>
+            </div>
+          )}
+          
           {/* DOC badge only - no Client/Task type badges */}
           {docLabel && (
             <div className="flex items-center gap-2 mb-1.5">
@@ -277,6 +323,92 @@ function KanbanCard({
           )}
         </div>
       </div>
+    </motion.div>
+  )
+}
+
+// Stacked Kanban Card - shows opportunity with linked tasks behind it
+function StackedKanbanCard({
+  stackedItem,
+  onMainClick,
+  onStackedClick,
+  onDragStart
+}: {
+  stackedItem: StackedKanbanItem
+  onMainClick: (item: KanbanItem) => void
+  onStackedClick: (mainItem: KanbanItem, linkedItems: KanbanItem[]) => void
+  onDragStart: (e: React.DragEvent, item: KanbanItem, linkedItems: KanbanItem[]) => void
+}) {
+  const [isHovered, setIsHovered] = useState(false)
+  const hasLinkedItems = stackedItem.linkedItems.length > 0
+
+  const handleClick = () => {
+    if (hasLinkedItems) {
+      onStackedClick(stackedItem.mainItem, stackedItem.linkedItems)
+    } else {
+      onMainClick(stackedItem.mainItem)
+    }
+  }
+
+  return (
+    <div 
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ 
+        // Add extra space when hovered to accommodate fanned out cards
+        marginBottom: isHovered && hasLinkedItems ? 0 : 0,
+        paddingRight: isHovered && hasLinkedItems ? stackedItem.linkedItems.length * 85 : 0,
+        transition: "padding-right 0.3s ease"
+      }}
+    >
+      {/* Stack indicator badge */}
+      {hasLinkedItems && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="absolute -top-2 -right-2 z-20 flex items-center gap-1 px-2 py-1 bg-purple-600 text-white text-[10px] font-medium rounded-full shadow-lg"
+        >
+          <Layers className="w-3 h-3" />
+          {stackedItem.linkedItems.length + 1}
+        </motion.div>
+      )}
+
+      {/* Render linked items first (they go behind) */}
+      <AnimatePresence>
+        {stackedItem.linkedItems.map((linkedItem, index) => (
+          <KanbanCard
+            key={`${linkedItem.type}-${linkedItem.id}`}
+            item={linkedItem}
+            onClick={() => onMainClick(linkedItem)}
+            onDragStart={(e) => e.preventDefault()}
+            isStacked={true}
+            stackIndex={index + 1}
+            isHovered={isHovered}
+          />
+        ))}
+      </AnimatePresence>
+
+      {/* Main opportunity card (on top) */}
+      <KanbanCard
+        item={stackedItem.mainItem}
+        onClick={handleClick}
+        onDragStart={(e) => onDragStart(e, stackedItem.mainItem, stackedItem.linkedItems)}
+        isStacked={hasLinkedItems}
+        stackIndex={0}
+        isHovered={isHovered}
+      />
+
+      {/* Hover hint */}
+      {hasLinkedItems && !isHovered && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute bottom-1 right-1 text-[10px] text-gray-400 pointer-events-none"
+        >
+          Hover to view linked
+        </motion.div>
+      )}
     </div>
   )
 }
@@ -286,18 +418,20 @@ function KanbanColumn({
   disposition, 
   label, 
   color, 
-  items,
+  stackedItems,
   totalValue,
   onItemClick,
+  onStackedClick,
   onDragOver,
   onDrop 
 }: { 
   disposition: Disposition
   label: string
   color: string
-  items: KanbanItem[]
+  stackedItems: StackedKanbanItem[]
   totalValue: number
   onItemClick: (item: KanbanItem) => void
+  onStackedClick: (mainItem: KanbanItem, linkedItems: KanbanItem[]) => void
   onDragOver: (e: React.DragEvent) => void
   onDrop: (e: React.DragEvent) => void
 }) {
@@ -318,6 +452,12 @@ function KanbanColumn({
     setIsDragOver(false)
     onDrop(e)
   }
+
+  // Count total items including linked ones
+  const totalItemsCount = stackedItems.reduce(
+    (sum, si) => sum + 1 + si.linkedItems.length, 
+    0
+  )
 
   return (
     <div 
@@ -340,7 +480,10 @@ function KanbanColumn({
           />
           <h4 className="text-sm font-semibold text-gray-900">{label}</h4>
           <span className="text-xs font-medium text-gray-500 bg-white/80 px-2 py-0.5 rounded-full">
-            {items.length}
+            {stackedItems.length}
+            {totalItemsCount > stackedItems.length && (
+              <span className="text-purple-500 ml-1">+{totalItemsCount - stackedItems.length}</span>
+            )}
           </span>
         </div>
         {totalValue > 0 && (
@@ -352,22 +495,26 @@ function KanbanColumn({
 
       {/* Cards Container */}
       <div 
-        className="flex-1 p-2 space-y-2 bg-gray-50/50 rounded-b-xl border border-gray-200 border-t-0 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto"
+        className="flex-1 p-2 space-y-3 bg-gray-50/50 rounded-b-xl border border-gray-200 border-t-0 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-visible"
       >
-        {items.length === 0 ? (
+        {stackedItems.length === 0 ? (
           <div className="flex items-center justify-center h-24 border-2 border-dashed border-gray-200 rounded-lg">
             <p className="text-xs text-gray-400">Drop items here</p>
           </div>
         ) : (
-          items.map((item) => (
-            <KanbanCard 
-              key={`${item.type}-${item.id}`}
-              item={item}
-              onClick={() => onItemClick(item)}
-              onDragStart={(e) => {
-                e.dataTransfer.setData("itemId", item.id)
-                e.dataTransfer.setData("itemType", item.type)
-                e.dataTransfer.setData("currentDisposition", item.disposition || "pitched")
+          stackedItems.map((stackedItem) => (
+            <StackedKanbanCard
+              key={`stacked-${stackedItem.mainItem.type}-${stackedItem.mainItem.id}`}
+              stackedItem={stackedItem}
+              onMainClick={onItemClick}
+              onStackedClick={onStackedClick}
+              onDragStart={(e, mainItem, linkedItems) => {
+                // Store all IDs for linked items so they move together
+                const linkedIds = linkedItems.map(li => li.id)
+                e.dataTransfer.setData("itemId", mainItem.id)
+                e.dataTransfer.setData("itemType", mainItem.type)
+                e.dataTransfer.setData("currentDisposition", mainItem.disposition || "pitched")
+                e.dataTransfer.setData("linkedItemIds", JSON.stringify(linkedIds))
               }}
             />
           ))
@@ -384,6 +531,7 @@ export function OpportunitiesKanbanView({
   onClientClick,
   onTaskClick,
   onOpportunityClick,
+  onStackedItemsClick,
   onUpdateClientDisposition,
   onUpdateTaskDisposition,
   onAddOpportunity
@@ -424,6 +572,7 @@ export function OpportunitiesKanbanView({
       dueDate: task.due_date,
       assignedTo: task.assigned_to,
       status: task.status,
+      opportunityId: task.opportunity_id,  // Track which opportunity this task is linked to
       originalData: task
     }))
 
@@ -432,15 +581,54 @@ export function OpportunitiesKanbanView({
 
   const allItems = convertToKanbanItems()
 
-  // Group items by disposition
-  const getItemsByDisposition = (disposition: Disposition): KanbanItem[] => {
-    return allItems.filter(item => (item.disposition || "open") === disposition)
-  }
+  // Group items into stacked items - opportunities with their linked tasks
+  const getStackedItemsByDisposition = useCallback((disposition: Disposition): StackedKanbanItem[] => {
+    const itemsInDisposition = allItems.filter(item => (item.disposition || "pitched") === disposition)
+    
+    // Find all opportunity clients (these are the main cards)
+    const opportunityItems = itemsInDisposition.filter(item => item.type === "client")
+    
+    // Find all tasks that are linked to opportunities
+    const linkedTaskItems = allItems.filter(item => 
+      item.type === "task" && item.opportunityId
+    )
+    
+    // Find standalone tasks (not linked to any opportunity)
+    const standaloneTaskItems = itemsInDisposition.filter(item => 
+      item.type === "task" && !item.opportunityId
+    )
+    
+    // Build stacked items
+    const stacked: StackedKanbanItem[] = []
+    
+    // Process opportunities with their linked tasks
+    opportunityItems.forEach(oppItem => {
+      const linkedTasks = linkedTaskItems.filter(task => task.opportunityId === oppItem.id)
+      stacked.push({
+        mainItem: oppItem,
+        linkedItems: linkedTasks
+      })
+    })
+    
+    // Add standalone tasks as their own stacked items (no linked items)
+    standaloneTaskItems.forEach(taskItem => {
+      stacked.push({
+        mainItem: taskItem,
+        linkedItems: []
+      })
+    })
+    
+    return stacked
+  }, [allItems])
 
-  // Calculate total value for a column
+  // Calculate total value for a column (including linked items)
   const getColumnValue = (disposition: Disposition): number => {
-    return getItemsByDisposition(disposition)
-      .reduce((sum, item) => sum + (item.value || 0), 0)
+    const stackedItems = getStackedItemsByDisposition(disposition)
+    return stackedItems.reduce((sum, si) => {
+      const mainValue = si.mainItem.value || 0
+      const linkedValue = si.linkedItems.reduce((s, li) => s + (li.value || 0), 0)
+      return sum + mainValue + linkedValue
+    }, 0)
   }
 
   // Handle item click - use opportunity modal for clients, task modal for tasks
@@ -457,17 +645,44 @@ export function OpportunitiesKanbanView({
     }
   }
 
-  // Handle drop on column
+  // Handle stacked items click - open both opportunity and linked tasks
+  const handleStackedClick = (mainItem: KanbanItem, linkedItems: KanbanItem[]) => {
+    if (onStackedItemsClick && mainItem.type === "client") {
+      const linkedTasks = linkedItems
+        .filter(li => li.type === "task")
+        .map(li => li.originalData as Task)
+      onStackedItemsClick(mainItem.originalData as Client, linkedTasks)
+    } else {
+      // Fallback to regular click
+      handleItemClick(mainItem)
+    }
+  }
+
+  // Handle drop on column - move opportunity AND linked tasks together
   const handleDrop = async (e: React.DragEvent, targetDisposition: Disposition) => {
     e.preventDefault()
     const itemId = e.dataTransfer.getData("itemId")
     const itemType = e.dataTransfer.getData("itemType") as "client" | "task"
     const currentDisposition = e.dataTransfer.getData("currentDisposition")
+    const linkedItemIdsJson = e.dataTransfer.getData("linkedItemIds")
 
     if (currentDisposition === targetDisposition) return
 
+    // Update the main item
     if (itemType === "client" && onUpdateClientDisposition) {
       onUpdateClientDisposition(itemId, targetDisposition)
+      
+      // Also update all linked tasks to follow the opportunity
+      if (linkedItemIdsJson && onUpdateTaskDisposition) {
+        try {
+          const linkedIds: string[] = JSON.parse(linkedItemIdsJson)
+          linkedIds.forEach(linkedId => {
+            onUpdateTaskDisposition(linkedId, targetDisposition)
+          })
+        } catch (err) {
+          console.error("Error parsing linked item IDs:", err)
+        }
+      }
     } else if (itemType === "task" && onUpdateTaskDisposition) {
       onUpdateTaskDisposition(itemId, targetDisposition)
     }
@@ -507,16 +722,17 @@ export function OpportunitiesKanbanView({
       />
 
       {/* Kanban Board */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 overflow-x-visible">
         {DISPOSITION_OPTIONS.map(({ value, label, color }) => (
           <KanbanColumn
             key={value}
             disposition={value}
             label={label}
             color={color}
-            items={getItemsByDisposition(value)}
+            stackedItems={getStackedItemsByDisposition(value)}
             totalValue={getColumnValue(value)}
             onItemClick={handleItemClick}
+            onStackedClick={handleStackedClick}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDrop(e, value)}
           />

@@ -79,17 +79,52 @@ export function TasksView({
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all")
   const [showCompleted, setShowCompleted] = useState(false)
   
+  // Helper to check if a task is assigned to a specific person (primary OR secondary)
+  const isAssignedTo = (task: Task, assignee: string): boolean => {
+    // Check primary assignee
+    if (task.assigned_to === assignee) return true
+    
+    // Check secondary assignees
+    if (task.secondary_assigned_to) {
+      if (Array.isArray(task.secondary_assigned_to)) {
+        return task.secondary_assigned_to.includes(assignee)
+      } else {
+        return task.secondary_assigned_to === assignee
+      }
+    }
+    
+    return false
+  }
+  
   // Get unique assignees from tasks for the filter dropdown
+  // Include BOTH primary and secondary assignees
   // Normalize names and filter out short names like "jake", "barb", etc.
   const uniqueAssignees = Array.from(
     new Set(
-      tasks
-        .map(t => t.assigned_to)
-        .filter((assignee): assignee is string => 
-          typeof assignee === "string" && assignee.trim() !== ""
-        )
-        .map(normalizeAssigneeName)
-        .filter(name => isValidAssigneeName(name) && name !== "Unassigned")
+      tasks.flatMap(t => {
+        const assignees: string[] = []
+        
+        // Add primary assignee
+        if (t.assigned_to && typeof t.assigned_to === "string" && t.assigned_to.trim() !== "") {
+          assignees.push(normalizeAssigneeName(t.assigned_to))
+        }
+        
+        // Add secondary assignees
+        if (t.secondary_assigned_to) {
+          if (Array.isArray(t.secondary_assigned_to)) {
+            t.secondary_assigned_to.forEach(s => {
+              if (typeof s === "string" && s.trim() !== "") {
+                assignees.push(normalizeAssigneeName(s))
+              }
+            })
+          } else if (typeof t.secondary_assigned_to === "string" && t.secondary_assigned_to.trim() !== "") {
+            assignees.push(normalizeAssigneeName(t.secondary_assigned_to))
+          }
+        }
+        
+        return assignees
+      })
+      .filter(name => isValidAssigneeName(name) && name !== "Unassigned")
     )
   ).sort()
 
@@ -101,12 +136,21 @@ export function TasksView({
     // Hide completed tasks unless showCompleted is true
     if (task.status === "completed" && !showCompleted) return false
     
+    // Search filter - includes secondary assignees
+    const secondaryAssigneesStr = task.secondary_assigned_to 
+      ? (Array.isArray(task.secondary_assigned_to) 
+          ? task.secondary_assigned_to.join(" ") 
+          : task.secondary_assigned_to)
+      : ""
     const matchesSearch = 
       task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.assigned_to?.toLowerCase().includes(searchQuery.toLowerCase())
+      task.assigned_to?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      secondaryAssigneesStr.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesBrand = brandFilter === "all" || task.brand === brandFilter
-    const matchesAssignee = assigneeFilter === "all" || task.assigned_to === assigneeFilter
+    
+    // Assignee filter - check BOTH primary and secondary assignees
+    const matchesAssignee = assigneeFilter === "all" || isAssignedTo(task, assigneeFilter)
     
     // Urgency filter
     const dueDateStatus = getDueDateStatus(task.due_date, task.status)
@@ -128,18 +172,24 @@ export function TasksView({
     // Must be completed and within 60-day window
     if (t.status !== "completed" || !isCompletedTaskVisible(t)) return false
     
-    // Apply assignee filter if set
-    if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false
+    // Apply assignee filter if set - check BOTH primary and secondary
+    if (assigneeFilter !== "all" && !isAssignedTo(t, assigneeFilter)) return false
     
     // Apply brand filter if set
     if (brandFilter !== "all" && t.brand !== brandFilter) return false
     
     // Apply search filter if set
     if (searchQuery) {
+      const secondaryStr = t.secondary_assigned_to 
+        ? (Array.isArray(t.secondary_assigned_to) 
+            ? t.secondary_assigned_to.join(" ") 
+            : t.secondary_assigned_to)
+        : ""
       const matchesSearch = 
         t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.client_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.assigned_to?.toLowerCase().includes(searchQuery.toLowerCase())
+        t.assigned_to?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        secondaryStr.toLowerCase().includes(searchQuery.toLowerCase())
       if (!matchesSearch) return false
     }
     
