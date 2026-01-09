@@ -40,13 +40,15 @@ interface KanbanItem {
   assignedTo?: string
   status?: string
   opportunityId?: string  // For tasks linked to opportunities
+  clientId?: string       // For tasks linked to clients
   originalData: Client | Task
 }
 
-// Type for grouped/stacked kanban items (opportunity + linked tasks)
+// Type for grouped/stacked kanban items (opportunity + linked tasks + linked clients)
 interface StackedKanbanItem {
   mainItem: KanbanItem  // The opportunity (client)
   linkedItems: KanbanItem[]  // Tasks linked to this opportunity
+  linkedClient?: KanbanItem  // Client linked to main item (if main is a task) or linked via task
 }
 
 interface OpportunitiesKanbanViewProps {
@@ -56,7 +58,7 @@ interface OpportunitiesKanbanViewProps {
   onClientClick: (client: Client) => void
   onTaskClick: (task: Task) => void
   onOpportunityClick?: (client: Client) => void  // New: open opportunity modal instead of client modal
-  onStackedItemsClick?: (opportunity: Client, linkedTasks: Task[]) => void  // New: open both opportunity and linked tasks
+  onStackedItemsClick?: (opportunity: Client, linkedTasks: Task[], linkedClient?: Client) => void  // Open opportunity, linked tasks, and optionally linked client
   onUpdateClientDisposition?: (clientId: string, disposition: Disposition) => void
   onUpdateTaskDisposition?: (taskId: string, disposition: Disposition) => void
   onAddOpportunity?: () => void
@@ -221,7 +223,8 @@ function KanbanCard({
   onDragStart,
   isStacked = false,
   stackIndex = 0,
-  isHovered = false
+  isHovered = false,
+  isLinkedClient = false
 }: { 
   item: KanbanItem
   onClick: () => void
@@ -229,6 +232,7 @@ function KanbanCard({
   isStacked?: boolean
   stackIndex?: number
   isHovered?: boolean
+  isLinkedClient?: boolean
 }) {
   const docLabel = item.doc ? `${item.doc}%` : null
 
@@ -256,7 +260,9 @@ function KanbanCard({
       }}
       className={`group p-3 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:shadow-md transition-colors cursor-grab active:cursor-grabbing ${
         isStacked && stackIndex > 0 ? "absolute inset-0" : "relative"
-      } ${isStacked && stackIndex > 0 && !isHovered ? "pointer-events-none" : ""}`}
+      } ${isStacked && stackIndex > 0 && !isHovered ? "pointer-events-none" : ""} ${
+        isLinkedClient ? "ring-2 ring-blue-200" : ""
+      }`}
       style={{
         zIndex: isStacked ? 10 - stackIndex : 1,
       }}
@@ -264,10 +270,19 @@ function KanbanCard({
       <div className="flex items-start gap-2">
         <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          {/* Type badge for linked tasks */}
-          {isStacked && stackIndex > 0 && (
+          {/* Type badge for linked clients */}
+          {isLinkedClient && isStacked && stackIndex > 0 && (
             <div className="flex items-center gap-2 mb-1.5">
               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700">
+                Linked Client
+              </span>
+            </div>
+          )}
+          
+          {/* Type badge for linked tasks (not clients) */}
+          {!isLinkedClient && isStacked && stackIndex > 0 && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700">
                 Linked Task
               </span>
             </div>
@@ -327,7 +342,7 @@ function KanbanCard({
   )
 }
 
-// Stacked Kanban Card - shows opportunity with linked tasks behind it
+// Stacked Kanban Card - shows opportunity with linked tasks and clients behind it
 function StackedKanbanCard({
   stackedItem,
   onMainClick,
@@ -336,15 +351,20 @@ function StackedKanbanCard({
 }: {
   stackedItem: StackedKanbanItem
   onMainClick: (item: KanbanItem) => void
-  onStackedClick: (mainItem: KanbanItem, linkedItems: KanbanItem[]) => void
+  onStackedClick: (mainItem: KanbanItem, linkedItems: KanbanItem[], linkedClient?: KanbanItem) => void
   onDragStart: (e: React.DragEvent, item: KanbanItem, linkedItems: KanbanItem[]) => void
 }) {
   const [isHovered, setIsHovered] = useState(false)
   const hasLinkedItems = stackedItem.linkedItems.length > 0
+  const hasLinkedClient = !!stackedItem.linkedClient
+  const hasAnyLinked = hasLinkedItems || hasLinkedClient
+  
+  // Calculate total linked count (tasks + client if present)
+  const totalLinkedCount = stackedItem.linkedItems.length + (hasLinkedClient ? 1 : 0)
 
   const handleClick = () => {
-    if (hasLinkedItems) {
-      onStackedClick(stackedItem.mainItem, stackedItem.linkedItems)
+    if (hasAnyLinked) {
+      onStackedClick(stackedItem.mainItem, stackedItem.linkedItems, stackedItem.linkedClient)
     } else {
       onMainClick(stackedItem.mainItem)
     }
@@ -357,24 +377,50 @@ function StackedKanbanCard({
       onMouseLeave={() => setIsHovered(false)}
       style={{ 
         // Add extra space when hovered to accommodate fanned out cards
-        marginBottom: isHovered && hasLinkedItems ? 0 : 0,
-        paddingRight: isHovered && hasLinkedItems ? stackedItem.linkedItems.length * 85 : 0,
+        marginBottom: isHovered && hasAnyLinked ? 0 : 0,
+        paddingRight: isHovered && hasAnyLinked ? (totalLinkedCount) * 85 : 0,
         transition: "padding-right 0.3s ease"
       }}
     >
-      {/* Stack indicator badge */}
-      {hasLinkedItems && (
+      {/* Stack indicator badge - purple for tasks, blue-purple gradient when client is also linked */}
+      {hasAnyLinked && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="absolute -top-2 -right-2 z-20 flex items-center gap-1 px-2 py-1 bg-purple-600 text-white text-[10px] font-medium rounded-full shadow-lg"
+          className={`absolute -top-2 -right-2 z-20 flex items-center gap-1 px-2 py-1 text-white text-[10px] font-medium rounded-full shadow-lg ${
+            hasLinkedClient && hasLinkedItems 
+              ? 'bg-gradient-to-r from-blue-600 to-purple-600' 
+              : hasLinkedClient 
+                ? 'bg-blue-600' 
+                : 'bg-purple-600'
+          }`}
         >
           <Layers className="w-3 h-3" />
-          {stackedItem.linkedItems.length + 1}
+          {totalLinkedCount + 1}
         </motion.div>
       )}
 
-      {/* Render linked items first (they go behind) */}
+      {/* Render linked client first if present (furthest behind) */}
+      <AnimatePresence>
+        {stackedItem.linkedClient && (
+          <KanbanCard
+            key={`client-${stackedItem.linkedClient.id}`}
+            item={{
+              ...stackedItem.linkedClient,
+              // Override to show "Linked Client" badge
+              type: "client" as const
+            }}
+            onClick={() => onMainClick(stackedItem.linkedClient!)}
+            onDragStart={(e) => e.preventDefault()}
+            isStacked={true}
+            stackIndex={stackedItem.linkedItems.length + 1}
+            isHovered={isHovered}
+            isLinkedClient={true}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Render linked task items (they go behind main card) */}
       <AnimatePresence>
         {stackedItem.linkedItems.map((linkedItem, index) => (
           <KanbanCard
@@ -394,13 +440,13 @@ function StackedKanbanCard({
         item={stackedItem.mainItem}
         onClick={handleClick}
         onDragStart={(e) => onDragStart(e, stackedItem.mainItem, stackedItem.linkedItems)}
-        isStacked={hasLinkedItems}
+        isStacked={hasAnyLinked}
         stackIndex={0}
         isHovered={isHovered}
       />
 
       {/* Hover hint */}
-      {hasLinkedItems && !isHovered && (
+      {hasAnyLinked && !isHovered && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -431,7 +477,7 @@ function KanbanColumn({
   stackedItems: StackedKanbanItem[]
   totalValue: number
   onItemClick: (item: KanbanItem) => void
-  onStackedClick: (mainItem: KanbanItem, linkedItems: KanbanItem[]) => void
+  onStackedClick: (mainItem: KanbanItem, linkedItems: KanbanItem[], linkedClient?: KanbanItem) => void
   onDragOver: (e: React.DragEvent) => void
   onDrop: (e: React.DragEvent) => void
 }) {
@@ -453,9 +499,9 @@ function KanbanColumn({
     onDrop(e)
   }
 
-  // Count total items including linked ones
+  // Count total items including linked ones and linked clients
   const totalItemsCount = stackedItems.reduce(
-    (sum, si) => sum + 1 + si.linkedItems.length, 
+    (sum, si) => sum + 1 + si.linkedItems.length + (si.linkedClient ? 1 : 0), 
     0
   )
 
@@ -573,6 +619,7 @@ export function OpportunitiesKanbanView({
       assignedTo: task.assigned_to,
       status: task.status,
       opportunityId: task.opportunity_id,  // Track which opportunity this task is linked to
+      clientId: task.client_id,            // Track which client this task is linked to
       originalData: task
     }))
 
@@ -581,7 +628,7 @@ export function OpportunitiesKanbanView({
 
   const allItems = convertToKanbanItems()
 
-  // Group items into stacked items - opportunities with their linked tasks
+  // Group items into stacked items - opportunities with their linked tasks and clients
   const getStackedItemsByDisposition = useCallback((disposition: Disposition): StackedKanbanItem[] => {
     const itemsInDisposition = allItems.filter(item => (item.disposition || "pitched") === disposition)
     
@@ -598,28 +645,60 @@ export function OpportunitiesKanbanView({
       item.type === "task" && !item.opportunityId
     )
     
-    // Build stacked items
-    const stacked: StackedKanbanItem[] = []
-    
-    // Process opportunities with their linked tasks
-    opportunityItems.forEach(oppItem => {
-      const linkedTasks = linkedTaskItems.filter(task => task.opportunityId === oppItem.id)
-      stacked.push({
-        mainItem: oppItem,
-        linkedItems: linkedTasks
+    // Create a lookup for all clients (including non-opportunities) to find linked clients
+    const clientLookup = new Map<string, KanbanItem>()
+    clients.forEach(client => {
+      clientLookup.set(client.id, {
+        id: client.id,
+        type: "client" as const,
+        name: client.company_name || client.name,
+        companyName: undefined,
+        brand: client.brand,
+        value: client.pitch_value,
+        disposition: client.disposition || "pitched",
+        doc: client.doc,
+        dueDate: client.next_followup_date,
+        assignedTo: client.assigned_to,
+        status: client.status,
+        originalData: client
       })
     })
     
-    // Add standalone tasks as their own stacked items (no linked items)
+    // Build stacked items
+    const stacked: StackedKanbanItem[] = []
+    
+    // Process opportunities with their linked tasks and clients
+    opportunityItems.forEach(oppItem => {
+      const linkedTasks = linkedTaskItems.filter(task => task.opportunityId === oppItem.id)
+      
+      // Check if any linked task has a client linked to it
+      let linkedClient: KanbanItem | undefined
+      for (const task of linkedTasks) {
+        if (task.clientId && clientLookup.has(task.clientId)) {
+          linkedClient = clientLookup.get(task.clientId)
+          break
+        }
+      }
+      
+      stacked.push({
+        mainItem: oppItem,
+        linkedItems: linkedTasks,
+        linkedClient
+      })
+    })
+    
+    // Add standalone tasks as their own stacked items (may have linked client)
     standaloneTaskItems.forEach(taskItem => {
+      const linkedClient = taskItem.clientId ? clientLookup.get(taskItem.clientId) : undefined
       stacked.push({
         mainItem: taskItem,
-        linkedItems: []
+        linkedItems: [],
+        linkedClient
       })
     })
     
     return stacked
-  }, [allItems])
+  }, [allItems, clients])
 
   // Calculate total value for a column (including linked items)
   const getColumnValue = (disposition: Disposition): number => {
@@ -645,13 +724,14 @@ export function OpportunitiesKanbanView({
     }
   }
 
-  // Handle stacked items click - open both opportunity and linked tasks
-  const handleStackedClick = (mainItem: KanbanItem, linkedItems: KanbanItem[]) => {
+  // Handle stacked items click - open opportunity, linked tasks, and linked client
+  const handleStackedClick = (mainItem: KanbanItem, linkedItems: KanbanItem[], linkedClient?: KanbanItem) => {
     if (onStackedItemsClick && mainItem.type === "client") {
       const linkedTasks = linkedItems
         .filter(li => li.type === "task")
         .map(li => li.originalData as Task)
-      onStackedItemsClick(mainItem.originalData as Client, linkedTasks)
+      const client = linkedClient ? linkedClient.originalData as Client : undefined
+      onStackedItemsClick(mainItem.originalData as Client, linkedTasks, client)
     } else {
       // Fallback to regular click
       handleItemClick(mainItem)

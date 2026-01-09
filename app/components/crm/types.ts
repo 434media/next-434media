@@ -269,10 +269,13 @@ export const STATUS_COLORS: Record<string, string> = {
 export const TASK_STATUS_COLORS: Record<string, string> = {
   not_started: "bg-gray-100 text-gray-600",
   in_progress: "bg-blue-100 text-blue-700",
+  to_do: "bg-amber-100 text-amber-700",
+  ready_for_review: "bg-purple-100 text-purple-700",
+  completed: "bg-emerald-100 text-emerald-700",
+  // Legacy statuses for backwards compatibility
   pending_review: "bg-purple-100 text-purple-700",
   on_hold: "bg-amber-100 text-amber-700",
   blocked: "bg-red-100 text-red-700",
-  completed: "bg-emerald-100 text-emerald-700",
   deferred: "bg-amber-100 text-amber-700",
 }
 

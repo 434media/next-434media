@@ -764,8 +764,9 @@ export async function getAllTasks(): Promise<Task[]> {
         tags.push(category)
       }
       
-      // Extract client name from production_name
-      const clientName = productionName || (rawItem.client_name as string) || undefined
+      // Extract client info - check direct client fields first, then fallback to production_name
+      const clientId = (rawItem.client_id as string) || undefined
+      const clientName = (rawItem.client_name as string) || productionName || undefined
       
       // Extract comments from master list item
       const comments = rawItem.comments as Task["comments"] | undefined
@@ -788,6 +789,7 @@ export async function getAllTasks(): Promise<Task[]> {
         status: mapMasterListStatusToTaskStatus(rawStatus) as Task["status"],
         priority: (item.priority || "medium") as Task["priority"],
         due_date: dueDate,
+        client_id: clientId,
         client_name: clientName,
         tags,
         created_at: item.created_at,
@@ -850,18 +852,28 @@ function mapMasterListStatusToTaskStatus(status: string): string {
     "finished": "completed",
     "closed": "completed",
     
-    // Blocked
-    "blocked": "blocked",
-    "stuck": "blocked",
-    "waiting": "blocked",
+    // To Do
+    "to do": "to_do",
+    "to_do": "to_do",
+    "todo": "to_do",
     
-    // Deferred
-    "on hold": "deferred",
-    "on_hold": "deferred",
-    "onhold": "deferred",
-    "deferred": "deferred",
-    "postponed": "deferred",
-    "paused": "deferred",
+    // Ready for Review
+    "ready for review": "ready_for_review",
+    "ready_for_review": "ready_for_review",
+    "review": "ready_for_review",
+    "pending review": "ready_for_review",
+    "pending_review": "ready_for_review",
+    
+    // Legacy mappings - convert to new statuses
+    "blocked": "not_started",
+    "stuck": "not_started",
+    "waiting": "not_started",
+    "on hold": "not_started",
+    "on_hold": "not_started",
+    "onhold": "not_started",
+    "deferred": "not_started",
+    "postponed": "not_started",
+    "paused": "not_started",
   }
   
   return statusMap[normalizedStatus] || "not_started"

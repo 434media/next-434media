@@ -24,7 +24,9 @@ import {
   ChevronDown,
   Pencil,
   Settings,
-  Target
+  Target,
+  Search,
+  Building2
 } from "lucide-react"
 import { 
   BRANDS, 
@@ -139,6 +141,16 @@ export function TaskModal({
   const [editMemberName, setEditMemberName] = useState("")
   const [editMemberEmail, setEditMemberEmail] = useState("")
   const [isSavingMember, setIsSavingMember] = useState(false)
+  
+  // State for client dropdown
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const [clientSearchQuery, setClientSearchQuery] = useState("")
+
+  // Filter clients based on search query
+  const filteredClients = clients.filter((client) => {
+    const name = client.company_name || client.name || ''
+    return name.toLowerCase().includes(clientSearchQuery.toLowerCase())
+  })
 
   // Fetch team members from Firestore
   const fetchTeamMembers = useCallback(async () => {
@@ -396,9 +408,8 @@ export function TaskModal({
                     >
                       <option value="not_started">Not Started</option>
                       <option value="in_progress">In Progress</option>
-                      <option value="pending_review">Pending Review</option>
-                      <option value="on_hold">On Hold</option>
-                      <option value="blocked">Blocked</option>
+                      <option value="to_do">To Do</option>
+                      <option value="ready_for_review">Ready for Review</option>
                       <option value="completed">Completed</option>
                     </select>
                   </div>
@@ -417,14 +428,130 @@ export function TaskModal({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label>
-                  <input
-                    type="date"
-                    value={formData.due_date}
-                    onChange={(e) => onFormChange({ ...formData, due_date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label>
+                    <input
+                      type="date"
+                      value={formData.due_date}
+                      onChange={(e) => onFormChange({ ...formData, due_date: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowClientDropdown(!showClientDropdown)
+                          setClientSearchQuery("")
+                        }}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                      >
+                        <span className={formData.client_id ? "text-gray-900 truncate" : "text-gray-400"}>
+                          {formData.client_name || "No client"}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showClientDropdown ? "rotate-180" : ""}`} />
+                      </button>
+                      
+                      {/* Client Dropdown menu */}
+                      <AnimatePresence>
+                        {showClientDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                          >
+                            {/* Search input */}
+                            <div className="p-2 border-b border-gray-100">
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                  type="text"
+                                  value={clientSearchQuery}
+                                  onChange={(e) => setClientSearchQuery(e.target.value)}
+                                  placeholder="Search clients..."
+                                  className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500 focus:bg-white"
+                                  autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="max-h-48 overflow-y-auto">
+                              {/* No client option */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onFormChange({ ...formData, client_id: "", client_name: "" })
+                                  setShowClientDropdown(false)
+                                  setClientSearchQuery("")
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                              >
+                                <span className="text-gray-500">No client</span>
+                                {!formData.client_id && <Check className="w-4 h-4 text-blue-600" />}
+                              </button>
+                              
+                              <div className="border-t border-gray-100" />
+                              
+                              {/* Filtered clients */}
+                              {filteredClients.length === 0 ? (
+                                <div className="px-3 py-4 text-center text-sm text-gray-500">
+                                  {clientSearchQuery ? "No clients found" : "No clients available"}
+                                </div>
+                              ) : (
+                                <>
+                                  {filteredClients.slice(0, 50).map((client) => {
+                                    const clientName = client.company_name || client.name || 'Unnamed Client'
+                                    return (
+                                      <button
+                                        key={client.id}
+                                        type="button"
+                                        onClick={() => {
+                                          onFormChange({ 
+                                            ...formData, 
+                                            client_id: client.id,
+                                            client_name: clientName
+                                          })
+                                          setShowClientDropdown(false)
+                                          setClientSearchQuery("")
+                                        }}
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                          <span className="text-gray-900 truncate">{clientName}</span>
+                                        </div>
+                                        {formData.client_id === client.id && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                                      </button>
+                                    )
+                                  })}
+                                  {filteredClients.length > 50 && (
+                                    <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50">
+                                      Showing 50 of {filteredClients.length} clients. Type to search for more.
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      
+                      {showClientDropdown && (
+                        <div
+                          className="fixed inset-0 z-20"
+                          onClick={() => {
+                            setShowClientDropdown(false)
+                            setClientSearchQuery("")
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Assignment Section */}
@@ -1029,33 +1156,6 @@ export function TaskModal({
                 <p className="text-xs text-gray-500 mt-2">
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
-              </div>
-
-              {/* Client Link Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  <Users className="w-4 h-4 inline mr-2" />
-                  Link to Contact
-                </label>
-                <select
-                  value={formData.client_id}
-                  onChange={(e) => {
-                    const selectedClient = clients.find(c => c.id === e.target.value)
-                    onFormChange({ 
-                      ...formData, 
-                      client_id: e.target.value,
-                      client_name: selectedClient?.company_name || selectedClient?.name || ""
-                    })
-                  }}
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                >
-                  <option value="">Select a contact...</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.company_name || client.name || 'Unnamed Contact'}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* Opportunity Link Section */}

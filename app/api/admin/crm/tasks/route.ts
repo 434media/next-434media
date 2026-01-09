@@ -249,8 +249,9 @@ export async function PUT(request: NextRequest) {
         const statusMap: Record<string, string> = {
           not_started: "To Do",
           in_progress: "In Progress", 
+          to_do: "To Do",
+          ready_for_review: "Ready for Review",
           completed: "Complete",
-          blocked: "Blocked",
         }
         masterListUpdates.task_status = statusMap[taskUpdates.status as string] || taskUpdates.status
       }
@@ -291,6 +292,13 @@ export async function PUT(request: NextRequest) {
       // Handle tagged users - store directly on master list item
       if (taskUpdates.tagged_users !== undefined) {
         masterListUpdates.tagged_users = taskUpdates.tagged_users
+      }
+      // Handle client fields - store directly on master list item
+      if (taskUpdates.client_id !== undefined) {
+        masterListUpdates.client_id = taskUpdates.client_id
+      }
+      if (taskUpdates.client_name !== undefined) {
+        masterListUpdates.client_name = taskUpdates.client_name
       }
       
       return masterListUpdates

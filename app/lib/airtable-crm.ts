@@ -511,16 +511,24 @@ function normalizeTaskStatus(value: unknown): string {
   const status = String(value || "").toLowerCase().replace(/\s+/g, "_")
   const statusMap: Record<string, string> = {
     not_started: "not_started",
-    "not started": "not_started",
-    todo: "not_started",
+    "not_started": "not_started",
+    todo: "to_do",
+    to_do: "to_do",
+    "to_do": "to_do",
     in_progress: "in_progress",
-    "in progress": "in_progress",
+    "in_progress": "in_progress",
     working: "in_progress",
+    ready_for_review: "ready_for_review",
+    "ready_for_review": "ready_for_review",
+    review: "ready_for_review",
+    pending_review: "ready_for_review",
     completed: "completed",
     done: "completed",
-    blocked: "blocked",
-    deferred: "deferred",
-    "on hold": "deferred",
+    // Legacy status conversions
+    blocked: "not_started",
+    deferred: "not_started",
+    on_hold: "not_started",
+    "on_hold": "not_started",
   }
   return statusMap[status] || "not_started"
 }
