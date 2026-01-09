@@ -1153,23 +1153,57 @@ export default function SalesCRMPage() {
     console.log("Client ID:", clientId)
     console.log("New Disposition:", disposition)
     
+    // Automatically set DOC to 100% when moving to Closed Won
+    // This ensures the opportunity is counted in Remaining and Pacing calculations
+    const shouldAutoSetDoc = disposition === "closed_won"
+    const docValue = shouldAutoSetDoc ? "100" as DOC : undefined
+    
+    if (shouldAutoSetDoc) {
+      console.log("Auto-setting DOC to 100% for Closed Won opportunity")
+    }
+    
     try {
+      // Build the update payload - include DOC if moving to closed_won
+      const updatePayload: { id: string; disposition: Disposition; doc?: DOC } = { 
+        id: clientId, 
+        disposition 
+      }
+      if (docValue) {
+        updatePayload.doc = docValue
+      }
+      
       const response = await fetch("/api/admin/crm/clients", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: clientId, disposition }),
+        body: JSON.stringify(updatePayload),
       })
 
       if (!response.ok) throw new Error("Failed to update client")
 
       console.log("Disposition updated successfully")
+      if (shouldAutoSetDoc) {
+        console.log("DOC automatically set to 100%")
+      }
       
-      // Optimistically update the local state
+      // Optimistically update the local state (include DOC if set)
       setClients(prevClients => 
-        prevClients.map(c => c.id === clientId ? { ...c, disposition } : c)
+        prevClients.map(c => {
+          if (c.id === clientId) {
+            const updates: Partial<Client> = { disposition }
+            if (docValue) {
+              updates.doc = docValue
+            }
+            return { ...c, ...updates }
+          }
+          return c
+        })
       )
-      setToast({ message: "Client moved", type: "success" })
+      
+      const successMessage = shouldAutoSetDoc 
+        ? "Opportunity moved to Closed Won (DOC set to 100%)" 
+        : "Client moved"
+      setToast({ message: successMessage, type: "success" })
     } catch (err) {
       setToast({ message: "Failed to move client", type: "error" })
     }
@@ -1197,21 +1231,48 @@ export default function SalesCRMPage() {
     }
     const owner = ownerMap[task.assigned_to] || "teams"
 
+    // Automatically set DOC to 100% when moving to Closed Won (for opportunity tasks)
+    const shouldAutoSetDoc = disposition === "closed_won" && task.is_opportunity
+    const docValue = shouldAutoSetDoc ? "100" as DOC : undefined
+
     try {
+      // Build update payload - include DOC if moving opportunity to closed_won
+      const updatePayload: { id: string; owner: string; disposition: Disposition; doc?: DOC } = { 
+        id: taskId, 
+        owner, 
+        disposition 
+      }
+      if (docValue) {
+        updatePayload.doc = docValue
+      }
+      
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: taskId, owner, disposition }),
+        body: JSON.stringify(updatePayload),
       })
 
       if (!response.ok) throw new Error("Failed to update task")
 
-      // Optimistically update the local state
+      // Optimistically update the local state (include DOC if set)
       setTasks(prevTasks => 
-        prevTasks.map(t => t.id === taskId ? { ...t, disposition } : t)
+        prevTasks.map(t => {
+          if (t.id === taskId) {
+            const updates: Partial<Task> = { disposition }
+            if (docValue) {
+              updates.doc = docValue
+            }
+            return { ...t, ...updates }
+          }
+          return t
+        })
       )
-      setToast({ message: "Task moved", type: "success" })
+      
+      const successMessage = shouldAutoSetDoc 
+        ? "Opportunity moved to Closed Won (DOC set to 100%)" 
+        : "Task moved"
+      setToast({ message: successMessage, type: "success" })
     } catch (err) {
       setToast({ message: "Failed to move task", type: "error" })
     }
