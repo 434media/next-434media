@@ -110,9 +110,13 @@ export interface ClientRecord extends BaseRecord {
   source?: string
   is_opportunity?: boolean
   disposition?: "open" | "pitched" | "closed_won" | "closed_lost"
-  doc?: "25" | "50" | "75" | "90"
+  doc?: "25" | "50" | "75" | "90" | "100"
   web_links?: string[]  // Array of URLs for opportunities
   docs?: string[]  // Array of document URLs for opportunities
+  
+  // Archive fields (for closed opportunities)
+  is_archived?: boolean  // Whether this opportunity is archived
+  archived_at?: string  // Date when the opportunity was archived
   
   // Linked records
   opportunity_ids?: string[]

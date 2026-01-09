@@ -21,6 +21,7 @@ import {
   isValidAssigneeName,
   TEAM_MEMBERS
 } from "./types"
+import { ArchivedOpportunitiesSection } from "./ArchivedOpportunitiesSection"
 import type { 
   Client, 
   Task, 
@@ -66,6 +67,9 @@ interface OpportunitiesKanbanViewProps {
   onUpdateClientDisposition?: (clientId: string, disposition: Disposition) => void
   onUpdateTaskDisposition?: (taskId: string, disposition: Disposition) => void
   onAddOpportunity?: () => void
+  onArchiveOpportunity?: (clientId: string) => void  // Archive an opportunity
+  onRestoreOpportunity?: (clientId: string) => void  // Restore an archived opportunity
+  currentUserName?: string  // Current logged-in user's name for default filters
 }
 
 // Helper to check if a brand matches a goal (supports combined brands like 434 Media + Digital Canvas)
@@ -558,13 +562,18 @@ export function OpportunitiesKanbanView({
   onStackedItemsClick,
   onUpdateClientDisposition,
   onUpdateTaskDisposition,
-  onAddOpportunity
+  onAddOpportunity,
+  onArchiveOpportunity,
+  onRestoreOpportunity,
+  currentUserName
 }: OpportunitiesKanbanViewProps) {
   const [showGoals, setShowGoals] = useState(false)
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: "client" | "task" } | null>(null)
 
-  // Filter only opportunity items
-  const opportunityClients = clients.filter(c => c.is_opportunity)
+  // Filter only opportunity items - separate active from archived
+  const allOpportunityClients = clients.filter(c => c.is_opportunity)
+  const opportunityClients = allOpportunityClients.filter(c => !c.is_archived)
+  const archivedOpportunities = allOpportunityClients.filter(c => c.is_archived)
   const opportunityTasks = tasks.filter(t => t.is_opportunity)
   
   // Get unique assignees from opportunities for the filter dropdown
@@ -817,6 +826,16 @@ export function OpportunitiesKanbanView({
             Mark clients or tasks as "Opportunity" to track them in this pipeline view
           </p>
         </div>
+      )}
+
+      {/* Archived Opportunities Section */}
+      {onRestoreOpportunity && (
+        <ArchivedOpportunitiesSection
+          archivedOpportunities={archivedOpportunities}
+          onRestoreOpportunity={onRestoreOpportunity}
+          onOpportunityClick={onOpportunityClick}
+          currentUserName={currentUserName}
+        />
       )}
     </div>
   )

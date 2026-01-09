@@ -106,6 +106,8 @@ export interface Client {
   title?: string  // Opportunity title
   web_links?: string[]  // Web links related to this opportunity
   docs?: string[]  // Document URLs (external or uploaded)
+  is_archived?: boolean  // Whether this opportunity is archived (for closed won/lost older than 60 days)
+  archived_at?: string  // Date when the opportunity was archived
   created_at: string
   updated_at: string
 }
@@ -157,7 +159,7 @@ export const MEDIA_434_BRANDS: Brand[] = ["434 Media", "Digital Canvas"]
 export const BRAND_GOALS: BrandGoal[] = [
   { brand: "TXMX Boxing", annualGoal: 1000000, color: "#000000", description: "Sports & Entertainment" },
   { brand: "Vemos Vamos", annualGoal: 250000, color: "#fc0000", description: "Bilingual Studio & Agency" },
-  { brand: "DEVSA TV", annualGoal: 250000, color: "#0008ff", description: "Documentary & Video Production" },
+  { brand: "DEVSA TV", annualGoal: 250000, color: "#c454f0", description: "Documentary & Video Production" },
   { 
     brand: "434 Media", 
     annualGoal: 250000, 

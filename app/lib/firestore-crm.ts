@@ -333,6 +333,9 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     doc: (rawData.doc || undefined) as ClientRecord["doc"],
     web_links: (rawData.web_links || []) as string[],
     docs: (rawData.docs || []) as string[],
+    // Archive fields
+    is_archived: (rawData.is_archived || false) as boolean,
+    archived_at: (rawData.archived_at || undefined) as string | undefined,
     // Tags
     tags: (rawData.tags || []) as string[],
     // Timestamps

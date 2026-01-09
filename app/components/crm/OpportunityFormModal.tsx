@@ -25,7 +25,8 @@ import {
   Link2,
   FileText,
   Upload,
-  ExternalLink
+  ExternalLink,
+  Archive
 } from "lucide-react"
 import { TEAM_MEMBERS, BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
 import type { Brand, TeamMember, Disposition, DOC, Client } from "./types"
@@ -73,6 +74,7 @@ interface OpportunityFormModalProps {
   onFormChange: (data: OpportunityFormData) => void
   onSave: () => void
   onClose: () => void
+  onArchive?: () => void  // Archive the opportunity (only shown for closed won/lost when editing)
 }
 
 // Generate unique ID for new contacts
@@ -89,6 +91,7 @@ export function OpportunityFormModal({
   onFormChange,
   onSave,
   onClose,
+  onArchive,
 }: OpportunityFormModalProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
@@ -1482,30 +1485,48 @@ export function OpportunityFormModal({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-3 p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onSave}
-                disabled={isSaving || !formData.company_name || !formData.brand}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-sky-700 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {isEditing ? "Saving..." : "Creating..."}
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    {isEditing ? "Save Changes" : "Create Opportunity"}
-                  </>
+            <div className="flex justify-between gap-3 p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
+              {/* Left side - Archive button (only for closed opportunities when editing) */}
+              <div>
+                {isEditing && onArchive && (formData.disposition === "closed_won" || formData.disposition === "closed_lost") && (
+                  <button
+                    onClick={onArchive}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                    title="Archive this opportunity"
+                  >
+                    <Archive className="w-4 h-4" />
+                    Archive
+                  </button>
                 )}
-              </button>
+              </div>
+
+              {/* Right side - Cancel and Save */}
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onSave}
+                  disabled={isSaving || !formData.company_name || !formData.brand}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-sky-700 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {isEditing ? "Saving..." : "Creating..."}
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      {isEditing ? "Save Changes" : "Create Opportunity"}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

@@ -270,7 +270,49 @@ export default function SalesCRMPage() {
         pitch_value: c.pitch_value,
       })))
       
-      setClients(allClients)
+      // Auto-archive opportunities that are closed (won/lost) and older than 60 days
+      const ARCHIVE_AFTER_DAYS = 60
+      const archiveThreshold = new Date()
+      archiveThreshold.setDate(archiveThreshold.getDate() - ARCHIVE_AFTER_DAYS)
+      
+      const opportunitiesToArchive = allClients.filter((c: Client) => 
+        c.is_opportunity &&
+        !c.is_archived &&
+        (c.disposition === "closed_won" || c.disposition === "closed_lost") &&
+        c.updated_at &&
+        new Date(c.updated_at) < archiveThreshold
+      )
+      
+      // Auto-archive in background (don't block UI)
+      if (opportunitiesToArchive.length > 0) {
+        console.log(`Auto-archiving ${opportunitiesToArchive.length} opportunities older than ${ARCHIVE_AFTER_DAYS} days`)
+        
+        // Archive each opportunity (fire and forget - don't await)
+        opportunitiesToArchive.forEach((opp: Client) => {
+          fetch("/api/admin/crm/clients", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              id: opp.id,
+              is_archived: true,
+              archived_at: new Date().toISOString(),
+            }),
+          }).catch(err => console.error("Failed to auto-archive opportunity:", err))
+        })
+        
+        // Update local state immediately to show archived opportunities
+        const archivedIds = new Set(opportunitiesToArchive.map((o: Client) => o.id))
+        const updatedClients = allClients.map((c: Client) =>
+          archivedIds.has(c.id)
+            ? { ...c, is_archived: true, archived_at: new Date().toISOString() }
+            : c
+        )
+        setClients(updatedClients)
+      } else {
+        setClients(allClients)
+      }
+      
       setIsClientsLoaded(true)
     } catch (err) {
       setToast({ message: "Failed to load clients", type: "error" })
@@ -1147,6 +1189,70 @@ export default function SalesCRMPage() {
     }
   }
 
+  // Archive an opportunity (move to archived section)
+  const handleArchiveOpportunity = async (clientId: string) => {
+    try {
+      const response = await fetch("/api/admin/crm/clients", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id: clientId,
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to archive opportunity")
+
+      // Optimistically update local state
+      setClients(prevClients =>
+        prevClients.map(c =>
+          c.id === clientId
+            ? { ...c, is_archived: true, archived_at: new Date().toISOString() }
+            : c
+        )
+      )
+
+      setToast({ message: "Opportunity archived", type: "success" })
+      setShowOpportunityForm(false)
+      setIsEditingOpportunity(false)
+    } catch (err) {
+      setToast({ message: "Failed to archive opportunity", type: "error" })
+    }
+  }
+
+  // Restore an archived opportunity (move back to active kanban)
+  const handleRestoreOpportunity = async (clientId: string) => {
+    try {
+      const response = await fetch("/api/admin/crm/clients", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id: clientId,
+          is_archived: false,
+          archived_at: null,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to restore opportunity")
+
+      // Optimistically update local state
+      setClients(prevClients =>
+        prevClients.map(c =>
+          c.id === clientId
+            ? { ...c, is_archived: false, archived_at: undefined }
+            : c
+        )
+      )
+
+      setToast({ message: "Opportunity restored to active pipeline", type: "success" })
+    } catch (err) {
+      setToast({ message: "Failed to restore opportunity", type: "error" })
+    }
+  }
+
   // Update client disposition via drag-and-drop in Kanban
   const handleUpdateClientDisposition = async (clientId: string, disposition: Disposition) => {
     console.log("=== Updating Client Disposition ===")
@@ -1549,6 +1655,8 @@ export default function SalesCRMPage() {
             onTaskClick={openTaskModal}
             onUpdateClientDisposition={handleUpdateClientDisposition}
             onUpdateTaskDisposition={handleUpdateTaskDisposition}
+            onRestoreOpportunity={handleRestoreOpportunity}
+            currentUserName={opportunityAssigneeFilter !== "all" ? opportunityAssigneeFilter : undefined}
             onAddOpportunity={() => {
               // Reset the opportunity form and show modal for NEW opportunity
               setIsEditingOpportunity(false)
@@ -1637,6 +1745,7 @@ export default function SalesCRMPage() {
           setShowOpportunityForm(false)
           setIsEditingOpportunity(false)
         }}
+        onArchive={opportunityForm.existing_company_id ? () => handleArchiveOpportunity(opportunityForm.existing_company_id!) : undefined}
       />
 
       {/* Task Modal */}
