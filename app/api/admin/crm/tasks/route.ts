@@ -259,9 +259,11 @@ export async function PUT(request: NextRequest) {
       if (taskUpdates.notes !== undefined) masterListUpdates.notes = taskUpdates.notes
       if (taskUpdates.tags !== undefined) masterListUpdates.tags = taskUpdates.tags
       if (taskUpdates.web_links !== undefined) {
+        // Store as both 'links' (legacy format) and 'web_links' (new format)
         masterListUpdates.links = Array.isArray(taskUpdates.web_links) 
           ? (taskUpdates.web_links as string[]).join("\n") 
           : taskUpdates.web_links
+        masterListUpdates.web_links = taskUpdates.web_links
       }
       if (taskUpdates.assigned_to !== undefined) {
         masterListUpdates.assignee = [{ name: taskUpdates.assigned_to }]

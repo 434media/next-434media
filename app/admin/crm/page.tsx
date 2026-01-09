@@ -60,6 +60,7 @@ export default function SalesCRMPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [brandFilter, setBrandFilter] = useState<string>("all")
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
+  const [opportunityAssigneeFilter, setOpportunityAssigneeFilter] = useState<string>("all")
   const [clientAssigneeFilter, setClientAssigneeFilter] = useState<string>("all")
   const [clientSourceFilter, setClientSourceFilter] = useState<string>("all")
   
@@ -220,6 +221,7 @@ export default function SalesCRMPage() {
       const matchedName = emailToNameMap[currentUser.email.toLowerCase()]
       if (matchedName) {
         setAssigneeFilter(matchedName)
+        setOpportunityAssigneeFilter(matchedName)
         setClientAssigneeFilter(matchedName)
       }
     }
@@ -1356,16 +1358,16 @@ export default function SalesCRMPage() {
     setShowOpportunityForm(true)
   }
 
-  // Handler for stacked kanban cards - opens opportunity AND shows linked tasks panel and linked client
-  const handleStackedItemsClick = (opportunity: Client, linkedTasksList: Task[], linkedClient?: Client) => {
+  // Handler for stacked kanban cards - opens opportunity AND shows linked tasks panel
+  const handleStackedItemsClick = (opportunity: Client, linkedTasksList: Task[]) => {
     // First, open the opportunity modal
     handleEditOpportunity(opportunity)
     
-    // Show the linked tasks panel if there are linked tasks or a linked client
-    if (linkedTasksList.length > 0 || linkedClient) {
+    // Show the linked tasks panel if there are linked tasks
+    if (linkedTasksList.length > 0) {
       setCurrentOpportunityForLinked(opportunity)
       setLinkedTasks(linkedTasksList)
-      setLinkedClientForPanel(linkedClient || null)
+      setLinkedClientForPanel(null)
       setShowLinkedTasksPanel(true)
     }
   }
@@ -1474,6 +1476,8 @@ export default function SalesCRMPage() {
           <OpportunitiesKanbanView 
             clients={clients}
             tasks={tasks}
+            assigneeFilter={opportunityAssigneeFilter}
+            onAssigneeFilterChange={setOpportunityAssigneeFilter}
             onRefresh={() => {
               loadClients()
               loadTasks()

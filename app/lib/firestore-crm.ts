@@ -732,13 +732,19 @@ export async function getAllTasks(): Promise<Task[]> {
       // Extract description - check description field first, fallback to notes for backwards compatibility
       const description = (rawItem.description as string) || (rawItem.notes as string) || ""
       
-      // Extract web links - could be a string or undefined
-      const links = rawItem.links as string | undefined
-      const webLinks: string[] = []
-      if (links && typeof links === "string") {
-        // Split by newlines or commas if multiple links
-        const linkParts = links.split(/[\n,]/).map(l => l.trim()).filter(Boolean)
-        webLinks.push(...linkParts)
+      // Extract web links - check web_links array first, then fallback to legacy 'links' string format
+      let webLinks: string[] = []
+      if (rawItem.web_links && Array.isArray(rawItem.web_links)) {
+        // New format: direct array of links
+        webLinks = rawItem.web_links as string[]
+      } else {
+        // Legacy format: newline-separated string in 'links' field
+        const links = rawItem.links as string | undefined
+        if (links && typeof links === "string") {
+          // Split by newlines or commas if multiple links
+          const linkParts = links.split(/[\n,]/).map(l => l.trim()).filter(Boolean)
+          webLinks.push(...linkParts)
+        }
       }
       
       // Extract brand from production_name or team

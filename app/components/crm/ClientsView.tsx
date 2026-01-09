@@ -1,7 +1,7 @@
 "use client"
 
 import { Search, Plus, Edit, Trash2, Mail, Phone, Users, Calendar, Building2, Filter } from "lucide-react"
-import { formatDate, normalizeAssigneeName, isValidAssigneeName, TEAM_MEMBERS } from "./types"
+import { formatDate, normalizeAssigneeName, TEAM_MEMBERS } from "./types"
 import type { Client } from "./types"
 
 interface ClientsViewProps {
@@ -29,23 +29,9 @@ export function ClientsView({
   onEditClient,
   onDeleteClient,
 }: ClientsViewProps) {
-  // Get unique assignees from clients for the filter dropdown
-  const uniqueAssignees = Array.from(
-    new Set(
-      clients
-        .map(c => c.assigned_to)
-        .filter((assignee): assignee is string => 
-          typeof assignee === "string" && assignee.trim() !== ""
-        )
-        .map(normalizeAssigneeName)
-        .filter(name => isValidAssigneeName(name) && name !== "Unassigned")
-    )
-  ).sort()
-
-  // Also include team members who may not have any clients yet
-  const allAssignees = Array.from(
-    new Set([...uniqueAssignees, ...TEAM_MEMBERS.map(m => m.name)])
-  ).sort()
+  // Use only the predefined team members for the dropdown
+  // This ensures only full names appear, not partial names from data
+  const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
 
   // Filter clients
   const filteredClients = clients.filter((client) => {

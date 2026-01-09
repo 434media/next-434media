@@ -308,37 +308,33 @@ export interface TeamMember {
 export function normalizeAssigneeName(name: string): string {
   if (!name) return "Unassigned"
   
-  const nameMap: Record<string, string> = {
+  // Use lowercase for matching to handle all case variations
+  const nameMapLower: Record<string, string> = {
     "jake": "Jacob Lee Miles",
-    "Jake": "Jacob Lee Miles",
+    "jacob": "Jacob Lee Miles",
     "marc": "Marcos Resendez",
-    "Marc": "Marcos Resendez",
     "marcos": "Marcos Resendez",
-    "Marcos": "Marcos Resendez",
     "jesse": "Jesse Hernandez",
-    "Jesse": "Jesse Hernandez",
     "barb": "Barbara Carreon",
-    "Barb": "Barbara Carreon",
+    "barbara": "Barbara Carreon",
     "nichole": "Nichole Snow",
-    "Nichole": "Nichole Snow",
     "stacy": "Stacy Carrizales",
-    "Stacy": "Stacy Carrizales",
     "pm": "Unassigned",
-    "PM": "Unassigned",
     "teams": "Unassigned",
-    "Teams": "Unassigned",
-    "Team": "Unassigned",
+    "team": "Unassigned",
   }
   
-  return nameMap[name] || name
+  const lowerName = name.toLowerCase().trim()
+  return nameMapLower[lowerName] || name
 }
 
 // Check if an assignee name is a valid full name (not a short name)
 export function isValidAssigneeName(name: string): boolean {
   if (!name || name === "Unassigned") return true
   
-  const shortNames = ["jake", "marc", "marcos", "jesse", "barb", "nichole", "stacy", "pm", "teams", "team"]
-  return !shortNames.includes(name.toLowerCase())
+  // All short/partial names that should be filtered out
+  const shortNames = ["jake", "jacob", "marc", "marcos", "jesse", "barb", "barbara", "nichole", "stacy", "pm", "teams", "team"]
+  return !shortNames.includes(name.toLowerCase().trim())
 }
 
 // Helper to parse a date string, handling YYYY-MM-DD format as local time
