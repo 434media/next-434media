@@ -959,7 +959,7 @@ export function DashboardView({
       {/* Top KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <KPICard label="Budget" value={formatCurrency(totalBudget, true)} subLabel="Annual sales goal" icon={RocketIcon} color="neutral" />
-        <KPICard label="Remaining" value={formatCurrency(remaining, true)} subLabel="Budget - Won (100% DOC)" icon={Target} color="amber" />
+        <KPICard label="Remaining" value={formatCurrency(remaining, false)} subLabel="Budget - Won (100% DOC)" icon={Target} color="amber" />
         <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won 100% + Pitched 90%" icon={TrendingUp} color="blue" />
         <KPICard label="Total Pitched" value={formatCurrency(totalPitched, true)} subLabel="All opportunities" icon={BarChart3} color="purple" />
 
