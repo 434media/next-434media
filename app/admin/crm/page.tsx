@@ -1681,10 +1681,10 @@ export default function SalesCRMPage() {
           {/* Panel */}
           <div className="relative w-full max-w-md h-full bg-white shadow-2xl pointer-events-auto overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-sky-50 to-cyan-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg">
-                  <Target className="w-5 h-5 text-purple-600" />
+                <div className="p-2 bg-gradient-to-br from-sky-100 to-cyan-100 rounded-lg">
+                  <Target className="w-5 h-5 text-sky-600" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Linked Items</h3>
@@ -1762,7 +1762,7 @@ export default function SalesCRMPage() {
               {/* Linked Tasks Section */}
               {linkedTasks.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+                  <p className="text-xs font-medium text-teal-600 uppercase tracking-wide mb-2 flex items-center gap-2">
                     <CheckCircle2 className="w-3 h-3" />
                     Linked Tasks ({linkedTasks.length})
                   </p>
@@ -1775,7 +1775,7 @@ export default function SalesCRMPage() {
                           setLinkedClientForPanel(null)
                           openTaskModal(task)
                         }}
-                        className="w-full text-left p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-purple-200 hover:shadow-md transition-all group"
+                        className="w-full text-left p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-teal-200 hover:shadow-md transition-all group"
                       >
                         <div className="flex items-start gap-3">
                           <div className={`p-2 rounded-lg ${
@@ -1788,7 +1788,7 @@ export default function SalesCRMPage() {
                             }`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate group-hover:text-purple-700 transition-colors">
+                            <p className="font-medium text-gray-900 truncate group-hover:text-teal-700 transition-colors">
                               {task.title}
                             </p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -1817,7 +1817,7 @@ export default function SalesCRMPage() {
                               </p>
                             )}
                           </div>
-                          <svg className="w-5 h-5 text-gray-300 group-hover:text-purple-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-gray-300 group-hover:text-teal-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </div>

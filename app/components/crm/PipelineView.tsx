@@ -47,14 +47,14 @@ function BrandGoalCard({
   const totalPitched = brandClients.reduce((sum, c) => sum + (c.pitch_value || 0), 0)
   const progressPercent = Math.min(100, (wonRevenue / goal) * 100)
 
-  // Get pipeline stages
+  // Get pipeline stages - cohesive color palette
   const stages = [
-    { id: "lead", label: "Lead", color: "#6366f1" },
-    { id: "qualified", label: "Qualified", color: "#3b82f6" },
-    { id: "proposal", label: "Proposal", color: "#8b5cf6" },
-    { id: "negotiation", label: "Negotiation", color: "#f59e0b" },
-    { id: "closed_won", label: "Closed Won", color: "#10b981" },
-    { id: "closed_lost", label: "Closed Lost", color: "#ef4444" },
+    { id: "lead", label: "Lead", color: "#3b82f6" },           // Blue
+    { id: "qualified", label: "Qualified", color: "#06b6d4" },  // Cyan
+    { id: "proposal", label: "Proposal", color: "#0ea5e9" },    // Sky blue
+    { id: "negotiation", label: "Negotiation", color: "#f59e0b" }, // Amber
+    { id: "closed_won", label: "Closed Won", color: "#22c55e" },   // Green
+    { id: "closed_lost", label: "Closed Lost", color: "#64748b" }, // Slate
   ]
 
   // Map client status to stage
@@ -285,15 +285,15 @@ export function PipelineView({ pipeline, clients = [], onRefresh, onClientClick,
         <h4 className="text-sm font-semibold mb-3 text-gray-500">Pipeline Stages Reference</h4>
         <div className="flex flex-wrap gap-4 p-3 rounded-lg bg-white border border-gray-200 shadow-sm">
           <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-indigo-500" />
+            <div className="w-3 h-3 rounded-full bg-blue-500" />
             <span>Lead</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
+            <div className="w-3 h-3 rounded-full bg-cyan-500" />
             <span>Qualified</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-violet-500" />
+            <div className="w-3 h-3 rounded-full bg-sky-500" />
             <span>Proposal</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-600">
@@ -301,11 +301,11 @@ export function PipelineView({ pipeline, clients = [], onRefresh, onClientClick,
             <span>Negotiation</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-emerald-500" />
+            <div className="w-3 h-3 rounded-full bg-green-500" />
             <span>Closed Won</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
+            <div className="w-3 h-3 rounded-full bg-slate-400" />
             <span>Closed Lost</span>
           </div>
         </div>

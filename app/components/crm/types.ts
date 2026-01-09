@@ -120,10 +120,11 @@ export type Disposition = "pitched" | "closed_won" | "closed_lost"
 export type DOC = "25" | "50" | "75" | "90" | "100"
 
 // Disposition options for UI
+// Colors chosen to NOT conflict with brand colors (no purple, red, orange, or emerald)
 export const DISPOSITION_OPTIONS: { value: Disposition; label: string; color: string }[] = [
-  { value: "pitched", label: "Pitched", color: "#8b5cf6" },
-  { value: "closed_won", label: "Closed Won", color: "#10b981" },
-  { value: "closed_lost", label: "Closed Lost", color: "#ef4444" },
+  { value: "pitched", label: "Pitched", color: "#0ea5e9" },      // Sky blue - active opportunities
+  { value: "closed_won", label: "Closed Won", color: "#22c55e" }, // Green - success (different from 434 Media emerald)
+  { value: "closed_lost", label: "Closed Lost", color: "#64748b" }, // Slate gray - neutral/inactive
 ]
 
 // DOC options for UI
@@ -154,13 +155,13 @@ export function is434MediaGroup(brand: Brand | undefined): boolean {
 export const MEDIA_434_BRANDS: Brand[] = ["434 Media", "Digital Canvas"]
 
 export const BRAND_GOALS: BrandGoal[] = [
-  { brand: "TXMX Boxing", annualGoal: 1000000, color: "#ef4444", description: "Sports & Entertainment" },
-  { brand: "Vemos Vamos", annualGoal: 250000, color: "#f97316", description: "Bilingual Studio & Agency" },
-  { brand: "DEVSA TV", annualGoal: 250000, color: "#8b5cf6", description: "Documentary & Video Production" },
+  { brand: "TXMX Boxing", annualGoal: 1000000, color: "#000000", description: "Sports & Entertainment" },
+  { brand: "Vemos Vamos", annualGoal: 250000, color: "#fc0000", description: "Bilingual Studio & Agency" },
+  { brand: "DEVSA TV", annualGoal: 250000, color: "#0008ff", description: "Documentary & Video Production" },
   { 
     brand: "434 Media", 
     annualGoal: 250000, 
-    color: "#10b981", 
+    color: "#fa6400", 
     description: "Parent Company & Digital Canvas",
     includedBrands: ["434 Media", "Digital Canvas"]
   },
@@ -268,12 +269,12 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export const TASK_STATUS_COLORS: Record<string, string> = {
   not_started: "bg-gray-100 text-gray-600",
-  in_progress: "bg-blue-100 text-blue-700",
+  in_progress: "bg-sky-100 text-sky-700",
   to_do: "bg-amber-100 text-amber-700",
-  ready_for_review: "bg-purple-100 text-purple-700",
+  ready_for_review: "bg-cyan-100 text-cyan-700",
   completed: "bg-emerald-100 text-emerald-700",
   // Legacy statuses for backwards compatibility
-  pending_review: "bg-purple-100 text-purple-700",
+  pending_review: "bg-cyan-100 text-cyan-700",
   on_hold: "bg-amber-100 text-amber-700",
   blocked: "bg-red-100 text-red-700",
   deferred: "bg-amber-100 text-amber-700",

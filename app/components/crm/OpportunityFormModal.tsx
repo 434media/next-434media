@@ -517,9 +517,9 @@ export function OpportunityFormModal({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-purple-50">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-sky-50 to-cyan-50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center">
                   <Target className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -1492,7 +1492,7 @@ export function OpportunityFormModal({
               <button
                 onClick={onSave}
                 disabled={isSaving || !formData.company_name || !formData.brand}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-sky-700 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 {isSaving ? (
                   <>

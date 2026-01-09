@@ -5,7 +5,7 @@ interface StatCardProps {
   value: string | number
   subValue?: string
   icon: React.ComponentType<{ className?: string }>
-  color: "blue" | "emerald" | "green" | "purple" | "amber"
+  color: "blue" | "emerald" | "green" | "sky" | "amber"
 }
 
 export function StatCard({ label, value, subValue, icon: Icon, color }: StatCardProps) {
@@ -13,7 +13,7 @@ export function StatCard({ label, value, subValue, icon: Icon, color }: StatCard
     blue: "bg-blue-50 text-blue-600",
     emerald: "bg-emerald-50 text-emerald-600",
     green: "bg-green-50 text-green-600",
-    purple: "bg-purple-50 text-purple-600",
+    sky: "bg-sky-50 text-sky-600",
     amber: "bg-amber-50 text-amber-600",
   }
 

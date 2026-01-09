@@ -456,7 +456,7 @@ export function TasksView({
                       {/* Platform */}
                       <td className="px-4 py-4 hidden md:table-cell">
                         {task.brand ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-teal-50 text-teal-700 border border-teal-100">
                             <Building className="w-3 h-3 mr-1" />
                             {task.brand}
                           </span>

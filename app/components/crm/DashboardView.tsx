@@ -72,7 +72,7 @@ function KPICard({
   value: string
   subLabel?: string
   icon: React.ElementType
-  color?: "neutral" | "emerald" | "amber" | "blue" | "purple" | "red"
+  color?: "neutral" | "emerald" | "amber" | "blue" | "sky" | "red"
   trend?: { value: number; isPositive: boolean }
 }) {
   const colorClasses = {
@@ -80,7 +80,7 @@ function KPICard({
     emerald: "bg-emerald-50 text-emerald-600",
     amber: "bg-amber-50 text-amber-600",
     blue: "bg-blue-50 text-blue-600",
-    purple: "bg-purple-50 text-purple-600",
+    sky: "bg-sky-50 text-sky-600",
     red: "bg-red-50 text-red-600",
   }
 
@@ -89,7 +89,7 @@ function KPICard({
     emerald: "text-emerald-600",
     amber: "text-amber-600",
     blue: "text-blue-600",
-    purple: "text-purple-600",
+    sky: "text-sky-600",
     red: "text-red-600",
   }
 
@@ -137,8 +137,8 @@ function OpportunityProgressChart({
   return (
     <div className="p-4 md:p-5 rounded-xl bg-white border border-neutral-200 shadow-sm col-span-2 lg:col-span-1">
       <div className="flex items-center gap-2 mb-3">
-        <div className="p-2 rounded-lg bg-purple-50">
-          <Target className="w-4 h-4 text-purple-600" />
+        <div className="p-2 rounded-lg bg-sky-50">
+          <Target className="w-4 h-4 text-sky-600" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-neutral-900">Opportunity Flow</h3>
@@ -161,7 +161,7 @@ function OpportunityProgressChart({
             )}
             {pitchedPercent > 0 && (
               <div 
-                className="h-full bg-violet-500 flex items-center justify-center"
+                className="h-full bg-sky-500 flex items-center justify-center"
                 style={{ width: `${pitchedPercent}%` }}
                 title={`Pitched: ${pitchedCount}`}
               >
@@ -170,7 +170,7 @@ function OpportunityProgressChart({
             )}
             {lostPercent > 0 && (
               <div 
-                className="h-full bg-red-400 flex items-center justify-center"
+                className="h-full bg-slate-400 flex items-center justify-center"
                 style={{ width: `${lostPercent}%` }}
                 title={`Lost: ${lostCount}`}
               >
@@ -186,17 +186,17 @@ function OpportunityProgressChart({
               <span className="text-[10px] text-neutral-600">Won ({wonCount})</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-violet-500" />
+              <div className="w-2.5 h-2.5 rounded bg-sky-500" />
               <span className="text-[10px] text-neutral-600">Pitched ({pitchedCount})</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-red-400" />
+              <div className="w-2.5 h-2.5 rounded bg-slate-400" />
               <span className="text-[10px] text-neutral-600">Lost ({lostCount})</span>
             </div>
           </div>
 
           <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-center gap-1">
-            <span className="text-lg font-bold text-purple-600">{activeOpportunities}</span>
+            <span className="text-lg font-bold text-sky-600">{activeOpportunities}</span>
             <span className="text-xs text-neutral-500">active opportunities</span>
           </div>
         </>
@@ -233,9 +233,9 @@ function PipelineConfidence({
     items: Array<{ data: Client; title: string; companyName: string; value?: number }>
   }> = [
     { label: "Low", value: "25", count: 0, amount: 0, color: "#fbbf24", description: "Early stage, needs nurturing", items: [] },
-    { label: "Medium", value: "50", count: 0, amount: 0, color: "#f97316", description: "Engaged, building relationship", items: [] },
-    { label: "High", value: "75", count: 0, amount: 0, color: "#8b5cf6", description: "Strong interest, likely to close", items: [] },
-    { label: "Very High", value: "90", count: 0, amount: 0, color: "#10b981", description: "Ready to close", items: [] },
+    { label: "Medium", value: "50", count: 0, amount: 0, color: "#0ea5e9", description: "Engaged, building relationship", items: [] },
+    { label: "High", value: "75", count: 0, amount: 0, color: "#14b8a6", description: "Strong interest, likely to close", items: [] },
+    { label: "Very High", value: "90", count: 0, amount: 0, color: "#22c55e", description: "Ready to close", items: [] },
   ]
 
   opportunityClients.forEach(c => {
@@ -263,8 +263,8 @@ function PipelineConfidence({
     <div className="p-4 md:p-5 rounded-xl bg-white border border-neutral-200 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-purple-50">
-            <TrendingUp className="w-4 h-4 text-purple-600" />
+          <div className="p-2 rounded-lg bg-teal-50">
+            <TrendingUp className="w-4 h-4 text-teal-600" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-neutral-900">Pipeline Confidence</h3>
@@ -332,7 +332,7 @@ function PipelineConfidence({
         <div className="mt-4 pt-4 border-t border-neutral-100">
           <div className="flex items-center justify-between">
             <span className="text-xs text-neutral-500">Expected Close Value</span>
-            <span className="text-sm font-bold text-purple-600">{formatCurrency(expectedValue, true)}</span>
+            <span className="text-sm font-bold text-teal-600">{formatCurrency(expectedValue, true)}</span>
           </div>
           <p className="text-[10px] text-neutral-400 mt-1">Based on {totalActive} active opportunities × confidence %</p>
         </div>
@@ -425,7 +425,7 @@ function ActiveOpportunitiesList({
         followUpDate: c.next_followup_date,
         disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.label || "Pitched",
         dispositionValue: c.disposition || "pitched",
-        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.color || "#8b5cf6",
+        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.color || "#0ea5e9",
         value: c.pitch_value,
         brand: c.brand,
         original: c,
@@ -961,7 +961,7 @@ export function DashboardView({
         <KPICard label="Budget" value={formatCurrency(totalBudget, true)} subLabel="Annual sales goal" icon={RocketIcon} color="neutral" />
         <KPICard label="Remaining" value={formatCurrency(remaining, false)} subLabel="Budget - Won (100% DOC)" icon={Target} color="amber" />
         <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won 100% + Pitched 90%" icon={TrendingUp} color="blue" />
-        <KPICard label="Total Pitched" value={formatCurrency(totalPitched, true)} subLabel="All opportunities" icon={BarChart3} color="purple" />
+        <KPICard label="Total Pitched" value={formatCurrency(totalPitched, true)} subLabel="All opportunities" icon={BarChart3} color="sky" />
 
         {/* Opportunity Flow Chart */}
         <div className="col-span-2 md:col-span-4 xl:col-span-1">

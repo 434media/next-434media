@@ -1158,12 +1158,11 @@ export function TaskModal({
                 </p>
               </div>
 
-              {/* Opportunity Link Section */}
               <div className="pt-4 border-t border-gray-200 space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-purple-100' : 'bg-gray-200'}`}>
-                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-purple-600' : 'text-gray-500'}`} />
+                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-sky-100' : 'bg-gray-200'}`}>
+                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-sky-600' : 'text-gray-500'}`} />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">Link to Opportunity</p>
@@ -1178,7 +1177,7 @@ export function TaskModal({
                       opportunity_id: !formData.is_opportunity ? formData.opportunity_id : ""
                     })}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      formData.is_opportunity ? 'bg-purple-600' : 'bg-gray-300'
+                      formData.is_opportunity ? 'bg-sky-600' : 'bg-gray-300'
                     }`}
                   >
                     <span
@@ -1196,7 +1195,7 @@ export function TaskModal({
                     <select
                       value={formData.opportunity_id}
                       onChange={(e) => onFormChange({ ...formData, opportunity_id: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-purple-500 focus:bg-white"
+                      className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-sky-500 focus:bg-white"
                     >
                       <option value="">Select an opportunity...</option>
                       {opportunities.map((opp) => (

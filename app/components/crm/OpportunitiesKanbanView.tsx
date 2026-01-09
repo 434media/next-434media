@@ -98,7 +98,7 @@ function PlatformGoalsSummary({
         className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-white" />
           </div>
           <div className="text-left">
@@ -248,7 +248,7 @@ function KanbanCard({
   return (
     <motion.div
       draggable={!isStacked || stackIndex === 0}
-      onDragStart={onDragStart}
+      onDragStartCapture={onDragStart}
       onClick={onClick}
       initial={false}
       animate={{
@@ -286,7 +286,7 @@ function KanbanCard({
           {/* Type badge for linked tasks (not clients) */}
           {!isLinkedClient && isStacked && stackIndex > 0 && (
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700">
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-teal-100 text-teal-700">
                 Linked Task
               </span>
             </div>
@@ -384,12 +384,12 @@ function StackedKanbanCard({
         transition: "padding-right 0.3s ease"
       }}
     >
-      {/* Stack indicator badge - purple for linked tasks */}
+      {/* Stack indicator badge for linked items */}
       {hasLinkedItems && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="absolute -top-2 -right-2 z-20 flex items-center gap-1 px-2 py-1 text-white text-[10px] font-medium rounded-full shadow-lg bg-purple-600"
+          className="absolute -top-2 -right-2 z-20 flex items-center gap-1 px-2 py-1 text-white text-[10px] font-medium rounded-full shadow-lg bg-sky-600"
         >
           <Layers className="w-3 h-3" />
           {totalLinkedCount + 1}
@@ -504,7 +504,7 @@ function KanbanColumn({
           <span className="text-xs font-medium text-gray-500 bg-white/80 px-2 py-0.5 rounded-full">
             {stackedItems.length}
             {totalItemsCount > stackedItems.length && (
-              <span className="text-purple-500 ml-1">+{totalItemsCount - stackedItems.length}</span>
+              <span className="text-sky-600 ml-1">+{totalItemsCount - stackedItems.length}</span>
             )}
           </span>
         </div>
