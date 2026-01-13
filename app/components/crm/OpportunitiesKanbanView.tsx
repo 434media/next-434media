@@ -202,7 +202,7 @@ function PlatformGoalsSummary({
                       
                       <div className="pt-2">
                         <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-gray-500">Progress</span>
+                          <span className="text-gray-500">Progress <span className="text-gray-400">(Won/Goal)</span></span>
                           <span className="font-medium" style={{ color: goal.color }}>{Math.round(progress)}%</span>
                         </div>
                         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -384,7 +384,7 @@ function StackedKanbanCard({
       style={{ 
         // Add extra space when hovered to accommodate fanned out cards
         marginBottom: isHovered && hasLinkedItems ? 0 : 0,
-        paddingRight: isHovered && hasLinkedItems ? (totalLinkedCount) * 85 : 0,
+        paddingRight: isHovered && hasLinkedItems ? (totalLinkedCount) * 10 : 0,
         transition: "padding-right 0.3s ease"
       }}
     >
@@ -396,7 +396,7 @@ function StackedKanbanCard({
           className="absolute -top-2 -right-2 z-20 flex items-center gap-1 px-2 py-1 text-white text-[10px] font-medium rounded-full shadow-lg bg-sky-600"
         >
           <Layers className="w-3 h-3" />
-          {totalLinkedCount + 1}
+          {totalLinkedCount + 0}
         </motion.div>
       )}
 
@@ -793,6 +793,7 @@ export function OpportunitiesKanbanView({
 
       {/* Platform Goals Section */}
       <PlatformGoalsSummary 
+        key={`goals-${clients.filter(c => c.disposition === "closed_won").length}-${clients.reduce((sum, c) => sum + (c.pitch_value || 0), 0)}`}
         clients={clients}
         tasks={tasks}
         isExpanded={showGoals}

@@ -415,7 +415,8 @@ export default function SalesCRMPage() {
   useEffect(() => {
     if (viewMode === "dashboard") {
       // Dashboard uses clients.is_opportunity for budget calculations
-      // Loads fresh clients and tasks for accurate data
+      // Loads fresh clients, tasks, and dashboard stats for accurate data
+      loadDashboard()
       loadClients()
       loadTasks()
     } else if (viewMode === "clients") {
@@ -1259,13 +1260,26 @@ export default function SalesCRMPage() {
     console.log("Client ID:", clientId)
     console.log("New Disposition:", disposition)
     
+    // Find the current client to check current state
+    const currentClient = clients.find(c => c.id === clientId)
+    const wasClosedWon = currentClient?.disposition === "closed_won"
+    
     // Automatically set DOC to 100% when moving to Closed Won
     // This ensures the opportunity is counted in Remaining and Pacing calculations
-    const shouldAutoSetDoc = disposition === "closed_won"
-    const docValue = shouldAutoSetDoc ? "100" as DOC : undefined
+    const shouldAutoSetDocTo100 = disposition === "closed_won"
     
-    if (shouldAutoSetDoc) {
+    // Automatically set DOC to 25% when:
+    // 1. Moving FROM closed_won back to pitched or closed_lost
+    // 2. Moving TO closed_lost from ANY state (to ensure closed_lost is never counted in pacing)
+    const shouldAutoSetDocTo25 = wasClosedWon && disposition === "pitched" || disposition === "closed_lost"
+    
+    let docValue: DOC | undefined = undefined
+    if (shouldAutoSetDocTo100) {
+      docValue = "100" as DOC
       console.log("Auto-setting DOC to 100% for Closed Won opportunity")
+    } else if (shouldAutoSetDocTo25) {
+      docValue = "25" as DOC
+      console.log("Auto-setting DOC to 25% for opportunity moved to", disposition)
     }
     
     try {
@@ -1288,8 +1302,10 @@ export default function SalesCRMPage() {
       if (!response.ok) throw new Error("Failed to update client")
 
       console.log("Disposition updated successfully")
-      if (shouldAutoSetDoc) {
+      if (shouldAutoSetDocTo100) {
         console.log("DOC automatically set to 100%")
+      } else if (shouldAutoSetDocTo25) {
+        console.log("DOC automatically set to 25%")
       }
       
       // Optimistically update the local state (include DOC if set)
@@ -1306,8 +1322,10 @@ export default function SalesCRMPage() {
         })
       )
       
-      const successMessage = shouldAutoSetDoc 
+      const successMessage = shouldAutoSetDocTo100 
         ? "Opportunity moved to Closed Won (DOC set to 100%)" 
+        : shouldAutoSetDocTo25
+        ? `Opportunity moved to ${disposition === "pitched" ? "Pitched" : "Closed Lost"} (DOC set to 25%)`
         : "Client moved"
       setToast({ message: successMessage, type: "success" })
     } catch (err) {
@@ -1337,9 +1355,23 @@ export default function SalesCRMPage() {
     }
     const owner = ownerMap[task.assigned_to] || "teams"
 
+    // Check if we're moving FROM closed_won
+    const wasClosedWon = task.disposition === "closed_won"
+    
     // Automatically set DOC to 100% when moving to Closed Won (for opportunity tasks)
-    const shouldAutoSetDoc = disposition === "closed_won" && task.is_opportunity
-    const docValue = shouldAutoSetDoc ? "100" as DOC : undefined
+    const shouldAutoSetDocTo100 = disposition === "closed_won" && task.is_opportunity
+    
+    // Automatically set DOC to 25% when:
+    // 1. Moving FROM closed_won back to pitched
+    // 2. Moving TO closed_lost from ANY state (to ensure closed_lost is never counted in pacing)
+    const shouldAutoSetDocTo25 = task.is_opportunity && (wasClosedWon && disposition === "pitched" || disposition === "closed_lost")
+    
+    let docValue: DOC | undefined = undefined
+    if (shouldAutoSetDocTo100) {
+      docValue = "100" as DOC
+    } else if (shouldAutoSetDocTo25) {
+      docValue = "25" as DOC
+    }
 
     try {
       // Build update payload - include DOC if moving opportunity to closed_won
@@ -1375,8 +1407,10 @@ export default function SalesCRMPage() {
         })
       )
       
-      const successMessage = shouldAutoSetDoc 
+      const successMessage = shouldAutoSetDocTo100 
         ? "Opportunity moved to Closed Won (DOC set to 100%)" 
+        : shouldAutoSetDocTo25
+        ? `Opportunity moved to ${disposition === "pitched" ? "Pitched" : "Closed Lost"} (DOC set to 25%)`
         : "Task moved"
       setToast({ message: successMessage, type: "success" })
     } catch (err) {
