@@ -1722,7 +1722,7 @@ export default function SalesCRMPage() {
         {/* Clients View */}
         {viewMode === "clients" && (
           <ClientsView
-            clients={clients.filter(c => !c.is_opportunity)}
+            clients={clients}
             searchQuery={searchQuery}
             sourceFilter={clientSourceFilter}
             assigneeFilter={clientAssigneeFilter}
