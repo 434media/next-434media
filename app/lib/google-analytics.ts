@@ -28,16 +28,16 @@ const ANALYTICS_PROPERTIES: AnalyticsProperty[] = [
 function getAnalyticsClient(): BetaAnalyticsDataClient {
   if (!analyticsDataClient) {
     try {
-      const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+      const serviceAccountKey = process.env.GA_SERVICE_ACCOUNT_KEY
       if (!serviceAccountKey) {
-        throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY environment variable is not set")
+        throw new Error("GA_SERVICE_ACCOUNT_KEY environment variable is not set")
       }
 
       let credentials
       try {
         credentials = JSON.parse(serviceAccountKey)
       } catch (parseError) {
-        throw new Error("Invalid JSON in GOOGLE_SERVICE_ACCOUNT_KEY")
+        throw new Error("Invalid JSON in GA_SERVICE_ACCOUNT_KEY")
       }
 
       analyticsDataClient = new BetaAnalyticsDataClient({

@@ -11,22 +11,8 @@ interface ServiceAccountCredentials {
 }
 
 function getCredentials(): ServiceAccountCredentials {
-  // Option 1: Use the same GOOGLE_SERVICE_ACCOUNT_KEY as analytics (full JSON)
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (serviceAccountKey) {
-    try {
-      const credentials = JSON.parse(serviceAccountKey)
-      return {
-        project_id: credentials.project_id,
-        client_email: credentials.client_email,
-        private_key: credentials.private_key,
-      }
-    } catch (error) {
-      console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:", error)
-    }
-  }
-
-  // Option 2: Fall back to separate FIREBASE_* variables
+  // Use Firebase-specific environment variables
+  // Note: GA_SERVICE_ACCOUNT_KEY is for Google Analytics only and should not be used here
   const projectId = process.env.FIREBASE_PROJECT_ID
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n")
@@ -40,7 +26,7 @@ function getCredentials(): ServiceAccountCredentials {
   }
 
   throw new Error(
-    "Firebase configuration is missing. Set either GOOGLE_SERVICE_ACCOUNT_KEY (JSON) or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY"
+    "Firebase configuration is missing. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY environment variables."
   )
 }
 

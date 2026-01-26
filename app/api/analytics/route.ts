@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
             required: [
               "At least one GA4_PROPERTY_ID or GA4_PROPERTY_ID_* - Your Google Analytics 4 property ID(s)",
               "GCP_PROJECT_ID - Your Google Cloud project ID",
-              "GOOGLE_SERVICE_ACCOUNT_KEY - Complete JSON service account key",
+              "GA_SERVICE_ACCOUNT_KEY - Complete JSON service account key for Google Analytics",
               "ADMIN_PASSWORD - Password for analytics dashboard access",
             ],
           },

@@ -12,8 +12,9 @@ export const analyticsConfig = {
   // Google Cloud Project
   gcpProjectId: process.env.GCP_PROJECT_ID,
 
-  // Service Account Authentication (JSON key)
-  googleServiceAccountKey: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+  // Service Account Authentication for Google Analytics (JSON key)
+  // This is separate from Firebase Auth - used only for GA4 Data API
+  googleServiceAccountKey: process.env.GA_SERVICE_ACCOUNT_KEY,
 } as const
 
 // Property configuration array
@@ -55,7 +56,7 @@ export function getMissingEnvironmentVariables(): string[] {
 
   // Core required variables
   if (!analyticsConfig.gcpProjectId) missing.push("GCP_PROJECT_ID")
-  if (!analyticsConfig.googleServiceAccountKey) missing.push("GOOGLE_SERVICE_ACCOUNT_KEY")
+  if (!analyticsConfig.googleServiceAccountKey) missing.push("GA_SERVICE_ACCOUNT_KEY")
 
   // Property IDs (at least main property should be configured)
   if (!analyticsConfig.ga4PropertyId) missing.push("GA4_PROPERTY_ID")
@@ -98,11 +99,11 @@ export function validateAnalyticsConfig(): boolean {
     try {
       const parsed = JSON.parse(analyticsConfig.googleServiceAccountKey)
       if (!parsed.client_email || !parsed.private_key) {
-        console.error("[Analytics Config] GOOGLE_SERVICE_ACCOUNT_KEY missing required fields")
+        console.error("[Analytics Config] GA_SERVICE_ACCOUNT_KEY missing required fields")
         return false
       }
     } catch (error) {
-      console.error("[Analytics Config] GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON")
+      console.error("[Analytics Config] GA_SERVICE_ACCOUNT_KEY is not valid JSON")
       return false
     }
   }
@@ -138,7 +139,7 @@ export function getConfigurationStatus() {
       GA4_PROPERTY_ID_AMPD: !!process.env.GA4_PROPERTY_ID_AMPD,
       GA4_PROPERTY_ID_DIGITALCANVAS: !!process.env.GA4_PROPERTY_ID_DIGITALCANVAS,
       GCP_PROJECT_ID: !!process.env.GCP_PROJECT_ID,
-      GOOGLE_SERVICE_ACCOUNT_KEY: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+      GA_SERVICE_ACCOUNT_KEY: !!process.env.GA_SERVICE_ACCOUNT_KEY,
     },
   }
 }

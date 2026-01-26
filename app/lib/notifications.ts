@@ -15,21 +15,7 @@ interface ServiceAccountCredentials {
 }
 
 function getCredentials(): ServiceAccountCredentials | null {
-  // Use the same service account key as Firebase
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (serviceAccountKey) {
-    try {
-      const credentials = JSON.parse(serviceAccountKey)
-      return {
-        client_email: credentials.client_email,
-        private_key: credentials.private_key,
-      }
-    } catch (error) {
-      console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:', error)
-    }
-  }
-
-  // Fallback to separate environment variables
+  // Use Firebase Admin SDK credentials for Gmail API
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
 
@@ -40,6 +26,7 @@ function getCredentials(): ServiceAccountCredentials | null {
     }
   }
 
+  console.error('[Notifications] Firebase credentials not found. Set FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.')
   return null
 }
 

@@ -8,7 +8,16 @@ function getFirebaseAuth() {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
     const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
 
-    if (projectId && clientEmail && privateKey) {
+    if (!projectId || !clientEmail || !privateKey) {
+      console.error('Firebase Admin SDK configuration missing:', {
+        hasProjectId: !!projectId,
+        hasClientEmail: !!clientEmail,
+        hasPrivateKey: !!privateKey
+      })
+      throw new Error('Firebase Admin SDK is not properly configured. Check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY environment variables.')
+    }
+
+    try {
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId,
@@ -16,6 +25,10 @@ function getFirebaseAuth() {
           privateKey,
         }),
       })
+      console.log('[Auth] Firebase Admin initialized successfully')
+    } catch (error) {
+      console.error('[Auth] Failed to initialize Firebase Admin:', error)
+      throw error
     }
   }
   return admin.auth()
@@ -74,8 +87,23 @@ export async function verifyFirebaseToken(idToken: string): Promise<User | null>
       uid: decodedToken.uid,
       authProvider: decodedToken.firebase?.sign_in_provider === 'password' ? 'email' : 'google',
     }
-  } catch (error) {
-    console.error('Failed to verify Firebase token:', error)
+  } catch (error: any) {
+    // Log detailed error for debugging
+    console.error('[Auth] Failed to verify Firebase token:', {
+      code: error?.code,
+      message: error?.message,
+      errorInfo: error?.errorInfo
+    })
+    
+    // Check for specific Firebase errors
+    if (error?.code === 'auth/id-token-expired') {
+      console.error('[Auth] Token expired - user needs to re-authenticate')
+    } else if (error?.code === 'auth/argument-error') {
+      console.error('[Auth] Invalid token format')
+    } else if (error?.code === 'auth/invalid-credential') {
+      console.error('[Auth] Invalid Firebase Admin credentials - check service account configuration')
+    }
+    
     return null
   }
 }

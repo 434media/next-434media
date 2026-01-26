@@ -8,17 +8,24 @@ import type { CreateBlogPostData, BlogFilters } from "@/app/types/blog-types"
 
 // Check if user is authenticated and has workspace email
 async function requireAdmin() {
-  const session = await getSession()
-  
-  if (!session) {
-    return { error: "Unauthorized", status: 401 }
+  try {
+    const session = await getSession()
+    
+    if (!session) {
+      console.log("[Blog API] No session found - user not authenticated")
+      return { error: "Unauthorized - Please sign in to access this resource", status: 401 }
+    }
+    
+    if (!isWorkspaceEmail(session.email)) {
+      console.log("[Blog API] Non-workspace email attempted access:", session.email)
+      return { error: "Forbidden: Workspace email required", status: 403 }
+    }
+    
+    return { session }
+  } catch (error: any) {
+    console.error("[Blog API] Error checking admin session:", error?.message)
+    return { error: "Authentication error - Please sign in again", status: 401 }
   }
-  
-  if (!isWorkspaceEmail(session.email)) {
-    return { error: "Forbidden: Workspace email required", status: 403 }
-  }
-  
-  return { session }
 }
 
 // GET - Fetch all blog posts (supports both admin and public access)
@@ -63,10 +70,14 @@ export async function GET(request: NextRequest) {
       posts,
       count: posts.length
     })
-  } catch (error) {
-    console.error("Error fetching blog posts:", error)
+  } catch (error: any) {
+    console.error("[Blog API] Error fetching blog posts:", {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack?.split('\n').slice(0, 3).join('\n')
+    })
     return NextResponse.json(
-      { error: "Failed to fetch blog posts" },
+      { error: "Failed to fetch blog posts. Please try again." },
       { status: 500 }
     )
   }

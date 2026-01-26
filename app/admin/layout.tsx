@@ -2,7 +2,8 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { Shield, AlertCircle, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Shield, AlertCircle, Mail, Lock, Eye, EyeOff, LogOut, User, Home } from "lucide-react"
+import Link from "next/link"
 import { 
   signInWithGoogle, 
   signInWithEmail, 
@@ -30,6 +31,7 @@ export default function AdminLayout({
   const [showPassword, setShowPassword] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   useEffect(() => {
     // Initialize auth - must check redirect result first, then session
@@ -238,6 +240,25 @@ export default function AdminLayout({
     }
   }
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      // Sign out from Firebase
+      await signOut()
+      // Clear server session
+      await fetch('/api/auth/signout', { method: 'POST' })
+      // Reset state
+      setIsAuthenticated(false)
+      setUser(null)
+      setError(null)
+    } catch (err) {
+      console.error('Logout error:', err)
+      setError('Failed to sign out. Please try again.')
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
   const handleCancel = () => {
     window.location.href = "/"
   }
@@ -434,5 +455,72 @@ export default function AdminLayout({
     )
   }
 
-  return <div className="w-full max-w-full">{children}</div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900">
+      {/* Admin Header */}
+      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Left side - Logo/Home */}
+            <div className="flex items-center gap-4">
+              <Link 
+                href="/"
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+              >
+                <Home className="w-5 h-5" />
+                <span className="hidden sm:inline text-sm">Back to Site</span>
+              </Link>
+              <div className="h-6 w-px bg-white/10" />
+              <Link 
+                href="/admin"
+                className="flex items-center gap-2 text-white font-semibold"
+              >
+                <Shield className="w-5 h-5 text-emerald-400" />
+                <span>Admin Dashboard</span>
+              </Link>
+            </div>
+
+            {/* Right side - User info & Logout */}
+            <div className="flex items-center gap-3">
+              {user && (
+                <>
+                  <div className="hidden sm:flex items-center gap-3">
+                    {user.picture ? (
+                      <img 
+                        src={user.picture} 
+                        alt={user.name} 
+                        className="w-8 h-8 rounded-full border-2 border-white/20"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center border-2 border-white/20">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-white">{user.name}</p>
+                      <p className="text-xs text-gray-400">{user.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 disabled:opacity-50"
+                    title="Sign out"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="w-full max-w-full">
+        {children}
+      </main>
+    </div>
+  )
 }

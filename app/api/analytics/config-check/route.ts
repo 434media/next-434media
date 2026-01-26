@@ -15,7 +15,7 @@ export async function GET() {
     recommendations: [
       !configStatus.propertyId && "Set GA4_PROPERTY_ID environment variable",
       !configStatus.projectId && "Set GCP_PROJECT_ID environment variable",
-      !configStatus.hasServiceAccountKey && "Set GOOGLE_SERVICE_ACCOUNT_KEY environment variable (JSON format)",
+      !configStatus.hasServiceAccountKey && "Set GA_SERVICE_ACCOUNT_KEY environment variable (JSON format)",
     ].filter(Boolean),
     debugInfo: {
       ga4PropertyId: configStatus.propertyId ? `${configStatus.propertyId.substring(0, 8)}...` : "missing",
