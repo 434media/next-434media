@@ -80,9 +80,13 @@ export default function BlogAdminPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
-  // Load posts on mount
+  // Load posts on mount with a small delay to ensure session is ready
   useEffect(() => {
-    loadPosts()
+    // Small delay to allow session to be established after auth
+    const timer = setTimeout(() => {
+      loadPosts()
+    }, 100)
+    return () => clearTimeout(timer)
   }, [])
 
   // Auto-hide toast
@@ -93,12 +97,23 @@ export default function BlogAdminPage() {
     }
   }, [toast])
 
-  const loadPosts = async () => {
+  const loadPosts = async (retryCount = 0) => {
     setIsLoading(true)
     setError(null)
     try {
       const response = await fetch("/api/blog?includeAll=true")
-      if (!response.ok) throw new Error("Failed to fetch posts")
+      
+      // If unauthorized and first attempt, wait a bit and retry (session may still be propagating)
+      if (response.status === 401 && retryCount < 2) {
+        console.log("Session not ready, retrying in 500ms...")
+        await new Promise(resolve => setTimeout(resolve, 500))
+        return loadPosts(retryCount + 1)
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to fetch posts (${response.status})`)
+      }
       const data = await response.json()
       setPosts(data.posts || [])
     } catch (err) {
@@ -308,7 +323,7 @@ export default function BlogAdminPage() {
         <div className="text-center py-12">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600">{error}</p>
-          <button onClick={loadPosts} className="mt-4 text-neutral-500 hover:text-neutral-900">
+          <button onClick={() => loadPosts()} className="mt-4 text-neutral-500 hover:text-neutral-900">
             Try again
           </button>
         </div>

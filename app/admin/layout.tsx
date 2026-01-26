@@ -57,11 +57,15 @@ export default function AdminLayout({
         // User is signed in to Firebase but not authenticated with our server
         console.log('Firebase user detected, creating server session...')
         
+        // Show loading state while creating session
+        setIsLoading(true)
+        
         // Verify workspace domain for Google users
         const isGoogle = firebaseUser.providerData.some(p => p.providerId === 'google.com')
         if (isGoogle && (!firebaseUser.email || !isWorkspaceDomainEmail(firebaseUser.email))) {
           await signOut()
           setError('Only 434 Media workspace accounts are allowed for Google sign-in.')
+          setIsLoading(false)
           return
         }
         
@@ -70,6 +74,8 @@ export default function AdminLayout({
         } catch (err: any) {
           console.error('Failed to create session from auth state:', err)
           setError(getErrorMessage(err.message || 'authentication_failed'))
+        } finally {
+          setIsLoading(false)
         }
       }
     })
