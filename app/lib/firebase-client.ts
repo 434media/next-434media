@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from 'firebase/app'
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app'
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -6,7 +6,8 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  type User
+  type User,
+  type Auth
 } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -18,44 +19,67 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
-const auth = getAuth(app)
+// Lazy initialization - only initialize when actually needed (client-side)
+let app: FirebaseApp | null = null
+let auth: Auth | null = null
+let googleProvider: GoogleAuthProvider | null = null
 
-// Configure Google provider with workspace domain restriction
-const googleProvider = new GoogleAuthProvider()
-googleProvider.setCustomParameters({
-  hd: process.env.NEXT_PUBLIC_WORKSPACE_DOMAIN || '434media.com',
-  prompt: 'select_account',
-})
+function getFirebaseApp(): FirebaseApp {
+  if (app) return app
+  
+  // Check if we have required config (prevents build-time errors)
+  if (!firebaseConfig.apiKey) {
+    throw new Error('Firebase API key is not configured. Please set NEXT_PUBLIC_FIREBASE_API_KEY environment variable.')
+  }
+  
+  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+  return app
+}
 
-export { auth, googleProvider }
+function getFirebaseAuth(): Auth {
+  if (auth) return auth
+  auth = getAuth(getFirebaseApp())
+  return auth
+}
+
+function getGoogleProvider(): GoogleAuthProvider {
+  if (googleProvider) return googleProvider
+  googleProvider = new GoogleAuthProvider()
+  googleProvider.setCustomParameters({
+    hd: process.env.NEXT_PUBLIC_WORKSPACE_DOMAIN || '434media.com',
+    prompt: 'select_account',
+  })
+  return googleProvider
+}
+
+// Export getters for lazy access
+export { getFirebaseAuth as auth, getGoogleProvider as googleProvider }
 
 // Sign in with Google (workspace domain only)
 export async function signInWithGoogle(): Promise<User> {
-  const result = await signInWithPopup(auth, googleProvider)
+  const result = await signInWithPopup(getFirebaseAuth(), getGoogleProvider())
   return result.user
 }
 
 // Sign in with email/password (for approved non-workspace admins)
 export async function signInWithEmail(email: string, password: string): Promise<User> {
-  const result = await signInWithEmailAndPassword(auth, email, password)
+  const result = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
   return result.user
 }
 
 // Sign out
 export async function signOut(): Promise<void> {
-  await firebaseSignOut(auth)
+  await firebaseSignOut(getFirebaseAuth())
 }
 
 // Get current user
 export function getCurrentUser(): User | null {
-  return auth.currentUser
+  return getFirebaseAuth().currentUser
 }
 
 // Subscribe to auth state changes
 export function onAuthStateChange(callback: (user: User | null) => void): () => void {
-  return onAuthStateChanged(auth, callback)
+  return onAuthStateChanged(getFirebaseAuth(), callback)
 }
 
 // Check if email is from workspace domain
@@ -66,7 +90,7 @@ export function isWorkspaceDomainEmail(email: string): boolean {
 
 // Get ID token for server-side verification
 export async function getIdToken(): Promise<string | null> {
-  const user = auth.currentUser
+  const user = getFirebaseAuth().currentUser
   if (!user) return null
   return user.getIdToken()
 }
