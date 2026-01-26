@@ -142,8 +142,9 @@ export function isWorkspaceDomainEmail(email: string): boolean {
 }
 
 // Get ID token for server-side verification
-export async function getIdToken(): Promise<string | null> {
-  const user = getFirebaseAuth().currentUser
-  if (!user) return null
-  return user.getIdToken()
+// Can pass a specific user (e.g., from redirect result) or use currentUser
+export async function getIdToken(user?: User | null): Promise<string | null> {
+  const targetUser = user || getFirebaseAuth().currentUser
+  if (!targetUser) return null
+  return targetUser.getIdToken()
 }

@@ -13,6 +13,7 @@ import {
   checkRedirectResult,
   isMobileDevice
 } from "@/app/lib/firebase-client"
+import type { User as FirebaseUser } from 'firebase/auth'
 
 export default function AdminLayout({
   children,
@@ -62,8 +63,9 @@ export default function AdminLayout({
         }
         
         // Create server session from the redirect result
+        // Pass the user from redirect result to get the ID token
         try {
-          await createServerSession('google')
+          await createServerSession('google', redirectResult.user)
           // Session created successfully - user is now authenticated
           // createServerSession already sets isAuthenticated and user
           setIsLoading(false)
@@ -108,9 +110,10 @@ export default function AdminLayout({
   }
 
   // Create server session from Firebase token
-  const createServerSession = async (authProvider: string) => {
+  // Optionally pass a specific Firebase user (e.g., from redirect result)
+  const createServerSession = async (authProvider: string, firebaseUser?: FirebaseUser) => {
     try {
-      const idToken = await getIdToken()
+      const idToken = await getIdToken(firebaseUser)
       if (!idToken) {
         throw new Error('Failed to get ID token')
       }
