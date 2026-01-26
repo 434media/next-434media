@@ -33,13 +33,34 @@ export function ClientsView({
   // This ensures only full names appear, not partial names from data
   const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
 
-  // Filter clients - EXCLUDE opportunities (they appear in Pipeline view only)
-  const filteredClients = clients.filter((client) => {
-    // Hide opportunity records from Clients view to prevent duplicates
-    // Multiple opportunities for same company (e.g., 3 VelocityTX opportunities) 
-    // should only appear in Pipeline view, not as 3 separate client records
-    if (client.is_opportunity) return false
+  // First, deduplicate clients by company_name to ensure each company appears only once
+  // This handles the case where a company has multiple opportunities - we want ONE client entry
+  // Priority: prefer non-opportunity records, but include opportunity-only companies too
+  const deduplicatedClients = clients.reduce((acc, client) => {
+    const companyName = (client.company_name || client.name || "").toLowerCase().trim()
+    if (!companyName) return acc
     
+    const existingIndex = acc.findIndex(c => 
+      (c.company_name || c.name || "").toLowerCase().trim() === companyName
+    )
+    
+    if (existingIndex === -1) {
+      // First time seeing this company - add it
+      acc.push(client)
+    } else {
+      // Company already exists - prefer non-opportunity record over opportunity record
+      const existing = acc[existingIndex]
+      if (existing.is_opportunity && !client.is_opportunity) {
+        // Replace opportunity record with non-opportunity record
+        acc[existingIndex] = client
+      }
+      // If both are opportunities or both are non-opportunities, keep the first one
+    }
+    return acc
+  }, [] as Client[])
+
+  // Filter clients based on search and filters
+  const filteredClients = deduplicatedClients.filter((client) => {
     const searchLower = searchQuery.toLowerCase()
     const matchesSearch = 
       (client.company_name || "").toLowerCase().includes(searchLower) ||
