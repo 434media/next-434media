@@ -28,14 +28,10 @@ export default function AdminLayout({
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
-  const [isCheckingRedirect, setIsCheckingRedirect] = useState(true)
 
   useEffect(() => {
-    // Check for existing session first
-    checkSession()
-    
-    // Check for redirect result (for mobile Google sign-in)
-    handleRedirectResult()
+    // Initialize auth - must check redirect result first, then session
+    initializeAuth()
     
     // Check for OAuth errors in URL
     const params = new URLSearchParams(window.location.search)
@@ -47,30 +43,48 @@ export default function AdminLayout({
     }
   }, [])
 
-  // Handle redirect result from mobile Google sign-in
-  const handleRedirectResult = async () => {
+  // Initialize authentication - handles redirect result first, then checks session
+  const initializeAuth = async () => {
     try {
-      const result = await checkRedirectResult()
-      if (result?.user) {
+      // First, check if we're returning from a redirect (mobile Google sign-in)
+      const redirectResult = await checkRedirectResult()
+      
+      if (redirectResult?.user) {
+        // We have a redirect result - user just signed in via Google on mobile
+        console.log('Processing redirect result for:', redirectResult.user.email)
+        
         // Verify workspace domain for Google users
-        if (!result.user.email || !isWorkspaceDomainEmail(result.user.email)) {
+        if (!redirectResult.user.email || !isWorkspaceDomainEmail(redirectResult.user.email)) {
           await signOut()
           setError('Only 434 Media workspace accounts are allowed for Google sign-in.')
-          setIsCheckingRedirect(false)
+          setIsLoading(false)
           return
         }
         
-        // Create server session
-        await createServerSession('google')
+        // Create server session from the redirect result
+        try {
+          await createServerSession('google')
+          // Session created successfully - user is now authenticated
+          // createServerSession already sets isAuthenticated and user
+          setIsLoading(false)
+          return
+        } catch (err: any) {
+          console.error('Failed to create session from redirect:', err)
+          setError(getErrorMessage(err.message || 'authentication_failed'))
+          setIsLoading(false)
+          return
+        }
       }
+      
+      // No redirect result - check for existing session
+      await checkSession()
     } catch (err: any) {
-      console.error('Redirect result error:', err)
+      console.error('Auth initialization error:', err)
       // Only show error if it's not a cancelled/empty redirect
       if (err.code && err.code !== 'auth/popup-closed-by-user') {
         setError(getErrorMessage(err.message || 'authentication_failed'))
       }
-    } finally {
-      setIsCheckingRedirect(false)
+      setIsLoading(false)
     }
   }
 
@@ -201,12 +215,12 @@ export default function AdminLayout({
     return errors[errorCode] || errorCode || 'An error occurred during sign in.'
   }
 
-  if (isLoading || isCheckingRedirect) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-white mb-2">Loading...</div>
-          {isCheckingRedirect && isMobileDevice() && (
+          {isMobileDevice() && (
             <div className="text-gray-400 text-sm">Completing sign-in...</div>
           )}
         </div>
