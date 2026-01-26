@@ -33,8 +33,13 @@ export function ClientsView({
   // This ensures only full names appear, not partial names from data
   const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
 
-  // Filter clients
+  // Filter clients - EXCLUDE opportunities (they appear in Pipeline view only)
   const filteredClients = clients.filter((client) => {
+    // Hide opportunity records from Clients view to prevent duplicates
+    // Multiple opportunities for same company (e.g., 3 VelocityTX opportunities) 
+    // should only appear in Pipeline view, not as 3 separate client records
+    if (client.is_opportunity) return false
+    
     const searchLower = searchQuery.toLowerCase()
     const matchesSearch = 
       (client.company_name || "").toLowerCase().includes(searchLower) ||
