@@ -1,21 +1,11 @@
 import { cookies } from 'next/headers'
-import { getAuth } from './firebase-admin'
 
 export interface User {
   email: string
   name: string
   picture?: string
-  uid?: string
-  authProvider?: 'google' | 'email' | 'legacy'
 }
 
-export interface SessionData {
-  user: User
-  expiresAt: string
-  firebaseToken?: string
-}
-
-// Get session from cookie (supports both legacy and Firebase sessions)
 export async function getSession(): Promise<User | null> {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get('admin-auth-session')
@@ -25,7 +15,7 @@ export async function getSession(): Promise<User | null> {
   }
 
   try {
-    const session: SessionData = JSON.parse(
+    const session = JSON.parse(
       Buffer.from(sessionCookie.value, 'base64').toString('utf-8')
     )
     
@@ -41,78 +31,22 @@ export async function getSession(): Promise<User | null> {
   }
 }
 
-// Verify Firebase ID token and return user info
-export async function verifyFirebaseToken(idToken: string): Promise<User | null> {
-  try {
-    const auth = getAuth()
-    const decodedToken = await auth.verifyIdToken(idToken)
-    
-    return {
-      email: decodedToken.email || '',
-      name: decodedToken.name || decodedToken.email || 'User',
-      picture: decodedToken.picture,
-      uid: decodedToken.uid,
-      authProvider: decodedToken.firebase?.sign_in_provider === 'password' ? 'email' : 'google',
-    }
-  } catch (error: any) {
-    // Log detailed error for debugging
-    console.error('[Auth] Failed to verify Firebase token:', {
-      code: error?.code,
-      message: error?.message,
-      errorInfo: error?.errorInfo
-    })
-    
-    // Check for specific Firebase errors
-    if (error?.code === 'auth/id-token-expired') {
-      console.error('[Auth] Token expired - user needs to re-authenticate')
-    } else if (error?.code === 'auth/argument-error') {
-      console.error('[Auth] Invalid token format')
-    } else if (error?.code === 'auth/invalid-credential') {
-      console.error('[Auth] Invalid Firebase Admin credentials - check service account configuration')
-    }
-    
-    return null
-  }
-}
-
-// Create a session cookie from Firebase token
-export async function createSessionFromFirebaseToken(idToken: string): Promise<User | null> {
-  const user = await verifyFirebaseToken(idToken)
-  
-  if (!user || !user.email) {
-    return null
-  }
-
-  // For Google sign-in, verify workspace domain
-  // Email/password users are managed in Firebase and don't require domain check
-  if (user.authProvider === 'google' && !isWorkspaceEmail(user.email)) {
-    return null
-  }
-
-  await setSession(user)
-  return user
-}
-
 export async function setSession(user: User): Promise<void> {
   const cookieStore = await cookies()
   
-  const sessionData: SessionData = {
+  const sessionData = {
     user,
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
   }
   
   const sessionValue = Buffer.from(JSON.stringify(sessionData)).toString('base64')
   
-  // Use SameSite: 'lax' for compatibility - this works with same-origin POST requests
-  // The popup flow is same-origin so this should work on all browsers including mobile
   cookieStore.set('admin-auth-session', sessionValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 24 * 60 * 60, // 24 hours
     path: '/',
-    // Ensure cookie is accessible on all subdomains if using custom domain
-    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
   })
 }
 

@@ -39,23 +39,7 @@ const nextConfig: NextConfig = {
         pathname: '/**'
       }
     ],
-  },
-  
-  // Headers for Firebase Authentication popup support
-  async headers() {
-    return [
-      {
-        // Apply to all routes
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin-allow-popups',
-          },
-        ],
-      },
-    ]
-  },
+  },  
   
   // Explicit rewrites for the SDOH routes
   async rewrites() {
