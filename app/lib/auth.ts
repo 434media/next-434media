@@ -1,38 +1,5 @@
 import { cookies } from 'next/headers'
-import admin from 'firebase-admin'
-
-// Initialize Firebase Admin if not already initialized
-function getFirebaseAuth() {
-  if (admin.apps.length === 0) {
-    const projectId = process.env.FIREBASE_PROJECT_ID
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-
-    if (!projectId || !clientEmail || !privateKey) {
-      console.error('Firebase Admin SDK configuration missing:', {
-        hasProjectId: !!projectId,
-        hasClientEmail: !!clientEmail,
-        hasPrivateKey: !!privateKey
-      })
-      throw new Error('Firebase Admin SDK is not properly configured. Check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY environment variables.')
-    }
-
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-      })
-      console.log('[Auth] Firebase Admin initialized successfully')
-    } catch (error) {
-      console.error('[Auth] Failed to initialize Firebase Admin:', error)
-      throw error
-    }
-  }
-  return admin.auth()
-}
+import { getAuth } from './firebase-admin'
 
 export interface User {
   email: string
@@ -77,7 +44,7 @@ export async function getSession(): Promise<User | null> {
 // Verify Firebase ID token and return user info
 export async function verifyFirebaseToken(idToken: string): Promise<User | null> {
   try {
-    const auth = getFirebaseAuth()
+    const auth = getAuth()
     const decodedToken = await auth.verifyIdToken(idToken)
     
     return {

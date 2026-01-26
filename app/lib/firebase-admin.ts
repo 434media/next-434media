@@ -126,5 +126,11 @@ export async function testFirestoreConnection(): Promise<boolean> {
   }
 }
 
+// Get Firebase Auth instance (for token verification)
+export function getAuth(): admin.auth.Auth {
+  getFirebaseApp() // Ensure app is initialized
+  return admin.auth()
+}
+
 // Export admin for type usage
 export { admin }
