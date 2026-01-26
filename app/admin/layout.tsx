@@ -29,6 +29,7 @@ export default function AdminLayout({
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [authCheckComplete, setAuthCheckComplete] = useState(false)
 
   useEffect(() => {
     // Initialize auth - must check redirect result first, then session
@@ -43,11 +44,41 @@ export default function AdminLayout({
       window.history.replaceState({}, '', '/admin')
     }
   }, [])
+  
+  // Set up Firebase auth state listener to catch authenticated users
+  // This helps on mobile when redirect flow or popup completes
+  useEffect(() => {
+    if (!authCheckComplete) return
+    
+    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      if (firebaseUser && !isAuthenticated) {
+        // User is signed in to Firebase but not authenticated with our server
+        console.log('Firebase user detected, creating server session...')
+        
+        // Verify workspace domain for Google users
+        const isGoogle = firebaseUser.providerData.some(p => p.providerId === 'google.com')
+        if (isGoogle && (!firebaseUser.email || !isWorkspaceDomainEmail(firebaseUser.email))) {
+          await signOut()
+          setError('Only 434 Media workspace accounts are allowed for Google sign-in.')
+          return
+        }
+        
+        try {
+          await createServerSession(isGoogle ? 'google' : 'email', firebaseUser)
+        } catch (err: any) {
+          console.error('Failed to create session from auth state:', err)
+          setError(getErrorMessage(err.message || 'authentication_failed'))
+        }
+      }
+    })
+    
+    return () => unsubscribe()
+  }, [authCheckComplete, isAuthenticated])
 
   // Initialize authentication - handles redirect result first, then checks session
   const initializeAuth = async () => {
     try {
-      // First, check if we're returning from a redirect (mobile Google sign-in)
+      // First, check if we're returning from a redirect (mobile Google sign-in fallback)
       const redirectResult = await checkRedirectResult()
       
       if (redirectResult?.user) {
@@ -59,6 +90,7 @@ export default function AdminLayout({
           await signOut()
           setError('Only 434 Media workspace accounts are allowed for Google sign-in.')
           setIsLoading(false)
+          setAuthCheckComplete(true)
           return
         }
         
@@ -69,17 +101,20 @@ export default function AdminLayout({
           // Session created successfully - user is now authenticated
           // createServerSession already sets isAuthenticated and user
           setIsLoading(false)
+          setAuthCheckComplete(true)
           return
         } catch (err: any) {
           console.error('Failed to create session from redirect:', err)
           setError(getErrorMessage(err.message || 'authentication_failed'))
           setIsLoading(false)
+          setAuthCheckComplete(true)
           return
         }
       }
       
       // No redirect result - check for existing session
       await checkSession()
+      setAuthCheckComplete(true)
     } catch (err: any) {
       console.error('Auth initialization error:', err)
       // Only show error if it's not a cancelled/empty redirect
@@ -87,6 +122,7 @@ export default function AdminLayout({
         setError(getErrorMessage(err.message || 'authentication_failed'))
       }
       setIsLoading(false)
+      setAuthCheckComplete(true)
     }
   }
 
@@ -146,10 +182,11 @@ export default function AdminLayout({
     setError(null)
     
     try {
-      // On mobile, this will redirect - the result is handled in handleRedirectResult
+      // signInWithGoogle now uses popup for all devices (more reliable)
+      // Falls back to redirect only if popup is blocked
       const firebaseUser = await signInWithGoogle()
       
-      // This code only runs on desktop (popup flow)
+      // Popup flow completed successfully
       // Verify workspace domain for Google users
       if (!firebaseUser.email || !isWorkspaceDomainEmail(firebaseUser.email)) {
         await signOut()
@@ -157,10 +194,10 @@ export default function AdminLayout({
         return
       }
 
-      await createServerSession('google')
+      await createServerSession('google', firebaseUser)
     } catch (err: any) {
       console.error('Google sign-in error:', err)
-      // Ignore redirect message (expected on mobile)
+      // Ignore redirect message (expected when popup is blocked and falls back to redirect)
       if (err.message === 'Redirecting...') {
         return
       }
@@ -168,9 +205,8 @@ export default function AdminLayout({
         // User closed the popup, don't show error
         return
       }
-      if (err.code === 'auth/popup-blocked') {
-        // Popup was blocked - suggest mobile flow
-        setError('Pop-up was blocked by your browser. Please allow pop-ups or try on a mobile device.')
+      if (err.code === 'auth/cancelled-popup-request') {
+        // Another popup was already open, don't show error
         return
       }
       setError(getErrorMessage(err.message || 'authentication_failed'))

@@ -108,12 +108,16 @@ export async function setSession(user: User): Promise<void> {
   
   const sessionValue = Buffer.from(JSON.stringify(sessionData)).toString('base64')
   
+  // Use SameSite: 'lax' for compatibility - this works with same-origin POST requests
+  // The popup flow is same-origin so this should work on all browsers including mobile
   cookieStore.set('admin-auth-session', sessionValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 24 * 60 * 60, // 24 hours
     path: '/',
+    // Ensure cookie is accessible on all subdomains if using custom domain
+    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
   })
 }
 
