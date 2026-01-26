@@ -19,8 +19,9 @@ import { getFeedItems, getFeedItemBySlug } from "@/app/lib/firestore-feed"
  *   - Rate limiting via Vercel's built-in protection
  */
 
-// Cache for 5 minutes (300 seconds)
-export const revalidate = 300
+// Force dynamic rendering to ensure fresh data from Firestore
+// The response still includes Cache-Control headers for CDN caching
+export const dynamic = 'force-dynamic'
 
 // Allowed origins for CORS (comma-separated in env var)
 const ALLOWED_ORIGINS = process.env.FEED_API_ALLOWED_ORIGINS

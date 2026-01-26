@@ -7,6 +7,9 @@ import {
 } from "../../lib/firestore-feed"
 import { getSession } from "../../lib/auth"
 
+// Force dynamic rendering - this route uses auth and Firestore
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // Check admin authentication using session
