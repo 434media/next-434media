@@ -205,6 +205,7 @@ export interface Task {
   assigned_to: string
   secondary_assigned_to?: string | string[]  // Can be single name or array of names for multi-select
   assigned_by?: string
+  created_by?: string  // Who created the task (uneditable)
   brand?: Brand
   status: string
   priority: string

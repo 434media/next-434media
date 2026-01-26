@@ -8,5 +8,5 @@ export async function POST() {
 
 export async function GET(request: NextRequest) {
   await clearSession()
-  return NextResponse.redirect(new URL('/', request.nextUrl.origin))
+  return NextResponse.redirect(new URL('/admin', request.nextUrl.origin))
 }

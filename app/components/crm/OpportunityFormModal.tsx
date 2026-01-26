@@ -540,12 +540,12 @@ export function OpportunityFormModal({
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              {/* Company Name - Dropdown with search */}
+              {/* Client Name - Dropdown with search */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   <span className="flex items-center gap-1.5">
                     <Building2 className="w-4 h-4 text-gray-500" />
-                    Company Name *
+                    Client Name *
                   </span>
                 </label>
                 <div className="relative">
@@ -555,7 +555,7 @@ export function OpportunityFormModal({
                     className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-left focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
                   >
                     <span className={formData.company_name ? "text-gray-900" : "text-gray-400"}>
-                      {formData.company_name || "Select or create company..."}
+                      {formData.company_name || "Select or create client..."}
                     </span>
                     <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`} />
                   </button>
@@ -575,9 +575,8 @@ export function OpportunityFormModal({
                             value={companySearchQuery}
                             onChange={(e) => {
                               setCompanySearchQuery(e.target.value)
-                              onFormChange({ ...formData, company_name: e.target.value })
                             }}
-                            placeholder="Search or type new company name..."
+                            placeholder="Search or type new client name..."
                             className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                             autoFocus
                           />
@@ -594,7 +593,8 @@ export function OpportunityFormModal({
                                     ...formData,
                                     company_name: companySearchQuery,
                                     existing_company_id: null,
-                                    contacts: [], // Clear contacts for new company
+                                    linked_company_id: null,
+                                    contacts: [], // Clear contacts for new client
                                   })
                                   setShowCompanyDropdown(false)
                                   setCompanySearchQuery("")
@@ -608,24 +608,31 @@ export function OpportunityFormModal({
                             </>
                           )}
 
-                          {/* Existing companies */}
+                          {/* Existing clients */}
                           {filteredCompanies.length > 0 ? (
-                            filteredCompanies.map((company) => (
-                              <button
-                                key={company.id}
-                                type="button"
-                                onClick={() => handleSelectCompany(company)}
-                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
-                              >
-                                <span className="text-gray-900">{company.name}</span>
-                                {formData.existing_company_id === company.id && (
-                                  <Check className="w-4 h-4 text-blue-600" />
-                                )}
-                              </button>
-                            ))
+                            <>
+                              {filteredCompanies.slice(0, 50).map((company) => (
+                                <button
+                                  key={company.id}
+                                  type="button"
+                                  onClick={() => handleSelectCompany(company)}
+                                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                >
+                                  <span className="text-gray-900">{company.name}</span>
+                                  {formData.existing_company_id === company.id && (
+                                    <Check className="w-4 h-4 text-blue-600" />
+                                  )}
+                                </button>
+                              ))}
+                              {uniqueCompanies.length > 50 && (
+                                <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50">
+                                  Showing {Math.min(50, filteredCompanies.length)} of {uniqueCompanies.length} clients. Type to search for more.
+                                </div>
+                              )}
+                            </>
                           ) : !companySearchQuery ? (
                             <div className="px-3 py-4 text-center text-sm text-gray-500">
-                              No existing companies. Type to create one.
+                              No existing clients. Type to create one.
                             </div>
                           ) : null}
                         </div>
@@ -646,7 +653,7 @@ export function OpportunityFormModal({
                 {formData.linked_company_id && !isEditing && (
                   <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
                     <Check className="w-3 h-3" />
-                    Linked to existing company (will create new opportunity)
+                    Linked to existing client (will create new opportunity)
                   </p>
                 )}
               </div>

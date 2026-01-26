@@ -146,10 +146,21 @@ export function TaskModal({
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [clientSearchQuery, setClientSearchQuery] = useState("")
 
+  // Get unique client names from clients list and sort alphabetically
+  const uniqueClients = clients
+    .filter(client => client.company_name || client.name)
+    .reduce((acc, client) => {
+      const name = client.company_name || client.name || ''
+      if (!acc.find(c => c.name === name)) {
+        acc.push({ id: client.id, name, company_name: client.company_name })
+      }
+      return acc
+    }, [] as { id: string; name: string; company_name?: string }[])
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   // Filter clients based on search query
-  const filteredClients = clients.filter((client) => {
-    const name = client.company_name || client.name || ''
-    return name.toLowerCase().includes(clientSearchQuery.toLowerCase())
+  const filteredClients = uniqueClients.filter((client) => {
+    return client.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
   })
 
   // Fetch team members from Firestore
@@ -398,6 +409,28 @@ export function TaskModal({
                   />
                 </div>
 
+                {/* Created By & Date Created - Read-only reference fields */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Created by</label>
+                    <input
+                      type="text"
+                      value={task?.id ? (task.created_by || "—") : (currentUser?.name || currentUser?.email || "—")}
+                      disabled
+                      className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Date Created</label>
+                    <input
+                      type="text"
+                      value={task?.id ? formatDate(task.created_at) : formatDate(new Date().toISOString())}
+                      disabled
+                      className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
@@ -505,7 +538,7 @@ export function TaskModal({
                               ) : (
                                 <>
                                   {filteredClients.slice(0, 50).map((client) => {
-                                    const clientName = client.company_name || client.name || 'Unnamed Client'
+                                    const clientName = client.name || 'Unnamed Client'
                                     return (
                                       <button
                                         key={client.id}
@@ -529,9 +562,9 @@ export function TaskModal({
                                       </button>
                                     )
                                   })}
-                                  {filteredClients.length > 50 && (
+                                  {uniqueClients.length > 50 && (
                                     <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50">
-                                      Showing 50 of {filteredClients.length} clients. Type to search for more.
+                                      Showing {Math.min(50, filteredClients.length)} of {uniqueClients.length} clients. Type to search for more.
                                     </div>
                                   )}
                                 </>

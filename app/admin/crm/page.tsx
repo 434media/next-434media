@@ -804,6 +804,7 @@ export default function SalesCRMPage() {
           body: JSON.stringify({
             owner,
             ...taskForm,
+            created_by: currentUser?.name || currentUser?.email || "Unknown",
             attachments: taskAttachments,
             comments: selectedTask.comments || [],
           }),
@@ -1001,7 +1002,7 @@ export default function SalesCRMPage() {
   // Client handlers
   const handleSaveClient = async () => {
     if (!clientForm.company_name.trim()) {
-      setToast({ message: "Company name is required", type: "error" })
+      setToast({ message: "Client name is required", type: "error" })
       return
     }
 
@@ -1067,7 +1068,7 @@ export default function SalesCRMPage() {
   // Save opportunity (creates or updates client with is_opportunity=true)
   const handleSaveOpportunity = async () => {
     if (!opportunityForm.company_name.trim()) {
-      setToast({ message: "Company name is required", type: "error" })
+      setToast({ message: "Client name is required", type: "error" })
       return
     }
 
@@ -1122,7 +1123,7 @@ export default function SalesCRMPage() {
         source: opportunityForm.source || undefined,
         is_opportunity: true, // Always true for opportunities
         disposition: opportunityForm.disposition || "pitched",
-        doc: opportunityForm.doc || undefined,
+        doc: opportunityForm.doc || "25", // Default to 25% if not selected
         web_links: opportunityForm.web_links.filter(link => link.trim() !== ""),
         docs: opportunityForm.docs.filter(doc => doc.trim() !== ""),
       }
@@ -1721,7 +1722,7 @@ export default function SalesCRMPage() {
         {/* Clients View */}
         {viewMode === "clients" && (
           <ClientsView
-            clients={clients}
+            clients={clients.filter(c => !c.is_opportunity)}
             searchQuery={searchQuery}
             sourceFilter={clientSourceFilter}
             assigneeFilter={clientAssigneeFilter}
@@ -1789,7 +1790,7 @@ export default function SalesCRMPage() {
         formData={taskForm}
         attachments={taskAttachments}
         opportunities={clients.filter(c => c.is_opportunity && c.disposition !== "closed_lost").map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
-        clients={clients.filter(c => !c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, name: c.name }))}
+        clients={clients.map(c => ({ id: c.id, company_name: c.company_name, name: c.name }))}
         currentUser={currentUser}
         isSaving={isSavingTask}
         isUploadingFile={isUploadingFile}

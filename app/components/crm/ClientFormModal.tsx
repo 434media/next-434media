@@ -154,10 +154,10 @@ export function ClientFormModal({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {isEditing ? "Contact" : "New Contact"}
+                    {isEditing ? "Client" : "New Client"}
                   </h3>
                   <p className="text-xs text-gray-500">
-                    {isEditing ? "Update contact information" : "Add a new point of contact"}
+                    {isEditing ? "Update client information" : "Add a new client"}
                   </p>
                 </div>
               </div>
@@ -171,10 +171,10 @@ export function ClientFormModal({
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              {/* Company Name - Primary Field */}
+              {/* Client Name - Primary Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Company Name *
+                  Client Name *
                 </label>
                 <input
                   type="text"
@@ -501,7 +501,7 @@ export function ClientFormModal({
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    {isEditing ? "Update Contact" : "Add Contact"}
+                    {isEditing ? "Update Client" : "Add Client"}
                   </>
                 )}
               </button>
