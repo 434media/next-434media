@@ -2,12 +2,17 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app'
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup, 
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  browserLocalPersistence,
+  setPersistence,
   type User,
-  type Auth
+  type Auth,
+  type UserCredential
 } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -23,6 +28,7 @@ const firebaseConfig = {
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
 let googleProvider: GoogleAuthProvider | null = null
+let persistenceSet = false
 
 function getFirebaseApp(): FirebaseApp {
   if (app) return app
@@ -42,6 +48,17 @@ function getFirebaseAuth(): Auth {
   return auth
 }
 
+// Set persistence to local to fix mobile storage issues
+async function ensurePersistence(): Promise<void> {
+  if (persistenceSet) return
+  try {
+    await setPersistence(getFirebaseAuth(), browserLocalPersistence)
+    persistenceSet = true
+  } catch (error) {
+    console.warn('Failed to set persistence:', error)
+  }
+}
+
 function getGoogleProvider(): GoogleAuthProvider {
   if (googleProvider) return googleProvider
   googleProvider = new GoogleAuthProvider()
@@ -52,17 +69,53 @@ function getGoogleProvider(): GoogleAuthProvider {
   return googleProvider
 }
 
+// Detect if running on mobile device
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  )
+}
+
 // Export getters for lazy access
 export { getFirebaseAuth as auth, getGoogleProvider as googleProvider }
 
 // Sign in with Google (workspace domain only)
+// Uses redirect on mobile devices to avoid popup/storage issues
 export async function signInWithGoogle(): Promise<User> {
+  await ensurePersistence()
+  
+  if (isMobileDevice()) {
+    // On mobile, use redirect flow - this will navigate away from the page
+    await signInWithRedirect(getFirebaseAuth(), getGoogleProvider())
+    // This line won't be reached as the page will redirect
+    throw new Error('Redirecting...')
+  }
+  
+  // On desktop, use popup flow
   const result = await signInWithPopup(getFirebaseAuth(), getGoogleProvider())
   return result.user
 }
 
+// Check for redirect result (call this on page load for mobile auth)
+export async function checkRedirectResult(): Promise<UserCredential | null> {
+  try {
+    await ensurePersistence()
+    const result = await getRedirectResult(getFirebaseAuth())
+    return result
+  } catch (error: any) {
+    // Handle specific redirect errors
+    if (error.code === 'auth/popup-closed-by-user') {
+      return null
+    }
+    console.error('Redirect result error:', error)
+    throw error
+  }
+}
+
 // Sign in with email/password (for approved non-workspace admins)
 export async function signInWithEmail(email: string, password: string): Promise<User> {
+  await ensurePersistence()
   const result = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
   return result.user
 }

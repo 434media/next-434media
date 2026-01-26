@@ -9,7 +9,9 @@ import {
   signOut, 
   onAuthStateChange,
   getIdToken,
-  isWorkspaceDomainEmail
+  isWorkspaceDomainEmail,
+  checkRedirectResult,
+  isMobileDevice
 } from "@/app/lib/firebase-client"
 
 export default function AdminLayout({
@@ -26,10 +28,14 @@ export default function AdminLayout({
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [isCheckingRedirect, setIsCheckingRedirect] = useState(true)
 
   useEffect(() => {
     // Check for existing session first
     checkSession()
+    
+    // Check for redirect result (for mobile Google sign-in)
+    handleRedirectResult()
     
     // Check for OAuth errors in URL
     const params = new URLSearchParams(window.location.search)
@@ -40,6 +46,33 @@ export default function AdminLayout({
       window.history.replaceState({}, '', '/admin')
     }
   }, [])
+
+  // Handle redirect result from mobile Google sign-in
+  const handleRedirectResult = async () => {
+    try {
+      const result = await checkRedirectResult()
+      if (result?.user) {
+        // Verify workspace domain for Google users
+        if (!result.user.email || !isWorkspaceDomainEmail(result.user.email)) {
+          await signOut()
+          setError('Only 434 Media workspace accounts are allowed for Google sign-in.')
+          setIsCheckingRedirect(false)
+          return
+        }
+        
+        // Create server session
+        await createServerSession('google')
+      }
+    } catch (err: any) {
+      console.error('Redirect result error:', err)
+      // Only show error if it's not a cancelled/empty redirect
+      if (err.code && err.code !== 'auth/popup-closed-by-user') {
+        setError(getErrorMessage(err.message || 'authentication_failed'))
+      }
+    } finally {
+      setIsCheckingRedirect(false)
+    }
+  }
 
   const checkSession = async () => {
     try {
@@ -96,8 +129,10 @@ export default function AdminLayout({
     setError(null)
     
     try {
+      // On mobile, this will redirect - the result is handled in handleRedirectResult
       const firebaseUser = await signInWithGoogle()
       
+      // This code only runs on desktop (popup flow)
       // Verify workspace domain for Google users
       if (!firebaseUser.email || !isWorkspaceDomainEmail(firebaseUser.email)) {
         await signOut()
@@ -108,8 +143,17 @@ export default function AdminLayout({
       await createServerSession('google')
     } catch (err: any) {
       console.error('Google sign-in error:', err)
+      // Ignore redirect message (expected on mobile)
+      if (err.message === 'Redirecting...') {
+        return
+      }
       if (err.code === 'auth/popup-closed-by-user') {
         // User closed the popup, don't show error
+        return
+      }
+      if (err.code === 'auth/popup-blocked') {
+        // Popup was blocked - suggest mobile flow
+        setError('Pop-up was blocked by your browser. Please allow pop-ups or try on a mobile device.')
         return
       }
       setError(getErrorMessage(err.message || 'authentication_failed'))
@@ -157,10 +201,15 @@ export default function AdminLayout({
     return errors[errorCode] || errorCode || 'An error occurred during sign in.'
   }
 
-  if (isLoading) {
+  if (isLoading || isCheckingRedirect) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+        <div className="text-center">
+          <div className="text-white mb-2">Loading...</div>
+          {isCheckingRedirect && isMobileDevice() && (
+            <div className="text-gray-400 text-sm">Completing sign-in...</div>
+          )}
+        </div>
       </div>
     )
   }
