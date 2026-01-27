@@ -23,6 +23,7 @@ import {
   ClientFormModal,
   OpportunityFormModal,
   TaskModal,
+  NotificationBell,
   TEAM_MEMBERS,
 } from "../../components/crm"
 
@@ -510,6 +511,39 @@ export default function SalesCRMPage() {
     setShowTaskModal(true)
   }
 
+  // Open task from notification
+  const handleOpenTaskFromNotification = async (taskId: string) => {
+    // First, ensure tasks are loaded
+    if (tasks.length === 0) {
+      await loadTasks()
+    }
+    
+    // Find the task in the loaded tasks
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      openTaskModal(task)
+    } else {
+      // If task not found in current tasks, try to fetch it directly
+      try {
+        // Switch to tasks view and show a message
+        setViewMode("tasks")
+        setToast({ message: "Loading task...", type: "success" })
+        
+        // Reload tasks to ensure we have the latest
+        await loadTasks()
+        
+        // Try again after reload
+        const refreshedTask = tasks.find(t => t.id === taskId)
+        if (refreshedTask) {
+          openTaskModal(refreshedTask)
+        }
+      } catch (err) {
+        console.error("Failed to load task from notification:", err)
+        setToast({ message: "Could not find the task", type: "error" })
+      }
+    }
+  }
+
   // Delete task
   const handleDeleteTask = async () => {
     if (!selectedTask) return
@@ -789,13 +823,51 @@ export default function SalesCRMPage() {
         "Nichole": "teams",
         "Nichole Snow": "teams",
       }
+
+      // Helper to convert assignee name to email
+      const getAssigneeEmail = (name: string): string | null => {
+        const member = TEAM_MEMBERS.find(m => 
+          m.name.toLowerCase() === name.toLowerCase() ||
+          m.name.split(' ')[0].toLowerCase() === name.toLowerCase()
+        )
+        return member?.email || null
+      }
       
       const owner = ownerMap[taskForm.assigned_to] || "teams"
       
       // Check if this is a new task (empty id)
       const isNewTask = !selectedTask.id
+
+      // Track who needs to be notified
+      const assigneesToNotify: string[] = []
+      const taggedToNotify: string[] = []
       
       if (isNewTask) {
+        // For new tasks, notify primary assignee (if not the creator)
+        if (taskForm.assigned_to && taskForm.assigned_to !== currentUser?.name) {
+          const email = getAssigneeEmail(taskForm.assigned_to)
+          if (email && email !== currentUser?.email) {
+            assigneesToNotify.push(email)
+          }
+        }
+        
+        // Notify secondary assignees
+        for (const name of taskForm.secondary_assigned_to) {
+          if (name !== currentUser?.name) {
+            const email = getAssigneeEmail(name)
+            if (email && email !== currentUser?.email && !assigneesToNotify.includes(email)) {
+              assigneesToNotify.push(email)
+            }
+          }
+        }
+        
+        // Notify tagged users
+        for (const email of taskForm.tagged_users) {
+          if (email !== currentUser?.email && !assigneesToNotify.includes(email)) {
+            taggedToNotify.push(email)
+          }
+        }
+
         // Create new task - include attachments and comments
         const response = await fetch("/api/admin/crm/tasks", {
           method: "POST",
@@ -812,9 +884,75 @@ export default function SalesCRMPage() {
 
         if (!response.ok) throw new Error("Failed to create task")
         
+        const result = await response.json()
+        const newTaskId = result.id || result.data?.id
+
+        // Send notifications for new task assignments (async, don't block UI)
+        if (assigneesToNotify.length > 0 && newTaskId) {
+          fetch("/api/admin/crm/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              notificationType: "assignment",
+              taskId: newTaskId,
+              taskTitle: taskForm.title,
+              assignedEmails: assigneesToNotify,
+              assignedBy: currentUser?.name || "Someone",
+            }),
+          }).catch(err => console.error("Failed to send assignment notifications:", err))
+        }
+
+        // Send notifications for tagged users
+        if (taggedToNotify.length > 0 && newTaskId) {
+          fetch("/api/admin/crm/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              notificationType: "tagged",
+              taskId: newTaskId,
+              taskTitle: taskForm.title,
+              assignedEmails: taggedToNotify,
+              assignedBy: currentUser?.name || "Someone",
+            }),
+          }).catch(err => console.error("Failed to send tagged notifications:", err))
+        }
+        
         setToast({ message: "Task created successfully", type: "success" })
       } else {
-        // Update existing task
+        // Update existing task - check for new assignees
+        const previousPrimaryAssignee = selectedTask.assigned_to
+        const previousSecondaryAssignees = Array.isArray(selectedTask.secondary_assigned_to) 
+          ? selectedTask.secondary_assigned_to 
+          : selectedTask.secondary_assigned_to ? [selectedTask.secondary_assigned_to] : []
+        const previousTaggedUsers = selectedTask.tagged_users || []
+
+        // Check for new primary assignee
+        if (taskForm.assigned_to && taskForm.assigned_to !== previousPrimaryAssignee && taskForm.assigned_to !== currentUser?.name) {
+          const email = getAssigneeEmail(taskForm.assigned_to)
+          if (email && email !== currentUser?.email) {
+            assigneesToNotify.push(email)
+          }
+        }
+
+        // Check for new secondary assignees
+        for (const name of taskForm.secondary_assigned_to) {
+          if (!previousSecondaryAssignees.includes(name) && name !== currentUser?.name) {
+            const email = getAssigneeEmail(name)
+            if (email && email !== currentUser?.email && !assigneesToNotify.includes(email)) {
+              assigneesToNotify.push(email)
+            }
+          }
+        }
+
+        // Check for new tagged users
+        for (const email of taskForm.tagged_users) {
+          if (!previousTaggedUsers.includes(email) && email !== currentUser?.email) {
+            taggedToNotify.push(email)
+          }
+        }
+
         // If the task was completed, use "completed" as owner so the API can handle reactivation
         let updateOwner = owner
         if (selectedTask.status === "completed") {
@@ -835,6 +973,38 @@ export default function SalesCRMPage() {
         if (!response.ok) throw new Error("Failed to update task")
 
         const result = await response.json()
+
+        // Send notifications for new assignees (async, don't block UI)
+        if (assigneesToNotify.length > 0) {
+          fetch("/api/admin/crm/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              notificationType: "assignment",
+              taskId: selectedTask.id,
+              taskTitle: taskForm.title,
+              assignedEmails: assigneesToNotify,
+              assignedBy: currentUser?.name || "Someone",
+            }),
+          }).catch(err => console.error("Failed to send assignment notifications:", err))
+        }
+
+        // Send notifications for newly tagged users
+        if (taggedToNotify.length > 0) {
+          fetch("/api/admin/crm/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              notificationType: "tagged",
+              taskId: selectedTask.id,
+              taskTitle: taskForm.title,
+              assignedEmails: taggedToNotify,
+              assignedBy: currentUser?.name || "Someone",
+            }),
+          }).catch(err => console.error("Failed to send tagged notifications:", err))
+        }
         
         // Show appropriate message based on whether task was reactivated
         if (result.reactivated) {
@@ -1889,6 +2059,8 @@ export default function SalesCRMPage() {
               Back
             </Link>
           </div>
+          {/* Notification Bell */}
+          <NotificationBell onOpenTask={handleOpenTaskFromNotification} />
         </div>
 
         {/* Title */}
@@ -2098,7 +2270,33 @@ export default function SalesCRMPage() {
         onRemoveAttachment={handleRemoveAttachment}
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
-        onClose={() => setShowTaskModal(false)}
+        onClose={() => {
+          setShowTaskModal(false)
+          setSelectedTask(null)
+          // Reset form state to prevent data carryover
+          setTaskForm({
+            title: "",
+            description: "",
+            assigned_to: "",
+            secondary_assigned_to: [],
+            brand: "",
+            status: "not_started",
+            priority: "medium",
+            due_date: "",
+            notes: "",
+            web_links: [],
+            tagged_users: [],
+            is_opportunity: false,
+            opportunity_id: "",
+            disposition: "",
+            doc: "",
+            client_id: "",
+            client_name: "",
+          })
+          setNewLink("")
+          setNewComment("")
+          setTaskAttachments([])
+        }}
       />
 
       {/* Linked Items Panel - Shows when clicking stacked kanban cards */}

@@ -249,21 +249,41 @@ export function OpportunityFormModal({
     try {
       const response = await fetch("/api/admin/team-members")
       const data = await response.json()
-      if (data.success && data.data.length > 0) {
-        setTeamMembers(data.data.filter((m: TeamMember) => m.isActive))
-      } else {
-        // Fallback to default TEAM_MEMBERS
-        setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-          id: `default-${i}`,
-          name: m.name,
-          email: m.email,
-          isActive: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })))
-      }
+      
+      // Get Firestore members (active only)
+      const firestoreMembers: TeamMember[] = data.success && data.data 
+        ? data.data.filter((m: TeamMember) => m.isActive)
+        : []
+      
+      // Create default team members for merging
+      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
+        id: `default-${i}`,
+        name: m.name,
+        email: m.email,
+        isActive: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))
+      
+      // Merge: use Firestore members + add any default members not already in Firestore
+      // This ensures the full list is always shown, including both Firestore and default members
+      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
+      const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
+      
+      const missingDefaults = defaultMembers.filter(d => 
+        !firestoreNames.has(d.name.toLowerCase()) && 
+        (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
+      )
+      
+      // Combine Firestore members with any missing defaults
+      const allMembers = [...firestoreMembers, ...missingDefaults]
+      
+      // Sort by name for consistent ordering
+      allMembers.sort((a, b) => a.name.localeCompare(b.name))
+      
+      setTeamMembers(allMembers)
     } catch {
-      // Fallback to default TEAM_MEMBERS
+      // Fallback to default TEAM_MEMBERS on error
       setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
         id: `default-${i}`,
         name: m.name,

@@ -9,6 +9,15 @@ interface NotificationData {
   taskUrl?: string
 }
 
+interface AssignmentNotificationData {
+  taskId: string
+  taskTitle: string
+  assignedEmails: string[]
+  assignedBy: string
+  notificationType: 'assignment' | 'tagged'
+  taskUrl?: string
+}
+
 interface ServiceAccountCredentials {
   client_email: string
   private_key: string
@@ -230,6 +239,76 @@ async function storeNotificationInFirestore(data: NotificationData): Promise<voi
     console.log(`[Notifications] Stored ${data.mentionedEmails.length} fallback notifications in Firestore`)
   } catch (error) {
     console.error('[Notifications] Failed to store notification in Firestore:', error)
+  }
+}
+
+/**
+ * Send notification when a user is assigned or tagged in a task
+ * Stores notifications in Firestore for in-app display
+ */
+export async function sendAssignmentNotification(data: AssignmentNotificationData): Promise<{ success: boolean; error?: string }> {
+  const { taskId, taskTitle, assignedEmails, assignedBy, notificationType, taskUrl } = data
+
+  if (!assignedEmails.length) {
+    return { success: true } // No one to notify
+  }
+
+  // Filter to only 434media.com emails
+  const validRecipients = assignedEmails.filter(email => 
+    email.endsWith('@434media.com')
+  )
+
+  if (!validRecipients.length) {
+    console.log('[Notifications] No valid 434media.com recipients to notify')
+    return { success: true }
+  }
+
+  // Store notification in Firestore for in-app display
+  try {
+    await storeAssignmentNotificationInFirestore({
+      taskId,
+      taskTitle,
+      assignedEmails: validRecipients,
+      assignedBy,
+      notificationType,
+      taskUrl,
+    })
+    
+    console.log(`[Notifications] Created ${validRecipients.length} in-app notifications for ${notificationType}`)
+    return { success: true }
+  } catch (error) {
+    console.error('[Notifications] Failed to create in-app notifications:', error)
+    return { success: false, error: 'Failed to create notifications' }
+  }
+}
+
+/**
+ * Store assignment notification in Firestore
+ */
+async function storeAssignmentNotificationInFirestore(data: AssignmentNotificationData): Promise<void> {
+  try {
+    const { getDb } = await import('./firebase-admin')
+    const db = getDb()
+    
+    const notificationCollection = db.collection('crm_notifications')
+    
+    await Promise.all(
+      data.assignedEmails.map(async (email) => {
+        await notificationCollection.add({
+          recipient_email: email,
+          type: data.notificationType,
+          task_id: data.taskId,
+          task_title: data.taskTitle,
+          assigned_by: data.assignedBy,
+          created_at: new Date().toISOString(),
+          read: false,
+        })
+      })
+    )
+    
+    console.log(`[Notifications] Stored ${data.assignedEmails.length} ${data.notificationType} notifications in Firestore`)
+  } catch (error) {
+    console.error('[Notifications] Failed to store assignment notification:', error)
   }
 }
 

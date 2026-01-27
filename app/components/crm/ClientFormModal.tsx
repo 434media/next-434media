@@ -17,6 +17,7 @@ import {
   Calendar,
 } from "lucide-react"
 import { TEAM_MEMBERS } from "./types"
+import type { TeamMember } from "./types"
 
 interface ContactFormData {
   id: string
@@ -71,6 +72,66 @@ export function ClientFormModal({
   onClose,
 }: ClientFormModalProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
+
+  // Fetch team members from Firestore
+  const fetchTeamMembers = useCallback(async () => {
+    setIsLoadingMembers(true)
+    try {
+      const response = await fetch("/api/admin/team-members")
+      const data = await response.json()
+      
+      // Get Firestore members (active only)
+      const firestoreMembers: TeamMember[] = data.success && data.data 
+        ? data.data.filter((m: TeamMember) => m.isActive)
+        : []
+      
+      // Create default team members for merging
+      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
+        id: `default-${i}`,
+        name: m.name,
+        email: m.email,
+        isActive: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))
+      
+      // Merge: use Firestore members + add any default members not already in Firestore
+      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
+      const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
+      
+      const missingDefaults = defaultMembers.filter(d => 
+        !firestoreNames.has(d.name.toLowerCase()) && 
+        (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
+      )
+      
+      // Combine and sort by name
+      const allMembers = [...firestoreMembers, ...missingDefaults]
+      allMembers.sort((a, b) => a.name.localeCompare(b.name))
+      
+      setTeamMembers(allMembers)
+    } catch {
+      // Fallback to default TEAM_MEMBERS
+      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
+        id: `default-${i}`,
+        name: m.name,
+        email: m.email,
+        isActive: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })))
+    } finally {
+      setIsLoadingMembers(false)
+    }
+  }, [])
+
+  // Fetch team members when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTeamMembers()
+    }
+  }, [isOpen, fetchTeamMembers])
 
   // Toggle contact expansion
   const toggleContact = (contactId: string) => {
@@ -469,10 +530,11 @@ export function ClientFormModal({
                   value={formData.assigned_to || ""}
                   onChange={(e) => onFormChange({ ...formData, assigned_to: e.target.value })}
                   className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  disabled={isLoadingMembers}
                 >
-                  <option value="">Select assignee...</option>
-                  {TEAM_MEMBERS.map((member) => (
-                    <option key={member.email} value={member.name}>
+                  <option value="">{isLoadingMembers ? "Loading..." : "Select assignee..."}</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.id} value={member.name}>
                       {member.name}
                     </option>
                   ))}

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isWorkspaceEmail } from "@/app/lib/auth"
 import { 
   sendCommentNotification, 
+  sendAssignmentNotification,
   getUnreadNotifications, 
   markNotificationsAsRead 
 } from "@/app/lib/notifications"
@@ -45,7 +46,7 @@ export async function GET() {
   }
 }
 
-// POST - Send a notification for a comment mention
+// POST - Send a notification for a comment mention or task assignment
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin()
@@ -58,6 +59,29 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Check if this is an assignment notification
+    if (body.notificationType === 'assignment' || body.notificationType === 'tagged') {
+      // Validate required fields for assignment notifications
+      if (!body.taskId || !body.taskTitle || !body.assignedEmails || !body.assignedBy) {
+        return NextResponse.json(
+          { error: "Missing required fields: taskId, taskTitle, assignedEmails, assignedBy" },
+          { status: 400 }
+        )
+      }
+
+      const result = await sendAssignmentNotification({
+        taskId: body.taskId,
+        taskTitle: body.taskTitle,
+        assignedEmails: body.assignedEmails,
+        assignedBy: body.assignedBy,
+        notificationType: body.notificationType,
+        taskUrl: body.taskUrl,
+      })
+
+      return NextResponse.json(result)
+    }
+
+    // Default: comment mention notification
     // Validate required fields
     if (!body.taskId || !body.taskTitle || !body.comment || !body.mentionedEmails) {
       return NextResponse.json(
