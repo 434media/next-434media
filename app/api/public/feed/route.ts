@@ -85,8 +85,16 @@ export async function GET(request: NextRequest) {
     const slug = searchParams.get("slug")
     const status = searchParams.get("status") || "published" // Default to published only
     const limit = searchParams.get("limit")
+    const fresh = searchParams.get("fresh") === "true" // Bypass cache when ?fresh=true
 
     const corsOrigin = getCorsOrigin(request)
+    
+    // Shorter cache for faster content updates
+    // fresh=true: no caching at all
+    // normal: 60s CDN cache with 2min stale-while-revalidate
+    const cacheControl = fresh 
+      ? 'no-cache, no-store, must-revalidate'
+      : 'public, s-maxage=60, stale-while-revalidate=120'
 
     // If slug is provided, return single item
     if (slug) {
@@ -112,7 +120,7 @@ export async function GET(request: NextRequest) {
         data: item,
       }, {
         headers: {
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          'Cache-Control': cacheControl,
           'Access-Control-Allow-Origin': corsOrigin,
         }
       })
@@ -135,7 +143,7 @@ export async function GET(request: NextRequest) {
       table: tableName,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': cacheControl,
         'Access-Control-Allow-Origin': corsOrigin,
       }
     })

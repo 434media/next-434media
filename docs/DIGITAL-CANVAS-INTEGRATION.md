@@ -52,6 +52,21 @@ https://434media.com/api/public/feed
 | `slug` | string | - | Fetch single item by URL slug |
 | `status` | string | `published` | Filter by status (use `all` for everything) |
 | `limit` | number | - | Maximum number of items to return |
+| `fresh` | boolean | `false` | Set to `true` to bypass all caching (use sparingly) |
+
+### Caching Behavior
+
+The API uses a multi-layer caching strategy for performance:
+
+| Layer | Duration | Notes |
+|-------|----------|-------|
+| In-memory cache | 10 seconds | Server-side, invalidated on content updates |
+| CDN cache | 60 seconds | Edge caching via Vercel |
+| Stale-while-revalidate | 2 minutes | Serves stale content while refreshing |
+
+**Typical delay after publishing: 1-2 minutes**
+
+For immediate updates (e.g., previewing just-published content), add `?fresh=true` to bypass caching.
 
 ---
 
