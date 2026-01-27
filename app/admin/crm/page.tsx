@@ -999,6 +999,293 @@ export default function SalesCRMPage() {
     }
   }
 
+  // Delete a comment from the task
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedTask || !currentUser) return
+    
+    const updatedComments = (selectedTask.comments || []).filter(c => c.id !== commentId)
+    const updatedTask = { ...selectedTask, comments: updatedComments }
+    setSelectedTask(updatedTask)
+    
+    if (!selectedTask.id) {
+      setToast({ message: "Comment deleted", type: "success" })
+      return
+    }
+    
+    try {
+      const ownerMap: Record<string, string> = {
+        "Jake": "jake",
+        "Jacob Lee Miles": "jake",
+        "Marc": "marc",
+        "Marcos Resendez": "marc",
+        "Stacy": "stacy",
+        "Stacy Ramirez": "stacy",
+        "Stacy Carrizales": "stacy",
+        "Jesse": "jesse",
+        "Jesse Hernandez": "jesse",
+        "Barb": "barb",
+        "Barbara Carreon": "barb",
+        "Nichole": "teams",
+        "Nichole Snow": "teams",
+      }
+      const owner = ownerMap[selectedTask.assigned_to] || "teams"
+      
+      const response = await fetch("/api/admin/crm/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id: selectedTask.id,
+          owner,
+          comments: updatedComments,
+        }),
+      })
+      
+      if (!response.ok) throw new Error("Failed to delete comment")
+      
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === selectedTask.id ? updatedTask : t)
+      )
+      setToast({ message: "Comment deleted", type: "success" })
+    } catch (err) {
+      console.error("Failed to delete comment:", err)
+      setToast({ message: "Failed to delete comment", type: "error" })
+      setSelectedTask(selectedTask)
+    }
+  }
+
+  // Edit an existing comment
+  const handleEditComment = async (commentId: string, newContent: string) => {
+    if (!selectedTask || !currentUser) return
+    
+    const updatedComments = (selectedTask.comments || []).map(c => 
+      c.id === commentId 
+        ? { ...c, content: newContent, updated_at: new Date().toISOString() }
+        : c
+    )
+    const updatedTask = { ...selectedTask, comments: updatedComments }
+    setSelectedTask(updatedTask)
+    
+    if (!selectedTask.id) {
+      setToast({ message: "Comment updated", type: "success" })
+      return
+    }
+    
+    try {
+      const ownerMap: Record<string, string> = {
+        "Jake": "jake",
+        "Jacob Lee Miles": "jake",
+        "Marc": "marc",
+        "Marcos Resendez": "marc",
+        "Stacy": "stacy",
+        "Stacy Ramirez": "stacy",
+        "Stacy Carrizales": "stacy",
+        "Jesse": "jesse",
+        "Jesse Hernandez": "jesse",
+        "Barb": "barb",
+        "Barbara Carreon": "barb",
+        "Nichole": "teams",
+        "Nichole Snow": "teams",
+      }
+      const owner = ownerMap[selectedTask.assigned_to] || "teams"
+      
+      const response = await fetch("/api/admin/crm/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id: selectedTask.id,
+          owner,
+          comments: updatedComments,
+        }),
+      })
+      
+      if (!response.ok) throw new Error("Failed to update comment")
+      
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === selectedTask.id ? updatedTask : t)
+      )
+      setToast({ message: "Comment updated", type: "success" })
+    } catch (err) {
+      console.error("Failed to update comment:", err)
+      setToast({ message: "Failed to update comment", type: "error" })
+      setSelectedTask(selectedTask)
+    }
+  }
+
+  // Handle file drop for drag and drop uploads
+  const handleFileDrop = async (files: FileList) => {
+    if (!files || files.length === 0 || !selectedTask || !currentUser) return
+    
+    // Reuse the same upload logic as handleFileUpload
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const maxSize = 50 * 1024 * 1024 // 50MB
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1)
+      
+      if (file.size > maxSize) {
+        setToast({ message: `File "${file.name}" is too large (${fileSizeMB}MB). Maximum size is 50MB.`, type: "error" })
+        continue
+      }
+      
+      const allowedTypes = [
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "application/pdf",
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain", "text/csv"
+      ]
+      
+      if (!allowedTypes.includes(file.type)) {
+        setToast({ message: `File "${file.name}" type not supported. Use images, PDF, DOC, XLS, or TXT.`, type: "error" })
+        continue
+      }
+      
+      setIsUploadingFile(true)
+      try {
+        const formData = new FormData()
+        formData.append("file", file)
+        formData.append("folder", "crm-tasks")
+        
+        const response = await fetch("/api/upload/crm", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          setToast({ message: errorData.error || `Upload failed (${response.status})`, type: "error" })
+          continue
+        }
+        
+        const data = await response.json()
+        
+        let fileType: "image" | "document" | "link" = "document"
+        if (file.type.startsWith("image/")) {
+          fileType = "image"
+        }
+        
+        const newAttachment: TaskAttachment = {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: fileType,
+          url: data.url,
+          uploaded_by: currentUser.name,
+          uploaded_at: new Date().toISOString(),
+        }
+        
+        const updatedAttachments = [...taskAttachments, newAttachment]
+        setTaskAttachments(updatedAttachments)
+        
+        if (selectedTask.id) {
+          const ownerMap: Record<string, string> = {
+            "Jake": "jake",
+            "Jacob Lee Miles": "jake",
+            "Marc": "marc",
+            "Marcos Resendez": "marc",
+            "Stacy": "stacy",
+            "Stacy Ramirez": "stacy",
+            "Stacy Carrizales": "stacy",
+            "Jesse": "jesse",
+            "Jesse Hernandez": "jesse",
+            "Barb": "barb",
+            "Barbara Carreon": "barb",
+            "Nichole": "teams",
+            "Nichole Snow": "teams",
+          }
+          const owner = ownerMap[selectedTask.assigned_to] || "teams"
+          
+          await fetch("/api/admin/crm/tasks", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              id: selectedTask.id,
+              owner,
+              attachments: updatedAttachments,
+            }),
+          })
+        }
+        
+        setToast({ message: `Uploaded ${file.name}`, type: "success" })
+      } catch (err) {
+        console.error("Upload error:", err)
+        setToast({ message: `Failed to upload ${file.name}`, type: "error" })
+      } finally {
+        setIsUploadingFile(false)
+      }
+    }
+  }
+
+  // Quick status change handler for TasksView
+  const handleQuickStatusChange = async (taskId: string, newStatus: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+    
+    // Optimistic update
+    setTasks(prevTasks => 
+      prevTasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t)
+    )
+    
+    try {
+      const ownerMap: Record<string, string> = {
+        "Jake": "jake",
+        "Jacob Lee Miles": "jake",
+        "Marc": "marc",
+        "Marcos Resendez": "marc",
+        "Stacy": "stacy",
+        "Stacy Ramirez": "stacy",
+        "Stacy Carrizales": "stacy",
+        "Jesse": "jesse",
+        "Jesse Hernandez": "jesse",
+        "Barb": "barb",
+        "Barbara Carreon": "barb",
+        "Nichole": "teams",
+        "Nichole Snow": "teams",
+      }
+      
+      let owner = ownerMap[task.assigned_to] || "teams"
+      // If task was completed, use "completed" owner for potential reactivation
+      if (task.status === "completed") {
+        owner = "completed"
+      }
+      
+      const response = await fetch("/api/admin/crm/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id: taskId,
+          owner,
+          status: newStatus,
+        }),
+      })
+      
+      if (!response.ok) throw new Error("Failed to update status")
+      
+      const result = await response.json()
+      
+      if (result.reactivated) {
+        setToast({ message: "Task reactivated", type: "success" })
+      } else if (result.moved) {
+        setToast({ message: "Task marked as completed", type: "success" })
+      } else {
+        setToast({ message: "Status updated", type: "success" })
+      }
+      
+      // Reload tasks to get fresh data
+      loadTasks()
+    } catch (err) {
+      console.error("Failed to update status:", err)
+      setToast({ message: "Failed to update status", type: "error" })
+      // Revert optimistic update
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === taskId ? task : t)
+      )
+    }
+  }
+
   // Client handlers
   const handleSaveClient = async () => {
     if (!clientForm.company_name.trim()) {
@@ -1751,6 +2038,7 @@ export default function SalesCRMPage() {
             onAssigneeFilterChange={setAssigneeFilter}
             onAddTask={handleAddTask}
             onOpenTask={openTaskModal}
+            onQuickStatusChange={handleQuickStatusChange}
           />
         )}
       </div>
@@ -1803,7 +2091,10 @@ export default function SalesCRMPage() {
         onRemoveLink={handleRemoveLink}
         onToggleUserTag={toggleUserTag}
         onAddComment={handleAddComment}
+        onDeleteComment={handleDeleteComment}
+        onEditComment={handleEditComment}
         onFileUpload={handleFileUpload}
+        onFileDrop={handleFileDrop}
         onRemoveAttachment={handleRemoveAttachment}
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}

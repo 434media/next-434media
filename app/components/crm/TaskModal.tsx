@@ -91,7 +91,10 @@ interface TaskModalProps {
   onRemoveLink: (index: number) => void
   onToggleUserTag: (email: string) => void
   onAddComment: () => void
+  onDeleteComment?: (commentId: string) => void
+  onEditComment?: (commentId: string, newContent: string) => void
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onFileDrop?: (files: FileList) => void
   onRemoveAttachment: (id: string) => void
   onSave: () => void
   onDelete: () => void
@@ -117,7 +120,10 @@ export function TaskModal({
   onRemoveLink,
   onToggleUserTag,
   onAddComment,
+  onDeleteComment,
+  onEditComment,
   onFileUpload,
+  onFileDrop,
   onRemoveAttachment,
   onSave,
   onDelete,
@@ -135,6 +141,13 @@ export function TaskModal({
   const [memberError, setMemberError] = useState("")
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSecondaryDropdown, setShowSecondaryDropdown] = useState(false)
+  
+  // State for drag-and-drop file upload
+  const [isDragOver, setIsDragOver] = useState(false)
+  
+  // State for comment editing
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editCommentContent, setEditCommentContent] = useState("")
   
   // State for editing existing team members
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
@@ -169,21 +182,41 @@ export function TaskModal({
     try {
       const response = await fetch("/api/admin/team-members")
       const data = await response.json()
-      if (data.success && data.data.length > 0) {
-        setTeamMembers(data.data.filter((m: TeamMember) => m.isActive))
-      } else {
-        // Fallback to default TEAM_MEMBERS if no data in Firestore
-        setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-          id: `default-${i}`,
-          name: m.name,
-          email: m.email,
-          isActive: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })))
-      }
+      
+      // Get Firestore members (active only)
+      const firestoreMembers: TeamMember[] = data.success && data.data 
+        ? data.data.filter((m: TeamMember) => m.isActive)
+        : []
+      
+      // Create default team members for merging
+      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
+        id: `default-${i}`,
+        name: m.name,
+        email: m.email,
+        isActive: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }))
+      
+      // Merge: use Firestore members + add any default members not already in Firestore
+      // This ensures the full list is always shown, including both Firestore and default members
+      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
+      const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
+      
+      const missingDefaults = defaultMembers.filter(d => 
+        !firestoreNames.has(d.name.toLowerCase()) && 
+        (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
+      )
+      
+      // Combine Firestore members with any missing defaults
+      const allMembers = [...firestoreMembers, ...missingDefaults]
+      
+      // Sort by name for consistent ordering
+      allMembers.sort((a, b) => a.name.localeCompare(b.name))
+      
+      setTeamMembers(allMembers)
     } catch {
-      // Fallback to default TEAM_MEMBERS
+      // Fallback to default TEAM_MEMBERS on error
       setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
         id: `default-${i}`,
         name: m.name,
@@ -1162,30 +1195,63 @@ export function TaskModal({
                   </div>
                 )}
 
-                {/* Upload Button */}
-                <label className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 cursor-pointer transition-colors">
-                  {isUploadingFile ? (
-                    <>
-                      <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                      <span className="text-sm text-gray-500">Uploading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-5 h-5 text-gray-400" />
-                      <span className="text-sm text-gray-500">
-                        Drop a file or click to upload
-                      </span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    onChange={onFileUpload}
-                    disabled={isUploadingFile}
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-                    className="hidden"
-                    multiple
-                  />
-                </label>
+                {/* Drag and Drop Upload Zone */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragOver(true)
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragOver(false)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragOver(false)
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFileDrop) {
+                      onFileDrop(e.dataTransfer.files)
+                    }
+                  }}
+                  className={`relative rounded-lg border-2 border-dashed transition-all ${
+                    isDragOver 
+                      ? "border-blue-500 bg-blue-50" 
+                      : "border-gray-300 hover:border-gray-400 bg-gray-50"
+                  }`}
+                >
+                  <label className="flex items-center justify-center gap-2 p-4 cursor-pointer">
+                    {isUploadingFile ? (
+                      <>
+                        <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                        <span className="text-sm text-gray-500">Uploading...</span>
+                      </>
+                    ) : isDragOver ? (
+                      <>
+                        <Upload className="w-5 h-5 text-blue-500" />
+                        <span className="text-sm text-blue-600 font-medium">
+                          Drop files here
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-500">
+                          Drag & drop files here, or click to browse
+                        </span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      onChange={onFileUpload}
+                      disabled={isUploadingFile}
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                      className="hidden"
+                      multiple
+                    />
+                  </label>
+                </div>
                 <p className="text-xs text-gray-500 mt-2">
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
@@ -1255,7 +1321,7 @@ export function TaskModal({
                 <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
                   {task.comments && task.comments.length > 0 ? (
                     task.comments.map((comment) => (
-                      <div key={comment.id} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                      <div key={comment.id} className="p-3 rounded-lg bg-gray-50 border border-gray-100 group">
                         <div className="flex items-start gap-2">
                           {comment.author_avatar ? (
                             <img 
@@ -1271,18 +1337,96 @@ export function TaskModal({
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-gray-900">
-                                {comment.author_name}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {formatDate(comment.created_at)}
-                              </span>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {comment.author_name}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {formatDate(comment.created_at)}
+                                  {comment.updated_at && comment.updated_at !== comment.created_at && (
+                                    <span className="ml-1 text-gray-400">(edited)</span>
+                                  )}
+                                </span>
+                              </div>
+                              {/* Edit/Delete buttons - only show for comment author */}
+                              {currentUser && comment.author_email === currentUser.email && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {editingCommentId !== comment.id && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingCommentId(comment.id)
+                                          setEditCommentContent(comment.content)
+                                        }}
+                                        className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                        title="Edit comment"
+                                      >
+                                        <Pencil className="w-3 h-3 text-gray-400 hover:text-blue-600" />
+                                      </button>
+                                      {onDeleteComment && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (confirm("Delete this comment?")) {
+                                              onDeleteComment(comment.id)
+                                            }
+                                          }}
+                                          className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                          title="Delete comment"
+                                        >
+                                          <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-600" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                              {comment.content}
-                            </p>
-                            {comment.mentions && comment.mentions.length > 0 && (
+                            {/* Editing mode */}
+                            {editingCommentId === comment.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editCommentContent}
+                                  onChange={(e) => setEditCommentContent(e.target.value)}
+                                  rows={2}
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-none"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (onEditComment && editCommentContent.trim()) {
+                                        onEditComment(comment.id, editCommentContent.trim())
+                                      }
+                                      setEditingCommentId(null)
+                                      setEditCommentContent("")
+                                    }}
+                                    disabled={!editCommentContent.trim()}
+                                    className="px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingCommentId(null)
+                                      setEditCommentContent("")
+                                    }}
+                                    className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                                {comment.content}
+                              </p>
+                            )}
+                            {comment.mentions && comment.mentions.length > 0 && !editingCommentId && (
                               <div className="flex gap-1 mt-2">
                                 {comment.mentions.map((email) => {
                                   const member = TEAM_MEMBERS.find(m => m.email === email)

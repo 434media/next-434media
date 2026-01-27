@@ -63,6 +63,7 @@ interface TasksViewProps {
   onAssigneeFilterChange: (assignee: string) => void
   onAddTask: () => void
   onOpenTask: (task: Task) => void
+  onQuickStatusChange?: (taskId: string, newStatus: string) => void
 }
 
 export function TasksView({
@@ -75,6 +76,7 @@ export function TasksView({
   onAssigneeFilterChange,
   onAddTask,
   onOpenTask,
+  onQuickStatusChange,
 }: TasksViewProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all")
   const [showCompleted, setShowCompleted] = useState(false)
@@ -423,32 +425,48 @@ export function TasksView({
                         </div>
                       </td>
                       
-                      {/* Status with urgency indicator */}
-                      <td className="px-4 py-4">
+                      {/* Status with urgency indicator - Quick status change dropdown */}
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-col gap-1">
-                          {task.status === "completed" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-600 w-fit">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Completed
+                          {dueDateStatus === "overdue" && task.status !== "completed" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600 w-fit">
+                              <AlertCircle className="w-3 h-3" />
+                              Overdue
                             </span>
+                          )}
+                          {dueDateStatus === "approaching" && task.status !== "completed" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-600 w-fit">
+                              <Clock className="w-3 h-3" />
+                              Due Soon
+                            </span>
+                          )}
+                          {onQuickStatusChange ? (
+                            <select
+                              value={task.status}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                onQuickStatusChange(task.id, e.target.value)
+                              }}
+                              className={`text-xs font-medium px-2 py-1 rounded cursor-pointer border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 ${TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.not_started}`}
+                              title="Change status"
+                            >
+                              <option value="not_started">Not Started</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="to_do">To Do</option>
+                              <option value="ready_for_review">Ready for Review</option>
+                              <option value="completed">Completed</option>
+                            </select>
                           ) : (
-                            <>
-                              {dueDateStatus === "overdue" && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600 w-fit">
-                                  <AlertCircle className="w-3 h-3" />
-                                  Overdue
-                                </span>
-                              )}
-                              {dueDateStatus === "approaching" && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-600 w-fit">
-                                  <Clock className="w-3 h-3" />
-                                  Due Soon
-                                </span>
-                              )}
+                            task.status === "completed" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-600 w-fit">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Completed
+                              </span>
+                            ) : (
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.not_started}`}>
                                 {task.status.replace(/_/g, " ")}
                               </span>
-                            </>
+                            )
                           )}
                         </div>
                       </td>
