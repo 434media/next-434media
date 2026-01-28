@@ -85,12 +85,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       
       if (response.ok) {
         const data = await response.json()
-        console.log("[NotificationContext] Fetched notifications:", data)
         
         if (data.success && data.notifications) {
           const newNotifications = data.notifications as Notification[]
-          
-          console.log(`[NotificationContext] Found ${newNotifications.length} unread notifications`)
           
           // Check if there are new notifications since last check
           if (hasCheckedOnce && newNotifications.length > previousCountRef.current) {
@@ -101,14 +98,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           
           previousCountRef.current = newNotifications.length
           setNotifications(newNotifications)
-        } else if (!data.success) {
-          console.warn("[NotificationContext] API returned success=false:", data)
         }
-      } else {
-        console.error("[NotificationContext] Failed to fetch notifications, status:", response.status)
       }
     } catch (error) {
-      console.error("[NotificationContext] Error fetching notifications:", error)
+      console.error("Failed to fetch notifications:", error)
     } finally {
       setIsLoading(false)
       setHasCheckedOnce(true)

@@ -253,12 +253,8 @@ export async function sendAssignmentNotification(data: AssignmentNotificationDat
   const { taskId, taskTitle, assignedEmails, assignedBy, notificationType, taskUrl } = data
 
   if (!assignedEmails.length) {
-    console.log('[Notifications] No emails provided to notify')
     return { success: true } // No one to notify
   }
-
-  console.log(`[Notifications] Processing ${notificationType} notification for task "${taskTitle}"`)
-  console.log('[Notifications] Emails to notify:', assignedEmails)
 
   // Filter to only 434media.com emails (case-insensitive)
   const validRecipients = assignedEmails.filter(email => 
@@ -266,11 +262,8 @@ export async function sendAssignmentNotification(data: AssignmentNotificationDat
   )
 
   if (!validRecipients.length) {
-    console.log('[Notifications] No valid 434media.com recipients to notify after filtering')
     return { success: true }
   }
-
-  console.log('[Notifications] Valid recipients:', validRecipients)
 
   // Store notification in Firestore for in-app display
   try {
@@ -283,10 +276,9 @@ export async function sendAssignmentNotification(data: AssignmentNotificationDat
       taskUrl,
     })
     
-    console.log(`[Notifications] Successfully created ${validRecipients.length} in-app notifications for ${notificationType}`)
     return { success: true }
   } catch (error) {
-    console.error('[Notifications] Failed to create in-app notifications:', error)
+    console.error('Failed to create in-app notifications:', error)
     return { success: false, error: 'Failed to create notifications' }
   }
 }
@@ -304,8 +296,6 @@ async function storeAssignmentNotificationInFirestore(data: AssignmentNotificati
     // Normalize emails to lowercase for consistent matching
     const normalizedEmails = data.assignedEmails.map(email => email.toLowerCase())
     
-    console.log(`[Notifications] Storing ${data.notificationType} notifications for:`, normalizedEmails)
-    
     await Promise.all(
       normalizedEmails.map(async (email) => {
         await notificationCollection.add({
@@ -319,10 +309,8 @@ async function storeAssignmentNotificationInFirestore(data: AssignmentNotificati
         })
       })
     )
-    
-    console.log(`[Notifications] Stored ${normalizedEmails.length} ${data.notificationType} notifications in Firestore`)
   } catch (error) {
-    console.error('[Notifications] Failed to store assignment notification:', error)
+    console.error('Failed to store assignment notification:', error)
   }
 }
 
@@ -350,8 +338,6 @@ export async function getUnreadNotifications(email: string): Promise<{
     // Normalize email to lowercase for consistent matching
     const normalizedEmail = email.toLowerCase()
     
-    console.log(`[Notifications] Fetching unread notifications for: ${normalizedEmail}`)
-    
     let snapshot
     try {
       // Try with orderBy first (requires composite index)
@@ -364,7 +350,6 @@ export async function getUnreadNotifications(email: string): Promise<{
         .get()
     } catch (indexError) {
       // If index doesn't exist, fall back to query without orderBy
-      console.warn('[Notifications] Index may be missing, falling back to unordered query:', indexError)
       snapshot = await db
         .collection('crm_notifications')
         .where('recipient_email', '==', normalizedEmail)
@@ -372,8 +357,6 @@ export async function getUnreadNotifications(email: string): Promise<{
         .limit(20)
         .get()
     }
-    
-    console.log(`[Notifications] Found ${snapshot.docs.length} unread notifications`)
     
     const notifications = snapshot.docs.map(doc => ({
       id: doc.id,
