@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Shield, AlertCircle } from "lucide-react"
+import { NotificationProvider } from "../context/notification-context"
 
 export default function AdminLayout({
   children,
@@ -143,5 +144,9 @@ export default function AdminLayout({
     )
   }
 
-  return <div className="w-full max-w-full">{children}</div>
+  return (
+    <NotificationProvider>
+      <div className="w-full max-w-full">{children}</div>
+    </NotificationProvider>
+  )
 }

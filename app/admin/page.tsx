@@ -5,6 +5,7 @@ import type React from "react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon, Mail } from "lucide-react"
+import { AdminUserMenu } from "../components/AdminUserMenu"
 
 interface CurrentUser {
   email: string
@@ -132,11 +133,12 @@ export default function AdminPage() {
             Back to Home
           </Link>
 
-          {/* Welcome Greeting */}
+          {/* User Menu with Notifications */}
           {currentUser && (
-            <p className="text-sm sm:text-base text-neutral-600">
-              {getGreeting()}, <span className="font-semibold text-neutral-900">{currentUser.name}</span>
-            </p>
+            <AdminUserMenu 
+              user={currentUser} 
+              greeting={getGreeting()}
+            />
           )}
         </div>
 

@@ -1,19 +1,35 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { Bell, X, CheckCircle2, UserPlus, AtSign, ExternalLink, Clock, Trash2, History } from "lucide-react"
-import { useNotifications, type Notification } from "../../context/notification-context"
+import { 
+  Bell, 
+  LogOut, 
+  ChevronDown, 
+  CheckCircle2, 
+  AtSign, 
+  UserPlus, 
+  ExternalLink,
+  Clock,
+  Trash2,
+  History
+} from "lucide-react"
+import { useNotifications, type Notification } from "../context/notification-context"
 
-interface NotificationBellProps {
-  onOpenTask?: (taskId: string) => void
+interface AdminUserMenuProps {
+  user: {
+    name: string
+    email: string
+    picture?: string
+  }
+  greeting?: string
 }
 
-export function NotificationBell({ onOpenTask }: NotificationBellProps) {
+export function AdminUserMenu({ user, greeting }: AdminUserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"new" | "history">("new")
-  const panelRef = useRef<HTMLDivElement>(null)
-
+  const menuRef = useRef<HTMLDivElement>(null)
+  
   const {
     notifications,
     notificationHistory,
@@ -25,10 +41,10 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
     clearHistory,
   } = useNotifications()
 
-  // Close panel when clicking outside
+  // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
@@ -39,13 +55,15 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
     }
   }, [isOpen])
 
-  // Handle notification click
-  const handleNotificationClick = (notification: Notification) => {
-    if (onOpenTask && notification.task_id) {
-      onOpenTask(notification.task_id)
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/signout", { method: "POST", credentials: "include" })
+      window.location.href = "/admin"
+    } catch (error) {
+      console.error("Failed to logout:", error)
+      window.location.href = "/admin"
     }
-    markAsRead([notification.id])
-    setIsOpen(false)
   }
 
   // Format time ago
@@ -85,63 +103,91 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
       case "mention":
         return (
           <span>
-            <strong>{notification.comment_author}</strong> mentioned you in a comment
+            <strong>{notification.comment_author}</strong> mentioned you
           </span>
         )
       case "assignment":
         return (
           <span>
-            <strong>{notification.assigned_by}</strong> assigned you to this task
+            <strong>{notification.assigned_by}</strong> assigned you
           </span>
         )
       case "tagged":
         return (
           <span>
-            <strong>{notification.assigned_by}</strong> tagged you in this task
+            <strong>{notification.assigned_by}</strong> tagged you
           </span>
         )
+      case "system":
+        return <span>{notification.message}</span>
       default:
         return <span>New notification</span>
     }
   }
 
+  // Handle notification click - navigate to CRM
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.task_id) {
+      // Store the task ID to open when CRM loads
+      sessionStorage.setItem("openTaskId", notification.task_id)
+      window.location.href = "/admin/crm"
+    }
+    markAsRead([notification.id])
+    setIsOpen(false)
+  }
+
   const currentNotifications = activeTab === "new" ? notifications : notificationHistory
 
   return (
-    <div className="relative" ref={panelRef}>
-      {/* Bell Button */}
+    <div className="relative" ref={menuRef}>
+      {/* User Button with Notification Badge */}
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-neutral-100 transition-colors"
-        aria-label="Notifications"
-        animate={hasNewNotification ? { 
-          rotate: [0, -15, 15, -15, 15, 0],
-          scale: [1, 1.1, 1.1, 1.1, 1.1, 1]
-        } : {}}
-        transition={{ duration: 0.5 }}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors group"
+        whileTap={{ scale: 0.98 }}
       >
-        <Bell className={`w-5 h-5 ${hasNewNotification ? 'text-red-500' : 'text-neutral-600'}`} />
-        {unreadCount > 0 && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full"
+        <span className="text-sm text-neutral-600 group-hover:text-neutral-900">
+          {greeting && <span className="hidden sm:inline">{greeting}, </span>}
+          <span className="font-semibold text-neutral-900">{user.name}</span>
+        </span>
+        
+        {/* Notification Badge */}
+        <div className="relative">
+          <motion.div
+            animate={hasNewNotification ? { 
+              rotate: [0, -15, 15, -15, 15, 0],
+              scale: [1, 1.1, 1.1, 1.1, 1.1, 1]
+            } : {}}
+            transition={{ duration: 0.5 }}
           >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </motion.span>
-        )}
-        {/* Pulse animation for new notifications */}
-        {hasNewNotification && (
-          <motion.span
-            initial={{ scale: 1, opacity: 0.8 }}
-            animate={{ scale: 2, opacity: 0 }}
-            transition={{ duration: 1, repeat: 2 }}
-            className="absolute inset-0 rounded-lg bg-red-400"
-          />
-        )}
+            <Bell className={`w-4 h-4 ${hasNewNotification ? 'text-red-500' : 'text-neutral-400'}`} />
+          </motion.div>
+          
+          {unreadCount > 0 && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -top-2 -right-2 flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full"
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </motion.span>
+          )}
+          
+          {/* Pulse animation for new notifications */}
+          {hasNewNotification && (
+            <motion.span
+              initial={{ scale: 1, opacity: 0.8 }}
+              animate={{ scale: 2, opacity: 0 }}
+              transition={{ duration: 1, repeat: 2 }}
+              className="absolute inset-0 rounded-full bg-red-400"
+            />
+          )}
+        </div>
+        
+        <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </motion.button>
 
-      {/* Notification Panel */}
+      {/* Dropdown Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -151,18 +197,25 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-12 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-neutral-50 to-neutral-100 border-b border-gray-200">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Bell className="w-4 h-4" />
-                Notifications
-              </h3>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 rounded hover:bg-gray-200 transition-colors"
-              >
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
+            {/* User Info Header */}
+            <div className="px-4 py-3 bg-gradient-to-r from-neutral-50 to-neutral-100 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                {user.picture ? (
+                  <img 
+                    src={user.picture} 
+                    alt={user.name}
+                    className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-neutral-300 flex items-center justify-center text-neutral-600 font-semibold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                </div>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -226,22 +279,22 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
             )}
 
             {/* Notification List */}
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-72 overflow-y-auto">
               {isLoading && currentNotifications.length === 0 ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
                 </div>
               ) : currentNotifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                   {activeTab === "new" ? (
                     <>
-                      <CheckCircle2 className="w-12 h-12 text-green-500 mb-3" />
-                      <p className="text-gray-600 font-medium">You&apos;re all caught up!</p>
+                      <CheckCircle2 className="w-10 h-10 text-green-500 mb-3" />
+                      <p className="text-gray-600 font-medium">All caught up!</p>
                       <p className="text-gray-400 text-sm mt-1">No new notifications</p>
                     </>
                   ) : (
                     <>
-                      <Clock className="w-12 h-12 text-neutral-300 mb-3" />
+                      <Clock className="w-10 h-10 text-neutral-300 mb-3" />
                       <p className="text-gray-600 font-medium">No history yet</p>
                       <p className="text-gray-400 text-sm mt-1">Read notifications will appear here</p>
                     </>
@@ -252,26 +305,28 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
                   {currentNotifications.map((notification) => (
                     <motion.button
                       key={notification.id}
-                      onClick={() => activeTab === "new" ? handleNotificationClick(notification) : onOpenTask && notification.task_id ? onOpenTask(notification.task_id) : null}
+                      onClick={() => activeTab === "new" ? handleNotificationClick(notification) : null}
                       className={`w-full px-4 py-3 text-left transition-colors flex gap-3 ${
-                        activeTab === "new" || (onOpenTask && notification.task_id)
+                        activeTab === "new" 
                           ? "hover:bg-gray-50 cursor-pointer" 
-                          : "cursor-default"
-                      } ${activeTab === "history" ? "opacity-75" : ""}`}
-                      whileHover={{ x: 2 }}
+                          : "cursor-default opacity-75"
+                      }`}
+                      whileHover={activeTab === "new" ? { x: 2 } : {}}
                     >
                       <div className="flex-shrink-0 mt-0.5">
                         {getNotificationIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 line-clamp-1 font-medium">
-                          {notification.task_title}
-                        </p>
+                        {notification.task_title && (
+                          <p className="text-sm text-gray-900 line-clamp-1 font-medium">
+                            {notification.task_title}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500 mt-0.5">
                           {getNotificationMessage(notification)}
                         </p>
                         {notification.comment_preview && (
-                          <p className="text-xs text-gray-400 mt-1 line-clamp-2 italic">
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-1 italic">
                             &ldquo;{notification.comment_preview}&rdquo;
                           </p>
                         )}
@@ -279,11 +334,24 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
                           {formatTimeAgo(notification.created_at)}
                         </p>
                       </div>
-                      <ExternalLink className="w-4 h-4 text-gray-300 flex-shrink-0 mt-1" />
+                      {activeTab === "new" && (
+                        <ExternalLink className="w-4 h-4 text-gray-300 flex-shrink-0 mt-1" />
+                      )}
                     </motion.button>
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="border-t border-gray-200">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign out
+              </button>
             </div>
           </motion.div>
         )}

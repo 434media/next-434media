@@ -13,3 +13,6 @@ export { ClientFormModal } from "./ClientFormModal"
 export { OpportunityFormModal } from "./OpportunityFormModal"
 export { TaskModal } from "./TaskModal"
 export { NotificationBell } from "./NotificationBell"
+
+// Re-export notification context types for convenience
+export type { Notification } from "../../context/notification-context"

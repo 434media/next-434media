@@ -207,6 +207,17 @@ export default function SalesCRMPage() {
     }
   }, [toast])
 
+  // Check for task to open from notification (from main admin page)
+  useEffect(() => {
+    if (!isLoading && tasks.length > 0) {
+      const storedTaskId = sessionStorage.getItem("openTaskId")
+      if (storedTaskId) {
+        sessionStorage.removeItem("openTaskId")
+        handleOpenTaskFromNotification(storedTaskId)
+      }
+    }
+  }, [isLoading, tasks])
+
   // Set default assignee filter based on logged-in user
   useEffect(() => {
     if (currentUser?.email) {
