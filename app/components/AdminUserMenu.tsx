@@ -41,6 +41,16 @@ export function AdminUserMenu({ user, greeting }: AdminUserMenuProps) {
     clearHistory,
   } = useNotifications()
 
+  // Debug log on mount and when notifications change
+  useEffect(() => {
+    console.log("[AdminUserMenu] Mounted with notifications:", {
+      unreadCount,
+      notifications,
+      isLoading,
+      user: user.email
+    })
+  }, [unreadCount, notifications, isLoading, user.email])
+
   // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
