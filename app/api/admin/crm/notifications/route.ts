@@ -58,16 +58,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    
+    console.log("[Notifications API] Received POST request:", JSON.stringify(body, null, 2))
 
     // Check if this is an assignment notification
     if (body.notificationType === 'assignment' || body.notificationType === 'tagged') {
       // Validate required fields for assignment notifications
       if (!body.taskId || !body.taskTitle || !body.assignedEmails || !body.assignedBy) {
+        console.error("[Notifications API] Missing required fields:", { taskId: body.taskId, taskTitle: body.taskTitle, assignedEmails: body.assignedEmails, assignedBy: body.assignedBy })
         return NextResponse.json(
           { error: "Missing required fields: taskId, taskTitle, assignedEmails, assignedBy" },
           { status: 400 }
         )
       }
+
+      console.log(`[Notifications API] Creating ${body.notificationType} notification for task "${body.taskTitle}" to:`, body.assignedEmails)
 
       const result = await sendAssignmentNotification({
         taskId: body.taskId,
@@ -78,6 +83,7 @@ export async function POST(request: NextRequest) {
         taskUrl: body.taskUrl,
       })
 
+      console.log("[Notifications API] sendAssignmentNotification result:", result)
       return NextResponse.json(result)
     }
 

@@ -218,25 +218,28 @@ async function storeNotificationInFirestore(data: NotificationData): Promise<voi
     
     const notificationCollection = db.collection('crm_notifications')
     
+    // Normalize emails to lowercase for consistent matching
+    const validEmails = data.mentionedEmails
+      .filter(email => email.toLowerCase().endsWith('@434media.com'))
+      .map(email => email.toLowerCase())
+    
     await Promise.all(
-      data.mentionedEmails
-        .filter(email => email.endsWith('@434media.com'))
-        .map(async (email) => {
-          await notificationCollection.add({
-            recipient_email: email,
-            type: 'mention',
-            task_id: data.taskId,
-            task_title: data.taskTitle,
-            comment_id: data.comment.id,
-            comment_author: data.comment.author_name,
-            comment_preview: data.comment.content.substring(0, 100),
-            created_at: new Date().toISOString(),
-            read: false,
-          })
+      validEmails.map(async (email) => {
+        await notificationCollection.add({
+          recipient_email: email,
+          type: 'mention',
+          task_id: data.taskId,
+          task_title: data.taskTitle,
+          comment_id: data.comment.id,
+          comment_author: data.comment.author_name,
+          comment_preview: data.comment.content.substring(0, 100),
+          created_at: new Date().toISOString(),
+          read: false,
         })
+      })
     )
     
-    console.log(`[Notifications] Stored ${data.mentionedEmails.length} fallback notifications in Firestore`)
+    console.log(`[Notifications] Stored ${validEmails.length} fallback notifications in Firestore`)
   } catch (error) {
     console.error('[Notifications] Failed to store notification in Firestore:', error)
   }
@@ -250,18 +253,24 @@ export async function sendAssignmentNotification(data: AssignmentNotificationDat
   const { taskId, taskTitle, assignedEmails, assignedBy, notificationType, taskUrl } = data
 
   if (!assignedEmails.length) {
+    console.log('[Notifications] No emails provided to notify')
     return { success: true } // No one to notify
   }
 
-  // Filter to only 434media.com emails
+  console.log(`[Notifications] Processing ${notificationType} notification for task "${taskTitle}"`)
+  console.log('[Notifications] Emails to notify:', assignedEmails)
+
+  // Filter to only 434media.com emails (case-insensitive)
   const validRecipients = assignedEmails.filter(email => 
-    email.endsWith('@434media.com')
+    email.toLowerCase().endsWith('@434media.com')
   )
 
   if (!validRecipients.length) {
-    console.log('[Notifications] No valid 434media.com recipients to notify')
+    console.log('[Notifications] No valid 434media.com recipients to notify after filtering')
     return { success: true }
   }
+
+  console.log('[Notifications] Valid recipients:', validRecipients)
 
   // Store notification in Firestore for in-app display
   try {
@@ -274,7 +283,7 @@ export async function sendAssignmentNotification(data: AssignmentNotificationDat
       taskUrl,
     })
     
-    console.log(`[Notifications] Created ${validRecipients.length} in-app notifications for ${notificationType}`)
+    console.log(`[Notifications] Successfully created ${validRecipients.length} in-app notifications for ${notificationType}`)
     return { success: true }
   } catch (error) {
     console.error('[Notifications] Failed to create in-app notifications:', error)
@@ -292,8 +301,13 @@ async function storeAssignmentNotificationInFirestore(data: AssignmentNotificati
     
     const notificationCollection = db.collection('crm_notifications')
     
+    // Normalize emails to lowercase for consistent matching
+    const normalizedEmails = data.assignedEmails.map(email => email.toLowerCase())
+    
+    console.log(`[Notifications] Storing ${data.notificationType} notifications for:`, normalizedEmails)
+    
     await Promise.all(
-      data.assignedEmails.map(async (email) => {
+      normalizedEmails.map(async (email) => {
         await notificationCollection.add({
           recipient_email: email,
           type: data.notificationType,
@@ -306,7 +320,7 @@ async function storeAssignmentNotificationInFirestore(data: AssignmentNotificati
       })
     )
     
-    console.log(`[Notifications] Stored ${data.assignedEmails.length} ${data.notificationType} notifications in Firestore`)
+    console.log(`[Notifications] Stored ${normalizedEmails.length} ${data.notificationType} notifications in Firestore`)
   } catch (error) {
     console.error('[Notifications] Failed to store assignment notification:', error)
   }
@@ -322,8 +336,9 @@ export async function getUnreadNotifications(email: string): Promise<{
     type: string
     task_id: string
     task_title: string
-    comment_author: string
-    comment_preview: string
+    comment_author?: string
+    comment_preview?: string
+    assigned_by?: string
     created_at: string
     read: boolean
   }>
@@ -332,13 +347,33 @@ export async function getUnreadNotifications(email: string): Promise<{
     const { getDb } = await import('./firebase-admin')
     const db = getDb()
     
-    const snapshot = await db
-      .collection('crm_notifications')
-      .where('recipient_email', '==', email)
-      .where('read', '==', false)
-      .orderBy('created_at', 'desc')
-      .limit(20)
-      .get()
+    // Normalize email to lowercase for consistent matching
+    const normalizedEmail = email.toLowerCase()
+    
+    console.log(`[Notifications] Fetching unread notifications for: ${normalizedEmail}`)
+    
+    let snapshot
+    try {
+      // Try with orderBy first (requires composite index)
+      snapshot = await db
+        .collection('crm_notifications')
+        .where('recipient_email', '==', normalizedEmail)
+        .where('read', '==', false)
+        .orderBy('created_at', 'desc')
+        .limit(20)
+        .get()
+    } catch (indexError) {
+      // If index doesn't exist, fall back to query without orderBy
+      console.warn('[Notifications] Index may be missing, falling back to unordered query:', indexError)
+      snapshot = await db
+        .collection('crm_notifications')
+        .where('recipient_email', '==', normalizedEmail)
+        .where('read', '==', false)
+        .limit(20)
+        .get()
+    }
+    
+    console.log(`[Notifications] Found ${snapshot.docs.length} unread notifications`)
     
     const notifications = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -348,11 +383,17 @@ export async function getUnreadNotifications(email: string): Promise<{
       type: string
       task_id: string
       task_title: string
-      comment_author: string
-      comment_preview: string
+      comment_author?: string
+      comment_preview?: string
+      assigned_by?: string
       created_at: string
       read: boolean
     }>
+    
+    // Sort by created_at desc if we used the fallback query
+    notifications.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
     
     return { success: true, notifications }
   } catch (error) {
