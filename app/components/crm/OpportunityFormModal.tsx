@@ -120,11 +120,14 @@ export function OpportunityFormModal({
   const [isSavingMember, setIsSavingMember] = useState(false)
 
   // Get unique company names from existing clients
+  // Use case-insensitive comparison to prevent duplicates like "HEB" and "HEB "
   const uniqueCompanies = existingClients
     .filter(client => client.company_name || client.name)
     .reduce((acc, client) => {
-      const name = client.company_name || client.name
-      if (!acc.find(c => c.name === name)) {
+      const name = (client.company_name || client.name || "").trim()
+      const nameLower = name.toLowerCase()
+      // Check if we already have this company (case-insensitive)
+      if (!acc.find(c => c.name.toLowerCase() === nameLower)) {
         acc.push({ id: client.id, name })
       }
       return acc

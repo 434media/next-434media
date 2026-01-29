@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     const client = await createClient({
       name: body.name.trim(),
       company_name: body.company_name || "",
+      department: body.department || "",  // For large clients with multiple departments
       title: body.title || "",
       email: body.email || "",
       phone: body.phone || "",
@@ -119,7 +120,6 @@ export async function POST(request: NextRequest) {
       is_opportunity: body.is_opportunity || false,
       disposition: body.disposition || undefined,
       doc: body.doc || undefined,
-      tags: body.tags || [],
       web_links: body.web_links || [],
       docs: body.docs || [],
     })

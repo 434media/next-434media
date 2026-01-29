@@ -33,22 +33,29 @@ export function ClientsView({
   // This ensures only full names appear, not partial names from data
   const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
 
-  // First, deduplicate clients by company_name to ensure each company appears only once
-  // This handles the case where a company has multiple opportunities - we want ONE client entry
+  // First, deduplicate clients by company_name + department to ensure each company/department combo appears only once
+  // This handles the case where a company has multiple opportunities - we want ONE client entry per department
   // Priority: prefer non-opportunity records, but include opportunity-only companies too
   const deduplicatedClients = clients.reduce((acc, client) => {
     const companyName = (client.company_name || client.name || "").toLowerCase().trim()
     if (!companyName) return acc
     
-    const existingIndex = acc.findIndex(c => 
-      (c.company_name || c.name || "").toLowerCase().trim() === companyName
-    )
+    // Create a unique key combining company name and department
+    const department = (client.department || "").toLowerCase().trim()
+    const uniqueKey = department ? `${companyName}|${department}` : companyName
+    
+    const existingIndex = acc.findIndex(c => {
+      const existingCompany = (c.company_name || c.name || "").toLowerCase().trim()
+      const existingDept = (c.department || "").toLowerCase().trim()
+      const existingKey = existingDept ? `${existingCompany}|${existingDept}` : existingCompany
+      return existingKey === uniqueKey
+    })
     
     if (existingIndex === -1) {
-      // First time seeing this company - add it
+      // First time seeing this company/department combo - add it
       acc.push(client)
     } else {
-      // Company already exists - prefer non-opportunity record over opportunity record
+      // Company/department already exists - prefer non-opportunity record over opportunity record
       const existing = acc[existingIndex]
       if (existing.is_opportunity && !client.is_opportunity) {
         // Replace opportunity record with non-opportunity record
@@ -184,6 +191,11 @@ export function ClientsView({
                       <td className="px-4 py-3.5">
                         <div className="min-w-0">
                           <p className="font-medium text-sm text-gray-900 truncate">{client.company_name || client.name || "Unnamed Client"}</p>
+                          {client.department && (
+                            <p className="text-xs text-blue-600 mt-0.5 truncate">
+                              {client.department}
+                            </p>
+                          )}
                           {contactCount > 1 && (
                             <p className="inline-flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                               <Users className="w-3 h-3 flex-shrink-0" />

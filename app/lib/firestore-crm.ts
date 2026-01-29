@@ -297,6 +297,7 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     // Basic Info - handle both standard and Airtable field names
     name: fullName,
     company_name: (rawData.company_name || rawData.company || rawData.Company || rawData["Company Name"] || "") as string,
+    department: (rawData.department || rawData.Department || "") as string,  // For large clients with multiple departments
     title: (rawData.title || "") as string,  // Opportunity title
     email,
     phone: (rawData.phone || rawData.phone_number || rawData.Phone || rawData["Phone Number"] || "") as string,

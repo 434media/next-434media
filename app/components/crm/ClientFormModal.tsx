@@ -35,6 +35,7 @@ interface ContactFormData {
 
 interface ClientFormData {
   company_name: string
+  department: string  // For large clients with multiple departments
   contacts: ContactFormData[]
   status: string
   next_followup_date: string
@@ -244,6 +245,23 @@ export function ClientFormModal({
                   className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
                   placeholder="e.g., Velocity TX"
                 />
+              </div>
+
+              {/* Department - For large clients with multiple departments */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Department <span className="text-gray-400 font-normal">(optional - for large clients)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.department || ""}
+                  onChange={(e) => onFormChange({ ...formData, department: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  placeholder="e.g., Marketing, HR, IT, Sales..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Use this for large organizations with multiple departments or divisions that need different admins.
+                </p>
               </div>
 
               {/* Contacts Section */}

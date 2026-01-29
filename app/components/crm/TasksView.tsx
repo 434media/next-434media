@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   ChevronDown,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowUpDown
 } from "lucide-react"
 import { TASK_STATUS_COLORS, getDueDateStatus, formatDate, BRANDS, normalizeAssigneeName, isValidAssigneeName, parseLocalDate } from "./types"
 import type { Task, Brand } from "./types"
@@ -66,6 +67,8 @@ interface TasksViewProps {
   onQuickStatusChange?: (taskId: string, newStatus: string) => void
 }
 
+type StatusSort = "default" | "not_started" | "in_progress" | "to_do" | "ready_for_review" | "completed"
+
 export function TasksView({
   tasks,
   searchQuery,
@@ -80,6 +83,7 @@ export function TasksView({
 }: TasksViewProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all")
   const [showCompleted, setShowCompleted] = useState(false)
+  const [statusSort, setStatusSort] = useState<StatusSort>("default")
   
   // Helper to check if a task is assigned to a specific person (primary OR secondary)
   const isAssignedTo = (task: Task, assignee: string): boolean => {
@@ -198,8 +202,18 @@ export function TasksView({
     return true
   }).length
 
-  // Sort tasks: completed tasks by due date (most recent first), then overdue, then due soon, then by due date
+  // Sort tasks based on statusSort selection
   const sortedTasks = [...filteredTasks].sort((a, b) => {
+    // If sorting by a specific status, put those tasks first
+    if (statusSort !== "default") {
+      const aMatches = a.status === statusSort
+      const bMatches = b.status === statusSort
+      if (aMatches && !bMatches) return -1
+      if (!aMatches && bMatches) return 1
+      // If both match or neither match, continue with secondary sort
+    }
+    
+    // Default sorting: completed tasks by due date (most recent first), then overdue, then due soon, then by due date
     // If showing completed tasks, sort them by due date (most recent due dates first)
     // This puts December due dates at the top
     if (a.status === "completed" && b.status === "completed") {
@@ -209,9 +223,11 @@ export function TasksView({
       return dateB - dateA // Most recent due dates first
     }
     
-    // Completed tasks go after active tasks (unless both are completed)
-    if (a.status === "completed" && b.status !== "completed") return 1
-    if (a.status !== "completed" && b.status === "completed") return -1
+    // Completed tasks go after active tasks (unless both are completed or sorting by completed)
+    if (statusSort !== "completed") {
+      if (a.status === "completed" && b.status !== "completed") return 1
+      if (a.status !== "completed" && b.status === "completed") return -1
+    }
     
     const statusA = getDueDateStatus(a.due_date, a.status)
     const statusB = getDueDateStatus(b.due_date, b.status)
@@ -354,6 +370,18 @@ export function TasksView({
             {uniqueAssignees.map((assignee) => (
               <option key={assignee} value={assignee}>{assignee}</option>
             ))}
+          </select>
+          <select
+            value={statusSort}
+            onChange={(e) => setStatusSort(e.target.value as StatusSort)}
+            className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:outline-none focus:border-gray-400 min-w-[100px]"
+          >
+            <option value="default">Status</option>
+            <option value="not_started">Not Started</option>
+            <option value="in_progress">In Progress</option>
+            <option value="to_do">To Do</option>
+            <option value="ready_for_review">Ready for Review</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
         <button

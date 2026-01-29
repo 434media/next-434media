@@ -71,6 +71,7 @@ export interface ClientRecord extends BaseRecord {
   // Basic Info
   name: string
   company_name?: string
+  department?: string  // For large clients with multiple departments (e.g., "Marketing", "HR", "IT")
   title?: string  // Opportunity title
   email?: string
   phone?: string

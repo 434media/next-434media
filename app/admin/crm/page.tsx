@@ -74,6 +74,7 @@ export default function SalesCRMPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [clientForm, setClientForm] = useState({
     company_name: "",
+    department: "",  // For large clients with multiple departments
     contacts: [] as Array<{
       id: string
       name: string
@@ -1524,7 +1525,7 @@ export default function SalesCRMPage() {
       setToast({ message: `Contact ${editingClient ? "updated" : "created"} successfully`, type: "success" })
       setShowClientForm(false)
       setEditingClient(null)
-      setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "", assigned_to: "" })
+      setClientForm({ company_name: "", department: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "", assigned_to: "" })
       loadClients()
     } catch (err) {
       setToast({ message: "Failed to save contact", type: "error" })
@@ -1942,6 +1943,7 @@ export default function SalesCRMPage() {
     
     setClientForm({
       company_name: client.company_name || client.name || "",
+      department: client.department || "",
       contacts,
       status: client.status,
       next_followup_date: client.next_followup_date || "",
@@ -2201,7 +2203,7 @@ export default function SalesCRMPage() {
             onAssigneeFilterChange={setClientAssigneeFilter}
             onAddClient={() => {
               setEditingClient(null)
-              setClientForm({ company_name: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "", assigned_to: currentUser?.name || "" })
+              setClientForm({ company_name: "", department: "", contacts: [], status: "prospect", next_followup_date: "", notes: "", source: "", is_opportunity: false, opportunity_id: "", assigned_to: currentUser?.name || "" })
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}

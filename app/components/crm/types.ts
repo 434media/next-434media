@@ -76,6 +76,7 @@ export interface Client {
   id: string
   name: string  // Primary contact name (for backwards compatibility)
   company_name?: string
+  department?: string  // For large clients with multiple departments (e.g., "Marketing", "HR", "IT")
   email?: string  // Primary contact email (for backwards compatibility)
   phone?: string  // Primary contact phone (for backwards compatibility)
   contacts?: ClientContact[]  // Additional contacts
@@ -113,7 +114,7 @@ export interface Client {
 }
 
 // Brand type
-export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing"
+export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing" | "AIMSATX"
 
 // Disposition (opportunity stage) type - used in kanban columns
 export type Disposition = "pitched" | "closed_won" | "closed_lost"
@@ -284,7 +285,7 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
 }
 
 // Brand options
-export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA TV", "Digital Canvas", "TXMX Boxing"]
+export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA TV", "Digital Canvas", "TXMX Boxing", "AIMSATX"]
 
 // Team members for tagging and assignment
 // Full names from Airtable migration

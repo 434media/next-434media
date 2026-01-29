@@ -160,11 +160,14 @@ export function TaskModal({
   const [clientSearchQuery, setClientSearchQuery] = useState("")
 
   // Get unique client names from clients list and sort alphabetically
+  // Use case-insensitive comparison to prevent duplicates like "HEB" and "HEB "
   const uniqueClients = clients
     .filter(client => client.company_name || client.name)
     .reduce((acc, client) => {
-      const name = client.company_name || client.name || ''
-      if (!acc.find(c => c.name === name)) {
+      const name = (client.company_name || client.name || '').trim()
+      const nameLower = name.toLowerCase()
+      // Check if we already have this client (case-insensitive)
+      if (!acc.find(c => c.name.toLowerCase() === nameLower)) {
         acc.push({ id: client.id, name, company_name: client.company_name })
       }
       return acc
@@ -1473,7 +1476,30 @@ export function TaskModal({
                         className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
                         placeholder="Add a comment... (use @name to mention someone)"
                       />
-                      <div className="flex justify-between items-center mt-2">
+                      {/* Tag options helper - shows available team members for tagging */}
+                      <div className="flex flex-wrap gap-1 mt-1.5 mb-2">
+                        <span className="text-xs text-gray-400 mr-1">Tag:</span>
+                        {teamMembers.filter(m => m.isActive !== false).map((member) => (
+                          <button
+                            key={member.id}
+                            type="button"
+                            onClick={() => {
+                              // Insert @name at cursor position or end
+                              const tagText = `@${member.name} `
+                              const currentText = newComment
+                              // Add tag to end if not already present
+                              if (!currentText.includes(`@${member.name}`)) {
+                                onNewCommentChange(currentText + (currentText.endsWith(' ') || currentText === '' ? '' : ' ') + tagText)
+                              }
+                            }}
+                            className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs transition-colors"
+                            title={`Tag ${member.name}`}
+                          >
+                            @{member.name.split(' ')[0]}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center">
                         <p className="text-xs text-gray-500">
                           Commenting as {currentUser.name}
                         </p>
