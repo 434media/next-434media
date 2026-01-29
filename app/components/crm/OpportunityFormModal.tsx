@@ -1504,13 +1504,21 @@ export function OpportunityFormModal({
               {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
-                  placeholder="Additional notes about this opportunity..."
-                />
+                <div className="relative">
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
+                    rows={4}
+                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
+                    placeholder="Additional notes about this opportunity..."
+                  />
+                  <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 10 10">
+                      <path d="M9 9H7v-1h1V7h1v2zm0-4H8V4h1v1zm-4 4H4V8h1v1zm4-8H8V0h1v1zM5 1H4V0h1v1zM1 9H0V7h1v2zm0-4H0V4h1v1zM1 1H0V0h1v1z" opacity="0.5"/>
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Drag corner to resize</p>
               </div>
             </div>
 

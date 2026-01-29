@@ -436,13 +436,21 @@ export function TaskModal({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => onFormChange({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
-                    placeholder="Task description..."
-                  />
+                  <div className="relative">
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => onFormChange({ ...formData, description: e.target.value })}
+                      rows={4}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
+                      placeholder="Task description..."
+                    />
+                    <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 10 10">
+                        <path d="M9 9H7v-1h1V7h1v2zm0-4H8V4h1v1zm-4 4H4V8h1v1zm4-8H8V0h1v1zM5 1H4V0h1v1zM1 9H0V7h1v2zm0-4H0V4h1v1zM1 1H0V0h1v1z" opacity="0.5"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Drag corner to resize</p>
                 </div>
 
                 {/* Created By & Date Created - Read-only reference fields */}
@@ -1393,8 +1401,8 @@ export function TaskModal({
                                 <textarea
                                   value={editCommentContent}
                                   onChange={(e) => setEditCommentContent(e.target.value)}
-                                  rows={2}
-                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-none"
+                                  rows={3}
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-y min-h-[60px] max-h-[200px]"
                                   autoFocus
                                 />
                                 <div className="flex gap-2">
@@ -1472,8 +1480,8 @@ export function TaskModal({
                       <textarea
                         value={newComment}
                         onChange={(e) => onNewCommentChange(e.target.value)}
-                        rows={2}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-none"
+                        rows={3}
+                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[70px] max-h-[200px]"
                         placeholder="Add a comment... (use @name to mention someone)"
                       />
                       {/* Tag options helper - shows available team members for tagging */}
