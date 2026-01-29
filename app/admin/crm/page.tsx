@@ -1599,6 +1599,127 @@ export default function SalesCRMPage() {
 
       if (!response.ok) throw new Error("Failed to save opportunity")
 
+      // Sync contacts to all clients with the same company name
+      // This ensures that when an admin adds a contact in the opportunity modal,
+      // that contact also appears in the client section
+      const companyNameLower = opportunityForm.company_name.trim().toLowerCase()
+      const relatedClients = clients.filter(c => {
+        const clientCompanyName = (c.company_name || c.name || "").trim().toLowerCase()
+        // Match same company name but different record (not the opportunity being saved)
+        return clientCompanyName === companyNameLower && 
+               c.id !== opportunityForm.existing_company_id &&
+               !c.is_opportunity // Only sync to non-opportunity client records
+      })
+
+      // Sync contacts, primary contact, and follow-up date to related clients
+      for (const relatedClient of relatedClients) {
+        const existingContacts = relatedClient.contacts || []
+        
+        // Build a map of existing contacts by email/name for matching
+        const existingContactMap = new Map<string, typeof existingContacts[0]>()
+        existingContacts.forEach(c => {
+          if (c.email) existingContactMap.set(c.email.toLowerCase(), c)
+          if (c.name) existingContactMap.set(c.name.toLowerCase(), c)
+        })
+
+        // Get the primary contact from the opportunity
+        const opportunityPrimaryContact = opportunityForm.contacts.find(c => c.is_primary)
+        
+        // Merge contacts: update existing ones and add new ones
+        const mergedContacts = existingContacts.map(existingContact => {
+          // Check if this contact exists in the opportunity (by email or name)
+          const matchingOppContact = opportunityForm.contacts.find(oppC => {
+            const emailMatch = oppC.email && existingContact.email && 
+                              oppC.email.toLowerCase() === existingContact.email.toLowerCase()
+            const nameMatch = oppC.name && existingContact.name &&
+                             oppC.name.toLowerCase() === existingContact.name.toLowerCase()
+            return emailMatch || nameMatch
+          })
+
+          if (matchingOppContact) {
+            // Update existing contact with opportunity data, including is_primary
+            return {
+              ...existingContact,
+              name: matchingOppContact.name || existingContact.name,
+              email: matchingOppContact.email || existingContact.email,
+              phone: matchingOppContact.phone || existingContact.phone,
+              role: matchingOppContact.role || existingContact.role,
+              is_primary: matchingOppContact.is_primary, // Sync primary status
+              address: matchingOppContact.address || existingContact.address || "",
+              city: matchingOppContact.city || existingContact.city || "",
+              state: matchingOppContact.state || existingContact.state || "",
+              zipcode: matchingOppContact.zipcode || existingContact.zipcode || "",
+              date_of_birth: matchingOppContact.date_of_birth || existingContact.date_of_birth || "",
+            }
+          }
+          
+          // If opportunity has a primary contact and this isn't it, ensure is_primary is false
+          if (opportunityPrimaryContact) {
+            return { ...existingContact, is_primary: false }
+          }
+          
+          return existingContact
+        })
+
+        // Find new contacts that don't exist in the client yet
+        const newContacts = opportunityForm.contacts.filter(oppC => {
+          const emailLower = (oppC.email || "").toLowerCase()
+          const nameLower = (oppC.name || "").toLowerCase()
+          const emailExists = emailLower && existingContactMap.has(emailLower)
+          const nameExists = nameLower && existingContactMap.has(nameLower)
+          return !emailExists && !nameExists && (oppC.name || oppC.email)
+        })
+
+        // Add new contacts
+        const allContacts = [
+          ...mergedContacts,
+          ...newContacts.map(c => ({
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            phone: c.phone,
+            role: c.role,
+            is_primary: c.is_primary,
+            address: c.address || "",
+            city: c.city || "",
+            state: c.state || "",
+            zipcode: c.zipcode || "",
+            date_of_birth: c.date_of_birth || "",
+          }))
+        ]
+
+        // Build update payload - always sync contacts, primary contact info, and follow-up date
+        const primaryContact = allContacts.find(c => c.is_primary) || allContacts[0]
+        const updatePayload: Record<string, unknown> = {
+          id: relatedClient.id,
+          contacts: allContacts,
+        }
+        
+        // Sync primary contact's name, email, phone to client's top-level fields
+        if (primaryContact) {
+          updatePayload.name = primaryContact.name || relatedClient.name
+          updatePayload.email = primaryContact.email || relatedClient.email
+          updatePayload.phone = primaryContact.phone || relatedClient.phone
+        }
+        
+        // Sync follow-up date if set in opportunity
+        if (opportunityForm.next_followup_date) {
+          updatePayload.next_followup_date = opportunityForm.next_followup_date
+        }
+
+        try {
+          await fetch("/api/admin/crm/clients", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(updatePayload),
+          })
+        } catch (syncErr) {
+          console.error("Failed to sync to related client:", syncErr)
+          // Don't fail the whole operation if sync fails
+        }
+      }
+
       setToast({ message: isEditingOpportunity ? "Opportunity updated successfully" : "Opportunity created successfully", type: "success" })
       setShowOpportunityForm(false)
       setIsEditingOpportunity(false)
