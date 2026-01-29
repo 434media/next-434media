@@ -26,7 +26,8 @@ import {
   Settings,
   Target,
   Search,
-  Building2
+  Building2,
+  ArrowLeft
 } from "lucide-react"
 import { 
   BRANDS, 
@@ -99,6 +100,8 @@ interface TaskModalProps {
   onSave: () => void
   onDelete: () => void
   onClose: () => void
+  onBackToLinkedItems?: () => void  // Optional: for navigating back to linked items panel
+  showBackButton?: boolean  // Optional: show back button when opened from linked items
 }
 
 export function TaskModal({
@@ -128,6 +131,8 @@ export function TaskModal({
   onSave,
   onDelete,
   onClose,
+  onBackToLinkedItems,
+  showBackButton = false,
 }: TaskModalProps) {
   // State for team member management
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -397,6 +402,16 @@ export function TaskModal({
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
+                {showBackButton && onBackToLinkedItems && (
+                  <button
+                    onClick={onBackToLinkedItems}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+                    title="Back to linked items"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back</span>
+                  </button>
+                )}
                 <h3 className="text-lg font-semibold text-gray-900">{task.id ? "Task" : "Add Task"}</h3>
                 {dueDateStatus === "overdue" && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-600 text-xs font-medium">

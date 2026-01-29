@@ -168,6 +168,7 @@ export default function SalesCRMPage() {
   const [linkedTasks, setLinkedTasks] = useState<Task[]>([])
   const [linkedClientForPanel, setLinkedClientForPanel] = useState<Client | null>(null)
   const [currentOpportunityForLinked, setCurrentOpportunityForLinked] = useState<Client | null>(null)
+  const [taskOpenedFromLinkedPanel, setTaskOpenedFromLinkedPanel] = useState(false)  // Track if task was opened from linked panel
 
   // Load data on mount - load all data needed for dashboard
   useEffect(() => {
@@ -1014,9 +1015,33 @@ export default function SalesCRMPage() {
         }
       }
       
+      // Close the task modal
       setShowTaskModal(false)
       setSelectedTask(null)
-      loadTasks()
+      
+      // Reload tasks first
+      await loadTasks()
+      
+      // If the task was opened from the linked panel, keep the panel open and refresh linked tasks
+      if (taskOpenedFromLinkedPanel && currentOpportunityForLinked) {
+        // Refresh linked tasks for the current opportunity
+        const opportunityId = currentOpportunityForLinked.id
+        // Use the freshly loaded tasks to filter linked tasks
+        const response = await fetch("/api/admin/crm/tasks", {
+          credentials: "include",
+        })
+        if (response.ok) {
+          const data = await response.json()
+          const allTasks = data.tasks || []
+          const refreshedLinkedTasks = allTasks.filter((t: Task) => t.opportunity_id === opportunityId)
+          setLinkedTasks(refreshedLinkedTasks)
+        }
+        setTaskOpenedFromLinkedPanel(false)
+        // Keep the linked panel open - don't close it
+        setShowLinkedTasksPanel(true)
+      } else {
+        setTaskOpenedFromLinkedPanel(false)
+      }
     } catch (err) {
       setToast({ message: `Failed to ${!selectedTask.id ? "create" : "update"} task`, type: "error" })
     } finally {
@@ -2376,6 +2401,13 @@ export default function SalesCRMPage() {
         isUploadingFile={isUploadingFile}
         newLink={newLink}
         newComment={newComment}
+        showBackButton={taskOpenedFromLinkedPanel}
+        onBackToLinkedItems={() => {
+          setShowTaskModal(false)
+          setSelectedTask(null)
+          setTaskOpenedFromLinkedPanel(false)
+          setShowLinkedTasksPanel(true)
+        }}
         onFormChange={setTaskForm}
         onNewLinkChange={setNewLink}
         onNewCommentChange={setNewComment}
@@ -2393,6 +2425,7 @@ export default function SalesCRMPage() {
         onClose={() => {
           setShowTaskModal(false)
           setSelectedTask(null)
+          setTaskOpenedFromLinkedPanel(false)
           // Reset form state to prevent data carryover
           setTaskForm({
             title: "",
@@ -2524,20 +2557,25 @@ export default function SalesCRMPage() {
                       <button
                         key={task.id}
                         onClick={() => {
+                          // Keep linked panel info so we can return
+                          setTaskOpenedFromLinkedPanel(true)
                           setShowLinkedTasksPanel(false)
-                          setLinkedClientForPanel(null)
                           openTaskModal(task)
                         }}
-                        className="w-full text-left p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-teal-200 hover:shadow-md transition-all group"
+                        className={`w-full text-left p-4 rounded-xl border transition-all group ${
+                          task.status === 'completed' 
+                            ? 'border-gray-200 bg-gray-50 opacity-60 hover:opacity-100 hover:bg-gray-100' 
+                            : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-teal-200 hover:shadow-md'
+                        }`}
                       >
                         <div className="flex items-start gap-3">
                           <div className={`p-2 rounded-lg ${
-                            task.status === 'completed' ? 'bg-green-100' : 
-                            task.status === 'in_progress' ? 'bg-blue-100' : 'bg-gray-100'
+                            task.status === 'completed' ? 'bg-gray-200' : 
+                            task.status === 'in_progress' ? 'bg-blue-100' : 'bg-amber-100'
                           }`}>
                             <CheckCircle2 className={`w-4 h-4 ${
-                              task.status === 'completed' ? 'text-green-600' : 
-                              task.status === 'in_progress' ? 'text-blue-600' : 'text-gray-400'
+                              task.status === 'completed' ? 'text-gray-500' : 
+                              task.status === 'in_progress' ? 'text-blue-600' : 'text-amber-500'
                             }`} />
                           </div>
                           <div className="flex-1 min-w-0">
