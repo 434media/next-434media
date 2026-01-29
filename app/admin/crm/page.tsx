@@ -1511,7 +1511,10 @@ export default function SalesCRMPage() {
           date_of_birth: c.date_of_birth || "",
         })),
         status: clientForm.status,
-        next_followup_date: clientForm.next_followup_date || undefined,
+        // For updates: use null to signal clearing the field, for creates: use undefined to skip
+        next_followup_date: editingClient 
+          ? (clientForm.next_followup_date || null)  // null signals "clear this field"
+          : (clientForm.next_followup_date || undefined),  // undefined skips for new records
         notes: clientForm.notes,
         source: clientForm.source || undefined,
         is_opportunity: clientForm.is_opportunity,

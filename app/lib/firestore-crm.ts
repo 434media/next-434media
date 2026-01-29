@@ -181,9 +181,16 @@ async function updateDocument<T>(
     const docRef = db.collection(collectionName).doc(id)
 
     // Remove undefined values and system fields
+    // null values are converted to FieldValue.delete() to clear the field
     const cleanUpdates: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(updates)) {
-      if (value !== undefined && key !== "id" && key !== "created_at") {
+      if (key === "id" || key === "created_at") {
+        continue // Skip system fields
+      }
+      if (value === null) {
+        // Explicitly delete the field when null is passed
+        cleanUpdates[key] = FieldValue.delete()
+      } else if (value !== undefined) {
         cleanUpdates[key] = value
       }
     }
