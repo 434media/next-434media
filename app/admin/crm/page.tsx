@@ -269,27 +269,6 @@ export default function SalesCRMPage() {
       const data = await response.json()
       const allClients = data.clients || []
       
-      // Debug: Log client data
-      console.log("=== Clients Loaded ===")
-      console.log("Total clients:", allClients.length)
-      
-      // Debug: Check for VelocityTX
-      const velocityClient = allClients.find((c: Client) => 
-        (c.company_name || "").toLowerCase() === "velocitytx"
-      )
-      console.log("VelocityTX in loaded clients:", velocityClient ? "YES" : "NO")
-      if (velocityClient) {
-        console.log("VelocityTX details:", {
-          id: velocityClient.id,
-          company_name: velocityClient.company_name,
-          name: velocityClient.name,
-          is_opportunity: velocityClient.is_opportunity,
-        })
-      }
-      
-      const opportunities = allClients.filter((c: Client) => c.is_opportunity)
-      console.log("Opportunities (is_opportunity=true):", opportunities.length)
-      
       // Auto-archive opportunities that are closed (won/lost) and older than 60 days
       const ARCHIVE_AFTER_DAYS = 60
       const archiveThreshold = new Date()

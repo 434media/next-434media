@@ -33,14 +33,6 @@ export function ClientsView({
   // This ensures only full names appear, not partial names from data
   const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
 
-  // Debug: Check for VelocityTX in incoming clients
-  const velocityIncoming = clients.find(c => 
-    (c.company_name || "").toLowerCase() === "velocitytx"
-  )
-  console.log("=== ClientsView Debug ===")
-  console.log("Total clients received:", clients.length)
-  console.log("VelocityTX in incoming clients:", velocityIncoming ? "YES" : "NO")
-
   // First, deduplicate clients by company_name + department to ensure each company/department combo appears only once
   // This handles the case where a company has multiple opportunities - we want ONE client entry per department
   // Priority: prefer non-opportunity records, but include opportunity-only companies too
@@ -74,13 +66,6 @@ export function ClientsView({
     return acc
   }, [] as Client[])
 
-  // Debug: Check if VelocityTX is in deduplicated clients
-  const velocityInDedup = deduplicatedClients.find(c => 
-    (c.company_name || c.name || "").toLowerCase().includes("velocity")
-  )
-  console.log("After dedup - Total unique clients:", deduplicatedClients.length)
-  console.log("VelocityTX in dedup clients:", velocityInDedup ? "YES" : "NO", velocityInDedup)
-
   // Filter clients based on search and filters
   const filteredClients = deduplicatedClients.filter((client) => {
     const searchLower = searchQuery.toLowerCase()
@@ -97,14 +82,6 @@ export function ClientsView({
     const matchesAssignee = assigneeFilter === "all" || normalizedAssignee === assigneeFilter
     return matchesSearch && matchesSource && matchesAssignee
   })
-
-  // Debug: Check if VelocityTX is in filtered clients
-  const velocityInFiltered = filteredClients.find(c => 
-    (c.company_name || c.name || "").toLowerCase().includes("velocity")
-  )
-  console.log("After filtering - Total:", filteredClients.length)
-  console.log("Current filters - search:", searchQuery, "source:", sourceFilter, "assignee:", assigneeFilter)
-  console.log("VelocityTX in filtered clients:", velocityInFiltered ? "YES" : "NO")
 
   // Sort by follow-up date (oldest first) - following the mockup's default sorting
   const sortedClients = [...filteredClients].sort((a, b) => {
