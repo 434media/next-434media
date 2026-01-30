@@ -4,8 +4,11 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Shield, AlertCircle, Mail, Lock, Loader2 } from "lucide-react"
 import { NotificationProvider } from "../context/notification-context"
-import { signInWithEmailAndPassword } from "firebase/auth"
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { auth } from "../lib/firebase"
+
+// Default password that requires reset on first use
+const DEFAULT_PASSWORD = "434Media2026"
 
 export default function AdminLayout({
   children,
@@ -22,6 +25,11 @@ export default function AdminLayout({
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isEmailLoading, setIsEmailLoading] = useState(false)
+  
+  // Password reset state
+  const [showPasswordResetPrompt, setShowPasswordResetPrompt] = useState(false)
+  const [passwordResetSent, setPasswordResetSent] = useState(false)
+  const [pendingUser, setPendingUser] = useState<{ email: string; idToken: string } | null>(null)
 
   useEffect(() => {
     // Check for existing session
@@ -91,6 +99,14 @@ export default function AdminLayout({
       // Get the ID token
       const idToken = await userCredential.user.getIdToken()
       
+      // Check if user is using the default password - prompt them to change it
+      if (password === DEFAULT_PASSWORD) {
+        setPendingUser({ email, idToken })
+        setShowPasswordResetPrompt(true)
+        setIsEmailLoading(false)
+        return
+      }
+      
       // Send to our API to verify and create session
       const response = await fetch('/api/auth/signin/firebase', {
         method: 'POST',
@@ -122,6 +138,53 @@ export default function AdminLayout({
       } else {
         setError(getErrorMessage('authentication_failed'))
       }
+    } finally {
+      setIsEmailLoading(false)
+    }
+  }
+
+  const handleSendPasswordReset = async () => {
+    if (!pendingUser) return
+    setIsEmailLoading(true)
+    setError(null)
+    
+    try {
+      await sendPasswordResetEmail(auth, pendingUser.email)
+      setPasswordResetSent(true)
+    } catch (err) {
+      console.error('Password reset error:', err)
+      setError('Failed to send password reset email. Please try again.')
+    } finally {
+      setIsEmailLoading(false)
+    }
+  }
+
+  const handleContinueWithDefaultPassword = async () => {
+    if (!pendingUser) return
+    setIsEmailLoading(true)
+    
+    try {
+      // Complete the login with the stored token
+      const response = await fetch('/api/auth/signin/firebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: pendingUser.idToken }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(getErrorMessage(data.error || 'authentication_failed'))
+        return
+      }
+
+      setIsAuthenticated(true)
+      setUser(data.user)
+      setShowPasswordResetPrompt(false)
+      setPendingUser(null)
+    } catch (err) {
+      console.error('Continue login error:', err)
+      setError('Failed to complete login. Please try again.')
     } finally {
       setIsEmailLoading(false)
     }
@@ -159,7 +222,92 @@ export default function AdminLayout({
               </div>
             )}
 
-            {!showEmailForm ? (
+            {/* Password Reset Prompt - shown when user logs in with default password */}
+            {showPasswordResetPrompt ? (
+              <div className="space-y-4">
+                {!passwordResetSent ? (
+                  <>
+                    <div className="p-4 bg-amber-500/20 border border-amber-500/50 rounded-lg">
+                      <p className="text-sm text-amber-200 mb-2">
+                        <strong>Welcome!</strong> You&apos;re using the default password.
+                      </p>
+                      <p className="text-sm text-amber-200">
+                        For security, we recommend setting your own password. We&apos;ll send a reset link to <strong>{pendingUser?.email}</strong>.
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={handleSendPasswordReset}
+                      disabled={isEmailLoading}
+                      className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50"
+                    >
+                      {isEmailLoading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-5 h-5" />
+                          <span>Send Password Reset Email</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={handleContinueWithDefaultPassword}
+                      disabled={isEmailLoading}
+                      className="w-full bg-transparent hover:bg-white/10 text-gray-300 font-semibold py-3 px-6 rounded-lg transition-all duration-200 border border-white/20 disabled:opacity-50"
+                    >
+                      Continue with current password
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
+                      <p className="text-sm text-green-200 mb-2">
+                        <strong>Check your email!</strong>
+                      </p>
+                      <p className="text-sm text-green-200">
+                        We&apos;ve sent a password reset link to <strong>{pendingUser?.email}</strong>. 
+                        Click the link in the email to set your new password.
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={handleContinueWithDefaultPassword}
+                      disabled={isEmailLoading}
+                      className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50"
+                    >
+                      {isEmailLoading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Signing in...</span>
+                        </>
+                      ) : (
+                        <span>Continue to Dashboard</span>
+                      )}
+                    </button>
+                    
+                    <p className="text-xs text-gray-400 text-center">
+                      You can reset your password anytime from the email we sent.
+                    </p>
+                  </>
+                )}
+                
+                <button
+                  onClick={() => {
+                    setShowPasswordResetPrompt(false)
+                    setPasswordResetSent(false)
+                    setPendingUser(null)
+                    setPassword("")
+                  }}
+                  className="w-full mt-2 bg-transparent hover:bg-white/10 text-gray-400 text-sm py-2 px-4 rounded-lg transition-all duration-200"
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            ) : !showEmailForm ? (
               <>
                 {/* Google Sign In Button */}
                 <button
