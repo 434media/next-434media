@@ -25,6 +25,7 @@ import {
   Building2
 } from "lucide-react"
 import { ImageUpload } from "../../components/ImageUpload"
+import { AdminRoleGuard } from "../../components/AdminRoleGuard"
 import DOMPurify from "isomorphic-dompurify"
 
 // Website options
@@ -1094,6 +1095,7 @@ export default function EventsAdminPage() {
   )
 
   return (
+    <AdminRoleGuard allowedRoles={["full_admin"]}>
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
         {/* Back to Admin */}
@@ -1128,5 +1130,6 @@ export default function EventsAdminPage() {
         {view === "list" ? renderListView() : renderEditorView()}
       </div>
     </div>
+    </AdminRoleGuard>
   )
 }

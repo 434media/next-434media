@@ -19,6 +19,7 @@ import {
   Users,
   Database,
 } from "lucide-react"
+import { AdminRoleGuard } from "../../components/AdminRoleGuard"
 
 interface EmailSignup {
   id: string
@@ -369,6 +370,7 @@ export default function EmailListsPage() {
   const totalCount = selectedSource ? (counts[selectedSource] || 0) : Object.values(counts).reduce((a, b) => a + b, 0)
 
   return (
+    <AdminRoleGuard allowedRoles={["full_admin"]}>
     <div className="min-h-screen bg-gray-50 pt-18">
       {/* Toast */}
       {toast && (
@@ -799,5 +801,6 @@ export default function EmailListsPage() {
         </div>
       </main>
     </div>
+    </AdminRoleGuard>
   )
 }

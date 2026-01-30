@@ -1,9 +1,67 @@
 import { cookies } from 'next/headers'
 
+export type AuthProvider = 'google' | 'firebase'
+export type AdminRole = 'full_admin' | 'crm_only'
+
 export interface User {
   email: string
   name: string
   picture?: string
+  authProvider?: AuthProvider
+  role?: AdminRole
+}
+
+// Define which admin sections each role can access
+export const ADMIN_SECTIONS = {
+  dashboard: { path: '/admin', roles: ['full_admin', 'crm_only'] },
+  analytics: { path: '/admin/analytics', roles: ['full_admin'] },
+  analyticsInstagram: { path: '/admin/analytics-instagram', roles: ['full_admin'] },
+  analyticsLinkedin: { path: '/admin/analytics-linkedin', roles: ['full_admin'] },
+  analyticsMailchimp: { path: '/admin/analytics-mailchimp', roles: ['full_admin'] },
+  analyticsWeb: { path: '/admin/analytics-web', roles: ['full_admin'] },
+  blog: { path: '/admin/blog', roles: ['full_admin'] },
+  crm: { path: '/admin/crm', roles: ['full_admin', 'crm_only'] },
+  emailLists: { path: '/admin/email-lists', roles: ['full_admin'] },
+  events: { path: '/admin/events', roles: ['full_admin'] },
+  feedForm: { path: '/admin/feed-form', roles: ['full_admin'] },
+} as const
+
+export type AdminSection = keyof typeof ADMIN_SECTIONS
+
+/**
+ * Check if a user has access to a specific admin section
+ */
+export function canAccessSection(user: User | null, section: AdminSection): boolean {
+  if (!user) return false
+  const role = user.role || 'crm_only'
+  return ADMIN_SECTIONS[section].roles.includes(role)
+}
+
+/**
+ * Check if a user can access a path
+ */
+export function canAccessPath(user: User | null, path: string): boolean {
+  if (!user) return false
+  const role = user.role || 'crm_only'
+  
+  // Find matching section for this path
+  for (const section of Object.values(ADMIN_SECTIONS)) {
+    if (path.startsWith(section.path) && section.path !== '/admin') {
+      return section.roles.includes(role)
+    }
+  }
+  
+  // Default: allow access to /admin root for all authenticated users
+  return true
+}
+
+/**
+ * Get the role for a user based on their auth provider
+ */
+export function getRoleForProvider(authProvider: AuthProvider): AdminRole {
+  // Google Workspace users get full admin access
+  // Firebase email/password users get CRM-only access
+  return authProvider === 'google' ? 'full_admin' : 'crm_only'
 }
 
 export async function getSession(): Promise<User | null> {
@@ -35,7 +93,13 @@ export async function setSession(user: User): Promise<void> {
   const cookieStore = await cookies()
   
   const sessionData = {
-    user,
+    user: {
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      authProvider: user.authProvider,
+      role: user.role,
+    },
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
   }
   

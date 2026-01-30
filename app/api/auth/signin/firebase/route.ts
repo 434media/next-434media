@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyFirebaseToken, getDb } from '@/app/lib/firebase-admin'
-import { setSession } from '@/app/lib/auth'
+import { setSession, getRoleForProvider } from '@/app/lib/auth'
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
 
@@ -73,16 +73,24 @@ export async function POST(request: NextRequest) {
     // This allows Firebase users to be tagged in comments and assigned to tasks
     const displayName = await ensureTeamMember(email, tokenName)
 
-    // Create session (same format as Google OAuth)
+    // Create session with CRM-only role for Firebase email/password users
     await setSession({
       email,
       name: displayName,
       picture,
+      authProvider: 'firebase',
+      role: getRoleForProvider('firebase'),
     })
 
     return NextResponse.json({
       success: true,
-      user: { email, name: displayName, picture },
+      user: { 
+        email, 
+        name: displayName, 
+        picture,
+        authProvider: 'firebase',
+        role: getRoleForProvider('firebase'),
+      },
     })
   } catch (error) {
     console.error('Firebase auth error:', error)

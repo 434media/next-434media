@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
+import { AdminRoleGuard } from "@/app/components/AdminRoleGuard"
 
 // Loading skeleton component
 const AnalyticsLoadingSkeleton = () => (
@@ -137,6 +138,7 @@ export default function UnifiedAnalyticsPage() {
   }
 
   return (
+    <AdminRoleGuard allowedRoles={["full_admin"]}>
     <div className="bg-white text-neutral-900">
       {/* Mobile Tab Bar - Fixed at bottom on mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-neutral-200 safe-area-pb shadow-lg">
@@ -230,7 +232,7 @@ export default function UnifiedAnalyticsPage() {
           </div>
         </main>
       </div>
-    </div>
+    </AdminRoleGuard>
   )
 }
 

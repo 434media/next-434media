@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { setSession, isWorkspaceEmail } from '@/app/lib/auth'
+import { setSession, isWorkspaceEmail, getRoleForProvider } from '@/app/lib/auth'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -105,11 +105,13 @@ export async function GET(request: NextRequest) {
     // Note: Google Workspace accounts with 'hd' parameter are always verified,
     // so we don't need to check email_verified for workspace accounts
 
-    // Create session
+    // Create session with full admin role for Google Workspace users
     await setSession({
       email: userInfo.email,
       name: userInfo.name,
       picture: userInfo.picture,
+      authProvider: 'google',
+      role: getRoleForProvider('google'),
     })
 
     // Clear OAuth state cookie

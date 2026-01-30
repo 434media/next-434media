@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
+import { AdminRoleGuard } from "../../components/AdminRoleGuard"
 import type { BlogPost, BlogFilters } from "../../types/blog-types"
 
 // Blog categories
@@ -664,6 +665,7 @@ export default function BlogAdminPage() {
   )
 
   return (
+    <AdminRoleGuard allowedRoles={["full_admin"]}>
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
         {/* Back to Admin */}
@@ -698,5 +700,6 @@ export default function BlogAdminPage() {
         {view === "list" ? renderListView() : renderEditorView()}
       </div>
     </div>
+    </AdminRoleGuard>
   )
 }

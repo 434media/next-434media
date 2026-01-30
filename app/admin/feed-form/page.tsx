@@ -12,6 +12,7 @@ import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, 
 import Link from "next/link"
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
+import { AdminRoleGuard } from "../../components/AdminRoleGuard"
 
 // Configure marked for consistent rendering with production
 const previewMarked = new Marked({ 
@@ -1017,6 +1018,7 @@ export default function FeedFormPage() {
   }
 
   return (
+    <AdminRoleGuard allowedRoles={["full_admin"]}>
     <div className="container mx-auto py-10 px-4 sm:px-6 pt-32 md:pt-24 max-w-7xl overflow-hidden">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
@@ -2161,5 +2163,6 @@ export default function FeedFormPage() {
         )}
       </motion.div>
     </div>
+    </AdminRoleGuard>
   )
 }

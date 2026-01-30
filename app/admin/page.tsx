@@ -3,14 +3,18 @@
 import type React from "react"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon, Mail } from "lucide-react"
 import { AdminUserMenu } from "../components/AdminUserMenu"
+
+type AdminRole = 'full_admin' | 'crm_only'
 
 interface CurrentUser {
   email: string
   name: string
   picture?: string
+  role?: AdminRole
+  authProvider?: 'google' | 'firebase'
 }
 
 interface AdminSection {
@@ -21,6 +25,7 @@ interface AdminSection {
   icon: React.ReactNode
   size: "large" | "medium" | "default"
   description: string
+  allowedRoles: AdminRole[]  // Which roles can see this section
 }
 
 const adminSections: AdminSection[] = [
@@ -32,6 +37,7 @@ const adminSections: AdminSection[] = [
     icon: <RocketIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Manage client relationships, sales pipeline, platform opportunities, and team tasks",
+    allowedRoles: ["full_admin", "crm_only"],
   },
   {
     id: "analytics-hub",
@@ -41,6 +47,7 @@ const adminSections: AdminSection[] = [
     icon: <GA4Icon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Unified dashboards for website traffic, social engagement, email campaigns, and LinkedIn performance metrics",
+    allowedRoles: ["full_admin"],
   },
   {
     id: "feed-form",
@@ -50,6 +57,7 @@ const adminSections: AdminSection[] = [
     icon: <RssIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Manage and schedule content for The Feed (Digital Canvas), The Culture Deck (Vemos Vamos), and The 8 COUNT (TXMX Boxing) from a single interface.",
+    allowedRoles: ["full_admin"],
   },
   {
     id: "blog",
@@ -59,6 +67,7 @@ const adminSections: AdminSection[] = [
     icon: <PencilIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Create and manage blog posts with rich text editing, images, and meta optimization",
+    allowedRoles: ["full_admin"],
   },
   {
     id: "events",
@@ -68,6 +77,7 @@ const adminSections: AdminSection[] = [
     icon: <Calendar className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Add events manually or import from Meetup, Eventbrite, and Lu.ma URLs",
+    allowedRoles: ["full_admin"],
   },
   {
     id: "email-lists",
@@ -77,6 +87,7 @@ const adminSections: AdminSection[] = [
     icon: <Mail className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Manage and export email signups from all 434 MEDIA websites and campaigns",
+    allowedRoles: ["full_admin"],
   },
 ]
 
@@ -149,13 +160,21 @@ export default function AdminPage() {
             ADMIN PANEL
           </h1>
           <p className="text-neutral-500 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Access to 434 Analytics and Content Management for all channels in one place
+            {currentUser?.role === 'crm_only' 
+              ? 'Access to CRM for managing opportunities, tasks, and client relationships'
+              : 'Access to 434 Analytics and Content Management for all channels in one place'
+            }
           </p>
         </div>
 
-        {/* Sections Grid */}
+        {/* Sections Grid - filtered by user role */}
         <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 sm:grid-cols-3">
-          {adminSections.map((section) => (
+          {adminSections
+            .filter((section) => {
+              const userRole = currentUser?.role || 'crm_only'
+              return section.allowedRoles.includes(userRole)
+            })
+            .map((section) => (
             <Link
               key={section.id}
               href={section.href}
