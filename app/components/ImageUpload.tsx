@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { upload } from "@vercel/blob/client"
 import { Upload, X, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react"
 
@@ -24,17 +24,17 @@ export function ImageUpload({
   const [isUploading, setIsUploading] = useState(false)
   const [uploadMethod, setUploadMethod] = useState<"url" | "file">("url")
   const [preview, setPreview] = useState<string>(value)
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dropZoneRef = useRef<HTMLDivElement>(null)
 
   // Sync preview with value prop when it changes (e.g., when editing an existing item)
   useEffect(() => {
     setPreview(value)
   }, [value])
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  // Process and upload a file (shared between click and drag-drop)
+  const processFile = useCallback(async (file: File) => {
     // Validate file size
     if (file.size > maxSize * 1024 * 1024) {
       alert(`File size must be less than ${maxSize}MB`)
@@ -81,7 +81,50 @@ export function ImageUpload({
         fileInputRef.current.value = ""
       }
     }
+  }, [maxSize, onChange, value])
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await processFile(file)
   }
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+    // Auto-switch to file upload mode when dragging
+    setUploadMethod("file")
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set isDragging to false if we're leaving the drop zone entirely
+    const relatedTarget = e.relatedTarget as Node | null
+    if (!dropZoneRef.current?.contains(relatedTarget)) {
+      setIsDragging(false)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      await processFile(file)
+    }
+  }, [processFile])
 
   // Helper to validate and sanitize image URLs
   const getSafeImageUrl = (url: string): string | null => {
@@ -205,16 +248,30 @@ export function ImageUpload({
             disabled={isUploading}
           />
           <div 
+            ref={dropZoneRef}
             onClick={() => !isUploading && fileInputRef.current?.click()}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             className={`relative flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
-              isUploading 
-                ? "bg-emerald-50 border-emerald-300" 
-                : value 
-                  ? "bg-green-50 border-green-300 hover:bg-green-100"
-                  : "bg-neutral-50 border-neutral-300 hover:border-emerald-400 hover:bg-emerald-50"
+              isDragging
+                ? "bg-sky-50 border-sky-400 ring-4 ring-sky-100 scale-[1.02]"
+                : isUploading 
+                  ? "bg-emerald-50 border-emerald-300" 
+                  : value 
+                    ? "bg-green-50 border-green-300 hover:bg-green-100"
+                    : "bg-neutral-50 border-neutral-300 hover:border-emerald-400 hover:bg-emerald-50"
             }`}
           >
-            {isUploading ? (
+            {isDragging ? (
+              <>
+                <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center animate-bounce">
+                  <Upload className="h-6 w-6 text-sky-600" />
+                </div>
+                <span className="text-sm font-semibold text-sky-700">Drop your image here!</span>
+              </>
+            ) : isUploading ? (
               <>
                 <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
                   <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
@@ -232,10 +289,10 @@ export function ImageUpload({
                   <span className={`text-sm font-semibold ${
                     value ? "text-green-700" : "text-neutral-700"
                   }`}>
-                    {value ? "File uploaded! Click to replace" : "Click to upload a file"}
+                    {value ? "File uploaded! Click or drag to replace" : "Drop image here or click to browse"}
                   </span>
                   <p className="text-xs text-neutral-500 mt-1">
-                    Drag & drop or click to browse
+                    JPG, PNG, GIF, WebP • Max {maxSize}MB
                   </p>
                 </div>
               </>
