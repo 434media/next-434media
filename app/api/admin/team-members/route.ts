@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getDb } from "@/app/lib/firebase-admin"
+import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
 
@@ -12,9 +13,32 @@ export interface TeamMember {
   updated_at: string
 }
 
+// Check admin access
+async function requireAdmin() {
+  const session = await getSession()
+
+  if (!session) {
+    return { error: "Unauthorized", status: 401 }
+  }
+
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: "Forbidden: Admin access required", status: 403 }
+  }
+
+  return { session }
+}
+
 // GET - Fetch all team members
 export async function GET() {
   try {
+    const authResult = await requireAdmin()
+    if ("error" in authResult) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const db = getDb()
     const snapshot = await db
       .collection(TEAM_MEMBERS_COLLECTION)

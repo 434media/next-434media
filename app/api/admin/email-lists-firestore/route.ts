@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSession, isWorkspaceEmail } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
 import { getEmailSignups as getAirtableSignups } from "@/app/lib/airtable-contacts"
 import { getMxrRsvpEmails } from "@/app/lib/airtable-mxr"
 import { getTxmxRsvpEmails } from "@/app/lib/airtable-txmx-iconic"
@@ -20,7 +20,7 @@ async function requireAdmin() {
   if (!session) {
     return { error: "Unauthorized", status: 401 }
   }
-  if (!isWorkspaceEmail(session.email)) {
+  if (!isAuthorizedAdmin(session.email)) {
     return { error: "Forbidden: Workspace email required", status: 403 }
   }
   return { session }

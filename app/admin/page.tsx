@@ -138,6 +138,7 @@ export default function AdminPage() {
             <AdminUserMenu 
               user={currentUser} 
               greeting={getGreeting()}
+              onProfileUpdate={(updatedUser) => setCurrentUser(updatedUser)}
             />
           )}
         </div>

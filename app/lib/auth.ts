@@ -59,3 +59,19 @@ export function isWorkspaceEmail(email: string): boolean {
   const workspaceDomain = process.env.WORKSPACE_DOMAIN || '434media.com'
   return email.endsWith(`@${workspaceDomain}`)
 }
+
+/**
+ * Check if a user is authorized to access admin areas.
+ * Returns true for any authenticated session because:
+ * - Google OAuth only allows @434media.com emails (enforced by isWorkspaceEmail in callback)
+ * - Firebase Auth users are managed in Firebase Console (only approved users can log in)
+ * 
+ * This function should be used for API route protection instead of isWorkspaceEmail
+ * to support both Google Workspace and Firebase email/password authentication.
+ */
+export function isAuthorizedAdmin(email: string): boolean {
+  // Any authenticated user is authorized
+  // Google Workspace: restricted at OAuth callback level to @434media.com
+  // Firebase: restricted by who is added in Firebase Console
+  return !!email
+}

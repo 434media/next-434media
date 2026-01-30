@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isWorkspaceEmail } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
 
 // Debug endpoint to test notifications and create test notifications
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession()
 
-    if (!session || !isWorkspaceEmail(session.email)) {
+    if (!session || !isAuthorizedAdmin(session.email)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession()
 
-    if (!session || !isWorkspaceEmail(session.email)) {
+    if (!session || !isAuthorizedAdmin(session.email)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

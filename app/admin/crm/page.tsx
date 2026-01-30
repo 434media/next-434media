@@ -163,6 +163,9 @@ export default function SalesCRMPage() {
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [taskAttachments, setTaskAttachments] = useState<TaskAttachment[]>([])
   
+  // Team members for dynamic email-to-name mapping
+  const [teamMembersMap, setTeamMembersMap] = useState<Record<string, string>>({})
+  
   // Linked tasks panel state (for stacked kanban cards)
   const [showLinkedTasksPanel, setShowLinkedTasksPanel] = useState(false)
   const [linkedTasks, setLinkedTasks] = useState<Task[]>([])
@@ -175,9 +178,10 @@ export default function SalesCRMPage() {
     const loadInitialData = async () => {
       // Load dashboard stats and pipeline
       await loadDashboard()
-      // Load clients and tasks needed for dashboard budget calculations
+      // Load clients, tasks, and team members needed for dashboard
       await Promise.all([
         loadClients(),
+        loadTeamMembersMap(),
         loadTasks(),
       ])
     }
@@ -222,24 +226,42 @@ export default function SalesCRMPage() {
 
   // Set default assignee filter based on logged-in user
   useEffect(() => {
-    if (currentUser?.email) {
-      // Map email to full name for the assignee filter
-      const emailToNameMap: Record<string, string> = {
-        "jake@434media.com": "Jacob Lee Miles",
-        "marcos@434media.com": "Marcos Resendez",
-        "stacy@434media.com": "Stacy Carrizales",
-        "jesse@434media.com": "Jesse Hernandez",
-        "barb@434media.com": "Barbara Carreon",
-        "nichole@434media.com": "Nichole Snow",
-      }
-      const matchedName = emailToNameMap[currentUser.email.toLowerCase()]
+    if (currentUser?.email && Object.keys(teamMembersMap).length > 0) {
+      // Use dynamic team members map for email-to-name lookup
+      const matchedName = teamMembersMap[currentUser.email.toLowerCase()]
       if (matchedName) {
         setAssigneeFilter(matchedName)
         setOpportunityAssigneeFilter(matchedName)
         setClientAssigneeFilter(matchedName)
+      } else if (currentUser.name) {
+        // Fallback to session name for Firebase users not yet in map
+        setAssigneeFilter(currentUser.name)
+        setOpportunityAssigneeFilter(currentUser.name)
+        setClientAssigneeFilter(currentUser.name)
       }
     }
-  }, [currentUser])
+  }, [currentUser, teamMembersMap])
+
+  // Load team members for email-to-name mapping
+  const loadTeamMembersMap = async () => {
+    try {
+      const response = await fetch("/api/admin/team-members")
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          const map: Record<string, string> = {}
+          for (const member of data.data) {
+            if (member.email && member.name && member.isActive) {
+              map[member.email.toLowerCase()] = member.name
+            }
+          }
+          setTeamMembersMap(map)
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load team members map:", err)
+    }
+  }
 
   const loadDashboard = async () => {
     setIsLoading(true)

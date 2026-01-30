@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isWorkspaceEmail } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
 import {
   getClients,
   getClientById,
@@ -17,8 +17,8 @@ async function requireAdmin() {
     return { error: "Unauthorized", status: 401 }
   }
 
-  if (!isWorkspaceEmail(session.email)) {
-    return { error: "Forbidden: Workspace email required", status: 403 }
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: "Forbidden: Admin access required", status: 403 }
   }
 
   return { session }

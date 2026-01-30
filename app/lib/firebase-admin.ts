@@ -140,5 +140,12 @@ export async function testFirestoreConnection(): Promise<boolean> {
   }
 }
 
+// Verify Firebase ID token for authentication
+export async function verifyFirebaseToken(idToken: string): Promise<admin.auth.DecodedIdToken> {
+  const app = getFirebaseApp()
+  const auth = admin.auth(app)
+  return auth.verifyIdToken(idToken)
+}
+
 // Export admin for type usage
 export { admin }
