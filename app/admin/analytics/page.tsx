@@ -232,6 +232,7 @@ export default function UnifiedAnalyticsPage() {
           </div>
         </main>
       </div>
+    </div>
     </AdminRoleGuard>
   )
 }
