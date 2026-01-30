@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { upload } from "@vercel/blob/client"
 import { Upload, X, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react"
 
@@ -25,6 +25,11 @@ export function ImageUpload({
   const [uploadMethod, setUploadMethod] = useState<"url" | "file">("url")
   const [preview, setPreview] = useState<string>(value)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync preview with value prop when it changes (e.g., when editing an existing item)
+  useEffect(() => {
+    setPreview(value)
+  }, [value])
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

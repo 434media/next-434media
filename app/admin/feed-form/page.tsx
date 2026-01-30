@@ -1,16 +1,24 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
 import { Button } from "../../components/analytics/Button"
 import { Badge } from "../../components/analytics/Badge"
+import { Marked } from 'marked'
 
 import { useToast } from "../../hooks/use-toast"
-import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, Star, Pencil } from "lucide-react"
+import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, Star, Pencil, Cloud, CloudOff, Clock } from "lucide-react"
 import Link from "next/link"
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
+
+// Configure marked for consistent rendering with production
+const previewMarked = new Marked({ 
+  async: false, 
+  gfm: true,
+  breaks: true
+})
 
 // Collapsible Section Component
 interface CollapsibleSectionProps {
@@ -117,6 +125,16 @@ interface PreviewFieldProps {
 function PreviewField({ label, value, isPreview, required, children, isRichText }: PreviewFieldProps) {
   const [isEditing, setIsEditing] = useState(false)
 
+  // Render markdown using the same library as production
+  const renderedHtml = useMemo(() => {
+    if (!value || !isRichText) return null
+    try {
+      return previewMarked.parse(value) as string
+    } catch {
+      return value.replace(/\n/g, '<br />')
+    }
+  }, [value, isRichText])
+
   // If not in preview mode globally, or if this field is being edited, show the edit form
   if (!isPreview || isEditing) {
     return (
@@ -138,21 +156,21 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
     )
   }
 
-  // For rich text, render HTML
+  // For rich text, render HTML using marked (matches production)
   const renderValue = () => {
     if (!value) {
       return <span className="text-neutral-400 italic text-sm">Click to add content</span>
     }
-    if (isRichText) {
-      // Simple markdown-like rendering for preview
-      const htmlContent = value
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/\n/g, '<br />')
+    if (isRichText && renderedHtml) {
       return (
         <div 
-          className="prose prose-sm max-w-none text-neutral-700 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+          className="prose prose-sm max-w-none text-neutral-700 leading-relaxed
+            prose-headings:text-gray-900 prose-strong:text-gray-900
+            prose-a:text-blue-600 prose-a:underline
+            prose-code:bg-gray-100 prose-code:rounded prose-code:px-1
+            prose-blockquote:border-gray-300 prose-blockquote:text-gray-600
+            prose-ul:my-2 prose-ol:my-2 prose-li:my-0"
+          dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />
       )
     }
@@ -328,6 +346,13 @@ export default function FeedFormPage() {
   const [hasDraft, setHasDraft] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
   
+  // Auto-save to Firestore state
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [autoSaveDraftId, setAutoSaveDraftId] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const lastSavedFormData = useRef<string>("")
+  
   // Collapsible section states - all collapsed by default
   const [openSections, setOpenSections] = useState<Set<string>>(new Set())
   
@@ -423,6 +448,99 @@ export default function FeedFormPage() {
       return () => clearTimeout(saveTimer)
     }
   }, [formData, editingId])
+
+  // Track unsaved changes
+  useEffect(() => {
+    const currentFormString = JSON.stringify(formData)
+    if (lastSavedFormData.current && currentFormString !== lastSavedFormData.current) {
+      setHasUnsavedChanges(true)
+    }
+  }, [formData])
+
+  // Auto-save draft to Firestore every 30 seconds
+  const autoSaveToFirestore = useCallback(async () => {
+    // Only auto-save if:
+    // 1. Not currently editing an existing published/archived item
+    // 2. Form has meaningful content (title AND summary)
+    // 3. Status is draft
+    // 4. There are unsaved changes
+    if (formData.status !== "draft") return
+    if (!formData.title?.trim() || !formData.summary?.trim()) return
+    if (!hasUnsavedChanges && autoSaveDraftId) return
+    
+    const currentFormString = JSON.stringify(formData)
+    if (currentFormString === lastSavedFormData.current) return
+
+    setIsAutoSaving(true)
+    try {
+      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
+      const tableName = currentBrand?.tableName || "thefeed"
+      
+      // If we already have a draft ID, update it; otherwise create new
+      const isUpdating = autoSaveDraftId !== null || editingId !== null
+      const method = isUpdating ? "PATCH" : "POST"
+      const draftId = autoSaveDraftId || editingId
+      
+      const body = isUpdating 
+        ? { id: draftId, ...formData, status: "draft" }
+        : { ...formData, status: "draft" }
+
+      const response = await fetch(`/api/feed-submit?table=${tableName}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Store the draft ID for future updates
+        if (!isUpdating && result.data?.id) {
+          setAutoSaveDraftId(result.data.id)
+        }
+        setLastSavedAt(new Date())
+        setHasUnsavedChanges(false)
+        lastSavedFormData.current = currentFormString
+        
+        // Refresh feed items list to show the draft
+        loadFeedItems()
+      }
+    } catch (error) {
+      console.error("Auto-save failed:", error)
+    } finally {
+      setIsAutoSaving(false)
+    }
+  }, [formData, selectedBrand, autoSaveDraftId, editingId, hasUnsavedChanges])
+
+  // Auto-save to Firestore every 30 seconds when there's content
+  useEffect(() => {
+    if (activeTab !== "create") return
+    if (!formData.title?.trim() || !formData.summary?.trim()) return
+    if (formData.status !== "draft") return
+
+    const autoSaveInterval = setInterval(() => {
+      autoSaveToFirestore()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(autoSaveInterval)
+  }, [activeTab, formData.title, formData.summary, formData.status, autoSaveToFirestore])
+
+  // Save to Firestore when leaving the page (beforeunload)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && formData.title?.trim() && formData.summary?.trim() && formData.status === "draft") {
+        // Trigger save
+        autoSaveToFirestore()
+        // Show browser warning
+        e.preventDefault()
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?"
+        return e.returnValue
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedChanges, formData, autoSaveToFirestore])
 
   // Load feed items on mount and when brand changes
   useEffect(() => {
@@ -732,6 +850,12 @@ export default function FeedFormPage() {
         localStorage.removeItem("feedFormDraft")
         setHasDraft(false)
         
+        // Reset auto-save state
+        setAutoSaveDraftId(null)
+        setLastSavedAt(null)
+        setHasUnsavedChanges(false)
+        lastSavedFormData.current = ""
+        
         // Reset form and editing state
         setFormData({
           title: "",
@@ -814,12 +938,30 @@ export default function FeedFormPage() {
       spotlight_3_cta_link: item.spotlight_3_cta_link,
     })
     setActiveTab("create")
+    
+    // Reset auto-save state when editing existing item
+    setAutoSaveDraftId(null)
+    setLastSavedAt(null)
+    setHasUnsavedChanges(false)
+    lastSavedFormData.current = JSON.stringify({
+      title: item.title,
+      type: item.type,
+      summary: item.summary,
+      // ... simplified - just mark as saved
+    })
   }
 
   // Cancel editing
   const handleCancelEdit = () => {
     setEditingId(null)
     setPreviewMode(false)
+    
+    // Reset auto-save state
+    setAutoSaveDraftId(null)
+    setLastSavedAt(null)
+    setHasUnsavedChanges(false)
+    lastSavedFormData.current = ""
+    
     setFormData({
       title: "",
       type: "newsletter",
@@ -1102,21 +1244,29 @@ export default function FeedFormPage() {
                           key={item.id}
                           className="bg-white border border-neutral-200 rounded-lg overflow-hidden hover:border-neutral-300 hover:shadow-md transition-all duration-150 group"
                         >
-                          {/* Image - Desktop only */}
-                          {displayImage && (
-                            <div className="hidden md:block h-24 relative overflow-hidden bg-neutral-100">
+                          {/* Image - Always show (with fallback) */}
+                          <div className="h-20 md:h-24 relative overflow-hidden bg-neutral-100">
+                            {displayImage ? (
                               <img
                                 src={displayImage}
                                 alt={item.title}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                onError={(e) => {
+                                  // Hide broken image and show fallback
+                                  e.currentTarget.style.display = 'none'
+                                }}
                               />
-                              {/* Status indicator dot */}
-                              <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full shadow-sm ${
-                                item.status === "published" ? "bg-green-500" :
-                                item.status === "draft" ? "bg-amber-500" : "bg-neutral-400"
-                              }`} title={item.status} />
-                            </div>
-                          )}
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon className="h-6 w-6 text-neutral-300" />
+                              </div>
+                            )}
+                            {/* Status indicator dot */}
+                            <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full shadow-sm ${
+                              item.status === "published" ? "bg-green-500" :
+                              item.status === "draft" ? "bg-amber-500" : "bg-neutral-400"
+                            }`} title={item.status} />
+                          </div>
                           
                           {/* Content */}
                           <div className="p-3">
@@ -1130,11 +1280,6 @@ export default function FeedFormPage() {
                               }`}>
                                 {item.type}
                               </span>
-                              {/* Mobile status dot */}
-                              <div className={`md:hidden w-2 h-2 rounded-full ${
-                                item.status === "published" ? "bg-green-500" :
-                                item.status === "draft" ? "bg-amber-500" : "bg-neutral-400"
-                              }`} title={item.status} />
                             </div>
                             
                             {/* Title */}
@@ -1227,6 +1372,39 @@ export default function FeedFormPage() {
                       <Save className="h-3 w-3 mr-1" />
                       Draft saved
                     </Badge>
+                  )}
+                  
+                  {/* Auto-save status indicator */}
+                  {formData.status === "draft" && formData.title?.trim() && formData.summary?.trim() && (
+                    <div className="flex items-center gap-2">
+                      {isAutoSaving ? (
+                        <Badge className="bg-sky-100 text-sky-700 border-sky-200 text-xs animate-pulse">
+                          <Cloud className="h-3 w-3 mr-1" />
+                          Saving to cloud...
+                        </Badge>
+                      ) : lastSavedAt ? (
+                        <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Badge>
+                      ) : hasUnsavedChanges ? (
+                        <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Unsaved changes
+                        </Badge>
+                      ) : null}
+                      
+                      {/* Manual save button */}
+                      {hasUnsavedChanges && !isAutoSaving && (
+                        <button
+                          type="button"
+                          onClick={autoSaveToFirestore}
+                          className="px-2 py-1 text-xs font-medium text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded transition-colors"
+                        >
+                          Save now
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -1437,7 +1615,7 @@ export default function FeedFormPage() {
                       </label>
                       <RichTextEditor
                         value={formData.summary}
-                        onChange={(value) => handleInputChange("summary", value)}
+                        onChange={(value: string) => handleInputChange("summary", value)}
                         placeholder="Enter a brief summary (supports Markdown)"
                         minRows={4}
                       />
@@ -1678,7 +1856,7 @@ export default function FeedFormPage() {
                           <div>
                             <RichTextEditor
                               value={formData.founders_note_text || ""}
-                              onChange={(value) => handleInputChange("founders_note_text", value)}
+                              onChange={(value: string) => handleInputChange("founders_note_text", value)}
                               placeholder="Enter founder's note content (supports Markdown)"
                               minRows={6}
                             />
@@ -1761,7 +1939,7 @@ export default function FeedFormPage() {
                               <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Write the main content for your featured post. Supports Markdown.</p>
                               <RichTextEditor
                                 value={formData.featured_post_content || ""}
-                                onChange={(value) => handleInputChange("featured_post_content", value)}
+                                onChange={(value: string) => handleInputChange("featured_post_content", value)}
                                 placeholder="Featured post content (supports Markdown)"
                                 minRows={6}
                               />
@@ -1810,7 +1988,7 @@ export default function FeedFormPage() {
                           <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Describe the event details, schedule, and what attendees can expect.</p>
                           <RichTextEditor
                             value={formData.upcoming_event_description || ""}
-                            onChange={(value) => handleInputChange("upcoming_event_description", value)}
+                            onChange={(value: string) => handleInputChange("upcoming_event_description", value)}
                             placeholder="Event description (supports Markdown)"
                             minRows={6}
                           />
@@ -1910,7 +2088,7 @@ export default function FeedFormPage() {
                             <p className="text-xs text-neutral-500 mb-2 leading-relaxed">A brief description of what you're spotlighting. Supports Markdown.</p>
                             <RichTextEditor
                               value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""}
-                              onChange={(value) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
+                              onChange={(value: string) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
                               placeholder={`Spotlight ${num} description`}
                               minRows={4}
                             />
