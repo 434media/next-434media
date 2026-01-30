@@ -227,6 +227,10 @@ export interface Task {
   attachments?: TaskAttachment[]
   comments?: TaskComment[]
   tagged_users?: string[]
+  // Social Media Calendar fields
+  is_social_post?: boolean  // Whether this task is linked to social media calendar
+  social_post_date?: string  // Scheduled date for social media post
+  social_platforms?: SocialPlatform[]  // Which platforms this post is scheduled for
   created_at: string
   updated_at: string
 }
@@ -260,7 +264,22 @@ export interface MigrationResult {
   }>
 }
 
-export type ViewMode = "dashboard" | "pipeline" | "clients" | "tasks"
+export type ViewMode = "dashboard" | "pipeline" | "clients" | "tasks" | "social-calendar"
+
+// Social Media Platform type
+export type SocialPlatform = "instagram" | "youtube" | "tiktok" | "linkedin" | "facebook"
+
+// Calendar view mode for social calendar
+export type CalendarViewMode = "day" | "week" | "month"
+
+// Social platform options with colors for UI
+export const SOCIAL_PLATFORM_OPTIONS: { value: SocialPlatform; label: string; color: string; bgColor: string }[] = [
+  { value: "instagram", label: "Instagram", color: "#E1306C", bgColor: "bg-pink-100" },
+  { value: "youtube", label: "YouTube", color: "#FF0000", bgColor: "bg-red-100" },
+  { value: "tiktok", label: "TikTok", color: "#000000", bgColor: "bg-gray-100" },
+  { value: "linkedin", label: "LinkedIn", color: "#0077B5", bgColor: "bg-blue-100" },
+  { value: "facebook", label: "Facebook", color: "#1877F2", bgColor: "bg-blue-100" },
+]
 
 // Status color mappings
 export const STATUS_COLORS: Record<string, string> = {

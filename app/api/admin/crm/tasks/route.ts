@@ -144,6 +144,10 @@ export async function POST(request: NextRequest) {
       attachments: body.attachments || [],
       comments: body.comments || [],
       tagged_users: body.tagged_users || [],
+      // Social Calendar fields
+      is_social_post: body.is_social_post || false,
+      social_post_date: body.social_post_date || "",
+      social_platforms: body.social_platforms || [],
     })
 
     return NextResponse.json({ success: true, task }, { status: 201 })
@@ -301,6 +305,16 @@ export async function PUT(request: NextRequest) {
       }
       if (taskUpdates.client_name !== undefined) {
         masterListUpdates.client_name = taskUpdates.client_name
+      }
+      // Handle social calendar fields
+      if (taskUpdates.is_social_post !== undefined) {
+        masterListUpdates.is_social_post = taskUpdates.is_social_post
+      }
+      if (taskUpdates.social_post_date !== undefined) {
+        masterListUpdates.social_post_date = taskUpdates.social_post_date
+      }
+      if (taskUpdates.social_platforms !== undefined) {
+        masterListUpdates.social_platforms = taskUpdates.social_platforms
       }
       
       return masterListUpdates

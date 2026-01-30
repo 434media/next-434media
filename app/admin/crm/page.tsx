@@ -10,6 +10,7 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
+  Calendar,
 } from "lucide-react"
 
 // Import CRM components
@@ -20,6 +21,7 @@ import {
   OpportunitiesKanbanView,
   ClientsView,
   TasksView,
+  SocialCalendarView,
   ClientFormModal,
   OpportunityFormModal,
   TaskModal,
@@ -41,6 +43,7 @@ import type {
   Disposition,
   DOC,
   CRMTag,
+  SocialPlatform,
 } from "../../components/crm/types"
 
 export default function SalesCRMPage() {
@@ -155,6 +158,9 @@ export default function SalesCRMPage() {
     doc: "" as DOC | "",
     client_id: "",
     client_name: "",
+    is_social_post: false,
+    social_post_date: "",
+    social_platforms: [] as SocialPlatform[],
   })
   const [newLink, setNewLink] = useState("")
   const [newComment, setNewComment] = useState("")
@@ -479,6 +485,9 @@ export default function SalesCRMPage() {
       doc: task.doc || "",
       client_id: task.client_id || "",
       client_name: task.client_name || "",
+      is_social_post: task.is_social_post || false,
+      social_post_date: task.social_post_date || "",
+      social_platforms: task.social_platforms || [],
     })
     setTaskAttachments(task.attachments || [])
     setShowTaskModal(true)
@@ -503,6 +512,9 @@ export default function SalesCRMPage() {
       is_opportunity: false,
       disposition: undefined,
       doc: undefined,
+      is_social_post: false,
+      social_post_date: "",
+      social_platforms: [],
       attachments: [],
       comments: [],
       created_at: new Date().toISOString(),
@@ -527,6 +539,9 @@ export default function SalesCRMPage() {
       doc: "",
       client_id: "",
       client_name: "",
+      is_social_post: false,
+      social_post_date: "",
+      social_platforms: [],
     })
     setTaskAttachments([])
     setShowTaskModal(true)
@@ -2246,11 +2261,12 @@ export default function SalesCRMPage() {
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-200 pb-4">
           {[
-            { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-            { id: "pipeline", label: "Opportunities", icon: Target },
-            { id: "clients", label: "Clients", icon: Users },
-            { id: "tasks", label: "Tasks", icon: CheckCircle2 },
-          ].map(({ id, label, icon: Icon }) => (
+            { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
+            { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
+            { id: "clients", label: "Clients", icon: Users, badge: null },
+            { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
+            { id: "social-calendar", label: "Social Calendar", icon: Calendar, badge: "Testing" },
+          ].map(({ id, label, icon: Icon, badge }) => (
             <button
               key={id}
               onClick={() => setViewMode(id as ViewMode)}
@@ -2262,6 +2278,11 @@ export default function SalesCRMPage() {
             >
               <Icon className="w-4 h-4" />
               {label}
+              {badge && (
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 border border-amber-200">
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -2383,6 +2404,14 @@ export default function SalesCRMPage() {
             onQuickStatusChange={handleQuickStatusChange}
           />
         )}
+
+        {/* Social Calendar View */}
+        {viewMode === "social-calendar" && (
+          <SocialCalendarView
+            tasks={tasks}
+            onOpenTask={openTaskModal}
+          />
+        )}
       </div>
 
       {/* Client Form Modal */}
@@ -2470,6 +2499,9 @@ export default function SalesCRMPage() {
             doc: "",
             client_id: "",
             client_name: "",
+            is_social_post: false,
+            social_post_date: "",
+            social_platforms: [],
           })
           setNewLink("")
           setNewComment("")
