@@ -20,7 +20,7 @@ export function EventCarousel() {
     id: "video-session",
     type: "video",
     videoUrl: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSW25+-+%C2%BFQue+es+SDOH_.mp4",
-    videoThumbnail: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSWPanels-27.jpg",
+    videoThumbnail: "https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-ochoa.jpg",
     title: dictionary.sdoh?.demoDay?.title || "¿Que es SDOH? Panel Session",
     description:
       dictionary.sdoh?.demoDay?.description || "Experience the complete panel discussion from RGV Startup Week 2025.",
@@ -50,7 +50,7 @@ export function EventCarousel() {
         }}
       >
         {/* Video showcase container */}
-        <div className="relative aspect-square">
+        <div className="relative aspect-[4/5]">
           {/* Background image */}
           <div className="absolute inset-0 overflow-hidden">
             <div

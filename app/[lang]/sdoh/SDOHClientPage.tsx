@@ -12,7 +12,7 @@ import SDOHHealthAccelerator from "../../components/sdoh/SDOHHealthAccelerator"
 import AcceleratorWinner from "../../components/sdoh/AcceleratorWinner"
 import SDOHImpactMessage from "../../components/sdoh/SDOHImpactMessage"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
-import { SectionTransition, SectionDivider } from "../../components/sdoh/SectionTransition"
+import { SectionTransition, SectionDivider, WaveDivider } from "../../components/sdoh/SectionTransition"
 import Script from "next/script"
 
 /**
@@ -69,40 +69,36 @@ export default function SDOHClientPage() {
         {/* 2. SDOH Intro - Dynamic logo with parallax effects */}
         <SDOHIntro locale={currentLocale} dict={dictionary} />
 
-        {/* 3. Strategic Partnership - VelocityTX & MHM */}
-        <StrategicPartnership locale={currentLocale} dict={dictionary} />
-
         {/* 4. Impact Stats - Year 2 metrics right after partnership */}
         <SDOHImpactStats locale={currentLocale} />
 
-        {/* Section Divider - Transition to Programs */}
-        <SectionDivider variant="double" colorScheme="mixed" />
+        {/* 3. Strategic Partnership - VelocityTX & MHM */}
+        <StrategicPartnership locale={currentLocale} dict={dictionary} />
+
+        {/* Wave Divider - Flowing transition to Programs */}
+        <WaveDivider colorScheme="mixed" size="large" />
 
         {/* 5. COMPONENT 1: Seminar Series - Learning as Catalyst for Change */}
-        <section className="py-20 bg-white relative overflow-hidden">
+        <section className="py-20 bg-white relative">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
             <SeminarSeries locale={currentLocale} dict={dictionary} />
           </div>
         </section>
 
-        {/* Section Divider */}
-        <SectionDivider variant="double" colorScheme="magenta" />
+        {/* Wave Divider - Magenta flow */}
+        <WaveDivider colorScheme="magenta" size="medium" />
 
         {/* 6. COMPONENT 2: Startup Bootcamp */}
-        <section className="py-20 bg-white relative overflow-hidden">
-          <SectionTransition variant="wave" colorScheme="magenta" maxWidth="5xl" className="px-4 sm:px-6 lg:px-8">
-            <SDOHStartupBootcamp locale={currentLocale} dict={dictionary} />
-          </SectionTransition>
+        <section className="py-20 bg-white relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SDOHStartupBootcamp locale={currentLocale} dict={dictionary} />
         </section>
 
-        {/* Section Divider between Bootcamp and Accelerator */}
-        <SectionDivider variant="double" colorScheme="magenta" />
+        {/* Wave Divider - Orange flow between Bootcamp and Accelerator */}
+        <WaveDivider colorScheme="orange" size="medium" />
 
         {/* 7. COMPONENT 3: Community Health Accelerator */}
-        <section className="py-20 bg-white relative overflow-hidden">
-          <SectionTransition variant="wave" colorScheme="orange" maxWidth="5xl" className="px-4 sm:px-6 lg:px-8">
-            <SDOHHealthAccelerator locale={currentLocale} dict={dictionary} />
-          </SectionTransition>
+        <section className="py-20 bg-white relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SDOHHealthAccelerator locale={currentLocale} dict={dictionary} />
         </section>
 
         {/* 8. Accelerator Winner - Success Story */}

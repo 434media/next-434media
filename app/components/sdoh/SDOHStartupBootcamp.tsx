@@ -1,8 +1,7 @@
 "use client"
-import type React from "react"
-import { useRef } from "react"
+import { useEffect, useState } from "react"
+import Image from "next/image"
 import type { Locale } from "../../../i18n-config"
-import { useEffect, useState, useCallback } from "react"
 import type { Dictionary } from "@/app/types/dictionary"
 import { useLanguage } from "@/app/context/language-context"
 import { FadeIn } from "../FadeIn"
@@ -10,228 +9,6 @@ import { FadeIn } from "../FadeIn"
 interface SDOHStartupBootcampProps {
   locale: Locale
   dict: Dictionary
-}
-
-const BootcampCarousel = () => {
-  const [activeSlide, setActiveSlide] = useState(0)
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-  const [touchStart, setTouchStart] = useState(0)
-  const [touchEnd, setTouchEnd] = useState(0)
-  const carouselRef = useRef<HTMLDivElement>(null)
-  const autoPlayRef = useRef<NodeJS.Timeout | null>(null)
-
-  const images = [
-    {
-      src: "https://ampd-asset.s3.us-east-2.amazonaws.com/SUBC-1.jpg",
-      alt: "RGV Startup Week - Bootcamp",
-    },
-    {
-      src: "https://ampd-asset.s3.us-east-2.amazonaws.com/SUBC-4.jpg",
-      alt: "RGV Startup Week - Bootcamp",
-    },
-    {
-      src: "https://ampd-asset.s3.us-east-2.amazonaws.com/SUBC-5.jpg",
-      alt: "RGV Startup Week - Bootcamp",
-    },
-    {
-      src: "https://ampd-asset.s3.us-east-2.amazonaws.com/SUBC-6.jpg",
-      alt: "RGV Startup Week - Bootcamp",
-    },
-  ]
-
-  const nextSlide = useCallback(() => {
-    setActiveSlide((prev) => (prev + 1) % images.length)
-  }, [images.length])
-
-  const prevSlide = useCallback(() => {
-    setActiveSlide((prev) => (prev - 1 + images.length) % images.length)
-  }, [images.length])
-
-  const goToSlide = (index: number) => {
-    setActiveSlide(index)
-  }
-
-  useEffect(() => {
-    if (isAutoPlaying) {
-      if (autoPlayRef.current) {
-        clearInterval(autoPlayRef.current)
-      }
-      autoPlayRef.current = setInterval(() => {
-        nextSlide()
-      }, 5000)
-    }
-    return () => {
-      if (autoPlayRef.current) {
-        clearInterval(autoPlayRef.current)
-      }
-    }
-  }, [isAutoPlaying, nextSlide])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") prevSlide()
-      else if (e.key === "ArrowRight") nextSlide()
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [nextSlide, prevSlide])
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX)
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX)
-  }
-
-  const handleTouchEnd = () => {
-    if (touchStart - touchEnd > 50) nextSlide()
-    if (touchStart - touchEnd < -50) prevSlide()
-  }
-
-  const handleMouseEnter = () => setIsAutoPlaying(false)
-  const handleMouseLeave = () => setIsAutoPlaying(true)
-
-  return (
-    <div
-      className="relative overflow-hidden bg-neutral-900 border border-neutral-800"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      ref={carouselRef}
-      aria-roledescription="carousel"
-      aria-label="Bootcamp image carousel"
-      style={{ aspectRatio: "1080/1350" }}
-    >
-      {/* Progress bar */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-neutral-800 z-20">
-        <div
-          className="h-full bg-cyan-500 transition-all duration-500"
-          style={{ width: `${((activeSlide + 1) / images.length) * 100}%` }}
-        />
-      </div>
-
-      {/* Slides container */}
-      <div className="relative w-full h-full">
-        {images.map((image, index) => (
-          <div
-            key={`bootcamp-slide-${index}`}
-            className={`absolute inset-0 transition-opacity duration-700 ${
-              index === activeSlide ? "opacity-100 z-10" : "opacity-0 z-0"
-            }`}
-            aria-hidden={index !== activeSlide}
-            role="group"
-            aria-roledescription="slide"
-            aria-label={`Slide ${index + 1} of ${images.length}: ${image.alt}`}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `url(${image.src})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-            {/* Caption - only on first slide */}
-            {index === 0 && (
-              <div className="absolute bottom-0 left-0 right-0 p-8 sm:p-12 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
-                <div className="max-w-2xl">
-                  <div className="inline-flex items-center bg-cyan-500 text-white px-4 py-2 text-sm font-bold tracking-wider mb-4">
-                    <div className="w-2 h-2 bg-white rounded-full mr-2" />
-                    STARTUP BOOTCAMP
-                  </div>
-                  <h3 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-4 leading-tight">
-                    Early-Stage Program
-                  </h3>
-                  <p className="text-white/90 text-base sm:text-lg leading-relaxed">
-                    A hands-on program that helped local entrepreneurs turn ideas into action with guidance on business
-                    models, impact measurement, and funding strategies.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Navigation controls */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-between items-center px-8 z-30">
-        {/* Slide counter */}
-        <div className="bg-white text-neutral-900 px-4 py-2 text-sm font-bold">
-          <span>{activeSlide + 1}</span>
-          <span className="text-neutral-400 mx-1">/</span>
-          <span className="text-neutral-500">{images.length}</span>
-        </div>
-
-        {/* Pagination dots */}
-        <div className="flex items-center justify-center space-x-3">
-          {images.map((_, index) => (
-            <button
-              key={`bootcamp-dot-${index}`}
-              onClick={() => goToSlide(index)}
-              className={`transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#A31545] ${
-                index === activeSlide
-                  ? "w-8 h-2 bg-[#A31545]"
-                  : "w-2 h-2 bg-white/60 hover:bg-white"
-              }`}
-              aria-label={`Go to slide ${index + 1}`}
-              aria-current={index === activeSlide ? "true" : "false"}
-            />
-          ))}
-        </div>
-
-        {/* Auto-play toggle */}
-        <button
-          onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-          className="bg-white text-neutral-900 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-[#A31545] p-3"
-          aria-label={isAutoPlaying ? "Pause auto-play" : "Start auto-play"}
-        >
-          {isAutoPlaying ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* Previous/Next buttons */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-6 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white text-neutral-900 flex items-center justify-center z-20 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A31545]"
-        aria-label="Previous slide"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-
-      <button
-        onClick={nextSlide}
-        className="absolute right-6 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white text-neutral-900 flex items-center justify-center z-20 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A31545]"
-        aria-label="Next slide"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-    </div>
-  )
 }
 
 export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcampProps) {
@@ -271,13 +48,6 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {getStringValue(d.title)}
             </h2>
-            {/* Accent underline */}
-            <div className="mx-auto w-16 h-1 bg-[#A31545] mb-6" />
-            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed max-w-2xl mx-auto">
-              {locale === "es"
-                ? "La conciencia se convierte en impulso"
-                : "Awareness became momentum"}
-            </p>
           </div>
         </div>
       </FadeIn>
@@ -329,10 +99,27 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
           </div>
         </FadeIn>
 
-        {/* Image Carousel */}
+        {/* Bootcamp Image */}
         <FadeIn>
           <div className="order-1 md:order-2 relative">
-            <BootcampCarousel />
+            {/* Decorative frame */}
+            <div className="absolute -inset-4 border border-[#A31545]/20 -z-10" />
+            <div className="absolute -inset-4 border border-[#FF6B35]/20 translate-x-2 translate-y-2 -z-10" />
+            
+            {/* Image container */}
+            <div className="relative aspect-[4/3] overflow-hidden bg-neutral-100">
+              <Image
+                src="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-bootcamp.jpg"
+                alt="SDOH Startup Bootcamp participants group photo"
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+              
+              {/* Accent corners */}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#A31545]" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#FF6B35]" />
+            </div>
           </div>
         </FadeIn>
       </div>

@@ -1,10 +1,11 @@
 "use client"
 import { FadeIn } from "../FadeIn"
 import type { Locale } from "../../../i18n-config"
-import { useEffect, useState } from "react"
-import SDOHDemoDay from "./SDOHDemoDay"
+import { useEffect, useState, useCallback } from "react"
+import Image from "next/image"
 import type { Dictionary } from "../../types/dictionary"
 import { useLanguage } from "../../context/language-context"
+import { VideoModal } from "./VideoModal"
 
 interface AcceleratorDictionary {
   title: string
@@ -26,6 +27,15 @@ const getStringValue = (value: any): string => {
 export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAcceleratorProps) {
   const { dictionary } = useLanguage()
   const [key, setKey] = useState(0)
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+
+  const openVideoModal = useCallback(() => {
+    setIsVideoModalOpen(true)
+  }, [])
+
+  const closeVideoModal = useCallback(() => {
+    setIsVideoModalOpen(false)
+  }, [])
 
   useEffect(() => {
     setKey((prev) => prev + 1)
@@ -60,13 +70,6 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {getStringValue(d.title)}
             </h2>
-            {/* Accent underline */}
-            <div className="mx-auto w-16 h-1 bg-[#A31545] mb-6" />
-            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed max-w-3xl mx-auto">
-              {locale === "es"
-                ? "Innovación sostenida a través de colaboración real, mentoría e impacto medible"
-                : "Sustained innovation through real-world collaboration, mentorship, and measurable impact"}
-            </p>
           </div>
         </div>
 
@@ -94,43 +97,60 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
                   {getStringValue(d.description2)}
                 </p>
 
-                {/* Learn more link */}
+                {/* Learn more link - opens video modal */}
                 <div className="pl-4">
-                  <a
-                    href="https://velocitytx.org/startup-programs/support/accelerator/"
+                  <button
+                    onClick={openVideoModal}
                     className="inline-flex items-center text-neutral-900 hover:text-[#A31545] font-medium transition-colors duration-200"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Learn more about the Community Health Accelerator"
+                    aria-label="Watch the Accelerator Program Recap video"
                   >
                     {learnMore}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5 ml-2"
                       viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      fill="currentColor"
                     >
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
+                      <path d="M8 5v14l11-7z" />
                     </svg>
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Demo Day Video */}
+          {/* Accelerator Image */}
           <div className="order-1 md:order-2 relative">
-            <div style={{ aspectRatio: "1080/1350" }} className="w-full">
-              <SDOHDemoDay dict={currentDict} locale={locale} />
+            {/* Decorative frame */}
+            <div className="absolute -inset-4 border border-[#A31545]/20 -z-10" />
+            <div className="absolute -inset-4 border border-[#FF6B35]/20 translate-x-2 translate-y-2 -z-10" />
+            
+            {/* Image container */}
+            <div className="relative aspect-[4/5] overflow-hidden bg-neutral-100">
+              <Image
+                src="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-accelerator.jpg"
+                alt="SDOH Community Health Accelerator winner receiving $50,000 check"
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 768px) 100vw, 50vw"
+              />
+              
+              {/* Accent corners */}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#A31545]" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#FF6B35]" />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Video Modal for Accelerator Program Recap */}
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={closeVideoModal}
+        videoSrc="https://ampd-asset.s3.us-east-2.amazonaws.com/SDOH+ACCELERATOR+PROGRAM+RECAP_2025.mp4"
+        title={locale === "es" ? "Resumen del Programa Acelerador SDOH" : "SDOH Accelerator Program Recap"}
+        description={locale === "es" ? "Mira los momentos destacados del programa acelerador de salud comunitaria." : "Watch the highlights from the community health accelerator program."}
+      />
     </FadeIn>
   )
 }

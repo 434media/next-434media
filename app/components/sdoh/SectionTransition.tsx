@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { motion, useInView } from "motion/react"
 
 interface SectionTransitionProps {
@@ -26,7 +26,7 @@ export function SectionTransition({
   children,
 }: SectionTransitionProps) {
   const ref = useRef<HTMLDivElement>(null)
-  const isInView = useInView(ref, { once: false, margin: "-100px" })
+  const isInView = useInView(ref, { once: false, margin: "-50px" })
 
   const maxWidthClasses = {
     "3xl": "max-w-3xl",
@@ -46,8 +46,8 @@ export function SectionTransition({
 
   return (
     <div ref={ref} className={`relative ${className}`}>
-      {/* Left Side Decorative Lines */}
-      <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 lg:w-32 xl:w-48 hidden lg:flex flex-col items-end justify-center pointer-events-none overflow-hidden">
+      {/* Left Side Decorative Lines - removed overflow-hidden, extended width */}
+      <div className="absolute left-0 top-0 bottom-0 w-24 sm:w-32 lg:w-48 xl:w-64 2xl:w-80 hidden lg:flex flex-col items-end justify-center pointer-events-none">
         {variant === "lines" && (
           <LinesPattern isInView={isInView} side="left" colorSet={colorSet} />
         )}
@@ -65,8 +65,8 @@ export function SectionTransition({
         )}
       </div>
 
-      {/* Right Side Decorative Lines */}
-      <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 lg:w-32 xl:w-48 hidden lg:flex flex-col items-start justify-center pointer-events-none overflow-hidden">
+      {/* Right Side Decorative Lines - removed overflow-hidden, extended width */}
+      <div className="absolute right-0 top-0 bottom-0 w-24 sm:w-32 lg:w-48 xl:w-64 2xl:w-80 hidden lg:flex flex-col items-start justify-center pointer-events-none">
         {variant === "lines" && (
           <LinesPattern isInView={isInView} side="right" colorSet={colorSet} />
         )}
@@ -196,7 +196,7 @@ function GradientPattern({
   )
 }
 
-// Wave Pattern - Flowing curves inspired by MHMxVelocity Impact Report
+// Wave Pattern - Flowing curves styled like SDOHImpactStats decorative background
 function WavePattern({ 
   isInView, 
   side, 
@@ -207,37 +207,39 @@ function WavePattern({
   colorScheme: "magenta" | "orange" | "mixed"
 }) {
   const strokeColors = {
-    magenta: ["#A31545", "#C41E54", "#8B1E3F"],
-    orange: ["#FF6B35", "#FF8C5A", "#F26522"],
-    mixed: ["#A31545", "#FF6B35", "#C41E54"],
+    magenta: "#A31545",
+    orange: "#FF6B35",
+    mixed: side === "left" ? "#A31545" : "#FF6B35",
   }
   
-  const strokes = strokeColors[colorScheme]
+  const stroke = strokeColors[colorScheme]
   
   return (
     <motion.div
-      className="relative w-full h-80"
+      className="relative w-full h-full min-h-[400px]"
       initial={{ opacity: 0 }}
       animate={isInView ? { opacity: 1 } : { opacity: 0 }}
       transition={{ duration: 0.8 }}
     >
       <svg
-        viewBox="0 0 100 300"
-        className={`absolute ${side === "left" ? "right-0" : "left-0"} top-1/2 -translate-y-1/2 h-full w-auto`}
-        style={{ transform: side === "right" ? "scaleX(-1) translateY(-50%)" : "translateY(-50%)" }}
-        preserveAspectRatio="xMidYMid meet"
+        viewBox="0 0 100 400"
+        className="absolute inset-0 w-full h-full"
+        preserveAspectRatio="xMidYMid slice"
+        style={{ transform: side === "right" ? "scaleX(-1)" : "none" }}
       >
-        {[0, 1, 2, 3, 4].map((i) => (
+        {/* Flowing wave lines matching SDOHImpactStats style */}
+        {[0, 1, 2, 3, 4, 5].map((i) => (
           <motion.path
             key={i}
-            d={`M ${80 - i * 12} 0 Q ${40 - i * 8} 75, ${70 - i * 10} 150 T ${80 - i * 12} 300`}
+            d={`M ${-10 + i * 15} 0 Q ${50 - i * 8} 100, ${30 + i * 10} 200 T ${-10 + i * 15} 400`}
             fill="none"
-            stroke={strokes[i % 3]}
-            strokeWidth={1.5 - i * 0.2}
-            strokeOpacity={0.6 - i * 0.1}
+            stroke={stroke}
+            strokeWidth={1.5 - i * 0.15}
+            strokeOpacity={0.5 - i * 0.06}
+            strokeLinecap="round"
             initial={{ pathLength: 0 }}
             animate={isInView ? { pathLength: 1 } : { pathLength: 0 }}
-            transition={{ duration: 1.2, delay: i * 0.15, ease: "easeOut" }}
+            transition={{ duration: 1.5, delay: i * 0.1, ease: "easeOut" }}
           />
         ))}
       </svg>
@@ -288,6 +290,88 @@ function CircuitPattern({
           transition={{ duration: 0.3, delay: 0.5 + i * 0.1 }}
         />
       ))}
+    </div>
+  )
+}
+
+/**
+ * WaveDivider - Full-width flowing wave transition between sections
+ * Styled like the decorative wave background in SDOHImpactStats
+ */
+export function WaveDivider({
+  colorScheme = "mixed",
+  size = "large",
+  background = "transparent",
+}: {
+  colorScheme?: "magenta" | "orange" | "mixed"
+  size?: "small" | "medium" | "large"
+  background?: "transparent" | "white" | "magenta"
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const isInView = useInView(ref, { once: false, margin: "-20px" })
+  
+  const strokeColors = {
+    magenta: { left: "#A31545", right: "#C41E54" },
+    orange: { left: "#FF6B35", right: "#FF8C5A" },
+    mixed: { left: "#A31545", right: "#FF6B35" },
+  }
+  
+  const bgColors = {
+    transparent: "bg-transparent",
+    white: "bg-white",
+    magenta: "bg-[#8B1E3F]",
+  }
+  
+  const colors = strokeColors[colorScheme]
+  
+  const heights = {
+    small: "h-24 sm:h-32",
+    medium: "h-40 sm:h-56",
+    large: "h-56 sm:h-72 lg:h-80",
+  }
+  
+  return (
+    <div 
+      ref={ref} 
+      className={`relative w-full ${heights[size]} ${bgColors[background]}`}
+    >
+      <svg 
+        className="absolute inset-0 w-full h-full" 
+        viewBox="0 0 800 200" 
+        preserveAspectRatio="none"
+      >
+        {/* Left side waves - flowing from left */}
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <motion.path
+            key={`left-${i}`}
+            d={`M ${-50 + i * 25} 0 Q ${200 - i * 35} 50, ${100 + i * 30} 100 T ${-50 + i * 25} 200`}
+            fill="none"
+            stroke={colors.left}
+            strokeWidth={2.5 - i * 0.3}
+            strokeOpacity={0.5 - i * 0.06}
+            strokeLinecap="round"
+            initial={{ pathLength: 0 }}
+            animate={isInView ? { pathLength: 1 } : { pathLength: 0 }}
+            transition={{ duration: 1.5, delay: i * 0.1, ease: "easeOut" }}
+          />
+        ))}
+        
+        {/* Right side waves - flowing from right */}
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <motion.path
+            key={`right-${i}`}
+            d={`M ${850 - i * 25} 0 Q ${600 + i * 35} 50, ${700 - i * 30} 100 T ${850 - i * 25} 200`}
+            fill="none"
+            stroke={colors.right}
+            strokeWidth={2.5 - i * 0.3}
+            strokeOpacity={0.4 - i * 0.05}
+            strokeLinecap="round"
+            initial={{ pathLength: 0 }}
+            animate={isInView ? { pathLength: 1 } : { pathLength: 0 }}
+            transition={{ duration: 1.5, delay: 0.3 + i * 0.1, ease: "easeOut" }}
+          />
+        ))}
+      </svg>
     </div>
   )
 }

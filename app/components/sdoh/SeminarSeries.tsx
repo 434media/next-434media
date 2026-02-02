@@ -24,13 +24,6 @@ export default function SeminarSeries({ locale, dict }: SeminarSeriesProps) {
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {dict?.sdoh?.seminar?.title || "Seminar + Speaker Series"}
             </h2>
-            {/* Accent underline */}
-            <div className="mx-auto w-16 h-1 bg-[#A31545] mb-6" />
-            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed max-w-2xl mx-auto">
-              {locale === "es"
-                ? "Descubre el primer componente de nuestro programa integral"
-                : "Discover the first component of our comprehensive program"}
-            </p>
           </div>
         </div>
 

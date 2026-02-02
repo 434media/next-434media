@@ -40,7 +40,7 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
   const impactDict = dict?.sdoh?.impact || {
     question: "What can I do to make a difference?",
     message: "If you've ever asked, ",
-    conclusion: " — this is where you start.",
+    conclusion: "This is where you start.",
   }
 
   const newsletterDict =
@@ -133,16 +133,15 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
               {/* Impact Message as Header */}
               <div className="mb-8">
                 <blockquote className="relative">
-                  <p className="text-2xl sm:text-3xl font-bold leading-snug">
+                  <p className="text-3xl font-bold leading-snug">
                     <span className="text-white">{impactDict.message}</span>
-                    <span className="text-[#FF6B35] italic">&quot;{impactDict.question}&quot;</span>
-                    <span className="text-white">{impactDict.conclusion}</span>
+                    <span className="text-[#FF6B35] italic block">&quot;{impactDict.question}&quot;</span>
                   </p>
                 </blockquote>
               </div>
 
               {/* Join the Conversation */}
-              <p className="text-lg text-white/80 mb-6">{joinText}</p>
+              <p className="text-lg text-white/80 mb-6">{impactDict.conclusion}</p>
 
               {/* Newsletter Form */}
               <div className="w-full">
