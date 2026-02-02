@@ -263,15 +263,6 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
       {/* Title Section */}
       <FadeIn>
         <div className="relative text-center">
-          {/* Component Number */}
-          <div className="relative inline-block mb-8">
-            <div className="relative w-20 h-20 bg-[#8B1E3F] text-white flex items-center justify-center">
-              <span className="text-3xl font-black">2</span>
-              {/* Accent corner */}
-              <div className="absolute top-0 right-0 w-3 h-3 bg-[#FF6B35]" />
-            </div>
-          </div>
-
           {/* Title */}
           <div className="relative max-w-4xl mx-auto">
             <p className="text-[#FF6B35] font-medium text-sm uppercase tracking-wider mb-4">

@@ -131,16 +131,10 @@ export function StrategicPartnership({ locale, dict }: StrategicPartnershipProps
                 ) : (
                   <>
                     In partnership with VelocityTX and Methodist Healthcare Ministries, the Community Health
-                    Accelerator program connects education, entrepreneurship, and innovation through{" "}
-                    <span className="font-bold text-[#A31545]">three core components</span>.
+                    Accelerator program connects education, entrepreneurship, and innovation.
                   </>
                 )}
               </p>
-
-              <div className="inline-flex items-center px-5 py-2 bg-neutral-100 text-neutral-900 text-base font-medium border border-neutral-200">
-                <div className="w-2 h-2 bg-[#A31545] rounded-full mr-2" />
-                {locale === "es" ? "Descubre cada componente a continuación" : "Discover each component below"}
-              </div>
             </motion.div>
           </div>
         </motion.div>

@@ -52,15 +52,6 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
       <div className="max-w-5xl mx-auto pt-16 sm:pt-20 lg:pt-24 mb-8 sm:mb-12 relative">
         {/* Header Section */}
         <div className="text-center mb-12 sm:mb-16 relative">
-          {/* Component Number */}
-          <div className="relative inline-block mb-8">
-            <div className="relative w-20 h-20 bg-[#8B1E3F] text-white flex items-center justify-center">
-              <span className="text-3xl font-black">3</span>
-              {/* Accent corner */}
-              <div className="absolute top-0 right-0 w-3 h-3 bg-[#FF6B35]" />
-            </div>
-          </div>
-
           {/* Title */}
           <div className="relative max-w-4xl mx-auto">
             <p className="text-[#FF6B35] font-medium text-sm uppercase tracking-wider mb-4">
