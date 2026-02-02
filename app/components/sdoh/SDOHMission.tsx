@@ -33,21 +33,25 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
   return (
     <SectionTransition variant="wave" colorScheme="magenta" maxWidth="5xl" className="py-20 sm:py-28 lg:py-32 bg-white">
       <FadeIn>
-        {/* Hero SDOH Introduction */}
+        {/* Hero SDOH Introduction - SVG Logo */}
         <div className="relative mb-16 sm:mb-20 lg:mb-24 text-center px-4 sm:px-6 lg:px-8">
-          <div className="relative mb-6 sm:mb-8">
-            <h1 className="relative text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none text-neutral-900">
-              {dict?.sdoh?.title || "¿Qué es SDOH?"}
-              </h1>
-              <div className="mt-4 mx-auto w-24 sm:w-32 h-1 bg-[#A31545]"></div>
-            </div>
-
-            <div className="relative max-w-4xl mx-auto">
-              <p className="text-lg sm:text-xl md:text-2xl text-neutral-500 font-medium leading-relaxed">
-                {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
-              </p>
-            </div>
+          <div className="relative mb-6 sm:mb-8 max-w-md mx-auto">
+            <Image
+              src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+              alt={dict?.sdoh?.title || "¿Qué es SDOH?"}
+              width={400}
+              height={200}
+              className="w-full h-auto"
+              priority
+            />
           </div>
+
+          <div className="relative max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed">
+              {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
+            </p>
+          </div>
+        </div>
 
           {/* SDOH Definition Content */}
           <div className="relative mb-16 sm:mb-20 lg:mb-24 px-4 sm:px-6 lg:px-8">

@@ -126,7 +126,7 @@ export default function SDOHPillars({ locale }: SDOHPillarsProps) {
 
   return (
     <section ref={ref} className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
         {/* Section intro */}
         <motion.div
           className="text-center mb-16 sm:mb-20"

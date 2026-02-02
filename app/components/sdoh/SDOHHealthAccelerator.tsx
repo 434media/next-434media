@@ -49,7 +49,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
 
   return (
     <FadeIn key={key}>
-      <div className="max-w-7xl mx-auto pt-16 sm:pt-20 lg:pt-24 mb-8 sm:mb-12 relative">
+      <div className="max-w-5xl mx-auto pt-16 sm:pt-20 lg:pt-24 mb-8 sm:mb-12 relative">
         {/* Header Section */}
         <div className="text-center mb-12 sm:mb-16 relative">
           {/* Component Number */}

@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { motion, useInView } from "motion/react"
-import { ImpactStatistic, SectionTransition } from "./SectionTransition"
+import { ImpactStatistic } from "./SectionTransition"
 import type { Locale } from "../../../i18n-config"
 
 interface SDOHImpactStatsProps {
@@ -10,71 +10,146 @@ interface SDOHImpactStatsProps {
 }
 
 /**
- * SDOHImpactStats - Impact report statistics section
+ * SDOHImpactStats - Impact report statistics section with PDF download
  * 
  * Displays key metrics from the Community Health Accelerator program Year 2
- * with animated counters and decorative transition lines.
+ * with animated counters and decorative wave background.
  * Updated with MHMxVelocity Impact Report brand colors and statistics.
  */
 export default function SDOHImpactStats({ locale }: SDOHImpactStatsProps) {
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: "-100px" })
+  const [isDownloading, setIsDownloading] = useState(false)
 
   // Year 2 Impact Report Statistics
   const stats = locale === "es" ? [
-    { value: 7, label: "Sesiones de Seminarios", suffix: "", prefix: "", colorScheme: "magenta" as const },
-    { value: 969, label: "Miles de Visualizaciones", suffix: "K+", prefix: "", colorScheme: "orange" as const },
-    { value: 1600, label: "Participantes en Seis Ciudades", suffix: "+", prefix: "", colorScheme: "magenta" as const },
-    { value: 403, label: "Miles de Cuentas Alcanzadas", suffix: "K+", prefix: "", colorScheme: "orange" as const },
+    { value: 7, label: "Sesiones", suffix: "", prefix: "", colorScheme: "magenta" as const },
+    { value: 969, label: "Miles de Vistas", suffix: "K+", prefix: "", colorScheme: "orange" as const },
+    { value: 1600, label: "Participantes", suffix: "+", prefix: "", colorScheme: "magenta" as const },
+    { value: 403, label: "Cuentas Alcanzadas", suffix: "K+", prefix: "", colorScheme: "orange" as const },
   ] : [
-    { value: 7, label: "Speaker Sessions", suffix: "", prefix: "", colorScheme: "magenta" as const },
+    { value: 7, label: "Sessions", suffix: "", prefix: "", colorScheme: "magenta" as const },
     { value: 969, label: "Thousand Views", suffix: "K+", prefix: "", colorScheme: "orange" as const },
-    { value: 1600, label: "Participants Across Six Cities", suffix: "+", prefix: "", colorScheme: "magenta" as const },
-    { value: 403, label: "Thousand Accounts Reached", suffix: "K+", prefix: "", colorScheme: "orange" as const },
+    { value: 1600, label: "Participants", suffix: "+", prefix: "", colorScheme: "magenta" as const },
+    { value: 403, label: "Accounts Reached", suffix: "K+", prefix: "", colorScheme: "orange" as const },
   ]
 
-  const sectionTitle = locale === "es" 
-    ? "Impacto del Año 2" 
-    : "Year 2 Impact"
+  const content = locale === "es" ? {
+    badge: "REPORTE DE IMPACTO",
+    title: "Impacto del Año 2",
+    subtitle: "Cuando la conciencia impulsa la innovación, las comunidades prosperan",
+    buttonText: "Descargar PDF del Reporte",
+    downloadingText: "Descargando...",
+    fileSize: "PDF • 2.4 MB",
+  } : {
+    badge: "IMPACT REPORT",
+    title: "Year 2 Impact",
+    subtitle: "When awareness drives innovation, communities thrive",
+    buttonText: "Download Report PDF",
+    downloadingText: "Downloading...",
+    fileSize: "PDF • 2.4 MB",
+  }
 
-  const sectionSubtitle = locale === "es"
-    ? "Cuando la conciencia impulsa la innovación, las comunidades prosperan"
-    : "When awareness drives innovation, communities thrive"
+  // API route for proxied download
+  const downloadApiUrl = "/api/download-impact-report"
+
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  const handleDownload = async () => {
+    setIsDownloading(true)
+    setDownloadError(null)
+    try {
+      const response = await fetch(downloadApiUrl)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Download failed")
+      }
+      
+      const contentType = response.headers.get("content-type")
+      if (!contentType?.includes("application/pdf")) {
+        throw new Error("PDF file is not currently available")
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "MHMxVelocity_Year2_Impact_Report.pdf"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Download error:", error)
+      setDownloadError(locale === "es" 
+        ? "PDF no disponible temporalmente" 
+        : "PDF temporarily unavailable")
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   return (
-    <section ref={ref} className="py-20 sm:py-28 lg:py-32 bg-neutral-50 relative overflow-hidden">
-      {/* Background decorative elements */}
+    <section ref={ref} className="py-20 sm:py-28 lg:py-32 bg-[#8B1E3F] relative overflow-hidden">
+      {/* Decorative wave background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#A31545] via-transparent to-[#FF6B35]" />
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-[#FF6B35] via-transparent to-[#A31545]" />
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid slice">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <motion.path
+              key={i}
+              d={`M ${-50 + i * 20} 0 Q ${200 - i * 30} 100, ${100 + i * 25} 200 T ${-50 + i * 20} 400`}
+              fill="none"
+              stroke="#A31545"
+              strokeWidth={1.5 - i * 0.15}
+              strokeOpacity={0.4 - i * 0.05}
+              initial={{ pathLength: 0 }}
+              animate={isInView ? { pathLength: 1 } : { pathLength: 0 }}
+              transition={{ duration: 1.5, delay: i * 0.1, ease: "easeOut" }}
+            />
+          ))}
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <motion.path
+              key={`right-${i}`}
+              d={`M ${850 - i * 20} 0 Q ${600 + i * 30} 100, ${700 - i * 25} 200 T ${850 - i * 20} 400`}
+              fill="none"
+              stroke="#FF6B35"
+              strokeWidth={1.5 - i * 0.15}
+              strokeOpacity={0.3 - i * 0.04}
+              initial={{ pathLength: 0 }}
+              animate={isInView ? { pathLength: 1 } : { pathLength: 0 }}
+              transition={{ duration: 1.5, delay: 0.5 + i * 0.1, ease: "easeOut" }}
+            />
+          ))}
+        </svg>
       </div>
 
-      <SectionTransition variant="wave" colorScheme="mixed" maxWidth="6xl" className="px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl relative z-10">
         {/* Section Header */}
         <motion.div
-          className="text-center mb-16 sm:mb-20"
+          className="text-center mb-12 sm:mb-16"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="inline-flex items-center px-4 py-2 bg-[#A31545] text-white text-sm font-bold tracking-wider mb-6">
+          <div className="inline-flex items-center px-4 py-2 bg-white/10 text-white text-sm font-bold tracking-wider mb-6">
             <div className="w-2 h-2 bg-[#FF6B35] rounded-full mr-3" />
-            {locale === "es" ? "REPORTE DE IMPACTO" : "IMPACT REPORT"}
+            {content.badge}
           </div>
           
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-neutral-900 mb-4">
-            {sectionTitle}
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white mb-4">
+            {content.title}
           </h2>
           
-          <div className="mx-auto w-24 h-1 bg-[#A31545] mb-6" />
+          <div className="mx-auto w-24 h-1 bg-[#FF6B35] mb-6" />
           
-          <p className="text-lg sm:text-xl text-neutral-500 max-w-3xl mx-auto">
-            {sectionSubtitle}
+          <p className="text-lg sm:text-xl text-white/70 max-w-3xl mx-auto">
+            {content.subtitle}
           </p>
         </motion.div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12 lg:gap-16">
+        {/* Stats Grid - Fixed sizing */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-12 sm:mb-16">
           {stats.map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -82,9 +157,9 @@ export default function SDOHImpactStats({ locale }: SDOHImpactStatsProps) {
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
               transition={{ duration: 0.6, delay: index * 0.15 }}
             >
-              <div className="relative p-6 sm:p-8 bg-white border border-neutral-200 h-full">
+              <div className="relative p-4 sm:p-6 bg-white border border-neutral-200 h-full min-h-[140px] sm:min-h-[160px] flex flex-col justify-center">
                 {/* Accent corner */}
-                <div className={`absolute top-0 left-0 w-3 h-3 ${stat.colorScheme === "magenta" ? "bg-[#A31545]" : "bg-[#FF6B35]"}`} />
+                <div className={`absolute top-0 left-0 w-2 h-2 sm:w-3 sm:h-3 ${stat.colorScheme === "magenta" ? "bg-[#A31545]" : "bg-[#FF6B35]"}`} />
                 
                 <ImpactStatistic
                   value={stat.value}
@@ -98,20 +173,50 @@ export default function SDOHImpactStats({ locale }: SDOHImpactStatsProps) {
           ))}
         </div>
 
-        {/* Bottom tagline */}
+        {/* Download Button */}
         <motion.div
-          className="text-center mt-16 sm:mt-20"
-          initial={{ opacity: 0 }}
-          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
+          className="text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
         >
-          <p className="text-neutral-500 text-sm font-medium tracking-wide">
-            {locale === "es" 
-              ? "Datos del Año 2 • Community Health Accelerator • MHM x VelocityTX"
-              : "Year 2 Data • Community Health Accelerator • MHM x VelocityTX"}
-          </p>
+          <motion.button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="inline-flex items-center gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-white text-[#A31545] font-bold text-base sm:text-lg hover:bg-[#FF6B35] hover:text-white transition-all duration-300 group disabled:opacity-70 disabled:cursor-wait"
+            whileHover={{ scale: isDownloading ? 1 : 1.02 }}
+            whileTap={{ scale: isDownloading ? 1 : 0.98 }}
+          >
+            {isDownloading ? (
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            {isDownloading ? content.downloadingText : content.buttonText}
+            {!isDownloading && (
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            )}
+          </motion.button>
+
+          {/* File size indicator or error message */}
+          {downloadError ? (
+            <p className="text-[#FF6B35] text-sm mt-3 font-medium">
+              {downloadError}
+            </p>
+          ) : (
+            <p className="text-white/50 text-sm mt-3">
+              {content.fileSize}
+            </p>
+          )}
         </motion.div>
-      </SectionTransition>
+      </div>
     </section>
   )
 }

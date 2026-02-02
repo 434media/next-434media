@@ -25,7 +25,7 @@ export default function ImpactReportDownload({ locale }: ImpactReportDownloadPro
     description: "Descubre cómo el Community Health Accelerator transformó la conciencia en acción y las ideas en innovación durante el Año 2.",
     buttonText: "Descargar PDF del Reporte",
     downloadingText: "Descargando...",
-    partnership: "Una colaboración entre Methodist Healthcare Ministries y VelocityTX",
+    cta: "Si alguna vez te has preguntado, \"¿Qué puedo hacer para marcar la diferencia?\" — aquí es donde empiezas.",
     fileSize: "PDF • 2.4 MB",
   } : {
     eyebrow: "DOWNLOAD",
@@ -34,7 +34,7 @@ export default function ImpactReportDownload({ locale }: ImpactReportDownloadPro
     description: "Discover how the Community Health Accelerator transformed awareness into action and ideas into innovation during Year 2.",
     buttonText: "Download Report PDF",
     downloadingText: "Downloading...",
-    partnership: "A collaboration between Methodist Healthcare Ministries & VelocityTX",
+    cta: "If you've ever asked, \"What can I do to make a difference?\" — this is where you start.",
     fileSize: "PDF • 2.4 MB",
   }
 
@@ -103,7 +103,7 @@ export default function ImpactReportDownload({ locale }: ImpactReportDownloadPro
         </svg>
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl relative z-10">
         <motion.div
           className="text-center"
           initial={{ opacity: 0, y: 30 }}
@@ -167,22 +167,11 @@ export default function ImpactReportDownload({ locale }: ImpactReportDownloadPro
             {content.fileSize}
           </p>
 
-          {/* Partnership */}
+          {/* CTA Message */}
           <div className="mt-12 pt-8 border-t border-white/20">
-            <p className="text-white/60 text-sm italic">
-              {content.partnership}
+            <p className="text-xl sm:text-2xl text-white font-medium leading-relaxed max-w-2xl mx-auto">
+              {content.cta}
             </p>
-            
-            {/* Partner logos placeholder */}
-            <div className="flex items-center justify-center gap-8 mt-6">
-              <div className="text-white font-bold tracking-tight">
-                <span className="text-[#FF6B35]">V</span>ELOCITY<span className="text-[#FF6B35]">.</span>TX
-              </div>
-              <div className="w-px h-8 bg-white/30" />
-              <div className="text-white font-medium text-sm">
-                Methodist Healthcare<br/>Ministries
-              </div>
-            </div>
           </div>
         </motion.div>
       </div>

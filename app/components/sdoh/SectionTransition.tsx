@@ -352,7 +352,7 @@ export function SectionDivider({
   // Connector variant - lines connecting to a center point
   return (
     <div ref={ref} className="py-16 sm:py-20 lg:py-24">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-center gap-4">
           {/* Left line */}
           <motion.div
@@ -431,15 +431,15 @@ export function ImpactStatistic({
   return (
     <motion.div
       ref={ref}
-      className="text-center"
+      className="text-center overflow-hidden"
       initial={{ opacity: 0, y: 20 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
       transition={{ duration: 0.6 }}
     >
-      <div className={`text-4xl sm:text-5xl lg:text-6xl font-black ${colors[colorScheme]}`}>
+      <div className={`text-2xl sm:text-3xl md:text-4xl font-black ${colors[colorScheme]} whitespace-nowrap`}>
         {prefix}{displayValue.toLocaleString()}{suffix}
       </div>
-      <div className="text-neutral-600 text-sm sm:text-base mt-2 font-medium">
+      <div className="text-neutral-600 text-xs sm:text-sm mt-2 font-medium leading-tight">
         {label}
       </div>
     </motion.div>

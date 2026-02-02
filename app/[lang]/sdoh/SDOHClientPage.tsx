@@ -3,17 +3,32 @@
 import { useEffect } from "react"
 import { useLanguage } from "@/app/context/language-context"
 import SDOHHero from "../../components/sdoh/SDOHHero"
-import SDOHImpactMessage from "../../components/sdoh/SDOHImpactMessage"
+import { SDOHIntro } from "../../components/sdoh/SDOHIntro"
+import { StrategicPartnership } from "../../components/sdoh/StrategicPartnership"
+import SDOHImpactStats from "../../components/sdoh/SDOHImpactStats"
+import SeminarSeries from "../../components/sdoh/SeminarSeries"
 import SDOHStartupBootcamp from "../../components/sdoh/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/sdoh/SDOHHealthAccelerator"
+import AcceleratorWinner from "../../components/sdoh/AcceleratorWinner"
+import SDOHImpactMessage from "../../components/sdoh/SDOHImpactMessage"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
 import { SectionTransition, SectionDivider } from "../../components/sdoh/SectionTransition"
-import SDOHImpactStats from "../../components/sdoh/SDOHImpactStats"
-import SDOHPillars from "../../components/sdoh/SDOHPillars"
-import AcceleratorWinner from "../../components/sdoh/AcceleratorWinner"
-import ImpactReportDownload from "../../components/sdoh/ImpactReportDownload"
 import Script from "next/script"
 
+/**
+ * SDOHClientPage - Main SDOH page with modular component ordering
+ * 
+ * Page Flow:
+ * 1. Hero Video
+ * 2. SDOH Intro (dynamic logo + definition)
+ * 3. Strategic Partnership (VelocityTX + MHM)
+ * 4. Impact Stats (Year 2 metrics + PDF download)
+ * 5. Seminar Series (Component 1 - Learning as Catalyst)
+ * 6. Startup Bootcamp (Component 2)
+ * 7. Health Accelerator (Component 3)
+ * 8. Accelerator Winner
+ * 9. Newsletter/Impact Message
+ */
 export default function SDOHClientPage() {
   const { dictionary, currentLocale, isLoading } = useLanguage()
 
@@ -46,48 +61,57 @@ export default function SDOHClientPage() {
       {/* Language Toggle */}
       <SDOHLanguageToggle showOnScroll={true} />
 
-      {/* Hero Section */}
+      {/* 1. Hero Video Section */}
       <SDOHHero locale={currentLocale} dict={dictionary} />
 
       {/* Main content */}
       <div id="main-content" className="outline-none" tabIndex={-1}>
-        {/* LEAD WITH IMPACT - Year 2 Highlights to hook viewers immediately */}
+        {/* 2. SDOH Intro - Dynamic logo with parallax effects */}
+        <SDOHIntro locale={currentLocale} dict={dictionary} />
+
+        {/* 3. Strategic Partnership - VelocityTX & MHM */}
+        <StrategicPartnership locale={currentLocale} dict={dictionary} />
+
+        {/* 4. Impact Stats - Year 2 metrics right after partnership */}
         <SDOHImpactStats locale={currentLocale} />
-
-        {/* Section Divider - Transition from Stats to Framework */}
-        <SectionDivider variant="connector" colorScheme="magenta" />
-
-        {/* Three Pillars Section - Show the Learn/Build/Sustain framework */}
-        <SDOHPillars locale={currentLocale} />
 
         {/* Section Divider - Transition to Programs */}
         <SectionDivider variant="double" colorScheme="mixed" />
 
+        {/* 5. COMPONENT 1: Seminar Series - Learning as Catalyst for Change */}
         <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
-          {/* Startup Bootcamp Section - First program */}
-          <SectionTransition variant="wave" colorScheme="magenta" maxWidth="6xl" className="px-4 sm:px-6 lg:px-8">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
+            <SeminarSeries locale={currentLocale} dict={dictionary} />
+          </div>
+        </section>
+
+        {/* Section Divider */}
+        <SectionDivider variant="connector" colorScheme="magenta" />
+
+        {/* 6. COMPONENT 2: Startup Bootcamp */}
+        <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
+          <SectionTransition variant="wave" colorScheme="magenta" maxWidth="5xl" className="px-4 sm:px-6 lg:px-8">
             <SDOHStartupBootcamp locale={currentLocale} dict={dictionary} />
           </SectionTransition>
+        </section>
 
-          {/* Section Divider between Bootcamp and Accelerator */}
-          <SectionDivider variant="double" colorScheme="magenta" />
+        {/* Section Divider between Bootcamp and Accelerator */}
+        <SectionDivider variant="double" colorScheme="magenta" />
 
-          {/* Community Health Accelerator Section - Second program */}
-          <SectionTransition variant="wave" colorScheme="orange" maxWidth="6xl" className="px-4 sm:px-6 lg:px-8">
+        {/* 7. COMPONENT 3: Community Health Accelerator */}
+        <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
+          <SectionTransition variant="wave" colorScheme="orange" maxWidth="5xl" className="px-4 sm:px-6 lg:px-8">
             <SDOHHealthAccelerator locale={currentLocale} dict={dictionary} />
           </SectionTransition>
         </section>
 
-        {/* 2025 Accelerator Winner - Success Story Spotlight */}
+        {/* 8. Accelerator Winner - Success Story */}
         <AcceleratorWinner locale={currentLocale} />
 
-        {/* Impact Report PDF Download - CTA to dive deeper */}
-        <ImpactReportDownload locale={currentLocale} />
-
-        {/* Section Divider - Transition to Final CTA */}
+        {/* Section Divider - Transition to Newsletter */}
         <SectionDivider variant="connector" colorScheme="orange" />
 
-        {/* Combined Impact Message + Newsletter Section - Close with CTA */}
+        {/* 9. Newsletter/Impact Message */}
         <SDOHImpactMessage locale={currentLocale} dict={dictionary} />
       </div>
 

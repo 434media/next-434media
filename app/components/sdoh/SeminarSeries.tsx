@@ -1,7 +1,7 @@
 "use client"
 
-import Image from "next/image"
 import { FadeIn } from "../FadeIn"
+import EventCarousel from "./EventCarousel"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
@@ -108,18 +108,9 @@ export default function SeminarSeries({ locale, dict }: SeminarSeriesProps) {
             </div>
           </div>
 
-          {/* Image Column */}
+          {/* Video Column - EventCarousel */}
           <div className="order-1 md:order-2 relative">
-            <div className="">
-              <div className="aspect-square relative">
-                <Image
-                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
-                  alt={(dict?.sdoh?.seminar?.imageAlt as string) ?? "SDOH Illustration"}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </div>
+            <EventCarousel />
           </div>
         </div>
       </div>

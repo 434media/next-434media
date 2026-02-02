@@ -109,7 +109,7 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
       {/* Accent line */}
       <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B35]" />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl relative z-10">
         <FadeIn>
           <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
             {/* Left side - SDOH Logo */}
