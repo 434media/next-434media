@@ -13,6 +13,7 @@ export { SocialCalendarView } from "./SocialCalendarView"
 export { ClientFormModal } from "./ClientFormModal"
 export { OpportunityFormModal } from "./OpportunityFormModal"
 export { TaskModal } from "./TaskModal"
+export { ContentFormModal } from "./ContentFormModal"
 export { NotificationBell } from "./NotificationBell"
 
 // Re-export notification context types for convenience

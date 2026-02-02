@@ -272,6 +272,41 @@ export type SocialPlatform = "instagram" | "youtube" | "tiktok" | "linkedin" | "
 // Calendar view mode for social calendar
 export type CalendarViewMode = "day" | "week" | "month"
 
+// Content Post Status type (for Social Calendar)
+export type ContentPostStatus = "to_do" | "planning" | "in_progress" | "needs_approval" | "approved" | "scheduled" | "posted"
+
+// Content Post Status options with colors for UI
+// planning/in_progress: no color (neutral), needs_approval: light red, approved: blue, scheduled: yellow, posted: green
+export const CONTENT_POST_STATUS_OPTIONS: { value: ContentPostStatus; label: string; color: string; bgColor: string; borderColor: string }[] = [
+  { value: "to_do", label: "To Do", color: "#6b7280", bgColor: "bg-gray-50", borderColor: "border-gray-200" },
+  { value: "planning", label: "Planning", color: "#6b7280", bgColor: "bg-gray-50", borderColor: "border-gray-200" },
+  { value: "in_progress", label: "In Progress", color: "#6b7280", bgColor: "bg-gray-50", borderColor: "border-gray-200" },
+  { value: "needs_approval", label: "Needs Approval", color: "#dc2626", bgColor: "bg-red-50", borderColor: "border-red-200" },
+  { value: "approved", label: "Approved", color: "#2563eb", bgColor: "bg-blue-50", borderColor: "border-blue-200" },
+  { value: "scheduled", label: "Scheduled", color: "#ca8a04", bgColor: "bg-yellow-50", borderColor: "border-yellow-200" },
+  { value: "posted", label: "Posted", color: "#16a34a", bgColor: "bg-green-50", borderColor: "border-green-200" },
+]
+
+// Content Post interface (for Social Calendar - independent from Tasks)
+export interface ContentPost {
+  id: string
+  user: string  // Assigned user (dropdown)
+  date_created: string  // Hard-coded creation date
+  platform?: Brand | ""  // Platform/brand dropdown
+  status: ContentPostStatus
+  title: string
+  date_to_post?: string  // Scheduled post date
+  notes?: string
+  thumbnail?: string  // Uploaded thumbnail URL
+  social_copy?: string  // The actual social media copy/text
+  links: string[]  // Array of links
+  assets: string[]  // Array of asset URLs
+  tags?: string  // Text field for tags
+  social_platforms: SocialPlatform[]  // Which social platforms (IG, TikTok, etc.)
+  created_at: string
+  updated_at: string
+}
+
 // Social platform options with colors for UI
 export const SOCIAL_PLATFORM_OPTIONS: { value: SocialPlatform; label: string; color: string; bgColor: string }[] = [
   { value: "instagram", label: "Instagram", color: "#E1306C", bgColor: "bg-pink-100" },

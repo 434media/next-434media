@@ -25,6 +25,7 @@ import {
   ClientFormModal,
   OpportunityFormModal,
   TaskModal,
+  ContentFormModal,
   NotificationBell,
   TEAM_MEMBERS,
 } from "../../components/crm"
@@ -44,6 +45,7 @@ import type {
   DOC,
   CRMTag,
   SocialPlatform,
+  ContentPost,
 } from "../../components/crm/types"
 
 export default function SalesCRMPage() {
@@ -58,7 +60,12 @@ export default function SalesCRMPage() {
   const [pipeline, setPipeline] = useState<PipelineColumn[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
-
+  const [contentPosts, setContentPosts] = useState<ContentPost[]>([])
+  
+  // Content Post Modal state
+  const [showContentPostForm, setShowContentPostForm] = useState(false)
+  const [editingContentPost, setEditingContentPost] = useState<ContentPost | null>(null)
+  const [isSavingContentPost, setIsSavingContentPost] = useState(false)
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard")
   const [searchQuery, setSearchQuery] = useState("")
@@ -359,6 +366,17 @@ export default function SalesCRMPage() {
     }
   }
 
+  const loadContentPosts = async () => {
+    try {
+      const response = await fetch("/api/admin/crm/content-posts")
+      if (!response.ok) throw new Error("Failed to fetch content posts")
+      const data = await response.json()
+      setContentPosts(data.posts || [])
+    } catch (err) {
+      setToast({ message: "Failed to load content posts", type: "error" })
+    }
+  }
+
   // Load tags from both Mailchimp and CRM Firestore
   const loadTags = async () => {
     setIsLoadingTags(true)
@@ -455,6 +473,8 @@ export default function SalesCRMPage() {
       loadPipeline()
       loadClients()
       loadTasks()
+    } else if (viewMode === "social-calendar") {
+      loadContentPosts()
     }
   }, [viewMode])
 
@@ -1083,6 +1103,89 @@ export default function SalesCRMPage() {
       setToast({ message: `Failed to ${!selectedTask.id ? "create" : "update"} task`, type: "error" })
     } finally {
       setIsSavingTask(false)
+    }
+  }
+
+  // Content Post Handlers
+  const handleAddContentPost = () => {
+    setEditingContentPost(null)
+    setShowContentPostForm(true)
+  }
+
+  const handleOpenContentPost = (post: ContentPost) => {
+    setEditingContentPost(post)
+    setShowContentPostForm(true)
+  }
+
+  const handleSaveContentPost = async (postData: Partial<ContentPost>) => {
+    setIsSavingContentPost(true)
+    try {
+      if (editingContentPost) {
+        // Update existing post via API
+        const response = await fetch(`/api/admin/crm/content-posts?id=${editingContentPost.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(postData),
+        })
+        
+        if (!response.ok) throw new Error("Failed to update content post")
+        
+        const data = await response.json()
+        setContentPosts(prev => prev.map(p => 
+          p.id === editingContentPost.id ? data.post : p
+        ))
+        setToast({ message: "Content post updated successfully", type: "success" })
+      } else {
+        // Create new post via API
+        const response = await fetch("/api/admin/crm/content-posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user: postData.user || "",
+            date_created: new Date().toISOString(),
+            platform: postData.platform,
+            status: postData.status || "to_do",
+            title: postData.title || "",
+            date_to_post: postData.date_to_post,
+            notes: postData.notes,
+            thumbnail: postData.thumbnail,
+            social_copy: postData.social_copy,
+            links: postData.links || [],
+            assets: postData.assets || [],
+            tags: postData.tags,
+            social_platforms: postData.social_platforms || [],
+          }),
+        })
+        
+        if (!response.ok) throw new Error("Failed to create content post")
+        
+        const data = await response.json()
+        setContentPosts(prev => [...prev, data.post])
+        setToast({ message: "Content post created successfully", type: "success" })
+      }
+      setShowContentPostForm(false)
+      setEditingContentPost(null)
+    } catch {
+      setToast({ message: `Failed to ${editingContentPost ? "update" : "create"} content post`, type: "error" })
+    } finally {
+      setIsSavingContentPost(false)
+    }
+  }
+
+  const handleDeleteContentPost = async (postId: string) => {
+    try {
+      const response = await fetch(`/api/admin/crm/content-posts?id=${postId}`, {
+        method: "DELETE",
+      })
+      
+      if (!response.ok) throw new Error("Failed to delete content post")
+      
+      setContentPosts(prev => prev.filter(p => p.id !== postId))
+      setShowContentPostForm(false)
+      setEditingContentPost(null)
+      setToast({ message: "Content post deleted successfully", type: "success" })
+    } catch {
+      setToast({ message: "Failed to delete content post", type: "error" })
     }
   }
 
@@ -2408,11 +2511,25 @@ export default function SalesCRMPage() {
         {/* Social Calendar View */}
         {viewMode === "social-calendar" && (
           <SocialCalendarView
-            tasks={tasks}
-            onOpenTask={openTaskModal}
+            contentPosts={contentPosts}
+            onOpenPost={handleOpenContentPost}
+            onAddPost={handleAddContentPost}
           />
         )}
       </div>
+
+      {/* Content Post Form Modal */}
+      <ContentFormModal
+        isOpen={showContentPostForm}
+        post={editingContentPost}
+        isSaving={isSavingContentPost}
+        onSave={handleSaveContentPost}
+        onDelete={editingContentPost ? handleDeleteContentPost : undefined}
+        onClose={() => {
+          setShowContentPostForm(false)
+          setEditingContentPost(null)
+        }}
+      />
 
       {/* Client Form Modal */}
       <ClientFormModal

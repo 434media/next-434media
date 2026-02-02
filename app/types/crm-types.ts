@@ -604,6 +604,7 @@ export const CRM_COLLECTIONS = {
   SALES_REPS: "crm_sales_reps",
   BARB_PIE_CHART: "crm_barb_pie_chart",
   PIE_SLICES: "crm_pie_slices",
+  CONTENT_POSTS: "crm_content_posts",
 } as const
 
 // Map Airtable table names to Firestore collections

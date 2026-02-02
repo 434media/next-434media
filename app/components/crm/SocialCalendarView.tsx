@@ -1,69 +1,63 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { 
   ChevronLeft, 
   ChevronRight, 
   Calendar,
-  Clock,
   CalendarDays,
   CalendarRange,
-  LayoutGrid
+  LayoutGrid,
+  Plus,
+  Filter,
+  X,
+  Check
 } from "lucide-react"
-import type { Task, SocialPlatform } from "./types"
-import { SOCIAL_PLATFORM_OPTIONS, formatDate } from "./types"
+import type { ContentPost, SocialPlatform, ContentPostStatus, TeamMember } from "./types"
+import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS, TEAM_MEMBERS } from "./types"
 
 interface SocialCalendarViewProps {
-  tasks: Task[]
-  onOpenTask: (task: Task) => void
+  contentPosts: ContentPost[]
+  onOpenPost: (post: ContentPost) => void
+  onAddPost: () => void
 }
 
 type CalendarViewMode = "day" | "week" | "month"
 
-// Helper function to get days in a month
 function getDaysInMonth(year: number, month: number): Date[] {
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
-  
   const days: Date[] = []
-  
   const startDayOfWeek = firstDay.getDay()
   for (let i = 0; i < startDayOfWeek; i++) {
     days.push(new Date(year, month, -startDayOfWeek + i + 1))
   }
-  
   for (let day = 1; day <= lastDay.getDate(); day++) {
     days.push(new Date(year, month, day))
   }
-  
   const remainingDays = 7 - (days.length % 7)
   if (remainingDays < 7) {
     for (let i = 1; i <= remainingDays; i++) {
       days.push(new Date(year, month + 1, i))
     }
   }
-  
   return days
 }
 
-// Helper to get days in a week
 function getDaysInWeek(date: Date): Date[] {
   const days: Date[] = []
   const dayOfWeek = date.getDay()
   const startOfWeek = new Date(date)
   startOfWeek.setDate(date.getDate() - dayOfWeek)
-  
   for (let i = 0; i < 7; i++) {
     const day = new Date(startOfWeek)
     day.setDate(startOfWeek.getDate() + i)
     days.push(day)
   }
-  
   return days
 }
 
-// Helper to format date as YYYY-MM-DD for comparison
 function toDateString(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")
@@ -71,7 +65,25 @@ function toDateString(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-// Platform SVG icons
+function getStatusStyle(status: ContentPostStatus): { bg: string; border: string; text: string } {
+  switch (status) {
+    case "to_do":
+    case "planning":
+    case "in_progress":
+      return { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" }
+    case "needs_approval":
+      return { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" }
+    case "approved":
+      return { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" }
+    case "scheduled":
+      return { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" }
+    case "posted":
+      return { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" }
+    default:
+      return { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" }
+  }
+}
+
 const PlatformIcon = ({ platform, className = "w-4 h-4", style }: { platform: SocialPlatform; className?: string; style?: React.CSSProperties }) => {
   switch (platform) {
     case "instagram":
@@ -109,372 +121,264 @@ const PlatformIcon = ({ platform, className = "w-4 h-4", style }: { platform: So
   }
 }
 
-// Platform badge component with SVG icons (no circle background)
 function PlatformBadge({ platform, size = "sm" }: { platform: SocialPlatform; size?: "sm" | "md" | "lg" }) {
   const platformConfig = SOCIAL_PLATFORM_OPTIONS.find(p => p.value === platform)
   if (!platformConfig) return null
-  
-  const sizeClasses = {
-    sm: "w-3.5 h-3.5",
-    md: "w-4 h-4",
-    lg: "w-5 h-5"
-  }
-  
-  return (
-    <PlatformIcon 
-      platform={platform} 
-      className={`${sizeClasses[size]} flex-shrink-0`}
-      style={{ color: platformConfig.color }}
-    />
-  )
+  const sizeClasses = { sm: "w-3.5 h-3.5", md: "w-4 h-4", lg: "w-5 h-5" }
+  return <PlatformIcon platform={platform} className={`${sizeClasses[size]} flex-shrink-0`} style={{ color: platformConfig.color }} />
 }
 
-// Compact task card for calendar cells
-function TaskCard({ task, onClick, compact = false }: { task: Task; onClick: () => void; compact?: boolean }) {
+function PostCard({ post, onClick, compact = false }: { post: ContentPost; onClick: () => void; compact?: boolean }) {
+  const statusStyle = getStatusStyle(post.status)
   return (
     <motion.div
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={onClick}
-      className={`group cursor-pointer rounded transition-colors ${
-        compact 
-          ? "px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200" 
-          : "px-2 py-1.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200"
-      }`}
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className={`group cursor-pointer rounded transition-all border ${statusStyle.bg} ${statusStyle.border} hover:shadow-sm hover:border-neutral-300 ${compact ? "px-1.5 py-1" : "px-2 py-1.5"}`}
     >
       <div className="flex items-center gap-1.5">
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          {task.social_platforms?.slice(0, compact ? 2 : 3).map(platform => (
+          {post.social_platforms?.slice(0, compact ? 2 : 3).map(platform => (
             <PlatformBadge key={platform} platform={platform} size="sm" />
           ))}
-          {task.social_platforms && task.social_platforms.length > (compact ? 2 : 3) && (
-            <span className="text-[8px] text-neutral-400">
-              +{task.social_platforms.length - (compact ? 2 : 3)}
-            </span>
+          {post.social_platforms && post.social_platforms.length > (compact ? 2 : 3) && (
+            <span className="text-[9px] font-medium text-neutral-400">+{post.social_platforms.length - (compact ? 2 : 3)}</span>
           )}
         </div>
-        <span className={`truncate text-neutral-700 ${compact ? "text-[10px]" : "text-xs"}`}>
-          {task.title}
-        </span>
+        <span className={`truncate leading-tight font-medium ${statusStyle.text} ${compact ? "text-[11px]" : "text-xs"}`}>{post.title}</span>
       </div>
     </motion.div>
   )
 }
 
-export function SocialCalendarView({
-  tasks,
-  onOpenTask,
-}: SocialCalendarViewProps) {
+function FilterSection({ title, options, selectedValues, onToggle, renderOption }: { 
+  title: string
+  options: { value: string; label: string; color?: string }[]
+  selectedValues: Set<string>
+  onToggle: (value: string) => void
+  renderOption?: (option: { value: string; label: string; color?: string }, isSelected: boolean) => React.ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">{title}</h4>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const isSelected = selectedValues.has(option.value)
+          if (renderOption) {
+            return <button key={option.value} onClick={() => onToggle(option.value)} className="transition-all">{renderOption(option, isSelected)}</button>
+          }
+          return (
+            <button
+              key={option.value}
+              onClick={() => onToggle(option.value)}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${isSelected ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: SocialCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
   const [hoveredDay, setHoveredDay] = useState<string | null>(null)
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set())
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   
-  // Filter tasks that are social posts
-  const socialTasks = useMemo(() => {
-    return tasks.filter(task => 
-      task.is_social_post && 
-      task.social_post_date
-    )
-  }, [tasks])
+  const fetchTeamMembers = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/team-members")
+      const data = await response.json()
+      const firestoreMembers: TeamMember[] = data.success && data.data ? data.data.filter((m: TeamMember) => m.isActive) : []
+      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({ id: `default-${i}`, name: m.name, email: m.email, isActive: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }))
+      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
+      const missingDefaults = defaultMembers.filter(d => !firestoreNames.has(d.name.toLowerCase()))
+      const allMembers = [...firestoreMembers, ...missingDefaults]
+      allMembers.sort((a, b) => a.name.localeCompare(b.name))
+      setTeamMembers(allMembers)
+    } catch {
+      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({ id: `default-${i}`, name: m.name, email: m.email, isActive: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })))
+    }
+  }, [])
   
-  // Group social tasks by date
-  const tasksByDate = useMemo(() => {
-    const grouped: Record<string, Task[]> = {}
-    socialTasks.forEach(task => {
-      if (task.social_post_date) {
-        const dateKey = task.social_post_date.split("T")[0]
-        if (!grouped[dateKey]) {
-          grouped[dateKey] = []
-        }
-        grouped[dateKey].push(task)
+  useEffect(() => { fetchTeamMembers() }, [fetchTeamMembers])
+  
+  const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
+  const togglePlatform = (platform: string) => { setSelectedPlatforms(prev => { const next = new Set(prev); next.has(platform) ? next.delete(platform) : next.add(platform); return next }) }
+  const toggleStatus = (status: string) => { setSelectedStatuses(prev => { const next = new Set(prev); next.has(status) ? next.delete(status) : next.add(status); return next }) }
+  const clearAllFilters = () => { setSelectedUsers(new Set()); setSelectedPlatforms(new Set()); setSelectedStatuses(new Set()) }
+  const hasActiveFilters = selectedUsers.size > 0 || selectedPlatforms.size > 0 || selectedStatuses.size > 0
+  
+  const filteredPosts = useMemo(() => {
+    return contentPosts.filter(post => {
+      if (selectedUsers.size > 0 && !selectedUsers.has(post.user)) return false
+      if (selectedPlatforms.size > 0 && post.platform && !selectedPlatforms.has(post.platform)) return false
+      if (selectedStatuses.size > 0 && !selectedStatuses.has(post.status)) return false
+      return true
+    })
+  }, [contentPosts, selectedUsers, selectedPlatforms, selectedStatuses])
+  
+  const postsByDate = useMemo(() => {
+    const grouped: Record<string, ContentPost[]> = {}
+    filteredPosts.forEach(post => {
+      if (post.date_to_post) {
+        const dateKey = post.date_to_post.split("T")[0]
+        if (!grouped[dateKey]) grouped[dateKey] = []
+        grouped[dateKey].push(post)
       }
     })
     return grouped
-  }, [socialTasks])
+  }, [filteredPosts])
   
-  // Get calendar days based on view mode
   const calendarDays = useMemo(() => {
-    if (viewMode === "day") {
-      return [currentDate]
-    } else if (viewMode === "week") {
-      return getDaysInWeek(currentDate)
-    } else {
-      return getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth())
-    }
+    if (viewMode === "day") return [currentDate]
+    if (viewMode === "week") return getDaysInWeek(currentDate)
+    return getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth())
   }, [currentDate, viewMode])
   
-  // Navigation functions
   const goToPrevious = () => {
     const newDate = new Date(currentDate)
-    if (viewMode === "day") {
-      newDate.setDate(currentDate.getDate() - 1)
-    } else if (viewMode === "week") {
-      newDate.setDate(currentDate.getDate() - 7)
-    } else {
-      newDate.setMonth(currentDate.getMonth() - 1)
-    }
+    if (viewMode === "day") newDate.setDate(currentDate.getDate() - 1)
+    else if (viewMode === "week") newDate.setDate(currentDate.getDate() - 7)
+    else newDate.setMonth(currentDate.getMonth() - 1)
     setCurrentDate(newDate)
   }
   
   const goToNext = () => {
     const newDate = new Date(currentDate)
-    if (viewMode === "day") {
-      newDate.setDate(currentDate.getDate() + 1)
-    } else if (viewMode === "week") {
-      newDate.setDate(currentDate.getDate() + 7)
-    } else {
-      newDate.setMonth(currentDate.getMonth() + 1)
-    }
+    if (viewMode === "day") newDate.setDate(currentDate.getDate() + 1)
+    else if (viewMode === "week") newDate.setDate(currentDate.getDate() + 7)
+    else newDate.setMonth(currentDate.getMonth() + 1)
     setCurrentDate(newDate)
   }
   
-  const goToToday = () => {
-    setCurrentDate(new Date())
-  }
+  const goToToday = () => setCurrentDate(new Date())
+  const isCurrentMonth = (date: Date) => date.getMonth() === currentDate.getMonth()
+  const isToday = (date: Date) => toDateString(date) === toDateString(new Date())
   
-  const isCurrentMonth = (date: Date) => {
-    return date.getMonth() === currentDate.getMonth()
-  }
-  
-  const isToday = (date: Date) => {
-    const today = new Date()
-    return toDateString(date) === toDateString(today)
-  }
-  
-  // Get header text based on view mode
   const getHeaderText = () => {
-    if (viewMode === "day") {
-      return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-    } else if (viewMode === "week") {
+    if (viewMode === "day") return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+    if (viewMode === "week") {
       const weekDays = getDaysInWeek(currentDate)
-      const start = weekDays[0]
-      const end = weekDays[6]
-      if (start.getMonth() === end.getMonth()) {
-        return `${start.toLocaleDateString("en-US", { month: "long" })} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`
-      }
+      const start = weekDays[0], end = weekDays[6]
+      if (start.getMonth() === end.getMonth()) return `${start.toLocaleDateString("en-US", { month: "long" })} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`
       return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
     }
     return currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
   
-  // Upcoming posts
-  const upcomingPosts = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    return socialTasks
-      .filter(task => {
-        if (!task.social_post_date) return false
-        const postDate = new Date(task.social_post_date)
-        postDate.setHours(0, 0, 0, 0)
-        return postDate >= today
-      })
-      .sort((a, b) => 
-        new Date(a.social_post_date || "").getTime() - new Date(b.social_post_date || "").getTime()
-      )
-      .slice(0, 10)
-  }, [socialTasks])
-  
-  // Platform stats
   const platformStats = useMemo(() => {
-    const stats: Record<SocialPlatform, number> = {
-      instagram: 0,
-      youtube: 0,
-      tiktok: 0,
-      linkedin: 0,
-      facebook: 0,
-    }
-    
-    socialTasks.forEach(task => {
-      task.social_platforms?.forEach(platform => {
-        stats[platform]++
-      })
-    })
-    
+    const stats: Record<SocialPlatform, number> = { instagram: 0, youtube: 0, tiktok: 0, linkedin: 0, facebook: 0 }
+    filteredPosts.forEach(post => { post.social_platforms?.forEach(platform => { stats[platform]++ }) })
     return stats
-  }, [socialTasks])
+  }, [filteredPosts])
   
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  const statusOptions = CONTENT_POST_STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label, color: s.color }))
+  const brandOptions = BRANDS.map(b => ({ value: b, label: b }))
+  
+  // Filter out specific users from the calendar filter list
+  const EXCLUDED_USERS = ["barbara carreon", "elon john", "guna", "nichole snow", "testing"]
+  const userOptions = teamMembers
+    .filter(m => !EXCLUDED_USERS.some(excluded => m.name.toLowerCase() === excluded.toLowerCase()))
+    .map(m => ({ value: m.name, label: m.name }))
   
   return (
     <div className="space-y-4">
-      {/* Main content - side by side layout */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-neutral-900">Content Calendar</h2>
+          <span className="text-sm text-neutral-500">{filteredPosts.length} post{filteredPosts.length !== 1 ? "s" : ""}</span>
+        </div>
+        <button onClick={onAddPost} className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium shadow-sm">
+          <Plus className="w-4 h-4" />Add Post
+        </button>
+      </div>
+      
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Calendar section - takes up 3 columns */}
         <div className="lg:col-span-3 space-y-3">
-          {/* Combined header: Navigation + Date on left, View mode selector on right */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              {/* Navigation */}
               <div className="flex items-center bg-white rounded-lg border border-neutral-200">
-                <button
-                  onClick={goToPrevious}
-                  className="p-2 hover:bg-neutral-100 rounded-l-lg transition-colors border-r border-neutral-200"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={goToToday}
-                  className="px-3 py-2 text-sm font-medium hover:bg-neutral-100 transition-colors"
-                >
-                  Today
-                </button>
-                <button
-                  onClick={goToNext}
-                  className="p-2 hover:bg-neutral-100 rounded-r-lg transition-colors border-l border-neutral-200"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                <button onClick={goToPrevious} className="p-2 hover:bg-neutral-100 rounded-l-lg transition-colors border-r border-neutral-200"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={goToToday} className="px-3 py-2 text-sm font-medium hover:bg-neutral-100 transition-colors">Today</button>
+                <button onClick={goToNext} className="p-2 hover:bg-neutral-100 rounded-r-lg transition-colors border-l border-neutral-200"><ChevronRight className="w-4 h-4" /></button>
               </div>
-              
-              <h2 className="text-base font-semibold text-neutral-900">
-                {getHeaderText()}
-              </h2>
+              <h2 className="text-base font-semibold text-neutral-900">{getHeaderText()}</h2>
             </div>
-            
-            {/* View mode selector */}
             <div className="flex items-center bg-white rounded-lg border border-neutral-200 p-0.5">
-              <button
-                onClick={() => setViewMode("day")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === "day" 
-                    ? "bg-neutral-900 text-white" 
-                    : "hover:bg-neutral-100 text-neutral-600"
-                }`}
-              >
-                <CalendarDays className="w-4 h-4" />
-                Day
-              </button>
-              <button
-                onClick={() => setViewMode("week")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === "week" 
-                    ? "bg-neutral-900 text-white" 
-                    : "hover:bg-neutral-100 text-neutral-600"
-                }`}
-              >
-                <CalendarRange className="w-4 h-4" />
-                Week
-              </button>
-              <button
-                onClick={() => setViewMode("month")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === "month" 
-                    ? "bg-neutral-900 text-white" 
-                    : "hover:bg-neutral-100 text-neutral-600"
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                Month
-              </button>
+              <button onClick={() => setViewMode("day")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "day" ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-600"}`}><CalendarDays className="w-4 h-4" />Day</button>
+              <button onClick={() => setViewMode("week")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "week" ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-600"}`}><CalendarRange className="w-4 h-4" />Week</button>
+              <button onClick={() => setViewMode("month")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "month" ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-600"}`}><LayoutGrid className="w-4 h-4" />Month</button>
             </div>
           </div>
           
-          {/* Day View */}
           {viewMode === "day" && (
             <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
               <div className="p-4 border-b border-neutral-200 bg-neutral-50">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-neutral-900">
-                    {currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                  </h3>
-                  <span className="text-sm text-neutral-500">
-                    {tasksByDate[toDateString(currentDate)]?.length || 0} posts scheduled
-                  </span>
+                  <h3 className="font-semibold text-neutral-900">{currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
+                  <span className="text-sm text-neutral-500">{postsByDate[toDateString(currentDate)]?.length || 0} posts scheduled</span>
                 </div>
               </div>
               <div className="divide-y divide-neutral-100 max-h-[600px] overflow-y-auto">
-                {(tasksByDate[toDateString(currentDate)] || []).length === 0 ? (
+                {(postsByDate[toDateString(currentDate)] || []).length === 0 ? (
                   <div className="p-8 text-center">
                     <Calendar className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
                     <p className="text-neutral-500">No posts scheduled for this day</p>
+                    <button onClick={onAddPost} className="mt-3 text-sm text-neutral-600 hover:text-neutral-900 font-medium">+ Add a post</button>
                   </div>
                 ) : (
-                  (tasksByDate[toDateString(currentDate)] || []).map(task => (
-                    <div
-                      key={task.id}
-                      onClick={() => onOpenTask(task)}
-                      className="p-4 hover:bg-neutral-50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {task.social_platforms?.map(platform => (
-                            <PlatformBadge key={platform} platform={platform} size="lg" />
-                          ))}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-neutral-900">{task.title}</p>
-                          {task.description && (
-                            <p className="text-sm text-neutral-500 mt-1 line-clamp-2">{task.description}</p>
-                          )}
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              task.status === "completed" 
-                                ? "bg-green-100 text-green-700"
-                                : task.status === "in_progress"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-neutral-100 text-neutral-600"
-                            }`}>
-                              {task.status.replace("_", " ")}
-                            </span>
-                            {task.assigned_to && (
-                              <span className="text-xs text-neutral-500">
-                                {task.assigned_to}
-                              </span>
-                            )}
+                  (postsByDate[toDateString(currentDate)] || []).map(post => {
+                    const statusStyle = getStatusStyle(post.status)
+                    const statusOption = CONTENT_POST_STATUS_OPTIONS.find(s => s.value === post.status)
+                    return (
+                      <div key={post.id} onClick={() => onOpenPost(post)} className={`p-4 hover:bg-neutral-50 cursor-pointer transition-colors border-l-4 ${statusStyle.border.replace("border-", "border-l-")}`}>
+                        <div className="flex items-start gap-3">
+                          <div className="flex items-center gap-1 flex-shrink-0">{post.social_platforms?.map(platform => <PlatformBadge key={platform} platform={platform} size="lg" />)}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-neutral-900">{post.title}</p>
+                            {post.social_copy && <p className="text-sm text-neutral-500 mt-1 line-clamp-2">{post.social_copy}</p>}
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>{statusOption?.label || post.status}</span>
+                              {post.user && <span className="text-xs text-neutral-500">{post.user}</span>}
+                              {post.platform && <span className="text-xs text-neutral-400">{post.platform}</span>}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
           )}
           
-          {/* Week View */}
           {viewMode === "week" && (
             <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
               <div className="grid grid-cols-7 bg-neutral-50 border-b border-neutral-200">
                 {calendarDays.map((date, i) => (
-                  <div 
-                    key={i} 
-                    className={`px-2 py-3 text-center border-r last:border-r-0 border-neutral-200 ${
-                      isToday(date) ? "bg-pink-50" : ""
-                    }`}
-                  >
-                    <p className="text-xs text-neutral-500">{weekDays[i]}</p>
-                    <p className={`text-lg font-semibold mt-0.5 ${
-                      isToday(date) ? "text-pink-600" : "text-neutral-900"
-                    }`}>
-                      {date.getDate()}
-                    </p>
+                  <div key={i} className={`px-2 py-3 text-center border-r last:border-r-0 border-neutral-200 ${isToday(date) ? "bg-blue-50" : ""}`}>
+                    <p className="text-xs font-medium text-neutral-500 leading-tight">{weekDays[i]}</p>
+                    <p className={`text-lg font-semibold mt-0.5 leading-tight ${isToday(date) ? "text-blue-600" : "text-neutral-900"}`}>{date.getDate()}</p>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-7 min-h-[400px]">
                 {calendarDays.map((date, i) => {
                   const dateKey = toDateString(date)
-                  const dayTasks = tasksByDate[dateKey] || []
-                  
+                  const dayPosts = postsByDate[dateKey] || []
                   return (
-                    <div 
-                      key={i}
-                      className={`p-2 border-r last:border-r-0 border-neutral-100 ${
-                        isToday(date) ? "bg-pink-50/50" : ""
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <AnimatePresence mode="popLayout">
-                          {dayTasks.map(task => (
-                            <TaskCard 
-                              key={task.id} 
-                              task={task} 
-                              onClick={() => onOpenTask(task)}
-                              compact
-                            />
-                          ))}
-                        </AnimatePresence>
+                    <div key={i} className={`p-2 border-r last:border-r-0 border-neutral-100 ${isToday(date) ? "bg-blue-50/50" : ""}`}>
+                      <div className="space-y-1 max-h-[380px] overflow-y-auto scrollbar-thin">
+                        <AnimatePresence mode="popLayout">{dayPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} compact />)}</AnimatePresence>
                       </div>
                     </div>
                   )
@@ -483,75 +387,30 @@ export function SocialCalendarView({
             </div>
           )}
           
-          {/* Month View */}
           {viewMode === "month" && (
             <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
               <div className="grid grid-cols-7 bg-neutral-50 border-b border-neutral-200">
-                {weekDays.map(day => (
-                  <div key={day} className="px-2 py-2 text-center text-xs font-medium text-neutral-500">
-                    {day}
-                  </div>
-                ))}
+                {weekDays.map(day => <div key={day} className="px-2 py-2.5 text-center text-xs font-semibold text-neutral-500 uppercase tracking-wide">{day}</div>)}
               </div>
               <div className="grid grid-cols-7">
                 {calendarDays.map((date, index) => {
                   const dateKey = toDateString(date)
-                  const dayTasks = tasksByDate[dateKey] || []
+                  const dayPosts = postsByDate[dateKey] || []
                   const isCurrentMonthDay = isCurrentMonth(date)
                   const isTodayDate = isToday(date)
-                  
                   return (
-                    <div
-                      key={index}
-                      className={`min-h-[80px] border-b border-r border-neutral-100 p-1.5 transition-colors ${
-                        !isCurrentMonthDay ? "bg-neutral-50/50" : "bg-white"
-                      } ${isTodayDate ? "bg-pink-50" : ""} ${
-                        hoveredDay === dateKey ? "bg-neutral-50" : ""
-                      }`}
-                      onMouseEnter={() => setHoveredDay(dateKey)}
+                    <div 
+                      key={index} 
+                      className={`min-h-[100px] max-h-[140px] border-b border-r border-neutral-100 p-1.5 transition-colors flex flex-col ${!isCurrentMonthDay ? "bg-neutral-50/50" : "bg-white"} ${isTodayDate ? "bg-blue-50/60" : ""} ${hoveredDay === dateKey ? "bg-neutral-50" : ""}`} 
+                      onMouseEnter={() => setHoveredDay(dateKey)} 
                       onMouseLeave={() => setHoveredDay(null)}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span
-                          className={`text-xs font-medium leading-none ${
-                            !isCurrentMonthDay
-                              ? "text-neutral-300"
-                              : isTodayDate
-                              ? "text-white"
-                              : "text-neutral-600"
-                          } ${isTodayDate ? "bg-pink-600 w-5 h-5 rounded-full flex items-center justify-center" : ""}`}
-                        >
-                          {date.getDate()}
-                        </span>
-                        {dayTasks.length > 0 && !isTodayDate && (
-                          <span className="text-[10px] text-neutral-400">
-                            {dayTasks.length}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between mb-1.5 flex-shrink-0">
+                        <span className={`text-xs font-semibold leading-none ${!isCurrentMonthDay ? "text-neutral-300" : isTodayDate ? "text-white" : "text-neutral-700"} ${isTodayDate ? "bg-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px]" : ""}`}>{date.getDate()}</span>
+                        {dayPosts.length > 0 && !isTodayDate && <span className="text-[10px] font-medium text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded-full">{dayPosts.length}</span>}
                       </div>
-                      
-                      <div className="space-y-0.5 overflow-hidden max-h-[52px]">
-                        <AnimatePresence mode="popLayout">
-                          {dayTasks.slice(0, 2).map(task => (
-                            <TaskCard 
-                              key={task.id} 
-                              task={task} 
-                              onClick={() => onOpenTask(task)}
-                              compact
-                            />
-                          ))}
-                        </AnimatePresence>
-                        {dayTasks.length > 2 && (
-                          <button
-                            onClick={() => {
-                              setCurrentDate(date)
-                              setViewMode("day")
-                            }}
-                            className="text-[10px] text-neutral-400 hover:text-neutral-600 px-1"
-                          >
-                            +{dayTasks.length - 2} more
-                          </button>
-                        )}
+                      <div className="space-y-1 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-200 scrollbar-track-transparent hover:scrollbar-thumb-neutral-300">
+                        <AnimatePresence mode="popLayout">{dayPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} compact />)}</AnimatePresence>
                       </div>
                     </div>
                   )
@@ -561,99 +420,37 @@ export function SocialCalendarView({
           )}
         </div>
         
-        {/* Sidebar - Upcoming posts */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden sticky top-4">
             <div className="p-3 border-b border-neutral-200 bg-neutral-50">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-neutral-500" />
-                <h3 className="font-semibold text-neutral-900 text-sm">Upcoming Posts</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2"><Filter className="w-4 h-4 text-neutral-500" /><h3 className="font-semibold text-neutral-900 text-sm">Filters</h3></div>
+                {hasActiveFilters && <button onClick={clearAllFilters} className="text-xs text-neutral-600 hover:text-neutral-900 font-medium flex items-center gap-1"><X className="w-3 h-3" />Clear</button>}
               </div>
             </div>
-            
-            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
-              {upcomingPosts.length === 0 ? (
-                <div className="p-4 text-center">
-                  <Calendar className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
-                  <p className="text-xs text-neutral-500">No upcoming posts</p>
-                  <p className="text-[10px] text-neutral-400 mt-1">Link tasks to the social calendar</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-neutral-100">
-                  {upcomingPosts.map(task => {
-                    const postDate = new Date(task.social_post_date || "")
-                    const today = new Date()
-                    today.setHours(0, 0, 0, 0)
-                    postDate.setHours(0, 0, 0, 0)
-                    const isTaskToday = postDate.getTime() === today.getTime()
-                    const isTomorrow = postDate.getTime() === today.getTime() + 86400000
-                    
-                    let dateLabel = formatDate(task.social_post_date || "")
-                    if (isTaskToday) dateLabel = "Today"
-                    else if (isTomorrow) dateLabel = "Tomorrow"
-                    
-                    return (
-                      <div
-                        key={task.id}
-                        onClick={() => onOpenTask(task)}
-                        className="p-3 hover:bg-neutral-50 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-2 mb-1.5">
-                          {task.social_platforms?.slice(0, 3).map(platform => (
-                            <PlatformBadge key={platform} platform={platform} size="sm" />
-                          ))}
-                          {task.social_platforms && task.social_platforms.length > 3 && (
-                            <span className="text-[10px] text-neutral-400">
-                              +{task.social_platforms.length - 3}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-medium text-neutral-900 truncate mb-1">
-                          {task.title}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-xs ${
-                            isTaskToday ? "text-pink-600 font-medium" : "text-neutral-500"
-                          }`}>
-                            {dateLabel}
-                          </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                            task.status === "completed" 
-                              ? "bg-green-100 text-green-700"
-                              : task.status === "in_progress"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-neutral-100 text-neutral-600"
-                          }`}>
-                            {task.status.replace("_", " ")}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+            <div className="p-3 space-y-4 max-h-[calc(100vh-400px)] overflow-y-auto">
+              <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
+              <FilterSection title="Platform" options={brandOptions} selectedValues={selectedPlatforms} onToggle={togglePlatform} />
+              <FilterSection title="Status" options={statusOptions} selectedValues={selectedStatuses} onToggle={toggleStatus} renderOption={(option, isSelected) => {
+                const statusConfig = CONTENT_POST_STATUS_OPTIONS.find(s => s.value === option.value)
+                return (
+                  <span className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all inline-flex items-center gap-1 ${isSelected ? `${statusConfig?.bgColor || "bg-neutral-100"} ${statusConfig?.borderColor || "border-neutral-200"} border-2` : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`} style={isSelected ? { color: option.color } : undefined}>
+                    {isSelected && <Check className="w-3 h-3" />}{option.label}
+                  </span>
+                )
+              }} />
             </div>
-            
-            {/* Quick stats at bottom */}
+            <div className="p-3 border-t border-neutral-200 bg-neutral-50">
+              <p className="text-xs text-neutral-500 mb-2">Status Legend</p>
+              <div className="space-y-1">
+                {CONTENT_POST_STATUS_OPTIONS.map(status => <div key={status.value} className="flex items-center gap-2 text-xs"><div className={`w-3 h-3 rounded ${status.bgColor} ${status.borderColor} border`} /><span className="text-neutral-600">{status.label}</span></div>)}
+              </div>
+            </div>
             <div className="p-3 border-t border-neutral-200 bg-neutral-50">
               <p className="text-xs text-neutral-500 mb-2">Platform breakdown</p>
               <div className="flex flex-wrap gap-2">
-                {SOCIAL_PLATFORM_OPTIONS.map(platform => {
-                  const count = platformStats[platform.value]
-                  if (count === 0) return null
-                  return (
-                    <div 
-                      key={platform.value}
-                      className="flex items-center gap-1 text-xs"
-                    >
-                      <PlatformBadge platform={platform.value} size="sm" />
-                      <span className="text-neutral-600">{count}</span>
-                    </div>
-                  )
-                })}
-                {Object.values(platformStats).every(v => v === 0) && (
-                  <span className="text-xs text-neutral-400">No posts yet</span>
-                )}
+                {SOCIAL_PLATFORM_OPTIONS.map(platform => { const count = platformStats[platform.value]; if (count === 0) return null; return <div key={platform.value} className="flex items-center gap-1 text-xs"><PlatformBadge platform={platform.value} size="sm" /><span className="text-neutral-600">{count}</span></div> })}
+                {Object.values(platformStats).every(v => v === 0) && <span className="text-xs text-neutral-400">No posts yet</span>}
               </div>
             </div>
           </div>

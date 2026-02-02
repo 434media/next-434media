@@ -15,11 +15,11 @@ import type {
   SalesRep,
   BarbPieChart,
   PieSlice,
-  CRM_COLLECTIONS,
   CRMDashboardStats,
   PipelineColumn,
   OpportunityStage,
 } from "../types/crm-types"
+import { CRM_COLLECTIONS } from "../types/crm-types"
 
 // Re-export collection names
 export { CRM_COLLECTIONS } from "../types/crm-types"
@@ -1174,5 +1174,126 @@ export async function getPipelineView(): Promise<PipelineColumn[]> {
   } catch (error) {
     console.error("Error building pipeline view:", error)
     throw error
+  }
+}
+
+// ============================================
+// CONTENT POSTS (Social Calendar)
+// ============================================
+import type { ContentPost } from "../components/crm/types"
+
+export async function getContentPosts(): Promise<ContentPost[]> {
+  const cacheKey = "collection:crm_content_posts"
+  const cached = getCached<ContentPost[]>(cacheKey)
+  if (cached) {
+    console.log("[Firestore] Cache hit for content posts")
+    return cached
+  }
+
+  try {
+    const db = getDb()
+    const snapshot = await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).orderBy("date_to_post", "desc").get()
+    const results = snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        ...data,
+        id: doc.id,
+        created_at: convertTimestamp(data.created_at),
+        updated_at: convertTimestamp(data.updated_at),
+      } as ContentPost
+    })
+    
+    setCache(cacheKey, results)
+    console.log("[Firestore] Fetched", results.length, "content posts")
+    return results
+  } catch (error) {
+    console.error("Error fetching content posts:", error)
+    return []
+  }
+}
+
+export async function getContentPostById(id: string): Promise<ContentPost | null> {
+  try {
+    const db = getDb()
+    const doc = await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id).get()
+    if (!doc.exists) return null
+    const data = doc.data()!
+    return {
+      ...data,
+      id: doc.id,
+      created_at: convertTimestamp(data.created_at),
+      updated_at: convertTimestamp(data.updated_at),
+    } as ContentPost
+  } catch (error) {
+    console.error("Error fetching content post:", id, error)
+    return null
+  }
+}
+
+export async function createContentPost(postData: Omit<ContentPost, "id" | "created_at" | "updated_at">): Promise<ContentPost> {
+  try {
+    const db = getDb()
+    const FieldValue = admin.firestore.FieldValue
+    const docRef = await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).add({
+      ...postData,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    })
+    
+    invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+    
+    const createdDoc = await docRef.get()
+    const data = createdDoc.data()!
+    return {
+      ...data,
+      id: createdDoc.id,
+      created_at: convertTimestamp(data.created_at),
+      updated_at: convertTimestamp(data.updated_at),
+    } as ContentPost
+  } catch (error) {
+    console.error("Error creating content post:", error)
+    throw new Error("Failed to create content post")
+  }
+}
+
+export async function updateContentPost(id: string, updates: Partial<ContentPost>): Promise<ContentPost> {
+  try {
+    const db = getDb()
+    const FieldValue = admin.firestore.FieldValue
+    const docRef = db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+    
+    // Remove id from updates
+    const { id: _, created_at: __, ...updateData } = updates
+    
+    await docRef.update({
+      ...updateData,
+      updated_at: FieldValue.serverTimestamp(),
+    })
+    
+    invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+    
+    const updatedDoc = await docRef.get()
+    const data = updatedDoc.data()!
+    return {
+      ...data,
+      id: updatedDoc.id,
+      created_at: convertTimestamp(data.created_at),
+      updated_at: convertTimestamp(data.updated_at),
+    } as ContentPost
+  } catch (error) {
+    console.error("Error updating content post:", id, error)
+    throw new Error("Failed to update content post")
+  }
+}
+
+export async function deleteContentPost(id: string): Promise<void> {
+  try {
+    const db = getDb()
+    await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id).delete()
+    invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+    console.log("[Firestore] Deleted content post:", id)
+  } catch (error) {
+    console.error("Error deleting content post:", id, error)
+    throw new Error("Failed to delete content post")
   }
 }
