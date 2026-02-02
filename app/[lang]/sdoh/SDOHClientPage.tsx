@@ -7,6 +7,11 @@ import SDOHImpactMessage from "../../components/sdoh/SDOHImpactMessage"
 import SDOHStartupBootcamp from "../../components/sdoh/SDOHStartupBootcamp"
 import SDOHHealthAccelerator from "../../components/sdoh/SDOHHealthAccelerator"
 import SDOHLanguageToggle from "./SDOHLanguageToggle"
+import { SectionTransition, SectionDivider } from "../../components/sdoh/SectionTransition"
+import SDOHImpactStats from "../../components/sdoh/SDOHImpactStats"
+import SDOHPillars from "../../components/sdoh/SDOHPillars"
+import AcceleratorWinner from "../../components/sdoh/AcceleratorWinner"
+import ImpactReportDownload from "../../components/sdoh/ImpactReportDownload"
 import Script from "next/script"
 
 export default function SDOHClientPage() {
@@ -46,17 +51,43 @@ export default function SDOHClientPage() {
 
       {/* Main content */}
       <div id="main-content" className="outline-none" tabIndex={-1}>
-        <section className="py-20 sm:py-28 lg:py-32 bg-white">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
-            {/* Startup Bootcamp Section */}
-            <SDOHStartupBootcamp locale={currentLocale} dict={dictionary} />
+        {/* LEAD WITH IMPACT - Year 2 Highlights to hook viewers immediately */}
+        <SDOHImpactStats locale={currentLocale} />
 
-            {/* Community Health Accelerator Section */}
+        {/* Section Divider - Transition from Stats to Framework */}
+        <SectionDivider variant="connector" colorScheme="magenta" />
+
+        {/* Three Pillars Section - Show the Learn/Build/Sustain framework */}
+        <SDOHPillars locale={currentLocale} />
+
+        {/* Section Divider - Transition to Programs */}
+        <SectionDivider variant="double" colorScheme="mixed" />
+
+        <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
+          {/* Startup Bootcamp Section - First program */}
+          <SectionTransition variant="wave" colorScheme="magenta" maxWidth="6xl" className="px-4 sm:px-6 lg:px-8">
+            <SDOHStartupBootcamp locale={currentLocale} dict={dictionary} />
+          </SectionTransition>
+
+          {/* Section Divider between Bootcamp and Accelerator */}
+          <SectionDivider variant="double" colorScheme="magenta" />
+
+          {/* Community Health Accelerator Section - Second program */}
+          <SectionTransition variant="wave" colorScheme="orange" maxWidth="6xl" className="px-4 sm:px-6 lg:px-8">
             <SDOHHealthAccelerator locale={currentLocale} dict={dictionary} />
-          </div>
+          </SectionTransition>
         </section>
 
-        {/* Combined Impact Message + Newsletter Section */}
+        {/* 2025 Accelerator Winner - Success Story Spotlight */}
+        <AcceleratorWinner locale={currentLocale} />
+
+        {/* Impact Report PDF Download - CTA to dive deeper */}
+        <ImpactReportDownload locale={currentLocale} />
+
+        {/* Section Divider - Transition to Final CTA */}
+        <SectionDivider variant="connector" colorScheme="orange" />
+
+        {/* Combined Impact Message + Newsletter Section - Close with CTA */}
         <SDOHImpactMessage locale={currentLocale} dict={dictionary} />
       </div>
 

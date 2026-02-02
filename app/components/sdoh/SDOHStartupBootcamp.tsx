@@ -173,9 +173,9 @@ const BootcampCarousel = () => {
             <button
               key={`bootcamp-dot-${index}`}
               onClick={() => goToSlide(index)}
-              className={`transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+              className={`transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#A31545] ${
                 index === activeSlide
-                  ? "w-8 h-2 bg-cyan-500"
+                  ? "w-8 h-2 bg-[#A31545]"
                   : "w-2 h-2 bg-white/60 hover:bg-white"
               }`}
               aria-label={`Go to slide ${index + 1}`}
@@ -187,7 +187,7 @@ const BootcampCarousel = () => {
         {/* Auto-play toggle */}
         <button
           onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-          className="bg-white text-neutral-900 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 p-3"
+          className="bg-white text-neutral-900 hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-[#A31545] p-3"
           aria-label={isAutoPlaying ? "Pause auto-play" : "Start auto-play"}
         >
           {isAutoPlaying ? (
@@ -213,7 +213,7 @@ const BootcampCarousel = () => {
       {/* Previous/Next buttons */}
       <button
         onClick={prevSlide}
-        className="absolute left-6 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white text-neutral-900 flex items-center justify-center z-20 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        className="absolute left-6 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white text-neutral-900 flex items-center justify-center z-20 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A31545]"
         aria-label="Previous slide"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -223,7 +223,7 @@ const BootcampCarousel = () => {
 
       <button
         onClick={nextSlide}
-        className="absolute right-6 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white text-neutral-900 flex items-center justify-center z-20 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        className="absolute right-6 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white text-neutral-900 flex items-center justify-center z-20 hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A31545]"
         aria-label="Next slide"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -265,24 +265,27 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
         <div className="relative text-center">
           {/* Component Number */}
           <div className="relative inline-block mb-8">
-            <div className="relative w-20 h-20 bg-neutral-900 text-white flex items-center justify-center">
+            <div className="relative w-20 h-20 bg-[#8B1E3F] text-white flex items-center justify-center">
               <span className="text-3xl font-black">2</span>
               {/* Accent corner */}
-              <div className="absolute top-0 right-0 w-3 h-3 bg-cyan-500" />
+              <div className="absolute top-0 right-0 w-3 h-3 bg-[#FF6B35]" />
             </div>
           </div>
 
           {/* Title */}
           <div className="relative max-w-4xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-none mb-6 text-neutral-900">
+            <p className="text-[#FF6B35] font-medium text-sm uppercase tracking-wider mb-4">
+              {locale === "es" ? "Convirtiendo la Perspicacia en Acción" : "Turning Insight into Action"}
+            </p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {getStringValue(d.title)}
             </h2>
             {/* Accent underline */}
-            <div className="mx-auto w-24 h-1 bg-cyan-500 mb-8" />
-            <p className="text-lg sm:text-xl md:text-2xl text-neutral-600 font-medium leading-relaxed max-w-3xl mx-auto">
+            <div className="mx-auto w-16 h-1 bg-[#A31545] mb-6" />
+            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed max-w-2xl mx-auto">
               {locale === "es"
-                ? "Descubre el segundo componente de nuestro programa integral"
-                : "Discover the second component of our comprehensive program"}
+                ? "La conciencia se convierte en impulso"
+                : "Awareness became momentum"}
             </p>
           </div>
         </div>
@@ -294,27 +297,43 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
         <FadeIn>
           <div className="order-2 md:order-1 space-y-8">
             {/* Subtitle badge */}
-            <div className="inline-flex items-center px-4 py-2 bg-neutral-100 border border-neutral-200 text-neutral-800 text-sm font-bold">
-              <div className="w-2 h-2 bg-cyan-500 rounded-full mr-3" />
+            <div className="inline-flex items-center px-4 py-2 bg-[#A31545]/10 border border-[#A31545]/30 text-neutral-800 text-sm font-bold">
+              <div className="w-2 h-2 bg-[#A31545] rounded-full mr-3" />
               {getStringValue(d.subtitle)}
             </div>
 
             {/* Main description */}
             <div className="relative">
-              <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500" />
-              <p className="text-lg md:text-xl text-neutral-700 leading-relaxed pl-6">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[#A31545]" />
+              <p className="text-lg text-neutral-600 leading-relaxed pl-6">
                 {getStringValue(d.description)}
               </p>
             </div>
 
             {/* Feature highlight box */}
-            <div className="relative p-8 bg-neutral-50 border border-neutral-200">
+            <div className="relative p-6 bg-neutral-50 border border-neutral-200">
               {/* Accent line */}
-              <div className="absolute left-0 top-0 w-1 h-full bg-yellow-400" />
-              <p className="text-lg leading-relaxed text-neutral-700 pl-4">
-                <span className="font-bold text-neutral-900">{getStringValue(d.keyFocus)}</span>{" "}
+              <div className="absolute left-0 top-0 w-1 h-full bg-[#FF6B35]" />
+              <p className="text-base leading-relaxed text-neutral-600 pl-4">
+                <span className="font-semibold text-neutral-900">{getStringValue(d.keyFocus)}</span>{" "}
                 {getStringValue(d.keyFocusDescription)}
               </p>
+            </div>
+
+            {/* Year 2 Stats */}
+            <div className="grid grid-cols-3 gap-3 pt-4">
+              <div className="text-center p-4 bg-[#FF6B35]/10 border border-[#FF6B35]/20">
+                <p className="text-2xl font-bold text-[#FF6B35]">7</p>
+                <p className="text-xs text-neutral-500">{locale === "es" ? "Sesiones" : "Sessions"}</p>
+              </div>
+              <div className="text-center p-4 bg-[#A31545]/10 border border-[#A31545]/20">
+                <p className="text-2xl font-bold text-[#A31545]">1,600+</p>
+                <p className="text-xs text-neutral-500">{locale === "es" ? "Participantes" : "Participants"}</p>
+              </div>
+              <div className="text-center p-4 bg-[#FF6B35]/10 border border-[#FF6B35]/20">
+                <p className="text-2xl font-bold text-[#FF6B35]">6</p>
+                <p className="text-xs text-neutral-500">{locale === "es" ? "Ciudades" : "Cities"}</p>
+              </div>
             </div>
           </div>
         </FadeIn>

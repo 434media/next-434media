@@ -66,7 +66,48 @@
     "impact": {
       "question": "What can I do to make a difference?",
       "message": "If you've ever asked, ",
-      "conclusion": " — this is where you start."
+      "conclusion": " — this is where you start.",
+      "tagline": "When awareness drives innovation, communities thrive.",
+      "year2Title": "Year 2 Impact",
+      "guidingQuestion": "What if awareness itself could transform health in South Texas?",
+      "year2Subtitle": "Year 2 of the Community Health Accelerator proved it can."
+    },
+    "pillars": {
+      "intro": "The Community Health Accelerator moved through three stages of growth:",
+      "learn": {
+        "title": "LEARN",
+        "subtitle": "Speaker Seminar Series",
+        "tagline": "Awareness through education"
+      },
+      "build": {
+        "title": "BUILD",
+        "subtitle": "Startup Bootcamp",
+        "tagline": "Ideas into innovation"
+      },
+      "sustain": {
+        "title": "SUSTAIN",
+        "subtitle": "Community Health Accelerator",
+        "tagline": "Mentorship into impact"
+      }
+    },
+    "acceleratorWinner": {
+      "badge": "2025 ACCELERATOR WINNER",
+      "title": "About InovCares",
+      "founderName": "Mohamed Kamara",
+      "founderRole": "CEO/Founder",
+      "story": "Founder Mohamed Kamara's inspiration to create a women's resource for a lifetime of health and wellness began in Sierra Leone. After losing his sister during childbirth due to a preventable condition called pre-eclampsia, he recognized the global need for consolidated education and prevention.",
+      "watchVideo": "Watch Mo's Story",
+      "quote": "We applaud InovCares's bold vision and eagerly anticipate the positive change they will bring to the health and well-being of our communities.",
+      "quoteAuthor": "Jaime Wesolowski",
+      "quoteRole": "President & CEO of Methodist Healthcare Ministries of South Texas, Inc."
+    },
+    "impactReport": {
+      "eyebrow": "DOWNLOAD",
+      "title": "Year 2 Impact Report",
+      "subtitle": "Advancing Health Equity Through Education, Connection & Community",
+      "description": "Discover how the Community Health Accelerator transformed awareness into action and ideas into innovation during Year 2.",
+      "buttonText": "Download Report PDF",
+      "partnership": "A collaboration between Methodist Healthcare Ministries & VelocityTX"
     },
     "title": "¿Qué es SDOH?",
     "subtitle": "(Or in plain terms: What the Heck is Social Determinants of Health?)",

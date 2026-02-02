@@ -19,7 +19,7 @@ export function SessionsSection({ dict }: SessionsSectionProps) {
               Seminar Highlights
             </h2>
             {/* Accent underline */}
-            <div className="mx-auto w-24 h-1 bg-cyan-500 mb-6" />
+            <div className="mx-auto w-24 h-1 bg-[#A31545] mb-6" />
             <p className="text-lg sm:text-xl md:text-2xl text-neutral-600 max-w-4xl mx-auto leading-relaxed font-light">
               Dive deep into the insights shared by our expert speakers
             </p>

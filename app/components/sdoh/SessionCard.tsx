@@ -78,7 +78,7 @@ export function SessionCard({
               ) : (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-yellow-600"
+                  className="h-4 w-4 text-[#FF6B35]"
                   viewBox="0 0 24 24"
                   fill="currentColor"
                   aria-hidden="true"
@@ -92,7 +92,7 @@ export function SessionCard({
           {/* Bottom accent line */}
           <div
             className={`absolute bottom-0 left-0 right-0 h-1 ${
-              hasVideo ? "bg-cyan-500" : "bg-yellow-400"
+              hasVideo ? "bg-[#A31545]" : "bg-[#FF6B35]"
             } transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left z-20`}
           />
         </div>
@@ -109,8 +109,8 @@ export function SessionCard({
             onClick={openModal}
             className={`inline-flex items-center justify-center w-full py-3 px-4 font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
               hasVideo
-                ? "bg-neutral-900 text-white hover:bg-cyan-600 focus:ring-neutral-900"
-                : "bg-yellow-400 text-neutral-900 hover:bg-yellow-500 focus:ring-yellow-400"
+                ? "bg-neutral-900 text-white hover:bg-[#A31545] focus:ring-neutral-900"
+                : "bg-[#FF6B35] text-white hover:bg-[#FF8C5A] focus:ring-[#FF6B35]"
             }`}
             aria-label={`${hasVideo ? "View" : "Preview"} ${title} session`}
           >

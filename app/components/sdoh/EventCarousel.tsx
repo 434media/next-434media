@@ -54,8 +54,8 @@ export function EventCarousel() {
         }}
       >
         {/* Accent lines */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 z-10" />
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-yellow-400 z-10" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-[#A31545] z-10" />
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-[#FF6B35] z-10" />
 
         {/* Video showcase container */}
         <div className="relative aspect-[4/5] lg:h-[600px] lg:aspect-auto">
@@ -80,7 +80,7 @@ export function EventCarousel() {
                 e.stopPropagation()
                 openVideoModal()
               }}
-              className="inline-block bg-yellow-400 text-neutral-900 px-6 py-3 text-base font-bold mb-6 sm:mb-8 hover:bg-yellow-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:ring-offset-neutral-900 w-fit"
+              className="inline-block bg-[#FF6B35] text-white px-6 py-3 text-base font-bold mb-6 sm:mb-8 hover:bg-[#FF8C5A] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#FF6B35] focus:ring-offset-2 focus:ring-offset-neutral-900 w-fit"
             >
               <span className="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
@@ -91,26 +91,26 @@ export function EventCarousel() {
             </button>
 
             {/* Title */}
-            <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white mb-3 sm:mb-4 leading-tight">
+            <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 leading-snug">
               {videoContent.title}
             </h3>
 
             {/* Subtitle */}
-            <p className="text-xl sm:text-2xl md:text-3xl text-cyan-400 font-bold mb-6 sm:mb-8">
+            <p className="text-lg sm:text-xl text-[#FF8C5A] font-medium mb-6">
               {videoContent.subtitle}
             </p>
 
             {/* Description */}
-            <p className="text-white/90 text-base sm:text-lg md:text-xl max-w-3xl mb-8 sm:mb-10 leading-relaxed">
+            <p className="text-white/80 text-base sm:text-lg max-w-2xl mb-8 leading-relaxed">
               {videoContent.description}
             </p>
 
             {/* Highlight badge */}
-            <div className="flex items-center bg-white/10 border border-white/20 p-4 sm:p-5 max-w-fit">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-neutral-900 flex items-center justify-center mr-4 relative">
+            <div className="flex items-center bg-white/10 border border-white/20 px-4 py-3 max-w-fit">
+              <div className="w-8 h-8 bg-neutral-900 flex items-center justify-center mr-3 relative">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-400"
+                  className="h-4 w-4 text-[#FF6B35]"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -118,9 +118,9 @@ export function EventCarousel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 {/* Corner accent */}
-                <div className="absolute top-0 right-0 w-2 h-2 bg-cyan-500" />
+                <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-[#A31545]" />
               </div>
-              <span className="text-white font-bold text-base sm:text-lg">
+              <span className="text-white font-medium text-sm">
                 {videoContent.highlight}
               </span>
             </div>

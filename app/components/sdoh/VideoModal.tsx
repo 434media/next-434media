@@ -189,7 +189,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top accent line */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 z-20"></div>
+        <div className="absolute top-0 left-0 w-full h-1 bg-[#A31545] z-20"></div>
 
         {/* Close button */}
         <button
@@ -216,7 +216,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
           {!hasValidVideoSrc && (
             <div className="absolute inset-0 flex items-center justify-center bg-neutral-900">
               <div className="text-center max-w-md px-6">
-                <div className="w-20 h-20 mx-auto mb-6 text-cyan-500">
+                <div className="w-20 h-20 mx-auto mb-6 text-[#FF6B35]">
                   <svg fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                   </svg>
@@ -225,7 +225,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
                 <p className="text-neutral-400 text-lg leading-relaxed mb-6">
                   This video will be available after the event. Check back later to watch the full session.
                 </p>
-                <div className="inline-flex items-center px-4 py-2 bg-neutral-800 text-cyan-500 text-sm font-medium border border-neutral-700">
+                <div className="inline-flex items-center px-4 py-2 bg-neutral-800 text-[#FF6B35] text-sm font-medium border border-neutral-700">
                   <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
                   </svg>
@@ -239,7 +239,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
           {hasValidVideoSrc && isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 z-10">
               <div className="text-center">
-                <div className="w-12 h-12 border-2 border-cyan-500 border-t-transparent mx-auto mb-4 animate-spin"></div>
+                <div className="w-12 h-12 border-2 border-[#A31545] border-t-transparent mx-auto mb-4 animate-spin"></div>
                 <p className="text-neutral-400 text-sm">Loading video...</p>
               </div>
             </div>
@@ -249,7 +249,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
           {hasValidVideoSrc && hasError && (
             <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 z-10">
               <div className="text-center max-w-md px-6">
-                <svg className="w-16 h-16 text-yellow-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-16 h-16 text-[#FF6B35] mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
                   <path
                     fillRule="evenodd"
                     d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -263,7 +263,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
                 </p>
                 <button
                   onClick={retryLoad}
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white transition-colors duration-200"
+                  className="px-4 py-2 bg-[#A31545] hover:bg-[#8B1E3F] text-white transition-colors duration-200"
                 >
                   Try Again
                 </button>
@@ -317,7 +317,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
                   onChange={handleSeek}
                   className="w-full h-1 bg-neutral-700 appearance-none cursor-pointer"
                   style={{
-                    background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${
+                    background: `linear-gradient(to right, #A31545 0%, #A31545 ${
                       duration ? (currentTime / duration) * 100 : 0
                     }%, #404040 ${duration ? (currentTime / duration) * 100 : 0}%, #404040 100%)`,
                   }}
@@ -391,7 +391,7 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
         </div>
 
         {/* Bottom accent line */}
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-yellow-400 z-20"></div>
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-[#FF6B35] z-20"></div>
       </div>
     </div>
   )

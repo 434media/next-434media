@@ -54,24 +54,27 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
         <div className="text-center mb-12 sm:mb-16 relative">
           {/* Component Number */}
           <div className="relative inline-block mb-8">
-            <div className="relative w-20 h-20 bg-neutral-900 text-white flex items-center justify-center">
+            <div className="relative w-20 h-20 bg-[#8B1E3F] text-white flex items-center justify-center">
               <span className="text-3xl font-black">3</span>
               {/* Accent corner */}
-              <div className="absolute top-0 right-0 w-3 h-3 bg-cyan-500" />
+              <div className="absolute top-0 right-0 w-3 h-3 bg-[#FF6B35]" />
             </div>
           </div>
 
           {/* Title */}
           <div className="relative max-w-4xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-none mb-6 text-neutral-900">
+            <p className="text-[#FF6B35] font-medium text-sm uppercase tracking-wider mb-4">
+              {locale === "es" ? "Donde la Innovación Encuentra Propósito" : "Where Innovation Meets Purpose"}
+            </p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {getStringValue(d.title)}
             </h2>
             {/* Accent underline */}
-            <div className="mx-auto w-24 h-1 bg-cyan-500 mb-8" />
-            <p className="text-lg sm:text-xl md:text-2xl text-neutral-600 font-medium leading-relaxed max-w-3xl mx-auto">
+            <div className="mx-auto w-16 h-1 bg-[#A31545] mb-6" />
+            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed max-w-3xl mx-auto">
               {locale === "es"
-                ? "Descubre el tercer componente de nuestro programa integral"
-                : "Discover the third component of our comprehensive program"}
+                ? "Innovación sostenida a través de colaboración real, mentoría e impacto medible"
+                : "Sustained innovation through real-world collaboration, mentorship, and measurable impact"}
             </p>
           </div>
         </div>
@@ -81,8 +84,8 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
           {/* Text Content */}
           <div className="order-2 md:order-1">
             <div className="mb-8">
-              <div className="inline-flex items-center px-4 py-2 bg-yellow-50 border border-yellow-200 text-neutral-800 text-sm font-bold">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full mr-3" />
+              <div className="inline-flex items-center px-4 py-2 bg-[#FF6B35]/10 border border-[#FF6B35]/30 text-neutral-800 text-sm font-bold">
+                <div className="w-2 h-2 bg-[#FF6B35] rounded-full mr-3" />
                 {getStringValue(d.subtitle)}
               </div>
             </div>
@@ -90,9 +93,9 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
             <div className="relative">
               <div className="p-8 border border-neutral-200 bg-neutral-50 relative">
                 {/* Accent line */}
-                <div className="absolute left-0 top-0 w-1 h-full bg-cyan-500" />
+                <div className="absolute left-0 top-0 w-1 h-full bg-[#A31545]" />
 
-                <p className="text-lg md:text-xl text-neutral-700 leading-relaxed pl-4 mb-6">
+                <p className="text-lg text-neutral-600 leading-relaxed pl-4 mb-6">
                   {getStringValue(d.description1)}
                 </p>
 
@@ -104,7 +107,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
                 <div className="pl-4">
                   <a
                     href="https://velocitytx.org/startup-programs/support/accelerator/"
-                    className="inline-flex items-center text-neutral-900 hover:text-cyan-600 font-medium transition-colors duration-200"
+                    className="inline-flex items-center text-neutral-900 hover:text-[#A31545] font-medium transition-colors duration-200"
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Learn more about the Community Health Accelerator"

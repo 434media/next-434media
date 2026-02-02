@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react"
 import { FadeIn } from "../FadeIn"
 import { HeroVideoSection } from "./HeroVideoSection"
-import { SessionsSection } from "./SessionsSection"
 import { EventCarousel } from "./EventCarousel"
 import { SDOHMission } from "./SDOHMission"
-import { SpeakersSection } from "./SpeakersSection"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
 
@@ -120,20 +118,20 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             <div className="text-center mb-16 relative">
               <div className="inline-block relative">
                 <div className="relative px-6 sm:px-8 py-4">
-                  <p className="text-xs sm:text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                  <p className="text-sm font-medium text-neutral-400 uppercase tracking-wider mb-3">
                     {locale === "es" ? "Serie de Seminarios y Oradores" : "Seminar & Speaker Series"}
                   </p>
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-neutral-900 mb-4">
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-neutral-900 mb-3">
                     ¿Que es SDOH?
                   </h2>
-                  <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-neutral-700 whitespace-nowrap">
+                  <p className="text-lg sm:text-xl md:text-2xl text-neutral-600">
                     And What It Means to{" "}
-                    <span className="inline-block font-black text-cyan-600">
+                    <span className="font-bold text-[#A31545]">
                       Y-O-U!
                     </span>
                   </p>
                   {/* Accent underline */}
-                  <div className="mt-4 mx-auto w-24 h-1 bg-yellow-400"></div>
+                  <div className="mt-6 mx-auto w-16 h-1 bg-[#FF6B35]"></div>
                 </div>
               </div>
             </div>
@@ -145,39 +143,39 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
             <FadeIn>
               <div className="h-full lg:h-[600px] bg-white p-8 md:p-10 border border-neutral-200 relative flex flex-col">
                 {/* Accent line */}
-                <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+                <div className="absolute top-0 left-0 w-1 h-full bg-[#A31545]"></div>
 
                 {/* Content */}
                 <div className="relative z-10 flex-1 flex flex-col pl-4">
                   <div className="mb-8">
-                    <div className="inline-flex items-center bg-neutral-100 px-4 py-2 border border-neutral-200 mb-6">
-                      <div className="w-2 h-2 bg-cyan-500 rounded-full mr-3"></div>
+                    <div className="inline-flex items-center bg-[#A31545]/10 px-4 py-2 border border-[#A31545]/30 mb-6">
+                      <div className="w-2 h-2 bg-[#A31545] rounded-full mr-3"></div>
                       <span className="text-neutral-800 font-semibold text-sm">
                         {locale === "es" ? "Panel de Discusión" : "Panel Discussion"}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex-1 flex flex-col justify-center space-y-8">
-                    <p className="text-lg sm:text-xl text-neutral-700 leading-relaxed">
+                  <div className="flex-1 flex flex-col justify-center space-y-6">
+                    <p className="text-lg text-neutral-600 leading-relaxed">
                       {getDictValue(
                         "sdoh.mission.description1",
                         "This panel brings together healthcare innovators, entrepreneurs, and community leaders to discuss how we can address SDOH in the Rio Grande Valley.",
                       )}
                     </p>
 
-                    <p className="text-lg sm:text-xl text-neutral-700 leading-relaxed">
+                    <p className="text-lg text-neutral-600 leading-relaxed">
                       {getDictValue(
                         "sdoh.mission.description2",
                         "We'll explore how technology, community engagement, and cross-sector collaboration can create sustainable solutions to improve health outcomes for all residents.",
                       )}
                     </p>
 
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2 pt-2">
                       {["#innovation", "#healthcare", "#community"].map((tag) => (
                         <span
                           key={tag}
-                          className="inline-block px-4 py-2 bg-neutral-100 text-neutral-700 text-sm font-medium border border-neutral-200"
+                          className="inline-block px-3 py-1.5 bg-neutral-100 text-neutral-500 text-sm font-medium"
                         >
                           {tag}
                         </span>
@@ -198,13 +196,9 @@ export default function SDOHHero({ locale = "en", dict }: SDOHHeroProps) {
         </div>
 
         {/* Speakers Section - Full Width Outside Grid */}
-        <div className="container px-4 sm:px-6 max-w-7xl mx-auto relative z-10">
-          <SpeakersSection companyLogos={companyLogos} />
-        </div>
       </section>
 
       {/* Sessions Section */}
-      <SessionsSection dict={mergedDict} />
     </>
   )
 }
