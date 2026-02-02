@@ -79,17 +79,17 @@ export default function SDOHClientPage() {
         <SectionDivider variant="double" colorScheme="mixed" />
 
         {/* 5. COMPONENT 1: Seminar Series - Learning as Catalyst for Change */}
-        <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
+        <section className="py-20 bg-white relative overflow-hidden">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
             <SeminarSeries locale={currentLocale} dict={dictionary} />
           </div>
         </section>
 
         {/* Section Divider */}
-        <SectionDivider variant="connector" colorScheme="magenta" />
+        <SectionDivider variant="double" colorScheme="magenta" />
 
         {/* 6. COMPONENT 2: Startup Bootcamp */}
-        <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
+        <section className="py-20 bg-white relative overflow-hidden">
           <SectionTransition variant="wave" colorScheme="magenta" maxWidth="5xl" className="px-4 sm:px-6 lg:px-8">
             <SDOHStartupBootcamp locale={currentLocale} dict={dictionary} />
           </SectionTransition>
@@ -99,7 +99,7 @@ export default function SDOHClientPage() {
         <SectionDivider variant="double" colorScheme="magenta" />
 
         {/* 7. COMPONENT 3: Community Health Accelerator */}
-        <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
+        <section className="py-20 bg-white relative overflow-hidden">
           <SectionTransition variant="wave" colorScheme="orange" maxWidth="5xl" className="px-4 sm:px-6 lg:px-8">
             <SDOHHealthAccelerator locale={currentLocale} dict={dictionary} />
           </SectionTransition>
@@ -107,9 +107,6 @@ export default function SDOHClientPage() {
 
         {/* 8. Accelerator Winner - Success Story */}
         <AcceleratorWinner locale={currentLocale} />
-
-        {/* Section Divider - Transition to Newsletter */}
-        <SectionDivider variant="connector" colorScheme="orange" />
 
         {/* 9. Newsletter/Impact Message */}
         <SDOHImpactMessage locale={currentLocale} dict={dictionary} />
