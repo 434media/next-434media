@@ -34,7 +34,7 @@ export default function ImpactReportDownload({ locale }: ImpactReportDownloadPro
     description: "Discover how the Community Health Accelerator transformed awareness into action and ideas into innovation during Year 2.",
     buttonText: "Download Report PDF",
     downloadingText: "Downloading...",
-    cta: "If you've ever asked, \"What can I do to make a difference?\" — this is where you start.",
+    cta: "If you've ever asked, \"What can I do to make a difference?\" This is where you start.",
     fileSize: "PDF • 2.4 MB",
   }
 

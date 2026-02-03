@@ -57,12 +57,6 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
         {/* Text Content */}
         <FadeIn>
           <div className="order-2 md:order-1 space-y-8">
-            {/* Subtitle badge */}
-            <div className="inline-flex items-center px-4 py-2 bg-[#A31545]/10 border border-[#A31545]/30 text-neutral-800 text-sm font-bold">
-              <div className="w-2 h-2 bg-[#A31545] rounded-full mr-3" />
-              {getStringValue(d.subtitle)}
-            </div>
-
             {/* Main description */}
             <div className="relative">
               <div className="absolute top-0 left-0 w-1 h-full bg-[#A31545]" />
