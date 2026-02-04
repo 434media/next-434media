@@ -74,22 +74,6 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
                 {getStringValue(d.keyFocusDescription)}
               </p>
             </div>
-
-            {/* Year 2 Stats */}
-            <div className="grid grid-cols-3 gap-3 pt-4">
-              <div className="text-center p-4 bg-[#FF6B35]/10 border border-[#FF6B35]/20">
-                <p className="text-2xl font-bold text-[#FF6B35]">7</p>
-                <p className="text-xs text-neutral-500">{locale === "es" ? "Sesiones" : "Sessions"}</p>
-              </div>
-              <div className="text-center p-4 bg-[#A31545]/10 border border-[#A31545]/20">
-                <p className="text-2xl font-bold text-[#A31545]">1,600+</p>
-                <p className="text-xs text-neutral-500">{locale === "es" ? "Participantes" : "Participants"}</p>
-              </div>
-              <div className="text-center p-4 bg-[#FF6B35]/10 border border-[#FF6B35]/20">
-                <p className="text-2xl font-bold text-[#FF6B35]">6</p>
-                <p className="text-xs text-neutral-500">{locale === "es" ? "Ciudades" : "Cities"}</p>
-              </div>
-            </div>
           </div>
         </FadeIn>
 

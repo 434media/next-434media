@@ -103,9 +103,6 @@ export default function SDOHClientPage() {
 
         {/* 8. Accelerator Winner - Success Story */}
         <AcceleratorWinner locale={currentLocale} />
-
-        {/* 9. Newsletter/Impact Message */}
-        <SDOHImpactMessage locale={currentLocale} dict={dictionary} />
       </div>
 
       <Script
