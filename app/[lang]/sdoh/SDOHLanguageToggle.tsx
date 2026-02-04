@@ -5,7 +5,6 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { i18n, type Locale } from "@/i18n-config"
 import { useLanguage } from "@/app/context/language-context"
-import { AnimatePresence, motion } from "motion/react"
 
 interface SDOHLanguageToggleProps {
   showOnScroll?: boolean
@@ -57,21 +56,17 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
   }
 
   return (
-    <AnimatePresence>
+    <>
       {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 0.9, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-          className="fixed top-20 right-4 z-50 opacity-90 hover:opacity-100 transition-opacity"
-          style={{ maxWidth: "fit-content", transform: "scale(0.9)" }}
+        <div
+          className="fixed top-20 right-4 z-50 transition-opacity duration-300"
+          style={{ maxWidth: "fit-content" }}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
           <div
-            className={`bg-white/40 backdrop-blur-md rounded-full shadow-sm border border-gray-200/50 p-1 flex items-center transition-all duration-300 ${
-              isHovered ? "shadow-md" : ""
+            className={`bg-white border border-neutral-200 p-1 flex items-center transition-shadow duration-200 ${
+              isHovered ? "shadow-md" : "shadow-sm"
             }`}
           >
             {i18n.locales.map((locale) => (
@@ -79,10 +74,10 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
                 key={locale}
                 onClick={(e) => handleLanguageChange(e, locale)}
                 disabled={isLoading || localLoading || locale === currentLocale}
-                className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${
+                className={`relative px-3 py-1.5 text-sm font-bold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#A31545] focus:ring-offset-2 ${
                   locale === currentLocale
-                    ? "bg-gradient-to-r from-cyan-500 to-cyan-600 text-white"
-                    : "text-gray-700 hover:bg-gray-100/80"
+                    ? "bg-[#A31545] text-white"
+                    : "text-neutral-700 hover:bg-neutral-100"
                 }`}
                 aria-label={`Switch to ${locale === "en" ? "English" : "Spanish"} language`}
                 aria-current={locale === currentLocale ? "true" : "false"}
@@ -131,8 +126,8 @@ export default function SDOHLanguageToggle({ showOnScroll = false }: SDOHLanguag
               </button>
             ))}
           </div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   )
 }

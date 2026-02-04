@@ -40,15 +40,13 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
   const impactDict = dict?.sdoh?.impact || {
     question: "What can I do to make a difference?",
     message: "If you've ever asked, ",
-    conclusion: " — this is where you start.",
+    conclusion: "This is where you start.",
   }
 
   const newsletterDict =
     dict?.newsletter && typeof dict.newsletter === "object"
       ? (dict.newsletter as unknown as NewsletterDictionary)
       : defaultNewsletterText
-
-  const joinText = locale === "es" ? "Únete a la conversación" : "Join the Conversation"
 
   const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0.9.-]+\.[a-zA-Z]{2,}$/
 
@@ -107,9 +105,9 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
   return (
     <section className="py-20 sm:py-28 lg:py-32 overflow-hidden relative bg-neutral-900" id="newsletter">
       {/* Accent line */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-yellow-400" />
+      <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B35]" />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl relative z-10">
         <FadeIn>
           <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
             {/* Left side - SDOH Logo */}
@@ -123,8 +121,8 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
                   className="w-full h-auto"
                 />
                 {/* Corner accents */}
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyan-500" />
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-yellow-400" />
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#A31545]" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#FF6B35]" />
               </div>
             </div>
 
@@ -133,16 +131,15 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
               {/* Impact Message as Header */}
               <div className="mb-8">
                 <blockquote className="relative">
-                  <p className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight">
+                  <p className="text-3xl font-bold leading-snug">
                     <span className="text-white">{impactDict.message}</span>
-                    <span className="text-cyan-400 italic">&quot;{impactDict.question}&quot;</span>
-                    <span className="text-white">{impactDict.conclusion}</span>
+                    <span className="text-[#FF6B35] italic block">&quot;{impactDict.question}&quot;</span>
                   </p>
                 </blockquote>
               </div>
 
               {/* Join the Conversation */}
-              <p className="text-lg text-white/80 mb-6">{joinText}</p>
+              <p className="text-lg text-white/80 mb-6">{impactDict.conclusion}</p>
 
               {/* Newsletter Form */}
               <div className="w-full">
@@ -201,7 +198,7 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
                     role="status"
                     aria-live="polite"
                   >
-                    <div className="bg-cyan-500 p-1 mr-3 flex-shrink-0">
+                    <div className="bg-[#A31545] p-1 mr-3 flex-shrink-0">
                       <CheckIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </div>
                     <span className="text-white text-sm sm:text-base font-medium">

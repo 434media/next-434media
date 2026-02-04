@@ -58,15 +58,15 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
           {/* Main container */}
           <div className="bg-white border border-neutral-200 p-8 lg:p-12 relative">
             {/* Accent lines */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500" />
-            <div className="absolute bottom-0 left-0 w-full h-1 bg-yellow-400" />
+            <div className="absolute top-0 left-0 w-full h-1 bg-[#A31545]" />
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-[#FF6B35]" />
 
             <div className="relative">
               {/* Header section */}
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-12 gap-6">
                 <div className="flex items-center">
                   <div className="relative">
-                    <span className="inline-block w-1 h-12 bg-yellow-400 mr-6" />
+                    <span className="inline-block w-1 h-12 bg-[#FF6B35] mr-6" />
                   </div>
                   <div>
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-neutral-900 mb-2">
@@ -80,7 +80,7 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
 
                 {/* Featured session badge */}
                 <div className="inline-flex items-center px-4 py-2 bg-neutral-900 text-white text-sm font-bold">
-                  <div className="w-2 h-2 bg-yellow-400 rounded-full mr-3" />
+                  <div className="w-2 h-2 bg-[#FF6B35] rounded-full mr-3" />
                   {dictionary.sdoh?.speakers?.featuredSession || "Featured Event"}
                 </div>
               </div>
@@ -93,7 +93,7 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
                       {/* Moderator badge */}
                       {speaker.isModerator && (
                         <div className="absolute -top-3 -right-3 z-10">
-                          <div className="px-3 py-1 bg-yellow-400 text-neutral-900 text-xs font-black">
+                          <div className="px-3 py-1 bg-[#FF6B35] text-white text-xs font-black">
                             {dictionary.sdoh?.speakers?.moderator || "MODERATOR"}
                           </div>
                         </div>
@@ -102,7 +102,7 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
                       {/* Accent corner */}
                       <div
                         className={`absolute top-0 right-0 w-3 h-3 ${
-                          speaker.isModerator ? "bg-yellow-400" : "bg-cyan-500"
+                          speaker.isModerator ? "bg-[#FF6B35]" : "bg-[#A31545]"
                         }`}
                       />
 
@@ -144,7 +144,7 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
                           href={speaker.website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center text-sm text-neutral-900 hover:text-cyan-600 font-bold transition-colors duration-200"
+                          className="inline-flex items-center text-sm text-neutral-900 hover:text-[#A31545] font-bold transition-colors duration-200"
                         >
                           <span className="mr-2">{dictionary.sdoh?.speakers?.visitWebsite || "Visit Website"}</span>
                           <svg

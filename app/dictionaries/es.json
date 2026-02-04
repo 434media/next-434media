@@ -55,7 +55,48 @@
     "impact": {
       "question": "¿Qué puedo hacer para marcar la diferencia?",
       "message": "Si alguna vez te has preguntado, ",
-      "conclusion": " — aquí es donde comienzas."
+      "conclusion": "Aquí es donde comienzas.",
+      "tagline": "Cuando la conciencia impulsa la innovación, las comunidades prosperan.",
+      "year2Title": "Impacto del Año 2",
+      "guidingQuestion": "¿Qué pasaría si la conciencia misma pudiera transformar la salud en el sur de Texas?",
+      "year2Subtitle": "El Año 2 del Community Health Accelerator demostró que sí puede."
+    },
+    "pillars": {
+      "intro": "El Community Health Accelerator avanzó a través de tres etapas de crecimiento:",
+      "learn": {
+        "title": "APRENDER",
+        "subtitle": "Serie de Seminarios",
+        "tagline": "Conciencia a través de la educación"
+      },
+      "build": {
+        "title": "CONSTRUIR",
+        "subtitle": "Startup Bootcamp",
+        "tagline": "Ideas en innovación"
+      },
+      "sustain": {
+        "title": "SOSTENER",
+        "subtitle": "Community Health Accelerator",
+        "tagline": "Mentoría en impacto"
+      }
+    },
+    "acceleratorWinner": {
+      "badge": "GANADOR DEL ACELERADOR 2025",
+      "title": "Sobre InovCares",
+      "founderName": "Mohamed Kamara",
+      "founderRole": "CEO/Fundador",
+      "story": "La inspiración del fundador Mohamed Kamara para crear un recurso para la salud y el bienestar de la mujer durante toda su vida comenzó en Sierra Leona. Después de perder a su hermana durante el parto debido a una condición prevenible llamada preeclampsia, reconoció la necesidad global de educación y prevención consolidadas.",
+      "watchVideo": "Ver la Historia de Mo",
+      "quote": "Aplaudimos la audaz visión de InovCares y esperamos con ansias el cambio positivo que traerán a la salud y el bienestar de nuestras comunidades.",
+      "quoteAuthor": "Jaime Wesolowski",
+      "quoteRole": "Presidente y CEO de Methodist Healthcare Ministries of South Texas, Inc."
+    },
+    "impactReport": {
+      "eyebrow": "DESCARGAR",
+      "title": "Reporte de Impacto Año 2",
+      "subtitle": "Avanzando la Equidad en Salud a Través de la Educación, Conexión y Comunidad",
+      "description": "Descubre cómo el Community Health Accelerator transformó la conciencia en acción y las ideas en innovación durante el Año 2.",
+      "buttonText": "Descargar PDF del Reporte",
+      "partnership": "Una colaboración entre Methodist Healthcare Ministries y VelocityTX"
     },
     "languageToggle": {
       "en": "Inglés",

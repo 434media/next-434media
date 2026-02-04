@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { FadeIn } from "../FadeIn"
+import { SectionTransition } from "./SectionTransition"
 import SeminarSeries from "./SeminarSeries"
 import type { Locale } from "../../../i18n-config"
 import type { Dictionary } from "@/app/types/dictionary"
@@ -30,43 +31,46 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
   }
 
   return (
-    <section className="relative py-20 sm:py-28 lg:py-32 overflow-hidden bg-white">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-10">
-        <FadeIn>
-          {/* Hero SDOH Introduction */}
-          <div className="relative mb-16 sm:mb-20 lg:mb-24 text-center">
-            <div className="relative mb-6 sm:mb-8">
-              <h1 className="relative text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-none text-neutral-900">
-                {dict?.sdoh?.title || "¿Qué es SDOH?"}
-              </h1>
-              <div className="mt-4 mx-auto w-24 sm:w-32 h-1 bg-cyan-500"></div>
-            </div>
-
-            <div className="relative max-w-4xl mx-auto">
-              <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-neutral-600 font-medium leading-relaxed tracking-wide px-4">
-                {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
-              </p>
-            </div>
+    <SectionTransition variant="wave" colorScheme="magenta" maxWidth="5xl" className="py-20 sm:py-28 lg:py-32 bg-white">
+      <FadeIn>
+        {/* Hero SDOH Introduction - SVG Logo */}
+        <div className="relative mb-16 sm:mb-20 lg:mb-24 text-center px-4 sm:px-6 lg:px-8">
+          <div className="relative mb-6 sm:mb-8 max-w-md mx-auto">
+            <Image
+              src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+              alt={dict?.sdoh?.title || "¿Qué es SDOH?"}
+              width={400}
+              height={200}
+              className="w-full h-auto"
+              priority
+            />
           </div>
 
+          <div className="relative max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-neutral-500 leading-relaxed">
+              {dict?.sdoh?.subtitle || "(Or in plain terms: What the Heck is Social Determinants of Health?)"}
+            </p>
+          </div>
+        </div>
+
           {/* SDOH Definition Content */}
-          <div className="relative mb-16 sm:mb-20 lg:mb-24">
-            <div className="space-y-8 sm:space-y-12 max-w-5xl mx-auto">
-              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl leading-relaxed text-neutral-700 font-light text-center">
+          <div className="relative mb-16 sm:mb-20 lg:mb-24 px-4 sm:px-6 lg:px-8">
+            <div className="space-y-8 sm:space-y-10 max-w-4xl mx-auto">
+              <p className="text-lg sm:text-xl md:text-2xl leading-relaxed text-neutral-600 text-center">
                 {dict?.sdoh?.intro1 ||
                   "Most of what affects our health doesn't happen in a hospital—it happens in our everyday lives. Where we live, what we eat, how we get to work or school, whether we feel safe, supported, and seen... these things shape our health long before a doctor ever gets involved."}
               </p>
 
               <div className="relative">
-                <div className="relative p-6 sm:p-8 md:p-12 lg:p-16 border border-neutral-200 bg-neutral-50">
-                  <div className="absolute left-0 top-0 w-1 h-full bg-cyan-500"></div>
-                  <div className="absolute right-0 top-0 w-1 h-full bg-yellow-400"></div>
+                <div className="relative p-6 sm:p-8 md:p-10 border border-neutral-200 bg-neutral-50">
+                  <div className="absolute left-0 top-0 w-1 h-full bg-[#A31545]"></div>
+                  <div className="absolute right-0 top-0 w-1 h-full bg-[#FF6B35]"></div>
 
-                  <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl leading-relaxed text-neutral-700 font-light text-center tracking-tight">
+                  <p className="text-lg sm:text-xl md:text-2xl leading-relaxed text-neutral-700 text-center">
                     {locale === "es" ? (
                       <>
                         {dict?.sdoh?.intro2Part1 || "Eso es lo que son los"}{" "}
-                        <span className="font-bold text-cyan-600">
+                        <span className="font-bold text-[#A31545]">
                           {dict?.sdoh?.sdohFull || "Determinantes Sociales de la Salud (SDOH)"}
                         </span>{" "}
                         {dict?.sdoh?.intro2Part2 ||
@@ -75,7 +79,7 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
                     ) : (
                       <>
                         {dict?.sdoh?.intro2Part1 || "That's what"}{" "}
-                        <span className="font-bold text-cyan-600">
+                        <span className="font-bold text-[#A31545]">
                           {dict?.sdoh?.sdohFull || "Social Determinants of Health (SDOH)"}
                         </span>{" "}
                         {dict?.sdoh?.intro2Part2 ||
@@ -89,15 +93,15 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
           </div>
 
           {/* STRATEGIC PARTNERSHIP */}
-          <div className="relative mb-16 sm:mb-20 lg:mb-24">
+          <div className="relative mb-16 sm:mb-20 lg:mb-24 px-4 sm:px-6 lg:px-8">
             <div className="relative bg-white py-10 sm:py-12 lg:py-16 px-6 sm:px-8 lg:px-12 border border-neutral-200">
-              <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500"></div>
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-yellow-400"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-[#A31545]"></div>
+              <div className="absolute bottom-0 left-0 w-full h-1 bg-[#FF6B35]"></div>
 
               <div className="relative max-w-5xl mx-auto">
                 <div className="text-center mb-6 sm:mb-8">
                   <div className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-neutral-900 text-white text-sm sm:text-base font-bold tracking-wider">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full mr-2 sm:mr-3"></div>
+                    <div className="w-2 h-2 bg-[#FF6B35] rounded-full mr-2 sm:mr-3"></div>
                     {partnershipDict.label}
                   </div>
                 </div>
@@ -126,7 +130,7 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
 
                     <div className="flex lg:flex-col items-center gap-4">
                       <div className="w-16 lg:w-px h-px lg:h-16 bg-neutral-300"></div>
-                      <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
+                      <div className="w-4 h-4 bg-[#FF6B35] rounded-full"></div>
                       <div className="w-16 lg:w-px h-px lg:h-16 bg-neutral-300"></div>
                     </div>
 
@@ -154,19 +158,19 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
                       <>
                         En asociación con VelocityTX y Methodist Healthcare Ministries, el programa Community Health
                         Accelerator conecta educación, emprendimiento e innovación a través de{" "}
-                        <span className="font-bold text-cyan-600">tres componentes principales</span>.
+                        <span className="font-bold text-[#A31545]">tres componentes principales</span>.
                       </>
                     ) : (
                       <>
                         In partnership with VelocityTX and Methodist Healthcare Ministries, the Community Health
                         Accelerator program connects education, entrepreneurship, and innovation through{" "}
-                        <span className="font-bold text-cyan-600">three core components</span>.
+                        <span className="font-bold text-[#A31545]">three core components</span>.
                       </>
                     )}
                   </p>
 
                   <div className="inline-flex items-center px-5 py-2 bg-neutral-100 text-neutral-900 text-base font-medium border border-neutral-200">
-                    <div className="w-2 h-2 bg-cyan-500 rounded-full mr-2"></div>
+                    <div className="w-2 h-2 bg-[#A31545] rounded-full mr-2"></div>
                     {locale === "es" ? "Descubre cada componente a continuación" : "Discover each component below"}
                   </div>
                 </div>
@@ -175,9 +179,10 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
           </div>
 
           {/* Seminar Series Content - Component 1 */}
-          <SeminarSeries locale={locale} dict={dict} />
+          <div className="px-4 sm:px-6 lg:px-8">
+            <SeminarSeries locale={locale} dict={dict} />
+          </div>
         </FadeIn>
-      </div>
-    </section>
+    </SectionTransition>
   )
 }

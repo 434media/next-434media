@@ -11,7 +11,7 @@ interface SessionsSectionProps {
 export function SessionsSection({ dict }: SessionsSectionProps) {
   return (
     <section className="py-20 sm:py-28 lg:py-32 bg-white relative overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl relative z-10">
         <FadeIn>
           {/* Section header */}
           <div className="text-center mb-16 sm:mb-20">
@@ -19,7 +19,7 @@ export function SessionsSection({ dict }: SessionsSectionProps) {
               Seminar Highlights
             </h2>
             {/* Accent underline */}
-            <div className="mx-auto w-24 h-1 bg-cyan-500 mb-6" />
+            <div className="mx-auto w-24 h-1 bg-[#A31545] mb-6" />
             <p className="text-lg sm:text-xl md:text-2xl text-neutral-600 max-w-4xl mx-auto leading-relaxed font-light">
               Dive deep into the insights shared by our expert speakers
             </p>
