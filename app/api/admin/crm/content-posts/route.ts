@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       assets: body.assets || [],
       tags: body.tags || undefined,
       social_platforms: body.social_platforms || [],
+      comments: body.comments || [],
     }
 
     const post = await createContentPost(postData)
@@ -146,6 +147,7 @@ export async function PUT(request: NextRequest) {
       assets: body.assets,
       tags: body.tags,
       social_platforms: body.social_platforms,
+      comments: body.comments,
     }
 
     // Remove undefined values

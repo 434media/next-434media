@@ -144,7 +144,7 @@ export function ContentFormModal({
       )
       
       // Exclude certain names from tag options
-      const EXCLUDED_TAG_NAMES = ["Elon Musk", "Elton John", "Testing", "Guna", "Barbara", "Barbara Carreon", "Nichole Snow"]
+      const EXCLUDED_TAG_NAMES = ["Elon", "Elon Musk", "Elton", "Elton John", "Testing", "Guna", "Barbara", "Barbara Carreon", "Nichole", "Nichole Snow"]
       const excludedLower = new Set(EXCLUDED_TAG_NAMES.map(n => n.toLowerCase()))
       
       const allMembers = [...firestoreMembers, ...missingDefaults]
@@ -225,19 +225,20 @@ export function ContentFormModal({
     setFormData(prev => ({ ...prev, assets: prev.assets.filter((_, i) => i !== index) }))
   }
 
-  const handleLocalAddComment = () => {
+  const handleLocalAddComment = async () => {
     if (!newComment.trim() || !currentUser) return
     
-    // Extract mentions from comment
-    const mentionRegex = /@(\w+(?:\s+\w+)?)/g
+    // Extract mentions from comment (case-insensitive)
+    const mentionRegex = /@(\w+(?:\s+\w+)?)/gi
     const mentions: string[] = []
     let match: RegExpExecArray | null
     while ((match = mentionRegex.exec(newComment)) !== null) {
       const mentionName = match[1].toLowerCase()
-      const mentionedMember = teamMembers.find(m => 
-        m.name.toLowerCase() === mentionName ||
-        m.name.split(' ')[0].toLowerCase() === mentionName
-      )
+      const mentionedMember = teamMembers.find(m => {
+        const fullNameLower = m.name.toLowerCase()
+        const firstNameLower = m.name.split(' ')[0].toLowerCase()
+        return fullNameLower === mentionName || firstNameLower === mentionName
+      })
       if (mentionedMember && mentionedMember.email && !mentions.includes(mentionedMember.email)) {
         mentions.push(mentionedMember.email)
       }
@@ -259,6 +260,24 @@ export function ContentFormModal({
       comments: [...prev.comments, comment]
     }))
     setNewComment("")
+
+    // Send notifications to mentioned users
+    if (mentions.length > 0 && post?.id) {
+      fetch("/api/admin/crm/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          taskId: post.id,
+          taskTitle: formData.title || post.title || "Content Post",
+          comment,
+          mentionedEmails: mentions,
+          isContentPost: true,
+        }),
+      }).catch(err => {
+        console.error("Failed to send notifications:", err)
+      })
+    }
 
     // Also call the parent handler if provided (for API saving)
     if (onAddComment) {
