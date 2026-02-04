@@ -21,5 +21,9 @@ initBotId({
       path: '/api/contact-form',
       method: 'POST',
     },
+    {
+      path: '/api/sdoh-impact-report',
+      method: 'POST',
+    },
   ],
 });
