@@ -91,6 +91,22 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
     setHasError(false)
   }
 
+  const handleVideoCanPlayThrough = () => {
+    // Video can play through without buffering interruptions
+    setIsLoading(false)
+    setHasError(false)
+  }
+
+  const handleVideoWaiting = () => {
+    // Video is waiting for more data (buffering)
+    setIsLoading(true)
+  }
+
+  const handleVideoPlaying = () => {
+    // Video has started playing after buffering
+    setIsLoading(false)
+  }
+
   const handleVideoError = () => {
     setIsLoading(false)
     setHasError(true)
@@ -122,9 +138,26 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
     if (isPlaying) {
       videoRef.current.pause()
     } else {
-      videoRef.current.play().catch(() => {
-        setHasError(true)
-      })
+      // Show loading state immediately when attempting to play on mobile
+      setIsLoading(true)
+      const playPromise = videoRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Playback started successfully
+            setIsLoading(false)
+          })
+          .catch((error) => {
+            // Check if it's a user interaction requirement (mobile autoplay policy)
+            if (error.name === 'NotAllowedError') {
+              // Reset loading state, user needs to tap again
+              setIsLoading(false)
+            } else {
+              setIsLoading(false)
+              setHasError(true)
+            }
+          })
+      }
     }
   }
 
@@ -235,12 +268,12 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
             </div>
           )}
 
-          {/* Loading state - only for valid video sources */}
+          {/* Loading state - only for valid video sources, shows during initial load and buffering */}
           {hasValidVideoSrc && isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 z-10">
+            <div className={`absolute inset-0 flex items-center justify-center z-10 ${isPlaying ? 'bg-neutral-900/60' : 'bg-neutral-900'}`}>
               <div className="text-center">
                 <div className="w-12 h-12 border-2 border-[#A31545] border-t-transparent mx-auto mb-4 animate-spin"></div>
-                <p className="text-neutral-400 text-sm">Loading video...</p>
+                <p className="text-neutral-400 text-sm">{isPlaying ? 'Buffering...' : 'Loading video...'}</p>
               </div>
             </div>
           )}
@@ -279,8 +312,13 @@ export function VideoModal({ isOpen, onClose, videoSrc, title, description }: Vi
               src={videoSrc}
               controls={false}
               playsInline
-              preload="metadata"
+              webkit-playsinline="true"
+              x-webkit-airplay="allow"
+              preload="auto"
               onCanPlay={handleVideoCanPlay}
+              onCanPlayThrough={handleVideoCanPlayThrough}
+              onWaiting={handleVideoWaiting}
+              onPlaying={handleVideoPlaying}
               onError={handleVideoError}
               onPlay={handleVideoPlay}
               onPause={handleVideoPause}
