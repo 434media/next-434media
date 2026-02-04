@@ -1154,6 +1154,7 @@ export default function SalesCRMPage() {
             assets: postData.assets || [],
             tags: postData.tags,
             social_platforms: postData.social_platforms || [],
+            comments: postData.comments || [],
           }),
         })
         
@@ -2523,6 +2524,7 @@ export default function SalesCRMPage() {
         isOpen={showContentPostForm}
         post={editingContentPost}
         isSaving={isSavingContentPost}
+        currentUser={currentUser}
         onSave={handleSaveContentPost}
         onDelete={editingContentPost ? handleDeleteContentPost : undefined}
         onClose={() => {

@@ -303,6 +303,7 @@ export interface ContentPost {
   assets: string[]  // Array of asset URLs
   tags?: string  // Text field for tags
   social_platforms: SocialPlatform[]  // Which social platforms (IG, TikTok, etc.)
+  comments?: TaskComment[]  // Comments with tagging/notifications
   created_at: string
   updated_at: string
 }
