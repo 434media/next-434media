@@ -143,7 +143,12 @@ export function ContentFormModal({
         !firestoreNames.has(d.name.toLowerCase())
       )
       
+      // Exclude certain names from tag options
+      const EXCLUDED_TAG_NAMES = ["Elon Musk", "Elton John", "Testing", "Guna", "Barbara", "Barbara Carreon", "Nichole Snow"]
+      const excludedLower = new Set(EXCLUDED_TAG_NAMES.map(n => n.toLowerCase()))
+      
       const allMembers = [...firestoreMembers, ...missingDefaults]
+        .filter(m => !excludedLower.has(m.name.toLowerCase()))
       allMembers.sort((a, b) => a.name.localeCompare(b.name))
       
       setTeamMembers(allMembers)
