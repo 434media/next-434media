@@ -13,6 +13,7 @@ export interface Notification {
   message?: string
   created_at: string
   read: boolean
+  is_content_post?: boolean
 }
 
 interface NotificationContextType {

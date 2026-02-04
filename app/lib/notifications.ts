@@ -7,6 +7,7 @@ interface NotificationData {
   comment: TaskComment
   mentionedEmails: string[]
   taskUrl?: string
+  isContentPost?: boolean
 }
 
 interface AssignmentNotificationData {
@@ -44,7 +45,7 @@ function getCredentials(): ServiceAccountCredentials | null {
  * Uses domain-wide delegation to send emails as the notification sender
  */
 export async function sendCommentNotification(data: NotificationData): Promise<{ success: boolean; error?: string }> {
-  const { taskId, taskTitle, comment, mentionedEmails, taskUrl } = data
+  const { taskId, taskTitle, comment, mentionedEmails, taskUrl, isContentPost } = data
 
   if (!mentionedEmails.length) {
     return { success: true } // No one to notify
@@ -235,6 +236,7 @@ async function storeNotificationInFirestore(data: NotificationData): Promise<voi
           comment_preview: data.comment.content.substring(0, 100),
           created_at: new Date().toISOString(),
           read: false,
+          is_content_post: data.isContentPost || false,
         })
       })
     )

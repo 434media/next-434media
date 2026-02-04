@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       comment: body.comment,
       mentionedEmails: body.mentionedEmails,
       taskUrl: body.taskUrl,
+      isContentPost: body.isContentPost || false,
     })
 
     return NextResponse.json(result)

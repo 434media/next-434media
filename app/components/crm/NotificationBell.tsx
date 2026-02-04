@@ -7,9 +7,10 @@ import { useNotifications, type Notification } from "../../context/notification-
 
 interface NotificationBellProps {
   onOpenTask?: (taskId: string) => void
+  onOpenContentPost?: (postId: string) => void
 }
 
-export function NotificationBell({ onOpenTask }: NotificationBellProps) {
+export function NotificationBell({ onOpenTask, onOpenContentPost }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"new" | "history">("new")
   const panelRef = useRef<HTMLDivElement>(null)
@@ -41,8 +42,13 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
 
   // Handle notification click
   const handleNotificationClick = (notification: Notification) => {
-    if (onOpenTask && notification.task_id) {
-      onOpenTask(notification.task_id)
+    if (notification.task_id) {
+      // Check if this is a content post notification
+      if (notification.is_content_post && onOpenContentPost) {
+        onOpenContentPost(notification.task_id)
+      } else if (onOpenTask) {
+        onOpenTask(notification.task_id)
+      }
     }
     markAsRead([notification.id])
     setIsOpen(false)
@@ -81,23 +87,24 @@ export function NotificationBell({ onOpenTask }: NotificationBellProps) {
 
   // Get notification message
   const getNotificationMessage = (notification: Notification) => {
+    const itemType = notification.is_content_post ? "content post" : "task"
     switch (notification.type) {
       case "mention":
         return (
           <span>
-            <strong>{notification.comment_author}</strong> mentioned you in a comment
+            <strong>{notification.comment_author}</strong> mentioned you in a {itemType}
           </span>
         )
       case "assignment":
         return (
           <span>
-            <strong>{notification.assigned_by}</strong> assigned you to this task
+            <strong>{notification.assigned_by}</strong> assigned you to this {itemType}
           </span>
         )
       case "tagged":
         return (
           <span>
-            <strong>{notification.assigned_by}</strong> tagged you in this task
+            <strong>{notification.assigned_by}</strong> tagged you in this {itemType}
           </span>
         )
       default:

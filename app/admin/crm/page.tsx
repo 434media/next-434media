@@ -600,6 +600,34 @@ export default function SalesCRMPage() {
     }
   }
 
+  // Open content post from notification
+  const handleOpenContentPostFromNotification = async (postId: string) => {
+    // First, ensure content posts are loaded
+    if (contentPosts.length === 0) {
+      await loadContentPosts()
+    }
+    
+    // Find the content post
+    let post = contentPosts.find(p => p.id === postId)
+    
+    if (!post) {
+      // Reload and try again
+      await loadContentPosts()
+      post = contentPosts.find(p => p.id === postId)
+    }
+    
+    if (post) {
+      // Switch to social calendar view and open the post
+      setViewMode("social-calendar")
+      setEditingContentPost(post)
+      setShowContentPostForm(true)
+    } else {
+      // Still not found, switch to calendar view and show message
+      setViewMode("social-calendar")
+      setToast({ message: "Could not find the content post", type: "error" })
+    }
+  }
+
   // Delete task
   const handleDeleteTask = async () => {
     if (!selectedTask) return
@@ -2349,7 +2377,10 @@ export default function SalesCRMPage() {
             </Link>
           </div>
           {/* Notification Bell */}
-          <NotificationBell onOpenTask={handleOpenTaskFromNotification} />
+          <NotificationBell 
+            onOpenTask={handleOpenTaskFromNotification} 
+            onOpenContentPost={handleOpenContentPostFromNotification}
+          />
         </div>
 
         {/* Title */}
