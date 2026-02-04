@@ -143,12 +143,16 @@ export function ContentFormModal({
         !firestoreNames.has(d.name.toLowerCase())
       )
       
-      // Exclude certain names from tag options
-      const EXCLUDED_TAG_NAMES = ["Elon", "Elon Musk", "Elton", "Elton John", "Testing", "Guna", "Barbara", "Barbara Carreon", "Nichole", "Nichole Snow"]
-      const excludedLower = new Set(EXCLUDED_TAG_NAMES.map(n => n.toLowerCase()))
+      // Exclude certain names from tag options (check both full name AND first name)
+      const EXCLUDED_FIRST_NAMES = ["elon", "elton", "testing", "guna", "barbara", "nichole", "barb", "test"]
       
       const allMembers = [...firestoreMembers, ...missingDefaults]
-        .filter(m => !excludedLower.has(m.name.toLowerCase()))
+        .filter(m => {
+          const nameLower = m.name.toLowerCase()
+          const firstNameLower = m.name.split(' ')[0].toLowerCase()
+          // Exclude if first name matches any excluded name
+          return !EXCLUDED_FIRST_NAMES.includes(firstNameLower) && !EXCLUDED_FIRST_NAMES.includes(nameLower)
+        })
       allMembers.sort((a, b) => a.name.localeCompare(b.name))
       
       setTeamMembers(allMembers)
@@ -228,17 +232,25 @@ export function ContentFormModal({
   const handleLocalAddComment = async () => {
     if (!newComment.trim() || !currentUser) return
     
-    // Extract mentions from comment (case-insensitive)
-    const mentionRegex = /@(\w+(?:\s+\w+)?)/gi
+    // Extract mentions from comment (case-insensitive, supports multiple tags)
+    // Matches @word or @FirstName LastName patterns
+    const mentionRegex = /@([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/g
     const mentions: string[] = []
     let match: RegExpExecArray | null
+    
+    // Reset regex lastIndex to ensure we start from beginning
+    mentionRegex.lastIndex = 0
+    
     while ((match = mentionRegex.exec(newComment)) !== null) {
-      const mentionName = match[1].toLowerCase()
+      const mentionName = match[1].toLowerCase().trim()
+      
+      // Find team member by first name or full name (case-insensitive)
       const mentionedMember = teamMembers.find(m => {
         const fullNameLower = m.name.toLowerCase()
         const firstNameLower = m.name.split(' ')[0].toLowerCase()
         return fullNameLower === mentionName || firstNameLower === mentionName
       })
+      
       if (mentionedMember && mentionedMember.email && !mentions.includes(mentionedMember.email)) {
         mentions.push(mentionedMember.email)
       }
@@ -751,15 +763,19 @@ export function ContentFormModal({
                                 {comment.content}
                               </p>
                             )}
-                            {comment.mentions && comment.mentions.length > 0 && !editingCommentId && (
-                              <div className="flex gap-1 mt-2">
+                            {comment.mentions && comment.mentions.length > 0 && editingCommentId !== comment.id && (
+                              <div className="flex flex-wrap gap-1 mt-2">
                                 {comment.mentions.map((email) => {
-                                  const member = teamMembers.find(m => m.email === email)
+                                  const member = teamMembers.find(m => m.email?.toLowerCase() === email?.toLowerCase())
                                   return member ? (
                                     <span key={email} className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
-                                      @{member.name}
+                                      @{member.name.split(' ')[0].toLowerCase()}
                                     </span>
-                                  ) : null
+                                  ) : (
+                                    <span key={email} className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
+                                      @{email.split('@')[0]}
+                                    </span>
+                                  )
                                 })}
                               </div>
                             )}
@@ -801,23 +817,27 @@ export function ContentFormModal({
                       {/* Tag options helper */}
                       <div className="flex flex-wrap gap-1 mt-1.5 mb-2">
                         <span className="text-xs text-gray-400 mr-1">Tag:</span>
-                        {teamMembers.filter(m => m.isActive !== false).slice(0, 8).map((member) => (
+                        {teamMembers.filter(m => m.isActive !== false).slice(0, 8).map((member) => {
+                          const firstName = member.name.split(' ')[0].toLowerCase()
+                          return (
                           <button
                             key={member.id}
                             type="button"
                             onClick={() => {
-                              const tagText = `@${member.name} `
+                              // Use lowercase first name for easier typing
+                              const tagText = `@${firstName} `
                               const currentText = newComment
-                              if (!currentText.includes(`@${member.name}`)) {
+                              // Check if already tagged (case-insensitive)
+                              if (!currentText.toLowerCase().includes(`@${firstName}`)) {
                                 setNewComment(currentText + (currentText.endsWith(' ') || currentText === '' ? '' : ' ') + tagText)
                               }
                             }}
                             className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs transition-colors"
                             title={`Tag ${member.name}`}
                           >
-                            @{member.name.split(' ')[0]}
+                            @{firstName}
                           </button>
-                        ))}
+                        )})}
                       </div>
                       <div className="flex justify-between items-center">
                         <p className="text-xs text-gray-500">
