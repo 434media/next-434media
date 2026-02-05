@@ -33,7 +33,8 @@ import type { Brand, TeamMember, Disposition, DOC, Client } from "./types"
 
 interface ContactFormData {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   email: string
   phone: string
   role: string
@@ -446,7 +447,8 @@ export function OpportunityFormModal({
   const addContact = () => {
     const newContact: ContactFormData = {
       id: generateContactId(),
-      name: "",
+      first_name: "",
+      last_name: "",
       email: "",
       phone: "",
       role: "",
@@ -722,7 +724,8 @@ export function OpportunityFormModal({
                   <div className="space-y-2">
                     {formData.contacts.map((contact, index) => {
                       const isExpanded = expandedContacts.has(contact.id)
-                      const hasContent = contact.name || contact.email || contact.phone
+                      const fullName = [contact.first_name, contact.last_name].filter(Boolean).join(" ")
+                      const hasContent = fullName || contact.email || contact.phone
                       
                       return (
                         <div
@@ -742,7 +745,7 @@ export function OpportunityFormModal({
                               <div className="text-left">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-medium text-gray-900">
-                                    {contact.name || `Contact ${index + 1}`}
+                                    {fullName || `Contact ${index + 1}`}
                                   </span>
                                   {contact.is_primary && (
                                     <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-600 rounded">
@@ -788,15 +791,27 @@ export function OpportunityFormModal({
                                 className="overflow-hidden"
                               >
                                 <div className="p-3 pt-0 space-y-3 border-t border-gray-200">
-                                  <div className="pt-3">
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
-                                    <input
-                                      type="text"
-                                      value={contact.name}
-                                      onChange={(e) => updateContact(contact.id, "name", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                      placeholder="Contact name"
-                                    />
+                                  <div className="pt-3 grid grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
+                                      <input
+                                        type="text"
+                                        value={contact.first_name}
+                                        onChange={(e) => updateContact(contact.id, "first_name", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        placeholder="First name"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
+                                      <input
+                                        type="text"
+                                        value={contact.last_name}
+                                        onChange={(e) => updateContact(contact.id, "last_name", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        placeholder="Last name"
+                                      />
+                                    </div>
                                   </div>
                                   
                                   <div className="grid grid-cols-2 gap-3">

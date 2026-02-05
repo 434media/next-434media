@@ -95,11 +95,13 @@ export function ClientsView({
   const getPrimaryContact = (client: Client) => {
     if (client.contacts && client.contacts.length > 0) {
       const primary = client.contacts.find(c => c.is_primary) || client.contacts[0]
-      return primary
+      // Build full name from first_name + last_name
+      const fullName = [primary.first_name, primary.last_name].filter(Boolean).join(" ") || primary.name
+      return { ...primary, fullName }
     }
     // Fallback to legacy fields
     if (client.name || client.email || client.phone) {
-      return { name: client.name, email: client.email, phone: client.phone }
+      return { first_name: "", last_name: "", fullName: client.name, email: client.email, phone: client.phone }
     }
     return null
   }
@@ -209,8 +211,8 @@ export function ClientsView({
                         <div className="min-w-0 space-y-1">
                           {primaryContact ? (
                             <>
-                              {primaryContact.name && (
-                                <p className="text-sm font-medium text-gray-800 truncate">{primaryContact.name}</p>
+                              {primaryContact.fullName && (
+                                <p className="text-sm font-medium text-gray-800 truncate">{primaryContact.fullName}</p>
                               )}
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 {primaryContact.email && (

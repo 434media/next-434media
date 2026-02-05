@@ -87,7 +87,8 @@ export default function SalesCRMPage() {
     department: "",  // For large clients with multiple departments
     contacts: [] as Array<{
       id: string
-      name: string
+      first_name: string
+      last_name: string
       email: string
       phone: string
       role: string
@@ -117,7 +118,8 @@ export default function SalesCRMPage() {
     linked_company_id: null as string | null,     // Set when creating new opp linked to existing company
     contacts: [] as Array<{
       id: string
-      name: string
+      first_name: string
+      last_name: string
       email: string
       phone: string
       role: string
@@ -1659,16 +1661,18 @@ export default function SalesCRMPage() {
     try {
       // Get primary contact info for backwards compatibility
       const primaryContact = clientForm.contacts.find(c => c.is_primary) || clientForm.contacts[0]
+      const primaryFullName = primaryContact ? [primaryContact.first_name, primaryContact.last_name].filter(Boolean).join(" ") : ""
       
       // Convert form data to API format
       const clientData = {
-        name: primaryContact?.name || clientForm.company_name, // Fallback to company name
+        name: primaryFullName || clientForm.company_name, // Fallback to company name
         company_name: clientForm.company_name,
         email: primaryContact?.email || "",
         phone: primaryContact?.phone || "",
         contacts: clientForm.contacts.map(c => ({
           id: c.id,
-          name: c.name,
+          first_name: c.first_name,
+          last_name: c.last_name,
           email: c.email,
           phone: c.phone,
           role: c.role,
@@ -1745,17 +1749,19 @@ export default function SalesCRMPage() {
     try {
       // Get primary contact info for backwards compatibility
       const primaryContact = opportunityForm.contacts.find(c => c.is_primary) || opportunityForm.contacts[0]
+      const primaryFullName = primaryContact ? [primaryContact.first_name, primaryContact.last_name].filter(Boolean).join(" ") : ""
       
       // Build the opportunity data
       const opportunityData = {
-        name: primaryContact?.name || opportunityForm.company_name,
+        name: primaryFullName || opportunityForm.company_name,
         company_name: opportunityForm.company_name,
         title: opportunityForm.title || "",
         email: primaryContact?.email || "",
         phone: primaryContact?.phone || "",
         contacts: opportunityForm.contacts.map(c => ({
           id: c.id,
-          name: c.name,
+          first_name: c.first_name,
+          last_name: c.last_name,
           email: c.email,
           phone: c.phone,
           role: c.role,
@@ -1816,7 +1822,8 @@ export default function SalesCRMPage() {
         const existingContactMap = new Map<string, typeof existingContacts[0]>()
         existingContacts.forEach(c => {
           if (c.email) existingContactMap.set(c.email.toLowerCase(), c)
-          if (c.name) existingContactMap.set(c.name.toLowerCase(), c)
+          const fullName = [c.first_name, c.last_name].filter(Boolean).join(" ")
+          if (fullName) existingContactMap.set(fullName.toLowerCase(), c)
         })
 
         // Get the primary contact from the opportunity
@@ -1824,12 +1831,16 @@ export default function SalesCRMPage() {
         
         // Merge contacts: update existing ones and add new ones
         const mergedContacts = existingContacts.map(existingContact => {
+          // Build full names for comparison
+          const existingFullName = [existingContact.first_name, existingContact.last_name].filter(Boolean).join(" ")
+          
           // Check if this contact exists in the opportunity (by email or name)
           const matchingOppContact = opportunityForm.contacts.find(oppC => {
+            const oppFullName = [oppC.first_name, oppC.last_name].filter(Boolean).join(" ")
             const emailMatch = oppC.email && existingContact.email && 
                               oppC.email.toLowerCase() === existingContact.email.toLowerCase()
-            const nameMatch = oppC.name && existingContact.name &&
-                             oppC.name.toLowerCase() === existingContact.name.toLowerCase()
+            const nameMatch = oppFullName && existingFullName &&
+                             oppFullName.toLowerCase() === existingFullName.toLowerCase()
             return emailMatch || nameMatch
           })
 
@@ -1837,7 +1848,8 @@ export default function SalesCRMPage() {
             // Update existing contact with opportunity data, including is_primary
             return {
               ...existingContact,
-              name: matchingOppContact.name || existingContact.name,
+              first_name: matchingOppContact.first_name || existingContact.first_name,
+              last_name: matchingOppContact.last_name || existingContact.last_name,
               email: matchingOppContact.email || existingContact.email,
               phone: matchingOppContact.phone || existingContact.phone,
               role: matchingOppContact.role || existingContact.role,
@@ -1861,10 +1873,10 @@ export default function SalesCRMPage() {
         // Find new contacts that don't exist in the client yet
         const newContacts = opportunityForm.contacts.filter(oppC => {
           const emailLower = (oppC.email || "").toLowerCase()
-          const nameLower = (oppC.name || "").toLowerCase()
+          const oppFullName = [oppC.first_name, oppC.last_name].filter(Boolean).join(" ").toLowerCase()
           const emailExists = emailLower && existingContactMap.has(emailLower)
-          const nameExists = nameLower && existingContactMap.has(nameLower)
-          return !emailExists && !nameExists && (oppC.name || oppC.email)
+          const nameExists = oppFullName && existingContactMap.has(oppFullName)
+          return !emailExists && !nameExists && (oppC.first_name || oppC.last_name || oppC.email)
         })
 
         // Add new contacts
@@ -1872,7 +1884,8 @@ export default function SalesCRMPage() {
           ...mergedContacts,
           ...newContacts.map(c => ({
             id: c.id,
-            name: c.name,
+            first_name: c.first_name,
+            last_name: c.last_name,
             email: c.email,
             phone: c.phone,
             role: c.role,
@@ -1894,7 +1907,8 @@ export default function SalesCRMPage() {
         
         // Sync primary contact's name, email, phone to client's top-level fields
         if (primaryContact) {
-          updatePayload.name = primaryContact.name || relatedClient.name
+          const primaryFullName = [primaryContact.first_name, primaryContact.last_name].filter(Boolean).join(" ")
+          updatePayload.name = primaryFullName || relatedClient.name
           updatePayload.email = primaryContact.email || relatedClient.email
           updatePayload.phone = primaryContact.phone || relatedClient.phone
         }
@@ -2199,7 +2213,8 @@ export default function SalesCRMPage() {
     // First, build contacts array from existing data
     const contacts: Array<{
       id: string
-      name: string
+      first_name: string
+      last_name: string
       email: string
       phone: string
       role: string
@@ -2216,7 +2231,8 @@ export default function SalesCRMPage() {
       client.contacts.forEach(c => {
         contacts.push({
           id: c.id || `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          name: c.name || "",
+          first_name: c.first_name || "",
+          last_name: c.last_name || "",
           email: c.email || "",
           phone: c.phone || "",
           role: c.role || "",
@@ -2230,9 +2246,12 @@ export default function SalesCRMPage() {
       })
     } else if (client.name || client.email || client.phone) {
       // Legacy: convert single contact fields to contacts array
+      // Split name into first_name and last_name
+      const nameParts = (client.name || "").trim().split(/\s+/)
       contacts.push({
         id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: client.name || "",
+        first_name: nameParts[0] || "",
+        last_name: nameParts.slice(1).join(" ") || "",
         email: client.email || "",
         phone: client.phone || "",
         role: "",
@@ -2265,7 +2284,8 @@ export default function SalesCRMPage() {
     // Convert existing client data to opportunity form format
     const contacts: Array<{
       id: string
-      name: string
+      first_name: string
+      last_name: string
       email: string
       phone: string
       role: string
@@ -2282,7 +2302,8 @@ export default function SalesCRMPage() {
       client.contacts.forEach(c => {
         contacts.push({
           id: c.id || `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          name: c.name || "",
+          first_name: c.first_name || "",
+          last_name: c.last_name || "",
           email: c.email || "",
           phone: c.phone || "",
           role: c.role || "",
@@ -2296,9 +2317,12 @@ export default function SalesCRMPage() {
       })
     } else if (client.name || client.email || client.phone) {
       // Legacy: convert single contact fields to contacts array
+      // Split name into first_name and last_name
+      const nameParts = (client.name || "").trim().split(/\s+/)
       contacts.push({
         id: `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: client.name || "",
+        first_name: nameParts[0] || "",
+        last_name: nameParts.slice(1).join(" ") || "",
         email: client.email || "",
         phone: client.phone || "",
         role: "",

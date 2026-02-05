@@ -269,19 +269,34 @@ const CLIENTS_COLLECTION = "crm_clients"
 function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
   // Parse contacts array if it exists
   const rawContacts = rawData.contacts as Array<Record<string, unknown>> | undefined
-  const contacts = rawContacts?.map(c => ({
-    id: (c.id || `contact_${Date.now()}`) as string,
-    name: (c.name || "") as string,
-    email: (c.email || "") as string,
-    phone: (c.phone || "") as string,
-    role: (c.role || "") as string,
-    is_primary: (c.is_primary || false) as boolean,
-    address: (c.address || "") as string,
-    city: (c.city || "") as string,
-    state: (c.state || "") as string,
-    zipcode: (c.zipcode || "") as string,
-    date_of_birth: (c.date_of_birth || "") as string,
-  }))
+  const contacts = rawContacts?.map(c => {
+    // Handle migration: split name into first_name/last_name if only name exists
+    let firstName = (c.first_name || "") as string
+    let lastName = (c.last_name || "") as string
+    const legacyName = (c.name || "") as string
+    
+    // If we have a legacy name but no first_name/last_name, split it
+    if (legacyName && !firstName && !lastName) {
+      const nameParts = legacyName.trim().split(/\s+/)
+      firstName = nameParts[0] || ""
+      lastName = nameParts.slice(1).join(" ") || ""
+    }
+    
+    return {
+      id: (c.id || `contact_${Date.now()}`) as string,
+      first_name: firstName,
+      last_name: lastName,
+      email: (c.email || "") as string,
+      phone: (c.phone || "") as string,
+      role: (c.role || "") as string,
+      is_primary: (c.is_primary || false) as boolean,
+      address: (c.address || "") as string,
+      city: (c.city || "") as string,
+      state: (c.state || "") as string,
+      zipcode: (c.zipcode || "") as string,
+      date_of_birth: (c.date_of_birth || "") as string,
+    }
+  })
 
   // Build full name from first_name + last_name if available
   const firstName = (rawData.first_name || rawData.firstName || rawData["First Name"] || "") as string

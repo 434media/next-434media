@@ -60,7 +60,9 @@ export interface Opportunity {
 // Contact information for a client
 export interface ClientContact {
   id: string
-  name: string
+  first_name: string
+  last_name: string
+  name?: string  // For backwards compatibility - computed from first_name + last_name
   email?: string
   phone?: string
   role?: string
