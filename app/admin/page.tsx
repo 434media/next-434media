@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { useState, useEffect, useMemo } from "react"
-import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon, Mail } from "lucide-react"
+import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon, Mail, ClipboardList, FileText } from "lucide-react"
 import { AdminUserMenu } from "../components/AdminUserMenu"
 
 type AdminRole = 'full_admin' | 'crm_only'
@@ -87,6 +87,26 @@ const adminSections: AdminSection[] = [
     icon: <Mail className="w-6 h-6 sm:w-7 sm:h-7" />,
     size: "large",
     description: "Manage and export email signups from all 434 MEDIA websites and campaigns",
+    allowedRoles: ["full_admin"],
+  },
+  {
+    id: "project-management",
+    title: "PROJECT MANAGEMENT",
+    subtitle: "Events • Vendors • Speakers",
+    href: "/admin/project-management",
+    icon: <ClipboardList className="w-6 h-6 sm:w-7 sm:h-7" />,
+    size: "large",
+    description: "Manage project events, vendors, and speakers. Sync data from Airtable and track project details.",
+    allowedRoles: ["full_admin"],
+  },
+  {
+    id: "sops",
+    title: "STANDARD OPERATING PROCEDURES",
+    subtitle: "SOPs • Documentation • Processes",
+    href: "/admin/sops",
+    icon: <FileText className="w-6 h-6 sm:w-7 sm:h-7" />,
+    size: "large",
+    description: "Create, manage, and maintain standard operating procedures for team processes and workflows.",
     allowedRoles: ["full_admin"],
   },
 ]

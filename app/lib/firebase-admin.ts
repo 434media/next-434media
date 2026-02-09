@@ -116,6 +116,11 @@ export const COLLECTIONS = {
   CRM_SALES_REPS: "crm_sales_reps",
   CRM_BARB_PIE_CHART: "crm_barb_pie_chart",
   CRM_PIE_SLICES: "crm_pie_slices",
+  // Project Management Collections
+  PM_EVENTS: "pm_events",
+  PM_VENDORS: "pm_vendors",
+  PM_SPEAKERS: "pm_speakers",
+  PM_SOPS: "pm_sops",
 } as const
 
 // Map table names to Firestore collections
