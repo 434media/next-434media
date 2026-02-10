@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
-import { 
-  getEmailSignups, 
-  getEmailSources, 
-  getEmailCountsBySource,
-  emailSignupsToCSV,
-  deleteEmailSignup,
-} from "@/app/lib/firestore-email-signups"
+import {
+  getContactForms,
+  getContactFormSources,
+  getContactFormCountsBySource,
+  contactFormsToCSV,
+  deleteContactForm,
+  migrateContactFormsFromAirtable,
+} from "@/app/lib/firestore-contact-forms"
 
 // Check admin access
 async function requireAdmin() {
@@ -31,30 +32,29 @@ export async function GET(request: Request) {
     const action = searchParams.get("action")
     const source = searchParams.get("source")
     const format = searchParams.get("format")
-    const dataSource = searchParams.get("dataSource") || "firestore" // "firestore" or "airtable"
 
     // Get counts by source
     if (action === "counts") {
-      const counts = await getEmailCountsBySource()
+      const counts = await getContactFormCountsBySource()
       return NextResponse.json({ success: true, counts })
     }
 
     // Get available sources
     if (action === "sources") {
-      const sources = await getEmailSources()
+      const sources = await getContactFormSources()
       return NextResponse.json({ success: true, sources })
     }
 
-    // Get emails (with optional source filter)
+    // Get contact form submissions
     const filters = source ? { source } : undefined
-    const signups = await getEmailSignups(filters)
+    const submissions = await getContactForms(filters)
 
     // Return as CSV download
     if (format === "csv") {
-      const csv = emailSignupsToCSV(signups)
+      const csv = contactFormsToCSV(submissions)
       const filename = source
-        ? `email-signups-${source.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.csv`
-        : `email-signups-all-${new Date().toISOString().split("T")[0]}.csv`
+        ? `contact-forms-${source.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.csv`
+        : `contact-forms-all-${new Date().toISOString().split("T")[0]}.csv`
 
       return new NextResponse(csv, {
         headers: {
@@ -66,20 +66,19 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      signups,
-      total: signups.length,
-      dataSource: "firestore",
+      submissions,
+      total: submissions.length,
     })
   } catch (error) {
-    console.error("Error in email-lists API:", error)
+    console.error("Error in contact-forms API:", error)
     return NextResponse.json(
-      { success: false, error: "Failed to fetch email signups" },
+      { success: false, error: "Failed to fetch contact form submissions" },
       { status: 500 }
     )
   }
 }
 
-// POST - No longer needed (migrations complete, data lives in Firestore)
+// POST - Trigger migration from Airtable to Firestore
 export async function POST(request: Request) {
   try {
     const authResult = await requireAdmin()
@@ -87,23 +86,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
+    const body = await request.json()
+
+    if (body.action === "migrate") {
+      console.log("[Contact Form Migration] Starting Airtable → Firestore migration...")
+
+      const results = await migrateContactFormsFromAirtable()
+
+      return NextResponse.json({
+        success: true,
+        message: `Migration complete: ${results.migrated} forms migrated, ${results.skipped} skipped`,
+        results,
+      })
+    }
+
     return NextResponse.json(
-      { 
-        success: false, 
-        error: "Airtable migrations have been completed. All email data is now in Firestore." 
-      },
-      { status: 410 }
+      { error: "Invalid action. Use 'migrate'." },
+      { status: 400 }
     )
   } catch (error) {
-    console.error("Error in email-lists POST:", error)
+    console.error("Error in contact-forms migration:", error)
     return NextResponse.json(
-      { success: false, error: "Request failed" },
+      { success: false, error: "Migration failed" },
       { status: 500 }
     )
   }
 }
 
-// DELETE - Delete an email signup
+// DELETE - Delete a contact form submission
 export async function DELETE(request: Request) {
   try {
     const authResult = await requireAdmin()
@@ -116,28 +126,28 @@ export async function DELETE(request: Request) {
 
     if (!id || typeof id !== "string") {
       return NextResponse.json(
-        { error: "Email signup ID is required" },
+        { error: "Contact form submission ID is required" },
         { status: 400 }
       )
     }
 
-    const result = await deleteEmailSignup(id)
+    const result = await deleteContactForm(id)
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.error || "Failed to delete email" },
+        { success: false, error: result.error || "Failed to delete submission" },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       success: true,
-      message: "Email signup deleted successfully",
+      message: "Contact form submission deleted successfully",
     })
   } catch (error) {
-    console.error("Error deleting email signup:", error)
+    console.error("Error deleting contact form:", error)
     return NextResponse.json(
-      { success: false, error: "Failed to delete email signup" },
+      { success: false, error: "Failed to delete contact form submission" },
       { status: 500 }
     )
   }

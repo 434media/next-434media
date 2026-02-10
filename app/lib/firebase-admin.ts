@@ -129,6 +129,9 @@ export const COLLECTIONS = {
   PM_VENDORS: "pm_vendors",
   PM_SPEAKERS: "pm_speakers",
   PM_SOPS: "pm_sops",
+  // Contact Form & Email Collections
+  CONTACT_FORMS: "contact_forms",
+  EMAIL_SIGNUPS: "email_signups",
 } as const
 
 // Map table names to Firestore collections
