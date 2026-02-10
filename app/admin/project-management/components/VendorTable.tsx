@@ -456,19 +456,14 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                               <span className="font-semibold text-neutral-900 hover:underline block truncate">
                                 {vendor.name}
                               </span>
-                              {vendor.specialty && (
+                              {(vendor.company || vendor.specialty) && (
                                 <span className="text-xs text-neutral-400 truncate block max-w-45">
-                                  {vendor.specialty}
+                                  {[vendor.company, vendor.specialty].filter(Boolean).join(" · ")}
                                 </span>
                               )}
                             </div>
                           </div>
                         </button>
-                      </td>
-
-                      {/* Company */}
-                      <td className="px-4 py-3 text-neutral-600 truncate max-w-40">
-                        {vendor.company || "—"}
                       </td>
 
                       {/* Category */}

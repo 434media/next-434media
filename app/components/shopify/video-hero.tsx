@@ -172,7 +172,7 @@ export function VideoHero({
       x: custom * 160, // Spread horizontally (wider spacing)
       scale: 1,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         stiffness: 500, // Increased stiffness for snappier animation
         damping: 22, // Reduced damping for more responsive feel
         mass: 0.8, // Reduced mass for faster movement
@@ -223,7 +223,7 @@ export function VideoHero({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[100dvh] overflow-hidden bg-black"
+      className="relative w-full h-dvh overflow-hidden bg-black"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -275,7 +275,7 @@ export function VideoHero({
         )}
 
         {/* Overlay gradient for better text visibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/20 to-black/30 pointer-events-none"></div>
       </div>
 
       {/* Content Overlay */}
