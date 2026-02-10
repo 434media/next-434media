@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 import { Globe, MapPin, Users, ChevronDown } from "lucide-react"
 import type { InstagramDemographics } from "../../types/instagram-insights"
 

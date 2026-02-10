@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 import { Image, Video, Film, Megaphone, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import type { InstagramReachBreakdown } from "../../types/instagram-insights"
 

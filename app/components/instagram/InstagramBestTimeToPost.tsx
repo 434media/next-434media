@@ -1,6 +1,6 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion } from "motion/react"
 import { Clock, TrendingUp, Sparkles } from "lucide-react"
 import type { InstagramOnlineFollowers } from "../../types/instagram-insights"
 
