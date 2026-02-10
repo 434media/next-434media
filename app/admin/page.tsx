@@ -3,18 +3,31 @@
 import type React from "react"
 
 import Link from "next/link"
-import { useState, useEffect, useMemo } from "react"
-import { ChevronRight, ChevronLeft, PencilIcon, Calendar, RssIcon, RocketIcon, Mail, ClipboardList, FileText } from "lucide-react"
+import { useState, useEffect } from "react"
+import {
+  ChevronRight,
+  ChevronLeft,
+  PencilIcon,
+  Calendar,
+  RssIcon,
+  RocketIcon,
+  Mail,
+  ClipboardList,
+  FileText,
+  BarChart3,
+  Layers,
+  Settings,
+} from "lucide-react"
 import { AdminUserMenu } from "../components/AdminUserMenu"
 
-type AdminRole = 'full_admin' | 'crm_only'
+type AdminRole = "full_admin" | "crm_only"
 
 interface CurrentUser {
   email: string
   name: string
   picture?: string
   role?: AdminRole
-  authProvider?: 'google' | 'firebase'
+  authProvider?: "google" | "firebase"
 }
 
 interface AdminSection {
@@ -23,91 +36,125 @@ interface AdminSection {
   subtitle: string
   href: string
   icon: React.ReactNode
-  size: "large" | "medium" | "default"
   description: string
-  allowedRoles: AdminRole[]  // Which roles can see this section
+  allowedRoles: AdminRole[]
 }
 
-const adminSections: AdminSection[] = [
+interface SectionGroup {
+  id: string
+  label: string
+  icon: React.ReactNode
+  sections: AdminSection[]
+  allowedRoles: AdminRole[]
+}
+
+// Featured CRM card — always top priority
+const crmSection: AdminSection = {
+  id: "crm",
+  title: "PLATFORM CRM",
+  subtitle: "Opportunities • Tasks • Clients • Pipeline",
+  href: "/admin/crm",
+  icon: <RocketIcon className="w-7 h-7 sm:w-8 sm:h-8" />,
+  description:
+    "Manage client relationships, sales pipeline, platform opportunities, and team tasks",
+  allowedRoles: ["full_admin", "crm_only"],
+}
+
+// Grouped sections for full_admin users
+const sectionGroups: SectionGroup[] = [
   {
-    id: "crm",
-    title: "PLATFORM CRM",
-    subtitle: "Opportunities • Tasks • Clients • Pipeline",
-    href: "/admin/crm",
-    icon: <RocketIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Manage client relationships, sales pipeline, platform opportunities, and team tasks",
-    allowedRoles: ["full_admin", "crm_only"],
+    id: "content",
+    label: "Content & Publishing",
+    icon: <Layers className="w-4 h-4" />,
+    allowedRoles: ["full_admin"],
+    sections: [
+      {
+        id: "feed-form",
+        title: "CONTENT HUB",
+        subtitle: "The Feed • Culture Deck • 8 COUNT",
+        href: "/admin/feed-form",
+        icon: <RssIcon className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Manage and schedule content for The Feed, The Culture Deck, and The 8 COUNT",
+        allowedRoles: ["full_admin"],
+      },
+      {
+        id: "blog",
+        title: "BLOG",
+        subtitle: "Create, edit, and publish posts",
+        href: "/admin/blog",
+        icon: <PencilIcon className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Blog posts with rich text editing, images, and meta optimization",
+        allowedRoles: ["full_admin"],
+      },
+      {
+        id: "events",
+        title: "EVENTS CALENDAR",
+        subtitle: "AIM & 434 MEDIA events",
+        href: "/admin/events",
+        icon: <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Add events manually or import from Meetup, Eventbrite, and Lu.ma",
+        allowedRoles: ["full_admin"],
+      },
+    ],
   },
   {
-    id: "analytics-hub",
-    title: "ANALYTICS HUB",
-    subtitle: "Web • Instagram • Mailchimp • LinkedIn",
-    href: "/admin/analytics",
-    icon: <GA4Icon className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Unified dashboards for website traffic, social engagement, email campaigns, and LinkedIn performance metrics",
+    id: "analytics",
+    label: "Analytics & Insights",
+    icon: <BarChart3 className="w-4 h-4" />,
     allowedRoles: ["full_admin"],
+    sections: [
+      {
+        id: "analytics-hub",
+        title: "ANALYTICS HUB",
+        subtitle: "Web • Instagram • Mailchimp • LinkedIn",
+        href: "/admin/analytics",
+        icon: <GA4Icon className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Unified dashboards for website traffic, social engagement, email campaigns, and LinkedIn metrics",
+        allowedRoles: ["full_admin"],
+      },
+    ],
   },
   {
-    id: "feed-form",
-    title: "CONTENT MANAGEMENT HUB",
-    subtitle: "The Feed • Culture Deck • 8 COUNT",
-    href: "/admin/feed-form",
-    icon: <RssIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Manage and schedule content for The Feed (Digital Canvas), The Culture Deck (Vemos Vamos), and The 8 COUNT (TXMX Boxing) from a single interface.",
+    id: "operations",
+    label: "Operations & Admin",
+    icon: <Settings className="w-4 h-4" />,
     allowedRoles: ["full_admin"],
-  },
-  {
-    id: "blog",
-    title: "BLOG MANAGEMENT",
-    subtitle: "Create, edit, delete, and publish blog posts displayed on the 434 MEDIA blog page",
-    href: "/admin/blog",
-    icon: <PencilIcon className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Create and manage blog posts with rich text editing, images, and meta optimization",
-    allowedRoles: ["full_admin"],
-  },
-  {
-    id: "events",
-    title: "EVENTS CALENDAR HUB",
-    subtitle: "Manage the events listed on the AIM, and 434 MEDIA event pages",
-    href: "/admin/events",
-    icon: <Calendar className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Add events manually or import from Meetup, Eventbrite, and Lu.ma URLs",
-    allowedRoles: ["full_admin"],
-  },
-  {
-    id: "email-lists",
-    title: "EMAIL LISTS MANAGEMENT",
-    subtitle: "View and export email signups from all websites",
-    href: "/admin/email-lists",
-    icon: <Mail className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Manage and export email signups from all 434 MEDIA websites and campaigns",
-    allowedRoles: ["full_admin"],
-  },
-  {
-    id: "project-management",
-    title: "PROJECT MANAGEMENT",
-    subtitle: "Events • Vendors • Speakers",
-    href: "/admin/project-management",
-    icon: <ClipboardList className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Manage project events, vendors, and speakers. Sync data from Airtable and track project details.",
-    allowedRoles: ["full_admin"],
-  },
-  {
-    id: "sops",
-    title: "STANDARD OPERATING PROCEDURES",
-    subtitle: "SOPs • Documentation • Processes",
-    href: "/admin/sops",
-    icon: <FileText className="w-6 h-6 sm:w-7 sm:h-7" />,
-    size: "large",
-    description: "Create, manage, and maintain standard operating procedures for team processes and workflows.",
-    allowedRoles: ["full_admin"],
+    sections: [
+      {
+        id: "email-lists",
+        title: "EMAIL LISTS",
+        subtitle: "Signups from all websites",
+        href: "/admin/email-lists",
+        icon: <Mail className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "View, export, and manage email signups from all 434 MEDIA websites",
+        allowedRoles: ["full_admin"],
+      },
+      {
+        id: "project-management",
+        title: "PROJECT MANAGEMENT",
+        subtitle: "Events • Vendors • Speakers",
+        href: "/admin/project-management",
+        icon: <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Manage project events, vendors, and speakers with Airtable sync",
+        allowedRoles: ["full_admin"],
+      },
+      {
+        id: "sops",
+        title: "SOPs",
+        subtitle: "Processes & Documentation",
+        href: "/admin/sops",
+        icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Standard operating procedures for team workflows and processes",
+        allowedRoles: ["full_admin"],
+      },
+    ],
   },
 ]
 
@@ -142,67 +189,63 @@ export default function AdminPage() {
     }
   }
 
+  const userRole = currentUser?.role || "crm_only"
+  const isCrmOnly = userRole === "crm_only"
+
   if (!mounted) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <div className="text-neutral-600">Loading...</div>
+        <div className="text-neutral-400 text-sm font-medium tracking-wide">
+          Loading...
+        </div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pt-24 sm:pt-28 md:pt-24">
+      <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pt-24 sm:pt-28 md:pt-24">
         {/* Top Navigation */}
         <div className="flex items-center justify-between mb-10 md:mb-12">
-          {/* Back to Home */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors duration-200 text-base font-medium"
+            className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-neutral-700 transition-colors duration-200 text-sm font-medium tracking-wide"
           >
-            <ChevronLeft className="w-5 h-5" />
-            Back to Home
+            <ChevronLeft className="w-4 h-4" />
+            Home
           </Link>
 
-          {/* User Menu with Notifications */}
           {currentUser && (
-            <AdminUserMenu 
-              user={currentUser} 
+            <AdminUserMenu
+              user={currentUser}
               greeting={getGreeting()}
               onProfileUpdate={(updatedUser) => setCurrentUser(updatedUser)}
             />
           )}
         </div>
 
-        {/* Header Section */}
-        <div className="mb-10 md:mb-12">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-neutral-900 mb-3 tracking-tight leading-none">
+        {/* Header */}
+        <div className="mb-10 md:mb-14">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-neutral-900 tracking-tight leading-none mb-2">
             ADMIN PANEL
           </h1>
-          <p className="text-neutral-500 text-sm sm:text-base leading-relaxed max-w-2xl">
-            {currentUser?.role === 'crm_only' 
-              ? 'Access to CRM for managing opportunities, tasks, and client relationships'
-              : 'Access to 434 Analytics and Content Management for all channels in one place'
-            }
+          <p className="text-neutral-400 text-sm sm:text-[15px] leading-relaxed font-normal max-w-xl">
+            {isCrmOnly
+              ? "Access to CRM for managing opportunities, tasks, and client relationships"
+              : "Manage analytics, content, and operations across all 434 MEDIA channels"}
           </p>
         </div>
 
-        {/* Sections Grid - filtered by user role */}
-        <div className="grid gap-4 sm:gap-5 md:gap-6 grid-cols-1 sm:grid-cols-3">
-          {adminSections
-            .filter((section) => {
-              const userRole = currentUser?.role || 'crm_only'
-              return section.allowedRoles.includes(userRole)
-            })
-            .map((section) => (
+        {/* ── Featured: Platform CRM ── */}
+        {crmSection.allowedRoles.includes(userRole) && (
+          <div className="mb-10 md:mb-14">
             <Link
-              key={section.id}
-              href={section.href}
-              className="group relative block rounded-xl border border-neutral-200 bg-white p-5 sm:p-6 transition-all duration-200 hover:border-neutral-300 hover:shadow-md"
+              href={crmSection.href}
+              className="group relative block rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 transition-all duration-200 hover:border-neutral-300 hover:shadow-lg"
             >
-              {/* 434 Media Logo Background Pattern */}
+              {/* Background pattern */}
               <div
-                className="absolute inset-0 opacity-[0.02] rounded-xl"
+                className="absolute inset-0 opacity-[0.015] rounded-2xl pointer-events-none"
                 style={{
                   backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK.png')`,
                   backgroundSize: "48px 48px",
@@ -211,36 +254,92 @@ export default function AdminPage() {
                 }}
               />
 
-              {/* Content */}
-              <div className="relative z-10">
-                {/* Icon */}
-                <div className="text-neutral-700 mb-4">
-                  {section.icon}
+              <div className="relative z-10 flex items-start gap-5 sm:gap-6">
+                <div className="shrink-0 text-neutral-800 mt-0.5">
+                  {crmSection.icon}
                 </div>
-
-                {/* Title */}
-                <h3 className="font-ggx88 text-base sm:text-lg text-neutral-900 leading-tight tracking-wide mb-2">
-                  {section.title}
-                </h3>
-
-                {/* Subtitle */}
-                <p className="text-xs sm:text-sm text-neutral-500 font-medium leading-relaxed mb-3">
-                  {section.subtitle}
-                </p>
-
-                {/* Description */}
-                <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2">
-                  {section.description}
-                </p>
-
-                {/* Arrow indicator */}
-                <div className="absolute top-5 sm:top-6 right-5 sm:right-6 text-neutral-300 group-hover:text-neutral-500 transition-colors duration-200">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <h2 className="font-ggx88 text-lg sm:text-xl text-neutral-900 tracking-wide leading-tight">
+                      {crmSection.title}
+                    </h2>
+                  </div>
+                  <p className="text-sm text-neutral-500 font-medium leading-snug mb-2">
+                    {crmSection.subtitle}
+                  </p>
+                  <p className="text-xs sm:text-[13px] text-neutral-400 leading-relaxed font-normal">
+                    {crmSection.description}
+                  </p>
+                </div>
+                <div className="shrink-0 text-neutral-300 group-hover:text-neutral-500 transition-colors duration-200 mt-1">
                   <ChevronRight className="w-5 h-5" />
                 </div>
               </div>
             </Link>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* ── Grouped Sections (full_admin only) ── */}
+        {!isCrmOnly && (
+          <div className="space-y-10 md:space-y-14">
+            {sectionGroups
+              .filter((group) => group.allowedRoles.includes(userRole))
+              .map((group) => (
+                <section key={group.id}>
+                  {/* Category header */}
+                  <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                    <span className="text-neutral-400">{group.icon}</span>
+                    <h2 className="text-xs sm:text-[13px] font-semibold text-neutral-400 uppercase tracking-widest leading-none">
+                      {group.label}
+                    </h2>
+                  </div>
+
+                  {/* Section cards */}
+                  <div
+                    className={`grid gap-3 sm:gap-4 ${
+                      group.sections.length === 1
+                        ? "grid-cols-1"
+                        : group.sections.length === 2
+                        ? "grid-cols-1 sm:grid-cols-2"
+                        : "grid-cols-1 sm:grid-cols-3"
+                    }`}
+                  >
+                    {group.sections.map((section) => (
+                      <Link
+                        key={section.id}
+                        href={section.href}
+                        className="group relative block rounded-xl border border-neutral-200 bg-white p-5 sm:p-6 transition-all duration-200 hover:border-neutral-300 hover:shadow-md"
+                      >
+                        {/* Content */}
+                        <div className="relative z-10">
+                          <div className="flex items-start justify-between mb-3.5">
+                            <div className="text-neutral-600">
+                              {section.icon}
+                            </div>
+                            <div className="text-neutral-300 group-hover:text-neutral-500 transition-colors duration-200">
+                              <ChevronRight className="w-4 h-4" />
+                            </div>
+                          </div>
+
+                          <h3 className="font-ggx88 text-[15px] sm:text-base text-neutral-900 leading-tight tracking-wide mb-1.5">
+                            {section.title}
+                          </h3>
+
+                          <p className="text-xs sm:text-[13px] text-neutral-500 font-medium leading-snug mb-2.5">
+                            {section.subtitle}
+                          </p>
+
+                          <p className="text-[11px] sm:text-xs text-neutral-400 leading-relaxed font-normal line-clamp-2">
+                            {section.description}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              ))}
+          </div>
+        )}
       </div>
     </div>
   )
