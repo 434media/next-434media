@@ -22,6 +22,10 @@ import {
   Eye,
   X,
   Filter,
+  Star,
+  Paperclip,
+  FileText,
+  Tag,
 } from "lucide-react"
 import type { Vendor } from "../../../types/project-management-types"
 import { VENDOR_CATEGORIES } from "../../../types/project-management-types"
@@ -35,7 +39,7 @@ interface VendorTableProps {
   showToast: (message: string, type: "success" | "error" | "warning") => void
 }
 
-type SortField = "name" | "company" | "category" | "contract_status" | "rate" | "city"
+type SortField = "name" | "category" | "contract_status" | "rate" | "city" | "rating"
 type SortDir = "asc" | "desc"
 type ViewLayout = "table" | "grid"
 
@@ -80,11 +84,12 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
       filtered = filtered.filter(
         (v) =>
           v.name?.toLowerCase().includes(q) ||
-          v.company?.toLowerCase().includes(q) ||
           v.email?.toLowerCase().includes(q) ||
           v.city?.toLowerCase().includes(q) ||
           v.specialty?.toLowerCase().includes(q) ||
-          v.category?.toLowerCase().includes(q)
+          v.category?.toLowerCase().includes(q) ||
+          v.notes?.toLowerCase().includes(q) ||
+          v.research?.toLowerCase().includes(q)
       )
     }
 
@@ -108,10 +113,6 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
           aVal = a.name?.toLowerCase() || ""
           bVal = b.name?.toLowerCase() || ""
           break
-        case "company":
-          aVal = a.company?.toLowerCase() || ""
-          bVal = b.company?.toLowerCase() || ""
-          break
         case "category":
           aVal = a.category?.toLowerCase() || ""
           bVal = b.category?.toLowerCase() || ""
@@ -127,6 +128,10 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
         case "city":
           aVal = a.city?.toLowerCase() || ""
           bVal = b.city?.toLowerCase() || ""
+          break
+        case "rating":
+          aVal = a.rating ?? -1
+          bVal = b.rating ?? -1
           break
       }
 
@@ -211,7 +216,7 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
             <input
               type="text"
-              placeholder="Search vendors by name, company, email, city..."
+              placeholder="Search vendors by name, company, specialty, city..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
@@ -375,8 +380,7 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50">
                   {[
-                    { field: "name" as SortField, label: "Name" },
-                    { field: "company" as SortField, label: "Company" },
+                    { field: "name" as SortField, label: "Vendor" },
                     { field: "category" as SortField, label: "Category" },
                     { field: "contract_status" as SortField, label: "Status" },
                     { field: "city" as SortField, label: "Location" },
@@ -393,8 +397,20 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                       </span>
                     </th>
                   ))}
+                  <th
+                    onClick={() => toggleSort("rating")}
+                    className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer hover:text-neutral-900 select-none"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      Rating
+                      <SortIcon field="rating" />
+                    </span>
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                     Contact
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-neutral-500 uppercase tracking-wider w-16">
+                    Info
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-500 uppercase tracking-wider w-28">
                     Actions
@@ -404,7 +420,7 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
               <tbody className="divide-y divide-neutral-100">
                 {paginatedData.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center">
+                    <td colSpan={9} className="px-4 py-12 text-center">
                       <Building2 className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
                       <p className="text-neutral-500 font-medium">No vendors match your filters</p>
                       <p className="text-neutral-400 text-xs mt-1">Try adjusting your search or filters</p>
@@ -427,25 +443,32 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                               <img
                                 src={vendor.photo}
                                 alt={vendor.name}
-                                className="w-8 h-8 rounded-full object-cover border border-neutral-200 flex-shrink-0"
+                                className="w-8 h-8 rounded-full object-cover border border-neutral-200 shrink-0"
                               />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center flex-shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-neutral-400">
                                   {vendor.name?.charAt(0) || "V"}
                                 </span>
                               </div>
                             )}
-                            <span className="font-semibold text-neutral-900 hover:underline">
-                              {vendor.name}
-                            </span>
+                            <div className="min-w-0">
+                              <span className="font-semibold text-neutral-900 hover:underline block truncate">
+                                {vendor.name}
+                              </span>
+                              {vendor.specialty && (
+                                <span className="text-xs text-neutral-400 truncate block max-w-45">
+                                  {vendor.specialty}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </button>
                       </td>
 
                       {/* Company */}
-                      <td className="px-4 py-3 text-neutral-600 truncate max-w-[160px]">
-                        {vendor.company && vendor.company !== vendor.name ? vendor.company : "—"}
+                      <td className="px-4 py-3 text-neutral-600 truncate max-w-40">
+                        {vendor.company || "—"}
                       </td>
 
                       {/* Category */}
@@ -467,7 +490,7 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                       </td>
 
                       {/* Location */}
-                      <td className="px-4 py-3 text-neutral-600 truncate max-w-[140px]">
+                      <td className="px-4 py-3 text-neutral-600 truncate max-w-35">
                         {[vendor.city, vendor.state].filter(Boolean).join(", ") || "—"}
                       </td>
 
@@ -477,6 +500,18 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                           <span className="font-semibold text-neutral-900">
                             ${vendor.rate}
                             <span className="text-neutral-400 font-normal">/{vendor.rate_type || "hr"}</span>
+                          </span>
+                        ) : (
+                          <span className="text-neutral-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Rating */}
+                      <td className="px-4 py-3">
+                        {vendor.rating !== undefined && vendor.rating !== null ? (
+                          <span className="inline-flex items-center gap-1 text-sm">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            <span className="font-medium text-neutral-700">{vendor.rating}</span>
                           </span>
                         ) : (
                           <span className="text-neutral-300">—</span>
@@ -500,6 +535,23 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                             <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="p-1 text-neutral-400 hover:text-neutral-700 rounded transition-colors" title={vendor.website}>
                               <Globe className="w-3.5 h-3.5" />
                             </a>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Info indicators */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          {vendor.attachments && vendor.attachments.length > 0 && (
+                            <span className="inline-flex items-center gap-0.5 p-1 text-neutral-400" title={`${vendor.attachments.length} attachment${vendor.attachments.length > 1 ? "s" : ""}`}>
+                              <Paperclip className="w-3.5 h-3.5" />
+                              <span className="text-[10px] font-medium">{vendor.attachments.length}</span>
+                            </span>
+                          )}
+                          {(vendor.notes || vendor.research) && (
+                            <span className="p-1 text-neutral-400" title={vendor.notes ? "Has notes" : "Has research"}>
+                              <FileText className="w-3.5 h-3.5" />
+                            </span>
                           )}
                         </div>
                       </td>
@@ -560,10 +612,10 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                         <img
                           src={vendor.photo}
                           alt={vendor.name}
-                          className="w-10 h-10 rounded-full object-cover border border-neutral-200 flex-shrink-0"
+                          className="w-10 h-10 rounded-full object-cover border border-neutral-200 shrink-0"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center shrink-0">
                           <span className="text-sm font-bold text-neutral-400">
                             {vendor.name?.charAt(0) || "V"}
                           </span>
@@ -578,11 +630,16 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                             {vendor.name}
                           </h3>
                         </button>
-                        {vendor.company && vendor.company !== vendor.name && (
-                          <p className="text-xs text-neutral-500 truncate">{vendor.company}</p>
-                        )}
                       </div>
                     </div>
+
+                    {/* Specialty */}
+                    {vendor.specialty && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <Tag className="w-3 h-3 text-neutral-300 shrink-0" />
+                        <p className="text-xs text-neutral-500 truncate">{vendor.specialty}</p>
+                      </div>
+                    )}
 
                     {/* Badges */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -592,6 +649,12 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                       {vendor.contract_status && (
                         <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${getContractStatusColor(vendor.contract_status)}`}>
                           {vendor.contract_status}
+                        </span>
+                      )}
+                      {vendor.rating !== undefined && vendor.rating !== null && (
+                        <span className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded-full">
+                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                          {vendor.rating}
                         </span>
                       )}
                     </div>
@@ -628,6 +691,18 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                         <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors">
                           <Globe className="w-3.5 h-3.5" />
                         </a>
+                      )}
+                      {/* Info indicators */}
+                      {vendor.attachments && vendor.attachments.length > 0 && (
+                        <span className="inline-flex items-center gap-0.5 p-1 text-neutral-300" title={`${vendor.attachments.length} attachment${vendor.attachments.length > 1 ? "s" : ""}`}>
+                          <Paperclip className="w-3 h-3" />
+                          <span className="text-[10px]">{vendor.attachments.length}</span>
+                        </span>
+                      )}
+                      {(vendor.notes || vendor.research) && (
+                        <span className="p-1 text-neutral-300" title="Has notes">
+                          <FileText className="w-3 h-3" />
+                        </span>
                       )}
                       <div className="flex-1" />
                       <button

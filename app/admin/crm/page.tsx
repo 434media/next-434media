@@ -2698,15 +2698,15 @@ export default function SalesCRMPage() {
           {/* Panel */}
           <div className="relative w-full max-w-md h-full bg-white shadow-2xl pointer-events-auto overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-sky-50 to-cyan-50">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-linear-to-r from-sky-50 to-cyan-50">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-sky-100 to-cyan-100 rounded-lg">
+                <div className="p-2 bg-linear-to-br from-sky-100 to-cyan-100 rounded-lg">
                   <Target className="w-5 h-5 text-sky-600" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Linked Items</h3>
                   {currentOpportunityForLinked && (
-                    <p className="text-sm text-gray-500 truncate max-w-[250px]">
+                    <p className="text-sm text-gray-500 truncate max-w-62.5">
                       {currentOpportunityForLinked.title || currentOpportunityForLinked.company_name}
                     </p>
                   )}
@@ -2768,7 +2768,7 @@ export default function SalesCRMPage() {
                           </p>
                         )}
                       </div>
-                      <svg className="w-5 h-5 text-blue-300 group-hover:text-blue-500 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-blue-300 group-hover:text-blue-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
@@ -2839,7 +2839,7 @@ export default function SalesCRMPage() {
                               </p>
                             )}
                           </div>
-                          <svg className="w-5 h-5 text-gray-300 group-hover:text-teal-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-gray-300 group-hover:text-teal-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </div>

@@ -60,15 +60,28 @@ function mapFirestoreToPMEvent(doc: admin.firestore.DocumentSnapshot): PMEvent {
     airtable_id: data.airtable_id,
     name: data.name || "",
     date: data.date || "",
+    start_date: data.start_date,
+    end_date: data.end_date,
     start_time: data.start_time,
     end_time: data.end_time,
     location: data.location,
     venue_name: data.venue_name,
+    venue_location: data.venue_location,
     venue_address: data.venue_address,
+    venue_map_link: data.venue_map_link,
     description: data.description,
+    agenda_overview: data.agenda_overview,
     status: data.status || "planning",
     budget: data.budget,
     actual_cost: data.actual_cost,
+    actual_expenses: data.actual_expenses,
+    estimated_expenses: data.estimated_expenses,
+    on_budget: data.on_budget,
+    days_to_go: data.days_to_go,
+    month: data.month,
+    photo_banner: data.photo_banner,
+    img_ai: data.img_ai,
+    website_url: data.website_url,
     notes: data.notes,
     vendor_ids: data.vendor_ids,
     speaker_ids: data.speaker_ids,
@@ -156,10 +169,13 @@ export async function updatePMEventInFirestore(
 
     const { id: _, created_at: __, ...updateData } = updates
 
-    await db.collection(PM_COLLECTIONS.PM_EVENTS).doc(id).update({
+    // Use set with merge to create-or-update (prevents NOT_FOUND errors
+    // when data was loaded from Airtable but not yet synced to Firestore)
+    await db.collection(PM_COLLECTIONS.PM_EVENTS).doc(id).set({
       ...updateData,
       updated_at: now,
-    })
+      created_at: __ || now,
+    }, { merge: true })
 
     invalidatePMCache()
 
@@ -204,10 +220,14 @@ function mapFirestoreToVendor(doc: admin.firestore.DocumentSnapshot): Vendor {
     category: data.category || "Other",
     specialty: data.specialty,
     website: data.website,
+    link_url: data.link_url,
     address: data.address,
     city: data.city,
     state: data.state,
     zip: data.zip,
+    photo: data.photo,
+    social_media: data.social_media,
+    research: data.research,
     rate: data.rate,
     rate_type: data.rate_type,
     contract_status: data.contract_status,
@@ -299,10 +319,10 @@ export async function updateVendorInFirestore(
 
     const { id: _, created_at: __, ...updateData } = updates
 
-    await db.collection(PM_COLLECTIONS.PM_VENDORS).doc(id).update({
+    await db.collection(PM_COLLECTIONS.PM_VENDORS).doc(id).set({
       ...updateData,
       updated_at: now,
-    })
+    }, { merge: true })
 
     invalidatePMCache()
 
@@ -441,10 +461,10 @@ export async function updateSpeakerInFirestore(
 
     const { id: _, created_at: __, ...updateData } = updates
 
-    await db.collection(PM_COLLECTIONS.PM_SPEAKERS).doc(id).update({
+    await db.collection(PM_COLLECTIONS.PM_SPEAKERS).doc(id).set({
       ...updateData,
       updated_at: now,
-    })
+    }, { merge: true })
 
     invalidatePMCache()
 
@@ -580,10 +600,10 @@ export async function updateSOPInFirestore(
 
     const { id: _, created_at: __, ...updateData } = updates
 
-    await db.collection(PM_COLLECTIONS.PM_SOPS).doc(id).update({
+    await db.collection(PM_COLLECTIONS.PM_SOPS).doc(id).set({
       ...updateData,
       updated_at: now,
-    })
+    }, { merge: true })
 
     invalidatePMCache()
 

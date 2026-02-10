@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { X, Loader2 } from "lucide-react"
-import type { Vendor } from "../../../types/project-management-types"
+import { X, Loader2, Trash2, Paperclip, Upload } from "lucide-react"
+import { upload } from "@vercel/blob/client"
+import type { Vendor, VendorAttachment } from "../../../types/project-management-types"
 import { VENDOR_CATEGORIES } from "../../../types/project-management-types"
+import { ImageUpload } from "../../../components/ImageUpload"
 
 interface VendorFormModalProps {
   isOpen: boolean
@@ -24,12 +26,14 @@ const emptyForm = {
   category: "Other",
   specialty: "",
   website: "",
+  link_url: "",
   address: "",
   city: "",
   state: "",
   zip: "",
   photo: "",
   social_media: "",
+  research: "",
   rate: "",
   rate_type: "hourly" as typeof RATE_TYPES[number],
   contract_status: "" as string,
@@ -39,8 +43,11 @@ const emptyForm = {
 
 export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: VendorFormModalProps) {
   const [form, setForm] = useState(emptyForm)
+  const [attachments, setAttachments] = useState<VendorAttachment[]>([])
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
 
   const isEditing = !!vendor
 
@@ -54,20 +61,24 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
         category: vendor.category || "Other",
         specialty: vendor.specialty || "",
         website: vendor.website || "",
+        link_url: vendor.link_url || "",
         address: vendor.address || "",
         city: vendor.city || "",
         state: vendor.state || "",
         zip: vendor.zip || "",
         photo: vendor.photo || "",
         social_media: vendor.social_media || "",
+        research: vendor.research || "",
         rate: vendor.rate?.toString() || "",
         rate_type: (vendor.rate_type || "hourly") as typeof RATE_TYPES[number],
         contract_status: vendor.contract_status || "",
         notes: vendor.notes || "",
         rating: vendor.rating?.toString() || "",
       })
+      setAttachments(vendor.attachments || [])
     } else {
       setForm(emptyForm)
+      setAttachments([])
     }
     setErrors({})
   }, [vendor, isOpen])
@@ -91,23 +102,26 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
       const data: Partial<Vendor> = {
         ...(isEditing && vendor ? { id: vendor.id } : {}),
         name: form.name.trim(),
-        company: form.company.trim() || undefined,
+        company: form.name.trim(),
         email: form.email.trim() || undefined,
         phone: form.phone.trim() || undefined,
         category: form.category,
         specialty: form.specialty.trim() || undefined,
         website: form.website.trim() || undefined,
+        link_url: form.link_url.trim() || undefined,
         address: form.address.trim() || undefined,
         city: form.city.trim() || undefined,
         state: form.state.trim() || undefined,
         zip: form.zip.trim() || undefined,
         photo: form.photo.trim() || undefined,
         social_media: form.social_media.trim() || undefined,
+        research: form.research.trim() || undefined,
         rate: form.rate ? Number(form.rate) : undefined,
         rate_type: form.rate ? (form.rate_type as Vendor["rate_type"]) : undefined,
         contract_status: form.contract_status ? (form.contract_status as Vendor["contract_status"]) : undefined,
         notes: form.notes.trim() || undefined,
         rating: form.rating ? Number(form.rating) : undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
       }
       await onSave(data)
     } catch {
@@ -129,9 +143,45 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
   }
 
   const inputClass = (field: string) =>
-    `w-full px-3 py-2 text-sm bg-neutral-50 border rounded-lg text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-400 ${
+    `w-full px-3 py-2.5 text-sm bg-white border rounded-lg text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-400 transition-colors ${
       errors[field] ? "border-red-300 focus:ring-red-100 focus:border-red-400" : "border-neutral-200"
     }`
+
+  const labelClass = "block text-sm font-medium text-neutral-700 mb-1.5"
+
+  const handleAttachmentUpload = useCallback(
+    async (file: File) => {
+      if (file.size > 25 * 1024 * 1024) {
+        alert("File size must be less than 25MB")
+        return
+      }
+      setUploadingAttachment(true)
+      try {
+        const timestamp = Date.now()
+        const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+        const filename = `vendor-attachments/${timestamp}-${originalName}`
+        const blob = await upload(filename, file, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        })
+        setAttachments((prev) => [
+          ...prev,
+          { url: blob.url, filename: file.name, type: file.type || "application/octet-stream" },
+        ])
+      } catch (error) {
+        console.error("Attachment upload error:", error)
+        alert("Failed to upload attachment")
+      } finally {
+        setUploadingAttachment(false)
+        if (attachmentInputRef.current) attachmentInputRef.current.value = ""
+      }
+    },
+    []
+  )
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
 
   return (
     <AnimatePresence>
@@ -148,60 +198,61 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-neutral-200">
-              <div>
-                <div className="w-8 h-1 bg-yellow-400 mb-2" />
-                <h2 className="text-xl font-bold text-neutral-900">
-                  {isEditing ? "Edit Vendor" : "Add New Vendor"}
-                </h2>
-                <p className="text-sm text-neutral-500 mt-0.5">
-                  {isEditing ? `Editing ${vendor?.name}` : "Fill in vendor details below"}
-                </p>
+            <div className="sticky top-0 z-10 bg-white border-b border-neutral-200 px-6 py-5 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="w-8 h-1 bg-yellow-400 mb-2" />
+                  <h2 className="text-xl font-bold text-neutral-900">
+                    {isEditing ? "Edit Vendor" : "Add New Vendor"}
+                  </h2>
+                  <p className="text-sm text-neutral-500 mt-0.5">
+                    {isEditing ? `Editing ${vendor?.name}` : "Fill in vendor details below"}
+                  </p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <form onSubmit={handleSubmit} className="p-6 space-y-8">
+              {/* Vendor Photo */}
+              <ImageUpload
+                value={form.photo}
+                onChange={(url) => updateField("photo", url)}
+                label="Vendor Photo"
+                accept="image/*,.gif"
+                maxSize={10}
+              />
+
               {/* Basic Info */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
                   Basic Information
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">
-                      Name <span className="text-red-500">*</span>
+                  <div className="sm:col-span-2">
+                    <label className={labelClass}>
+                      Company / Vendor Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.name}
                       onChange={(e) => updateField("name", e.target.value)}
-                      placeholder="Vendor name"
+                      placeholder="Company or vendor name"
                       className={inputClass("name")}
                     />
                     {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Company</label>
-                    <input
-                      type="text"
-                      value={form.company}
-                      onChange={(e) => updateField("company", e.target.value)}
-                      placeholder="Company name"
-                      className={inputClass("company")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Category</label>
+                    <label className={labelClass}>Category</label>
                     <select
                       value={form.category}
                       onChange={(e) => updateField("category", e.target.value)}
@@ -213,7 +264,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Specialty</label>
+                    <label className={labelClass}>Specialty</label>
                     <input
                       type="text"
                       value={form.specialty}
@@ -227,12 +278,12 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Contact */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
                   Contact Information
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Email</label>
+                    <label className={labelClass}>Email</label>
                     <input
                       type="email"
                       value={form.email}
@@ -243,7 +294,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Phone</label>
+                    <label className={labelClass}>Phone</label>
                     <input
                       type="tel"
                       value={form.phone}
@@ -253,7 +304,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Website</label>
+                    <label className={labelClass}>Website</label>
                     <input
                       type="url"
                       value={form.website}
@@ -263,7 +314,17 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Social Media</label>
+                    <label className={labelClass}>Link URL</label>
+                    <input
+                      type="url"
+                      value={form.link_url}
+                      onChange={(e) => updateField("link_url", e.target.value)}
+                      placeholder="https://portfolio.com"
+                      className={inputClass("link_url")}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Social Media</label>
                     <input
                       type="text"
                       value={form.social_media}
@@ -277,12 +338,12 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Location */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
                   Location
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Address</label>
+                    <label className={labelClass}>Address</label>
                     <input
                       type="text"
                       value={form.address}
@@ -292,7 +353,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
+                    <label className={labelClass}>City</label>
                     <input
                       type="text"
                       value={form.city}
@@ -303,7 +364,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
+                      <label className={labelClass}>State</label>
                       <input
                         type="text"
                         value={form.state}
@@ -313,7 +374,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
+                      <label className={labelClass}>ZIP</label>
                       <input
                         type="text"
                         value={form.zip}
@@ -328,12 +389,12 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Rate & Status */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
                   Rate & Status
                 </legend>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Rate ($)</label>
+                    <label className={labelClass}>Rate ($)</label>
                     <input
                       type="text"
                       value={form.rate}
@@ -344,7 +405,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     {errors.rate && <p className="text-xs text-red-500 mt-1">{errors.rate}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Rate Type</label>
+                    <label className={labelClass}>Rate Type</label>
                     <select
                       value={form.rate_type}
                       onChange={(e) => updateField("rate_type", e.target.value)}
@@ -356,7 +417,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Contract Status</label>
+                    <label className={labelClass}>Status</label>
                     <select
                       value={form.contract_status}
                       onChange={(e) => updateField("contract_status", e.target.value)}
@@ -368,28 +429,9 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                       ))}
                     </select>
                   </div>
-                </div>
-              </fieldset>
-
-              {/* Additional */}
-              <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-                  Additional
-                </legend>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Photo URL</label>
-                    <input
-                      type="url"
-                      value={form.photo}
-                      onChange={(e) => updateField("photo", e.target.value)}
-                      placeholder="https://..."
-                      className={inputClass("photo")}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">
-                      Rating <span className="text-neutral-400">(0-5)</span>
+                    <label className={labelClass}>
+                      Rating <span className="text-neutral-400 font-normal">(0-5)</span>
                     </label>
                     <input
                       type="text"
@@ -400,8 +442,27 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     />
                     {errors.rating && <p className="text-xs text-red-500 mt-1">{errors.rating}</p>}
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
+                </div>
+              </fieldset>
+
+              {/* Research & Notes */}
+              <fieldset>
+                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                  Additional Details
+                </legend>
+                <div className="space-y-4">
+                  <div>
+                    <label className={labelClass}>Research</label>
+                    <textarea
+                      value={form.research}
+                      onChange={(e) => updateField("research", e.target.value)}
+                      placeholder="Research notes, background info, references..."
+                      rows={3}
+                      className={inputClass("research") + " resize-none"}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Notes</label>
                     <textarea
                       value={form.notes}
                       onChange={(e) => updateField("notes", e.target.value)}
@@ -413,19 +474,90 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                 </div>
               </fieldset>
 
+              {/* Attachments */}
+              <fieldset>
+                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                  Attachments
+                </legend>
+                <div className="space-y-3">
+                  {attachments.length > 0 && (
+                    <div className="space-y-2">
+                      {attachments.map((att, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg group"
+                        >
+                          <Paperclip className="w-4 h-4 text-neutral-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <a
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-neutral-700 hover:text-blue-600 truncate block"
+                            >
+                              {att.filename || "Attachment"}
+                            </a>
+                            {att.type && (
+                              <span className="text-xs text-neutral-400">{att.type}</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(idx)}
+                            className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (file) await handleAttachmentUpload(file)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={uploadingAttachment}
+                    onClick={() => attachmentInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-neutral-600 bg-white border-2 border-dashed border-neutral-300 rounded-lg hover:border-neutral-400 hover:bg-neutral-50 transition-colors w-full justify-center"
+                  >
+                    {uploadingAttachment ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Add Attachment
+                        <span className="text-xs text-neutral-400 ml-1">(PDF, DOC, images, up to 25MB)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </fieldset>
+
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
+              <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-200">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-colors"
+                  className="px-5 py-2.5 text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                  className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isEditing ? "Save Changes" : "Create Vendor"}

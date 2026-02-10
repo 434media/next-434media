@@ -26,9 +26,11 @@ import {
   Timer,
   ArrowRight,
   BarChart3,
+  GripVertical,
 } from "lucide-react"
 import type { PMEvent } from "../../../types/project-management-types"
 import { PM_EVENT_STATUSES } from "../../../types/project-management-types"
+import { ImageUpload } from "../../../components/ImageUpload"
 
 // ============================================
 // Props
@@ -310,123 +312,12 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
   const displayEvents = activeTab === "completed" ? completedToShow : filteredEvents
 
   return (
-    <div className="space-y-6">
-      {/* Dashboard Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0 }}
-          className="col-span-2 relative overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-800 text-white rounded-2xl p-5"
-        >
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 text-neutral-400 text-xs font-semibold uppercase tracking-wider mb-2">
-              <Timer className="w-3.5 h-3.5" />
-              Next Event
-            </div>
-            {metrics.nextEvent ? (
-              <>
-                <h3 className="text-lg font-bold leading-tight mb-1 truncate">
-                  {metrics.nextEvent.name}
-                </h3>
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-neutral-300">
-                    {formatDate(metrics.nextEvent.start_date || metrics.nextEvent.date)}
-                  </span>
-                  <span className="px-2 py-0.5 bg-white/10 rounded-full text-xs font-bold">
-                    {formatCountdown(metrics.nextDays)}
-                  </span>
-                </div>
-                {metrics.nextEvent.venue_name && (
-                  <div className="flex items-center gap-1.5 text-neutral-400 text-xs mt-2">
-                    <MapPin className="w-3 h-3" />
-                    {metrics.nextEvent.venue_name}
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-neutral-400 text-sm">No upcoming events scheduled</p>
-            )}
-          </div>
-          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full" />
-          <div className="absolute -right-2 -bottom-2 w-20 h-20 bg-white/5 rounded-full" />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="bg-white border border-neutral-200 rounded-2xl p-5"
-        >
-          <div className="flex items-center gap-2 text-neutral-400 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Zap className="w-3.5 h-3.5" />
-            Active
-          </div>
-          <div className="flex items-end gap-3">
-            <span className="text-3xl font-black text-neutral-900">
-              {metrics.inProgress + metrics.upcoming}
-            </span>
-            <div className="flex flex-col text-xs text-neutral-500 mb-1">
-              {metrics.inProgress > 0 && (
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                  {metrics.inProgress} live
-                </span>
-              )}
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                {metrics.upcoming} upcoming
-              </span>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white border border-neutral-200 rounded-2xl p-5"
-        >
-          <div className="flex items-center gap-2 text-neutral-400 text-xs font-semibold uppercase tracking-wider mb-3">
-            <BarChart3 className="w-3.5 h-3.5" />
-            Budget
-          </div>
-          {metrics.totalBudget > 0 ? (
-            <>
-              <span className="text-2xl font-black text-neutral-900">
-                ${metrics.totalActual.toLocaleString()}
-              </span>
-              <div className="mt-2">
-                <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
-                  <span>of ${metrics.totalBudget.toLocaleString()}</span>
-                  <span className={
-                    metrics.totalActual <= metrics.totalBudget ? "text-emerald-600 font-semibold" : "text-red-600 font-semibold"
-                  }>
-                    {Math.round((metrics.totalActual / metrics.totalBudget) * 100)}%
-                  </span>
-                </div>
-                <div className="w-full bg-neutral-100 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${
-                      metrics.totalActual <= metrics.totalBudget ? "bg-emerald-500" : "bg-red-500"
-                    }`}
-                    style={{ width: `${Math.min(100, (metrics.totalActual / metrics.totalBudget) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <span className="text-sm text-neutral-400">No budgets set</span>
-          )}
-        </motion.div>
-      </div>
-
+    <div className="space-y-5">
       {/* Tabs & Toolbar */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-1 bg-neutral-100 rounded-xl p-1">
             {([
-              { id: "in-progress" as EventTab, label: "Happening Now", count: categorized["in-progress"].length, dot: "bg-purple-500" },
               { id: "upcoming" as EventTab, label: "Upcoming", count: categorized.upcoming.length, dot: "bg-amber-500" },
               { id: "completed" as EventTab, label: "Completed", count: categorized.completed.length, dot: "bg-emerald-500" },
               { id: "all" as EventTab, label: "All", count: events.length, dot: "bg-neutral-500" },
@@ -500,17 +391,17 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-3 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl"
         >
-          <div className="relative flex-shrink-0">
+          <div className="relative shrink-0">
             <span className="flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500" />
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-sm font-semibold text-purple-800">
+            <span className="text-sm font-bold tracking-tight text-purple-800">
               {categorized["in-progress"].length} event{categorized["in-progress"].length > 1 ? "s" : ""} happening now
             </span>
-            <span className="text-sm text-purple-600 ml-2">
+            <span className="text-sm text-purple-600 ml-2 font-medium">
               {categorized["in-progress"].map(e => e.name).join(", ")}
             </span>
           </div>
@@ -525,8 +416,8 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
       )}
 
       {/* Results Info */}
-      <div className="flex items-center justify-between text-sm text-neutral-500">
-        <span>
+      <div className="flex items-center justify-between text-sm text-neutral-500 tracking-wide">
+        <span className="font-medium">
           {displayEvents.length} event{displayEvents.length !== 1 ? "s" : ""}
           {searchQuery && ` matching "${searchQuery}"`}
         </span>
@@ -544,11 +435,7 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
       {displayEvents.length === 0 ? (
         <EmptyState tab={activeTab} searchQuery={searchQuery} onAddNew={openNew} />
       ) : layout === "grid" ? (
-        <div className={`grid gap-5 ${
-          activeTab === "in-progress"
-            ? "sm:grid-cols-1 lg:grid-cols-2"
-            : "sm:grid-cols-2 lg:grid-cols-3"
-        }`}>
+        <div className="grid gap-4 grid-cols-1">
           <AnimatePresence mode="popLayout">
             {displayEvents.map((event, idx) => (
               <EventCard
@@ -647,7 +534,7 @@ function EmptyState({ tab, searchQuery, onAddNew }: { tab: EventTab; searchQuery
     all: {
       icon: Calendar,
       title: "No events found",
-      desc: 'Click "Add Event" to create one or sync from Airtable',
+      desc: 'Click "Add Event" to create one',
     },
   }
 
@@ -699,222 +586,210 @@ function EventCard({ event, tab, index, onView, onEdit, onDelete, onStatusChange
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ delay: index * 0.03 }}
-      className={`group relative overflow-hidden bg-white transition-all duration-300 rounded-xl cursor-pointer ${
+      exit={{ opacity: 0, x: -10 }}
+      transition={{ delay: index * 0.025 }}
+      className={`group relative overflow-hidden bg-white transition-all duration-200 rounded-xl cursor-pointer ${
         isLive
-          ? "border-2 border-purple-300 shadow-lg shadow-purple-100/50 hover:border-purple-400"
+          ? "border-2 border-purple-300 shadow-md shadow-purple-100/50 hover:border-purple-400"
           : tab === "completed"
-          ? "border border-neutral-200 opacity-80 hover:opacity-100 hover:border-neutral-300"
-          : "border border-neutral-200 hover:border-neutral-900 hover:shadow-md"
+          ? "border border-neutral-200 opacity-75 hover:opacity-100 hover:border-neutral-300"
+          : "border border-neutral-200 hover:border-neutral-400 hover:shadow-sm"
       }`}
       onClick={onView}
     >
-      {/* Live indicator */}
+      {/* Live top accent */}
       {isLive && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-purple-400 to-purple-500 animate-pulse z-10" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-purple-500 via-purple-400 to-purple-500 animate-pulse" />
       )}
 
-      {/* Banner */}
-      <div className={`relative ${isLive ? "aspect-[21/9]" : "aspect-[16/9]"} bg-neutral-100 overflow-hidden`}>
-        {event.photo_banner || event.img_ai ? (
-          <img
-            src={event.photo_banner || event.img_ai}
-            alt={event.name}
-            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
-              tab === "completed" ? "grayscale-[30%]" : ""
-            }`}
-          />
-        ) : (
-          <div className={`w-full h-full flex items-center justify-center ${
-            isLive
-              ? "bg-gradient-to-br from-purple-100 to-purple-200"
-              : "bg-gradient-to-br from-neutral-100 to-neutral-200"
-          }`}>
-            <Calendar className={`w-12 h-12 ${isLive ? "text-purple-300" : "text-neutral-300"}`} />
-          </div>
-        )}
-
-        {/* Status badge */}
-        <div className="absolute top-3 left-3 z-10">
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowStatusMenu(!showStatusMenu) }}
-            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md flex items-center gap-1.5 ${
-              STATUS_BADGE_SOLID[event.status] || "bg-neutral-500 text-white"
-            } hover:ring-2 hover:ring-white/50 transition-all`}
-          >
-            {isLive && (
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-              </span>
-            )}
-            {event.status}
-            <ChevronDown className="w-3 h-3 opacity-70" />
-          </button>
-
-          <AnimatePresence>
-            {showStatusMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl py-1 min-w-[140px] z-20"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {PM_EVENT_STATUSES.map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => {
-                      setShowStatusMenu(false)
-                      if (status !== event.status) onStatusChange(event, status)
-                    }}
-                    disabled={isChangingStatus}
-                    className={`w-full text-left px-3 py-2 text-xs font-semibold capitalize flex items-center gap-2 transition-colors ${
-                      status === event.status
-                        ? "bg-neutral-50 text-neutral-900"
-                        : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
-                    {status}
-                    {status === event.status && <CheckCircle2 className="w-3 h-3 ml-auto text-neutral-400" />}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Countdown badge */}
-        {days !== null && tab !== "completed" && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className={`px-2.5 py-1 text-xs font-bold rounded-md backdrop-blur-sm ${
-              days <= 0
-                ? "bg-purple-500/90 text-white"
-                : days <= 7
-                ? "bg-red-500/90 text-white"
-                : days <= 30
-                ? "bg-amber-500/90 text-white"
-                : "bg-white/90 text-neutral-700"
-            }`}>
-              {formatCountdown(days)}
-            </span>
-          </div>
-        )}
-
-        {event.on_budget && tab !== "completed" && (
-          <div className="absolute bottom-3 right-3 z-10">
-            <span className="bg-white/90 backdrop-blur-sm px-2 py-1 text-xs font-medium rounded-md">
-              {event.on_budget}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-5 border-t border-neutral-100">
-        <div className={`w-8 h-1 mb-3 ${isLive ? "bg-purple-400" : "bg-yellow-400"}`} />
-        <h3 className={`text-lg font-bold leading-tight mb-2 ${
-          tab === "completed" ? "text-neutral-600" : "text-neutral-900"
+      <div className="flex items-stretch">
+        {/* Left: Thumbnail */}
+        <div className={`relative w-28 sm:w-36 shrink-0 overflow-hidden ${
+          isLive ? "bg-purple-50" : "bg-neutral-50"
         }`}>
-          {event.name}
-        </h3>
-
-        <div className="flex items-center gap-2 text-sm text-neutral-600 mb-1.5">
-          <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-          <span className="font-medium">{formatDate(event.start_date || event.date)}</span>
-          {event.end_date && event.end_date !== (event.start_date || event.date) && (
-            <span className="text-neutral-400">- {formatDate(event.end_date)}</span>
+          {event.photo_banner || event.img_ai ? (
+            <img
+              src={event.photo_banner || event.img_ai}
+              alt={event.name}
+              className={`w-full h-full object-cover ${
+                tab === "completed" ? "grayscale-30" : ""
+              }`}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Calendar className={`w-8 h-8 ${isLive ? "text-purple-300" : "text-neutral-300"}`} />
+            </div>
+          )}
+          {isLive && (
+            <div className="absolute top-2 left-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500" />
+              </span>
+            </div>
           )}
         </div>
 
-        {(event.venue_name || event.location) && (
-          <div className="flex items-start gap-2 text-sm text-neutral-500 mb-1.5">
-            <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-neutral-400" />
-            <div>
-              {event.venue_name && (
-                <span className="font-medium text-neutral-700">{event.venue_name}</span>
-              )}
-              {event.venue_name && event.venue_location && <br />}
-              {event.venue_location && (
-                <span className="text-xs text-neutral-400">{event.venue_location}</span>
-              )}
-              {!event.venue_name && event.location && (
-                <span className="text-neutral-500">{event.location}</span>
-              )}
+        {/* Center: Event Info */}
+        <div className="flex-1 min-w-0 px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
+          {/* Row 1: Name + Status */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h3 className={`text-base font-bold tracking-tight leading-snug truncate ${
+              tab === "completed" ? "text-neutral-500" : "text-neutral-900"
+            }`}>
+              {event.name}
+            </h3>
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowStatusMenu(!showStatusMenu) }}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-md ${
+                  STATUS_BADGE_SOLID[event.status] || "bg-neutral-500 text-white"
+                } hover:ring-2 hover:ring-offset-1 hover:ring-neutral-300 transition-all`}
+              >
+                {event.status}
+                <ChevronDown className="w-2.5 h-2.5 opacity-70" />
+              </button>
+              <AnimatePresence>
+                {showStatusMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl py-1 min-w-35 z-30"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {PM_EVENT_STATUSES.map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          setShowStatusMenu(false)
+                          if (status !== event.status) onStatusChange(event, status)
+                        }}
+                        disabled={isChangingStatus}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold capitalize flex items-center gap-2 transition-colors ${
+                          status === event.status
+                            ? "bg-neutral-50 text-neutral-900"
+                            : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
+                        {status}
+                        {status === event.status && <CheckCircle2 className="w-3 h-3 ml-auto text-neutral-400" />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        )}
 
-        {/* Budget bar */}
-        {budgetHealth && (
-          <div className="mt-3 pt-3 border-t border-neutral-100">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-neutral-500 flex items-center gap-1">
-                <DollarSign className="w-3 h-3" />
-                Budget
-              </span>
-              <span className={`font-semibold ${budgetHealth.color}`}>
-                {budgetHealth.percent}% - {budgetHealth.label}
-              </span>
-            </div>
-            <div className="w-full bg-neutral-100 rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all ${
-                  budgetHealth.percent <= 80 ? "bg-emerald-500"
-                    : budgetHealth.percent <= 100 ? "bg-blue-500"
-                    : budgetHealth.percent <= 120 ? "bg-amber-500"
-                    : "bg-red-500"
-                }`}
-                style={{ width: `${Math.min(100, budgetHealth.percent)}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-[10px] text-neutral-400 mt-1">
-              <span>${(event.actual_expenses || 0).toLocaleString()} spent</span>
-              <span>${(event.budget || event.estimated_expenses || 0).toLocaleString()} budget</span>
-            </div>
-          </div>
-        )}
-
-        {/* Completed footer */}
-        {tab === "completed" && (
-          <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center gap-2">
-            <span className="flex items-center gap-1 text-xs text-emerald-600">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Completed
+          {/* Row 2: Key details — date, venue, location */}
+          <div className="flex items-center gap-4 text-sm text-neutral-500 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 font-medium text-neutral-600">
+              <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+              {formatDate(event.start_date || event.date)}
+              {event.end_date && event.end_date !== (event.start_date || event.date) && (
+                <span className="text-neutral-400 font-normal">– {formatDate(event.end_date)}</span>
+              )}
             </span>
-            {event.actual_expenses !== undefined && event.budget !== undefined && (
-              <span className="text-xs text-neutral-400 ml-auto">
-                Final: ${event.actual_expenses.toLocaleString()} / ${event.budget.toLocaleString()}
+            {(event.venue_name || event.location) && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-neutral-400" />
+                <span className="truncate max-w-48">
+                  {event.venue_name || event.location}
+                </span>
               </span>
             )}
+            {event.website_url && (
+              <a
+                href={event.website_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">Link</span>
+              </a>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Hover actions */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        {(days === null || tab === "completed") && (
-          <>
+          {/* Row 3: Budget summary (inline) */}
+          {budgetHealth && (
+            <div className="flex items-center gap-3 mt-0.5">
+              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                <DollarSign className="w-3 h-3" />
+                <span>${(event.actual_expenses || 0).toLocaleString()}</span>
+                <span className="text-neutral-300">/</span>
+                <span>${(event.budget || event.estimated_expenses || 0).toLocaleString()}</span>
+              </div>
+              <div className="w-20 bg-neutral-100 rounded-full h-1.5">
+                <div
+                  className={`h-1.5 rounded-full transition-all ${
+                    budgetHealth.percent <= 80 ? "bg-emerald-500"
+                      : budgetHealth.percent <= 100 ? "bg-blue-500"
+                      : budgetHealth.percent <= 120 ? "bg-amber-500"
+                      : "bg-red-500"
+                  }`}
+                  style={{ width: `${Math.min(100, budgetHealth.percent)}%` }}
+                />
+              </div>
+              <span className={`text-[11px] font-semibold ${budgetHealth.color}`}>
+                {budgetHealth.percent}%
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Countdown + Actions */}
+        <div className="flex items-center gap-3 px-4 sm:px-5 shrink-0 border-l border-neutral-100">
+          {/* Countdown */}
+          {days !== null && tab !== "completed" && (
+            <div className={`text-center px-3 py-1.5 rounded-lg ${
+              days <= 0
+                ? "bg-purple-50 text-purple-700"
+                : days <= 7
+                ? "bg-red-50 text-red-700"
+                : days <= 30
+                ? "bg-amber-50 text-amber-700"
+                : "bg-neutral-50 text-neutral-600"
+            }`}>
+              <div className="text-lg font-extrabold leading-none tabular-nums">
+                {days <= 0 ? (days === 0 ? "0" : Math.abs(days)) : days}
+              </div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider mt-0.5">
+                {days === 0 ? "Today" : days < 0 ? "days ago" : days === 1 ? "day" : "days"}
+              </div>
+            </div>
+          )}
+
+          {tab === "completed" && (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-lg">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Done
+            </span>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); onEdit() }}
-              className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md text-neutral-600 hover:text-neutral-900 shadow-sm"
+              className="p-2 rounded-lg text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
               title="Edit"
             >
-              <Edit2 className="w-3.5 h-3.5" />
+              <Edit2 className="w-4 h-4" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="p-1.5 bg-white/90 backdrop-blur-sm rounded-md text-neutral-600 hover:text-red-600 shadow-sm"
+              className="p-2 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
               title="Delete"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4" />
             </button>
-          </>
-        )}
+          </div>
+        </div>
       </div>
     </motion.div>
   )
@@ -1012,12 +887,12 @@ function EventTable({
                         <img
                           src={event.photo_banner || event.img_ai}
                           alt=""
-                          className={`w-10 h-7 rounded object-cover flex-shrink-0 ${
-                            tab === "completed" ? "grayscale-[30%]" : ""
+                          className={`w-10 h-7 rounded object-cover shrink-0 ${
+                            tab === "completed" ? "grayscale-30" : ""
                           }`}
                         />
                       )}
-                      <span className="font-semibold text-neutral-900 truncate max-w-[200px]">
+                      <span className="font-semibold text-neutral-900 truncate max-w-50">
                         {event.name}
                       </span>
                     </div>
@@ -1035,7 +910,7 @@ function EventTable({
                       {event.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-neutral-600 truncate max-w-[180px]">
+                  <td className="px-4 py-3 text-neutral-600 truncate max-w-45">
                     {event.venue_name || event.location || "\u2014"}
                   </td>
                   <td className="px-4 py-3 text-neutral-600 whitespace-nowrap">
@@ -1150,6 +1025,7 @@ function EventFormModal({ event, onClose, onSave, showToast }: EventFormModalPro
       actual_expenses: undefined,
       website_url: "",
       notes: "",
+      photo_banner: "",
     }
   )
 
@@ -1172,6 +1048,28 @@ function EventFormModal({ event, onClose, onSave, showToast }: EventFormModalPro
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // Helper to render clickable links in text
+  const renderTextWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = text.split(urlRegex)
+    return parts.map((part, i) =>
+      urlRegex.test(part) ? (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline underline-offset-2 break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    )
   }
 
   return (
@@ -1219,12 +1117,28 @@ function EventFormModal({ event, onClose, onSave, showToast }: EventFormModalPro
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">Website URL</label>
-                <input type="url" value={form.website_url || ""} onChange={(e) => handleChange("website_url", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
+                <input type="url" value={form.website_url || ""} onChange={(e) => handleChange("website_url", e.target.value)} placeholder="https://..." className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
+                {form.website_url && (
+                  <a href={form.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2">
+                    <ExternalLink className="w-3 h-3" />
+                    Open link
+                  </a>
+                )}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Description</label>
-              <textarea rows={3} value={form.description || ""} onChange={(e) => handleChange("description", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-none" />
+              <textarea
+                rows={5}
+                value={form.description || ""}
+                onChange={(e) => handleChange("description", e.target.value)}
+                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-30"
+                placeholder="Describe the event details, purpose, and any important information..."
+              />
+              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
+                <GripVertical className="w-3 h-3" />
+                Drag the bottom-right corner to expand this field
+              </p>
             </div>
           </fieldset>
 
@@ -1270,7 +1184,13 @@ function EventFormModal({ event, onClose, onSave, showToast }: EventFormModalPro
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Map Link</label>
-              <input type="url" value={form.venue_map_link || ""} onChange={(e) => handleChange("venue_map_link", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
+              <input type="url" value={form.venue_map_link || ""} onChange={(e) => handleChange("venue_map_link", e.target.value)} placeholder="https://maps.google.com/..." className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
+              {form.venue_map_link && (
+                <a href={form.venue_map_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2">
+                  <MapPin className="w-3 h-3" />
+                  Open in Maps
+                </a>
+              )}
             </div>
           </fieldset>
 
@@ -1293,19 +1213,46 @@ function EventFormModal({ event, onClose, onSave, showToast }: EventFormModalPro
           </fieldset>
 
           <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Additional</legend>
+            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Additional Details</legend>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Agenda Overview</label>
-              <textarea rows={3} value={form.agenda_overview || ""} onChange={(e) => handleChange("agenda_overview", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-none" />
+              <textarea
+                rows={6}
+                value={form.agenda_overview || ""}
+                onChange={(e) => handleChange("agenda_overview", e.target.value)}
+                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-35"
+                placeholder="Enter the event agenda, schedule, speakers, topics, etc..."
+              />
+              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
+                <GripVertical className="w-3 h-3" />
+                Drag the bottom-right corner to expand &bull; URLs will become clickable after saving
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
-              <textarea rows={3} value={form.notes || ""} onChange={(e) => handleChange("notes", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-none" />
+              <textarea
+                rows={5}
+                value={form.notes || ""}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-30"
+                placeholder="Internal notes, reminders, follow-ups, links to resources..."
+              />
+              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
+                <GripVertical className="w-3 h-3" />
+                Drag the bottom-right corner to expand &bull; URLs will become clickable after saving
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Banner Image URL</label>
-              <input type="url" value={form.photo_banner || ""} onChange={(e) => handleChange("photo_banner", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-            </div>
+          </fieldset>
+
+          <fieldset className="space-y-4">
+            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Banner Image</legend>
+            <ImageUpload
+              value={form.photo_banner || ""}
+              onChange={(url) => handleChange("photo_banner", url)}
+              label="Event Banner"
+              accept="image/*,.gif"
+              maxSize={10}
+            />
           </fieldset>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
@@ -1349,6 +1296,31 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, onStatusChange }: 
     })
   }
 
+  // Render text with auto-linked URLs
+  const renderLinkedText = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = text.split(urlRegex)
+    return parts.map((part, i) => {
+      if (urlRegex.test(part)) {
+        // Reset regex lastIndex since it's stateful with global flag
+        urlRegex.lastIndex = 0
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline underline-offset-2 decoration-blue-300 hover:decoration-blue-600 break-all transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        )
+      }
+      return <span key={i}>{part}</span>
+    })
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1367,13 +1339,13 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, onStatusChange }: 
         }`}
       >
         {isLive && (
-          <div className="h-1 bg-gradient-to-r from-purple-500 via-purple-400 to-purple-500 rounded-t-2xl animate-pulse" />
+          <div className="h-1 bg-linear-to-r from-purple-500 via-purple-400 to-purple-500 rounded-t-2xl animate-pulse" />
         )}
 
         {(event.photo_banner || event.img_ai) && (
-          <div className="relative aspect-[16/9] bg-neutral-100 overflow-hidden rounded-t-2xl">
-            <img src={event.photo_banner || event.img_ai} alt={event.name} className={`w-full h-full object-cover ${isCompleted ? "grayscale-[20%]" : ""}`} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          <div className="relative aspect-video bg-neutral-100 overflow-hidden rounded-t-2xl">
+            <img src={event.photo_banner || event.img_ai} alt={event.name} className={`w-full h-full object-cover ${isCompleted ? "grayscale-20" : ""}`} />
+            <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent" />
             {days !== null && !isCompleted && (
               <div className="absolute bottom-4 right-4">
                 <span className={`px-3 py-1.5 text-sm font-bold rounded-lg backdrop-blur-sm ${
@@ -1473,7 +1445,7 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, onStatusChange }: 
           {event.agenda_overview && (
             <div>
               <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Agenda Overview</h4>
-              <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">{event.agenda_overview}</div>
+              <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">{renderLinkedText(event.agenda_overview)}</div>
             </div>
           )}
 
@@ -1534,9 +1506,23 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, onStatusChange }: 
           </div>
 
           {(event.description || event.notes) && (
-            <div>
-              <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Notes</h4>
-              <p className="text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">{event.description || event.notes}</p>
+            <div className="space-y-4">
+              {event.description && (
+                <div>
+                  <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Description</h4>
+                  <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">
+                    {renderLinkedText(event.description)}
+                  </div>
+                </div>
+              )}
+              {event.notes && (
+                <div>
+                  <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Notes</h4>
+                  <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">
+                    {renderLinkedText(event.notes)}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

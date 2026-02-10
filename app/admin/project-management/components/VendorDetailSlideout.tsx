@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Tag,
   FileText,
+  Paperclip,
+  Link,
 } from "lucide-react"
 import type { Vendor } from "../../../types/project-management-types"
 
@@ -76,10 +78,10 @@ export default function VendorDetailSlideout({
                     alt={vendor.name}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
                 </div>
               ) : (
-                <div className="h-32 bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
+                <div className="h-32 bg-linear-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
                   <Building2 className="w-16 h-16 text-neutral-300" />
                 </div>
               )}
@@ -95,13 +97,10 @@ export default function VendorDetailSlideout({
 
             {/* Content */}
             <div className="p-6 space-y-6">
-              {/* Name & company */}
+              {/* Vendor name */}
               <div>
                 <div className="w-10 h-1 bg-yellow-400 mb-3" />
                 <h2 className="text-2xl font-bold text-neutral-900 leading-tight">{vendor.name}</h2>
-                {vendor.company && vendor.company !== vendor.name && (
-                  <p className="text-base text-neutral-500 font-medium mt-1">{vendor.company}</p>
-                )}
               </div>
 
               {/* Badges */}
@@ -181,7 +180,7 @@ export default function VendorDetailSlideout({
                         <Globe className="w-4 h-4 text-neutral-500" />
                       </div>
                       <span className="truncate">{vendor.website.replace(/^https?:\/\//, "")}</span>
-                      <ExternalLink className="w-3 h-3 text-neutral-400 flex-shrink-0" />
+                      <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0" />
                     </a>
                   )}
                 </div>
@@ -192,7 +191,7 @@ export default function VendorDetailSlideout({
                 <div>
                   <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Location</h4>
                   <div className="flex items-start gap-3 text-sm text-neutral-700">
-                    <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0 mt-0.5">
                       <MapPin className="w-4 h-4 text-neutral-500" />
                     </div>
                     <div className="leading-relaxed">
@@ -200,6 +199,25 @@ export default function VendorDetailSlideout({
                       <p>{[vendor.city, vendor.state, vendor.zip].filter(Boolean).join(", ")}</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Link URL */}
+              {vendor.link_url && (
+                <div>
+                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Link</h4>
+                  <a
+                    href={vendor.link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center group-hover:bg-neutral-200 transition-colors">
+                      <Link className="w-4 h-4 text-neutral-500" />
+                    </div>
+                    <span className="truncate">{vendor.link_url.replace(/^https?:\/\//, "")}</span>
+                    <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0" />
+                  </a>
                 </div>
               )}
 
@@ -211,6 +229,16 @@ export default function VendorDetailSlideout({
                 </div>
               )}
 
+              {/* Research */}
+              {vendor.research && (
+                <div>
+                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">Research</h4>
+                  <div className="p-4 bg-blue-50 rounded-xl text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap border border-blue-100">
+                    {vendor.research}
+                  </div>
+                </div>
+              )}
+
               {/* Notes */}
               {vendor.notes && (
                 <div>
@@ -218,6 +246,35 @@ export default function VendorDetailSlideout({
                   <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap border border-neutral-100">
                     <FileText className="w-4 h-4 text-neutral-400 mb-2" />
                     {vendor.notes}
+                  </div>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {vendor.attachments && vendor.attachments.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Attachments</h4>
+                  <div className="space-y-2">
+                    {vendor.attachments.map((att, idx) => (
+                      <a
+                        key={idx}
+                        href={att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors group"
+                      >
+                        <Paperclip className="w-4 h-4 text-neutral-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-neutral-700 group-hover:text-neutral-900 truncate block">
+                            {att.filename || "Attachment"}
+                          </span>
+                          {att.type && (
+                            <span className="text-xs text-neutral-400">{att.type}</span>
+                          )}
+                        </div>
+                        <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0" />
+                      </a>
+                    ))}
                   </div>
                 </div>
               )}

@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
 import {
-  getPMEventsFromAirtable,
-  getVendorsFromAirtable,
-  getSpeakersFromAirtable,
-} from "../../../lib/airtable-project-management"
-import {
   getPMEventsFromFirestore,
   getVendorsFromFirestore,
   getSpeakersFromFirestore,
@@ -18,9 +13,6 @@ import {
   createSpeakerInFirestore,
   updateSpeakerInFirestore,
   deleteSpeakerFromFirestore,
-  savePMEventsToFirestore,
-  saveVendorsToFirestore,
-  saveSpeakersToFirestore,
 } from "../../../lib/firestore-project-management"
 
 // Check if user is authenticated and has workspace email
@@ -38,7 +30,7 @@ async function requireAdmin() {
   return { session }
 }
 
-// GET - Fetch all project management data
+// GET - Fetch all project management data from Firestore
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAdmin()
@@ -48,32 +40,17 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") || "all"
-    const source = searchParams.get("source") || "firestore"
 
     let response: Record<string, unknown> = {}
 
-    if (source === "airtable") {
-      // Fetch from Airtable
-      if (type === "all" || type === "events") {
-        response.events = await getPMEventsFromAirtable()
-      }
-      if (type === "all" || type === "vendors") {
-        response.vendors = await getVendorsFromAirtable()
-      }
-      if (type === "all" || type === "speakers") {
-        response.speakers = await getSpeakersFromAirtable()
-      }
-    } else {
-      // Fetch from Firestore (default)
-      if (type === "all" || type === "events") {
-        response.events = await getPMEventsFromFirestore()
-      }
-      if (type === "all" || type === "vendors") {
-        response.vendors = await getVendorsFromFirestore()
-      }
-      if (type === "all" || type === "speakers") {
-        response.speakers = await getSpeakersFromFirestore()
-      }
+    if (type === "all" || type === "events") {
+      response.events = await getPMEventsFromFirestore()
+    }
+    if (type === "all" || type === "vendors") {
+      response.vendors = await getVendorsFromFirestore()
+    }
+    if (type === "all" || type === "speakers") {
+      response.speakers = await getSpeakersFromFirestore()
     }
 
     return NextResponse.json(response)
@@ -86,7 +63,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new item or sync from Airtable
+// POST - Create new item
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin()
@@ -96,57 +73,6 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { action, type, data } = body
-
-    // Handle sync action
-    if (action === "sync") {
-      const results: Record<string, number> = {}
-      const errors: string[] = []
-
-      if (type === "all" || type === "events") {
-        try {
-          const events = await getPMEventsFromAirtable()
-          results.events = await savePMEventsToFirestore(events)
-        } catch (err: any) {
-          console.error("Error syncing events:", err?.message || err)
-          errors.push(`Events: ${err?.message || "Unknown error"}`)
-          results.events = 0
-        }
-      }
-      if (type === "all" || type === "vendors") {
-        try {
-          const vendors = await getVendorsFromAirtable()
-          results.vendors = await saveVendorsToFirestore(vendors)
-        } catch (err: any) {
-          console.error("Error syncing vendors:", err?.message || err)
-          errors.push(`Vendors: ${err?.message || "Unknown error"}`)
-          results.vendors = 0
-        }
-      }
-      if (type === "all" || type === "speakers") {
-        try {
-          const speakers = await getSpeakersFromAirtable()
-          results.speakers = await saveSpeakersToFirestore(speakers)
-        } catch (err: any) {
-          console.error("Error syncing speakers:", err?.message || err)
-          errors.push(`Speakers: ${err?.message || "Unknown error"}`)
-          results.speakers = 0
-        }
-      }
-
-      // Return success with any partial errors
-      if (errors.length > 0) {
-        return NextResponse.json({
-          message: "Sync completed with some errors",
-          synced: results,
-          errors,
-        })
-      }
-
-      return NextResponse.json({
-        message: "Sync completed successfully",
-        synced: results,
-      })
-    }
 
     // Handle create action
     if (action === "create") {

@@ -21,17 +21,25 @@ function getCredentials(): ServiceAccountCredentials {
         client_email: credentials.client_email,
         private_key: credentials.private_key,
       }
-    } catch (error) {
-      console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:", error)
+    } catch {
+      // GOOGLE_SERVICE_ACCOUNT_KEY is malformed — will fall back to separate FIREBASE_* env vars
     }
   }
 
   // Option 2: Fall back to separate FIREBASE_* variables
   const projectId = process.env.FIREBASE_PROJECT_ID
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n")
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY
 
   if (projectId && clientEmail && privateKey) {
+    // Handle common private key encoding issues:
+    // 1. Literal \n strings that need to be real newlines
+    privateKey = privateKey.replace(/\\n/g, "\n")
+    // 2. Remove surrounding quotes if env var was double-quoted
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1).replace(/\\n/g, "\n")
+    }
+    
     return {
       project_id: projectId,
       client_email: clientEmail,

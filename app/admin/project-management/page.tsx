@@ -9,7 +9,6 @@ import {
   Calendar,
   Building2,
   Mic2,
-  RefreshCw,
   CheckCircle2,
   AlertCircle,
   X,
@@ -30,7 +29,6 @@ interface Toast {
 export default function ProjectManagementPage() {
   // State
   const [isLoading, setIsLoading] = useState(true)
-  const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
 
@@ -63,7 +61,7 @@ export default function ProjectManagementPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch("/api/admin/project-management?type=all&source=airtable")
+      const response = await fetch("/api/admin/project-management?type=all")
       if (!response.ok) throw new Error("Failed to fetch data")
       const data = await response.json()
       setEvents(data.events || [])
@@ -73,39 +71,6 @@ export default function ProjectManagementPage() {
       setError(err instanceof Error ? err.message : "Failed to load data")
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const syncFromAirtable = async () => {
-    setIsSyncing(true)
-    try {
-      const response = await fetch("/api/admin/project-management", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sync", type: "all" }),
-      })
-      const result = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(result.error || "Sync failed")
-      }
-
-      if (result.errors && result.errors.length > 0) {
-        showToast(
-          `Partial sync: ${result.synced.events || 0} events, ${result.synced.vendors || 0} vendors, ${result.synced.speakers || 0} speakers. Some tables failed.`,
-          "warning"
-        )
-      } else {
-        showToast(
-          `Synced: ${result.synced.events || 0} events, ${result.synced.vendors || 0} vendors, ${result.synced.speakers || 0} speakers`,
-          "success"
-        )
-      }
-      await loadData()
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to sync from Airtable", "error")
-    } finally {
-      setIsSyncing(false)
     }
   }
 
@@ -121,7 +86,10 @@ export default function ProjectManagementPage() {
       })
       if (!response.ok) throw new Error("Delete failed")
       showToast("Item deleted successfully", "success")
-      await loadData()
+      // Remove from local state
+      if (type === "event") setEvents(prev => prev.filter(e => e.id !== id))
+      else if (type === "vendor") setVendors(prev => prev.filter(v => v.id !== id))
+      else if (type === "speaker") setSpeakers(prev => prev.filter(s => s.id !== id))
     } catch {
       showToast("Failed to delete item", "error")
     }
@@ -183,22 +151,35 @@ export default function ProjectManagementPage() {
 
   const handleSaveEvent = async (event: Partial<PMEvent>, isNew: boolean) => {
     try {
+      // Ensure date is synced with start_date
+      const eventData = { ...event }
+      if (eventData.start_date && !eventData.date) {
+        eventData.date = eventData.start_date
+      }
+
       if (isNew) {
         const response = await fetch("/api/admin/project-management", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "create", type: "event", data: event }),
+          body: JSON.stringify({ action: "create", type: "event", data: eventData }),
         })
-        if (!response.ok) throw new Error("Create failed")
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || "Create failed")
+        }
         showToast("Event created successfully", "success")
       } else {
-        const { id, ...data } = event
+        const { id, ...data } = eventData
+        if (!id) throw new Error("Event ID is missing")
         const response = await fetch("/api/admin/project-management", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "event", id, data }),
         })
-        if (!response.ok) throw new Error("Update failed")
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || "Update failed")
+        }
         showToast("Event updated successfully", "success")
       }
       await loadData()
@@ -218,7 +199,7 @@ export default function ProjectManagementPage() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className={`fixed top-4 right-4 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-xl border shadow-lg ${
+              className={`fixed top-4 right-4 z-60 flex items-center gap-3 px-5 py-3.5 rounded-xl border shadow-lg ${
                 toast.type === "success"
                   ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                   : toast.type === "error"
@@ -255,17 +236,6 @@ export default function ProjectManagementPage() {
                 <h1 className="text-lg font-bold tracking-tight text-neutral-900">
                   Project Management
                 </h1>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={syncFromAirtable}
-                  disabled={isSyncing}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg transition-all disabled:opacity-50 shadow-sm"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  {isSyncing ? "Syncing..." : "Sync from Airtable"}
-                </button>
               </div>
             </div>
           </div>

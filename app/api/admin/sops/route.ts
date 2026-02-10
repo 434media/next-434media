@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
-import { getSOPsFromAirtable } from "../../../lib/airtable-project-management"
 import {
   getSOPsFromFirestore,
   getSOPByIdFromFirestore,
   createSOPInFirestore,
   updateSOPInFirestore,
   deleteSOPFromFirestore,
-  saveSOPsToFirestore,
 } from "../../../lib/firestore-project-management"
 
 // Check if user is authenticated and has workspace email
@@ -35,7 +33,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
-    const source = searchParams.get("source") || "firestore"
 
     if (id) {
       const sop = await getSOPByIdFromFirestore(id)
@@ -45,12 +42,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ sop })
     }
 
-    let sops
-    if (source === "airtable") {
-      sops = await getSOPsFromAirtable()
-    } else {
-      sops = await getSOPsFromFirestore()
-    }
+    const sops = await getSOPsFromFirestore()
 
     return NextResponse.json({ sops, total: sops.length })
   } catch (error) {
@@ -62,7 +54,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new SOP or sync from Airtable
+// POST - Create new SOP
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin()
@@ -71,27 +63,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { action, data } = body
+    const { data } = body
 
-    // Handle sync action
-    if (action === "sync") {
-      try {
-        const sops = await getSOPsFromAirtable()
-        const count = await saveSOPsToFirestore(sops)
-        return NextResponse.json({
-          message: "Sync completed successfully",
-          synced: count,
-        })
-      } catch (error) {
-        console.error("Error syncing SOPs:", error)
-        return NextResponse.json(
-          { error: "Failed to sync SOPs - table may not exist in Airtable" },
-          { status: 500 }
-        )
-      }
-    }
-
-    // Handle create action
     if (!data || !data.title || !data.content) {
       return NextResponse.json(
         { error: "Title and content are required" },
