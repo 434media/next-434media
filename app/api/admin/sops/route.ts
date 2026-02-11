@@ -6,7 +6,9 @@ import {
   createSOPInFirestore,
   updateSOPInFirestore,
   deleteSOPFromFirestore,
+  saveSOPsToFirestore,
 } from "../../../lib/firestore-project-management"
+import { getSOPsFromAirtable } from "../../../lib/airtable-project-management"
 
 // Check if user is authenticated and has workspace email
 async function requireAdmin() {
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new SOP
+// POST - Create new SOP or sync from Airtable
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin()
@@ -63,13 +65,34 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // Handle sync action
+    if (body.action === "sync") {
+      try {
+        const airtableSOPs = await getSOPsFromAirtable()
+        const synced = await saveSOPsToFirestore(airtableSOPs)
+        return NextResponse.json({ success: true, synced, message: `Synced ${synced} SOPs from Airtable` })
+      } catch (syncError) {
+        console.error("Error syncing SOPs from Airtable:", syncError)
+        return NextResponse.json(
+          { error: syncError instanceof Error ? syncError.message : "Failed to sync from Airtable" },
+          { status: 500 }
+        )
+      }
+    }
+
     const { data } = body
 
-    if (!data || !data.title || !data.content) {
+    if (!data || !data.title) {
       return NextResponse.json(
-        { error: "Title and content are required" },
+        { error: "Title is required" },
         { status: 400 }
       )
+    }
+
+    // Ensure content has a default value
+    if (!data.content) {
+      data.content = ""
     }
 
     const created = await createSOPInFirestore(data)

@@ -23,8 +23,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
 
         return {
-          allowedContentTypes: ["image/jpeg", "image/png", "image/gif", "image/webp"],
-          maximumSizeInBytes: 10 * 1024 * 1024, // 10MB
+          allowedContentTypes: [
+            "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "text/plain", "text/csv", "text/markdown",
+          ],
+          maximumSizeInBytes: 50 * 1024 * 1024, // 50MB
         }
       },
       onUploadCompleted: async ({ blob }) => {

@@ -496,6 +496,10 @@ export async function getSOPsFromAirtable(): Promise<SOP[]> {
     if (error?.statusCode === 404 || error?.error === "NOT_FOUND") {
       console.error(`Table "${AIRTABLE_PM_TABLES.SOPS}" not found. Check your Airtable base and set AIRTABLE_PM_SOPS_TABLE if needed.`)
     }
+    if (error?.statusCode === 403 || error?.message?.includes("not authorized")) {
+      console.warn("SOPs table is not accessible with the current API key. Returning empty array.")
+      return []
+    }
     throw new Error(`Failed to fetch SOPs from Airtable: ${error?.message || "Unknown error"}`)
   }
 }
