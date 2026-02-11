@@ -93,6 +93,55 @@ export function getDb(): admin.firestore.Firestore {
   return db
 }
 
+// Named database instances cache
+const namedDbs: Record<string, admin.firestore.Firestore> = {}
+
+/**
+ * Get a Firestore instance for a named database (e.g., "techday", "aimsatx")
+ * These are separate databases within the same GCP project.
+ */
+export function getNamedDb(databaseId: string): admin.firestore.Firestore {
+  if (namedDbs[databaseId]) return namedDbs[databaseId]
+
+  const appName = `named-db-${databaseId}`
+  let namedApp: admin.app.App
+
+  // Check if this named app already exists
+  const existing = admin.apps.find((a) => a?.name === appName)
+  if (existing) {
+    namedApp = existing
+  } else {
+    const credentials = getCredentials()
+    namedApp = admin.initializeApp(
+      {
+        credential: admin.credential.cert({
+          projectId: credentials.project_id,
+          clientEmail: credentials.client_email,
+          privateKey: credentials.private_key,
+        }),
+      },
+      appName
+    )
+  }
+
+  const namedFirestore = namedApp.firestore()
+  try {
+    namedFirestore.settings({ databaseId, ignoreUndefinedProperties: true })
+  } catch {
+    // Settings already applied
+  }
+
+  namedDbs[databaseId] = namedFirestore
+  console.log(`[Firestore] Named database '${databaseId}' initialized`)
+  return namedFirestore
+}
+
+// Named database IDs
+export const NAMED_DATABASES = {
+  TECHDAY: "techday",
+  AIMSATX: "aimsatx",
+} as const
+
 // Collection names - maps to different Firestore collections
 export const COLLECTIONS = {
   EVENTS: "events",

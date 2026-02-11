@@ -1,4 +1,4 @@
-import { getDb } from "./firebase-admin"
+import { getDb, getNamedDb, NAMED_DATABASES } from "./firebase-admin"
 import type { EmailSignup as AirtableEmailSignup } from "./airtable-contacts"
 
 // Firestore email signup interface
@@ -12,9 +12,54 @@ export interface FirestoreEmailSignup {
   ip_address?: string
   user_agent?: string
   page_url?: string
+  _dbSource?: string // Track which database this came from
 }
 
 const COLLECTION_NAME = "email_signups"
+
+/**
+ * Fetch email signups from the aimsatx named database
+ */
+async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<FirestoreEmailSignup[]> {
+  try {
+    // If filtering by a non-aim source, skip
+    if (filters?.source && filters.source !== "aim") return []
+
+    const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+    const snapshot = await aimsDb.collection("email_signups").get()
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: `aimsatx:${doc.id}`,
+        email: data.email || "",
+        source: data.source || "aim",
+        created_at: data.created_at || "",
+        mailchimp_synced: data.mailchimp_synced || false,
+        mailchimp_tags: data.tags || data.mailchimp_tags || [],
+        page_url: data.pageUrl || data.page_url || "",
+        _dbSource: "aimsatx",
+      }
+    })
+  } catch (error) {
+    console.error("Error fetching aimsatx email signups:", error)
+    return []
+  }
+}
+
+/**
+ * Deduplicate email signups across databases by email+source
+ */
+function deduplicateEmailSignups(signups: FirestoreEmailSignup[]): FirestoreEmailSignup[] {
+  const seen = new Map<string, FirestoreEmailSignup>()
+  for (const signup of signups) {
+    const key = `${signup.email.toLowerCase()}|${signup.source}`
+    const existing = seen.get(key)
+    if (!existing || (signup._dbSource === "default" && existing._dbSource !== "default")) {
+      seen.set(key, signup)
+    }
+  }
+  return Array.from(seen.values())
+}
 
 /**
  * Save an email signup to Firestore
@@ -52,9 +97,18 @@ export async function saveEmailSignup(data: Omit<FirestoreEmailSignup, "id">): P
 
 /**
  * Delete an email signup from Firestore
+ * Supports deletion from both default and aimsatx databases
  */
 export async function deleteEmailSignup(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    if (id.startsWith("aimsatx:")) {
+      const realId = id.replace("aimsatx:", "")
+      const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+      await aimsDb.collection("email_signups").doc(realId).delete()
+      console.log(`[Firestore] Deleted aimsatx email signup: ${realId}`)
+      return { success: true }
+    }
+
     const db = getDb()
     
     const docRef = db.collection(COLLECTION_NAME).doc(id)
@@ -76,7 +130,7 @@ export async function deleteEmailSignup(id: string): Promise<{ success: boolean;
 
 /**
  * Get email signups with optional filtering
- * Note: Sorting is done client-side to avoid needing Firestore composite indexes
+ * Merges results from default DB and aimsatx named database
  */
 export async function getEmailSignups(filters?: {
   source?: string
@@ -92,15 +146,24 @@ export async function getEmailSignups(filters?: {
       query = query.where("source", "==", filters.source)
     }
     
-    // Skip orderBy to avoid needing composite index - we'll sort client-side
-    // This is fine for small-medium datasets (< 10,000 records)
+    const [defaultSnapshot, aimsSignups] = await Promise.all([
+      query.get(),
+      getAimsatxEmailSignups(filters),
+    ])
     
-    const snapshot = await query.get()
-    
-    let signups = snapshot.docs.map((doc) => ({
+    const defaultSignups = defaultSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      _dbSource: "default",
     })) as FirestoreEmailSignup[]
+    
+    // If filtering by source and it's not aim, only return default
+    let signups: FirestoreEmailSignup[]
+    if (filters?.source && filters.source !== "aim") {
+      signups = defaultSignups
+    } else {
+      signups = deduplicateEmailSignups([...defaultSignups, ...aimsSignups])
+    }
     
     // Client-side date filtering
     if (filters?.startDate) {
@@ -129,19 +192,23 @@ export async function getEmailSignups(filters?: {
 }
 
 /**
- * Get unique sources from Firestore
+ * Get unique sources from Firestore (merges aimsatx)
  */
 export async function getEmailSources(): Promise<string[]> {
   try {
     const db = getDb()
-    const snapshot = await db.collection(COLLECTION_NAME).get()
+    const [defaultSnapshot, aimsSignups] = await Promise.all([
+      db.collection(COLLECTION_NAME).get(),
+      getAimsatxEmailSignups(),
+    ])
     
     const sources = new Set<string>()
-    snapshot.docs.forEach((doc) => {
+    defaultSnapshot.docs.forEach((doc) => {
       const data = doc.data()
-      if (data.source) {
-        sources.add(data.source)
-      }
+      if (data.source) sources.add(data.source)
+    })
+    aimsSignups.forEach((s) => {
+      if (s.source) sources.add(s.source)
     })
     
     return Array.from(sources).sort()
@@ -152,20 +219,16 @@ export async function getEmailSources(): Promise<string[]> {
 }
 
 /**
- * Get email counts by source
+ * Get email counts by source (merges aimsatx)
  */
 export async function getEmailCountsBySource(): Promise<Record<string, number>> {
   try {
-    const db = getDb()
-    const snapshot = await db.collection(COLLECTION_NAME).get()
-    
+    const allSignups = await getEmailSignups()
     const counts: Record<string, number> = {}
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data()
-      const source = data.source || "Unknown"
+    allSignups.forEach((signup) => {
+      const source = signup.source || "Unknown"
       counts[source] = (counts[source] || 0) + 1
     })
-    
     return counts
   } catch (error) {
     console.error("[Firestore] Failed to get email counts:", error)

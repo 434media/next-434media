@@ -1,4 +1,4 @@
-import { getDb, COLLECTIONS } from "./firebase-admin"
+import { getDb, getNamedDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
 import Airtable from "airtable"
 
 // Firestore contact form submission interface
@@ -12,6 +12,7 @@ export interface ContactFormSubmission {
   message?: string
   source: string // "434Media" | "AIM" | "VemosVamos" | "DigitalCanvas" | "SATechDay"
   created_at: string
+  _dbSource?: string // Track which database this came from
 }
 
 /**
@@ -38,9 +39,18 @@ export async function saveContactForm(
 
 /**
  * Delete a contact form submission from Firestore
+ * Supports deletion from both default and aimsatx databases
  */
 export async function deleteContactForm(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    if (id.startsWith("aimsatx:")) {
+      const realId = id.replace("aimsatx:", "")
+      const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+      await aimsDb.collection("contact_submissions").doc(realId).delete()
+      console.log(`[Firestore] Deleted aimsatx contact submission: ${realId}`)
+      return { success: true }
+    }
+
     const db = getDb()
     const docRef = db.collection(COLLECTIONS.CONTACT_FORMS).doc(id)
     const doc = await docRef.get()
@@ -94,7 +104,54 @@ export async function updateContactForm(
 }
 
 /**
+ * Fetch contact submissions from the aimsatx named database
+ */
+async function getAimsatxContactSubmissions(filters?: { source?: string }): Promise<ContactFormSubmission[]> {
+  try {
+    // If filtering by a non-AIM source, skip
+    if (filters?.source && filters.source !== "AIM") return []
+
+    const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+    const snapshot = await aimsDb.collection("contact_submissions").get()
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: `aimsatx:${doc.id}`,
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        company: data.company || "",
+        email: data.email || "",
+        phone: data.phoneNumber || data.phone || "",
+        message: data.message || "",
+        source: "AIM",
+        created_at: data.created_at || "",
+        _dbSource: "aimsatx",
+      }
+    })
+  } catch (error) {
+    console.error("Error fetching aimsatx contact submissions:", error)
+    return []
+  }
+}
+
+/**
+ * Deduplicate contact form submissions across databases by email+source+name
+ */
+function deduplicateContactForms(submissions: ContactFormSubmission[]): ContactFormSubmission[] {
+  const seen = new Map<string, ContactFormSubmission>()
+  for (const sub of submissions) {
+    const key = `${sub.email.toLowerCase()}|${sub.source}|${sub.firstName}|${sub.lastName}`
+    const existing = seen.get(key)
+    if (!existing || (sub._dbSource === "default" && existing._dbSource !== "default")) {
+      seen.set(key, sub)
+    }
+  }
+  return Array.from(seen.values())
+}
+
+/**
  * Get contact form submissions with optional filtering
+ * Merges results from default DB and aimsatx named database
  */
 export async function getContactForms(filters?: {
   source?: string
@@ -110,12 +167,24 @@ export async function getContactForms(filters?: {
       query = query.where("source", "==", filters.source)
     }
 
-    const snapshot = await query.get()
+    const [defaultSnapshot, aimsRegs] = await Promise.all([
+      query.get(),
+      getAimsatxContactSubmissions(filters),
+    ])
 
-    let submissions = snapshot.docs.map((doc) => ({
+    const defaultSubs = defaultSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      _dbSource: "default",
     })) as ContactFormSubmission[]
+
+    // If filtering by source and it's not AIM, only return default
+    let submissions: ContactFormSubmission[]
+    if (filters?.source && filters.source !== "AIM") {
+      submissions = defaultSubs
+    } else {
+      submissions = deduplicateContactForms([...defaultSubs, ...aimsRegs])
+    }
 
     // Client-side date filtering
     if (filters?.startDate) {
@@ -143,19 +212,23 @@ export async function getContactForms(filters?: {
 }
 
 /**
- * Get unique sources from contact form submissions
+ * Get unique sources from contact form submissions (merges aimsatx)
  */
 export async function getContactFormSources(): Promise<string[]> {
   try {
     const db = getDb()
-    const snapshot = await db.collection(COLLECTIONS.CONTACT_FORMS).get()
+    const [defaultSnapshot, aimsRegs] = await Promise.all([
+      db.collection(COLLECTIONS.CONTACT_FORMS).get(),
+      getAimsatxContactSubmissions(),
+    ])
 
     const sources = new Set<string>()
-    snapshot.docs.forEach((doc) => {
+    defaultSnapshot.docs.forEach((doc) => {
       const data = doc.data()
-      if (data.source) {
-        sources.add(data.source)
-      }
+      if (data.source) sources.add(data.source)
+    })
+    aimsRegs.forEach((r) => {
+      if (r.source) sources.add(r.source)
     })
 
     return Array.from(sources).sort()
@@ -166,20 +239,16 @@ export async function getContactFormSources(): Promise<string[]> {
 }
 
 /**
- * Get contact form counts by source
+ * Get contact form counts by source (merges aimsatx)
  */
 export async function getContactFormCountsBySource(): Promise<Record<string, number>> {
   try {
-    const db = getDb()
-    const snapshot = await db.collection(COLLECTIONS.CONTACT_FORMS).get()
-
+    const allForms = await getContactForms()
     const counts: Record<string, number> = {}
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data()
-      const source = data.source || "Unknown"
+    allForms.forEach((form) => {
+      const source = form.source || "Unknown"
       counts[source] = (counts[source] || 0) + 1
     })
-
     return counts
   } catch (error) {
     console.error("[Firestore] Failed to get contact form counts:", error)
