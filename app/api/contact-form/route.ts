@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import Airtable from "airtable"
 import { checkBotId } from "botid/server"
+import { saveContactForm } from "@/app/lib/firestore-contact-forms"
 
 const airtableBaseId = process.env.AIRTABLE_BASE_ID
 const airtableApiKey = process.env.AIRTABLE_API_KEY
@@ -45,6 +46,18 @@ export async function POST(request: Request) {
         },
       },
     ])
+
+    // Also save to Firestore for centralized tracking
+    await saveContactForm({
+      firstName,
+      lastName,
+      company,
+      email,
+      phone: phoneNumber || "",
+      message: message || "",
+      source: "434Media",
+      created_at: new Date().toISOString(),
+    })
 
     return NextResponse.json({ message: "Contact form submission successful" }, { status: 200 })
   } catch (error) {

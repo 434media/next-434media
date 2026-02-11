@@ -1,0 +1,94 @@
+import { NextResponse } from "next/server"
+import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import {
+  getEventRegistrations,
+  getEventRegistrationCounts,
+  deleteEventRegistration,
+  eventRegistrationsToCSV,
+} from "@/app/lib/firestore-event-registrations"
+
+async function requireAdmin() {
+  const session = await getSession()
+  if (!session) {
+    return { error: "Unauthorized", status: 401 }
+  }
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: "Forbidden: Workspace email required", status: 403 }
+  }
+  return { session }
+}
+
+export async function GET(request: Request) {
+  try {
+    const authResult = await requireAdmin()
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const action = searchParams.get("action")
+    const event = searchParams.get("event")
+    const format = searchParams.get("format")
+
+    // Get counts by event
+    if (action === "counts") {
+      const counts = await getEventRegistrationCounts()
+      return NextResponse.json({ success: true, counts })
+    }
+
+    // Get registrations with optional event filter
+    const filters = event ? { event } : undefined
+    const registrations = await getEventRegistrations(filters)
+
+    // Return as CSV download
+    if (format === "csv") {
+      const csv = eventRegistrationsToCSV(registrations)
+      const filename = event
+        ? `event-registrations-${event.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.csv`
+        : `event-registrations-all-${new Date().toISOString().split("T")[0]}.csv`
+
+      return new NextResponse(csv, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      })
+    }
+
+    return NextResponse.json({ success: true, registrations })
+  } catch (error) {
+    console.error("Error in event-registrations GET:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch event registrations" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const authResult = await requireAdmin()
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing registration ID" }, { status: 400 })
+    }
+
+    const result = await deleteEventRegistration(id)
+    if (result.success) {
+      return NextResponse.json({ success: true })
+    }
+    return NextResponse.json({ error: result.error }, { status: 500 })
+  } catch (error) {
+    console.error("Error in event-registrations DELETE:", error)
+    return NextResponse.json(
+      { error: "Failed to delete event registration" },
+      { status: 500 }
+    )
+  }
+}

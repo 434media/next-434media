@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, Fragment } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
   ChevronLeft,
@@ -19,6 +19,17 @@ import {
   Users,
   Database,
   MessageSquare,
+  X,
+  Phone,
+  Building2,
+  User,
+  Eye,
+  Clock,
+  Pencil,
+  Save,
+  Ticket,
+  MapPin,
+  Check,
 } from "lucide-react"
 import { AdminRoleGuard } from "../../components/AdminRoleGuard"
 
@@ -43,12 +54,29 @@ interface ContactFormSubmission {
   created_at: string
 }
 
+interface EventRegistration {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  fullName: string
+  company: string | null
+  subscribeToFeed: boolean
+  event: string
+  eventName: string
+  eventDate: string
+  registeredAt: string
+  source: string
+  tags: string[]
+  pageUrl: string
+}
+
 interface Toast {
   message: string
   type: "success" | "error"
 }
 
-type ActiveTab = "emails" | "contact-forms"
+type ActiveTab = "emails" | "contact-forms" | "events"
 
 // ── Main Component ──
 
@@ -109,7 +137,7 @@ export default function EmailListsPage() {
                 <div className="hidden sm:flex items-center gap-2">
                   <Mail className="w-4 h-4 text-neutral-600" />
                   <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
-                    EMAIL & CONTACT DATA
+                    LEADS & REGISTRATIONS
                   </h1>
                 </div>
               </div>
@@ -117,22 +145,6 @@ export default function EmailListsPage() {
 
             {/* Tab Navigation */}
             <nav className="flex gap-0 -mb-px">
-              <button
-                onClick={() => setActiveTab("emails")}
-                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
-                  activeTab === "emails"
-                    ? "text-neutral-900"
-                    : "text-neutral-400 hover:text-neutral-600"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5" />
-                  Email Lists
-                </span>
-                {activeTab === "emails" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
-                )}
-              </button>
               <button
                 onClick={() => setActiveTab("contact-forms")}
                 className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
@@ -149,16 +161,50 @@ export default function EmailListsPage() {
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab("events")}
+                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                  activeTab === "events"
+                    ? "text-neutral-900"
+                    : "text-neutral-400 hover:text-neutral-600"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Ticket className="w-3.5 h-3.5" />
+                  Events
+                </span>
+                {activeTab === "events" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab("emails")}
+                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                  activeTab === "emails"
+                    ? "text-neutral-900"
+                    : "text-neutral-400 hover:text-neutral-600"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5" />
+                  Email Lists
+                </span>
+                {activeTab === "emails" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
+                )}
+              </button>
             </nav>
           </div>
         </header>
 
         {/* Tab Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          {activeTab === "emails" ? (
-            <EmailListsTab setToast={setToast} />
-          ) : (
+          {activeTab === "contact-forms" ? (
             <ContactFormsTab setToast={setToast} />
+          ) : activeTab === "events" ? (
+            <EventRegistrationsTab setToast={setToast} />
+          ) : (
+            <EmailListsTab setToast={setToast} />
           )}
         </main>
       </div>
@@ -732,7 +778,10 @@ function ContactFormsTab({
     errors: number
     details?: Record<string, { total: number; migrated: number; skipped: number; errors: number }>
   } | null>(null)
-  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [selectedSubmission, setSelectedSubmission] = useState<ContactFormSubmission | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editForm, setEditForm] = useState<Partial<ContactFormSubmission>>({})
 
   const fetchSourcesAndCounts = useCallback(async () => {
     try {
@@ -801,6 +850,49 @@ function ContactFormsTab({
     } finally {
       setIsDeleting(null)
     }
+  }
+
+  const handleUpdate = async () => {
+    if (!selectedSubmission) return
+    try {
+      setIsSaving(true)
+      const res = await fetch("/api/admin/contact-forms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedSubmission.id, ...editForm }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setToast({ message: "Submission updated successfully", type: "success" })
+        // Update in local state
+        const updated = { ...selectedSubmission, ...editForm } as ContactFormSubmission
+        setSelectedSubmission(updated)
+        setSubmissions((prev) =>
+          prev.map((s) => (s.id === selectedSubmission.id ? updated : s))
+        )
+        setIsEditing(false)
+      } else {
+        setToast({ message: data.error || "Failed to update", type: "error" })
+      }
+    } catch {
+      setToast({ message: "Failed to update submission", type: "error" })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const startEditing = () => {
+    if (!selectedSubmission) return
+    setEditForm({
+      firstName: selectedSubmission.firstName,
+      lastName: selectedSubmission.lastName,
+      email: selectedSubmission.email,
+      phone: selectedSubmission.phone || "",
+      company: selectedSubmission.company,
+      message: selectedSubmission.message || "",
+      source: selectedSubmission.source,
+    })
+    setIsEditing(true)
   }
 
   const handleMigration = async () => {
@@ -1107,10 +1199,16 @@ function ContactFormsTab({
               <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    Name
+                    First Name
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    Last Name
                   </th>
                   <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Email
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
+                    Phone
                   </th>
                   <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden md:table-cell">
                     Company
@@ -1129,7 +1227,7 @@ function ContactFormsTab({
               <tbody className="divide-y divide-neutral-100">
                 {filteredSubmissions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center text-neutral-400">
+                    <td colSpan={8} className="px-5 py-12 text-center text-neutral-400">
                       <MessageSquare className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
                       <p className="text-sm font-medium text-neutral-500">No submissions found</p>
                       {searchQuery && (
@@ -1139,35 +1237,56 @@ function ContactFormsTab({
                   </tr>
                 ) : (
                   filteredSubmissions.map((sub) => (
-                    <Fragment key={sub.id}>
-                      <tr
-                        className="hover:bg-neutral-50 transition-colors cursor-pointer"
-                        onClick={() => setExpandedRow(expandedRow === sub.id ? null : sub.id)}
-                      >
-                        <td className="px-4 sm:px-5 py-3">
-                          <span className="text-neutral-900 text-[13px] font-medium leading-snug">
-                            {sub.firstName} {sub.lastName}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-5 py-3">
-                          <span className="text-neutral-600 text-[13px] font-normal leading-snug">
-                            {sub.email}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-5 py-3 hidden md:table-cell">
-                          <span className="text-neutral-500 text-[12px] font-normal">
-                            {sub.company || "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-5 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide">
-                            {sub.source}
-                          </span>
-                        </td>
-                        <td className="px-4 sm:px-5 py-3 text-neutral-400 text-[12px] font-normal whitespace-nowrap hidden sm:table-cell">
-                          {formatDate(sub.created_at)}
-                        </td>
-                        <td className="px-4 sm:px-5 py-3 text-right">
+                    <tr
+                      key={sub.id}
+                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                      onClick={() => setSelectedSubmission(sub)}
+                    >
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
+                          {sub.firstName || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
+                          {sub.lastName || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="text-neutral-600 text-[13px] font-normal leading-snug">
+                          {sub.email}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 hidden lg:table-cell">
+                        <span className="text-neutral-500 text-[12px] font-normal">
+                          {sub.phone || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 hidden md:table-cell">
+                        <span className="text-neutral-500 text-[12px] font-normal">
+                          {sub.company || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide">
+                          {sub.source}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 text-neutral-400 text-[12px] font-normal whitespace-nowrap hidden sm:table-cell">
+                        {formatDate(sub.created_at)}
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedSubmission(sub)
+                            }}
+                            className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -1183,54 +1302,9 @@ function ContactFormsTab({
                               <Trash2 className="w-3.5 h-3.5" />
                             )}
                           </button>
-                        </td>
-                      </tr>
-                      {/* Expanded row for message details */}
-                      {expandedRow === sub.id && (
-                        <tr className="bg-neutral-50">
-                          <td colSpan={6} className="px-5 py-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
-                              {sub.phone && (
-                                <div>
-                                  <span className="text-neutral-400 font-semibold uppercase tracking-wide text-[10px]">
-                                    Phone
-                                  </span>
-                                  <p className="text-neutral-700 font-normal leading-snug mt-0.5">
-                                    {sub.phone}
-                                  </p>
-                                </div>
-                              )}
-                              <div>
-                                <span className="text-neutral-400 font-semibold uppercase tracking-wide text-[10px]">
-                                  Company
-                                </span>
-                                <p className="text-neutral-700 font-normal leading-snug mt-0.5">
-                                  {sub.company || "N/A"}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-neutral-400 font-semibold uppercase tracking-wide text-[10px]">
-                                  Date
-                                </span>
-                                <p className="text-neutral-700 font-normal leading-snug mt-0.5">
-                                  {formatDate(sub.created_at)}
-                                </p>
-                              </div>
-                              {sub.message && (
-                                <div className="sm:col-span-2">
-                                  <span className="text-neutral-400 font-semibold uppercase tracking-wide text-[10px]">
-                                    Message
-                                  </span>
-                                  <p className="text-neutral-700 font-normal leading-relaxed mt-0.5 whitespace-pre-wrap">
-                                    {sub.message}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
+                        </div>
+                      </td>
+                    </tr>
                   ))
                 )}
               </tbody>
@@ -1252,6 +1326,867 @@ function ContactFormsTab({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Submission Detail Modal */}
+      {selectedSubmission && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => { setSelectedSubmission(null); setIsEditing(false) }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" />
+
+          {/* Modal */}
+          <div
+            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center text-sm font-bold">
+                  {(selectedSubmission.firstName?.[0] || "").toUpperCase()}
+                  {(selectedSubmission.lastName?.[0] || "").toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-semibold text-neutral-900 leading-tight">
+                    {isEditing ? "Edit Submission" : `${selectedSubmission.firstName} ${selectedSubmission.lastName}`}
+                  </h3>
+                  <span className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-neutral-400">
+                    <Clock className="w-3 h-3" />
+                    {formatDate(selectedSubmission.created_at)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {!isEditing && (
+                  <button
+                    onClick={startEditing}
+                    className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
+                    title="Edit"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => { setSelectedSubmission(null); setIsEditing(false) }}
+                  className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {isEditing ? (
+                /* ── Edit Mode ── */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">First Name</label>
+                      <input
+                        type="text"
+                        value={editForm.firstName || ""}
+                        onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Last Name</label>
+                      <input
+                        type="text"
+                        value={editForm.lastName || ""}
+                        onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={editForm.email || ""}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={editForm.phone || ""}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Company</label>
+                      <input
+                        type="text"
+                        value={editForm.company || ""}
+                        onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Source</label>
+                    <input
+                      type="text"
+                      value={editForm.source || ""}
+                      onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Message</label>
+                    <textarea
+                      value={editForm.message || ""}
+                      onChange={(e) => setEditForm({ ...editForm, message: e.target.value })}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-normal text-neutral-800 resize-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* ── View Mode ── */
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <User className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">First Name</p>
+                        <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
+                          {selectedSubmission.firstName || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <User className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Last Name</p>
+                        <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
+                          {selectedSubmission.lastName || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <Mail className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Email</p>
+                        <a
+                          href={`mailto:${selectedSubmission.email}`}
+                          className="text-[13px] text-blue-600 hover:text-blue-700 font-medium mt-0.5 truncate block"
+                        >
+                          {selectedSubmission.email}
+                        </a>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <Phone className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Phone</p>
+                        {selectedSubmission.phone ? (
+                          <a
+                            href={`tel:${selectedSubmission.phone}`}
+                            className="text-[13px] text-blue-600 hover:text-blue-700 font-medium mt-0.5 truncate block"
+                          >
+                            {selectedSubmission.phone}
+                          </a>
+                        ) : (
+                          <p className="text-[13px] text-neutral-400 font-normal mt-0.5">—</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <Building2 className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Company</p>
+                        <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
+                          {selectedSubmission.company || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <Globe className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Source</p>
+                        <span className="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-900 text-white tracking-wide">
+                          {selectedSubmission.source}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Message */}
+                  {selectedSubmission.message && (
+                    <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-neutral-400" />
+                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Message</p>
+                      </div>
+                      <p className="text-[13px] text-neutral-700 font-normal leading-relaxed whitespace-pre-wrap">
+                        {selectedSubmission.message}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-100 bg-neutral-50/50">
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleUpdate}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    Save Changes
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      handleDelete(selectedSubmission.id, selectedSubmission.email)
+                      setSelectedSubmission(null)
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={startEditing}
+                      className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setSelectedSubmission(null)}
+                      className="px-4 py-2 text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Event Registrations Tab ──
+
+function EventRegistrationsTab({
+  setToast,
+}: {
+  setToast: (t: Toast | null) => void
+}) {
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [registrations, setRegistrations] = useState<EventRegistration[]>([])
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [selectedEvent, setSelectedEvent] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null)
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/event-registrations?action=counts")
+      const data = await res.json()
+      if (data.success) setCounts(data.counts)
+    } catch (err) {
+      console.error("Error fetching event registration counts:", err)
+    }
+  }, [])
+
+  const fetchRegistrations = useCallback(async (eventSlug?: string) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const url = eventSlug
+        ? `/api/admin/event-registrations?event=${encodeURIComponent(eventSlug)}`
+        : "/api/admin/event-registrations"
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data.success) {
+        setRegistrations(data.registrations)
+      } else {
+        setError(data.error || "Failed to fetch registrations")
+      }
+    } catch {
+      setError("Failed to fetch event registrations")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCounts()
+    fetchRegistrations()
+  }, [fetchCounts, fetchRegistrations])
+
+  const handleFilterByEvent = (eventName: string) => {
+    setSelectedEvent(eventName)
+    if (eventName) {
+      // Filter client-side since we have all data
+      // No need to re-fetch
+    }
+  }
+
+  const handleDelete = async (id: string, email: string) => {
+    if (!confirm(`Delete registration for ${email}? This cannot be undone.`)) return
+    try {
+      setIsDeleting(id)
+      const res = await fetch("/api/admin/event-registrations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setToast({ message: `Deleted registration for ${email}`, type: "success" })
+        setRegistrations((prev) => prev.filter((r) => r.id !== id))
+        if (selectedRegistration?.id === id) setSelectedRegistration(null)
+        await fetchCounts()
+      } else {
+        setToast({ message: data.error || "Failed to delete", type: "error" })
+      }
+    } catch {
+      setToast({ message: "Failed to delete registration", type: "error" })
+    } finally {
+      setIsDeleting(null)
+    }
+  }
+
+  const handleDownloadCSV = async () => {
+    try {
+      setIsDownloading(true)
+      const url = "/api/admin/event-registrations?format=csv"
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = downloadUrl
+      a.download = `event-registrations-${new Date().toISOString().split("T")[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(downloadUrl)
+      setToast({ message: `Downloaded ${registrations.length} registrations`, type: "success" })
+    } catch {
+      setToast({ message: "Failed to download CSV", type: "error" })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
+  // Filter registrations
+  const filteredRegistrations = registrations.filter((r) => {
+    if (selectedEvent && r.eventName !== selectedEvent) return false
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      return (
+        r.email.toLowerCase().includes(q) ||
+        r.firstName.toLowerCase().includes(q) ||
+        r.lastName.toLowerCase().includes(q) ||
+        (r.company || "").toLowerCase().includes(q) ||
+        r.eventName.toLowerCase().includes(q)
+      )
+    }
+    return true
+  }).sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+
+  const totalCount = Object.values(counts).reduce((a, b) => a + b, 0)
+
+  return (
+    <div>
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
+            Event Registrations
+          </h2>
+          <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
+            Registration data from Digital Canvas and SA Tech Day events
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { fetchCounts(); fetchRegistrations() }}
+            disabled={isLoading}
+            className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={handleDownloadCSV}
+            disabled={isDownloading || totalCount === 0}
+            className="flex items-center gap-2 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isDownloading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Event Cards */}
+      {Object.keys(counts).length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 mb-6">
+          <button
+            onClick={() => handleFilterByEvent("")}
+            className={`p-3 rounded-xl border transition-all text-left ${
+              selectedEvent === ""
+                ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
+                : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
+            }`}
+          >
+            <div className="flex items-center gap-1.5 mb-1">
+              <Ticket className="w-3 h-3 opacity-50" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">All Events</span>
+            </div>
+            <div className="text-xl font-bold leading-tight">{totalCount.toLocaleString()}</div>
+            <div className="text-[11px] opacity-50 font-normal leading-snug">registrations</div>
+          </button>
+          {Object.entries(counts)
+            .sort(([, a], [, b]) => b - a)
+            .map(([eventName, count]) => (
+              <button
+                key={eventName}
+                onClick={() => handleFilterByEvent(eventName)}
+                className={`p-3 rounded-xl border transition-all text-left ${
+                  selectedEvent === eventName
+                    ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
+                    : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Ticket className="w-3 h-3 opacity-50" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider truncate">
+                    {eventName}
+                  </span>
+                </div>
+                <div className="text-xl font-bold leading-tight">{count.toLocaleString()}</div>
+                <div className="text-[11px] opacity-50 font-normal leading-snug">registrations</div>
+              </button>
+            ))}
+        </div>
+      )}
+
+      {/* Search */}
+      {registrations.length > 0 && (
+        <div className="bg-white rounded-xl border border-neutral-200 p-3 sm:p-4 mb-4 shadow-sm">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300" />
+            <input
+              type="text"
+              placeholder="Search by name, email, company, or event..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-normal text-neutral-700"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Results Summary */}
+      {registrations.length > 0 && (
+        <div className="flex items-center gap-2 text-neutral-500 mb-4">
+          <Users className="w-4 h-4" />
+          <span className="text-[13px] font-normal leading-snug">
+            Showing{" "}
+            <strong className="text-neutral-900 font-semibold">
+              {filteredRegistrations.length.toLocaleString()}
+            </strong>{" "}
+            of{" "}
+            <strong className="text-neutral-900 font-semibold">
+              {totalCount.toLocaleString()}
+            </strong>{" "}
+            registrations
+            {selectedEvent && (
+              <>
+                {" "}for{" "}
+                <strong className="text-neutral-900 font-semibold">{selectedEvent}</strong>
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
+          <p className="text-red-700 text-sm font-medium">{error}</p>
+          <button
+            onClick={() => fetchRegistrations()}
+            className="mt-3 px-4 py-2 bg-red-600 text-white text-[13px] font-medium rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && !error && (
+        <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+          <Loader2 className="w-6 h-6 animate-spin text-neutral-300 mx-auto mb-3" />
+          <p className="text-neutral-400 text-[13px] font-normal">Loading event registrations...</p>
+        </div>
+      )}
+
+      {/* Registrations Table */}
+      {!isLoading && !error && registrations.length > 0 && (
+        <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto max-h-[60vh]">
+            <table className="w-full">
+              <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
+                <tr>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    First Name
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    Last Name
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    Email
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden md:table-cell">
+                    Company
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
+                    Event
+                  </th>
+                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden sm:table-cell">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Registered
+                    </span>
+                  </th>
+                  <th className="text-center px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
+                    Feed
+                  </th>
+                  <th className="text-right px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {filteredRegistrations.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-12 text-center text-neutral-400">
+                      <Ticket className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
+                      <p className="text-sm font-medium text-neutral-500">No registrations found</p>
+                      {searchQuery && (
+                        <p className="text-[12px] mt-1 font-normal">Try adjusting your search</p>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRegistrations.map((reg) => (
+                    <tr
+                      key={reg.id}
+                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                      onClick={() => setSelectedRegistration(reg)}
+                    >
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
+                          {reg.firstName || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
+                          {reg.lastName || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3">
+                        <span className="text-neutral-600 text-[13px] font-normal leading-snug">
+                          {reg.email}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 hidden md:table-cell">
+                        <span className="text-neutral-500 text-[12px] font-normal">
+                          {reg.company || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 hidden lg:table-cell">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide">
+                          {reg.eventName}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 text-neutral-400 text-[12px] font-normal whitespace-nowrap hidden sm:table-cell">
+                        {formatDate(reg.registeredAt)}
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 text-center hidden lg:table-cell">
+                        {reg.subscribeToFeed ? (
+                          <Check className="w-4 h-4 text-green-500 mx-auto" />
+                        ) : (
+                          <span className="text-neutral-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 sm:px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedRegistration(reg)
+                            }}
+                            className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                            title="View details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(reg.id!, reg.email)
+                            }}
+                            disabled={isDeleting === reg.id}
+                            className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            title={`Delete ${reg.email}`}
+                          >
+                            {isDeleting === reg.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredRegistrations.length > 0 && (
+            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
+              <span className="text-[11px] text-neutral-400 font-normal">
+                {filteredRegistrations.length} registration{filteredRegistrations.length !== 1 ? "s" : ""} in table
+              </span>
+              <button
+                onClick={handleDownloadCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                <Download className="w-3 h-3" />
+                CSV
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No data */}
+      {!isLoading && !error && registrations.length === 0 && (
+        <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+          <Ticket className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
+          <p className="text-sm font-medium text-neutral-500">No event registrations found</p>
+          <p className="text-[12px] text-neutral-400 mt-1 font-normal">
+            Event registrations will appear here once collected
+          </p>
+        </div>
+      )}
+
+      {/* Registration Detail Modal */}
+      {selectedRegistration && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedRegistration(null)}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" />
+
+          <div
+            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center text-sm font-bold">
+                  {(selectedRegistration.firstName?.[0] || "").toUpperCase()}
+                  {(selectedRegistration.lastName?.[0] || "").toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-semibold text-neutral-900 leading-tight">
+                    {selectedRegistration.fullName || `${selectedRegistration.firstName} ${selectedRegistration.lastName}`.trim()}
+                  </h3>
+                  <span className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-neutral-400">
+                    <Clock className="w-3 h-3" />
+                    Registered {formatDate(selectedRegistration.registeredAt)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                  <User className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Name</p>
+                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
+                      {selectedRegistration.fullName || `${selectedRegistration.firstName} ${selectedRegistration.lastName}`.trim() || "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                  <Mail className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Email</p>
+                    <a
+                      href={`mailto:${selectedRegistration.email}`}
+                      className="text-[13px] text-blue-600 hover:text-blue-700 font-medium mt-0.5 truncate block"
+                    >
+                      {selectedRegistration.email}
+                    </a>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                  <Building2 className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Company</p>
+                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
+                      {selectedRegistration.company || "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                  <Globe className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Source</p>
+                    <span className="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-900 text-white tracking-wide">
+                      {selectedRegistration.source}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Info */}
+              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <Ticket className="w-4 h-4 text-neutral-400" />
+                  <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Event Details</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Event</p>
+                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5">{selectedRegistration.eventName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Event Date</p>
+                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5">{formatDate(selectedRegistration.eventDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Subscribed to Feed</p>
+                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5">
+                      {selectedRegistration.subscribeToFeed ? (
+                        <span className="inline-flex items-center gap-1 text-green-600">
+                          <Check className="w-3.5 h-3.5" /> Yes
+                        </span>
+                      ) : "No"}
+                    </p>
+                  </div>
+                  {selectedRegistration.tags?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Tags</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedRegistration.tags.map((tag) => (
+                          <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-200 text-neutral-600">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Page URL */}
+              {selectedRegistration.pageUrl && (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
+                  <MapPin className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Registered From</p>
+                    <a
+                      href={selectedRegistration.pageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12px] text-blue-600 hover:text-blue-700 font-normal mt-0.5 truncate block"
+                    >
+                      {selectedRegistration.pageUrl.replace(/https?:\/\//, "").split("?")[0]}
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-100 bg-neutral-50/50">
+              <button
+                onClick={() => {
+                  handleDelete(selectedRegistration.id!, selectedRegistration.email)
+                  setSelectedRegistration(null)
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                className="px-4 py-2 text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

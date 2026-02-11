@@ -265,7 +265,7 @@ export default function SOPsPage() {
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
-      <div className="min-h-screen bg-neutral-50 text-neutral-900">
+      <div className="min-h-screen bg-neutral-50 text-neutral-900 pt-20 md:pt-16">
         {/* Toast Notification */}
         <AnimatePresence>
           {toast && (
@@ -395,7 +395,7 @@ export default function SOPsPage() {
                 >
                   {/* Filters */}
                   <div className="flex flex-wrap items-center gap-4 mb-6">
-                    <div className="relative flex-1 min-w-[200px] max-w-md">
+                    <div className="relative flex-1 min-w-50 max-w-md">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                       <input
                         type="text"
@@ -767,7 +767,7 @@ export default function SOPsPage() {
                       </div>
 
                       {/* Version */}
-                      <div className="max-w-[200px]">
+                      <div className="max-w-50">
                         <label className="block text-sm font-semibold text-neutral-700 mb-2">
                           Version
                         </label>

@@ -6,6 +6,7 @@ import {
   getContactFormCountsBySource,
   contactFormsToCSV,
   deleteContactForm,
+  updateContactForm,
   migrateContactFormsFromAirtable,
 } from "@/app/lib/firestore-contact-forms"
 
@@ -108,6 +109,46 @@ export async function POST(request: Request) {
     console.error("Error in contact-forms migration:", error)
     return NextResponse.json(
       { success: false, error: "Migration failed" },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH - Update a contact form submission
+export async function PATCH(request: Request) {
+  try {
+    const authResult = await requireAdmin()
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const body = await request.json()
+    const { id, ...updateData } = body
+
+    if (!id || typeof id !== "string") {
+      return NextResponse.json(
+        { error: "Contact form submission ID is required" },
+        { status: 400 }
+      )
+    }
+
+    const result = await updateContactForm(id, updateData)
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error || "Failed to update submission" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Contact form submission updated successfully",
+    })
+  } catch (error) {
+    console.error("Error updating contact form:", error)
+    return NextResponse.json(
+      { success: false, error: "Failed to update contact form submission" },
       { status: 500 }
     )
   }

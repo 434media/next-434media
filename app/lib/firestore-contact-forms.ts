@@ -59,6 +59,41 @@ export async function deleteContactForm(id: string): Promise<{ success: boolean;
 }
 
 /**
+ * Update a contact form submission in Firestore
+ */
+export async function updateContactForm(
+  id: string,
+  data: Partial<Omit<ContactFormSubmission, "id">>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const db = getDb()
+    const docRef = db.collection(COLLECTIONS.CONTACT_FORMS).doc(id)
+    const doc = await docRef.get()
+
+    if (!doc.exists) {
+      return { success: false, error: "Contact form submission not found" }
+    }
+
+    // Only update provided fields, normalize email if changed
+    const updateData: Record<string, unknown> = {}
+    if (data.firstName !== undefined) updateData.firstName = data.firstName
+    if (data.lastName !== undefined) updateData.lastName = data.lastName
+    if (data.company !== undefined) updateData.company = data.company
+    if (data.email !== undefined) updateData.email = data.email.toLowerCase().trim()
+    if (data.phone !== undefined) updateData.phone = data.phone
+    if (data.message !== undefined) updateData.message = data.message
+    if (data.source !== undefined) updateData.source = data.source
+
+    await docRef.update(updateData)
+    console.log(`[Firestore] Updated contact form: ${id}`)
+    return { success: true }
+  } catch (error) {
+    console.error("[Firestore] Failed to update contact form:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+  }
+}
+
+/**
  * Get contact form submissions with optional filtering
  */
 export async function getContactForms(filters?: {

@@ -126,12 +126,12 @@ const sectionGroups: SectionGroup[] = [
     sections: [
       {
         id: "email-lists",
-        title: "EMAIL LISTS",
-        subtitle: "Signups from all websites",
+        title: "LEADS & REGISTRATIONS",
+        subtitle: "Contact Forms • Event Registrations • Email Signups",
         href: "/admin/email-lists",
         icon: <Mail className="w-5 h-5 sm:w-6 sm:h-6" />,
         description:
-          "View, export, and manage email signups from all 434 MEDIA websites",
+          "Manage contact form submissions, event registrations, and email signups across all 434 MEDIA websites with Airtable sync",
         allowedRoles: ["full_admin"],
       },
       {

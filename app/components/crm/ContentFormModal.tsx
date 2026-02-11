@@ -488,7 +488,7 @@ export function ContentFormModal({
                     onChange={(e) => setFormData(prev => ({ ...prev, social_copy: e.target.value }))}
                     placeholder="Enter the post caption or copy..."
                     rows={6}
-                    className="w-full px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[120px] max-h-[400px] leading-relaxed"
+                    className="w-full px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-30 max-h-100 leading-relaxed"
                   />
                   <div className="absolute bottom-1 right-1 text-gray-300 pointer-events-none">
                     <GripVertical className="w-4 h-4" />
@@ -509,7 +509,7 @@ export function ContentFormModal({
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                     placeholder="Additional notes, instructions, or context for the team..."
                     rows={5}
-                    className="w-full px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[350px] leading-relaxed"
+                    className="w-full px-3 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-25 max-h-87.5 leading-relaxed"
                   />
                   <div className="absolute bottom-1 right-1 text-gray-300 pointer-events-none">
                     <GripVertical className="w-4 h-4" />
@@ -573,9 +573,9 @@ export function ContentFormModal({
                         rel="noopener noreferrer"
                         className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors truncate"
                       >
-                        <Link2 className="w-4 h-4 flex-shrink-0" />
+                        <Link2 className="w-4 h-4 shrink-0" />
                         <span className="truncate">{link}</span>
-                        <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </a>
                       <button 
                         type="button" 
@@ -720,7 +720,7 @@ export function ContentFormModal({
                                   value={editCommentContent}
                                   onChange={(e) => setEditCommentContent(e.target.value)}
                                   rows={3}
-                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-y min-h-[60px] max-h-[200px]"
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-y min-h-15 max-h-50"
                                   autoFocus
                                 />
                                 <div className="flex gap-2">
@@ -791,7 +791,7 @@ export function ContentFormModal({
                 {/* Add Comment */}
                 {currentUser ? (
                   <div className="flex gap-2">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       {currentUser.picture ? (
                         <img 
                           src={currentUser.picture} 
@@ -811,7 +811,7 @@ export function ContentFormModal({
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         rows={3}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[70px] max-h-[200px]"
+                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-17.5 max-h-50"
                         placeholder="Add a comment... (use @name to mention someone)"
                       />
                       {/* Tag options helper */}

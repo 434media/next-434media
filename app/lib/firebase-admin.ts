@@ -132,6 +132,7 @@ export const COLLECTIONS = {
   // Contact Form & Email Collections
   CONTACT_FORMS: "contact_forms",
   EMAIL_SIGNUPS: "email_signups",
+  EVENT_REGISTRATIONS: "event_registrations",
 } as const
 
 // Map table names to Firestore collections
