@@ -335,7 +335,7 @@ export default function BlogAdminPage() {
             >
               <div className="flex items-start gap-4">
                 {/* Thumbnail */}
-                <div className="w-20 h-20 rounded-lg bg-neutral-100 flex-shrink-0 overflow-hidden">
+                <div className="w-20 h-20 rounded-lg bg-neutral-100 shrink-0 overflow-hidden">
                   {post.featured_image ? (
                     <img 
                       src={post.featured_image} 
@@ -358,7 +358,7 @@ export default function BlogAdminPage() {
                         {post.excerpt || post.content.substring(0, 100)}...
                       </p>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${
+                    <span className={`px-2 py-1 text-xs rounded-full shrink-0 ${
                       post.status === "published" 
                         ? "bg-emerald-100 text-emerald-700" 
                         : "bg-yellow-100 text-yellow-700"
@@ -384,7 +384,7 @@ export default function BlogAdminPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   {post.status === "published" && (
                     <a
                       href={`/blog/${post.slug}`}

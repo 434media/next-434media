@@ -476,7 +476,7 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
 
       {/* Help panel */}
       {showHelp && (
-        <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-200 p-4 text-sm">
+        <div className="bg-linear-to-r from-sky-50 to-blue-50 border-b border-sky-200 p-4 text-sm">
           <h4 className="font-semibold text-sky-900 mb-3 flex items-center gap-2">
             <HelpCircle className="h-4 w-4" />
             Markdown Quick Reference
@@ -534,7 +534,7 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
               onKeyDown={handleKeyDown}
               placeholder={placeholder || "Write your content here using Markdown...\n\nTip: Use **bold**, *italic*, [links](url), and more!\n\nLine breaks are preserved. Use blank lines for new paragraphs."}
               rows={minRows}
-              className="w-full px-4 py-4 focus:outline-none focus:ring-2 focus:ring-sky-500/20 resize-y font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400 min-h-[200px] bg-white"
+              className="w-full px-4 py-4 focus:outline-none focus:ring-2 focus:ring-sky-500/20 resize-y font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400 min-h-50 bg-white"
               style={{ minHeight: `${Math.max(minRows * 1.75, 12)}rem` }}
             />
             {/* Editor label */}
@@ -556,7 +556,7 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
               </div>
             )}
             <div 
-              className="px-6 py-4 min-h-[200px] overflow-auto prose prose-sm max-w-none 
+              className="px-6 py-4 min-h-50 overflow-auto prose prose-sm max-w-none 
                 prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 
                 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
                 prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:rounded prose-code:px-1
