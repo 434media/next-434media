@@ -1507,7 +1507,13 @@ export function TaskModal({
                       {/* Tag options helper - shows available team members for tagging */}
                       <div className="flex flex-wrap gap-1 mt-1.5 mb-2">
                         <span className="text-xs text-gray-400 mr-1">Tag:</span>
-                        {teamMembers.filter(m => m.isActive !== false).map((member) => (
+                        {teamMembers.filter(m => {
+                          if (m.isActive === false) return false
+                          // Filter out test/demo team member entries
+                          const nameLower = m.name.toLowerCase()
+                          const excludeNames = ["elon", "434mediamgr", "testing"]
+                          return !excludeNames.includes(nameLower)
+                        }).map((member) => (
                           <button
                             key={member.id}
                             type="button"

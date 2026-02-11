@@ -15,6 +15,7 @@ export { OpportunityFormModal } from "./OpportunityFormModal"
 export { TaskModal } from "./TaskModal"
 export { ContentFormModal } from "./ContentFormModal"
 export { NotificationBell } from "./NotificationBell"
+export { default as LinkedTasksPanel } from "./LinkedTasksPanel"
 
 // Re-export notification context types for convenience
 export type { Notification } from "../../context/notification-context"

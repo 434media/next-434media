@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
       assigned_to: body.assigned_to || body.owner,
       secondary_assigned_to: body.secondary_assigned_to || [],
       assigned_by: body.assigned_by || "",
+      created_by: body.created_by || "",
       brand: body.brand || undefined,
       status: body.status || "not_started",
       priority: body.priority || "medium",

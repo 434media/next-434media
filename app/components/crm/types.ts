@@ -344,6 +344,29 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
 // Brand options
 export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA TV", "Digital Canvas", "TXMX Boxing", "AIMSATX"]
 
+// Shared owner map: maps assignee display names to Firestore task collection owners
+// Used across task handlers to determine which collection a task belongs to
+export const OWNER_MAP: Record<string, string> = {
+  "Jake": "jake",
+  "Jacob Lee Miles": "jake",
+  "Marc": "marc",
+  "Marcos Resendez": "marc",
+  "Stacy": "stacy",
+  "Stacy Ramirez": "stacy",
+  "Stacy Carrizales": "stacy",
+  "Jesse": "jesse",
+  "Jesse Hernandez": "jesse",
+  "Barb": "barb",
+  "Barbara Carreon": "barb",
+  "Nichole": "teams",
+  "Nichole Snow": "teams",
+}
+
+// Get the Firestore collection owner key for a given assignee name
+export function getTaskOwner(assigneeName: string): string {
+  return OWNER_MAP[assigneeName] || "teams"
+}
+
 // Team members for tagging and assignment
 // Full names from Airtable migration
 // Note: This is a fallback list. Team members are now managed in Firestore (crm_team_members collection)
