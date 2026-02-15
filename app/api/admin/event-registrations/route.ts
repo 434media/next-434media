@@ -7,6 +7,9 @@ import {
   eventRegistrationsToCSV,
 } from "@/app/lib/firestore-event-registrations"
 
+// Ensure this route is never cached — always fetch fresh data from Firestore
+export const dynamic = "force-dynamic"
+
 async function requireAdmin() {
   const session = await getSession()
   if (!session) {
@@ -33,7 +36,9 @@ export async function GET(request: Request) {
     // Get counts by event
     if (action === "counts") {
       const counts = await getEventRegistrationCounts()
-      return NextResponse.json({ success: true, counts })
+      return NextResponse.json({ success: true, counts }, {
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      })
     }
 
     // Get registrations with optional event filter
@@ -55,7 +60,9 @@ export async function GET(request: Request) {
       })
     }
 
-    return NextResponse.json({ success: true, registrations })
+    return NextResponse.json({ success: true, registrations }, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    })
   } catch (error) {
     console.error("Error in event-registrations GET:", error)
     return NextResponse.json(

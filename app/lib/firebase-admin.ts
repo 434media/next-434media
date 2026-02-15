@@ -142,6 +142,54 @@ export const NAMED_DATABASES = {
   AIMSATX: "aimsatx",
 } as const
 
+// ── External project: Digital Canvas (media-analytics-proxy) ──
+// The Digital Canvas site writes MHTH event registrations to its own
+// GCP project ("media-analytics-proxy") instead of the 434 Media project.
+// We connect to it as a separate Firebase app to read those registrations.
+let digitalCanvasDb: admin.firestore.Firestore | undefined
+
+export function getDigitalCanvasDb(): admin.firestore.Firestore {
+  if (digitalCanvasDb) return digitalCanvasDb
+
+  const appName = "digitalcanvas"
+
+  // Check if app already exists
+  const existing = admin.apps.find((a) => a?.name === appName)
+  if (existing) {
+    digitalCanvasDb = existing.firestore()
+    return digitalCanvasDb
+  }
+
+  const raw = process.env.DIGITALCANVAS_SERVICE_ACCOUNT_KEY
+  if (!raw) {
+    throw new Error(
+      "DIGITALCANVAS_SERVICE_ACCOUNT_KEY is not set. Cannot connect to Digital Canvas Firestore."
+    )
+  }
+
+  const creds = JSON.parse(raw)
+  const dcApp = admin.initializeApp(
+    {
+      credential: admin.credential.cert({
+        projectId: creds.project_id,
+        clientEmail: creds.client_email,
+        privateKey: creds.private_key,
+      }),
+    },
+    appName
+  )
+
+  digitalCanvasDb = dcApp.firestore()
+  try {
+    digitalCanvasDb.settings({ ignoreUndefinedProperties: true })
+  } catch {
+    // Settings already applied
+  }
+
+  console.log("[Firestore] Digital Canvas project (media-analytics-proxy) initialized")
+  return digitalCanvasDb
+}
+
 // Collection names - maps to different Firestore collections
 export const COLLECTIONS = {
   EVENTS: "events",

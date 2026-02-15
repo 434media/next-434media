@@ -23,7 +23,7 @@ const COLLECTION_NAME = "email_signups"
 async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<FirestoreEmailSignup[]> {
   try {
     // If filtering by a non-aim source, skip
-    if (filters?.source && filters.source !== "aim") return []
+    if (filters?.source && filters.source.toLowerCase() !== "aim") return []
 
     const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
     const snapshot = await aimsDb.collection("email_signups").get()
@@ -32,7 +32,7 @@ async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<Fi
       return {
         id: `aimsatx:${doc.id}`,
         email: data.email || "",
-        source: data.source || "aim",
+        source: data.source || "AIM",
         created_at: data.created_at || "",
         mailchimp_synced: data.mailchimp_synced || false,
         mailchimp_tags: data.tags || data.mailchimp_tags || [],
@@ -52,7 +52,7 @@ async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<Fi
 function deduplicateEmailSignups(signups: FirestoreEmailSignup[]): FirestoreEmailSignup[] {
   const seen = new Map<string, FirestoreEmailSignup>()
   for (const signup of signups) {
-    const key = `${signup.email.toLowerCase()}|${signup.source}`
+    const key = `${signup.email.toLowerCase()}|${signup.source.toLowerCase()}`
     const existing = seen.get(key)
     if (!existing || (signup._dbSource === "default" && existing._dbSource !== "default")) {
       seen.set(key, signup)
@@ -159,7 +159,7 @@ export async function getEmailSignups(filters?: {
     
     // If filtering by source and it's not aim, only return default
     let signups: FirestoreEmailSignup[]
-    if (filters?.source && filters.source !== "aim") {
+    if (filters?.source && filters.source.toLowerCase() !== "aim") {
       signups = defaultSignups
     } else {
       signups = deduplicateEmailSignups([...defaultSignups, ...aimsSignups])

@@ -1,4 +1,4 @@
-import { getDb, getNamedDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
+import { getDb, getNamedDb, getDigitalCanvasDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
 
 // Event Registration interface
 export interface EventRegistration {
@@ -22,25 +22,50 @@ export interface EventRegistration {
 const COLLECTION = COLLECTIONS.EVENT_REGISTRATIONS
 
 /**
+ * Convert a Firestore Timestamp or date value to ISO string
+ */
+function toISOString(value: unknown): string {
+  if (!value) return ""
+  // Firestore Timestamp object (has _seconds or seconds property)
+  if (typeof value === "object" && value !== null) {
+    const v = value as Record<string, unknown>
+    const seconds = (v._seconds ?? v.seconds) as number | undefined
+    if (typeof seconds === "number") {
+      return new Date(seconds * 1000).toISOString()
+    }
+    // Firestore Timestamp with toDate() method
+    if (typeof (v as { toDate?: () => Date }).toDate === "function") {
+      return (v as { toDate: () => Date }).toDate().toISOString()
+    }
+  }
+  // Already a string
+  if (typeof value === "string") return value
+  // Number (milliseconds)
+  if (typeof value === "number") return new Date(value).toISOString()
+  return ""
+}
+
+/**
  * Map a Firestore doc to an EventRegistration (default DB format)
+ * Handles both string dates and Firestore Timestamp objects
  */
 function mapDefaultDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistration {
   const data = doc.data()!
   return {
     id: doc.id,
     email: data.email || "",
-    firstName: data.firstName || "",
-    lastName: data.lastName || "",
-    fullName: data.fullName || "",
+    firstName: data.firstName || data.first_name || "",
+    lastName: data.lastName || data.last_name || "",
+    fullName: data.fullName || data.full_name || data.name || "",
     company: data.company || null,
-    subscribeToFeed: data.subscribeToFeed || false,
+    subscribeToFeed: data.subscribeToFeed || data.subscribe_to_feed || false,
     event: data.event || "",
-    eventName: data.eventName || "",
-    eventDate: data.eventDate || "",
-    registeredAt: data.registeredAt || "",
+    eventName: data.eventName || data.event_name || "",
+    eventDate: toISOString(data.eventDate || data.event_date || ""),
+    registeredAt: toISOString(data.registeredAt || data.registered_at || data.createdAt || data.created_at || ""),
     source: data.source || "",
     tags: data.tags || [],
-    pageUrl: data.pageUrl || "",
+    pageUrl: data.pageUrl || data.page_url || "",
     _dbSource: "default",
   }
 }
@@ -90,6 +115,44 @@ async function getTechdayRegistrations(filters?: { event?: string }): Promise<Ev
 }
 
 /**
+ * Fetch registrations from the Digital Canvas Firestore project (media-analytics-proxy).
+ * Digital Canvas writes to the "event-registrations" collection (hyphenated)
+ * in a completely separate GCP project.
+ */
+async function getDigitalCanvasRegistrations(filters?: { event?: string }): Promise<EventRegistration[]> {
+  try {
+    // If filtering by a non-MHTH event, skip
+    if (filters?.event && filters.event !== "MoreHumanThanHuman2026") return []
+
+    const dcDb = getDigitalCanvasDb()
+    const snapshot = await dcDb.collection("event-registrations").get()
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: `dc:${doc.id}`,
+        email: data.email || "",
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        fullName: data.fullName || "",
+        company: data.company || null,
+        subscribeToFeed: data.subscribeToFeed || false,
+        event: data.event || "MoreHumanThanHuman2026",
+        eventName: data.eventName || "More Human Than Human",
+        eventDate: toISOString(data.eventDate || "2026-02-28"),
+        registeredAt: toISOString(data.registeredAt || data.createdAt || ""),
+        source: data.source || "web-digitalcanvas",
+        tags: data.tags || [],
+        pageUrl: data.pageUrl || "",
+        _dbSource: "digitalcanvas",
+      }
+    })
+  } catch (error) {
+    console.error("Error fetching Digital Canvas registrations:", error)
+    return []
+  }
+}
+
+/**
  * Deduplicate registrations across databases by email+event
  * Default DB registrations take priority (they may have been enriched)
  */
@@ -108,7 +171,10 @@ function deduplicateRegistrations(registrations: EventRegistration[]): EventRegi
 
 /**
  * Get event registrations with optional filtering
- * Merges results from default DB and techday named database
+ * Merges results from:
+ *  1. Default DB (groovy-ego) — event_registrations collection (migrated data)
+ *  2. Techday named DB (groovy-ego/techday) — registrations collection
+ *  3. Digital Canvas project (media-analytics-proxy) — event-registrations collection
  */
 export async function getEventRegistrations(filters?: {
   event?: string
@@ -126,20 +192,21 @@ export async function getEventRegistrations(filters?: {
       query = query.where("source", "==", filters.source)
     }
 
-    const [defaultSnapshot, techdayRegs] = await Promise.all([
+    const [defaultSnapshot, techdayRegs, dcRegs] = await Promise.all([
       query.get(),
       getTechdayRegistrations(filters),
+      getDigitalCanvasRegistrations(filters),
     ])
 
     const defaultRegs = defaultSnapshot.docs.map(mapDefaultDoc)
 
-    // If filtering by source and it's not SATechDay, only return default
-    if (filters?.source && filters.source !== "SATechDay") {
+    // If filtering by source and it's not SATechDay or digitalcanvas, only return default
+    if (filters?.source && filters.source !== "SATechDay" && filters.source !== "web-digitalcanvas") {
       return defaultRegs
     }
 
-    // Merge and deduplicate
-    const allRegs = deduplicateRegistrations([...defaultRegs, ...techdayRegs])
+    // Merge and deduplicate across all three sources
+    const allRegs = deduplicateRegistrations([...defaultRegs, ...techdayRegs, ...dcRegs])
     return allRegs
   } catch (error) {
     console.error("Error fetching event registrations:", error)
@@ -167,7 +234,7 @@ export async function getEventNames(): Promise<string[]> {
 }
 
 /**
- * Get counts by event (merges default + techday databases)
+ * Get counts by event (merges default + techday + digitalcanvas databases)
  */
 export async function getEventRegistrationCounts(): Promise<Record<string, number>> {
   try {
@@ -186,7 +253,7 @@ export async function getEventRegistrationCounts(): Promise<Record<string, numbe
 
 /**
  * Delete an event registration
- * Supports deletion from both default and techday databases
+ * Supports deletion from default, techday, and digitalcanvas databases
  */
 export async function deleteEventRegistration(id: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -195,6 +262,14 @@ export async function deleteEventRegistration(id: string): Promise<{ success: bo
       const realId = id.replace("techday:", "")
       const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
       await tdDb.collection("registrations").doc(realId).delete()
+      return { success: true }
+    }
+
+    // Check if this is a digitalcanvas-prefixed ID
+    if (id.startsWith("dc:")) {
+      const realId = id.replace("dc:", "")
+      const dcDb = getDigitalCanvasDb()
+      await dcDb.collection("event-registrations").doc(realId).delete()
       return { success: true }
     }
 

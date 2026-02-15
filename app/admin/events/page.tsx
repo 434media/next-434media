@@ -593,7 +593,7 @@ export default function EventsAdminPage() {
             >
               <div className="flex items-start gap-3 sm:gap-4">
                 {/* Date Badge */}
-                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex-shrink-0 flex flex-col items-center justify-center ${
+                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl shrink-0 flex flex-col items-center justify-center ${
                   event.status === "upcoming"
                     ? activeWebsite === "434media"
                       ? "bg-emerald-50 border border-emerald-200"
@@ -625,7 +625,7 @@ export default function EventsAdminPage() {
                         {event.description}
                       </p>
                     </div>
-                    <span className={`px-2.5 py-1 text-[10px] sm:text-xs font-medium rounded-full flex-shrink-0 ${
+                    <span className={`px-2.5 py-1 text-[10px] sm:text-xs font-medium rounded-full shrink-0 ${
                       event.status === "upcoming" 
                         ? activeWebsite === "434media"
                           ? "bg-emerald-100 text-emerald-700 border border-emerald-200" 
@@ -641,7 +641,7 @@ export default function EventsAdminPage() {
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 sm:mt-3 text-[10px] sm:text-xs text-neutral-500">
                     <span className="flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
-                      <span className="truncate max-w-[120px] sm:max-w-none">
+                      <span className="truncate max-w-30 sm:max-w-none">
                         {event.is_virtual ? "Virtual" : event.location}
                       </span>
                     </span>
@@ -670,7 +670,7 @@ export default function EventsAdminPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                   {event.event_url && (
                     <a
                       href={event.event_url}
@@ -752,7 +752,7 @@ export default function EventsAdminPage() {
                 {activeWebsite === "434media" ? "434 Media" : "AIM SATX"}
               </span>
             </div>
-            <p className="text-neutral-500 text-xs sm:text-sm truncate max-w-[200px] sm:max-w-none">
+            <p className="text-neutral-500 text-xs sm:text-sm truncate max-w-50 sm:max-w-none">
               {view === "edit" ? `Editing: ${selectedEvent?.title}` : "Fill in the event details"}
             </p>
           </div>
@@ -782,7 +782,7 @@ export default function EventsAdminPage() {
 
       {/* Import from URL option (only for create) */}
       {view === "create" && (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 sm:p-5 shadow-sm">
+        <div className="bg-linear-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 sm:p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-amber-600" />
@@ -814,7 +814,7 @@ export default function EventsAdminPage() {
           </div>
           {parseError && (
             <p className="text-sm text-red-600 mt-3 flex items-center gap-1.5 bg-red-50 px-3 py-2 rounded-lg">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span className="line-clamp-2">{parseError}</span>
             </p>
           )}

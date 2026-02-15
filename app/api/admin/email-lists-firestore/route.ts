@@ -8,6 +8,9 @@ import {
   deleteEmailSignup,
 } from "@/app/lib/firestore-email-signups"
 
+// Ensure this route is never cached — always fetch fresh data from Firestore
+export const dynamic = "force-dynamic"
+
 // Check admin access
 async function requireAdmin() {
   const session = await getSession()
@@ -33,16 +36,18 @@ export async function GET(request: Request) {
     const format = searchParams.get("format")
     const dataSource = searchParams.get("dataSource") || "firestore" // "firestore" or "airtable"
 
+    const noCacheHeaders = { "Cache-Control": "no-store, no-cache, must-revalidate" }
+
     // Get counts by source
     if (action === "counts") {
       const counts = await getEmailCountsBySource()
-      return NextResponse.json({ success: true, counts })
+      return NextResponse.json({ success: true, counts }, { headers: noCacheHeaders })
     }
 
     // Get available sources
     if (action === "sources") {
       const sources = await getEmailSources()
-      return NextResponse.json({ success: true, sources })
+      return NextResponse.json({ success: true, sources }, { headers: noCacheHeaders })
     }
 
     // Get emails (with optional source filter)
@@ -69,7 +74,7 @@ export async function GET(request: Request) {
       signups,
       total: signups.length,
       dataSource: "firestore",
-    })
+    }, { headers: noCacheHeaders })
   } catch (error) {
     console.error("Error in email-lists API:", error)
     return NextResponse.json(

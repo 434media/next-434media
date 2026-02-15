@@ -235,8 +235,8 @@ function EmailListsTab({
   const fetchSourcesAndCounts = useCallback(async () => {
     try {
       const [sourcesRes, countsRes] = await Promise.all([
-        fetch("/api/admin/email-lists-firestore?action=sources"),
-        fetch("/api/admin/email-lists-firestore?action=counts"),
+        fetch(`/api/admin/email-lists-firestore?action=sources&_t=${Date.now()}`, { cache: "no-store" }),
+        fetch(`/api/admin/email-lists-firestore?action=counts&_t=${Date.now()}`, { cache: "no-store" }),
       ])
       const sourcesData = await sourcesRes.json()
       const countsData = await countsRes.json()
@@ -253,9 +253,9 @@ function EmailListsTab({
         setIsLoading(true)
         setError(null)
         const url = source
-          ? `/api/admin/email-lists-firestore?source=${encodeURIComponent(source)}`
-          : "/api/admin/email-lists-firestore"
-        const res = await fetch(url)
+          ? `/api/admin/email-lists-firestore?source=${encodeURIComponent(source)}&_t=${Date.now()}`
+          : `/api/admin/email-lists-firestore?_t=${Date.now()}`
+        const res = await fetch(url, { cache: "no-store" })
         const data = await res.json()
         if (data.success) {
           setSignups(data.signups)
@@ -1145,30 +1145,6 @@ function ContactFormsTab({
         </div>
       )}
 
-      {/* Results Summary */}
-      {submissions.length > 0 && (
-        <div className="flex items-center gap-2 text-neutral-500 mb-4">
-          <Users className="w-4 h-4" />
-          <span className="text-[13px] font-normal leading-snug">
-            Showing{" "}
-            <strong className="text-neutral-900 font-semibold">
-              {filteredSubmissions.length.toLocaleString()}
-            </strong>{" "}
-            of{" "}
-            <strong className="text-neutral-900 font-semibold">
-              {totalCount.toLocaleString()}
-            </strong>{" "}
-            submissions
-            {selectedSource && (
-              <>
-                {" "}from{" "}
-                <strong className="text-neutral-900 font-semibold">{selectedSource}</strong>
-              </>
-            )}
-          </span>
-        </div>
-      )}
-
       {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
@@ -1617,7 +1593,7 @@ function EventRegistrationsTab({
 
   const fetchCounts = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/event-registrations?action=counts")
+      const res = await fetch(`/api/admin/event-registrations?action=counts&_t=${Date.now()}`, { cache: "no-store" })
       const data = await res.json()
       if (data.success) setCounts(data.counts)
     } catch (err) {
@@ -1630,9 +1606,9 @@ function EventRegistrationsTab({
       setIsLoading(true)
       setError(null)
       const url = eventSlug
-        ? `/api/admin/event-registrations?event=${encodeURIComponent(eventSlug)}`
-        : "/api/admin/event-registrations"
-      const res = await fetch(url)
+        ? `/api/admin/event-registrations?event=${encodeURIComponent(eventSlug)}&_t=${Date.now()}`
+        : `/api/admin/event-registrations?_t=${Date.now()}`
+      const res = await fetch(url, { cache: "no-store" })
       const data = await res.json()
       if (data.success) {
         setRegistrations(data.registrations)
