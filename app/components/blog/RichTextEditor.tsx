@@ -479,31 +479,98 @@ export default function RichTextEditor({
     }
   }
 
-  // Search and replace functionality
+  // Escape special regex characters in user input to prevent ReDoS and injection
+  const escapeRegExp = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  // Search and replace functionality using DOM TreeWalker for safe text manipulation
   const handleSearch = () => {
     if (!searchTerm || !editorRef.current) return
     
-    const content = editorRef.current.innerHTML
-    const regex = new RegExp(searchTerm, 'gi')
-    const highlighted = content.replace(regex, `<mark class="bg-yellow-200">$&</mark>`)
-    editorRef.current.innerHTML = highlighted
+    // First clear any existing highlights
+    clearHighlights()
+    
+    // Use TreeWalker to find text nodes, avoiding HTML reinterpretation
+    const walker = document.createTreeWalker(
+      editorRef.current,
+      NodeFilter.SHOW_TEXT,
+      null
+    )
+    
+    const escapedTerm = escapeRegExp(searchTerm)
+    const regex = new RegExp(escapedTerm, 'gi')
+    const textNodes: Text[] = []
+    let node: Text | null
+    while ((node = walker.nextNode() as Text | null)) {
+      if (regex.test(node.textContent || '')) {
+        textNodes.push(node)
+      }
+      regex.lastIndex = 0
+    }
+    
+    // Wrap matches in <mark> elements safely via DOM API
+    for (const textNode of textNodes) {
+      const text = textNode.textContent || ''
+      const parts = text.split(new RegExp(`(${escapedTerm})`, 'gi'))
+      if (parts.length <= 1) continue
+      
+      const fragment = document.createDocumentFragment()
+      for (const part of parts) {
+        if (new RegExp(`^${escapedTerm}$`, 'i').test(part)) {
+          const mark = document.createElement('mark')
+          mark.className = 'bg-yellow-200'
+          mark.textContent = part
+          fragment.appendChild(mark)
+        } else {
+          fragment.appendChild(document.createTextNode(part))
+        }
+      }
+      textNode.parentNode?.replaceChild(fragment, textNode)
+    }
   }
 
   const handleReplace = () => {
     if (!searchTerm || !editorRef.current) return
     
-    const content = editorRef.current.innerHTML
-    const regex = new RegExp(searchTerm, 'gi')
-    const replaced = content.replace(regex, replaceTerm)
-    editorRef.current.innerHTML = replaced
+    // First clear any highlights
+    clearHighlights()
+    
+    // Use TreeWalker for safe text-only replacement
+    const walker = document.createTreeWalker(
+      editorRef.current,
+      NodeFilter.SHOW_TEXT,
+      null
+    )
+    
+    const escapedTerm = escapeRegExp(searchTerm)
+    const regex = new RegExp(escapedTerm, 'gi')
+    const textNodes: Text[] = []
+    let node: Text | null
+    while ((node = walker.nextNode() as Text | null)) {
+      if (regex.test(node.textContent || '')) {
+        textNodes.push(node)
+      }
+      regex.lastIndex = 0
+    }
+    
+    for (const textNode of textNodes) {
+      const text = textNode.textContent || ''
+      textNode.textContent = text.replace(regex, replaceTerm)
+    }
     handleContentChange()
   }
 
   const clearHighlights = () => {
     if (!editorRef.current) return
-    const content = editorRef.current.innerHTML
-    const cleared = content.replace(/<mark[^>]*>(.*?)<\/mark>/gi, '$1')
-    editorRef.current.innerHTML = cleared
+    // Remove <mark> elements safely via DOM API instead of innerHTML manipulation
+    const marks = editorRef.current.querySelectorAll('mark.bg-yellow-200')
+    marks.forEach(mark => {
+      const textNode = document.createTextNode(mark.textContent || '')
+      mark.parentNode?.replaceChild(textNode, mark)
+    })
+    // Normalize adjacent text nodes
+    editorRef.current.normalize()
   }
 
   // Copy content to clipboard
@@ -920,7 +987,7 @@ export default function RichTextEditor({
             </button>
             
             {showFormatDropdown && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[160px]">
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-40">
                 <button onClick={() => insertHeading(1)} className="w-full px-3 py-2 text-left hover:bg-gray-50 border-b border-gray-100">
                   <span className="text-2xl font-bold">Heading 1</span>
                 </button>
@@ -1083,7 +1150,7 @@ export default function RichTextEditor({
       {/* Editor Content */}
       <div className="relative" style={{ zoom: `${zoomLevel}%` }}>
         {isPreviewMode ? (
-          <div className="p-6 min-h-[400px] prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-gray-900">
+          <div className="p-6 min-h-100 prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-gray-900">
             <div dangerouslySetInnerHTML={{ __html: value }} />
           </div>
         ) : (
@@ -1095,7 +1162,7 @@ export default function RichTextEditor({
             onMouseUp={handleTextSelection}
             onKeyUp={handleTextSelection}
             onFocus={() => setShowFormatDropdown(false)}
-            className={`p-6 min-h-[400px] focus:outline-none text-left transition-all ${
+            className={`p-6 min-h-100 focus:outline-none text-left transition-all ${
               readOnly ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'
             }`}
             style={{

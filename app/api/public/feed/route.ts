@@ -32,15 +32,22 @@ const ALLOWED_ORIGINS = process.env.FEED_API_ALLOWED_ORIGINS
 const API_KEY = process.env.FEED_API_SECRET
 const REQUIRE_API_KEY = process.env.FEED_API_REQUIRE_KEY === 'true'
 
-// Validate origin
+// Validate origin against allow-list
 function isAllowedOrigin(origin: string | null): boolean {
   if (ALLOWED_ORIGINS.includes('*')) return true
   if (!origin) return false
-  return ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || 
-    origin.endsWith(allowed.replace('*', '')) ||
-    allowed === '*'
-  )
+  return ALLOWED_ORIGINS.some(allowed => {
+    if (allowed === '*') return true
+    // Exact match
+    if (origin === allowed) return true
+    // Wildcard subdomain match: *.example.com should match sub.example.com
+    if (allowed.startsWith('*.')) {
+      const domain = allowed.slice(2) // Remove '*.' prefix
+      // Must match exactly as a subdomain suffix (with dot boundary)
+      return origin.endsWith(domain) && origin[origin.length - domain.length - 1] === '.'
+    }
+    return false
+  })
 }
 
 // Get CORS origin header

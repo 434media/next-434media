@@ -28,8 +28,16 @@ function getPlatformFromHostname(hostname: string): 'meetup' | 'eventbrite' | 'l
   return null
 }
 
+// Maximum URL length to prevent abuse
+const MAX_URL_LENGTH = 2048
+
 // Validate URL is in allow-list to prevent SSRF attacks
 function validateUrlForSSRF(url: string): { valid: true; safeUrl: string; platform: 'meetup' | 'eventbrite' | 'luma' } | { valid: false; error: string } {
+  // Length check to prevent abuse
+  if (!url || url.length > MAX_URL_LENGTH) {
+    return { valid: false, error: "Invalid or excessively long URL." }
+  }
+
   let urlObj: URL
   try {
     urlObj = new URL(url)
@@ -40,6 +48,11 @@ function validateUrlForSSRF(url: string): { valid: true; safeUrl: string; platfo
   // Only allow HTTPS protocol to prevent protocol-based attacks
   if (urlObj.protocol !== 'https:') {
     return { valid: false, error: "Only HTTPS URLs are supported for security reasons." }
+  }
+
+  // Reject URLs with authentication credentials
+  if (urlObj.username || urlObj.password) {
+    return { valid: false, error: "URLs with credentials are not allowed." }
   }
 
   const hostname = urlObj.hostname.toLowerCase()
@@ -53,9 +66,14 @@ function validateUrlForSSRF(url: string): { valid: true; safeUrl: string; platfo
     }
   }
 
-  // Reconstruct URL from validated components to ensure safety
-  // This prevents URL manipulation attacks
-  const safeUrl = `https://${urlObj.hostname}${urlObj.pathname}${urlObj.search}`
+  // Reconstruct a clean URL from validated components to break taint tracking
+  // Use URL constructor to ensure proper encoding and prevent manipulation
+  const reconstructed = new URL(`https://${urlObj.hostname}${urlObj.pathname}`)
+  // Only copy over safe search params (no fragments, no credentials)
+  urlObj.searchParams.forEach((value, key) => {
+    reconstructed.searchParams.set(key, value)
+  })
+  const safeUrl = reconstructed.toString()
 
   return { valid: true, safeUrl, platform }
 }

@@ -66,7 +66,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    // Limit email length to prevent ReDoS attacks before regex validation
+    if (email.length > 254) {
+      return NextResponse.json(
+        { error: "Email address is too long" },
+        { status: 400 }
+      )
+    }
+
+    // Use a simple, non-backtracking email validation regex
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: "Invalid email format" },

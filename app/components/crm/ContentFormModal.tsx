@@ -105,7 +105,14 @@ export function ContentFormModal({
           notes: post.notes || "",
           thumbnail: post.thumbnail || "",
           social_copy: post.social_copy || "",
-          links: post.links || [],
+          links: (post.links || []).filter((link: string) => {
+            try {
+              const parsed = new URL(link)
+              return ['http:', 'https:'].includes(parsed.protocol)
+            } catch {
+              return false
+            }
+          }),
           assets: post.assets || [],
           tags: post.tags || "",
           social_platforms: post.social_platforms || [],
@@ -215,6 +222,15 @@ export function ContentFormModal({
       let url = newLink.trim()
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
         url = "https://" + url
+      }
+      // Validate the URL is safe (no javascript: or data: protocols)
+      try {
+        const parsed = new URL(url)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return // Reject non-HTTP(S) URLs
+        }
+      } catch {
+        return // Reject malformed URLs
       }
       setFormData(prev => ({ ...prev, links: [...prev.links, url] }))
       setNewLink("")
@@ -568,7 +584,14 @@ export function ContentFormModal({
                   {formData.links.map((link, index) => (
                     <div key={index} className="flex items-center gap-2 group">
                       <a 
-                        href={link} 
+                        href={(() => {
+                          try {
+                            const parsed = new URL(link)
+                            return ['http:', 'https:'].includes(parsed.protocol) ? link : '#'
+                          } catch {
+                            return '#'
+                          }
+                        })()}
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors truncate"

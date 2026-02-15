@@ -41,6 +41,37 @@ function getCredentials(): ServiceAccountCredentials | null {
 }
 
 /**
+ * Escape HTML special characters to prevent injection in email templates
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+/**
+ * Validate that a URL is a safe HTTP(S) URL to prevent SSRF/injection
+ */
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return '#'
+    }
+    // Reject URLs with credentials
+    if (parsed.username || parsed.password) {
+      return '#'
+    }
+    return parsed.toString()
+  } catch {
+    return '#'
+  }
+}
+
+/**
  * Send email notification to mentioned users via Gmail API
  * Uses domain-wide delegation to send emails as the notification sender
  */
@@ -85,9 +116,15 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
 
     // Create the email content
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://434media.com'
-    const taskLink = taskUrl || `${baseUrl}/admin/crm?task=${taskId}`
+    // Sanitize taskUrl to prevent SSRF/injection; fall back to safe constructed URL
+    const taskLink = taskUrl ? sanitizeUrl(taskUrl) : `${baseUrl}/admin/crm?task=${encodeURIComponent(taskId)}`
     
-    const emailSubject = `[434 Media CRM] You were mentioned in: ${taskTitle}`
+    // Escape user-controlled content to prevent HTML injection in email
+    const safeTaskTitle = escapeHtml(taskTitle)
+    const safeAuthorName = escapeHtml(comment.author_name)
+    const safeCommentContent = escapeHtml(comment.content).replace(/\n/g, '<br>')
+
+    const emailSubject = `[434 Media CRM] You were mentioned in: ${safeTaskTitle}`
     const emailBody = `
 <html>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -98,10 +135,10 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
     
     <div style="background-color: #f8f9fa; border-radius: 8px; padding: 16px; margin: 20px 0;">
       <p style="margin: 0 0 8px 0; font-weight: bold; color: #333;">
-        ${comment.author_name} commented on "${taskTitle}":
+        ${safeAuthorName} commented on "${safeTaskTitle}":
       </p>
       <blockquote style="margin: 12px 0; padding: 12px 16px; border-left: 4px solid #4f46e5; background-color: white; border-radius: 4px;">
-        ${comment.content.replace(/\n/g, '<br>')}
+        ${safeCommentContent}
       </blockquote>
       <p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">
         ${new Date(comment.created_at).toLocaleString('en-US', { 
