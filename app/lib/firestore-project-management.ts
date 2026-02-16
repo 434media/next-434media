@@ -83,6 +83,8 @@ function mapFirestoreToPMEvent(doc: admin.firestore.DocumentSnapshot): PMEvent {
     img_ai: data.img_ai,
     website_url: data.website_url,
     notes: data.notes,
+    links: data.links || [],
+    client_contacts: data.client_contacts || [],
     vendor_ids: data.vendor_ids,
     speaker_ids: data.speaker_ids,
     created_at: data.created_at instanceof Timestamp

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
 import {
   getPMEventsFromFirestore,
+  getPMEventByIdFromFirestore,
   getVendorsFromFirestore,
   getSpeakersFromFirestore,
   createPMEventInFirestore,
@@ -40,6 +41,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type") || "all"
+    const id = searchParams.get("id")
+
+    // Support fetching a single event by ID
+    if (type === "event" && id) {
+      const event = await getPMEventByIdFromFirestore(id)
+      if (!event) {
+        return NextResponse.json({ error: "Event not found" }, { status: 404 })
+      }
+      return NextResponse.json({ event })
+    }
 
     let response: Record<string, unknown> = {}
 

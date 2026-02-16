@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "motion/react"
 import {
   Search,
@@ -18,19 +19,12 @@ import {
   Trash2,
   Edit2,
   Eye,
-  X,
-  Loader2,
-  ExternalLink,
   CheckCircle2,
   Zap,
-  Timer,
   ArrowRight,
-  BarChart3,
-  GripVertical,
 } from "lucide-react"
 import type { PMEvent } from "../../../types/project-management-types"
 import { PM_EVENT_STATUSES } from "../../../types/project-management-types"
-import { ImageUpload } from "../../../components/ImageUpload"
 
 // ============================================
 // Props
@@ -130,6 +124,7 @@ function getBudgetHealth(event: PMEvent): { label: string; color: string; percen
 // Main Component
 // ============================================
 export default function EventsSection({ events, onDelete, onSave, showToast }: EventsSectionProps) {
+  const router = useRouter()
   const [layout, setLayout] = useState<ViewLayout>("grid")
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState<EventTab>("upcoming")
@@ -137,10 +132,7 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [showCompletedAll, setShowCompletedAll] = useState(false)
 
-  // Modal states
-  const [formOpen, setFormOpen] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<PMEvent | null>(null)
-  const [detailEvent, setDetailEvent] = useState<PMEvent | null>(null)
+  // Status change state
   const [statusChangeEvent, setStatusChangeEvent] = useState<string | null>(null)
 
   // Categorize events
@@ -284,13 +276,15 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
   }
 
   const openNew = () => {
-    setEditingEvent(null)
-    setFormOpen(true)
+    router.push("/admin/project-management/events/new")
   }
 
   const openEdit = (event: PMEvent) => {
-    setEditingEvent(event)
-    setFormOpen(true)
+    router.push(`/admin/project-management/events/${event.id}/edit`)
+  }
+
+  const viewEvent = (event: PMEvent) => {
+    router.push(`/admin/project-management/events/${event.id}`)
   }
 
   const handleQuickStatusChange = async (event: PMEvent, newStatus: PMEvent["status"]) => {
@@ -443,7 +437,7 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
                 event={event}
                 tab={activeTab}
                 index={idx}
-                onView={() => setDetailEvent(event)}
+                onView={() => viewEvent(event)}
                 onEdit={() => openEdit(event)}
                 onDelete={() => onDelete(event.id)}
                 onStatusChange={handleQuickStatusChange}
@@ -462,7 +456,7 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
           toggleSort={toggleSort}
           SortIcon={SortIcon}
           formatDate={formatDate}
-          onView={(event) => setDetailEvent(event)}
+          onView={(event) => viewEvent(event)}
           onEdit={(event) => openEdit(event)}
           onDelete={(id) => onDelete(id)}
           onStatusChange={handleQuickStatusChange}
@@ -483,29 +477,6 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
         </div>
       )}
 
-      {/* Modals */}
-      <AnimatePresence>
-        {formOpen && (
-          <EventFormModal
-            event={editingEvent}
-            onClose={() => { setFormOpen(false); setEditingEvent(null) }}
-            onSave={onSave}
-            showToast={showToast}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {detailEvent && (
-          <EventDetailModal
-            event={detailEvent}
-            onClose={() => setDetailEvent(null)}
-            onEdit={(event) => { setDetailEvent(null); openEdit(event) }}
-            onDelete={(id) => { setDetailEvent(null); onDelete(id) }}
-            onStatusChange={handleQuickStatusChange}
-          />
-        )}
-      </AnimatePresence>
     </div>
   )
 }
@@ -990,543 +961,3 @@ function EventTable({
   )
 }
 
-
-// ============================================
-// Event Form Modal
-// ============================================
-interface EventFormModalProps {
-  event: PMEvent | null
-  onClose: () => void
-  onSave: (event: Partial<PMEvent>, isNew: boolean) => Promise<void>
-  showToast: (message: string, type: "success" | "error" | "warning") => void
-}
-
-function EventFormModal({ event, onClose, onSave, showToast }: EventFormModalProps) {
-  const isNew = !event
-  const [isSaving, setIsSaving] = useState(false)
-  const [form, setForm] = useState<Partial<PMEvent>>(
-    event || {
-      name: "",
-      date: "",
-      start_date: "",
-      end_date: "",
-      start_time: "",
-      end_time: "",
-      location: "",
-      venue_name: "",
-      venue_location: "",
-      venue_address: "",
-      venue_map_link: "",
-      description: "",
-      agenda_overview: "",
-      status: "planning",
-      budget: undefined,
-      estimated_expenses: undefined,
-      actual_expenses: undefined,
-      website_url: "",
-      notes: "",
-      photo_banner: "",
-    }
-  )
-
-  const handleChange = (field: keyof PMEvent, value: string | number | undefined) => {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name?.trim()) {
-      showToast("Event name is required", "error")
-      return
-    }
-    setIsSaving(true)
-    try {
-      await onSave(form, isNew)
-      onClose()
-    } catch {
-      // error handled by parent
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Helper to render clickable links in text
-  const renderTextWithLinks = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = text.split(urlRegex)
-    return parts.map((part, i) =>
-      urlRegex.test(part) ? (
-        <a
-          key={i}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 underline underline-offset-2 break-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {part}
-        </a>
-      ) : (
-        <span key={i}>{part}</span>
-      )
-    )
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
-      >
-        <div className="sticky top-0 z-10 flex items-center justify-between p-6 pb-4 bg-white border-b border-neutral-200 rounded-t-2xl">
-          <div>
-            <h2 className="text-xl font-bold text-neutral-900">
-              {isNew ? "Add Event" : "Edit Event"}
-            </h2>
-            <p className="text-sm text-neutral-500 mt-0.5">
-              {isNew ? "Create a new event" : `Editing ${event?.name}`}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Basic Information</legend>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Event Name <span className="text-red-500">*</span></label>
-              <input type="text" value={form.name || ""} onChange={(e) => handleChange("name", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
-                <select value={form.status || "planning"} onChange={(e) => handleChange("status", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200">
-                  {PM_EVENT_STATUSES.map((s) => (<option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Website URL</label>
-                <input type="url" value={form.website_url || ""} onChange={(e) => handleChange("website_url", e.target.value)} placeholder="https://..." className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-                {form.website_url && (
-                  <a href={form.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2">
-                    <ExternalLink className="w-3 h-3" />
-                    Open link
-                  </a>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Description</label>
-              <textarea
-                rows={5}
-                value={form.description || ""}
-                onChange={(e) => handleChange("description", e.target.value)}
-                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-30"
-                placeholder="Describe the event details, purpose, and any important information..."
-              />
-              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                <GripVertical className="w-3 h-3" />
-                Drag the bottom-right corner to expand this field
-              </p>
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Date & Time</legend>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Start Date</label>
-                <input type="date" value={form.start_date || ""} onChange={(e) => handleChange("start_date", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">End Date</label>
-                <input type="date" value={form.end_date || ""} onChange={(e) => handleChange("end_date", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Start Time</label>
-                <input type="time" value={form.start_time || ""} onChange={(e) => handleChange("start_time", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">End Time</label>
-                <input type="time" value={form.end_time || ""} onChange={(e) => handleChange("end_time", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Venue</legend>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Venue Name</label>
-                <input type="text" value={form.venue_name || ""} onChange={(e) => handleChange("venue_name", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Location</label>
-                <input type="text" value={form.location || ""} onChange={(e) => handleChange("location", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Venue Address</label>
-              <input type="text" value={form.venue_address || ""} onChange={(e) => handleChange("venue_address", e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Map Link</label>
-              <input type="url" value={form.venue_map_link || ""} onChange={(e) => handleChange("venue_map_link", e.target.value)} placeholder="https://maps.google.com/..." className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              {form.venue_map_link && (
-                <a href={form.venue_map_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2">
-                  <MapPin className="w-3 h-3" />
-                  Open in Maps
-                </a>
-              )}
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Budget</legend>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Budget</label>
-                <input type="number" min={0} step="0.01" value={form.budget ?? ""} onChange={(e) => handleChange("budget", e.target.value ? parseFloat(e.target.value) : undefined)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Estimated</label>
-                <input type="number" min={0} step="0.01" value={form.estimated_expenses ?? ""} onChange={(e) => handleChange("estimated_expenses", e.target.value ? parseFloat(e.target.value) : undefined)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Actual</label>
-                <input type="number" min={0} step="0.01" value={form.actual_expenses ?? ""} onChange={(e) => handleChange("actual_expenses", e.target.value ? parseFloat(e.target.value) : undefined)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Additional Details</legend>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Agenda Overview</label>
-              <textarea
-                rows={6}
-                value={form.agenda_overview || ""}
-                onChange={(e) => handleChange("agenda_overview", e.target.value)}
-                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-35"
-                placeholder="Enter the event agenda, schedule, speakers, topics, etc..."
-              />
-              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                <GripVertical className="w-3 h-3" />
-                Drag the bottom-right corner to expand &bull; URLs will become clickable after saving
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
-              <textarea
-                rows={5}
-                value={form.notes || ""}
-                onChange={(e) => handleChange("notes", e.target.value)}
-                className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-30"
-                placeholder="Internal notes, reminders, follow-ups, links to resources..."
-              />
-              <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                <GripVertical className="w-3 h-3" />
-                Drag the bottom-right corner to expand &bull; URLs will become clickable after saving
-              </p>
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Banner Image</legend>
-            <ImageUpload
-              value={form.photo_banner || ""}
-              onChange={(url) => handleChange("photo_banner", url)}
-              label="Event Banner"
-              accept="image/*,.gif"
-              maxSize={10}
-            />
-          </fieldset>
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
-            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors">Cancel</button>
-            <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors shadow-sm disabled:opacity-50">
-              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isNew ? "Create Event" : "Save Changes"}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-
-// ============================================
-// Event Detail Modal
-// ============================================
-interface EventDetailModalProps {
-  event: PMEvent
-  onClose: () => void
-  onEdit: (event: PMEvent) => void
-  onDelete: (id: string) => void
-  onStatusChange: (event: PMEvent, status: PMEvent["status"]) => void
-}
-
-function EventDetailModal({ event, onClose, onEdit, onDelete, onStatusChange }: EventDetailModalProps) {
-  const days = getDaysUntil(event.start_date || event.date)
-  const budgetHealth = getBudgetHealth(event)
-  const isLive = categorizeEvent(event) === "in-progress"
-  const isCompleted = categorizeEvent(event) === "completed"
-
-  const formatDateLong = (dateStr?: string) => {
-    if (!dateStr) return "Date TBD"
-    return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-
-  // Render text with auto-linked URLs
-  const renderLinkedText = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = text.split(urlRegex)
-    return parts.map((part, i) => {
-      if (urlRegex.test(part)) {
-        // Reset regex lastIndex since it's stateful with global flag
-        urlRegex.lastIndex = 0
-        return (
-          <a
-            key={i}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 underline underline-offset-2 decoration-blue-300 hover:decoration-blue-600 break-all transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {part}
-          </a>
-        )
-      }
-      return <span key={i}>{part}</span>
-    })
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        onClick={(e) => e.stopPropagation()}
-        className={`bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl ${
-          isLive ? "ring-2 ring-purple-300" : ""
-        }`}
-      >
-        {isLive && (
-          <div className="h-1 bg-linear-to-r from-purple-500 via-purple-400 to-purple-500 rounded-t-2xl animate-pulse" />
-        )}
-
-        {(event.photo_banner || event.img_ai) && (
-          <div className="relative aspect-video bg-neutral-100 overflow-hidden rounded-t-2xl">
-            <img src={event.photo_banner || event.img_ai} alt={event.name} className={`w-full h-full object-cover ${isCompleted ? "grayscale-20" : ""}`} />
-            <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent" />
-            {days !== null && !isCompleted && (
-              <div className="absolute bottom-4 right-4">
-                <span className={`px-3 py-1.5 text-sm font-bold rounded-lg backdrop-blur-sm ${
-                  isLive ? "bg-purple-500/90 text-white" : days <= 7 ? "bg-red-500/90 text-white" : "bg-white/90 text-neutral-700"
-                }`}>
-                  {isLive ? "Happening Now" : formatCountdown(days)}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="p-6 space-y-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className={`w-10 h-1 mb-3 ${isLive ? "bg-purple-400" : "bg-yellow-400"}`} />
-              <h2 className="text-2xl font-bold text-neutral-900 leading-tight">{event.name}</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => onEdit(event)} className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors" title="Edit">
-                <Edit2 className="w-5 h-5" />
-              </button>
-              <button onClick={() => onDelete(event.id)} className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                <Trash2 className="w-5 h-5" />
-              </button>
-              <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full border flex items-center gap-1.5 ${
-              STATUS_COLORS[event.status] || "bg-neutral-100 text-neutral-600 border-neutral-200"
-            }`}>
-              {isLive && (
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500" />
-                </span>
-              )}
-              {event.days_to_go || event.status}
-            </span>
-            {event.on_budget && (
-              <span className="px-3 py-1.5 text-sm rounded-full bg-neutral-100 border border-neutral-200">{event.on_budget} Budget</span>
-            )}
-            {event.month && (
-              <span className="px-3 py-1.5 text-xs font-medium rounded-full bg-neutral-100 text-neutral-600">{event.month}</span>
-            )}
-            <div className="ml-auto flex items-center gap-1.5">
-              {!isCompleted && event.status !== "completed" && (
-                <button onClick={() => onStatusChange(event, "completed")} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Mark Complete
-                </button>
-              )}
-              {!isLive && event.status !== "in-progress" && !isCompleted && (
-                <button onClick={() => onStatusChange(event, "in-progress")} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors">
-                  <Zap className="w-3.5 h-3.5" />
-                  Mark Live
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl">
-              <div className="w-10 h-10 rounded-lg bg-white border border-neutral-200 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-neutral-600" />
-              </div>
-              <div>
-                <p className="text-xs text-neutral-400 uppercase tracking-wide font-semibold">Date</p>
-                <p className="text-sm font-semibold text-neutral-900">{formatDateLong(event.start_date || event.date)}</p>
-                {event.end_date && event.end_date !== event.start_date && (
-                  <p className="text-xs text-neutral-500">to {formatDateLong(event.end_date)}</p>
-                )}
-                {(event.start_time || event.end_time) && (
-                  <p className="text-xs text-neutral-400 mt-0.5">{event.start_time}{event.end_time ? ` - ${event.end_time}` : ""}</p>
-                )}
-              </div>
-            </div>
-
-            {(event.venue_name || event.location) && (
-              <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl">
-                <div className="w-10 h-10 rounded-lg bg-white border border-neutral-200 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-neutral-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-neutral-400 uppercase tracking-wide font-semibold">Venue</p>
-                  <p className="text-sm font-semibold text-neutral-900 truncate">{event.venue_name || ""}</p>
-                  {event.venue_location && <p className="text-xs text-neutral-500 truncate">{event.venue_location}</p>}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {event.agenda_overview && (
-            <div>
-              <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Agenda Overview</h4>
-              <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">{renderLinkedText(event.agenda_overview)}</div>
-            </div>
-          )}
-
-          {(event.actual_expenses !== undefined || event.estimated_expenses !== undefined || event.budget !== undefined) && (
-            <div>
-              <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-3">Budget</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {event.budget !== undefined && (
-                  <div className="p-3 bg-neutral-50 rounded-xl text-center">
-                    <p className="text-xs text-neutral-400 mb-1">Budget</p>
-                    <p className="text-lg font-bold text-neutral-900">${event.budget.toLocaleString()}</p>
-                  </div>
-                )}
-                {event.estimated_expenses !== undefined && (
-                  <div className="p-3 bg-neutral-50 rounded-xl text-center">
-                    <p className="text-xs text-neutral-400 mb-1">Estimated</p>
-                    <p className="text-lg font-bold text-neutral-900">${event.estimated_expenses.toLocaleString()}</p>
-                  </div>
-                )}
-                {event.actual_expenses !== undefined && (
-                  <div className="p-3 bg-neutral-50 rounded-xl text-center">
-                    <p className="text-xs text-neutral-400 mb-1">Actual</p>
-                    <p className="text-lg font-bold text-neutral-900">${event.actual_expenses.toLocaleString()}</p>
-                  </div>
-                )}
-              </div>
-              {budgetHealth && (
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="text-neutral-500">Budget utilization</span>
-                    <span className={`font-semibold ${budgetHealth.color}`}>{budgetHealth.percent}% - {budgetHealth.label}</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 rounded-full h-2">
-                    <div className={`h-2 rounded-full transition-all ${
-                      budgetHealth.percent <= 80 ? "bg-emerald-500" : budgetHealth.percent <= 100 ? "bg-blue-500" : budgetHealth.percent <= 120 ? "bg-amber-500" : "bg-red-500"
-                    }`} style={{ width: `${Math.min(100, budgetHealth.percent)}%` }} />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {event.venue_map_link && (
-              <a href={event.venue_map_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">
-                <MapPin className="w-4 h-4" />
-                View Map
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
-            {event.website_url && (
-              <a href={event.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">
-                <Globe className="w-4 h-4" />
-                Website
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
-          </div>
-
-          {(event.description || event.notes) && (
-            <div className="space-y-4">
-              {event.description && (
-                <div>
-                  <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Description</h4>
-                  <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">
-                    {renderLinkedText(event.description)}
-                  </div>
-                </div>
-              )}
-              {event.notes && (
-                <div>
-                  <h4 className="text-xs text-neutral-400 uppercase tracking-wide font-semibold mb-2">Notes</h4>
-                  <div className="p-4 bg-neutral-50 rounded-xl text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">
-                    {renderLinkedText(event.notes)}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}

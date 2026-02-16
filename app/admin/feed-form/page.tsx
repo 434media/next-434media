@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
 import { Button } from "../../components/analytics/Button"
 import { Badge } from "../../components/analytics/Badge"
 import { Marked } from 'marked'
 
-import { useToast } from "../../hooks/use-toast"
-import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Circle, Sparkles, Star, Pencil, Cloud, CloudOff, Clock } from "lucide-react"
+import { Toast } from "../../components/crm/Toast"
+import type { Toast as ToastType, CurrentUser, TeamMember } from "../../components/crm/types"
+import { TEAM_MEMBERS } from "../../components/crm/types"
+import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Sparkles, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { RichTextEditor } from "../../components/RichTextEditor"
 import { ImageUpload } from "../../components/ImageUpload"
@@ -103,7 +105,7 @@ function CollapsibleSection({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
           >
-            <div className="px-5 pb-6 pt-3 border-t border-sky-100 bg-gradient-to-b from-sky-50/30 to-transparent">
+            <div className="px-5 pb-6 pt-3 border-t border-sky-100 bg-linear-to-b from-sky-50/30 to-transparent">
               {children}
             </div>
           </motion.div>
@@ -192,7 +194,7 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
           <span className="hidden group-hover:inline">Click to edit</span>
         </span>
       </div>
-      <div className="px-4 py-3 bg-neutral-50 border-2 border-neutral-200 rounded-xl min-h-[52px] group-hover:border-sky-300 group-hover:bg-sky-50/30 transition-all flex items-center">
+      <div className="px-4 py-3 bg-neutral-50 border-2 border-neutral-200 rounded-xl min-h-13 group-hover:border-sky-300 group-hover:bg-sky-50/30 transition-all flex items-center">
         {renderValue()}
       </div>
     </div>
@@ -202,34 +204,18 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
 type FeedType = "video" | "article" | "podcast" | "newsletter"
 type FeedStatus = "draft" | "published" | "archived"
 
-// Brand feed configuration
-interface BrandFeed {
+// Comment interface for feed items (follows CRM TaskComment pattern)
+interface FeedComment {
   id: string
-  name: string
-  tableName: string
-  description: string
+  content: string
+  author_name: string
+  author_email: string
+  author_avatar?: string
+  created_at: string
+  updated_at?: string
 }
 
-const BRAND_FEEDS: BrandFeed[] = [
-  {
-    id: "digital-canvas",
-    name: "The Feed - Digital Canvas",
-    tableName: "THEFEED",
-    description: "Digital Canvas content feed"
-  },
-  {
-    id: "vemos-vamos",
-    name: "Culture Deck - Vemos Vamos",
-    tableName: "CULTUREDECK",
-    description: "Vemos Vamos cultural content"
-  },
-  {
-    id: "txmx-boxing",
-    name: "8 Count - TXMX Boxing",
-    tableName: "8COUNT",
-    description: "TXMX Boxing updates"
-  }
-]
+const FEED_TABLE = "THEFEED"
 
 interface FeedItem {
   id?: string
@@ -280,6 +266,9 @@ interface FeedItem {
   spotlight_3_image?: string
   spotlight_3_cta_text?: string
   spotlight_3_cta_link?: string
+  
+  // Comments
+  comments?: FeedComment[]
 }
 
 interface FeedFormData {
@@ -334,12 +323,19 @@ interface FeedFormData {
 
 export default function FeedFormPage() {
   const router = useRouter()
-  const { toast } = useToast()
+  const [toast, setToast] = useState<ToastType | null>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [feedItems, setFeedItems] = useState<FeedItem[]>([])
   const [activeTab, setActiveTab] = useState<"view" | "create">("view")
-  const [selectedBrand, setSelectedBrand] = useState<string>("digital-canvas")
+  
+  // Comment & tagging state
+  const [newComment, setNewComment] = useState("")
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editCommentContent, setEditCommentContent] = useState("")
+  const [expandedFeedComments, setExpandedFeedComments] = useState<Set<string>>(new Set())
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [filterType, setFilterType] = useState<string>("all")
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" })
@@ -437,6 +433,77 @@ export default function FeedFormPage() {
     }
   }, [])
 
+  // Auto-hide toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [toast])
+
+  // Load current user from session
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/auth/session")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.user) {
+            setCurrentUser(data.user)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load current user:", err)
+      }
+    }
+    loadCurrentUser()
+  }, [])
+
+  // Load team members for @-mention tagging
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      try {
+        const response = await fetch("/api/admin/team-members")
+        const data = await response.json()
+        
+        const firestoreMembers: TeamMember[] = data.success && data.data
+          ? data.data.filter((m: TeamMember) => m.isActive)
+          : []
+        
+        const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
+          id: `default-${i}`,
+          name: m.name,
+          email: m.email,
+          isActive: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }))
+        
+        const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
+        const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
+        
+        const missingDefaults = defaultMembers.filter(d =>
+          !firestoreNames.has(d.name.toLowerCase()) &&
+          (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
+        )
+        
+        const allMembers = [...firestoreMembers, ...missingDefaults]
+        allMembers.sort((a, b) => a.name.localeCompare(b.name))
+        setTeamMembers(allMembers)
+      } catch {
+        setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
+          id: `default-${i}`,
+          name: m.name,
+          email: m.email,
+          isActive: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })))
+      }
+    }
+    fetchTeamMembers()
+  }, [])
+
   // Auto-save draft to localStorage when form changes
   useEffect(() => {
     // Only auto-save if form has content and not editing an existing item
@@ -474,9 +541,6 @@ export default function FeedFormPage() {
 
     setIsAutoSaving(true)
     try {
-      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
-      const tableName = currentBrand?.tableName || "thefeed"
-      
       // If we already have a draft ID, update it; otherwise create new
       const isUpdating = autoSaveDraftId !== null || editingId !== null
       const method = isUpdating ? "PATCH" : "POST"
@@ -486,7 +550,7 @@ export default function FeedFormPage() {
         ? { id: draftId, ...formData, status: "draft" }
         : { ...formData, status: "draft" }
 
-      const response = await fetch(`/api/feed-submit?table=${tableName}`, {
+      const response = await fetch(`/api/feed-submit?table=${FEED_TABLE}`, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -511,7 +575,7 @@ export default function FeedFormPage() {
     } finally {
       setIsAutoSaving(false)
     }
-  }, [formData, selectedBrand, autoSaveDraftId, editingId, hasUnsavedChanges])
+  }, [formData, autoSaveDraftId, editingId, hasUnsavedChanges])
 
   // Auto-save to Firestore every 30 seconds when there's content
   useEffect(() => {
@@ -543,37 +607,27 @@ export default function FeedFormPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [hasUnsavedChanges, formData, autoSaveToFirestore])
 
-  // Load feed items on mount and when brand changes
+  // Load feed items on mount
   useEffect(() => {
     loadFeedItems()
-  }, [selectedBrand])
+  }, [])
 
   // Load feed items from Firestore
   const loadFeedItems = async () => {
     setIsLoading(true)
     try {
-      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
-      
-      const response = await fetch(`/api/feed-submit?table=${currentBrand?.tableName || "thefeed"}`)
+      const response = await fetch(`/api/feed-submit?table=${FEED_TABLE}`)
 
       const result = await response.json()
 
       if (result.success) {
         setFeedItems(result.data || [])
       } else {
-        toast({
-          title: "Error Loading Feeds",
-          description: result.error || "Failed to load feed items",
-          variant: "destructive",
-        })
+        setToast({ message: result.error || "Failed to load feed items", type: "error" })
       }
     } catch (error) {
       console.error("Error loading feeds:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load feed items from database",
-        variant: "destructive",
-      })
+      setToast({ message: "Failed to load feed items from database", type: "error" })
     } finally {
       setIsLoading(false)
     }
@@ -703,17 +757,9 @@ export default function FeedFormPage() {
         const draft = JSON.parse(savedDraft)
         setFormData(draft)
         setHasDraft(false)
-        toast({
-          title: "Draft Loaded",
-          description: "Your saved draft has been restored.",
-          variant: "default",
-        })
+        setToast({ message: "Draft loaded successfully", type: "success" })
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to load draft.",
-          variant: "destructive",
-        })
+        setToast({ message: "Failed to load draft", type: "error" })
       }
     }
   }
@@ -722,22 +768,14 @@ export default function FeedFormPage() {
   const clearDraft = () => {
     localStorage.removeItem("feedFormDraft")
     setHasDraft(false)
-    toast({
-      title: "Draft Cleared",
-      description: "Saved draft has been removed.",
-      variant: "default",
-    })
+    setToast({ message: "Draft cleared", type: "success" })
   }
 
   // Save current form as draft
   const saveDraft = () => {
     localStorage.setItem("feedFormDraft", JSON.stringify(formData))
     setHasDraft(true)
-    toast({
-      title: "Draft Saved",
-      description: "Your progress has been saved. You can come back later to finish.",
-      variant: "default",
-    })
+    setToast({ message: "Draft saved", type: "success" })
   }
 
   // Load mock data for testing
@@ -793,11 +831,7 @@ export default function FeedFormPage() {
     }
 
     setFormData(mockData)
-    toast({
-      title: "Mock Data Loaded",
-      description: "Test data has been loaded into the form. You can now test the database connection.",
-      variant: "default",
-    })
+    setToast({ message: "Test data loaded", type: "success" })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -805,11 +839,7 @@ export default function FeedFormPage() {
 
     // Validation
     if (!formData.title || !formData.summary) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields (Title and Summary).",
-        variant: "destructive",
-      })
+      setToast({ message: "Please fill in all required fields (Title and Summary)", type: "error" })
       return
     }
 
@@ -818,13 +848,9 @@ export default function FeedFormPage() {
     try {
       const adminKey = sessionStorage.getItem("adminKey") || localStorage.getItem("adminKey")
       
-      // Get current brand's table name
-      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
-      const tableName = currentBrand?.tableName || "thefeed"
-      
       // Determine if we're editing or creating
       const isEditing = editingId !== null
-      const url = `/api/feed-submit?table=${tableName}`
+      const url = `/api/feed-submit?table=${FEED_TABLE}`
       const method = isEditing ? "PATCH" : "POST"
       const body = isEditing ? { id: editingId, ...formData } : formData
       
@@ -839,13 +865,7 @@ export default function FeedFormPage() {
       const result = await response.json()
 
       if (result.success) {
-        toast({
-          title: "Success!",
-          description: isEditing 
-            ? "Feed item has been updated successfully." 
-            : "Feed item has been created successfully.",
-          variant: "default",
-        })
+        setToast({ message: isEditing ? "Feed item updated" : "Feed item created", type: "success" })
         
         // Clear draft on successful submission
         localStorage.removeItem("feedFormDraft")
@@ -874,18 +894,10 @@ export default function FeedFormPage() {
         await loadFeedItems()
         setActiveTab("view")
       } else {
-        toast({
-          title: isEditing ? "Update Failed" : "Submission Failed",
-          description: result.error || "Unknown error occurred",
-          variant: "destructive",
-        })
+        setToast({ message: result.error || "Unknown error occurred", type: "error" })
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit feed item",
-        variant: "destructive",
-      })
+      setToast({ message: error instanceof Error ? error.message : "Failed to submit feed item", type: "error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -982,44 +994,169 @@ export default function FeedFormPage() {
     }
 
     try {
-      // Get current brand's table name
-      const currentBrand = BRAND_FEEDS.find(b => b.id === selectedBrand)
-      const tableName = currentBrand?.tableName || "thefeed"
-      
-      const response = await fetch(`/api/feed-submit?id=${id}&table=${tableName}`, {
+      const response = await fetch(`/api/feed-submit?id=${id}&table=${FEED_TABLE}`, {
         method: "DELETE",
       })
 
       const result = await response.json()
 
       if (result.success) {
-        toast({
-          title: "Deleted",
-          description: "Feed item has been deleted successfully.",
-          variant: "default",
-        })
+        setToast({ message: "Feed item deleted", type: "success" })
         
         // Reload feed items
         await loadFeedItems()
       } else {
-        toast({
-          title: "Delete Failed",
-          description: result.error || "Unknown error occurred",
-          variant: "destructive",
-        })
+        setToast({ message: result.error || "Unknown error occurred", type: "error" })
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete feed item",
-        variant: "destructive",
+      setToast({ message: error instanceof Error ? error.message : "Failed to delete feed item", type: "error" })
+    }
+  }
+
+  // Ref map for auto-scrolling to comment panels
+  const commentPanelRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  // Toggle comment section for a feed item (only one open at a time)
+  const toggleFeedComments = (feedId: string) => {
+    setExpandedFeedComments(prev => {
+      const next = new Set<string>()
+      if (!prev.has(feedId)) {
+        // Open this one (close all others)
+        next.add(feedId)
+        // Auto-scroll after render
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const panel = commentPanelRefs.current.get(feedId)
+            if (panel) {
+              panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            }
+          }, 100)
+        })
+      }
+      // If already open, next is empty = close it
+      return next
+    })
+    // Reset comment input when toggling
+    setNewComment("")
+    setEditingCommentId(null)
+    setEditCommentContent("")
+  }
+
+  // Add comment to a feed item
+  const handleAddComment = async (feedId: string) => {
+    if (!newComment.trim() || !currentUser) return
+
+    const comment: FeedComment = {
+      id: crypto.randomUUID(),
+      content: newComment.trim(),
+      author_name: currentUser.name,
+      author_email: currentUser.email,
+      author_avatar: currentUser.picture,
+      created_at: new Date().toISOString(),
+    }
+
+    // Find the feed item and update it optimistically
+    const feedItem = feedItems.find(f => f.id === feedId)
+    if (!feedItem) return
+
+    const updatedComments = [...(feedItem.comments || []), comment]
+    setFeedItems(prev => prev.map(f => f.id === feedId ? { ...f, comments: updatedComments } : f))
+    setNewComment("")
+
+    try {
+      const response = await fetch(`/api/feed-submit?table=${FEED_TABLE}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: feedId, comments: updatedComments }),
       })
+
+      if (!response.ok) throw new Error("Failed to save comment")
+      setToast({ message: "Comment added", type: "success" })
+    } catch {
+      setToast({ message: "Failed to save comment", type: "error" })
+      // Rollback
+      setFeedItems(prev => prev.map(f => f.id === feedId ? { ...f, comments: feedItem.comments || [] } : f))
+    }
+  }
+
+  // Delete comment from a feed item
+  const handleDeleteComment = async (feedId: string, commentId: string) => {
+    if (!confirm("Delete this comment?")) return
+
+    const feedItem = feedItems.find(f => f.id === feedId)
+    if (!feedItem) return
+
+    const updatedComments = (feedItem.comments || []).filter(c => c.id !== commentId)
+    setFeedItems(prev => prev.map(f => f.id === feedId ? { ...f, comments: updatedComments } : f))
+
+    try {
+      const response = await fetch(`/api/feed-submit?table=${FEED_TABLE}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: feedId, comments: updatedComments }),
+      })
+
+      if (!response.ok) throw new Error("Failed to delete comment")
+      setToast({ message: "Comment deleted", type: "success" })
+    } catch {
+      setToast({ message: "Failed to delete comment", type: "error" })
+      setFeedItems(prev => prev.map(f => f.id === feedId ? { ...f, comments: feedItem.comments || [] } : f))
+    }
+  }
+
+  // Edit comment on a feed item
+  const handleEditComment = async (feedId: string, commentId: string, newContent: string) => {
+    const feedItem = feedItems.find(f => f.id === feedId)
+    if (!feedItem) return
+
+    const updatedComments = (feedItem.comments || []).map(c =>
+      c.id === commentId
+        ? { ...c, content: newContent, updated_at: new Date().toISOString() }
+        : c
+    )
+    setFeedItems(prev => prev.map(f => f.id === feedId ? { ...f, comments: updatedComments } : f))
+    setEditingCommentId(null)
+    setEditCommentContent("")
+
+    try {
+      const response = await fetch(`/api/feed-submit?table=${FEED_TABLE}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: feedId, comments: updatedComments }),
+      })
+
+      if (!response.ok) throw new Error("Failed to update comment")
+      setToast({ message: "Comment updated", type: "success" })
+    } catch {
+      setToast({ message: "Failed to update comment", type: "error" })
+      setFeedItems(prev => prev.map(f => f.id === feedId ? { ...f, comments: feedItem.comments || [] } : f))
+    }
+  }
+
+  // Format comment date
+  const formatCommentDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Chicago"
+      })
+    } catch {
+      return dateString
     }
   }
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
     <div className="container mx-auto py-10 px-4 sm:px-6 pt-32 md:pt-24 max-w-7xl overflow-hidden">
+      {/* Toast Notification */}
+      <Toast toast={toast} />
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
         <div className="mb-8">
@@ -1031,22 +1168,19 @@ export default function FeedFormPage() {
           </Link>
           <div className="">
             <h1 className="max-w-3xl uppercase text-5xl md:text-6xl mb-3 font-black md:font-menda-black tracking-tight">
-              Brand Content Management
+              The Feed
             </h1>
             <p className="max-w-xl text-lg text-neutral-600 mb-6">
-              Manage and schedule content for <span className="font-semibold text-neutral-900">The Feed (Digital Canvas), Culture Deck (Vemos Vamos), and 8 Count (TXMX Boxing)</span> all in one place.
+              Manage and schedule content for <span className="font-semibold text-neutral-900">Digital Canvas</span>.
             </p>
             
-            {/* Brand Selector - Hero Element with Custom Gradients */}
-            <div className={`rounded-xl p-6 shadow-lg transition-all ${
-              selectedBrand === "digital-canvas" 
-                ? "bg-gradient-to-r from-black to-sky-500"
-                : selectedBrand === "vemos-vamos"
-                ? "bg-gradient-to-r from-rose-500 to-red-600"
-                : "bg-gradient-to-r from-black to-red-600"
-            }`}>
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-white text-sm font-semibold uppercase tracking-wide">Select Brand Feed</label>
+            {/* Header Bar */}
+            <div className="rounded-xl p-6 shadow-lg bg-linear-to-r from-black to-sky-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-white text-lg font-bold">The Feed — Digital Canvas</h2>
+                  <p className="text-white/80 text-sm mt-1">Content feed management</p>
+                </div>
                 <Button 
                   onClick={loadFeedItems} 
                   variant="outline" 
@@ -1058,23 +1192,6 @@ export default function FeedFormPage() {
                   Refresh
                 </Button>
               </div>
-              <select
-                value={selectedBrand}
-                onChange={(e) => {
-                  setSelectedBrand(e.target.value)
-                  setActiveTab("view")
-                }}
-                className="w-full px-4 py-3 text-lg font-bold rounded-lg border-2 border-white bg-white text-neutral-900 focus:ring-4 focus:ring-white/50 focus:outline-none"
-              >
-                {BRAND_FEEDS.map((brand) => (
-                  <option key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-white/90 text-sm mt-2">
-                {BRAND_FEEDS.find(b => b.id === selectedBrand)?.description}
-              </p>
             </div>
           </div>
         </div>
@@ -1203,7 +1320,7 @@ export default function FeedFormPage() {
             }}
             className={`flex-1 md:flex-initial px-6 py-3.5 text-base font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "create" 
-                ? "bg-gradient-to-r from-sky-600 to-sky-600 text-white shadow-lg shadow-sky-600/25 scale-[1.02]" 
+                ? "bg-linear-to-r from-sky-600 to-sky-600 text-white shadow-lg shadow-sky-600/25 scale-[1.02]" 
                 : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
             }`}
           >
@@ -1237,14 +1354,20 @@ export default function FeedFormPage() {
                     </p>
                   </div>
                 ) : (
+                  <>
                   <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                     {filteredFeedItems.map((item) => {
                       const displayImage = item.featured_post_image || item.hero_image_desktop || item.og_image
+                      const isCommentOpen = !!(item.id && expandedFeedComments.has(item.id))
                       
                       return (
+                        <React.Fragment key={item.id}>
                         <div
-                          key={item.id}
-                          className="bg-white border border-neutral-200 rounded-lg overflow-hidden hover:border-neutral-300 hover:shadow-md transition-all duration-150 group"
+                          className={`bg-white border-2 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 group relative ${
+                            isCommentOpen
+                              ? "border-sky-400 shadow-lg shadow-sky-100/50 ring-2 ring-sky-200/50"
+                              : "border-neutral-200 hover:border-neutral-300"
+                          }`}
                         >
                           {/* Image - Always show (with fallback) */}
                           <div className="h-20 md:h-24 relative overflow-hidden bg-neutral-100">
@@ -1303,6 +1426,19 @@ export default function FeedFormPage() {
                                 Edit
                               </button>
                               <button
+                                onClick={() => item.id && toggleFeedComments(item.id)}
+                                className={`px-2 py-1.5 text-[11px] font-medium rounded transition-colors flex items-center gap-1 ${
+                                  isCommentOpen
+                                    ? "bg-sky-500 text-white shadow-sm"
+                                    : "text-neutral-400 hover:bg-sky-50 hover:text-sky-600"
+                                }`}
+                              >
+                                <MessageSquare className="h-3 w-3" />
+                                {(item.comments?.length || 0) > 0 && (
+                                  <span className="text-[10px]">{item.comments!.length}</span>
+                                )}
+                              </button>
+                              <button
                                 onClick={() => handleDelete(item.id!)}
                                 className="px-2 py-1.5 text-[11px] font-medium text-neutral-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
                               >
@@ -1310,10 +1446,269 @@ export default function FeedFormPage() {
                               </button>
                             </div>
                           </div>
+
+                          {/* Arrow indicator when comments are open */}
+                          {isCommentOpen && (
+                            <div className="absolute -bottom-2.25 left-1/2 -translate-x-1/2 z-10">
+                              <div className="w-4 h-4 bg-sky-50 border-b-2 border-r-2 border-sky-400 rotate-45 transform" />
+                            </div>
+                          )}
                         </div>
+
+                        {/* Inline Comment Panel - appears directly below card's row via col-span-full */}
+                        <AnimatePresence>
+                          {isCommentOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.25, ease: "easeOut" }}
+                              className="col-span-full overflow-hidden"
+                              ref={(el: HTMLDivElement | null) => {
+                                if (el && item.id) {
+                                  commentPanelRefs.current.set(item.id, el)
+                                }
+                              }}
+                            >
+                    <div className="bg-white border-2 border-sky-400 rounded-xl shadow-lg shadow-sky-100/30 overflow-hidden">
+                      {/* Comment Header */}
+                      <div className="flex items-center justify-between px-5 py-3 bg-sky-50 border-b border-sky-200">
+                        <div className="flex items-center gap-3">
+                          <div className="p-1.5 rounded-lg bg-sky-100">
+                            <MessageSquare className="h-4 w-4 text-sky-600" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-neutral-900">{item.title}</h4>
+                            <p className="text-xs text-sky-600 font-medium">
+                              {(item.comments?.length || 0)} comment{(item.comments?.length || 0) !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => item.id && toggleFeedComments(item.id)}
+                          className="p-1.5 rounded-lg hover:bg-sky-100 transition-colors"
+                        >
+                          <X className="h-4 w-4 text-neutral-400" />
+                        </button>
+                      </div>
+
+                      {/* Existing Comments */}
+                      <div className="px-5 py-4 space-y-3 max-h-80 overflow-y-auto">
+                        {item.comments && item.comments.length > 0 ? (
+                          item.comments.map((comment) => (
+                            <div key={comment.id} className="p-3 rounded-lg bg-neutral-50 border border-neutral-100 group">
+                              <div className="flex items-start gap-2">
+                                {comment.author_avatar ? (
+                                  <img 
+                                    src={comment.author_avatar} 
+                                    alt={comment.author_name}
+                                    className="w-8 h-8 rounded-full"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                                    <span className="text-xs font-medium text-neutral-600">
+                                      {comment.author_name.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-neutral-900">
+                                        {comment.author_name}
+                                      </span>
+                                      <span className="text-xs text-neutral-500">
+                                        {formatCommentDate(comment.created_at)}
+                                        {comment.updated_at && comment.updated_at !== comment.created_at && (
+                                          <span className="ml-1 text-neutral-400">(edited)</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    {/* Edit/Delete - only for comment author */}
+                                    {currentUser && comment.author_email === currentUser.email && (
+                                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {editingCommentId !== comment.id && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setEditingCommentId(comment.id)
+                                                setEditCommentContent(comment.content)
+                                              }}
+                                              className="p-1 rounded hover:bg-neutral-200 transition-colors"
+                                              title="Edit comment"
+                                            >
+                                              <Pencil className="w-3 h-3 text-neutral-400 hover:text-sky-600" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteComment(item.id!, comment.id)}
+                                              className="p-1 rounded hover:bg-neutral-200 transition-colors"
+                                              title="Delete comment"
+                                            >
+                                              <Trash2 className="w-3 h-3 text-neutral-400 hover:text-red-600" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* Editing mode */}
+                                  {editingCommentId === comment.id ? (
+                                    <div className="space-y-2">
+                                      <textarea
+                                        value={editCommentContent}
+                                        onChange={(e) => setEditCommentContent(e.target.value)}
+                                        rows={3}
+                                        className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-300 text-sm text-neutral-900 focus:outline-none focus:border-sky-500 resize-y min-h-15 max-h-50"
+                                        autoFocus
+                                      />
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (editCommentContent.trim()) {
+                                              handleEditComment(item.id!, comment.id, editCommentContent.trim())
+                                            }
+                                          }}
+                                          disabled={!editCommentContent.trim()}
+                                          className="px-2 py-1 bg-sky-600 text-white text-xs font-medium rounded hover:bg-sky-700 disabled:opacity-50"
+                                        >
+                                          Save
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingCommentId(null)
+                                            setEditCommentContent("")
+                                          }}
+                                          className="px-2 py-1 bg-neutral-200 text-neutral-700 text-xs font-medium rounded hover:bg-neutral-300"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-neutral-600 whitespace-pre-wrap">
+                                      {(() => {
+                                        const text = comment.content
+                                        const parts: React.ReactNode[] = []
+                                        const mentionRegex = /@(\S+(?:\s+\S+)*?)(?=\s{2}|$|\.|,|!|\?)/g
+                                        let lastIndex = 0
+                                        let match
+                                        while ((match = mentionRegex.exec(text)) !== null) {
+                                          if (match.index > lastIndex) {
+                                            parts.push(text.slice(lastIndex, match.index))
+                                          }
+                                          parts.push(
+                                            <span key={match.index} className="inline-flex items-center px-1 py-0.5 rounded bg-sky-50 text-sky-600 font-medium text-xs mx-0.5">
+                                              {match[0]}
+                                            </span>
+                                          )
+                                          lastIndex = match.index + match[0].length
+                                        }
+                                        if (lastIndex < text.length) {
+                                          parts.push(text.slice(lastIndex))
+                                        }
+                                        return parts.length > 0 ? parts : text
+                                      })()}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-neutral-400 text-center py-4">No comments yet</p>
+                        )}
+                      </div>
+
+                      {/* Add Comment */}
+                      {currentUser ? (
+                        <div className="px-5 py-4 border-t border-neutral-200 bg-neutral-50/50">
+                          <div className="flex gap-3">
+                            <div className="shrink-0">
+                              {currentUser.picture ? (
+                                <img 
+                                  src={currentUser.picture} 
+                                  alt={currentUser.name}
+                                  className="w-8 h-8 rounded-full"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                                  <span className="text-xs font-medium text-neutral-600">
+                                    {currentUser.name.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <textarea
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-sky-500 focus:bg-white resize-y min-h-14 max-h-50"
+                                placeholder="Add a comment... (use @name to mention someone)"
+                              />
+                              {/* Tag options helper - shows available team members for @-mention tagging */}
+                              <div className="flex flex-wrap gap-1 mt-1.5 mb-2">
+                                <span className="text-xs text-neutral-400 mr-1">Tag:</span>
+                                {teamMembers.filter(m => {
+                                  if (m.isActive === false) return false
+                                  const nameLower = m.name.toLowerCase()
+                                  const excludeNames = ["elon", "434mediamgr", "testing"]
+                                  return !excludeNames.includes(nameLower)
+                                }).map((member) => (
+                                  <button
+                                    key={member.id}
+                                    type="button"
+                                    onClick={() => {
+                                      const tagText = `@${member.name} `
+                                      const currentText = newComment
+                                      if (!currentText.includes(`@${member.name}`)) {
+                                        setNewComment(currentText + (currentText.endsWith(' ') || currentText === '' ? '' : ' ') + tagText)
+                                      }
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs transition-colors"
+                                    title={`Tag ${member.name}`}
+                                  >
+                                    @{member.name.split(' ')[0]}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <p className="text-xs text-neutral-500">
+                                  Commenting as {currentUser.name}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddComment(item.id!)}
+                                  disabled={!newComment.trim()}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  Comment
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="px-5 py-3 border-t border-neutral-200">
+                          <p className="text-sm text-neutral-400 text-center">
+                            Sign in to leave comments
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        </React.Fragment>
                       )
                     })}
                   </div>
+                  </>
                 )}
               </>
             )}
@@ -1433,7 +1828,7 @@ export default function FeedFormPage() {
                     className={`font-semibold transition-all ${
                       editingId 
                         ? 'bg-sky-600 hover:bg-sky-700' 
-                        : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
+                        : 'bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
                     } text-white shadow-md hover:shadow-lg`}
                   >
                     {isSubmitting ? (
@@ -1459,7 +1854,7 @@ export default function FeedFormPage() {
 
             {/* Draft Notification */}
             {hasDraft && !editingId && (
-              <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="mb-4 p-4 bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-amber-100 rounded-lg">
                     <FileText className="h-5 w-5 text-amber-600" />
@@ -1497,7 +1892,7 @@ export default function FeedFormPage() {
               <div className="mb-6">
                 {/* Intro Panel for New Feeds */}
                 {!editingId && !formData.title && (
-                  <div className="mb-4 p-5 bg-gradient-to-br from-sky-50 to-sky-50 border-2 border-sky-200 rounded-xl">
+                  <div className="mb-4 p-5 bg-linear-to-br from-sky-50 to-sky-50 border-2 border-sky-200 rounded-xl">
                     <h3 className="text-base font-bold text-sky-900 mb-2 flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-sky-600" />
                       Creating a New Newsletter
@@ -1721,7 +2116,7 @@ export default function FeedFormPage() {
                   {/* Open Graph Settings */}
                   <div className="pt-4 border-t border-neutral-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <div className="p-2 bg-gradient-to-br from-sky-500 to-sky-600 rounded-lg">
+                      <div className="p-2 bg-linear-to-br from-sky-500 to-sky-600 rounded-lg">
                         <LinkIcon className="h-4 w-4 text-white" />
                       </div>
                       <div>
@@ -1730,7 +2125,7 @@ export default function FeedFormPage() {
                       </div>
                     </div>
                     
-                    <div className="bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl p-5 border-2 border-sky-100 space-y-5">
+                    <div className="bg-linear-to-br from-sky-50 to-sky-100 rounded-xl p-5 border-2 border-sky-100 space-y-5">
                       {/* OG Title */}
                       <PreviewField label="OG Title" value={formData.og_title || ""} isPreview={previewMode && !!editingId}>
                         <div>
@@ -1758,7 +2153,7 @@ export default function FeedFormPage() {
                           <textarea
                             value={formData.og_description || ""}
                             onChange={(e) => handleInputChange("og_description", e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all resize-y min-h-[80px]"
+                            className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all resize-y min-h-20"
                             placeholder={formData.summary ? formData.summary.substring(0, 160) : "Enter social description..."}
                             maxLength={200}
                           />

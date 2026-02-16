@@ -461,7 +461,7 @@ export function TaskModal({
                       value={formData.description}
                       onChange={(e) => onFormChange({ ...formData, description: e.target.value })}
                       rows={4}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
+                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-25 max-h-75"
                       placeholder="Task description..."
                     />
                     <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
@@ -549,7 +549,7 @@ export function TaskModal({
                         <span className={formData.client_id ? "text-gray-900 truncate" : "text-gray-400"}>
                           {formData.client_name || "No client"}
                         </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showClientDropdown ? "rotate-180" : ""}`} />
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showClientDropdown ? "rotate-180" : ""}`} />
                       </button>
                       
                       {/* Client Dropdown menu */}
@@ -619,10 +619,10 @@ export function TaskModal({
                                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
                                       >
                                         <div className="flex items-center gap-2 min-w-0">
-                                          <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                          <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
                                           <span className="text-gray-900 truncate">{clientName}</span>
                                         </div>
-                                        {formData.client_id === client.id && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                                        {formData.client_id === client.id && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                                       </button>
                                     )
                                   })}
@@ -670,7 +670,7 @@ export function TaskModal({
                           <span className={formData.assigned_to ? "text-gray-900 truncate" : "text-gray-400"}>
                             {formData.assigned_to || "Select..."}
                           </span>
-                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showDropdown ? "rotate-180" : ""}`} />
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showDropdown ? "rotate-180" : ""}`} />
                         </button>
                         
                         {/* Dropdown menu */}
@@ -721,7 +721,7 @@ export function TaskModal({
                                           <div className="truncate">
                                             <span className="text-gray-900">{member.name}</span>
                                           </div>
-                                          {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                                          {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                                         </button>
                                         {!member.id.startsWith("default-") && (
                                           <button
@@ -787,7 +787,7 @@ export function TaskModal({
                         <button
                           type="button"
                           onClick={() => setShowSecondaryDropdown(!showSecondaryDropdown)}
-                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between min-h-[38px]"
+                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between min-h-9.5"
                         >
                           <span className={formData.secondary_assigned_to.length > 0 ? "text-gray-900 truncate" : "text-gray-400"}>
                             {formData.secondary_assigned_to.length > 0 
@@ -796,7 +796,7 @@ export function TaskModal({
                                 : `${formData.secondary_assigned_to.length} selected`
                               : "None"}
                           </span>
-                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showSecondaryDropdown ? "rotate-180" : ""}`} />
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showSecondaryDropdown ? "rotate-180" : ""}`} />
                         </button>
                         
                         {/* Selected members chips */}
@@ -877,7 +877,7 @@ export function TaskModal({
                                           className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? "bg-blue-50" : "hover:bg-gray-50"}`}
                                         >
                                           <span className="text-gray-900 truncate">{member.name}</span>
-                                          {isSelected && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                                          {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                                         </button>
                                       )
                                     })}
@@ -1150,7 +1150,7 @@ export function TaskModal({
                 <div className="space-y-2">
                   {formData.web_links.map((link, index) => (
                     <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
-                      <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <ExternalLink className="w-4 h-4 text-gray-400 shrink-0" />
                       <a 
                         href={link} 
                         target="_blank" 
@@ -1200,9 +1200,9 @@ export function TaskModal({
                     {attachments.map((attachment) => (
                       <div key={attachment.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
                         {attachment.type === "image" ? (
-                          <ImageIcon className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
                         ) : (
-                          <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          <FileText className="w-4 h-4 text-blue-600 shrink-0" />
                         )}
                         <a 
                           href={attachment.url} 
@@ -1306,7 +1306,7 @@ export function TaskModal({
                       is_opportunity: !formData.is_opportunity,
                       opportunity_id: !formData.is_opportunity ? formData.opportunity_id : ""
                     })}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       formData.is_opportunity ? 'bg-sky-600' : 'bg-gray-300'
                     }`}
                   >
@@ -1422,7 +1422,7 @@ export function TaskModal({
                                   value={editCommentContent}
                                   onChange={(e) => setEditCommentContent(e.target.value)}
                                   rows={3}
-                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-y min-h-[60px] max-h-[200px]"
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-y min-h-15 max-h-50"
                                   autoFocus
                                 />
                                 <div className="flex gap-2">
@@ -1481,7 +1481,7 @@ export function TaskModal({
                 {/* Add Comment */}
                 {currentUser ? (
                   <div className="flex gap-2">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       {currentUser.picture ? (
                         <img 
                           src={currentUser.picture} 
@@ -1501,7 +1501,7 @@ export function TaskModal({
                         value={newComment}
                         onChange={(e) => onNewCommentChange(e.target.value)}
                         rows={3}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[70px] max-h-[200px]"
+                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-17.5 max-h-50"
                         placeholder="Add a comment... (use @name to mention someone)"
                       />
                       {/* Tag options helper - shows available team members for tagging */}

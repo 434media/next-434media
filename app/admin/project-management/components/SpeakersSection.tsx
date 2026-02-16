@@ -178,7 +178,7 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
                             {(speaker.photo || speaker.headshot) ? (
                               <img src={speaker.photo || speaker.headshot} alt={speaker.name} className="w-8 h-8 rounded-full object-cover border border-neutral-200" />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-50 to-purple-50 border border-neutral-200 flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-50 to-purple-50 border border-neutral-200 flex items-center justify-center">
                                 <span className="text-xs font-bold text-neutral-400">{speaker.name?.charAt(0) || "S"}</span>
                               </div>
                             )}
@@ -186,8 +186,8 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
                           </div>
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-neutral-600 truncate max-w-[160px]">{speaker.title || "—"}</td>
-                      <td className="px-4 py-3 text-neutral-600 truncate max-w-[140px]">{speaker.company || "—"}</td>
+                      <td className="px-4 py-3 text-neutral-600 truncate max-w-40">{speaker.title || "—"}</td>
+                      <td className="px-4 py-3 text-neutral-600 truncate max-w-35">{speaker.company || "—"}</td>
                       <td className="px-4 py-3">
                         {speaker.speaking_fee ? (
                           <span className="font-semibold text-emerald-700">${speaker.speaking_fee.toLocaleString()}</span>
@@ -240,7 +240,7 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
                       {(speaker.photo || speaker.headshot) ? (
                         <img src={speaker.photo || speaker.headshot} alt={speaker.name} className="w-12 h-12 rounded-full object-cover border border-neutral-200" />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center border border-neutral-200">
+                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-blue-50 to-purple-50 flex items-center justify-center border border-neutral-200">
                           <span className="text-lg font-bold text-neutral-300">{speaker.name?.charAt(0)}</span>
                         </div>
                       )}
@@ -529,10 +529,10 @@ function SpeakerDetailSlideout({ speaker, onClose, onEdit, onDelete }: {
               {(speaker.photo || speaker.headshot) ? (
                 <div className="relative h-48 bg-neutral-100 overflow-hidden">
                   <img src={speaker.photo || speaker.headshot} alt={speaker.name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
                 </div>
               ) : (
-                <div className="h-32 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+                <div className="h-32 bg-linear-to-br from-blue-50 to-purple-50 flex items-center justify-center">
                   <span className="text-5xl font-bold text-neutral-300">{speaker.name?.charAt(0)}</span>
                 </div>
               )}

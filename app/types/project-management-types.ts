@@ -2,6 +2,26 @@
 // Based on 434 Media Project Management Airtable Base (appYlReVbar7qmCRe)
 
 // ============================================
+// Event Link Type
+// ============================================
+export interface EventLink {
+  label: string
+  url: string
+}
+
+// ============================================
+// Event Client Contact Type
+// ============================================
+export interface EventClientContact {
+  name: string
+  email?: string
+  phone?: string
+  company?: string
+  title?: string
+  notes?: string
+}
+
+// ============================================
 // PM Events Table Types
 // ============================================
 export interface PMEvent {
@@ -32,6 +52,8 @@ export interface PMEvent {
   img_ai?: string
   website_url?: string
   notes?: string
+  links?: EventLink[]
+  client_contacts?: EventClientContact[]
   vendor_ids?: string[]
   speaker_ids?: string[]
   created_at?: string
