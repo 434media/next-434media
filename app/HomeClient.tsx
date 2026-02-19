@@ -29,7 +29,6 @@ export default function HomeClient() {
   return (
     <>
       <HeroSection />
-      <NewsletterPopup showModal={showNewsletter} onClose={handleCloseNewsletter} />
     </>
   )
 }

@@ -25,15 +25,14 @@ export default function Footer() {
   ]
 
   const networkLinks = [
-    { label: "AIM 2026", href: "https://www.aimsatx.com/", external: true },
     { label: "TXMX Boxing", href: "https://www.txmxboxing.com/", external: true },
     { label: "Vemos Vamos", href: "https://www.vemosvamos.com/", external: true },
     { label: "Digital Canvas", href: "https://www.digitalcanvas.community", external: true },
     { label: "AMPD Project", href: "https://www.ampdproject.com/", external: true },
     { label: "Salute to Troops", href: "https://www.salutetotroops.com/", external: true },
+    { label: "AIM R&D Summit", href: "https://www.aimsatx.com/", external: true },
     { label: "SDOH", href: "/sdoh" },
     { label: "DEVSA", href: "https://devsa.community", external: true },
-
   ]
 
   useEffect(() => {
@@ -172,7 +171,7 @@ export default function Footer() {
                     <p className="font-geist-sans text-[11px] font-semibold text-neutral-500 uppercase tracking-widest mb-4 leading-none">
                       Network
                     </p>
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5">
+                    <ul className="grid grid-cols-2 md:grid-cols-2 gap-x-6 gap-y-2.5">
                       {networkLinks.map((link) => (
                         <li key={link.label}>
                           {link.external ? (

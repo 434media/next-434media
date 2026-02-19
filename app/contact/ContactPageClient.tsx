@@ -13,34 +13,34 @@ const trustedByLogos = [
   {
     name: "Alamo Angels",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/angels.png",
-    height: "h-8 md:h-7",
+    height: "h-6 md:h-7",
   },
   {
     name: "Digital Canvas",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/digital-canvas-ymas.svg",
     invert: true,
-    height: "h-7 md:h-7",
+    height: "h-6 md:h-7",
   },
   {
     name: "Univision",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/univision-logo.svg",
-    height: "h-5 md:h-9",
+    height: "h-7 md:h-9",
   },
   {
     name: "TXMX Boxing",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg",
     invert: true,
-    height: "h-8 md:h-8",
+    height: "h-6 md:h-8",
   },
   {
     name: "VelocityTX",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+MAIN+RGB+(1).png",
-    height: "h-7 md:h-9",
+    height: "h-6 md:h-9",
   },
   {
     name: "SDOH",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg",
-    height: "h-9 md:h-9",
+    height: "h-7 md:h-9",
   },
   {
     name: "The Health Cell",
@@ -50,7 +50,7 @@ const trustedByLogos = [
   {
     name: "Mission Road Ministries",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/missionroad.svg",
-    height: "h-7 md:h-9",
+    height: "h-6 md:h-9",
   },
   {
     name: "Methodist Healthcare Ministries",
@@ -65,7 +65,7 @@ const trustedByLogos = [
   {
     name: "Learn2AI",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Learn2ai.svg",
-    height: "h-7 md:h-7",
+    height: "h-6 md:h-7",
   },
 ]
 
