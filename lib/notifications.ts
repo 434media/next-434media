@@ -237,11 +237,9 @@ function createRawEmail(params: {
   ].join('\r\n')
 
   // Base64 URL encode the email
-  return Buffer.from(email)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
+  // Using native base64url encoding which handles +→- , /→_ , and padding removal
+  // without regex (avoids ReDoS risk from polynomial /=+$/ pattern)
+  return Buffer.from(email).toString('base64url')
 }
 
 /**

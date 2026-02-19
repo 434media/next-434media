@@ -7,31 +7,28 @@ interface ParseResult {
   error?: string
 }
 
-// Strict allow-list of permitted domains for SSRF prevention
-const ALLOWED_DOMAINS = ['meetup.com', 'eventbrite.com', 'lu.ma'] as const
-
-// Helper to strictly validate hostname against allowed domains
-function isAllowedHostname(hostname: string, allowedDomain: string): boolean {
-  const normalizedHostname = hostname.toLowerCase()
-  const normalizedDomain = allowedDomain.toLowerCase()
-  // Exact match or valid subdomain (must have dot before domain)
-  return normalizedHostname === normalizedDomain || 
-    normalizedHostname.endsWith(`.${normalizedDomain}`)
-}
-
-// Helper to determine platform from validated URL
-function getPlatformFromHostname(hostname: string): 'meetup' | 'eventbrite' | 'luma' | null {
-  const normalizedHostname = hostname.toLowerCase()
-  if (isAllowedHostname(normalizedHostname, 'meetup.com')) return 'meetup'
-  if (isAllowedHostname(normalizedHostname, 'eventbrite.com')) return 'eventbrite'
-  if (isAllowedHostname(normalizedHostname, 'lu.ma')) return 'luma'
-  return null
+// Hardcoded allow-list of permitted domains for SSRF prevention.
+// The canonical hostnames below are string literals — never derived from user input —
+// so the URL passed to fetch() is built entirely from trusted constants + a sanitised path,
+// which breaks the taint chain that static-analysis tools flag.
+const PLATFORM_HOSTS: Record<string, { canonical: string; platform: 'meetup' | 'eventbrite' | 'luma' }> = {
+  'meetup.com':      { canonical: 'www.meetup.com',      platform: 'meetup' },
+  'www.meetup.com':  { canonical: 'www.meetup.com',      platform: 'meetup' },
+  'eventbrite.com':      { canonical: 'www.eventbrite.com',  platform: 'eventbrite' },
+  'www.eventbrite.com':  { canonical: 'www.eventbrite.com',  platform: 'eventbrite' },
+  'lu.ma':  { canonical: 'lu.ma', platform: 'luma' },
 }
 
 // Maximum URL length to prevent abuse
 const MAX_URL_LENGTH = 2048
 
-// Validate URL is in allow-list to prevent SSRF attacks
+// Allowed characters in the path: letters, digits, hyphens, underscores, slashes, dots, tildes, percent-encoded sequences
+const SAFE_PATH_RE = /^[a-zA-Z0-9\-._~/%]+$/
+
+/**
+ * Validate a user-supplied URL against the allow-list and return a safe URL
+ * constructed entirely from hardcoded hostnames (no user-derived hostname in fetch target).
+ */
 function validateUrlForSSRF(url: string): { valid: true; safeUrl: string; platform: 'meetup' | 'eventbrite' | 'luma' } | { valid: false; error: string } {
   // Length check to prevent abuse
   if (!url || url.length > MAX_URL_LENGTH) {
@@ -55,27 +52,27 @@ function validateUrlForSSRF(url: string): { valid: true; safeUrl: string; platfo
     return { valid: false, error: "URLs with credentials are not allowed." }
   }
 
-  const hostname = urlObj.hostname.toLowerCase()
-  const platform = getPlatformFromHostname(hostname)
-
-  // Strict allow-list validation - SSRF protection
-  if (!platform) {
-    return { 
-      valid: false, 
-      error: `Unsupported platform. Only ${ALLOWED_DOMAINS.join(', ')} are supported.` 
+  // --- Hostname: looked up in hardcoded map (not derived from user input) ---
+  const entry = PLATFORM_HOSTS[urlObj.hostname.toLowerCase()]
+  if (!entry) {
+    return {
+      valid: false,
+      error: `Unsupported platform. Only meetup.com, eventbrite.com, and lu.ma are supported.`
     }
   }
 
-  // Reconstruct a clean URL from validated components to break taint tracking
-  // Use URL constructor to ensure proper encoding and prevent manipulation
-  const reconstructed = new URL(`https://${urlObj.hostname}${urlObj.pathname}`)
-  // Only copy over safe search params (no fragments, no credentials)
-  urlObj.searchParams.forEach((value, key) => {
-    reconstructed.searchParams.set(key, value)
-  })
-  const safeUrl = reconstructed.toString()
+  // --- Pathname: sanitise to prevent path-traversal ---
+  // Resolve the pathname (collapses ".." segments) and re-validate
+  const resolvedPath = new URL(urlObj.pathname, 'https://x').pathname // normalises "/a/../b" → "/b"
+  if (!SAFE_PATH_RE.test(resolvedPath)) {
+    return { valid: false, error: "URL contains invalid characters." }
+  }
 
-  return { valid: true, safeUrl, platform }
+  // Build the outgoing URL entirely from hardcoded hostname + sanitised path.
+  // This breaks taint tracking: the hostname is a string literal from PLATFORM_HOSTS.
+  const safeUrl = `https://${entry.canonical}${resolvedPath}`
+
+  return { valid: true, safeUrl, platform: entry.platform }
 }
 
 export async function parseEventUrl(url: string): Promise<ParseResult> {

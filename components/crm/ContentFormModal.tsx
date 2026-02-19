@@ -56,6 +56,24 @@ const getDefaultFormData = () => ({
   comments: [] as TaskComment[],
 })
 
+/**
+ * Sanitize a URL to only allow safe protocols (http/https).
+ * Prevents XSS via javascript:, data:, or other dangerous URI schemes
+ * when user-controlled strings are used in src or href attributes.
+ */
+function sanitizeUrl(url: string | undefined): string {
+  if (!url) return ''
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString()
+    }
+    return ''
+  } catch {
+    return ''
+  }
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
@@ -550,7 +568,7 @@ export function ContentFormModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Thumbnail</label>
                 {formData.thumbnail ? (
                   <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-200">
-                    <img src={formData.thumbnail} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <img src={sanitizeUrl(formData.thumbnail)} alt="Thumbnail" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, thumbnail: "" }))}
@@ -584,14 +602,7 @@ export function ContentFormModal({
                   {formData.links.map((link, index) => (
                     <div key={index} className="flex items-center gap-2 group">
                       <a 
-                        href={(() => {
-                          try {
-                            const parsed = new URL(link)
-                            return ['http:', 'https:'].includes(parsed.protocol) ? link : '#'
-                          } catch {
-                            return '#'
-                          }
-                        })()}
+                        href={sanitizeUrl(link) || '#'}
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors truncate"
@@ -638,7 +649,7 @@ export function ContentFormModal({
                     <div className="flex flex-wrap gap-2">
                       {formData.assets.map((asset, index) => (
                         <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
-                          <img src={asset} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
+                          <img src={sanitizeUrl(asset)} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
                           <button 
                             type="button" 
                             onClick={() => handleRemoveAsset(index)} 
@@ -673,7 +684,7 @@ export function ContentFormModal({
                         <div className="flex items-start gap-2">
                           {comment.author_avatar ? (
                             <img 
-                              src={comment.author_avatar} 
+                              src={sanitizeUrl(comment.author_avatar)} 
                               alt={comment.author_name}
                               className="w-8 h-8 rounded-full"
                             />
@@ -817,7 +828,7 @@ export function ContentFormModal({
                     <div className="shrink-0">
                       {currentUser.picture ? (
                         <img 
-                          src={currentUser.picture} 
+                          src={sanitizeUrl(currentUser.picture)} 
                           alt={currentUser.name}
                           className="w-8 h-8 rounded-full"
                         />
