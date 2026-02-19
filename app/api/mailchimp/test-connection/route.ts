@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { testMailchimpConnection } from "../../../lib/mailchimp-analytics"
+import { testMailchimpConnection } from "@/lib/mailchimp-analytics"
 
 export async function GET(request: NextRequest) {
   try {

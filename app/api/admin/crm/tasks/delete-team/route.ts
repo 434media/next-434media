@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
-import { deleteAllTasksFromOwner } from "@/app/lib/firestore-crm"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { deleteAllTasksFromOwner } from "@/lib/firestore-crm"
 
 // Check admin access
 async function requireAdmin() {

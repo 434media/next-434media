@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import Airtable from "airtable"
 import { checkBotId } from "botid/server"
-import { saveContactForm } from "@/app/lib/firestore-contact-forms"
+import { saveContactForm } from "@/lib/firestore-contact-forms"
 
 const airtableBaseId = process.env.AIRTABLE_BASE_ID
 const airtableApiKey = process.env.AIRTABLE_API_KEY

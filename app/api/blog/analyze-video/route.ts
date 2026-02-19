@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { analyzeVideoUrl, validateVideoUrl, getVideoMetadata } from "../../../lib/video-utils"
-import type { VideoEmbedResponse } from "../../../types/blog-types"
+import { analyzeVideoUrl, validateVideoUrl, getVideoMetadata } from "@/lib/video-utils"
+import type { VideoEmbedResponse } from "@/types/blog-types"
 
 export async function POST(request: NextRequest): Promise<NextResponse<VideoEmbedResponse>> {
   try {

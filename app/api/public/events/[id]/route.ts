@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getAimsEventByIdFromFirestore } from "@/app/lib/firestore-aims-events"
+import { getAimsEventByIdFromFirestore } from "@/lib/firestore-aims-events"
 
 // ============================================
 // PUBLIC API ENDPOINT FOR AIMSATX.COM - SINGLE EVENT

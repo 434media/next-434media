@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getDictionary } from "@/app/lib/dictionary"
+import { getDictionary } from "@/lib/dictionary"
 import { i18n, type Locale } from "../../../i18n-config"
 
 export async function GET(request: NextRequest) {

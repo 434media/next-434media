@@ -1,6 +1,6 @@
-import { getDictionary } from "@/app/lib/dictionary"
+import { getDictionary } from "@/lib/dictionary"
 import type { Locale } from "@/i18n-config"
-import { LanguageProvider } from "@/app/context/language-context"
+import { LanguageProvider } from "@/context/language-context"
 import SDOHClientPage from "./SDOHClientPage"
 import type { Metadata } from "next"
 

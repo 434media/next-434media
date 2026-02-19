@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 
 // Debug endpoint to test notifications and create test notifications
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { getDb } = await import("@/app/lib/firebase-admin")
+    const { getDb } = await import("@/lib/firebase-admin")
     const db = getDb()
 
     const normalizedEmail = session.email.toLowerCase()
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { getDb } = await import("@/app/lib/firebase-admin")
+    const { getDb } = await import("@/lib/firebase-admin")
     const db = getDb()
 
     const normalizedEmail = session.email.toLowerCase()

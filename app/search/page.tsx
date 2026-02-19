@@ -1,10 +1,10 @@
 import { Suspense } from "react"
-import { defaultSort, sorting } from "../lib/constants"
-import { getProducts, getCollections } from "../lib/shopify"
-import Grid from "../components/shopify/grid"
-import ProductGridItems from "../components/shopify/layout/product-grid-items"
-import { CollectionNavbar } from "../components/shopify/collection-navbar"
-import { Skeleton } from "../components/shopify/skeleton"
+import { defaultSort, sorting } from "@/lib/constants"
+import { getProducts, getCollections } from "@/lib/shopify"
+import Grid from "@/components/shopify/grid"
+import ProductGridItems from "@/components/shopify/layout/product-grid-items"
+import { CollectionNavbar } from "@/components/shopify/collection-navbar"
+import { Skeleton } from "@/components/shopify/skeleton"
 
 export const metadata = {
   title: "Search | 434 MEDIA Store",

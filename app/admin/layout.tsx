@@ -3,9 +3,9 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Shield, AlertCircle, Mail, Lock, Loader2 } from "lucide-react"
-import { NotificationProvider } from "../context/notification-context"
+import { NotificationProvider } from "@/context/notification-context"
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
-import { auth } from "../lib/firebase"
+import { auth } from "@/lib/firebase"
 
 // Default password that requires reset on first use
 const DEFAULT_PASSWORD = "434Media2026"

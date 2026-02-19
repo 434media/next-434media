@@ -24,10 +24,10 @@ import {
   MoreVertical,
   ExternalLink
 } from "lucide-react"
-import { RichTextEditor } from "../../components/RichTextEditor"
-import { ImageUpload } from "../../components/ImageUpload"
-import { AdminRoleGuard } from "../../components/AdminRoleGuard"
-import type { BlogPost, BlogFilters } from "../../types/blog-types"
+import { RichTextEditor } from "@/components/RichTextEditor"
+import { ImageUpload } from "@/components/ImageUpload"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import type { BlogPost, BlogFilters } from "@/types/blog-types"
 
 // Blog categories
 const CATEGORIES = [

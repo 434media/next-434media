@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getOpportunities,
   getOpportunityById,
@@ -9,8 +9,8 @@ import {
   getOpportunitiesByStage,
   getOpportunitiesByClient,
   getPipelineView,
-} from "@/app/lib/firestore-crm"
-import type { OpportunityStage } from "@/app/types/crm-types"
+} from "@/lib/firestore-crm"
+import type { OpportunityStage } from "@/types/crm-types"
 
 // Check admin access
 async function requireAdmin() {

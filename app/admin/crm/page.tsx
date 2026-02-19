@@ -28,7 +28,7 @@ import {
   ContentFormModal,
   NotificationBell,
   LinkedTasksPanel,
-} from "../../components/crm"
+} from "@/components/crm"
 
 import type {
   DashboardStats,
@@ -41,12 +41,12 @@ import type {
   TaskAttachment,
   CRMTag,
   ContentPost,
-} from "../../components/crm/types"
+} from "@/components/crm/types"
 
-import { useTaskHandlers, EMPTY_TASK_FORM } from "../../hooks/useTaskHandlers"
-import type { TaskFormData } from "../../hooks/useTaskHandlers"
-import { useClientHandlers, EMPTY_CLIENT_FORM, EMPTY_OPPORTUNITY_FORM } from "../../hooks/useClientHandlers"
-import type { ClientFormData, OpportunityFormData } from "../../hooks/useClientHandlers"
+import { useTaskHandlers, EMPTY_TASK_FORM } from "@/hooks/useTaskHandlers"
+import type { TaskFormData } from "@/hooks/useTaskHandlers"
+import { useClientHandlers, EMPTY_CLIENT_FORM, EMPTY_OPPORTUNITY_FORM } from "@/hooks/useClientHandlers"
+import type { ClientFormData, OpportunityFormData } from "@/hooks/useClientHandlers"
 
 export default function SalesCRMPage() {
   // State

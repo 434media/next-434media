@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getEmailSignups, getEmailSources, getEmailCountsBySource, emailSignupsToCSV } from "@/app/lib/airtable-contacts"
+import { getEmailSignups, getEmailSources, getEmailCountsBySource, emailSignupsToCSV } from "@/lib/airtable-contacts"
 
 export async function GET(request: Request) {
   try {

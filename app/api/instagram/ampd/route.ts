@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession } from "../../../lib/auth"
-import { getInstagramConfigurationStatus } from "../../../lib/instagram-config"
-import { calculateEngagementRate, extractHashtags } from "../../../lib/instagram-utils"
+import { getSession } from "@/lib/auth"
+import { getInstagramConfigurationStatus } from "@/lib/instagram-config"
+import { calculateEngagementRate, extractHashtags } from "@/lib/instagram-utils"
 
 // Helper function to convert relative dates to YYYY-MM-DD format
 function formatDateForInstagram(dateString: string): string {

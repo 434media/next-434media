@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getMailchimpListsData } from "../../../lib/mailchimp-analytics"
+import { getMailchimpListsData } from "@/lib/mailchimp-analytics"
 
 export async function GET() {
   try {

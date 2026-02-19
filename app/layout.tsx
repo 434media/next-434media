@@ -4,13 +4,13 @@ import { Geist, Geist_Mono } from "next/font/google"
 import localFont from "next/font/local"
 import "./globals.css"
 import "remixicon/fonts/remixicon.css"
-import { CombinedNavbar } from "./components/combined-navbar"
-import Footer from "./components/Footer"
+import { CombinedNavbar } from "@/components/combined-navbar"
+import Footer from "@/components/Footer"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
-import { getCart, getMenu } from "./lib/shopify"
-import { CartProvider } from "./components/shopify/cart/cart-context"
-import { PageTransition } from "./components/shopify/page-transition"
+import { getCart, getMenu } from "@/lib/shopify"
+import { CartProvider } from "@/components/shopify/cart/cart-context"
+import { PageTransition } from "@/components/shopify/page-transition"
 import { Suspense } from "react"
 import Script from "next/script"
 
@@ -27,13 +27,13 @@ const geistMono = Geist_Mono({
 })
 
 const mendaBlack = localFont({
-  src: "./fonts/Menda-Black.otf",
+  src: "../fonts/Menda-Black.otf",
   variable: "--font-menda-black",
   display: "swap",
 })
 
 const ggx88Font = localFont({
-  src: "./fonts/GGX88.otf",
+  src: "../fonts/GGX88.otf",
   variable: "--font-ggx88",
   display: "swap",
 })

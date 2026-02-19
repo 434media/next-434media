@@ -5,9 +5,9 @@ import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, Share2, Copy, X, ExternalLink } from "lucide-react"
-import { getBlogPostBySlugAction, getBlogPostsAction } from "@/app/actions/blog"
-import BlogCard from "../../components/blog/BlogCard"
-import type { BlogPost } from "../../types/blog-types"
+import { getBlogPostBySlugAction, getBlogPostsAction } from "@/actions/blog"
+import BlogCard from "@/components/blog/BlogCard"
+import type { BlogPost } from "@/types/blog-types"
 
 interface BlogPostPageProps {
   params: { slug: string }

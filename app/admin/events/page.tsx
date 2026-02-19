@@ -24,8 +24,8 @@ import {
   DollarSign,
   Building2
 } from "lucide-react"
-import { ImageUpload } from "../../components/ImageUpload"
-import { AdminRoleGuard } from "../../components/AdminRoleGuard"
+import { ImageUpload } from "@/components/ImageUpload"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import DOMPurify from "isomorphic-dompurify"
 
 // Website options

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { saveEmailSignup } from "@/app/lib/firestore-email-signups"
+import { saveEmailSignup } from "@/lib/firestore-email-signups"
 import { headers } from "next/headers"
 
 // Valid sources that can submit emails

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { 
   getEmailSignups, 
   getEmailSources, 
   getEmailCountsBySource,
   emailSignupsToCSV,
   deleteEmailSignup,
-} from "@/app/lib/firestore-email-signups"
+} from "@/lib/firestore-email-signups"
 
 // Ensure this route is never cached — always fetch fresh data from Firestore
 export const dynamic = "force-dynamic"

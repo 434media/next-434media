@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getInstagramConfigurationStatus, validateInstagramConfig } from "../../../../lib/instagram-config"
+import { getInstagramConfigurationStatus, validateInstagramConfig } from "@/lib/instagram-config"
 
 async function debugAccessToken() {
   const appId = process.env.INSTAGRAM_APP_ID

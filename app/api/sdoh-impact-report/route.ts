@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import axios from "axios"
 import { checkBotId } from "botid/server"
-import { saveEmailSignup } from "@/app/lib/firestore-email-signups"
+import { saveEmailSignup } from "@/lib/firestore-email-signups"
 
 const mailchimpApiKey = process.env.MAILCHIMP_API_KEY
 const mailchimpListId = process.env.MAILCHIMP_AUDIENCE_ID

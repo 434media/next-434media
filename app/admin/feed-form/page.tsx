@@ -3,18 +3,18 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
-import { Button } from "../../components/analytics/Button"
-import { Badge } from "../../components/analytics/Badge"
+import { Button } from "@/components/analytics/Button"
+import { Badge } from "@/components/analytics/Badge"
 import { Marked } from 'marked'
 
-import { Toast } from "../../components/crm/Toast"
-import type { Toast as ToastType, CurrentUser, TeamMember } from "../../components/crm/types"
-import { TEAM_MEMBERS } from "../../components/crm/types"
+import { Toast } from "@/components/crm/Toast"
+import type { Toast as ToastType, CurrentUser, TeamMember } from "@/components/crm/types"
+import { TEAM_MEMBERS } from "@/components/crm/types"
 import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Sparkles, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
 import Link from "next/link"
-import { RichTextEditor } from "../../components/RichTextEditor"
-import { ImageUpload } from "../../components/ImageUpload"
-import { AdminRoleGuard } from "../../components/AdminRoleGuard"
+import { RichTextEditor } from "@/components/RichTextEditor"
+import { ImageUpload } from "@/components/ImageUpload"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 
 // Configure marked for consistent rendering with production
 const previewMarked = new Marked({ 

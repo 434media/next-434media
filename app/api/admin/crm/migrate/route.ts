@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getRecordsFromTable,
   mapAirtableRecordToTyped,
   getMigrationStatus,
   AIRTABLE_CRM_TABLES,
-} from "@/app/lib/airtable-crm"
-import { batchWrite } from "@/app/lib/firestore-crm"
-import { AIRTABLE_TO_FIRESTORE_MAP } from "@/app/types/crm-types"
+} from "@/lib/airtable-crm"
+import { batchWrite } from "@/lib/firestore-crm"
+import { AIRTABLE_TO_FIRESTORE_MAP } from "@/types/crm-types"
 
 // Check admin access
 async function requireAdmin() {

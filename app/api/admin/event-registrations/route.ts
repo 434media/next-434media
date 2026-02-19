@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getEventRegistrations,
   getEventRegistrationCounts,
   deleteEventRegistration,
   eventRegistrationsToCSV,
-} from "@/app/lib/firestore-event-registrations"
+} from "@/lib/firestore-event-registrations"
 
 // Ensure this route is never cached — always fetch fresh data from Firestore
 export const dynamic = "force-dynamic"

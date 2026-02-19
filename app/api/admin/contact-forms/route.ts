@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getContactForms,
   getContactFormSources,
@@ -8,7 +8,7 @@ import {
   deleteContactForm,
   updateContactForm,
   migrateContactFormsFromAirtable,
-} from "@/app/lib/firestore-contact-forms"
+} from "@/lib/firestore-contact-forms"
 
 // Check admin access
 async function requireAdmin() {

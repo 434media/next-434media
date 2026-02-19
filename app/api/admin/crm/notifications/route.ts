@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { 
   sendCommentNotification, 
   sendAssignmentNotification,
   getUnreadNotifications, 
   markNotificationsAsRead 
-} from "@/app/lib/notifications"
+} from "@/lib/notifications"
 
 // Check admin access
 async function requireAdmin() {

@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { i18n, type Locale } from "@/i18n-config"
-import { useLanguage } from "@/app/context/language-context"
+import { useLanguage } from "@/context/language-context"
 
 interface SDOHLanguageToggleProps {
   showOnScroll?: boolean

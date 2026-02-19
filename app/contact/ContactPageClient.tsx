@@ -1,108 +1,160 @@
 "use client"
 
 import { motion } from "motion/react"
-import { useEffect, useState } from "react"
-import { ContactForm } from "../components/ContactForm"
-import { Sparkles, Video, MessageSquare } from "lucide-react"
+import { useEffect, useState, useRef, useCallback } from "react"
+import { ContactForm } from "@/components/ContactForm"
 
 const trustedByLogos = [
   {
-    name: "VelocityTX",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+MAIN+RGB+(1).png",
-  },
-  {
     name: "Builders VC",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/builders-dark.svg",
-  },
-  {
-    name: "The Health Cell",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/healthcell.png",
-  },
-  {
-    name: "Mission Road Ministries",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/missionroad.svg",
-  },
-  {
-    name: "Univision",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/univision-logo.svg",
-  },
-  {
-    name: "Methodist Healthcare Ministries",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png",
-  },
-  {
-    name: "Akshar Staffing",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/vemos-vamos/Akshar-Staffing.png",
+    height: "h-8 md:h-9",
   },
   {
     name: "Alamo Angels",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/angels.png",
+    height: "h-8 md:h-7",
+  },
+  {
+    name: "Digital Canvas",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/digital-canvas-ymas.svg",
+    invert: true,
+    height: "h-7 md:h-7",
+  },
+  {
+    name: "Univision",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/univision-logo.svg",
+    height: "h-5 md:h-9",
+  },
+  {
+    name: "TXMX Boxing",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg",
+    invert: true,
+    height: "h-8 md:h-8",
+  },
+  {
+    name: "VelocityTX",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+MAIN+RGB+(1).png",
+    height: "h-7 md:h-9",
+  },
+  {
+    name: "SDOH",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg",
+    height: "h-9 md:h-9",
+  },
+  {
+    name: "The Health Cell",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/healthcell.png",
+    height: "h-7 md:h-8",
+  },
+  {
+    name: "Mission Road Ministries",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/missionroad.svg",
+    height: "h-7 md:h-9",
+  },
+  {
+    name: "Methodist Healthcare Ministries",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png",
+    height: "h-9 md:h-10",
   },
   {
     name: "Tech Bloc",
     logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/healthcell-2-techbloc.png",
+    height: "h-9 md:h-12",
+  },
+  {
+    name: "Learn2AI",
+    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Learn2ai.svg",
+    height: "h-7 md:h-7",
   },
 ]
 
 export function ContactPageClient() {
   const [mounted, setMounted] = useState(false)
-
-  const services = [
-    {
-      icon: Sparkles,
-      text: "ROI-driven media strategies that deliver measurable results",
-    },
-    {
-      icon: MessageSquare,
-      text: "Brand storytelling that connects with your audience",
-    },
-    {
-      icon: Video,
-      text: "Video production and event coverage that captivates",
-    },
-  ]
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Ensure page starts at top on mount
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
 
-  return (
-    <div className="min-h-[100dvh] bg-white text-gray-900 overflow-hidden">
-      <div className="relative min-h-[100dvh] flex items-center py-8 lg:py-12">
-        {/* Subtle Background Pattern */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-50" />
-          <div 
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: `radial-gradient(circle at 1px 1px, gray 1px, transparent 0)`,
-              backgroundSize: '32px 32px',
-            }}
-          />
-        </div>
+  // Dot distortion shader
+  const drawDots = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
 
-        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-20 items-start">
+    const dpr = window.devicePixelRatio || 1
+    const w = canvas.clientWidth
+    const h = canvas.clientHeight
+    canvas.width = w * dpr
+    canvas.height = h * dpr
+    ctx.scale(dpr, dpr)
+
+    ctx.clearRect(0, 0, w, h)
+
+    const gap = 24
+    const dotRadius = 1
+    const alpha = 0.12
+
+    ctx.fillStyle = `rgba(0,0,0,${alpha})`
+    for (let x = gap; x < w; x += gap) {
+      for (let y = gap; y < h; y += gap) {
+        ctx.beginPath()
+        ctx.arc(x, y, dotRadius, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    drawDots()
+
+    const onResize = () => drawDots()
+    window.addEventListener("resize", onResize)
+
+    return () => {
+      window.removeEventListener("resize", onResize)
+    }
+  }, [drawDots])
+
+  return (
+    <div className="min-h-dvh bg-white text-gray-900 overflow-hidden pt-10">
+      <div className="relative min-h-dvh flex items-center py-4 lg:py-6">
+        {/* Dot Distortion Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-linear-to-br from-gray-50 via-white to-gray-50" />
+        </div>
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          aria-hidden="true"
+        />
+
+        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-16 items-start">
             <motion.div
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="space-y-8 lg:space-y-10 mt-16 sm:mt-20 lg:mt-0"
+              className="space-y-5 lg:space-y-6 mt-16 sm:mt-20 lg:mt-0"
             >
               {/* Main Headline */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.2 }}
-                className="space-y-5 lg:space-y-6"
+                className="space-y-4 lg:space-y-5"
               >
                 <motion.h1
-                  className="text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-[1.1] tracking-tight"
+                  className="font-ggx88 font-black text-5xl lg:text-6xl xl:text-7xl text-gray-900 leading-[0.9] tracking-tighter"
                   transition={{ duration: 0.3 }}
                 >
                   <motion.span
@@ -111,15 +163,15 @@ export function ContactPageClient() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.8, delay: 0.3 }}
                   >
-                    Take the
+                    Bold Stories.
                   </motion.span>
                   <motion.span
-                    className="block text-gray-900"
+                    className="block"
                     initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.8, delay: 0.5 }}
                   >
-                    next step
+                    Proven Impact.
                   </motion.span>
                 </motion.h1>
 
@@ -127,58 +179,27 @@ export function ContactPageClient() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.7 }}
-                  className="text-lg sm:text-xl text-gray-600 leading-relaxed font-normal max-w-lg"
+                  className="font-geist-sans text-base text-gray-500 leading-relaxed font-normal max-w-md"
                 >
-                  We partner with venture capital firms, accelerators, startups, and industry leaders to create{" "}
-                  <span className="text-gray-900 font-medium">bold, strategic content</span> that delivers results.
+                  From brand campaigns, to event production, we help the world&apos;s most innovative firms find their voice and amplify their impact through bold storytelling and experiences.
                 </motion.p>
               </motion.div>
 
-              {/* Services List */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.9 }}
-                className="space-y-5"
-              >
-                <motion.h2
-                  className="text-lg sm:text-xl font-semibold text-gray-900 tracking-tight"
-                  transition={{ duration: 0.3 }}
-                >
-                  What we specialize in
-                </motion.h2>
-                <ul className="space-y-4">
-                  {services.map((service, index) => (
-                    <motion.li
-                      key={index}
-                      className="flex items-start gap-4"
-                      initial={{ opacity: 0, x: -30 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.6, delay: 1.0 + 0.15 * index }}
-                    >
-                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center mt-0.5">
-                        <service.icon className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <span className="flex-1 text-base text-gray-600 leading-relaxed font-normal">{service.text}</span>
-                    </motion.li>
-                  ))}
-                </ul>
-              </motion.div>
-
-              {/* Trust Indicator - Logo Carousel */}
+              {/* Trust Indicator - Logo Carousel (mobile) / Grid (desktop) */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 1.5 }}
-                className="pt-6 border-t border-gray-100"
+                className="pt-4 border-t border-gray-100"
               >
-                <p className="text-sm text-gray-500 font-normal mb-4">
+                <p className="font-geist-sans text-[11px] text-gray-400 font-semibold tracking-widest uppercase mb-3.5">
                   Trusted by <span className="font-medium text-gray-700">leading organizations</span>
                 </p>
-                <div className="relative overflow-hidden">
-                  {/* Gradient masks for smooth fade effect */}
-                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-                  <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+                {/* Mobile: scrolling marquee */}
+                <div className="relative overflow-hidden lg:hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-linear-to-r from-white to-transparent z-10 pointer-events-none" />
+                  <div className="absolute right-0 top-0 bottom-0 w-12 bg-linear-to-l from-white to-transparent z-10 pointer-events-none" />
                   
                   <motion.div
                     className="flex items-center gap-8"
@@ -194,20 +215,35 @@ export function ContactPageClient() {
                       },
                     }}
                   >
-                    {/* Double the logos for seamless loop */}
                     {[...trustedByLogos, ...trustedByLogos].map((company, index) => (
                       <div
                         key={`${company.name}-${index}`}
-                        className="flex-shrink-0 h-8 flex items-center justify-center"
+                        className="shrink-0 h-6 flex items-center justify-center"
                       >
                         <img
                           src={company.logo}
                           alt={`${company.name} logo`}
-                          className="h-6 md:h-8 w-auto object-contain opacity-60 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-300"
+                          className={`${company.height} w-auto object-contain opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-300${company.invert ? ' invert' : ''}`}
                         />
                       </div>
                     ))}
                   </motion.div>
+                </div>
+
+                {/* Desktop: logo grid */}
+                <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                  {trustedByLogos.map((company) => (
+                    <div
+                      key={company.name}
+                      className="bg-white flex items-center justify-center p-5 xl:p-6 group"
+                    >
+                      <img
+                        src={company.logo}
+                        alt={`${company.name} logo`}
+                        className={`${company.height} w-auto object-contain opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-300${company.invert ? ' invert' : ''}`}
+                      />
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             </motion.div>
@@ -216,7 +252,7 @@ export function ContactPageClient() {
               initial={{ opacity: 0, y: 60, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 1, delay: 0.5 }}
-              className="mt-8 lg:mt-0"
+              className="mt-6 lg:mt-0"
             >
               <div className="relative">
                 <ContactForm

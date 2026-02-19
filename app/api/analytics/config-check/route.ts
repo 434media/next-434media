@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { validateAnalyticsConfig, getConfigurationStatus } from "../../../lib/analytics-config"
+import { validateAnalyticsConfig, getConfigurationStatus } from "@/lib/analytics-config"
 
 export async function GET() {
   const configStatus = getConfigurationStatus()

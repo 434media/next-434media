@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getBlogPostBySlugFromFirestore } from "../../lib/firestore-blog"
+import { getBlogPostBySlugFromFirestore } from "@/lib/firestore-blog"
 import BlogPostPageClient from "./BlogPostPageClient"
 
 type Props = {

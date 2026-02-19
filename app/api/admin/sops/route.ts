@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getSOPsFromFirestore,
   getSOPByIdFromFirestore,
@@ -7,8 +7,8 @@ import {
   updateSOPInFirestore,
   deleteSOPFromFirestore,
   saveSOPsToFirestore,
-} from "../../../lib/firestore-project-management"
-import { getSOPsFromAirtable } from "../../../lib/airtable-project-management"
+} from "@/lib/firestore-project-management"
+import { getSOPsFromAirtable } from "@/lib/airtable-project-management"
 
 // Check if user is authenticated and has workspace email
 async function requireAdmin() {

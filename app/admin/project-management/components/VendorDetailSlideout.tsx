@@ -18,7 +18,7 @@ import {
   Paperclip,
   Link,
 } from "lucide-react"
-import type { Vendor } from "../../../types/project-management-types"
+import type { Vendor } from "@/types/project-management-types"
 
 interface VendorDetailSlideoutProps {
   vendor: Vendor | null

@@ -2,14 +2,14 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Suspense } from "react"
-import { HIDDEN_PRODUCT_TAG } from "../../lib/constants"
-import { getProduct, getProductRecommendations } from "../../lib/shopify"
-import type { Image } from "../../lib/shopify/types"
-import { GridTileImage } from "../../components/shopify/grid/tile"
-import { Gallery } from "../../components/shopify/product/gallery"
-import { ProductProvider } from "../../components/shopify/product/product-context"
-import { ProductDescription } from "../../components/shopify/product/product-description"
-import { BackButton } from "../../components/shopify/product/back-button"
+import { HIDDEN_PRODUCT_TAG } from "@/lib/constants"
+import { getProduct, getProductRecommendations } from "@/lib/shopify"
+import type { Image } from "@/lib/shopify/types"
+import { GridTileImage } from "@/components/shopify/grid/tile"
+import { Gallery } from "@/components/shopify/product/gallery"
+import { ProductProvider } from "@/components/shopify/product/product-context"
+import { ProductDescription } from "@/components/shopify/product/product-description"
+import { BackButton } from "@/components/shopify/product/back-button"
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +22,8 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
   const { url, width, height, altText: alt } = product.featuredImage || {}
   const indexable = !product.tags.includes(HIDDEN_PRODUCT_TAG)
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
+
   return {
     title: product.seo.title || product.title,
     description: product.seo.description || product.description,
@@ -33,18 +35,36 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
         follow: indexable,
       },
     },
-    openGraph: url
-      ? {
-          images: [
-            {
-              url,
-              width,
-              height,
-              alt,
-            },
-          ],
-        }
-      : null,
+    alternates: {
+      canonical: `/product/${handle}`,
+    },
+    openGraph: {
+      title: product.seo.title || product.title,
+      description: product.seo.description || product.description,
+      url: `${siteUrl}/product/${handle}`,
+      siteName: "434 MEDIA",
+      ...(url
+        ? {
+            images: [
+              {
+                url,
+                width,
+                height,
+                alt: alt || product.title,
+              },
+            ],
+          }
+        : {}),
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image" as const,
+      title: product.seo.title || product.title,
+      description: product.seo.description || product.description,
+      ...(url ? { images: [url] } : {}),
+      creator: "@434media",
+      site: "@434media",
+    },
   }
 }
 

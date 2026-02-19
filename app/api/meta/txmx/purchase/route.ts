@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { trackTXMXPurchase } from "../../../../lib/meta-server-tracking"
-import type { TXMXOrderData } from "../../../../types/meta-pixel"
+import { trackTXMXPurchase } from "@/lib/meta-server-tracking"
+import type { TXMXOrderData } from "@/types/meta-pixel"
 
 export async function POST(request: NextRequest) {
   try {

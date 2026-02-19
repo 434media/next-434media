@@ -9,7 +9,7 @@ import {
   getMailchimpCampaignsData,
   getMailchimpRealtimeData,
   getMailchimpTags,
-} from "../../lib/mailchimp-analytics"
+} from "@/lib/mailchimp-analytics"
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     switch (endpoint) {
       case "test-connection":
-        const { testMailchimpConnection } = await import("../../lib/mailchimp-analytics")
+        const { testMailchimpConnection } = await import("@/lib/mailchimp-analytics")
         data = await testMailchimpConnection(audienceId || undefined)
         break
 

@@ -3,7 +3,7 @@ import Airtable from "airtable"
 import axios from "axios"
 import crypto from "crypto"
 import { checkBotId } from "botid/server"
-import { saveEmailSignup } from "@/app/lib/firestore-email-signups"
+import { saveEmailSignup } from "@/lib/firestore-email-signups"
 
 const airtableBaseId = process.env.AIRTABLE_BASE_ID
 const airtableApiKey = process.env.AIRTABLE_API_KEY

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const path = searchParams.get("path") || ""
 
     // Font
-    const fontData = await fetch(new URL("../../fonts/Menda-Black.otf", import.meta.url)).then((res) =>
+    const fontData = await fetch(new URL("../../../fonts/Menda-Black.otf", import.meta.url)).then((res) =>
       res.arrayBuffer(),
     )
 

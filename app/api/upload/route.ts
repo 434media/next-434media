@@ -1,6 +1,6 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { NextRequest, NextResponse } from "next/server"
-import { getSession } from "../../lib/auth"
+import { getSession } from "@/lib/auth"
 
 // Configure route segment for uploads
 export const runtime = 'nodejs'

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getDb } from "@/app/lib/firebase-admin"
+import { getDb } from "@/lib/firebase-admin"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
 
