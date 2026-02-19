@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { parseEventUrl } from "../../lib/event-parser"
+import { parseEventUrl } from "@/lib/event-parser"
 
 export async function POST(request: NextRequest) {
   try {

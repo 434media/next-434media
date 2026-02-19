@@ -1,19 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { InstagramAnalyticsHeader } from "../../components/instagram/InstagramAnalyticsHeader"
-import { InstagramKeyMetrics } from "../../components/instagram/InstagramKeyMetrics"
-import { InstagramTopPostsTable } from "../../components/instagram/InstagramTopPostsTable"
-import { InstagramAccountInfo } from "../../components/instagram/InstagramAccountInfo"
-import { InstagramReachBreakdown } from "../../components/instagram/InstagramReachBreakdown"
-import { InfoTooltip } from "../../components/analytics/InfoTooltip"
+import { InstagramAnalyticsHeader } from "@/components/instagram/InstagramAnalyticsHeader"
+import { InstagramKeyMetrics } from "@/components/instagram/InstagramKeyMetrics"
+import { InstagramTopPostsTable } from "@/components/instagram/InstagramTopPostsTable"
+import { InstagramAccountInfo } from "@/components/instagram/InstagramAccountInfo"
+import { InstagramReachBreakdown } from "@/components/instagram/InstagramReachBreakdown"
+import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import type {
   InstagramTimeRange,
   InstagramAccount,
   InstagramMedia,
   InstagramMediaInsights,
   InstagramReachBreakdown as InstagramReachBreakdownType,
-} from "../../types/instagram-insights"
+} from "@/types/instagram-insights"
 
 interface InstagramInsightsData {
   reach: number

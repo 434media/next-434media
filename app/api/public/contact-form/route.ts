@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { saveContactForm } from "@/app/lib/firestore-contact-forms"
+import { saveContactForm } from "@/lib/firestore-contact-forms"
 import { headers } from "next/headers"
 
 // Valid sources that can submit contact forms

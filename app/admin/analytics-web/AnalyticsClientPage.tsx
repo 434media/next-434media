@@ -1,15 +1,15 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader"
-import { MetricsOverview } from "../../components/analytics/MetricsOverview"
-import { PageViewsChart } from "../../components/analytics/PageViewsChart"
-import { TopPagesTable } from "../../components/analytics/TopPagesTable"
-import { TrafficSourcesChart } from "../../components/analytics/TrafficSourcesChart"
-import { DeviceBreakdown } from "../../components/analytics/DeviceBreakdown"
-import { GeographicMap } from "../../components/analytics/GeographicMap"
-import { InfoTooltip } from "../../components/analytics/InfoTooltip"
-import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "../../types/analytics"
+import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader"
+import { MetricsOverview } from "@/components/analytics/MetricsOverview"
+import { PageViewsChart } from "@/components/analytics/PageViewsChart"
+import { TopPagesTable } from "@/components/analytics/TopPagesTable"
+import { TrafficSourcesChart } from "@/components/analytics/TrafficSourcesChart"
+import { DeviceBreakdown } from "@/components/analytics/DeviceBreakdown"
+import { GeographicMap } from "@/components/analytics/GeographicMap"
+import { InfoTooltip } from "@/components/analytics/InfoTooltip"
+import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "@/types/analytics"
 
 // Download analytics summary as CSV
 async function downloadAnalyticsCSV(dateRange: DateRange, propertyId?: string, propertyName?: string) {

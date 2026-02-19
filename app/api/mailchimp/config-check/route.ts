@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { validateMailchimpConfig, isMailchimpConfigured } from "../../../lib/mailchimp-config"
+import { validateMailchimpConfig, isMailchimpConfigured } from "@/lib/mailchimp-config"
 
 export async function GET() {
   try {

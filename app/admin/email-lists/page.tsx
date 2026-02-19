@@ -31,7 +31,7 @@ import {
   MapPin,
   Check,
 } from "lucide-react"
-import { AdminRoleGuard } from "../../components/AdminRoleGuard"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 
 // ── Types ──
 

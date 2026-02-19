@@ -4,8 +4,8 @@ import {
   getFeedItems, 
   updateFeedItem, 
   deleteFeedItem 
-} from "../../lib/firestore-feed"
-import { getSession } from "../../lib/auth"
+} from "@/lib/firestore-feed"
+import { getSession } from "@/lib/auth"
 
 // Force dynamic rendering - this route uses auth and Firestore
 export const dynamic = 'force-dynamic'

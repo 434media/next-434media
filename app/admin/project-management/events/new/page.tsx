@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Loader2, AlertCircle } from "lucide-react"
-import type { PMEvent, Vendor } from "../../../../types/project-management-types"
-import { AdminRoleGuard } from "../../../../components/AdminRoleGuard"
+import type { PMEvent, Vendor } from "@/types/project-management-types"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import EventForm from "../../components/EventForm"
 
 export default function NewEventPage() {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { setSession, isWorkspaceEmail, getRoleForProvider } from '@/app/lib/auth'
+import { setSession, isWorkspaceEmail, getRoleForProvider } from '@/lib/auth'
 
 interface GoogleTokenResponse {
   access_token: string

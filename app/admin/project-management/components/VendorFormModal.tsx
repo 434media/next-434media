@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { X, Loader2, Trash2, Paperclip, Upload } from "lucide-react"
 import { upload } from "@vercel/blob/client"
-import type { Vendor, VendorAttachment } from "../../../types/project-management-types"
-import { VENDOR_CATEGORIES } from "../../../types/project-management-types"
-import { ImageUpload } from "../../../components/ImageUpload"
+import type { Vendor, VendorAttachment } from "@/types/project-management-types"
+import { VENDOR_CATEGORIES } from "@/types/project-management-types"
+import { ImageUpload } from "@/components/ImageUpload"
 
 interface VendorFormModalProps {
   isOpen: boolean

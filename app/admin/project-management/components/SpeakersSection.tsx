@@ -25,7 +25,7 @@ import {
   DollarSign,
   Star,
 } from "lucide-react"
-import type { Speaker } from "../../../types/project-management-types"
+import type { Speaker } from "@/types/project-management-types"
 
 interface SpeakersSectionProps {
   speakers: Speaker[]

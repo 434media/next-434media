@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getProducts } from "@/app/lib/shopify"
+import { getProducts } from "@/lib/shopify"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)

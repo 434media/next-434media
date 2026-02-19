@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getTasks,
   getTaskById,
@@ -12,7 +12,7 @@ import {
   getMasterListItemById,
   updateMasterListItem,
   deleteMasterListItem,
-} from "@/app/lib/firestore-crm"
+} from "@/lib/firestore-crm"
 
 // Task owner types
 type TaskOwner = "jake" | "pm" | "marc" | "stacy" | "jesse" | "barb" | "teams" | "completed"

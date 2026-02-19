@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isWorkspaceEmail } from "@/app/lib/auth"
+import { getSession, isWorkspaceEmail } from "@/lib/auth"
 import { 
   getBlogPostByIdFromFirestore,
   getBlogPostBySlugFromFirestore,
   updateBlogPostInFirestore, 
   deleteBlogPostFromFirestore
-} from "@/app/lib/firestore-blog"
-import type { UpdateBlogPostData } from "@/app/types/blog-types"
+} from "@/lib/firestore-blog"
+import type { UpdateBlogPostData } from "@/types/blog-types"
 
 // Check if user is authenticated and has workspace email
 async function requireAdmin() {

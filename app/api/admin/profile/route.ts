@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { getSession, setSession, isAuthorizedAdmin } from "@/app/lib/auth"
-import { getDb } from "@/app/lib/firebase-admin"
+import { getSession, setSession, isAuthorizedAdmin } from "@/lib/auth"
+import { getDb } from "@/lib/firebase-admin"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
 

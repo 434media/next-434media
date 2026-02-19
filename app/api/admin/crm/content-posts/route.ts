@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getContentPosts,
   getContentPostById,
   createContentPost,
   updateContentPost,
   deleteContentPost,
-} from "@/app/lib/firestore-crm"
+} from "@/lib/firestore-crm"
 
 // Check admin access
 async function requireAdmin() {

@@ -1,4 +1,4 @@
-import Grid from '../components/shopify/grid';
+import Grid from '@/components/shopify/grid';
 
 export default function Loading() {
   return (

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
-import { AdminRoleGuard } from "@/app/components/AdminRoleGuard"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 
 // Loading skeleton component
 const AnalyticsLoadingSkeleton = () => (

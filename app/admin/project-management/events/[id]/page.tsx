@@ -23,8 +23,8 @@ import {
   Mail,
   Clock,
 } from "lucide-react"
-import type { PMEvent, Vendor } from "../../../../types/project-management-types"
-import { AdminRoleGuard } from "../../../../components/AdminRoleGuard"
+import type { PMEvent, Vendor } from "@/types/project-management-types"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 
 const STATUS_COLORS: Record<string, string> = {
   planning: "bg-amber-100 text-amber-700 border-amber-200",

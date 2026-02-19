@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { trackTXMXPageView } from "../../../../lib/meta-server-tracking"
+import { trackTXMXPageView } from "@/lib/meta-server-tracking"
 
 export async function POST(request: NextRequest) {
   try {

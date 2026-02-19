@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { MetaConversionsAPI } from "../../../../lib/meta-conversions-api"
+import { MetaConversionsAPI } from "@/lib/meta-conversions-api"
 
 export async function GET(request: NextRequest) {
   try {

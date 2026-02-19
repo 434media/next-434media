@@ -9,9 +9,9 @@ import {
   getGeographicData,
   getRealtimeData,
   getAvailableProperties,
-} from "../../lib/google-analytics"
-import { validateAnalyticsConfig, getConfigurationStatus } from "../../lib/analytics-config"
-import { getSession } from "../../lib/auth"
+} from "@/lib/google-analytics"
+import { validateAnalyticsConfig, getConfigurationStatus } from "@/lib/analytics-config"
+import { getSession } from "@/lib/auth"
 
 // Helper function to convert relative dates to YYYY-MM-DD format
 function formatDateForGA(dateString: string): string {

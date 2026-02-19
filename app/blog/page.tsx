@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getBlogPostsFromFirestore } from "../lib/firestore-blog"
+import { getBlogPostsFromFirestore } from "@/lib/firestore-blog"
 import BlogClientPage from "./BlogClientPage"
 
 export const metadata: Metadata = {

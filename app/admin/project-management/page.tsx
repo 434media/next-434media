@@ -13,8 +13,8 @@ import {
   AlertCircle,
   X,
 } from "lucide-react"
-import type { PMEvent, Vendor, Speaker } from "../../types/project-management-types"
-import { AdminRoleGuard } from "../../components/AdminRoleGuard"
+import type { PMEvent, Vendor, Speaker } from "@/types/project-management-types"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import VendorTable from "./components/VendorTable"
 import SpeakersSection from "./components/SpeakersSection"
 import EventsSection from "./components/EventsSection"

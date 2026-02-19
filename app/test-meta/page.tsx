@@ -1,4 +1,13 @@
-import MetaTestRunner from "../components/meta/MetaTestRunner"
+import type { Metadata } from "next"
+import MetaTestRunner from "@/components/meta/MetaTestRunner"
+
+export const metadata: Metadata = {
+  title: "Meta Conversions API Testing",
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default function TestMetaPage() {
   return (

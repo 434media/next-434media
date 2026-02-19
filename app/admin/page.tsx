@@ -18,7 +18,7 @@ import {
   Layers,
   Settings,
 } from "lucide-react"
-import { AdminUserMenu } from "../components/AdminUserMenu"
+import { AdminUserMenu } from "@/components/AdminUserMenu"
 
 type AdminRole = "full_admin" | "crm_only"
 
@@ -71,11 +71,11 @@ const sectionGroups: SectionGroup[] = [
       {
         id: "feed-form",
         title: "CONTENT HUB",
-        subtitle: "The Feed • Culture Deck • 8 COUNT",
+        subtitle: "The Feed",
         href: "/admin/feed-form",
         icon: <RssIcon className="w-5 h-5 sm:w-6 sm:h-6" />,
         description:
-          "Manage and schedule content for The Feed, The Culture Deck, and The 8 COUNT",
+          "Manage and schedule content for The Feed on the Digital Canvas website",
         allowedRoles: ["full_admin"],
       },
       {

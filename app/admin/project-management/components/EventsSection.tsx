@@ -23,8 +23,8 @@ import {
   Zap,
   ArrowRight,
 } from "lucide-react"
-import type { PMEvent } from "../../../types/project-management-types"
-import { PM_EVENT_STATUSES } from "../../../types/project-management-types"
+import type { PMEvent } from "@/types/project-management-types"
+import { PM_EVENT_STATUSES } from "@/types/project-management-types"
 
 // ============================================
 // Props

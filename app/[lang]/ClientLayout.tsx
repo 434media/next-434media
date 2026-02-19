@@ -1,8 +1,8 @@
 "use client"
 
 import { type ReactNode, useEffect } from "react"
-import { LanguageProvider } from "../context/language-context"
-import type { Dictionary } from "../types/dictionary"
+import { LanguageProvider } from "@/context/language-context"
+import type { Dictionary } from "@/types/dictionary"
 import type { Locale } from "../../i18n-config"
 
 export default function ClientLayout({

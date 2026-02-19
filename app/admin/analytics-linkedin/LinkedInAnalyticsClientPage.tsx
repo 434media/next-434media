@@ -1,17 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LinkedInAnalyticsHeader } from "../../components/linkedin/LinkedInAnalyticsHeader"
-import { LinkedInKeyMetrics } from "../../components/linkedin/LinkedInKeyMetrics"
-import { LinkedInOrganizationInfo } from "../../components/linkedin/LinkedInOrganizationInfo"
-import { LinkedInTopPostsTable } from "../../components/linkedin/LinkedInTopPostsTable"
-import { InfoTooltip } from "../../components/analytics/InfoTooltip"
+import { LinkedInAnalyticsHeader } from "@/components/linkedin/LinkedInAnalyticsHeader"
+import { LinkedInKeyMetrics } from "@/components/linkedin/LinkedInKeyMetrics"
+import { LinkedInOrganizationInfo } from "@/components/linkedin/LinkedInOrganizationInfo"
+import { LinkedInTopPostsTable } from "@/components/linkedin/LinkedInTopPostsTable"
+import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import type {
   LinkedInTimeRange,
   LinkedInOrganization,
   LinkedInOrganizationInsights,
   LinkedInPostWithInsights,
-} from "../../types/linkedin-insights"
+} from "@/types/linkedin-insights"
 
 // Helper to format numbers with commas
 function formatNumber(num: number): string {

@@ -27,8 +27,8 @@ import {
   FileText,
   Tag,
 } from "lucide-react"
-import type { Vendor } from "../../../types/project-management-types"
-import { VENDOR_CATEGORIES } from "../../../types/project-management-types"
+import type { Vendor } from "@/types/project-management-types"
+import { VENDOR_CATEGORIES } from "@/types/project-management-types"
 import VendorFormModal from "./VendorFormModal"
 import VendorDetailSlideout from "./VendorDetailSlideout"
 

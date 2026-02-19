@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getAimsEventsFromFirestore, markPastAimsEventsInFirestore } from "@/app/lib/firestore-aims-events"
+import { getAimsEventsFromFirestore, markPastAimsEventsInFirestore } from "@/lib/firestore-aims-events"
 
 // ============================================
 // PUBLIC API ENDPOINT FOR AIMSATX.COM

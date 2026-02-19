@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getFeedItems, getFeedItemBySlug } from "@/app/lib/firestore-feed"
+import { getFeedItems, getFeedItemBySlug } from "@/lib/firestore-feed"
 
 /**
  * Public Feed API Endpoint

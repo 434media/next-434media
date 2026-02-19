@@ -42,11 +42,11 @@ import {
   Megaphone,
   FolderOpen,
 } from "lucide-react"
-import type { SOP, SOPAttachment } from "../../types/project-management-types"
-import { SOP_STATUSES } from "../../types/project-management-types"
-import { AdminRoleGuard } from "../../components/AdminRoleGuard"
-import { RichTextEditor } from "../../components/RichTextEditor"
-import { ImageUpload } from "../../components/ImageUpload"
+import type { SOP, SOPAttachment } from "@/types/project-management-types"
+import { SOP_STATUSES } from "@/types/project-management-types"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { RichTextEditor } from "@/components/RichTextEditor"
+import { ImageUpload } from "@/components/ImageUpload"
 
 // ── Local categories (page-scoped, not from types) ──
 const DOC_CATEGORIES = ["Brands", "Design", "Web", "Marketing", "Other"] as const

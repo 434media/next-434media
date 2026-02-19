@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { MailchimpHeader } from "../../components/mailchimp/MailchimpHeader"
-import { MailchimpMetricsOverview } from "../../components/mailchimp/MailchimpMetricsOverview"
-import { MailchimpTopCampaignsTable } from "../../components/mailchimp/MailchimpTopCampaignsTable"
-import { MailchimpTagsOverview } from "../../components/mailchimp/MailchimpTagsOverview"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/analytics/Card"
-import { Badge } from "../../components/analytics/Badge"
-import { useToast } from "../../hooks/use-toast"
+import { MailchimpHeader } from "@/components/mailchimp/MailchimpHeader"
+import { MailchimpMetricsOverview } from "@/components/mailchimp/MailchimpMetricsOverview"
+import { MailchimpTopCampaignsTable } from "@/components/mailchimp/MailchimpTopCampaignsTable"
+import { MailchimpTagsOverview } from "@/components/mailchimp/MailchimpTagsOverview"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/analytics/Card"
+import { Badge } from "@/components/analytics/Badge"
+import { useToast } from "@/hooks/use-toast"
 import type {
   MailchimpAnalyticsSummary,
   MailchimpCampaignPerformanceResponse,
@@ -19,7 +19,7 @@ import type {
   MailchimpRealtimeData,
   MailchimpTag,
   MailchimpTagsResponse,
-} from "../../types/mailchimp-analytics"
+} from "@/types/mailchimp-analytics"
 
 interface MailchimpAnalyticsData {
   summary?: MailchimpAnalyticsSummary

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { MetaConversionsAPI } from "../../../../lib/meta-conversions-api"
-import { extractUserDataFromRequest } from "../../../../lib/meta-user-data"
-import type { TXMXProductData } from "../../../../types/meta-pixel"
+import { MetaConversionsAPI } from "@/lib/meta-conversions-api"
+import { extractUserDataFromRequest } from "@/lib/meta-user-data"
+import type { TXMXProductData } from "@/types/meta-pixel"
 
 interface TestResult {
   testName: string

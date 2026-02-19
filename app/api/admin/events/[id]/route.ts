@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { 
   getEventByIdFromFirestore,
   updateEventInFirestore, 
   deleteEventFromFirestore
-} from "@/app/lib/firestore-events"
+} from "@/lib/firestore-events"
 
 // Check if user is authenticated and has workspace email
 async function requireAdmin() {

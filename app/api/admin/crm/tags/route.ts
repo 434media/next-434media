@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
-import { getDb } from "@/app/lib/firebase-admin"
-import { createMailchimpTag } from "@/app/lib/mailchimp-analytics"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { getDb } from "@/lib/firebase-admin"
+import { createMailchimpTag } from "@/lib/mailchimp-analytics"
 
 // CRM Tags collection name
 const TAGS_COLLECTION = "crm_tags"

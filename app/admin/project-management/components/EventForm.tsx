@@ -24,9 +24,9 @@ import {
   DollarSign,
   ChevronDown,
 } from "lucide-react"
-import type { PMEvent, EventLink, EventClientContact, Vendor } from "../../../types/project-management-types"
-import { PM_EVENT_STATUSES, VENDOR_CATEGORIES } from "../../../types/project-management-types"
-import { ImageUpload } from "../../../components/ImageUpload"
+import type { PMEvent, EventLink, EventClientContact, Vendor } from "@/types/project-management-types"
+import { PM_EVENT_STATUSES, VENDOR_CATEGORIES } from "@/types/project-management-types"
+import { ImageUpload } from "@/components/ImageUpload"
 
 interface EventFormProps {
   event?: PMEvent | null

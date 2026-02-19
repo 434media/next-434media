@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession } from "../../lib/auth"
+import { getSession } from "@/lib/auth"
 import {
   linkedinConfig,
   getLinkedInConfigurationStatus,
@@ -8,7 +8,7 @@ import {
   getLinkedInDateRange,
   LINKEDIN_API_BASE_URL,
   LINKEDIN_REST_API_BASE_URL,
-} from "../../lib/linkedin-config"
+} from "@/lib/linkedin-config"
 
 // Retry configuration
 const MAX_RETRIES = 3

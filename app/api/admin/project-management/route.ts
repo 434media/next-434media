@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/app/lib/auth"
+import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getPMEventsFromFirestore,
   getPMEventByIdFromFirestore,
@@ -14,7 +14,7 @@ import {
   createSpeakerInFirestore,
   updateSpeakerInFirestore,
   deleteSpeakerFromFirestore,
-} from "../../../lib/firestore-project-management"
+} from "@/lib/firestore-project-management"
 
 // Check if user is authenticated and has workspace email
 async function requireAdmin() {

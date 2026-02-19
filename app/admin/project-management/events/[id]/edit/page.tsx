@@ -3,8 +3,8 @@
 import { useState, useEffect, use } from "react"
 import { Loader2, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import type { PMEvent, Vendor } from "../../../../../types/project-management-types"
-import { AdminRoleGuard } from "../../../../../components/AdminRoleGuard"
+import type { PMEvent, Vendor } from "@/types/project-management-types"
+import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import EventForm from "../../../components/EventForm"
 
 export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
