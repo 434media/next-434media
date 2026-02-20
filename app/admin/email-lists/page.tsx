@@ -662,26 +662,74 @@ function EmailListsTab({
         </div>
       )}
 
-      {/* Email Table */}
+      {/* Email List */}
       {!isLoading && !error && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto max-h-[60vh]">
+          {/* ── Mobile Card View ── */}
+          <div className="block sm:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
+            {filteredSignups.length === 0 ? (
+              <div className="px-5 py-12 text-center text-neutral-400">
+                <Mail className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
+                <p className="text-sm font-medium text-neutral-500">No email signups found</p>
+                {searchQuery && (
+                  <p className="text-[12px] mt-1 font-normal">Try adjusting your search</p>
+                )}
+              </div>
+            ) : (
+              filteredSignups.map((signup) => (
+                <div
+                  key={signup.id}
+                  className="px-4 py-3.5 hover:bg-neutral-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight truncate">
+                        {signup.email}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteEmail(signup.id, signup.email)}
+                      disabled={isDeleting === signup.id}
+                      className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                    >
+                      {isDeleting === signup.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                      {signup.source}
+                    </span>
+                    <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
+                      {formatDate(signup.created_at)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Desktop Table View ── */}
+          <div className="hidden sm:block overflow-x-auto max-h-[65vh]">
             <table className="w-full">
               <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Email
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Source
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       Date
                     </span>
                   </th>
-                  <th className="text-right px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-right px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Actions
                   </th>
                 </tr>
@@ -700,20 +748,20 @@ function EmailListsTab({
                 ) : (
                   filteredSignups.map((signup) => (
                     <tr key={signup.id} className="hover:bg-neutral-50 transition-colors">
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
+                      <td className="px-5 py-3.5">
+                        <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
                           {signup.email}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide">
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
                           {signup.source}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-neutral-400 text-[12px] font-normal whitespace-nowrap">
+                      <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
                         {formatDate(signup.created_at)}
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-right">
+                      <td className="px-5 py-3.5 text-right">
                         <button
                           onClick={() => handleDeleteEmail(signup.id, signup.email)}
                           disabled={isDeleting === signup.id}
@@ -736,8 +784,8 @@ function EmailListsTab({
 
           {filteredSignups.length > 0 && (
             <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
-              <span className="text-[11px] text-neutral-400 font-normal">
-                {filteredSignups.length} email{filteredSignups.length !== 1 ? "s" : ""} in table
+              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
+                {filteredSignups.length} email{filteredSignups.length !== 1 ? "s" : ""}
               </span>
               <button
                 onClick={handleDownloadFilteredCSV}
@@ -1167,35 +1215,100 @@ function ContactFormsTab({
         </div>
       )}
 
-      {/* Submissions Table */}
+      {/* Submissions List */}
       {!isLoading && !error && submissions.length > 0 && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto max-h-[60vh]">
+          {/* ── Mobile Card View ── */}
+          <div className="block md:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
+            {filteredSubmissions.length === 0 ? (
+              <div className="px-5 py-12 text-center text-neutral-400">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
+                <p className="text-sm font-medium text-neutral-500">No submissions found</p>
+                {searchQuery && (
+                  <p className="text-[12px] mt-1 font-normal">Try adjusting your search</p>
+                )}
+              </div>
+            ) : (
+              filteredSubmissions.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="px-4 py-3.5 hover:bg-neutral-50 transition-colors cursor-pointer active:bg-neutral-100"
+                  onClick={() => setSelectedSubmission(sub)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
+                        {sub.firstName} {sub.lastName}
+                      </p>
+                      <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
+                        {sub.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub) }}
+                        className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(sub.id, sub.email) }}
+                        disabled={isDeleting === sub.id}
+                        className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {isDeleting === sub.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                      {sub.source}
+                    </span>
+                    {sub.company && (
+                      <span className="text-[12px] text-neutral-400 font-normal truncate">
+                        {sub.company}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 text-[12px] text-neutral-400 font-normal leading-relaxed">
+                    {formatDate(sub.created_at)}
+                    {sub.message && (
+                      <span className="ml-2 text-neutral-300">• has message</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Desktop Table View ── */}
+          <div className="hidden md:block overflow-x-auto max-h-[65vh]">
             <table className="w-full">
               <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    First Name
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    Name
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    Last Name
-                  </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Email
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
                     Phone
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden md:table-cell">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
                     Company
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Source
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden sm:table-cell">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Date
                   </th>
-                  <th className="text-right px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-right px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Actions
                   </th>
                 </tr>
@@ -1203,7 +1316,7 @@ function ContactFormsTab({
               <tbody className="divide-y divide-neutral-100">
                 {filteredSubmissions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-neutral-400">
+                    <td colSpan={7} className="px-5 py-12 text-center text-neutral-400">
                       <MessageSquare className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
                       <p className="text-sm font-medium text-neutral-500">No submissions found</p>
                       {searchQuery && (
@@ -1218,40 +1331,35 @@ function ContactFormsTab({
                       className="hover:bg-neutral-50 transition-colors cursor-pointer"
                       onClick={() => setSelectedSubmission(sub)}
                     >
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
-                          {sub.firstName || "—"}
+                      <td className="px-5 py-3.5">
+                        <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
+                          {sub.firstName} {sub.lastName}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
-                          {sub.lastName || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-600 text-[13px] font-normal leading-snug">
+                      <td className="px-5 py-3.5">
+                        <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {sub.email}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 hidden lg:table-cell">
-                        <span className="text-neutral-500 text-[12px] font-normal">
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                        <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {sub.phone || "—"}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 hidden md:table-cell">
-                        <span className="text-neutral-500 text-[12px] font-normal">
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                        <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {sub.company || "—"}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide">
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
                           {sub.source}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-neutral-400 text-[12px] font-normal whitespace-nowrap hidden sm:table-cell">
+                      <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
                         {formatDate(sub.created_at)}
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-right">
+                      <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={(e) => {
@@ -1289,9 +1397,8 @@ function ContactFormsTab({
 
           {filteredSubmissions.length > 0 && (
             <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
-              <span className="text-[11px] text-neutral-400 font-normal">
-                {filteredSubmissions.length} submission{filteredSubmissions.length !== 1 ? "s" : ""} in
-                table
+              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
+                {filteredSubmissions.length} submission{filteredSubmissions.length !== 1 ? "s" : ""}
               </span>
               <button
                 onClick={handleDownloadCSV}
@@ -1850,38 +1957,105 @@ function EventRegistrationsTab({
         </div>
       )}
 
-      {/* Registrations Table */}
+      {/* Registrations List */}
       {!isLoading && !error && registrations.length > 0 && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto max-h-[60vh]">
+          {/* ── Mobile Card View ── */}
+          <div className="block md:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
+            {filteredRegistrations.length === 0 ? (
+              <div className="px-5 py-12 text-center text-neutral-400">
+                <Ticket className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
+                <p className="text-sm font-medium text-neutral-500">No registrations found</p>
+                {searchQuery && (
+                  <p className="text-[12px] mt-1 font-normal">Try adjusting your search</p>
+                )}
+              </div>
+            ) : (
+              filteredRegistrations.map((reg) => (
+                <div
+                  key={reg.id}
+                  className="px-4 py-3.5 hover:bg-neutral-50 transition-colors cursor-pointer active:bg-neutral-100"
+                  onClick={() => setSelectedRegistration(reg)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
+                        {reg.firstName} {reg.lastName}
+                      </p>
+                      <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
+                        {reg.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedRegistration(reg) }}
+                        className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(reg.id!, reg.email) }}
+                        disabled={isDeleting === reg.id}
+                        className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {isDeleting === reg.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                      {reg.eventName}
+                    </span>
+                    {reg.company && (
+                      <span className="text-[12px] text-neutral-400 font-normal truncate">
+                        {reg.company}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-3 text-[12px] text-neutral-400 font-normal leading-relaxed">
+                    <span>{formatDate(reg.registeredAt)}</span>
+                    {reg.subscribeToFeed && (
+                      <span className="inline-flex items-center gap-1 text-green-600">
+                        <Check className="w-3 h-3" /> Feed
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Desktop Table View ── */}
+          <div className="hidden md:block overflow-x-auto max-h-[65vh]">
             <table className="w-full">
               <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    First Name
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                    Name
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    Last Name
-                  </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Email
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden md:table-cell">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
                     Company
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Event
                   </th>
-                  <th className="text-left px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden sm:table-cell">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       Registered
                     </span>
                   </th>
-                  <th className="text-center px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
+                  <th className="text-center px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden lg:table-cell">
                     Feed
                   </th>
-                  <th className="text-right px-4 sm:px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
+                  <th className="text-right px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Actions
                   </th>
                 </tr>
@@ -1889,7 +2063,7 @@ function EventRegistrationsTab({
               <tbody className="divide-y divide-neutral-100">
                 {filteredRegistrations.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-neutral-400">
+                    <td colSpan={7} className="px-5 py-12 text-center text-neutral-400">
                       <Ticket className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
                       <p className="text-sm font-medium text-neutral-500">No registrations found</p>
                       {searchQuery && (
@@ -1904,42 +2078,37 @@ function EventRegistrationsTab({
                       className="hover:bg-neutral-50 transition-colors cursor-pointer"
                       onClick={() => setSelectedRegistration(reg)}
                     >
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
-                          {reg.firstName || "—"}
+                      <td className="px-5 py-3.5">
+                        <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
+                          {reg.firstName} {reg.lastName}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-900 text-[13px] font-medium leading-snug">
-                          {reg.lastName || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-5 py-3">
-                        <span className="text-neutral-600 text-[13px] font-normal leading-snug">
+                      <td className="px-5 py-3.5">
+                        <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {reg.email}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 hidden md:table-cell">
-                        <span className="text-neutral-500 text-[12px] font-normal">
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                        <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {reg.company || "—"}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 hidden lg:table-cell">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide">
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
                           {reg.eventName}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-neutral-400 text-[12px] font-normal whitespace-nowrap hidden sm:table-cell">
+                      <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
                         {formatDate(reg.registeredAt)}
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-center hidden lg:table-cell">
+                      <td className="px-5 py-3.5 text-center hidden lg:table-cell">
                         {reg.subscribeToFeed ? (
                           <Check className="w-4 h-4 text-green-500 mx-auto" />
                         ) : (
                           <span className="text-neutral-300">—</span>
                         )}
                       </td>
-                      <td className="px-4 sm:px-5 py-3 text-right">
+                      <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={(e) => {
@@ -1977,8 +2146,8 @@ function EventRegistrationsTab({
 
           {filteredRegistrations.length > 0 && (
             <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
-              <span className="text-[11px] text-neutral-400 font-normal">
-                {filteredRegistrations.length} registration{filteredRegistrations.length !== 1 ? "s" : ""} in table
+              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
+                {filteredRegistrations.length} registration{filteredRegistrations.length !== 1 ? "s" : ""}
               </span>
               <button
                 onClick={handleDownloadCSV}

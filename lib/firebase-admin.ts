@@ -15,7 +15,9 @@ function getCredentials(): ServiceAccountCredentials {
   const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   if (serviceAccountKey) {
     try {
-      const credentials = JSON.parse(serviceAccountKey)
+      // Sanitize control characters (e.g. literal newlines in the private_key field)
+      const sanitized = serviceAccountKey.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+      const credentials = JSON.parse(sanitized)
       return {
         project_id: credentials.project_id,
         client_email: credentials.client_email,
@@ -167,7 +169,9 @@ export function getDigitalCanvasDb(): admin.firestore.Firestore {
     )
   }
 
-  const creds = JSON.parse(raw)
+  // Sanitize control characters (e.g. literal newlines in the private_key field)
+  const sanitized = raw.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+  const creds = JSON.parse(sanitized)
   const dcApp = admin.initializeApp(
     {
       credential: admin.credential.cert({
