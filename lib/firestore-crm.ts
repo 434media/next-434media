@@ -665,6 +665,29 @@ export async function deleteTask(owner: TaskOwner, id: string): Promise<void> {
   cache.delete("all_tasks_combined")
 }
 
+// Find a task across all collections when the owner is unknown or mismatched
+// Returns the task and the actual owner collection it was found in
+export async function findTaskInAnyCollection(
+  id: string,
+  preferredOwner?: TaskOwner
+): Promise<{ task: Task; actualOwner: TaskOwner } | null> {
+  // Check preferred owner first for efficiency
+  if (preferredOwner) {
+    const task = await getTaskById(preferredOwner, id)
+    if (task) return { task, actualOwner: preferredOwner }
+  }
+
+  // Search all other collections
+  const owners = Object.keys(TASK_COLLECTIONS) as TaskOwner[]
+  for (const owner of owners) {
+    if (owner === preferredOwner) continue
+    const task = await getTaskById(owner, id)
+    if (task) return { task, actualOwner: owner }
+  }
+
+  return null
+}
+
 // Delete all tasks from a specific owner's collection
 export async function deleteAllTasksFromOwner(owner: TaskOwner): Promise<number> {
   const db = getDb()

@@ -12,6 +12,7 @@ import {
   getMasterListItemById,
   updateMasterListItem,
   deleteMasterListItem,
+  findTaskInAnyCollection,
 } from "@/lib/firestore-crm"
 
 // Task owner types
@@ -207,23 +208,29 @@ export async function PUT(request: NextRequest) {
     }
 
     // STEP 1: Find where the task actually exists
-    // Check owner's collection first
+    // Check owner's collection first, then search all collections
+    // This handles cases where a task was reassigned (assigned_to changed
+    // but the document remains in the original owner's collection)
     let existingTask = await getTaskById(owner, id)
+    let actualOwner: TaskOwner = owner
     let taskSource: "owner_collection" | "completed_collection" | "master_list" | null = null
     
     if (existingTask) {
       taskSource = owner === "completed" ? "completed_collection" : "owner_collection"
     }
     
-    // If not found and owner is "completed", the task might be in master list
-    if (!existingTask && owner === "completed") {
-      const masterListItem = await getMasterListItemById(id)
-      if (masterListItem) {
-        taskSource = "master_list"
+    // If not found in specified owner's collection, search ALL collections
+    if (!existingTask) {
+      const found = await findTaskInAnyCollection(id, owner)
+      if (found) {
+        existingTask = found.task
+        actualOwner = found.actualOwner
+        taskSource = actualOwner === "completed" ? "completed_collection" : "owner_collection"
+        console.log(`[Tasks API] Task ${id} found in '${actualOwner}' collection instead of '${owner}'`)
       }
     }
     
-    // If still not found, check master list (for any owner)
+    // If still not found, check master list
     if (!taskSource) {
       const masterListItem = await getMasterListItemById(id)
       if (masterListItem) {
@@ -343,13 +350,14 @@ export async function PUT(request: NextRequest) {
     }
 
     // Handle OWNER COLLECTION tasks being marked as completed
+    // Use actualOwner (where task really lives) instead of the requested owner
     if (taskSource === "owner_collection" && updates.status === "completed") {
-      const task = await completeTask(owner, id)
+      const task = await completeTask(actualOwner, id)
       return NextResponse.json({ success: true, task, moved: true })
     }
 
-    // Handle regular updates to owner collection or completed collection
-    const task = await updateTask(owner, id, updates)
+    // Handle regular updates - use actualOwner (where task really lives)
+    const task = await updateTask(actualOwner, id, updates)
     return NextResponse.json({ success: true, task })
     
   } catch (error) {
@@ -391,16 +399,19 @@ export async function DELETE(request: NextRequest) {
     }
 
     // First, check where the task actually exists
-    // Check owner's collection first
-    const existingTask = await getTaskById(owner, id)
+    // Search specified owner's collection first, then all collections
+    const found = await findTaskInAnyCollection(id, owner)
     
-    if (existingTask) {
-      // Task exists in owner's collection, delete it there
-      await deleteTask(owner, id)
+    if (found) {
+      // Task found - delete from the collection where it actually lives
+      if (found.actualOwner !== owner) {
+        console.log(`[Tasks API] DELETE: Task ${id} found in '${found.actualOwner}' collection instead of '${owner}'`)
+      }
+      await deleteTask(found.actualOwner, id)
       return NextResponse.json({ success: true, message: "Task deleted" })
     }
     
-    // Task not found in owner's collection, check master list
+    // Task not found in any task collection, check master list
     const masterListItem = await getMasterListItemById(id)
     
     if (masterListItem) {

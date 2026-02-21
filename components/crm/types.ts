@@ -367,6 +367,18 @@ export function getTaskOwner(assigneeName: string): string {
   return OWNER_MAP[assigneeName] || "teams"
 }
 
+// CRM Super Admins - can update/delete tasks across all collections regardless of ownership
+export const CRM_SUPER_ADMINS = [
+  "marcos@434media.com",
+  "jesse@434media.com",
+]
+
+// Check if a user is a CRM super admin
+export function isCrmSuperAdmin(email: string | undefined | null): boolean {
+  if (!email) return false
+  return CRM_SUPER_ADMINS.includes(email.toLowerCase())
+}
+
 // Team members for tagging and assignment
 // Full names from Airtable migration
 // Note: This is a fallback list. Team members are now managed in Firestore (crm_team_members collection)
