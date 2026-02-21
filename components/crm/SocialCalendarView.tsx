@@ -125,7 +125,7 @@ function PlatformBadge({ platform, size = "sm" }: { platform: SocialPlatform; si
   const platformConfig = SOCIAL_PLATFORM_OPTIONS.find(p => p.value === platform)
   if (!platformConfig) return null
   const sizeClasses = { sm: "w-3.5 h-3.5", md: "w-4 h-4", lg: "w-5 h-5" }
-  return <PlatformIcon platform={platform} className={`${sizeClasses[size]} flex-shrink-0`} style={{ color: platformConfig.color }} />
+  return <PlatformIcon platform={platform} className={`${sizeClasses[size]} shrink-0`} style={{ color: platformConfig.color }} />
 }
 
 function PostCard({ post, onClick, compact = false }: { post: ContentPost; onClick: () => void; compact?: boolean }) {
@@ -138,7 +138,7 @@ function PostCard({ post, onClick, compact = false }: { post: ContentPost; onCli
       className={`group cursor-pointer rounded transition-all border ${statusStyle.bg} ${statusStyle.border} hover:shadow-sm hover:border-neutral-300 ${compact ? "px-1.5 py-1" : "px-2 py-1.5"}`}
     >
       <div className="flex items-center gap-1.5">
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           {post.social_platforms?.slice(0, compact ? 2 : 3).map(platform => (
             <PlatformBadge key={platform} platform={platform} size="sm" />
           ))}
@@ -328,7 +328,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                   <span className="text-sm text-neutral-500">{postsByDate[toDateString(currentDate)]?.length || 0} posts scheduled</span>
                 </div>
               </div>
-              <div className="divide-y divide-neutral-100 max-h-[600px] overflow-y-auto">
+              <div className="divide-y divide-neutral-100 max-h-150 overflow-y-auto">
                 {(postsByDate[toDateString(currentDate)] || []).length === 0 ? (
                   <div className="p-8 text-center">
                     <Calendar className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
@@ -342,7 +342,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                     return (
                       <div key={post.id} onClick={() => onOpenPost(post)} className={`p-4 hover:bg-neutral-50 cursor-pointer transition-colors border-l-4 ${statusStyle.border.replace("border-", "border-l-")}`}>
                         <div className="flex items-start gap-3">
-                          <div className="flex items-center gap-1 flex-shrink-0">{post.social_platforms?.map(platform => <PlatformBadge key={platform} platform={platform} size="lg" />)}</div>
+                          <div className="flex items-center gap-1 shrink-0">{post.social_platforms?.map(platform => <PlatformBadge key={platform} platform={platform} size="lg" />)}</div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-neutral-900">{post.title}</p>
                             {post.social_copy && <p className="text-sm text-neutral-500 mt-1 line-clamp-2">{post.social_copy}</p>}
@@ -371,13 +371,13 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 min-h-[400px]">
+              <div className="grid grid-cols-7 min-h-100">
                 {calendarDays.map((date, i) => {
                   const dateKey = toDateString(date)
                   const dayPosts = postsByDate[dateKey] || []
                   return (
                     <div key={i} className={`p-2 border-r last:border-r-0 border-neutral-100 ${isToday(date) ? "bg-blue-50/50" : ""}`}>
-                      <div className="space-y-1 max-h-[380px] overflow-y-auto scrollbar-thin">
+                      <div className="space-y-1 max-h-95 overflow-y-auto scrollbar-thin">
                         <AnimatePresence mode="popLayout">{dayPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} compact />)}</AnimatePresence>
                       </div>
                     </div>
@@ -401,11 +401,11 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                   return (
                     <div 
                       key={index} 
-                      className={`min-h-[100px] max-h-[140px] border-b border-r border-neutral-100 p-1.5 transition-colors flex flex-col ${!isCurrentMonthDay ? "bg-neutral-50/50" : "bg-white"} ${isTodayDate ? "bg-blue-50/60" : ""} ${hoveredDay === dateKey ? "bg-neutral-50" : ""}`} 
+                      className={`min-h-25 max-h-35 border-b border-r border-neutral-100 p-1.5 transition-colors flex flex-col ${!isCurrentMonthDay ? "bg-neutral-50/50" : "bg-white"} ${isTodayDate ? "bg-blue-50/60" : ""} ${hoveredDay === dateKey ? "bg-neutral-50" : ""}`} 
                       onMouseEnter={() => setHoveredDay(dateKey)} 
                       onMouseLeave={() => setHoveredDay(null)}
                     >
-                      <div className="flex items-center justify-between mb-1.5 flex-shrink-0">
+                      <div className="flex items-center justify-between mb-1.5 shrink-0">
                         <span className={`text-xs font-semibold leading-none ${!isCurrentMonthDay ? "text-neutral-300" : isTodayDate ? "text-white" : "text-neutral-700"} ${isTodayDate ? "bg-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px]" : ""}`}>{date.getDate()}</span>
                         {dayPosts.length > 0 && !isTodayDate && <span className="text-[10px] font-medium text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded-full">{dayPosts.length}</span>}
                       </div>

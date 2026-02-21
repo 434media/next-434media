@@ -62,6 +62,62 @@ const crmSection: AdminSection = {
 
 // Grouped sections for full_admin users
 const sectionGroups: SectionGroup[] = [
+    {
+    id: "operations",
+    label: "Operations & Admin",
+    icon: <Settings className="w-4 h-4" />,
+    allowedRoles: ["full_admin"],
+    sections: [
+      {
+        id: "leads-registrations",
+        title: "LEADS & REGISTRATIONS",
+        subtitle: "Contact Forms • Event Registrations • Newsletter Signups",
+        href: "/admin/leads",
+        icon: <Mail className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Manage contact form submissions, event registrations, and newsletter signups across all 434 MEDIA websites with Airtable sync",
+        allowedRoles: ["full_admin"],
+      },
+      {
+        id: "sops",
+        title: "SOPs",
+        subtitle: "Processes & Documentation",
+        href: "/admin/sops",
+        icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Standard operating procedures for team workflows and processes",
+        allowedRoles: ["full_admin"],
+      },
+      {
+        id: "project-management",
+        title: "PROJECT MANAGEMENT",
+        subtitle: "Events • Vendors • Speakers",
+        href: "/admin/project-management",
+        icon: <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Manage project events, vendors, and speakers with Airtable sync",
+        allowedRoles: ["full_admin"],
+      },
+    ],
+  },
+  {
+    id: "analytics",
+    label: "Analytics & Insights",
+    icon: <BarChart3 className="w-4 h-4" />,
+    allowedRoles: ["full_admin"],
+    sections: [
+      {
+        id: "analytics-hub",
+        title: "ANALYTICS HUB",
+        subtitle: "Web • Instagram • Mailchimp • LinkedIn",
+        href: "/admin/analytics",
+        icon: <GA4Icon className="w-5 h-5 sm:w-6 sm:h-6" />,
+        description:
+          "Unified dashboards for website traffic, social engagement, email campaigns, and LinkedIn metrics",
+        allowedRoles: ["full_admin"],
+      },
+    ],
+  },
   {
     id: "content",
     label: "Content & Publishing",
@@ -88,7 +144,7 @@ const sectionGroups: SectionGroup[] = [
           "Blog posts with rich text editing, images, and meta optimization",
         allowedRoles: ["full_admin"],
       },
-      {
+/*       {
         id: "events",
         title: "EVENTS CALENDAR",
         subtitle: "AIM & 434 MEDIA events",
@@ -97,63 +153,7 @@ const sectionGroups: SectionGroup[] = [
         description:
           "Add events manually or import from Meetup, Eventbrite, and Lu.ma",
         allowedRoles: ["full_admin"],
-      },
-    ],
-  },
-  {
-    id: "analytics",
-    label: "Analytics & Insights",
-    icon: <BarChart3 className="w-4 h-4" />,
-    allowedRoles: ["full_admin"],
-    sections: [
-      {
-        id: "analytics-hub",
-        title: "ANALYTICS HUB",
-        subtitle: "Web • Instagram • Mailchimp • LinkedIn",
-        href: "/admin/analytics",
-        icon: <GA4Icon className="w-5 h-5 sm:w-6 sm:h-6" />,
-        description:
-          "Unified dashboards for website traffic, social engagement, email campaigns, and LinkedIn metrics",
-        allowedRoles: ["full_admin"],
-      },
-    ],
-  },
-  {
-    id: "operations",
-    label: "Operations & Admin",
-    icon: <Settings className="w-4 h-4" />,
-    allowedRoles: ["full_admin"],
-    sections: [
-      {
-        id: "email-lists",
-        title: "LEADS & REGISTRATIONS",
-        subtitle: "Contact Forms • Event Registrations • Email Signups",
-        href: "/admin/email-lists",
-        icon: <Mail className="w-5 h-5 sm:w-6 sm:h-6" />,
-        description:
-          "Manage contact form submissions, event registrations, and email signups across all 434 MEDIA websites with Airtable sync",
-        allowedRoles: ["full_admin"],
-      },
-      {
-        id: "project-management",
-        title: "PROJECT MANAGEMENT",
-        subtitle: "Events • Vendors • Speakers",
-        href: "/admin/project-management",
-        icon: <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />,
-        description:
-          "Manage project events, vendors, and speakers with Airtable sync",
-        allowedRoles: ["full_admin"],
-      },
-      {
-        id: "sops",
-        title: "SOPs",
-        subtitle: "Processes & Documentation",
-        href: "/admin/sops",
-        icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6" />,
-        description:
-          "Standard operating procedures for team workflows and processes",
-        allowedRoles: ["full_admin"],
-      },
+      }, */
     ],
   },
 ]

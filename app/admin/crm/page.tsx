@@ -539,7 +539,7 @@ export default function SalesCRMPage() {
             { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
             { id: "clients", label: "Clients", icon: Users, badge: null },
             { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
-            { id: "social-calendar", label: "Social Calendar", icon: Calendar, badge: "Testing" },
+            { id: "social-calendar", label: "Social Calendar", icon: Calendar, badge: null },
           ].map(({ id, label, icon: Icon, badge }) => (
             <button
               key={id}
