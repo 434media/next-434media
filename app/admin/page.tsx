@@ -20,6 +20,22 @@ import {
 } from "lucide-react"
 import { AdminUserMenu } from "@/components/AdminUserMenu"
 
+// Robot/Android Icon for More Human Than Human
+function RobotIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="8" width="18" height="12" rx="2" />
+      <path d="M12 2v6" />
+      <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="14" r="1.5" />
+      <circle cx="15.5" cy="14" r="1.5" />
+      <path d="M9 18h6" />
+      <path d="M1 12v4" />
+      <path d="M23 12v4" />
+    </svg>
+  )
+}
+
 type AdminRole = "full_admin" | "crm_only"
 
 interface CurrentUser {
@@ -46,6 +62,18 @@ interface SectionGroup {
   icon: React.ReactNode
   sections: AdminSection[]
   allowedRoles: AdminRole[]
+}
+
+// Featured: More Human Than Human — event day command center
+const mhthSection: AdminSection = {
+  id: "more-human-than-human",
+  title: "MORE HUMAN THAN HUMAN",
+  subtitle: "Speakers • Community Spotlights • Registrations • Walk-Ups",
+  href: "/admin/more-human-than-human",
+  icon: <RobotIcon className="w-7 h-7 sm:w-8 sm:h-8" />,
+  description:
+    "Event day command center — manage speakers, community spotlights, all registrations, and walk-up check-ins for MHTH 2026",
+  allowedRoles: ["full_admin"],
 }
 
 // Featured CRM card — always top priority
@@ -235,6 +263,52 @@ export default function AdminPage() {
               : "Manage analytics, content, and operations across all 434 MEDIA channels"}
           </p>
         </div>
+
+        {/* ── Featured: More Human Than Human ── */}
+        {mhthSection.allowedRoles.includes(userRole) && (
+          <div className="mb-6 md:mb-8">
+            <Link
+              href={mhthSection.href}
+              className="group relative block rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8 transition-all duration-200 hover:border-neutral-300 hover:shadow-lg"
+            >
+              {/* Background pattern */}
+              <div
+                className="absolute inset-0 opacity-[0.015] rounded-2xl pointer-events-none"
+                style={{
+                  backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK.png')`,
+                  backgroundSize: "48px 48px",
+                  backgroundRepeat: "repeat",
+                  backgroundPosition: "center",
+                }}
+              />
+
+              <div className="relative z-10 flex items-start gap-5 sm:gap-6">
+                <div className="shrink-0 text-neutral-800 mt-0.5">
+                  {mhthSection.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <h2 className="font-ggx88 text-lg sm:text-xl text-neutral-900 tracking-wide leading-tight">
+                      {mhthSection.title}
+                    </h2>
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full leading-none uppercase tracking-wider">
+                      Feb 28
+                    </span>
+                  </div>
+                  <p className="text-sm text-neutral-500 font-medium leading-snug mb-2">
+                    {mhthSection.subtitle}
+                  </p>
+                  <p className="text-xs sm:text-[13px] text-neutral-400 leading-relaxed font-normal">
+                    {mhthSection.description}
+                  </p>
+                </div>
+                <div className="shrink-0 text-neutral-300 group-hover:text-neutral-500 transition-colors duration-200 mt-1">
+                  <ChevronRight className="w-5 h-5" />
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
 
         {/* ── Featured: Platform CRM ── */}
         {crmSection.allowedRoles.includes(userRole) && (

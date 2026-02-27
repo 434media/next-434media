@@ -16,6 +16,8 @@ export interface EventRegistration {
   source: string
   tags: string[]
   pageUrl: string
+  checkedIn?: boolean
+  checkedInAt?: string
   _dbSource?: string // Track which database this came from
 }
 
@@ -66,6 +68,8 @@ function mapDefaultDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     source: data.source || "",
     tags: data.tags || [],
     pageUrl: data.pageUrl || data.page_url || "",
+    checkedIn: data.checkedIn || false,
+    checkedInAt: toISOString(data.checkedInAt || ""),
     _dbSource: "default",
   }
 }
@@ -93,6 +97,8 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     source: "SATechDay",
     tags: ["sa-tech-day", ...(data.events || [])],
     pageUrl: "https://www.sanantoniotechday.com",
+    checkedIn: data.checkedIn || false,
+    checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
     _dbSource: "techday",
   }
 }
@@ -143,6 +149,8 @@ async function getDigitalCanvasRegistrations(filters?: { event?: string }): Prom
         source: data.source || "web-digitalcanvas",
         tags: data.tags || [],
         pageUrl: data.pageUrl || "",
+        checkedIn: data.checkedIn || false,
+        checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
         _dbSource: "digitalcanvas",
       }
     })
@@ -248,6 +256,56 @@ export async function getEventRegistrationCounts(): Promise<Record<string, numbe
   } catch (error) {
     console.error("Error fetching event registration counts:", error)
     return {}
+  }
+}
+
+/**
+ * Update fields on an event registration (e.g. check-in status)
+ * Supports default, techday, and digitalcanvas databases
+ */
+export async function updateEventRegistration(
+  id: string,
+  fields: Partial<Pick<EventRegistration, "checkedIn" | "checkedInAt">>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (id.startsWith("techday:")) {
+      const realId = id.replace("techday:", "")
+      const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+      await tdDb.collection("registrations").doc(realId).update(fields)
+      return { success: true }
+    }
+    if (id.startsWith("dc:")) {
+      const realId = id.replace("dc:", "")
+      const dcDb = getDigitalCanvasDb()
+      await dcDb.collection("event-registrations").doc(realId).update(fields)
+      return { success: true }
+    }
+    const db = getDb()
+    await db.collection(COLLECTION).doc(id).update(fields)
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating event registration:", error)
+    return { success: false, error: "Failed to update event registration" }
+  }
+}
+
+/**
+ * Add a new event registration (e.g. walk-up at event day)
+ * Writes to the default database event_registrations collection
+ */
+export async function addEventRegistration(
+  registration: Omit<EventRegistration, "id">
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  try {
+    const db = getDb()
+    const docRef = await db.collection(COLLECTION).add({
+      ...registration,
+      registeredAt: registration.registeredAt || new Date().toISOString(),
+    })
+    return { success: true, id: docRef.id }
+  } catch (error) {
+    console.error("Error adding event registration:", error)
+    return { success: false, error: "Failed to add event registration" }
   }
 }
 

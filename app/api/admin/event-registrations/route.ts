@@ -4,6 +4,8 @@ import {
   getEventRegistrations,
   getEventRegistrationCounts,
   deleteEventRegistration,
+  addEventRegistration,
+  updateEventRegistration,
   eventRegistrationsToCSV,
 } from "@/lib/firestore-event-registrations"
 
@@ -72,6 +74,39 @@ export async function GET(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const authResult = await requireAdmin()
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const body = await request.json()
+    const { id, checkedIn } = body
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing registration ID" }, { status: 400 })
+    }
+
+    const fields: { checkedIn: boolean; checkedInAt: string } = {
+      checkedIn: !!checkedIn,
+      checkedInAt: checkedIn ? new Date().toISOString() : "",
+    }
+
+    const result = await updateEventRegistration(id, fields)
+    if (result.success) {
+      return NextResponse.json({ success: true, ...fields })
+    }
+    return NextResponse.json({ error: result.error }, { status: 500 })
+  } catch (error) {
+    console.error("Error in event-registrations PATCH:", error)
+    return NextResponse.json(
+      { error: "Failed to update event registration" },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const authResult = await requireAdmin()
@@ -95,6 +130,53 @@ export async function DELETE(request: Request) {
     console.error("Error in event-registrations DELETE:", error)
     return NextResponse.json(
       { error: "Failed to delete event registration" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const authResult = await requireAdmin()
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    }
+
+    const body = await request.json()
+    const { firstName, lastName, email, company, event, eventName, eventDate, source, tags } = body
+
+    if (!firstName || !lastName || !email) {
+      return NextResponse.json(
+        { error: "First name, last name, and email are required" },
+        { status: 400 }
+      )
+    }
+
+    const registration = {
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+      email,
+      company: company || null,
+      subscribeToFeed: false,
+      event: event || "MoreHumanThanHuman2026",
+      eventName: eventName || "More Human Than Human",
+      eventDate: eventDate || "2026-02-28",
+      registeredAt: new Date().toISOString(),
+      source: source || "walk-up",
+      tags: tags || ["walk-up", "more-human-than-human"],
+      pageUrl: "",
+    }
+
+    const result = await addEventRegistration(registration)
+    if (result.success) {
+      return NextResponse.json({ success: true, id: result.id, registration: { ...registration, id: result.id } })
+    }
+    return NextResponse.json({ error: result.error }, { status: 500 })
+  } catch (error) {
+    console.error("Error in event-registrations POST:", error)
+    return NextResponse.json(
+      { error: "Failed to add event registration" },
       { status: 500 }
     )
   }
