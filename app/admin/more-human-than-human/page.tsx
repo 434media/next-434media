@@ -391,13 +391,11 @@ export default function MoreHumanThanHumanPage() {
       const data = await res.json()
       if (data.success) {
         const label = activeSection === "speakers" ? "Speaker" : activeSection === "spotlights" ? "Spotlight" : "Registration"
-        setToast({ message: `${label} added: ${quickAddForm.firstName} ${quickAddForm.lastName}`, type: "success" })
+        const verb = data.merged ? "updated" : "added"
+        setToast({ message: `${label} ${verb}: ${quickAddForm.firstName} ${quickAddForm.lastName}`, type: "success" })
         setQuickAddForm({ firstName: "", lastName: "", email: "", company: "" })
-        if (data.registration) {
-          setRegistrations((prev) => [data.registration, ...prev])
-        } else {
-          await fetchRegistrations()
-        }
+        // Always refresh from Firestore to ensure accurate state
+        await fetchRegistrations()
       } else {
         setToast({ message: data.error || "Failed to add", type: "error" })
       }

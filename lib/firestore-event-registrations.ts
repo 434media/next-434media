@@ -161,17 +161,28 @@ async function getDigitalCanvasRegistrations(filters?: { event?: string }): Prom
 }
 
 /**
- * Deduplicate registrations across databases by email+event
- * Default DB registrations take priority (they may have been enriched)
+ * Deduplicate registrations across databases by email+event+name
+ * Default DB registrations take priority (they may have been enriched).
+ * Tags are merged across duplicates so speaker/spotlight tags are never lost.
+ * Uses email+event+firstName+lastName as the key so that different people
+ * sharing a placeholder email (e.g. "speaker@mail.com") are kept separate.
  */
 function deduplicateRegistrations(registrations: EventRegistration[]): EventRegistration[] {
   const seen = new Map<string, EventRegistration>()
   for (const reg of registrations) {
-    const key = `${reg.email.toLowerCase()}|${reg.event}`
+    const key = `${reg.email.toLowerCase()}|${reg.event}|${reg.firstName.toLowerCase()}|${reg.lastName.toLowerCase()}`
     const existing = seen.get(key)
-    // Prefer default DB records over named DB records
-    if (!existing || (reg._dbSource === "default" && existing._dbSource !== "default")) {
+    if (!existing) {
       seen.set(key, reg)
+    } else {
+      // Merge tags from both records so enriched tags are never dropped
+      const mergedTags = Array.from(new Set([...existing.tags, ...reg.tags]))
+      // Prefer default DB record as the base
+      if (reg._dbSource === "default" && existing._dbSource !== "default") {
+        seen.set(key, { ...reg, tags: mergedTags })
+      } else {
+        seen.set(key, { ...existing, tags: mergedTags })
+      }
     }
   }
   return Array.from(seen.values())
@@ -265,7 +276,7 @@ export async function getEventRegistrationCounts(): Promise<Record<string, numbe
  */
 export async function updateEventRegistration(
   id: string,
-  fields: Partial<Pick<EventRegistration, "checkedIn" | "checkedInAt">>
+  fields: Partial<Pick<EventRegistration, "checkedIn" | "checkedInAt" | "tags" | "source">>
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (id.startsWith("techday:")) {
@@ -291,13 +302,45 @@ export async function updateEventRegistration(
 
 /**
  * Add a new event registration (e.g. walk-up at event day)
- * Writes to the default database event_registrations collection
+ * Writes to the default database event_registrations collection.
+ * If a registration with the same email+event already exists, merges tags
+ * instead of creating a duplicate.
  */
 export async function addEventRegistration(
   registration: Omit<EventRegistration, "id">
-): Promise<{ success: boolean; id?: string; error?: string }> {
+): Promise<{ success: boolean; id?: string; merged?: boolean; error?: string }> {
   try {
     const db = getDb()
+
+    // Check for existing registration with the same email + event + name
+    // Query by email only (single-field index) and filter in JS
+    // to avoid requiring a composite Firestore index
+    const emailSnapshot = await db
+      .collection(COLLECTION)
+      .where("email", "==", registration.email)
+      .get()
+
+    const matchingDoc = emailSnapshot.docs.find(
+      (doc) => {
+        const data = doc.data()
+        return data.event === registration.event
+          && (data.firstName || "").toLowerCase() === (registration.firstName || "").toLowerCase()
+          && (data.lastName || "").toLowerCase() === (registration.lastName || "").toLowerCase()
+      }
+    )
+
+    if (matchingDoc) {
+      // Merge tags into the existing record
+      const data = matchingDoc.data()
+      const existingTags: string[] = data.tags || []
+      const newTags = registration.tags || []
+      const mergedTags = Array.from(new Set([...existingTags, ...newTags]))
+
+      await matchingDoc.ref.update({ tags: mergedTags })
+      return { success: true, id: matchingDoc.id, merged: true }
+    }
+
+    // No existing record — create a new one
     const docRef = await db.collection(COLLECTION).add({
       ...registration,
       registeredAt: registration.registeredAt || new Date().toISOString(),

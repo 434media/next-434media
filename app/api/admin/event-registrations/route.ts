@@ -170,7 +170,12 @@ export async function POST(request: Request) {
 
     const result = await addEventRegistration(registration)
     if (result.success) {
-      return NextResponse.json({ success: true, id: result.id, registration: { ...registration, id: result.id } })
+      return NextResponse.json({
+        success: true,
+        id: result.id,
+        merged: result.merged || false,
+        registration: { ...registration, id: result.id },
+      })
     }
     return NextResponse.json({ error: result.error }, { status: 500 })
   } catch (error) {
