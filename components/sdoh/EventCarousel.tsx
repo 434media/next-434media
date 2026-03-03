@@ -19,8 +19,8 @@ export function EventCarousel() {
   const videoContent: VideoContent = {
     id: "video-session",
     type: "video",
-    videoUrl: "https://ampd-asset.s3.us-east-2.amazonaws.com/RGVSW25+-+%C2%BFQue+es+SDOH_.mp4",
-    videoThumbnail: "https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-ochoa.jpg",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/RGVSW25%20-%20%C2%BFQue%20es%20SDOH_.mp4",
+    videoThumbnail: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-ochoa.jpg",
     title: dictionary.sdoh?.demoDay?.title || "¿Que es SDOH? Panel Session",
     description:
       dictionary.sdoh?.demoDay?.description || "Experience the complete panel discussion from RGV Startup Week 2025.",

@@ -114,7 +114,7 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
             <div className="relative order-2 md:order-1">
               <div className="relative w-full max-w-md mx-auto">
                 <Image
-                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+                  src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg"
                   alt="SDOH Logo"
                   width={400}
                   height={400}

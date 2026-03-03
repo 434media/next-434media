@@ -62,7 +62,7 @@ export function HomeClient({ collectionImages }: HomeClientProps) {
     <>
       {/* Hero video section */}
       <VideoHero
-        videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/434_SHOP_1080_V001.mp4"
+        videoUrl="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434_SHOP_1080_V001.mp4"
         title="434 SHOP"
         subtitle="Exclusive apparel and merchandise from 434 Media"
         ctaText="Explore Collections"

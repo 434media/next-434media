@@ -34,9 +34,9 @@ export function SessionsSection({ dict }: SessionsSectionProps) {
                 dict.sdoh?.sessions?.card1?.description ||
                 "Understanding Needs and Quality Solutions presented by Shireen Abdullah, Founder, Yumlish, 2024 MHM Accelerator Cohort Champion"
               }
-              image="https://ampd-asset.s3.us-east-2.amazonaws.com/card1.jpg"
+              image="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/card1.jpg"
               videoId="session1"
-              videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Shireen+Abdullah.mp4"
+              videoUrl="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Shireen%20Abdullah.mp4"
               href="https://yumlish.com"
               viewSessionText={dict.sdoh?.sessions?.viewSession || "View Session"}
               comingSoonText={dict.sdoh?.sessions?.comingSoon || "Coming Soon"}
@@ -56,9 +56,9 @@ export function SessionsSection({ dict }: SessionsSectionProps) {
                 dict.sdoh?.sessions?.card2?.description ||
                 "Understanding the Process presented by Jose Padilla, Founder, Padilla Law, LLC and LegalmenteAI"
               }
-              image="https://ampd-asset.s3.us-east-2.amazonaws.com/card2.jpeg"
+              image="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/card2.jpeg"
               videoId="session2"
-              videoUrl="https://ampd-asset.s3.us-east-2.amazonaws.com/Jose+Padilla.mp4"
+              videoUrl="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Jose%20Padilla.mp4"
               href="https://padillalawllc.com"
               viewSessionText={dict.sdoh?.sessions?.viewSession || "View Session"}
               comingSoonText={dict.sdoh?.sessions?.comingSoon || "Coming Soon"}
@@ -78,7 +78,7 @@ export function SessionsSection({ dict }: SessionsSectionProps) {
                 dict.sdoh?.sessions?.card3?.description ||
                 "Captivating Investors and Closing Deals presented by Luis Martinez, PhD, Sr. Venture Assoc., Capital Factory"
               }
-              image="https://ampd-asset.s3.us-east-2.amazonaws.com/card3.jpeg"
+              image="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/card3.jpeg"
               videoId="session3"
               href="https://capitalfactory.com"
               viewSessionText={dict.sdoh?.sessions?.viewSession || "View Session"}

@@ -66,7 +66,7 @@ export function SDOHIntro({ locale, dict }: SDOHIntroProps) {
               >
                 <div className="relative w-[100px] sm:w-[120px]">
                   <Image
-                    src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+                    src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg"
                     alt={dict?.sdoh?.title || "¿Qué es SDOH?"}
                     width={120}
                     height={120}
@@ -152,7 +152,7 @@ export function SDOHIntro({ locale, dict }: SDOHIntroProps) {
               {/* Image container - adjusted aspect ratio to match text height */}
               <div className="relative aspect-[5/4] lg:aspect-[4/3] overflow-hidden bg-neutral-100">
                 <Image
-                  src="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-marcos.jpg"
+                  src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-marcos.jpg"
                   alt="Awareness Drives Innovation - SDOH Speaker"
                   fill
                   className="object-cover"

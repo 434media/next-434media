@@ -62,7 +62,7 @@ export default async function CategoryPage({
   // Get all collections for the navbar dropdown
   const collections = await getCollections()
 
-  // Get the banner image for this collection from our S3 bucket
+  // Get the banner image for this collection from our Firebase Storage bucket
   const bannerImage = getCollectionBannerImage(params.collection)
 
   // Get collection-specific configuration
@@ -91,7 +91,7 @@ export default async function CategoryPage({
           </div>
 
           {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900/30 to-black"></div>
+          <div className="absolute inset-0 bg-linear-to-br from-black via-gray-900/30 to-black"></div>
 
           {/* Hero Content - Centered */}
           <div className="container mx-auto px-4 relative z-10 w-full">
@@ -136,11 +136,11 @@ export default async function CategoryPage({
           <div className="container mx-auto px-4">
             <div className="flex justify-center">
               <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
+                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg"
                 alt="TXMX Boxing - Premium Boxing Merchandise"
                 width={600}
                 height={240}
-                className="w-96 sm:w-[500px] md:w-[600px] h-auto"
+                className="w-96 sm:w-125 md:w-150 h-auto"
                 priority={false}
                 sizes="(max-width: 640px) 384px, (max-width: 768px) 500px, 600px"
               />

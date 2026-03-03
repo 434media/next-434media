@@ -46,8 +46,8 @@ export function HeroSection() {
   const [error, setError] = useState<string | null>(null)
   const [loadAttempts, setLoadAttempts] = useState(0)
 
-  const videoUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434+Media.mp4"
-  const posterUrl = "https://ampd-asset.s3.us-east-2.amazonaws.com/434-poster.png"
+  const videoUrl = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434%20Media.mp4"
+  const posterUrl = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434-poster.png"
 
   // Intersection Observer to play/pause video based on visibility
   useEffect(() => {

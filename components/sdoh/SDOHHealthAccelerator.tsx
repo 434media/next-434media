@@ -128,7 +128,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
             {/* Image container */}
             <div className="relative aspect-[4/5] overflow-hidden bg-neutral-100">
               <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-accelerator.jpg"
+                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-accelerator.jpg"
                 alt="SDOH Community Health Accelerator winner receiving $50,000 check"
                 fill
                 className="object-cover object-center"
@@ -147,7 +147,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
       <VideoModal
         isOpen={isVideoModalOpen}
         onClose={closeVideoModal}
-        videoSrc="https://ampd-asset.s3.us-east-2.amazonaws.com/SDOH+ACCELERATOR+PROGRAM+RECAP_2025.mp4"
+        videoSrc="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/SDOH%20ACCELERATOR%20PROGRAM%20RECAP_2025.mp4"
         title={locale === "es" ? "Resumen del Programa Acelerador SDOH" : "SDOH Accelerator Program Recap"}
         description={locale === "es" ? "Mira los momentos destacados del programa acelerador de salud comunitaria." : "Watch the highlights from the community health accelerator program."}
       />

@@ -82,7 +82,7 @@ export function StrategicPartnership({ locale, dict }: StrategicPartnershipProps
                 >
                   <div className="relative h-28 sm:h-32 lg:h-36 w-72 sm:w-80 lg:w-96">
                     <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
+                      src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20BUTTON%20RGB.png"
                       alt={partnershipDict.velocityAlt ?? "VelocityTX Logo"}
                       fill
                       className="object-contain"
@@ -104,7 +104,7 @@ export function StrategicPartnership({ locale, dict }: StrategicPartnershipProps
                 >
                   <div className="relative h-28 sm:h-32 lg:h-36 w-72 sm:w-80 lg:w-96">
                     <Image
-                      src="https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png"
+                      src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/mhm.png"
                       alt={partnershipDict.methodistAlt ?? "Methodist Healthcare Ministries Logo"}
                       fill
                       className="object-contain"

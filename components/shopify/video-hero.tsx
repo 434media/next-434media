@@ -265,7 +265,7 @@ export function VideoHero({
             playsInline
             loop
             muted={true}
-            poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
+            poster="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/shop-poster.png"
             aria-label={`${title} promotional video`}
             preload="auto"
           >

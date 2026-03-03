@@ -87,7 +87,7 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
             {/* Image container */}
             <div className="relative aspect-[4/3] overflow-hidden bg-neutral-100">
               <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-bootcamp.jpg"
+                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-bootcamp.jpg"
                 alt="SDOH Startup Bootcamp participants group photo"
                 fill
                 className="object-cover object-center"

@@ -114,7 +114,7 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
             <div className="lg:w-1/2 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30 z-10" />
               <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/soi.jpeg"
+                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/soi.jpeg"
                 alt="434 Media Creative Team"
                 fill
                 className="object-cover"

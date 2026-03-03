@@ -16,7 +16,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "ampd-asset.s3.us-east-2.amazonaws.com",
+        hostname: "storage.googleapis.com",
+        pathname: "/groovy-ego-462522-v2.firebasestorage.app/**",
       },
        {
         protocol: 'https',

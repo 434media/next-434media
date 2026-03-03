@@ -140,8 +140,8 @@ export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
     setShowModalControls(true)
   }
 
-  const videoSrc = "https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mov"
-  const posterImage = "https://ampd-asset.s3.us-east-2.amazonaws.com/demoday-poster.png"
+  const videoSrc = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Demo-Day-V3.mov"
+  const posterImage = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/demoday-poster.png"
 
   return (
     <>
@@ -226,7 +226,7 @@ export default function SDOHDemoDay({ dict }: SDOHDemoDayProps) {
                 onClick={toggleModalPlayPause}
               >
                 <source src={videoSrc} type="video/quicktime" />
-                <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/Demo-Day-V3.mp4" type="video/mp4" />
+                <source src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Demo-Day-V3.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
 

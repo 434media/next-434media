@@ -34,12 +34,12 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
               loop
               muted
               playsInline
-              poster="https://ampd-asset.s3.us-east-2.amazonaws.com/sdoh-poster.png"
+              poster="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-poster.png"
               className="w-full h-full object-cover"
               preload="metadata"
             >
               <source
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/Start+Up+Week+Post+Promo+WEB.mp4"
+                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Start%20Up%20Week%20Post%20Promo%20WEB.mp4"
                 type="video/mp4"
               />
               <track kind="captions" src="/captions.vtt" label="English captions" />

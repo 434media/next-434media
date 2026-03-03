@@ -1,24 +1,24 @@
 // Map collection handles to banner images (for collection pages only)
-// These are custom banner images from our S3 bucket
+// These are custom banner images from our Firebase Storage bucket
 // Replace the entire collectionBannerImages object with this updated version
 export const collectionBannerImages: Record<string, string> = {
   // Default fallback image
   default: "/placeholder.svg?height=600&width=1600&text=Collection",
 
   // Active collections
-  "txmx-boxing": "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+Hero+Banner.mp4",
-  vemosvamos: "https://ampd-asset.s3.us-east-2.amazonaws.com/VV+Web+Banner+2.mp4",
-  milcityusa: "https://ampd-asset.s3.us-east-2.amazonaws.com/MilCity.mp4",
-  devsa: "https://ampd-asset.s3.us-east-2.amazonaws.com/DEVSA+Web+Banner.mp4",
-  "434-media": "https://ampd-asset.s3.us-east-2.amazonaws.com/MilCity.mp4",
+  "txmx-boxing": "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20Hero%20Banner.mp4",
+  vemosvamos: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/VV%20Web%20Banner%202.mp4",
+  milcityusa: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/MilCity.mp4",
+  devsa: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/DEVSA%20Web%20Banner.mp4",
+  "434-media": "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/MilCity.mp4",
 
   // Keep some of the original examples for backward compatibility
-  frontpage: "https://ampd-asset.s3.us-east-2.amazonaws.com/pexels-bohlemedia-1884584.jpg",
-  summer: "https://ampd-asset.s3.us-east-2.amazonaws.com/pexels-bohlemedia-1884584.jpg",
-  winter: "https://ampd-asset.s3.us-east-2.amazonaws.com/pexels-bohlemedia-1884584.jpg",
-  accessories: "https://ampd-asset.s3.us-east-2.amazonaws.com/pexels-bohlemedia-1884584.jpg",
-  "new-arrivals": "https://ampd-asset.s3.us-east-2.amazonaws.com/pexels-bohlemedia-1884584.jpg",
-  featured: "https://ampd-asset.s3.us-east-2.amazonaws.com/pexels-bohlemedia-1884584.jpg",
+  frontpage: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/pexels-bohlemedia-1884584.jpg",
+  summer: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/pexels-bohlemedia-1884584.jpg",
+  winter: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/pexels-bohlemedia-1884584.jpg",
+  accessories: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/pexels-bohlemedia-1884584.jpg",
+  "new-arrivals": "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/pexels-bohlemedia-1884584.jpg",
+  featured: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/pexels-bohlemedia-1884584.jpg",
 }
 
 // Default fallback image as a constant

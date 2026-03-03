@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 // Try multiple potential PDF URLs
 const PDF_URLS = [
-  "https://ampd-asset.s3.us-east-2.amazonaws.com/MHMxVelocity_Year2_Impact_Report.pdf",
+  "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/MHMxVelocity_Year2_Impact_Report.pdf",
 ]
 const DOWNLOAD_FILENAME = "MHMxVelocity_Year2_Impact_Report.pdf"
 

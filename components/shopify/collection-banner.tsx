@@ -282,7 +282,7 @@ export function CollectionBanner({
                 loop
                 autoPlay
                 className="h-full w-full object-cover"
-                poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
+                poster="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/shop-poster.png"
               >
                 <source src={image} type="video/mp4" />
                 Your browser does not support the video tag.

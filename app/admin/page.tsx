@@ -275,7 +275,7 @@ export default function AdminPage() {
               <div
                 className="absolute inset-0 opacity-[0.015] rounded-2xl pointer-events-none"
                 style={{
-                  backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK.png')`,
+                  backgroundImage: `url('https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONBLACK.png')`,
                   backgroundSize: "48px 48px",
                   backgroundRepeat: "repeat",
                   backgroundPosition: "center",
@@ -321,7 +321,7 @@ export default function AdminPage() {
               <div
                 className="absolute inset-0 opacity-[0.015] rounded-2xl pointer-events-none"
                 style={{
-                  backgroundImage: `url('https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONBLACK.png')`,
+                  backgroundImage: `url('https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONBLACK.png')`,
                   backgroundSize: "48px 48px",
                   backgroundRepeat: "repeat",
                   backgroundPosition: "center",

@@ -7,64 +7,64 @@ import { ContactForm } from "@/components/ContactForm"
 const trustedByLogos = [
   {
     name: "Builders VC",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/builders-dark.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/builders-dark.svg",
     height: "h-8 md:h-9",
   },
   {
     name: "Alamo Angels",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/angels.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/angels.png",
     height: "h-6 md:h-7",
   },
   {
     name: "Digital Canvas",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/digital-canvas-ymas.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digital-canvas-ymas.svg",
     invert: true,
     height: "h-6 md:h-7",
   },
   {
     name: "Univision",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/univision-logo.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/univision-logo.svg",
     height: "h-7 md:h-9",
   },
   {
     name: "TXMX Boxing",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg",
     invert: true,
     height: "h-6 md:h-8",
   },
   {
     name: "VelocityTX",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+MAIN+RGB+(1).png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20MAIN%20RGB%20(1).png",
     height: "h-6 md:h-9",
   },
   {
     name: "SDOH",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg",
     height: "h-7 md:h-9",
   },
   {
     name: "The Health Cell",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/healthcell.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/healthcell.png",
     height: "h-7 md:h-8",
   },
   {
     name: "Mission Road Ministries",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/missionroad.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/missionroad.svg",
     height: "h-6 md:h-9",
   },
   {
     name: "Methodist Healthcare Ministries",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/mhm.png",
     height: "h-9 md:h-10",
   },
   {
     name: "Tech Bloc",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/healthcell-2-techbloc.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TB%20Full%20Logo.png",
     height: "h-9 md:h-12",
   },
   {
     name: "Learn2AI",
-    logo: "https://ampd-asset.s3.us-east-2.amazonaws.com/Learn2ai.svg",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Learn2ai.svg",
     height: "h-6 md:h-7",
   },
 ]

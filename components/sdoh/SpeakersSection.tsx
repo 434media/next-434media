@@ -23,7 +23,7 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
     {
       name: "Marcos Resendez",
       role: dictionary.sdoh?.speakers?.founder || "Founder",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/49d10ec854acc0af8a20810dd891eafb.jpeg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/49d10ec854acc0af8a20810dd891eafb.jpeg",
       company: "434 MEDIA",
       website: "https://434media.com",
       isModerator: true,
@@ -31,21 +31,21 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
     {
       name: "Dr. Lyssa Ochoa",
       role: dictionary.sdoh?.speakers?.founder || "Founder",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/Lyssa_Ochoa_LinkedIn_Headshot.jpeg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Lyssa_Ochoa_LinkedIn_Headshot.jpeg",
       company: "The SAVE Clinic",
       website: "https://thesaveclinic.com",
     },
     {
       name: "Daniyal Liaqat",
       role: "Founder, 2024 MHM Accelerator",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/daniyal-liaqat.jpeg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/daniyal-liaqat.jpeg",
       company: "Tabiat Research",
       website: "https://tabiat.care",
     },
     {
       name: "Lina Rugova",
       role: dictionary.sdoh?.speakers?.founder || "Founder",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/lina-rugova.jpeg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/lina-rugova.jpeg",
       company: "Emerge and Rise",
       website: "https://emergeandrise.org",
     },

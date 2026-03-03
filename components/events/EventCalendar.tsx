@@ -171,7 +171,7 @@ export function EventCalendar({ events, onEventClick, onDateSelect }: EventCalen
         {/* 434 Logo - Smaller on mobile */}
         <div className="relative z-10">
           <img
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
+            src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONWHITE.png"
             alt="434 Media Logo"
             className="h-20 md:h-32 w-auto invert scale-125 down-shadow-lg drop-shadow-lg drop-shadow-neutral-200/40"
           />

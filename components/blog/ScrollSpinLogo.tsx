@@ -65,7 +65,7 @@ export default function ScrollSpinLogo() {
         {/* Large 434 Logo - fills most of the circle */}
         <div className="relative w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40">
           <Image
-            src="https://ampd-asset.s3.us-east-2.amazonaws.com/434MediaICONWHITE.png"
+            src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONWHITE.png"
             alt="434 Media Logo"
             fill
             className="object-contain filter drop-shadow-2xl"

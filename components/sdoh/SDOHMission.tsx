@@ -37,7 +37,7 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
         <div className="relative mb-16 sm:mb-20 lg:mb-24 text-center px-4 sm:px-6 lg:px-8">
           <div className="relative mb-6 sm:mb-8 max-w-md mx-auto">
             <Image
-              src="https://ampd-asset.s3.us-east-2.amazonaws.com/que.svg"
+              src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg"
               alt={dict?.sdoh?.title || "¿Qué es SDOH?"}
               width={400}
               height={200}
@@ -120,7 +120,7 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
                     >
                       <div className="relative h-28 sm:h-32 lg:h-36 w-72 sm:w-80 lg:w-96">
                         <Image
-                          src="https://ampd-asset.s3.us-east-2.amazonaws.com/Sponsor+Logos/VelocityTX+Logo+BUTTON+RGB.png"
+                          src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20BUTTON%20RGB.png"
                           alt={partnershipDict.velocityAlt ?? "VelocityTX Logo"}
                           fill
                           className="object-contain"
@@ -142,7 +142,7 @@ export function SDOHMission({ locale, dict }: SDOHMissionProps) {
                     >
                       <div className="relative h-28 sm:h-32 lg:h-36 w-72 sm:w-80 lg:w-96">
                         <Image
-                          src="https://ampd-asset.s3.us-east-2.amazonaws.com/mhm.png"
+                          src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/mhm.png"
                           alt={partnershipDict.methodistAlt ?? "Methodist Healthcare Ministries Logo"}
                           fill
                           className="object-contain"

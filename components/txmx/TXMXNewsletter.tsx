@@ -114,7 +114,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
             <div className="lg:w-1/2 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/20 z-10" />
               <Image
-                src="https://ampd-asset.s3.us-east-2.amazonaws.com/bam3.jpg"
+                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/bam3.jpg"
                 alt="TXMX Boxing Fighter"
                 fill
                 className="object-cover"
@@ -138,7 +138,7 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       {/* TXMX Logo - Using text fallback if SVG doesn't load */}
                       <div className="relative">
                         <Image
-                          src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
+                          src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg"
                           alt="TXMX Boxing Logo"
                           width={160}
                           height={80}

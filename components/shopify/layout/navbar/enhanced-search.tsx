@@ -42,22 +42,22 @@ export default function EnhancedSearch() {
     {
       text: "TXMX Boxing",
       type: "collection",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+Hero+Banner.jpg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20Hero%20Banner.jpg",
     },
     {
       text: "Vemos Vamos",
       type: "collection",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/VV+Web+Banner+2.jpg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/VV%20Web%20Banner%202.jpg",
     },
     {
       text: "MilCity USA",
       type: "collection",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/MilCity.jpg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/MilCity.jpg",
     },
     {
       text: "DEVSA",
       type: "collection",
-      image: "https://ampd-asset.s3.us-east-2.amazonaws.com/DEVSA+Web+Banner.jpg",
+      image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/DEVSA%20Web%20Banner.jpg",
     },
   ]
 

@@ -47,7 +47,7 @@ const collectionConfigs: Record<string, Partial<CollectionConfig>> = {
     buttonStyle: "custom",
     customButtonClasses:
       "bg-black/40 backdrop-blur-sm text-white border border-white/30 hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-lg font-bold px-8 py-4",
-    logoSrc: "https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg", // Path to the TXMX logo
+    logoSrc: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg", // Path to the TXMX logo
     logoWidth: 800, // Significantly increased logo size
     logoHeight: 400, // Significantly increased logo size
     scrollToProducts: true, // Enable scroll to products

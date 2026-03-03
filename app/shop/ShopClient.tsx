@@ -84,9 +84,9 @@ export default function ShopClient() {
               loop
               playsInline
               className="w-full h-full object-cover"
-              poster="https://ampd-asset.s3.us-east-2.amazonaws.com/shop-poster.png"
+              poster="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/shop-poster.png"
             >
-              <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER+V2.mp4" type="video/mp4" />
+              <source src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20DROP%20TEASER%20V2.mp4" type="video/mp4" />
               Your browser does not support the video tag.
             </video>
           </div>
@@ -154,7 +154,7 @@ export default function ShopClient() {
                 playsInline
                 className="w-full h-full object-cover"
               >
-                <source src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMX+DROP+TEASER+V2.mp4" type="video/mp4" />
+                <source src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20DROP%20TEASER%20V2.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
 
@@ -218,7 +218,7 @@ export default function ShopClient() {
                 <div className="relative">
                   <h1 id="shop-heading" className="sr-only">TXMX Boxing — Premium Boxing Merchandise</h1>
                   <Image
-                    src="https://ampd-asset.s3.us-east-2.amazonaws.com/TXMXBack.svg"
+                    src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg"
                     alt="TXMX Boxing - Premium Boxing Merchandise"
                     width={400}
                     height={160}
