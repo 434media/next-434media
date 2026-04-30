@@ -45,6 +45,11 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
   // Check if cart has items - only after component has mounted
   const hasCartItems = hasMounted && typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
 
+  // Hide the public navbar entirely on admin routes — admin has its own shell
+  if (pathname?.startsWith("/admin")) {
+    return null
+  }
+
   // Check if we're in the shop section
   const isInShop = pathname?.startsWith("/shop") || pathname?.startsWith("/product") || pathname?.startsWith("/search")
   

@@ -1335,3 +1335,212 @@ export async function deleteContentPost(id: string): Promise<void> {
     throw new Error("Failed to delete content post")
   }
 }
+
+// ============================================
+// UNIFIED TASKS — single-collection model
+// ============================================
+// Once the migration has run, all task reads/writes go to a single
+// `crm_tasks` collection. Pre-migration, these helpers fall back to the
+// legacy per-rep + completed + master-list code paths.
+
+const UNIFIED_TASKS = "crm_tasks"
+const META_TASK_MIGRATION_KEY = "crm_meta:task_migration"
+
+async function isTaskMigrationCompleted(): Promise<boolean> {
+  const cached = getCached<boolean>(META_TASK_MIGRATION_KEY)
+  if (cached !== null) return cached
+  try {
+    const db = getDb()
+    const snap = await db.collection("crm_meta").doc("task_migration").get()
+    const completed = snap.exists && snap.data()?.completed === true
+    setCache(META_TASK_MIGRATION_KEY, completed)
+    return completed
+  } catch (error) {
+    console.error("[firestore-crm] Failed to read task migration flag:", error)
+    return false
+  }
+}
+
+/** Force a re-read of the migration flag (e.g. right after running the migration). */
+export function invalidateTaskMigrationFlag(): void {
+  cache.delete(META_TASK_MIGRATION_KEY)
+}
+
+export interface UnifiedTaskFilters {
+  assignee?: string
+  status?: string
+  brand?: string
+  client_id?: string
+  opportunity_id?: string
+  // Limit applied client-side after fetch
+  limit?: number
+}
+
+/**
+ * Get tasks (unified or legacy depending on migration status).
+ * Filters are applied server-side when the migration is complete; otherwise
+ * client-side after the existing legacy merge.
+ */
+export async function getUnifiedTasks(filters?: UnifiedTaskFilters): Promise<Task[]> {
+  const migrated = await isTaskMigrationCompleted()
+
+  let tasks: Task[]
+  if (migrated) {
+    const db = getDb()
+    let query: FirebaseFirestore.Query = db.collection(UNIFIED_TASKS)
+    // Apply at most one server-side equality filter to keep the index
+    // requirements lean. Additional filters run client-side below.
+    if (filters?.assignee) {
+      query = query.where("assigned_to", "==", filters.assignee)
+    } else if (filters?.client_id) {
+      query = query.where("client_id", "==", filters.client_id)
+    } else if (filters?.opportunity_id) {
+      query = query.where("opportunity_id", "==", filters.opportunity_id)
+    }
+    const snap = await query.get()
+    tasks = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Task[]
+  } else {
+    tasks = await getAllTasks()
+  }
+
+  if (filters?.assignee && !migrated) {
+    tasks = tasks.filter((t) => t.assigned_to === filters.assignee)
+  }
+  if (filters?.status) tasks = tasks.filter((t) => t.status === filters.status)
+  if (filters?.brand) tasks = tasks.filter((t) => t.brand === filters.brand)
+  if (filters?.client_id && !migrated) {
+    tasks = tasks.filter((t) => t.client_id === filters.client_id)
+  }
+  if (filters?.opportunity_id && !migrated) {
+    tasks = tasks.filter((t) => t.opportunity_id === filters.opportunity_id)
+  }
+  if (filters?.limit) tasks = tasks.slice(0, filters.limit)
+  return tasks
+}
+
+export async function getUnifiedTaskById(id: string): Promise<Task | null> {
+  const migrated = await isTaskMigrationCompleted()
+  if (migrated) {
+    const db = getDb()
+    const snap = await db.collection(UNIFIED_TASKS).doc(id).get()
+    if (!snap.exists) return null
+    return { id: snap.id, ...snap.data() } as Task
+  }
+  // Pre-migration: search legacy collections + master list
+  const found = await findTaskInAnyCollection(id)
+  if (found) return found.task
+  // Master list fallback — `getAllTasks()` includes master-list-derived tasks,
+  // and a single-id lookup against the merged result is cheap enough.
+  const all = await getAllTasks()
+  return all.find((t) => t.id === id) ?? null
+}
+
+export async function createUnifiedTask(
+  data: Omit<Task, "id" | "created_at" | "updated_at">,
+): Promise<Task> {
+  const migrated = await isTaskMigrationCompleted()
+  if (migrated) {
+    const db = getDb()
+    const FieldValue = admin.firestore.FieldValue
+    const now = FieldValue.serverTimestamp()
+    const docRef = await db.collection(UNIFIED_TASKS).add({
+      ...data,
+      created_at: now,
+      updated_at: now,
+    })
+    invalidateCache(UNIFIED_TASKS)
+    cache.delete("all_tasks_combined")
+    const snap = await docRef.get()
+    return { id: snap.id, ...snap.data() } as Task
+  }
+  // Legacy path: route to per-rep collection based on assigned_to
+  const owner = legacyOwnerFromAssignee(data.assigned_to) as TaskOwner
+  return createTask(owner, data)
+}
+
+export async function updateUnifiedTask(id: string, updates: Partial<Task>): Promise<Task> {
+  const migrated = await isTaskMigrationCompleted()
+  if (migrated) {
+    const db = getDb()
+    const FieldValue = admin.firestore.FieldValue
+    const cleanUpdates: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === "id" || key === "created_at") continue
+      if (value === null) cleanUpdates[key] = FieldValue.delete()
+      else if (value !== undefined) cleanUpdates[key] = value
+    }
+    cleanUpdates.updated_at = FieldValue.serverTimestamp()
+    await db.collection(UNIFIED_TASKS).doc(id).update(cleanUpdates)
+    invalidateCache(UNIFIED_TASKS)
+    cache.delete("all_tasks_combined")
+    const snap = await db.collection(UNIFIED_TASKS).doc(id).get()
+    return { id: snap.id, ...snap.data() } as Task
+  }
+  // Legacy path: locate task across collections, then update in place
+  const found = await findTaskInAnyCollection(id)
+  if (!found) throw new Error("Task not found")
+  return updateTask(found.actualOwner, id, updates)
+}
+
+export async function deleteUnifiedTask(id: string): Promise<void> {
+  const migrated = await isTaskMigrationCompleted()
+  if (migrated) {
+    const db = getDb()
+    await db.collection(UNIFIED_TASKS).doc(id).delete()
+    invalidateCache(UNIFIED_TASKS)
+    cache.delete("all_tasks_combined")
+    return
+  }
+  const found = await findTaskInAnyCollection(id)
+  if (!found) throw new Error("Task not found")
+  await deleteTask(found.actualOwner, id)
+}
+
+/**
+ * Mark a task as completed — post-migration this is just a status flip;
+ * pre-migration it preserves the legacy "move to crm_tasks_completed" behavior.
+ */
+export async function completeUnifiedTask(id: string): Promise<Task> {
+  const migrated = await isTaskMigrationCompleted()
+  if (migrated) {
+    return updateUnifiedTask(id, {
+      status: "completed",
+      completed_date: new Date().toISOString(),
+    })
+  }
+  const found = await findTaskInAnyCollection(id)
+  if (!found) throw new Error("Task not found")
+  return completeTask(found.actualOwner, id)
+}
+
+export async function uncompleteUnifiedTask(id: string, newStatus = "in_progress"): Promise<Task> {
+  const migrated = await isTaskMigrationCompleted()
+  if (migrated) {
+    return updateUnifiedTask(id, { status: newStatus as Task["status"], completed_date: "" })
+  }
+  // Legacy: task is in `crm_tasks_completed`; need a destination owner
+  const completed = await getTaskById("completed", id)
+  if (!completed) throw new Error("Completed task not found")
+  const owner = legacyOwnerFromAssignee(completed.assigned_to) as TaskOwner
+  return uncompleteTask(id, owner, newStatus)
+}
+
+function legacyOwnerFromAssignee(name: string | undefined): string {
+  if (!name) return "teams"
+  const map: Record<string, string> = {
+    Jake: "jake",
+    "Jacob Lee Miles": "jake",
+    Marc: "marc",
+    "Marcos Resendez": "marc",
+    Stacy: "stacy",
+    "Stacy Ramirez": "stacy",
+    "Stacy Carrizales": "stacy",
+    Jesse: "jesse",
+    "Jesse Hernandez": "jesse",
+    Barb: "barb",
+    "Barbara Carreon": "barb",
+    Nichole: "teams",
+    "Nichole Snow": "teams",
+  }
+  return map[name] ?? "teams"
+}

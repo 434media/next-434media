@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { motion, AnimatePresence } from "motion/react"
 import {
-  ChevronLeft,
   Loader2,
   Calendar,
   Building2,
@@ -191,7 +189,7 @@ export default function ProjectManagementPage() {
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
-      <div className="min-h-dvh pt-20 bg-neutral-50 text-neutral-900">
+      <div className="min-h-full bg-neutral-50 text-neutral-900">
         {/* Toast Notification */}
         <AnimatePresence>
           {toast && (
@@ -225,14 +223,6 @@ export default function ProjectManagementPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
-                <Link
-                  href="/admin"
-                  className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                  <span className="text-sm font-medium tracking-wide">Back</span>
-                </Link>
-                <div className="h-6 w-px bg-neutral-200" />
                 <h1 className="text-lg font-bold tracking-tight text-neutral-900">
                   Project Management
                 </h1>

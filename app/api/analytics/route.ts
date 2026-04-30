@@ -53,6 +53,20 @@ export async function GET(request: NextRequest) {
   console.log("[Analytics API] Headers:", Object.fromEntries(request.headers.entries()))
 
   try {
+    // Properties endpoint just enumerates configured property env vars;
+    // it doesn't need the GA4 client or a valid service-account key.
+    // Short-circuit it so the dropdown can populate even when other
+    // config is incomplete.
+    const earlyParams = request.nextUrl.searchParams
+    if (earlyParams.get("endpoint") === "properties") {
+      const availableProperties = getAvailableProperties()
+      return NextResponse.json({
+        success: true,
+        properties: availableProperties,
+        defaultPropertyId: availableProperties[0]?.id,
+      })
+    }
+
     // Check configuration first
     console.log("[Analytics API] Checking configuration...")
 

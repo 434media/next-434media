@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import Link from "next/link"
 import { upload } from "@vercel/blob/client"
 import {
-  ChevronLeft,
   Loader2,
   FileText,
   Search,
@@ -294,20 +292,15 @@ export default function SOPsPage() {
 
         {/* ── Sticky top bar ── */}
         <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-neutral-200">
-          <div className="max-w-360 mx-auto px-4 sm:px-6 pt-20 md:pt-16">
+          <div className="max-w-360 mx-auto px-4 sm:px-6">
             <div className="flex items-center justify-between h-14">
               <div className="flex items-center gap-3">
-                {viewMode !== "docs" ? (
+                {viewMode !== "docs" && (
                   <button onClick={() => { setViewMode("docs"); setSelectedSOP(null) }} className="flex items-center gap-1.5 text-neutral-400 hover:text-neutral-700 transition-colors text-sm font-medium">
                     <ArrowLeft className="w-4 h-4" /><span className="hidden sm:inline">Back</span>
                   </button>
-                ) : (
-                  <Link href="/admin" className="flex items-center gap-1.5 text-neutral-400 hover:text-neutral-700 transition-colors text-sm font-medium">
-                    <ChevronLeft className="w-4 h-4" /><span className="hidden sm:inline">Admin</span>
-                  </Link>
                 )}
-                <div className="h-5 w-px bg-neutral-200 hidden sm:block" />
-                <div className="hidden sm:flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-neutral-600" />
                   <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
                     {viewMode === "create" ? "NEW DOCUMENT" : viewMode === "edit" ? "EDIT DOCUMENT" : viewMode === "detail" ? "DOCUMENT" : "434 MEDIA HUB"}

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import Link from "next/link"
 import { 
   ChevronLeft, 
   Plus, 
@@ -1096,17 +1095,8 @@ export default function EventsAdminPage() {
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20">
-        {/* Back to Admin */}
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors mb-6"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back to Admin
-        </Link>
-
+    <div className="min-h-full bg-neutral-50 text-neutral-900">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Toast */}
         <AnimatePresence>
           {toast && (

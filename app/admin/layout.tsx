@@ -6,6 +6,7 @@ import { Shield, AlertCircle, Mail, Lock, Loader2 } from "lucide-react"
 import { NotificationProvider } from "@/context/notification-context"
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { AdminShell } from "@/components/admin/AdminShell"
 
 // Default password that requires reset on first use
 const DEFAULT_PASSWORD = "434Media2026"
@@ -17,7 +18,7 @@ export default function AdminLayout({
 }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<{ email: string; name: string; picture?: string } | null>(null)
+  const [user, setUser] = useState<{ email: string; name: string; picture?: string; role?: "full_admin" | "crm_only" } | null>(null)
   const [error, setError] = useState<string | null>(null)
   
   // Email/Password form state
@@ -450,7 +451,16 @@ export default function AdminLayout({
 
   return (
     <NotificationProvider>
-      <div className="w-full max-w-full">{children}</div>
+      {user ? (
+        <AdminShell
+          user={user}
+          onProfileUpdate={(u) => setUser((prev) => (prev ? { ...prev, ...u } : prev))}
+        >
+          {children}
+        </AdminShell>
+      ) : (
+        <div className="w-full max-w-full">{children}</div>
+      )}
     </NotificationProvider>
   )
 }

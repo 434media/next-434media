@@ -7,10 +7,8 @@ import {
   contactFormsToCSV,
   deleteContactForm,
   updateContactForm,
-  migrateContactFormsFromAirtable,
 } from "@/lib/firestore-contact-forms"
 
-// Check admin access
 async function requireAdmin() {
   const session = await getSession()
   if (!session) {
@@ -34,23 +32,19 @@ export async function GET(request: Request) {
     const source = searchParams.get("source")
     const format = searchParams.get("format")
 
-    // Get counts by source
     if (action === "counts") {
       const counts = await getContactFormCountsBySource()
       return NextResponse.json({ success: true, counts })
     }
 
-    // Get available sources
     if (action === "sources") {
       const sources = await getContactFormSources()
       return NextResponse.json({ success: true, sources })
     }
 
-    // Get contact form submissions
     const filters = source ? { source } : undefined
     const submissions = await getContactForms(filters)
 
-    // Return as CSV download
     if (format === "csv") {
       const csv = contactFormsToCSV(submissions)
       const filename = source
@@ -79,42 +73,6 @@ export async function GET(request: Request) {
   }
 }
 
-// POST - Trigger migration from Airtable to Firestore
-export async function POST(request: Request) {
-  try {
-    const authResult = await requireAdmin()
-    if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
-    }
-
-    const body = await request.json()
-
-    if (body.action === "migrate") {
-      console.log("[Contact Form Migration] Starting Airtable → Firestore migration...")
-
-      const results = await migrateContactFormsFromAirtable()
-
-      return NextResponse.json({
-        success: true,
-        message: `Migration complete: ${results.migrated} forms migrated, ${results.skipped} skipped`,
-        results,
-      })
-    }
-
-    return NextResponse.json(
-      { error: "Invalid action. Use 'migrate'." },
-      { status: 400 }
-    )
-  } catch (error) {
-    console.error("Error in contact-forms migration:", error)
-    return NextResponse.json(
-      { success: false, error: "Migration failed" },
-      { status: 500 }
-    )
-  }
-}
-
-// PATCH - Update a contact form submission
 export async function PATCH(request: Request) {
   try {
     const authResult = await requireAdmin()
@@ -154,7 +112,6 @@ export async function PATCH(request: Request) {
   }
 }
 
-// DELETE - Delete a contact form submission
 export async function DELETE(request: Request) {
   try {
     const authResult = await requireAdmin()

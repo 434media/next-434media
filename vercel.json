@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/ga4-snapshot",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/mailchimp-sync",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/instagram-snapshot",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/linkedin-token-refresh",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-digest",
+      "schedule": "0 13 * * 1"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Eye, Users, MousePointer, Clock, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
+import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface MetricsOverviewProps {
   dateRange: DateRange
@@ -11,6 +12,8 @@ interface MetricsOverviewProps {
   setError?: React.Dispatch<React.SetStateAction<string | null>>
   adminKey?: string
   propertyId?: string
+  useSnapshot?: boolean
+  onSnapshotMeta?: (meta: { snapshotDate: string; generatedAt: string } | null) => void
 }
 
 interface MetricData {
@@ -30,6 +33,8 @@ export function MetricsOverview({
   setError,
   adminKey,
   propertyId,
+  useSnapshot,
+  onSnapshotMeta,
 }: MetricsOverviewProps) {
   const [data, setData] = useState<MetricData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -43,10 +48,7 @@ export function MetricsOverview({
         console.log("[MetricsOverview] Date range:", dateRange)
         console.log("[MetricsOverview] Property ID:", propertyId)
 
-        let url = `/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-        if (propertyId) {
-          url += `&propertyId=${propertyId}`
-        }
+        const url = buildAnalyticsUrl({ endpoint: "summary", dateRange, propertyId, useSnapshot })
 
         console.log("[MetricsOverview] Making request to:", url)
 
@@ -71,6 +73,13 @@ export function MetricsOverview({
 
         const result = await response.json()
         console.log("[MetricsOverview] Success response:", result)
+
+        if (result._snapshot && onSnapshotMeta) {
+          onSnapshotMeta({
+            snapshotDate: result._snapshot.snapshotDate,
+            generatedAt: result._snapshot.generatedAt,
+          })
+        }
 
         // Ensure we have valid data structure
         const validatedData: MetricData = {
@@ -106,7 +115,7 @@ export function MetricsOverview({
       console.warn("[MetricsOverview] Invalid date range:", dateRange)
       setIsLoading(false)
     }
-  }, [dateRange, setError, adminKey, propertyId])
+  }, [dateRange, setError, adminKey, propertyId, useSnapshot, onSnapshotMeta])
 
   const formatNumber = (num: number): string => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`

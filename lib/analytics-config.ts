@@ -94,16 +94,22 @@ export function validateAnalyticsConfig(): boolean {
     return false
   }
 
-  // Validate JSON key format
+  // Validate JSON key format. Sanitize literal control chars first
+  // (matches lib/google-analytics.ts and lib/firebase-admin.ts behavior),
+  // since pasted JSON keys often contain literal newlines inside private_key.
   if (analyticsConfig.googleServiceAccountKey) {
     try {
-      const parsed = JSON.parse(analyticsConfig.googleServiceAccountKey)
+      const sanitized = analyticsConfig.googleServiceAccountKey
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t")
+      const parsed = JSON.parse(sanitized)
       if (!parsed.client_email || !parsed.private_key) {
         console.error("[Analytics Config] GOOGLE_SERVICE_ACCOUNT_KEY missing required fields")
         return false
       }
     } catch (error) {
-      console.error("[Analytics Config] GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON")
+      console.error("[Analytics Config] GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON:", error instanceof Error ? error.message : error)
       return false
     }
   }

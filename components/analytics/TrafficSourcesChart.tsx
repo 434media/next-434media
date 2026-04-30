@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { Globe, Loader2, Users, MousePointer, TrendingUp } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
+import { buildAnalyticsUrl } from "../../lib/analytics-url"
 import { TwitterIcon, InstagramIcon, LinkedInIcon, FacebookIcon } from "./SocialIcons"
 
 interface TrafficSourcesChartProps {
@@ -12,6 +13,7 @@ interface TrafficSourcesChartProps {
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
   propertyId?: string
+  useSnapshot?: boolean
 }
 
 interface SourceIconConfig {
@@ -109,6 +111,7 @@ export function TrafficSourcesChart({
   isLoading: parentLoading = false,
   setError,
   propertyId,
+  useSnapshot,
 }: TrafficSourcesChartProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -117,10 +120,7 @@ export function TrafficSourcesChart({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        let url = `/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-        if (propertyId) {
-          url += `&propertyId=${propertyId}`
-        }
+        const url = buildAnalyticsUrl({ endpoint: "trafficsources", dateRange, propertyId, useSnapshot })
 
         const response = await fetch(url)
 
@@ -141,7 +141,7 @@ export function TrafficSourcesChart({
     }
 
     loadData()
-  }, [dateRange, setError, propertyId])
+  }, [dateRange, setError, propertyId, useSnapshot])
 
   const totalSessions = data.reduce((sum, item) => sum + item.sessions, 0)
 

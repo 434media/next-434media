@@ -1,28 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
-import { 
-  getAimsEventsFromFirestore, 
+import {
+  getAimsEventsFromFirestore,
   createAimsEventInFirestore,
-  importAimsEventsFromAirtable,
-  markPastAimsEventsInFirestore
+  markPastAimsEventsInFirestore,
 } from "@/lib/firestore-aims-events"
 
-// Check if user is authenticated and has workspace email
 async function requireAdmin() {
   const session = await getSession()
-  
+
   if (!session) {
     return { error: "Unauthorized", status: 401 }
   }
-  
+
   if (!isAuthorizedAdmin(session.email)) {
     return { error: "Forbidden: Workspace email required", status: 403 }
   }
-  
+
   return { session }
 }
 
-// GET - Fetch all AIMS events (admin only)
 export async function GET() {
   try {
     const authResult = await requireAdmin()
@@ -33,12 +30,10 @@ export async function GET() {
       )
     }
 
-    // Mark past events automatically
     await markPastAimsEventsInFirestore()
 
     const events = await getAimsEventsFromFirestore()
-    
-    // Transform to match admin page expectations
+
     const transformedEvents = events.map(event => ({
       id: event.id,
       title: event.title,
@@ -73,7 +68,6 @@ export async function GET() {
   }
 }
 
-// POST - Create a new AIMS event (admin only)
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin()
@@ -85,33 +79,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    
-    // Check if this is an import request
-    if (body.action === "import") {
-      const result = await importAimsEventsFromAirtable()
-      return NextResponse.json({ 
-        success: true, 
-        imported: result.imported,
-        errors: result.errors,
-        message: `Imported ${result.imported} events from Airtable`
-      })
-    }
-    
-    // Validate required fields
+
     if (!body.title?.trim()) {
       return NextResponse.json(
         { error: "Title is required" },
         { status: 400 }
       )
     }
-    
+
     if (!body.start_date) {
       return NextResponse.json(
         { error: "Start date is required" },
         { status: 400 }
       )
     }
-    
+
     if (!body.location?.trim()) {
       return NextResponse.json(
         { error: "Location is required" },
@@ -119,7 +101,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Map admin form fields to Firestore event structure
     const eventData = {
       title: body.title.trim(),
       description: body.description?.trim() || "",
@@ -138,9 +119,9 @@ export async function POST(request: NextRequest) {
     }
 
     const newEvent = await createAimsEventInFirestore(eventData)
-    
-    return NextResponse.json({ 
-      success: true, 
+
+    return NextResponse.json({
+      success: true,
       event: newEvent,
       message: "AIMS event created successfully"
     })
@@ -153,7 +134,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Helper to map admin categories to Firestore categories
 function mapCategory(category: string): "conference" | "workshop" | "meetup" | "networking" | "other" {
   const categoryMap: Record<string, "conference" | "workshop" | "meetup" | "networking" | "other"> = {
     "Conference": "conference",

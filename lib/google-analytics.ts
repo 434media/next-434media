@@ -33,16 +33,61 @@ function getAnalyticsClient(): BetaAnalyticsDataClient {
         throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY environment variable is not set")
       }
 
-      let credentials
+      let credentials: { project_id?: string; client_email?: string; private_key?: string; type?: string }
       try {
-        credentials = JSON.parse(serviceAccountKey)
+        // Sanitize literal control chars in the private_key field (matches lib/firebase-admin.ts behavior)
+        const sanitized = serviceAccountKey
+          .replace(/\n/g, "\\n")
+          .replace(/\r/g, "\\r")
+          .replace(/\t/g, "\\t")
+        credentials = JSON.parse(sanitized)
       } catch (parseError) {
-        throw new Error("Invalid JSON in GOOGLE_SERVICE_ACCOUNT_KEY")
+        // Surface enough detail to debug without leaking the secret
+        const len = serviceAccountKey.length
+        const head = serviceAccountKey.slice(0, 20).replace(/[\r\n\t"]/g, " ")
+        const tail = serviceAccountKey.slice(-20).replace(/[\r\n\t"]/g, " ")
+        const wrappedInQuotes = serviceAccountKey.startsWith('"') && serviceAccountKey.endsWith('"')
+        const looksLikeOAuthClient = serviceAccountKey.includes('"installed"') || serviceAccountKey.includes('"web"')
+        const detail = [
+          `length=${len}`,
+          `starts="${head}"`,
+          `ends="${tail}"`,
+          wrappedInQuotes ? "value is wrapped in double-quotes (remove them)" : null,
+          looksLikeOAuthClient
+            ? "value looks like an OAuth client JSON (has \"installed\"/\"web\" key) — you need a service-account JSON instead"
+            : null,
+        ]
+          .filter(Boolean)
+          .join("; ")
+        throw new Error(`Invalid JSON in GOOGLE_SERVICE_ACCOUNT_KEY (${detail}). Original: ${parseError instanceof Error ? parseError.message : parseError}`)
+      }
+
+      // Fix common private_key encoding issue: literal \n strings → real newlines
+      if (credentials.private_key && typeof credentials.private_key === "string") {
+        credentials.private_key = credentials.private_key.replace(/\\n/g, "\n")
+      }
+
+      // Sanity check the shape
+      if (!credentials.client_email || !credentials.private_key) {
+        const missing = [
+          !credentials.client_email && "client_email",
+          !credentials.private_key && "private_key",
+        ]
+          .filter(Boolean)
+          .join(", ")
+        const isOAuthClient = credentials.type !== "service_account" && credentials.type !== undefined
+        throw new Error(
+          `GOOGLE_SERVICE_ACCOUNT_KEY parsed but is missing required fields: ${missing}. ${
+            isOAuthClient
+              ? `Found type="${credentials.type}" — this is not a service-account key. Download a fresh JSON key from GCP IAM → Service Accounts → Keys.`
+              : "Expected a Google Cloud service-account JSON key."
+          }`,
+        )
       }
 
       analyticsDataClient = new BetaAnalyticsDataClient({
-        credentials,
-        projectId: process.env.GCP_PROJECT_ID,
+        credentials: credentials as { client_email: string; private_key: string },
+        projectId: process.env.GCP_PROJECT_ID || credentials.project_id,
       })
 
       console.log("[GA4] Analytics client initialized successfully")

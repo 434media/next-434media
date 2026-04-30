@@ -207,16 +207,6 @@ export interface SOPsResponse {
   total: number
 }
 
-// ============================================
-// Airtable to Firestore Mapping
-// ============================================
-export const PM_AIRTABLE_TO_FIRESTORE_MAP: Record<string, string> = {
-  'Events': 'pm_events',
-  'Vendors': 'pm_vendors',
-  'Speakers': 'pm_speakers',
-  'SOPs': 'pm_sops',
-} as const
-
 // Categories for vendors
 export const VENDOR_CATEGORIES = [
   'Catering',

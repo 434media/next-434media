@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { ChevronLeft } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 
 // Loading skeleton component
@@ -143,16 +142,6 @@ export default function UnifiedAnalyticsPage() {
       {/* Mobile Tab Bar - Fixed at bottom on mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-neutral-200 safe-area-pb shadow-lg">
         <nav className="flex justify-around py-1.5">
-          {/* Back to Admin */}
-          <Link
-            href="/admin"
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors text-neutral-600 hover:text-neutral-900"
-          >
-            <span className="p-1.5 rounded-lg">
-              <ChevronLeft className="w-5 h-5 text-neutral-600" />
-            </span>
-            <span className="text-[9px] font-medium">Admin</span>
-          </Link>
           {tabs.map((t) => {
             const Icon = t.icon
             const active = activeTab === t.key
@@ -178,15 +167,6 @@ export default function UnifiedAnalyticsPage() {
         {/* Sidebar - Desktop only, always visible with full opacity */}
         <aside className="hidden md:flex flex-col w-20 lg:w-64 border-r border-neutral-200 bg-white">
           <div className="p-4 lg:px-6 lg:py-6 flex flex-col gap-6 sticky top-16 z-10">
-            {/* Back to Admin */}
-            <Link
-              href="/admin"
-              className="flex items-center justify-center lg:justify-start gap-2 text-neutral-700 hover:text-neutral-900 transition-colors duration-200 text-sm font-medium"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              <span className="hidden lg:inline">Back to Admin</span>
-            </Link>
-            
             <div className="space-y-1">
               <h2 className="hidden lg:block text-sm uppercase tracking-wider text-neutral-700 font-semibold">Analytics</h2>
               <p className="hidden lg:block text-xs text-neutral-500 leading-relaxed">Unified dashboards for web, social, and email.</p>

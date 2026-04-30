@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import {
-  ChevronLeft,
   Loader2,
   Download,
   Mail,
@@ -17,7 +16,6 @@ import {
   Trash2,
   Globe,
   Users,
-  Database,
   MessageSquare,
   X,
   Phone,
@@ -78,11 +76,39 @@ interface Toast {
 
 type ActiveTab = "emails" | "contact-forms" | "events"
 
+const VALID_TABS = new Set<ActiveTab>(["emails", "contact-forms", "events"])
+
 // ── Main Component ──
 
 export default function EmailListsPage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("contact-forms")
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const tabParam = searchParams?.get("tab") as ActiveTab | null
+  const initialTab: ActiveTab = tabParam && VALID_TABS.has(tabParam) ? tabParam : "contact-forms"
+  const initialSearch = searchParams?.get("search") ?? ""
+  const initialEvent = searchParams?.get("event") ?? ""
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab)
   const [toast, setToast] = useState<Toast | null>(null)
+
+  const switchTab = (next: ActiveTab) => {
+    setActiveTab(next)
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("tab", next)
+    // Drop search/event when switching to keep URLs clean
+    params.delete("search")
+    params.delete("event")
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  // Sync activeTab when URL changes (e.g., user navigates back/forward)
+  useEffect(() => {
+    if (tabParam && VALID_TABS.has(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam])
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -94,7 +120,7 @@ export default function EmailListsPage() {
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
-      <div className="min-dvh bg-neutral-50 text-neutral-900 pt-20 md:pt-16">
+      <div className="min-dvh bg-neutral-50 text-neutral-900">
         {/* Toast */}
         {toast && (
           <div className="fixed top-20 right-4 z-50 animate-in fade-in slide-in-from-top-2">
@@ -125,28 +151,18 @@ export default function EmailListsPage() {
         <header className="bg-white border-b border-neutral-200 sticky top-0 z-30">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-14">
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/admin"
-                  className="flex items-center gap-1.5 text-neutral-400 hover:text-neutral-700 transition-colors text-sm font-medium tracking-wide"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Admin
-                </Link>
-                <div className="h-5 w-px bg-neutral-200 hidden sm:block" />
-                <div className="hidden sm:flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-neutral-600" />
-                  <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
-                    LEADS & REGISTRATIONS
-                  </h1>
-                </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-neutral-600" />
+                <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
+                  LEADS & REGISTRATIONS
+                </h1>
               </div>
             </div>
 
             {/* Tab Navigation */}
             <nav className="flex gap-0 -mb-px">
               <button
-                onClick={() => setActiveTab("contact-forms")}
+                onClick={() => switchTab("contact-forms")}
                 className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
                   activeTab === "contact-forms"
                     ? "text-neutral-900"
@@ -162,7 +178,7 @@ export default function EmailListsPage() {
                 )}
               </button>
               <button
-                onClick={() => setActiveTab("events")}
+                onClick={() => switchTab("events")}
                 className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
                   activeTab === "events"
                     ? "text-neutral-900"
@@ -178,7 +194,7 @@ export default function EmailListsPage() {
                 )}
               </button>
               <button
-                onClick={() => setActiveTab("emails")}
+                onClick={() => switchTab("emails")}
                 className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
                   activeTab === "emails"
                     ? "text-neutral-900"
@@ -200,11 +216,11 @@ export default function EmailListsPage() {
         {/* Tab Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           {activeTab === "contact-forms" ? (
-            <ContactFormsTab setToast={setToast} />
+            <ContactFormsTab setToast={setToast} initialSearch={initialSearch} />
           ) : activeTab === "events" ? (
-            <EventRegistrationsTab setToast={setToast} />
+            <EventRegistrationsTab setToast={setToast} initialSearch={initialSearch} initialEvent={initialEvent} />
           ) : (
-            <EmailListsTab setToast={setToast} />
+            <EmailListsTab setToast={setToast} initialSearch={initialSearch} />
           )}
         </main>
       </div>
@@ -216,16 +232,18 @@ export default function EmailListsPage() {
 
 function EmailListsTab({
   setToast,
+  initialSearch = "",
 }: {
   setToast: (t: Toast | null) => void
+  initialSearch?: string
 }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [signups, setSignups] = useState<EmailSignup[]>([])
   const [sources, setSources] = useState<string[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
-  const [selectedSource, setSelectedSource] = useState<string>("AIM")
-  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedSource, setSelectedSource] = useState<string>(initialSearch ? "" : "AIM")
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDownloading, setIsDownloading] = useState(false)
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -806,8 +824,10 @@ function EmailListsTab({
 
 function ContactFormsTab({
   setToast,
+  initialSearch = "",
 }: {
   setToast: (t: Toast | null) => void
+  initialSearch?: string
 }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -815,17 +835,9 @@ function ContactFormsTab({
   const [sources, setSources] = useState<string[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [selectedSource, setSelectedSource] = useState<string>("")
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [isMigrating, setIsMigrating] = useState(false)
-  const [migrationResults, setMigrationResults] = useState<{
-    total: number
-    migrated: number
-    skipped: number
-    errors: number
-    details?: Record<string, { total: number; migrated: number; skipped: number; errors: number }>
-  } | null>(null)
   const [selectedSubmission, setSelectedSubmission] = useState<ContactFormSubmission | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -943,35 +955,6 @@ function ContactFormsTab({
     setIsEditing(true)
   }
 
-  const handleMigration = async () => {
-    if (!confirm("Migrate contact form data from Airtable (434Form, AIMForm, VemosForm) to Firestore? Existing entries will be skipped.")) return
-    try {
-      setIsMigrating(true)
-      setMigrationResults(null)
-      const res = await fetch("/api/admin/contact-forms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "migrate" }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setMigrationResults(data.results)
-        setToast({
-          message: `Migration complete: ${data.results.migrated} forms migrated`,
-          type: "success",
-        })
-        await fetchSourcesAndCounts()
-        await fetchSubmissions(selectedSource || undefined)
-      } else {
-        setToast({ message: data.error || "Migration failed", type: "error" })
-      }
-    } catch {
-      setToast({ message: "Migration failed", type: "error" })
-    } finally {
-      setIsMigrating(false)
-    }
-  }
-
   const handleDownloadCSV = async () => {
     try {
       setIsDownloading(true)
@@ -1021,8 +1004,6 @@ function ContactFormsTab({
     ? counts[selectedSource] || 0
     : Object.values(counts).reduce((a, b) => a + b, 0)
 
-  const hasNoData = !isLoading && sources.length === 0 && submissions.length === 0
-
   return (
     <div>
       {/* Page header */}
@@ -1058,79 +1039,6 @@ function ContactFormsTab({
           </button>
         </div>
       </div>
-
-      {/* Migration Section — shown when no data or explicitly needed */}
-      {hasNoData && (
-        <div className="bg-white rounded-xl border border-neutral-200 p-5 sm:p-6 mb-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <Database className="w-4 h-4 text-neutral-600" />
-            <h3 className="text-[13px] font-semibold text-neutral-800 tracking-wide">
-              Airtable → Firestore Migration
-            </h3>
-          </div>
-          <p className="text-[12px] text-neutral-400 font-normal leading-relaxed mb-4">
-            Migrate contact form submissions from Airtable (434Form, AIMForm, VemosForm) to Firestore.
-            Duplicate entries are automatically skipped.
-          </p>
-          <button
-            onClick={handleMigration}
-            disabled={isMigrating}
-            className="flex items-center gap-2 px-4 py-2.5 bg-neutral-800 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isMigrating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Database className="w-4 h-4" />
-            )}
-            Migrate Contact Forms
-          </button>
-
-          {migrationResults && (
-            <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-                <span className="text-[13px] font-semibold text-neutral-800">Migration Complete</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
-                <div className="bg-white p-2.5 rounded-lg border border-neutral-200">
-                  <div className="text-neutral-400 font-medium">Total</div>
-                  <div className="text-neutral-900 font-bold text-lg leading-tight mt-0.5">
-                    {migrationResults.total}
-                  </div>
-                </div>
-                <div className="bg-white p-2.5 rounded-lg border border-neutral-200">
-                  <div className="text-neutral-400 font-medium">Migrated</div>
-                  <div className="text-green-600 font-bold text-lg leading-tight mt-0.5">
-                    {migrationResults.migrated}
-                  </div>
-                </div>
-                <div className="bg-white p-2.5 rounded-lg border border-neutral-200">
-                  <div className="text-neutral-400 font-medium">Skipped</div>
-                  <div className="text-amber-600 font-bold text-lg leading-tight mt-0.5">
-                    {migrationResults.skipped}
-                  </div>
-                </div>
-                <div className="bg-white p-2.5 rounded-lg border border-neutral-200">
-                  <div className="text-neutral-400 font-medium">Errors</div>
-                  <div className="text-red-600 font-bold text-lg leading-tight mt-0.5">
-                    {migrationResults.errors}
-                  </div>
-                </div>
-              </div>
-              {migrationResults.details && (
-                <div className="mt-3 space-y-1">
-                  {Object.entries(migrationResults.details).map(([source, detail]) => (
-                    <div key={source} className="text-[11px] text-neutral-500 font-normal">
-                      <span className="font-semibold text-neutral-700">{source}:</span>{" "}
-                      {detail.migrated} migrated, {detail.skipped} skipped
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Source Stats Cards */}
       {Object.keys(counts).length > 0 && (
@@ -1685,15 +1593,19 @@ function ContactFormsTab({
 
 function EventRegistrationsTab({
   setToast,
+  initialSearch = "",
+  initialEvent = "",
 }: {
   setToast: (t: Toast | null) => void
+  initialSearch?: string
+  initialEvent?: string
 }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [registrations, setRegistrations] = useState<EventRegistration[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
-  const [selectedEvent, setSelectedEvent] = useState<string>("")
-  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedEvent, setSelectedEvent] = useState<string>(initialEvent)
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDownloading, setIsDownloading] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null)

@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { TEAM_MEMBERS } from "./types"
 import type { TeamMember } from "./types"
+import { Customer360Panel } from "./Customer360Panel"
 
 interface ContactFormData {
   id: string
@@ -56,6 +57,8 @@ interface ClientFormModalProps {
   onFormChange: (data: ClientFormData) => void
   onSave: () => void
   onClose: () => void
+  /** When set (and isEditing is true), enables the "360 view" tab. */
+  clientId?: string | null
 }
 
 // Generate unique ID for new contacts
@@ -72,10 +75,18 @@ export function ClientFormModal({
   onFormChange,
   onSave,
   onClose,
+  clientId,
 }: ClientFormModalProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
+  const [activeTab, setActiveTab] = useState<"edit" | "360">("edit")
+  const showCustomer360Tab = isEditing && !!clientId
+
+  // Reset to edit tab whenever the modal opens for a new client
+  useEffect(() => {
+    if (isOpen) setActiveTab("edit")
+  }, [isOpen, clientId])
 
   // Fetch team members from Firestore
   const fetchTeamMembers = useCallback(async () => {
@@ -233,8 +244,46 @@ export function ClientFormModal({
               </button>
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+            {showCustomer360Tab && (
+              <div className="flex border-b border-gray-200 bg-white px-4 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("edit")}
+                  className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
+                    activeTab === "edit"
+                      ? "border-blue-600 text-blue-700"
+                      : "border-transparent text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  Edit details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("360")}
+                  className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
+                    activeTab === "360"
+                      ? "border-blue-600 text-blue-700"
+                      : "border-transparent text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  Customer 360
+                </button>
+              </div>
+            )}
+
+            {/* Customer 360 Tab */}
+            {showCustomer360Tab && activeTab === "360" && (
+              <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <Customer360Panel clientId={clientId!} />
+              </div>
+            )}
+
+            {/* Scrollable Content (edit tab) */}
+            <div
+              className={`flex-1 overflow-y-auto p-4 space-y-5 ${
+                showCustomer360Tab && activeTab !== "edit" ? "hidden" : ""
+              }`}
+            >
               {/* Client Name - Primary Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">

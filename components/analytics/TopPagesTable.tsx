@@ -5,12 +5,14 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { FileText, ExternalLink, Loader2, Eye } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
+import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface TopPagesTableProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
   propertyId?: string
+  useSnapshot?: boolean
 }
 
 export function TopPagesTable({
@@ -18,6 +20,7 @@ export function TopPagesTable({
   isLoading: parentLoading = false,
   setError,
   propertyId,
+  useSnapshot,
 }: TopPagesTableProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -26,10 +29,7 @@ export function TopPagesTable({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        let url = `/api/analytics?endpoint=toppages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-        if (propertyId) {
-          url += `&propertyId=${propertyId}`
-        }
+        const url = buildAnalyticsUrl({ endpoint: "toppages", dateRange, propertyId, useSnapshot })
 
         const response = await fetch(url)
 
@@ -50,7 +50,7 @@ export function TopPagesTable({
     }
 
     loadData()
-  }, [dateRange, setError, propertyId])
+  }, [dateRange, setError, propertyId, useSnapshot])
 
   const totalViews = data.reduce((sum, page) => sum + page.pageViews, 0)
 

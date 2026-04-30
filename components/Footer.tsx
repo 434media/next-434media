@@ -2,14 +2,21 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
+import { usePathname } from "next/navigation"
 import { ScrambleText } from "./ScrambleText"
 import { Newsletter } from "./Newsletter"
 import Link from "next/link"
 
 export default function Footer() {
+  const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(false)
   const footerRef = useRef<HTMLElement>(null)
   const currentYear = new Date().getFullYear()
+
+  // Hide the public footer on admin routes
+  if (pathname?.startsWith("/admin")) {
+    return null
+  }
 
   const navLinks = [
     { label: "Work", href: "/work" },

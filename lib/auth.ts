@@ -1,7 +1,23 @@
 import { cookies } from 'next/headers'
 
 export type AuthProvider = 'google' | 'firebase'
-export type AdminRole = 'full_admin' | 'crm_only'
+export type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only'
+
+/**
+ * Hardcoded fallback list of CRM super admins. Used when the Firestore
+ * `crm_team_members.role` field hasn't been backfilled yet — guarantees
+ * Marcos and Jesse can always reach the settings page even on a brand-new
+ * environment. Once the backfill runs, role lookups read from Firestore.
+ */
+export const CRM_SUPER_ADMIN_FALLBACK = [
+  'marcos@434media.com',
+  'jesse@434media.com',
+]
+
+export function isCrmSuperAdminFromFallback(email?: string | null): boolean {
+  if (!email) return false
+  return CRM_SUPER_ADMIN_FALLBACK.includes(email.toLowerCase())
+}
 
 export interface User {
   email: string
@@ -138,4 +154,31 @@ export function isAuthorizedAdmin(email: string): boolean {
   // Google Workspace: restricted at OAuth callback level to @434media.com
   // Firebase: restricted by who is added in Firebase Console
   return !!email
+}
+
+/**
+ * Async super-admin check. Reads the `role` field from `crm_team_members`
+ * in Firestore. Falls back to `CRM_SUPER_ADMIN_FALLBACK` if Firestore
+ * lookup fails or the user has no record yet.
+ *
+ * Server-side only — uses firebase-admin SDK.
+ */
+export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
+  if (!email) return false
+  const lower = email.toLowerCase()
+  if (isCrmSuperAdminFromFallback(lower)) return true
+  try {
+    // Lazy import to keep this auth lib usable from edge runtime contexts
+    const { getDb } = await import('./firebase-admin')
+    const snap = await getDb()
+      .collection('crm_team_members')
+      .where('email', '==', lower)
+      .limit(1)
+      .get()
+    if (snap.empty) return false
+    return snap.docs[0].data().role === 'crm_super_admin'
+  } catch (error) {
+    console.error('[auth] isCrmSuperAdmin Firestore lookup failed; using fallback:', error)
+    return isCrmSuperAdminFromFallback(lower)
+  }
 }

@@ -8,12 +8,14 @@ import { ChartContainer, ChartTooltip } from "./Chart"
 import { XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart } from "recharts"
 import { TrendingUp, Loader2, Calendar } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
+import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface PageViewsChartProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
   propertyId?: string
+  useSnapshot?: boolean
 }
 
 export function PageViewsChart({
@@ -21,6 +23,7 @@ export function PageViewsChart({
   isLoading: parentLoading = false,
   setError,
   propertyId,
+  useSnapshot,
 }: PageViewsChartProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -88,10 +91,7 @@ export function PageViewsChart({
           propertyId,
         })
 
-        let url = `/api/analytics?endpoint=daily-metrics&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-        if (propertyId) {
-          url += `&propertyId=${propertyId}`
-        }
+        const url = buildAnalyticsUrl({ endpoint: "daily-metrics", dateRange, propertyId, useSnapshot })
 
         const response = await fetch(url)
 
@@ -153,7 +153,7 @@ export function PageViewsChart({
     }
 
     loadData()
-  }, [dateRange.startDate, dateRange.endDate, dateRange.label, setError, propertyId])
+  }, [dateRange.startDate, dateRange.endDate, dateRange.label, setError, propertyId, useSnapshot])
 
   return (
     <div className="w-full max-w-full min-w-0">

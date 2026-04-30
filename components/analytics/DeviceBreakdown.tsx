@@ -6,12 +6,14 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, } from "./Card"
 import { Smartphone, Monitor, Loader2, Tablet } from "lucide-react"
 import type { DateRange } from "../../types/analytics"
+import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface DeviceBreakdownProps {
   dateRange: DateRange
   isLoading?: boolean
   setError: React.Dispatch<React.SetStateAction<string | null>>
   propertyId?: string
+  useSnapshot?: boolean
 }
 
 const getDeviceIcon = (device: string) => {
@@ -42,6 +44,7 @@ export function DeviceBreakdown({
   isLoading: parentLoading = false,
   setError,
   propertyId,
+  useSnapshot,
 }: DeviceBreakdownProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -51,10 +54,7 @@ export function DeviceBreakdown({
     const loadData = async () => {
       setIsLoading(true)
       try {
-        let url = `/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-        if (propertyId) {
-          url += `&propertyId=${propertyId}`
-        }
+        const url = buildAnalyticsUrl({ endpoint: "devices", dateRange, propertyId, useSnapshot })
 
         const response = await fetch(url)
 
@@ -77,7 +77,7 @@ export function DeviceBreakdown({
     }
 
     loadData()
-  }, [dateRange, setError, propertyId])
+  }, [dateRange, setError, propertyId, useSnapshot])
 
   const totalSessions = data.reduce((sum, item) => sum + item.sessions, 0)
 

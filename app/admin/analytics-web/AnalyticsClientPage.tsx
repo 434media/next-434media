@@ -9,6 +9,7 @@ import { TrafficSourcesChart } from "@/components/analytics/TrafficSourcesChart"
 import { DeviceBreakdown } from "@/components/analytics/DeviceBreakdown"
 import { GeographicMap } from "@/components/analytics/GeographicMap"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
+import { DataSourceBanner } from "@/components/analytics/DataSourceBanner"
 import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "@/types/analytics"
 
 // Download analytics summary as CSV
@@ -490,6 +491,9 @@ export default function AnalyticsClientPage() {
   const [availableProperties, setAvailableProperties] = useState<AnalyticsProperty[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<AnalyticsConnectionStatus | null>(null)
+  const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
+  const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
+  const useSnapshot = dataSource === "snapshot"
 
   // Load properties on component mount
   useEffect(() => {
@@ -648,6 +652,16 @@ export default function AnalyticsClientPage() {
 
           {/* Analytics Dashboard - Always show components */}
           <>
+            <div className="mb-4">
+              <DataSourceBanner
+                dataSource={dataSource}
+                snapshotMeta={snapshotMeta}
+                onToggle={(next) => {
+                  setSnapshotMeta(null)
+                  setDataSource(next)
+                }}
+              />
+            </div>
             {/* Metrics Overview */}
             <div className="py-4 sm:py-6 relative z-10">
               <div className="flex items-center gap-2 mb-4 sm:mb-5">
@@ -659,6 +673,8 @@ export default function AnalyticsClientPage() {
                 isLoading={isLoading}
                 setError={setError}
                 propertyId={selectedPropertyId}
+                useSnapshot={useSnapshot}
+                onSnapshotMeta={setSnapshotMeta}
               />
             </div>
 
@@ -674,6 +690,7 @@ export default function AnalyticsClientPage() {
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
+                  useSnapshot={useSnapshot}
                 />
               </div>
             </div>
@@ -690,6 +707,7 @@ export default function AnalyticsClientPage() {
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
+                  useSnapshot={useSnapshot}
                 />
               </div>
 
@@ -703,6 +721,7 @@ export default function AnalyticsClientPage() {
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
+                  useSnapshot={useSnapshot}
                 />
               </div>
             </div>
@@ -719,6 +738,7 @@ export default function AnalyticsClientPage() {
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
+                  useSnapshot={useSnapshot}
                 />
               </div>
 
@@ -732,6 +752,7 @@ export default function AnalyticsClientPage() {
                   isLoading={isLoading}
                   setError={setError}
                   propertyId={selectedPropertyId}
+                  useSnapshot={useSnapshot}
                 />
               </div>
             </div>

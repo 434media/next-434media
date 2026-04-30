@@ -3,7 +3,6 @@
 import { useState, type Dispatch, type SetStateAction } from "react"
 import {
   TEAM_MEMBERS,
-  getTaskOwner,
 } from "../components/crm/types"
 import type {
   Task,
@@ -237,8 +236,7 @@ export function useTaskHandlers({
 
     setIsSavingTask(true)
     try {
-      const owner = getTaskOwner(selectedTask.assigned_to)
-      const response = await fetch(`/api/admin/crm/tasks?id=${selectedTask.id}&owner=${owner}`, {
+      const response = await fetch(`/api/admin/crm/tasks?id=${selectedTask.id}`, {
         method: "DELETE",
         credentials: "include",
       })
@@ -280,7 +278,6 @@ export function useTaskHandlers({
 
     setIsSavingTask(true)
     try {
-      const owner = getTaskOwner(taskForm.assigned_to)
       const isNewTask = !selectedTask.id
 
       // Track who needs to be notified
@@ -307,7 +304,6 @@ export function useTaskHandlers({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            owner,
             ...taskForm,
             created_by: currentUser?.name || currentUser?.email || "Unknown",
             attachments: taskAttachments,
@@ -372,16 +368,12 @@ export function useTaskHandlers({
           if (!previousTaggedUsers.includes(email) && email !== currentUser?.email) taggedToNotify.push(email)
         }
 
-        let updateOwner = owner
-        if (selectedTask.status === "completed") updateOwner = "completed"
-
         const response = await fetch("/api/admin/crm/tasks", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
             id: selectedTask.id,
-            owner: updateOwner,
             ...taskForm,
           }),
         })
@@ -521,12 +513,11 @@ export function useTaskHandlers({
         setTaskAttachments(updatedAttachments)
 
         if (selectedTask.id) {
-          const owner = getTaskOwner(selectedTask.assigned_to)
           await fetch("/api/admin/crm/tasks", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ id: selectedTask.id, owner, attachments: updatedAttachments }),
+            body: JSON.stringify({ id: selectedTask.id, attachments: updatedAttachments }),
           })
           setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
           setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t))
@@ -561,12 +552,11 @@ export function useTaskHandlers({
 
     if (selectedTask.id) {
       try {
-        const owner = getTaskOwner(selectedTask.assigned_to)
         await fetch("/api/admin/crm/tasks", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ id: selectedTask.id, owner, attachments: updatedAttachments }),
+          body: JSON.stringify({ id: selectedTask.id, attachments: updatedAttachments }),
         })
         setSelectedTask({ ...selectedTask, attachments: updatedAttachments })
         setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, attachments: updatedAttachments } : t))
@@ -640,12 +630,11 @@ export function useTaskHandlers({
         setTaskAttachments(updatedAttachments)
 
         if (selectedTask.id) {
-          const owner = getTaskOwner(selectedTask.assigned_to)
           await fetch("/api/admin/crm/tasks", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ id: selectedTask.id, owner, attachments: updatedAttachments }),
+            body: JSON.stringify({ id: selectedTask.id, attachments: updatedAttachments }),
           })
         }
 
@@ -667,14 +656,11 @@ export function useTaskHandlers({
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
 
     try {
-      let owner = getTaskOwner(task.assigned_to)
-      if (task.status === "completed") owner = "completed"
-
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: taskId, owner, status: newStatus }),
+        body: JSON.stringify({ id: taskId, status: newStatus }),
       })
       if (!response.ok) throw new Error("Failed to update status")
 
@@ -699,7 +685,6 @@ export function useTaskHandlers({
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
 
-    const owner = getTaskOwner(task.assigned_to)
     const wasClosedWon = task.disposition === "closed_won"
     const shouldAutoSetDocTo100 = disposition === "closed_won" && task.is_opportunity
     const shouldAutoSetDocTo25 = task.is_opportunity && (wasClosedWon && disposition === "pitched" || disposition === "closed_lost")
@@ -709,8 +694,8 @@ export function useTaskHandlers({
     else if (shouldAutoSetDocTo25) docValue = "25" as DOC
 
     try {
-      const updatePayload: { id: string; owner: string; disposition: Disposition; doc?: DOC } = {
-        id: taskId, owner, disposition,
+      const updatePayload: { id: string; disposition: Disposition; doc?: DOC } = {
+        id: taskId, disposition,
       }
       if (docValue) updatePayload.doc = docValue
 
@@ -811,12 +796,11 @@ export function useTaskHandlers({
     }
 
     try {
-      const owner = getTaskOwner(selectedTask.assigned_to)
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: selectedTask.id, owner, comments: updatedComments }),
+        body: JSON.stringify({ id: selectedTask.id, comments: updatedComments }),
       })
       if (!response.ok) throw new Error("Failed to save comment")
 
@@ -857,12 +841,11 @@ export function useTaskHandlers({
     }
 
     try {
-      const owner = getTaskOwner(selectedTask.assigned_to)
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: selectedTask.id, owner, comments: updatedComments }),
+        body: JSON.stringify({ id: selectedTask.id, comments: updatedComments }),
       })
       if (!response.ok) throw new Error("Failed to delete comment")
 
@@ -893,12 +876,11 @@ export function useTaskHandlers({
     }
 
     try {
-      const owner = getTaskOwner(selectedTask.assigned_to)
       const response = await fetch("/api/admin/crm/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: selectedTask.id, owner, comments: updatedComments }),
+        body: JSON.stringify({ id: selectedTask.id, comments: updatedComments }),
       })
       if (!response.ok) throw new Error("Failed to update comment")
 

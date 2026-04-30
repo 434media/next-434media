@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { InstagramAnalyticsHeader } from "@/components/instagram/InstagramAnalyticsHeader"
+import { DataSourceBanner } from "@/components/analytics/DataSourceBanner"
 import { InstagramKeyMetrics } from "@/components/instagram/InstagramKeyMetrics"
 import { InstagramTopPostsTable } from "@/components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "@/components/instagram/InstagramAccountInfo"
@@ -447,10 +448,14 @@ export default function InstagramAnalyticsClientPage() {
   // New analytics data states
   const [reachBreakdownData, setReachBreakdownData] = useState<InstagramReachBreakdownType | null>(null)
 
+  // Snapshot vs live toggle (snapshot serves cached account-info + media instantly)
+  const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
+  const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
+
   // Load Instagram data on component mount and when date range or account changes
   useEffect(() => {
     loadInstagramData()
-  }, [dateRange, selectedAccount])
+  }, [dateRange, selectedAccount, dataSource])
 
   // Handle account change
   const handleAccountChange = (accountId: string) => {
@@ -509,11 +514,21 @@ export default function InstagramAnalyticsClientPage() {
       const startDate = getStartDateForRange(dateRange)
       const endDate = "today"
 
+      // account-info and media can come from snapshot (instant); insights still hits live
+      const accountUrl =
+        dataSource === "snapshot"
+          ? `/api/instagram/snapshot?account=${selectedAccount}&endpoint=account-info`
+          : `${apiRoute}?endpoint=account-info`
+      const mediaUrl =
+        dataSource === "snapshot"
+          ? `/api/instagram/snapshot?account=${selectedAccount}&endpoint=media`
+          : `${apiRoute}?endpoint=media`
+
       // Fetch data with individual error handling - don't fail entirely if one request fails
       const [accountRes, insightsRes, mediaRes] = await Promise.all([
-        fetch(`${apiRoute}?endpoint=account-info`).catch(() => null),
+        fetch(accountUrl).catch(() => null),
         fetch(`${apiRoute}?endpoint=insights&startDate=${startDate}&endDate=${endDate}`).catch(() => null),
-        fetch(`${apiRoute}?endpoint=media`).catch(() => null),
+        fetch(mediaUrl).catch(() => null),
       ])
 
       // Process account data
@@ -523,8 +538,25 @@ export default function InstagramAnalyticsClientPage() {
           if (accountResult.data) {
             setAccountData(accountResult.data)
           }
+          if (accountResult._snapshot) {
+            setSnapshotMeta({
+              snapshotDate: accountResult._snapshot.snapshotDate,
+              generatedAt: accountResult._snapshot.generatedAt,
+            })
+          }
         } catch {
           console.warn("Failed to parse account data")
+        }
+      } else if (accountRes && !accountRes.ok && dataSource === "snapshot") {
+        // Snapshot may not exist yet — fall back to live for account-info
+        try {
+          const liveRes = await fetch(`${apiRoute}?endpoint=account-info`)
+          if (liveRes.ok) {
+            const liveResult = await liveRes.json()
+            if (liveResult.data) setAccountData(liveResult.data)
+          }
+        } catch {
+          // ignore
         }
       }
 
@@ -540,10 +572,20 @@ export default function InstagramAnalyticsClientPage() {
         }
       }
 
-      // Process media data
-      if (mediaRes?.ok) {
+      // Snapshot fallback for media if needed
+      let effectiveMediaRes: Response | null = mediaRes ?? null
+      if (mediaRes && !mediaRes.ok && dataSource === "snapshot") {
         try {
-          const mediaResult = await mediaRes.json()
+          effectiveMediaRes = await fetch(`${apiRoute}?endpoint=media`)
+        } catch {
+          effectiveMediaRes = null
+        }
+      }
+
+      // Process media data
+      if (effectiveMediaRes?.ok) {
+        try {
+          const mediaResult = await effectiveMediaRes.json()
           if (mediaResult.data) {
             const transformedMedia: InstagramMediaWithInsights[] = (mediaResult.data || []).map((media: any) => ({
               id: media.id,
@@ -576,7 +618,7 @@ export default function InstagramAnalyticsClientPage() {
         } catch {
           console.warn("Failed to parse media data")
         }
-      } else if (mediaRes && !mediaRes.ok) {
+      } else if (effectiveMediaRes && !effectiveMediaRes.ok) {
         // Log media fetch failure but don't throw - other data may still be useful
         console.warn("Media fetch returned error, continuing with other data")
       }
@@ -674,6 +716,16 @@ export default function InstagramAnalyticsClientPage() {
 
       <div className="py-4 sm:py-6 w-full overflow-x-hidden">
         <div className="px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
+          <div className="mb-4">
+            <DataSourceBanner
+              dataSource={dataSource}
+              snapshotMeta={snapshotMeta}
+              onToggle={(next) => {
+                setSnapshotMeta(null)
+                setDataSource(next)
+              }}
+            />
+          </div>
           {/* Error Display */}
           {error && (
             <div className="mb-4">

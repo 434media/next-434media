@@ -10,8 +10,7 @@ import { Marked } from 'marked'
 import { Toast } from "@/components/crm/Toast"
 import type { Toast as ToastType, CurrentUser, TeamMember } from "@/components/crm/types"
 import { TEAM_MEMBERS } from "@/components/crm/types"
-import { Loader2, Send, ArrowLeft, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Sparkles, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
-import Link from "next/link"
+import { Loader2, Send, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Sparkles, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
 import { RichTextEditor } from "@/components/RichTextEditor"
 import { ImageUpload } from "@/components/ImageUpload"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
@@ -1154,18 +1153,12 @@ export default function FeedFormPage() {
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
-    <div className="container mx-auto py-10 px-4 sm:px-6 pt-32 md:pt-24 max-w-7xl overflow-hidden">
+    <div className="container mx-auto py-6 px-4 sm:px-6 max-w-7xl overflow-hidden">
       {/* Toast Notification */}
       <Toast toast={toast} />
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
         <div className="mb-8">
-          <Link href="/admin">
-            <Button variant="outline" className="mb-6 hover:bg-neutral-50">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Admin
-            </Button>
-          </Link>
           <div className="">
             <h1 className="max-w-3xl uppercase text-5xl md:text-6xl mb-3 font-black md:font-menda-black tracking-tight">
               The Feed

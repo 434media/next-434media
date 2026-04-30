@@ -1,9 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import {
-  ChevronLeft,
   Loader2,
   BarChart3,
   Target,
@@ -26,7 +24,6 @@ import {
   OpportunityFormModal,
   TaskModal,
   ContentFormModal,
-  NotificationBell,
   LinkedTasksPanel,
 } from "@/components/crm"
 
@@ -441,13 +438,18 @@ export default function SalesCRMPage() {
     }
   }, [toast])
 
-  // Check for task to open from notification (from main admin page)
+  // Check for task or content post to open from notification (from admin top bar)
   useEffect(() => {
     if (!isLoading && tasks.length > 0) {
       const storedTaskId = sessionStorage.getItem("openTaskId")
       if (storedTaskId) {
         sessionStorage.removeItem("openTaskId")
         handleOpenTaskFromNotification(storedTaskId)
+      }
+      const storedContentPostId = sessionStorage.getItem("openContentPostId")
+      if (storedContentPostId) {
+        sessionStorage.removeItem("openContentPostId")
+        handleOpenContentPostFromNotification(storedContentPostId)
       }
     }
   }, [isLoading, tasks])
@@ -499,39 +501,11 @@ export default function SalesCRMPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-full bg-neutral-50 text-neutral-900">
       {/* Toast */}
       <Toast toast={toast} />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
-        {/* Header */}
-        <div className="flex flex-col gap-6 mb-8 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              Back
-            </Link>
-          </div>
-          {/* Notification Bell */}
-          <NotificationBell 
-            onOpenTask={handleOpenTaskFromNotification} 
-            onOpenContentPost={handleOpenContentPostFromNotification}
-          />
-        </div>
-
-        {/* Title */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-ggx88 text-neutral-900 mb-2 tracking-tight">
-            PLATFORM CRM
-          </h1>
-          <p className="text-neutral-500 text-sm sm:text-base">
-            Manage tasks, clients, opportunities, and sales pipeline
-          </p>
-        </div>
-
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-200 pb-4">
           {[
@@ -713,6 +687,7 @@ export default function SalesCRMPage() {
         onFormChange={setClientForm}
         onSave={handleSaveClient}
         onClose={() => setShowClientForm(false)}
+        clientId={editingClient?.id ?? null}
       />
 
       {/* Opportunity Form Modal */}

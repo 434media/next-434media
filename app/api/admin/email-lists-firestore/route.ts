@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
-import { 
-  getEmailSignups, 
-  getEmailSources, 
+import {
+  getEmailSignups,
+  getEmailSources,
   getEmailCountsBySource,
   emailSignupsToCSV,
   deleteEmailSignup,
@@ -34,7 +34,6 @@ export async function GET(request: Request) {
     const action = searchParams.get("action")
     const source = searchParams.get("source")
     const format = searchParams.get("format")
-    const dataSource = searchParams.get("dataSource") || "firestore" // "firestore" or "airtable"
 
     const noCacheHeaders = { "Cache-Control": "no-store, no-cache, must-revalidate" }
 
@@ -73,36 +72,11 @@ export async function GET(request: Request) {
       success: true,
       signups,
       total: signups.length,
-      dataSource: "firestore",
     }, { headers: noCacheHeaders })
   } catch (error) {
     console.error("Error in email-lists API:", error)
     return NextResponse.json(
       { success: false, error: "Failed to fetch email signups" },
-      { status: 500 }
-    )
-  }
-}
-
-// POST - No longer needed (migrations complete, data lives in Firestore)
-export async function POST(request: Request) {
-  try {
-    const authResult = await requireAdmin()
-    if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
-    }
-
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: "Airtable migrations have been completed. All email data is now in Firestore." 
-      },
-      { status: 410 }
-    )
-  } catch (error) {
-    console.error("Error in email-lists POST:", error)
-    return NextResponse.json(
-      { success: false, error: "Request failed" },
       { status: 500 }
     )
   }

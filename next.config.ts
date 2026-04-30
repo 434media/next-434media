@@ -31,11 +31,6 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'v5.airtableusercontent.com',
-        pathname: '/**'
-      },
-      {
-        protocol: 'https',
         hostname: '*.public.blob.vercel-storage.com',
         pathname: '/**'
       },

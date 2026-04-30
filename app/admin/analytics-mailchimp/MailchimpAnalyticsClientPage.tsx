@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { MailchimpHeader } from "@/components/mailchimp/MailchimpHeader"
+import { DataSourceBanner } from "@/components/analytics/DataSourceBanner"
 import { MailchimpMetricsOverview } from "@/components/mailchimp/MailchimpMetricsOverview"
 import { MailchimpTopCampaignsTable } from "@/components/mailchimp/MailchimpTopCampaignsTable"
 import { MailchimpTagsOverview } from "@/components/mailchimp/MailchimpTagsOverview"
@@ -43,8 +44,12 @@ export default function MailchimpAnalyticsClientPage() {
   const [selectedAudienceId, setSelectedAudienceId] = useState<string>("")
   const [selectedTag, setSelectedTag] = useState<string>("")
   const [configStatus, setConfigStatus] = useState<any>(null)
+  const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
+  const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+
+  const SNAPSHOT_ENDPOINTS = new Set(["summary", "campaigns", "engagement", "subscribers"])
 
   // Check configuration on component mount
   useEffect(() => {
@@ -54,7 +59,7 @@ export default function MailchimpAnalyticsClientPage() {
   // Fetch data when date range changes
   useEffect(() => {
     fetchAllData()
-  }, [dateRange, selectedAudienceId])
+  }, [dateRange, selectedAudienceId, dataSource])
 
   const fetchConfig = async () => {
     try {
@@ -80,9 +85,10 @@ export default function MailchimpAnalyticsClientPage() {
   }
 
   const fetchData = async (endpoint: string, requiresDateRange = true) => {
+    const useSnapshot = dataSource === "snapshot" && SNAPSHOT_ENDPOINTS.has(endpoint)
     const params = new URLSearchParams({ endpoint })
 
-    if (requiresDateRange) {
+    if (!useSnapshot && requiresDateRange) {
       params.append("startDate", dateRange.startDate)
       params.append("endDate", dateRange.endDate)
     }
@@ -91,11 +97,34 @@ export default function MailchimpAnalyticsClientPage() {
       params.append("audienceId", selectedAudienceId)
     }
 
-    const response = await fetch(`/api/mailchimp?${params}`)
+    const url = useSnapshot ? `/api/mailchimp/snapshot?${params}` : `/api/mailchimp?${params}`
+    const response = await fetch(url)
     const result = await response.json()
 
     if (!result.success) {
+      // Snapshot may not exist yet — fall back to live silently
+      if (useSnapshot && response.status === 404) {
+        const liveParams = new URLSearchParams({ endpoint })
+        if (requiresDateRange) {
+          liveParams.append("startDate", dateRange.startDate)
+          liveParams.append("endDate", dateRange.endDate)
+        }
+        if (selectedAudienceId && selectedAudienceId !== "all") {
+          liveParams.append("audienceId", selectedAudienceId)
+        }
+        const liveResp = await fetch(`/api/mailchimp?${liveParams}`)
+        const liveResult = await liveResp.json()
+        if (!liveResult.success) throw new Error(liveResult.error || `Failed to fetch ${endpoint} data`)
+        return liveResult.data
+      }
       throw new Error(result.error || `Failed to fetch ${endpoint} data`)
+    }
+
+    if (useSnapshot && result.data?._snapshot && !snapshotMeta) {
+      setSnapshotMeta({
+        snapshotDate: result.data._snapshot.snapshotDate,
+        generatedAt: result.data._snapshot.generatedAt,
+      })
     }
 
     return result.data
@@ -578,6 +607,14 @@ export default function MailchimpAnalyticsClientPage() {
 
       {/* Main Content */}
       <div ref={contentRef} className="px-3 sm:px-4 lg:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10 w-full overflow-x-hidden">
+        <DataSourceBanner
+          dataSource={dataSource}
+          snapshotMeta={snapshotMeta}
+          onToggle={(next) => {
+            setSnapshotMeta(null)
+            setDataSource(next)
+          }}
+        />
         {/* Metrics Overview */}
         <div>
           <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">

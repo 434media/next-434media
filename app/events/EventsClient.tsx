@@ -10,7 +10,7 @@ import { EventCardSkeleton, CalendarSkeleton } from "@/components/events/Loading
 import { Toast } from "@/components/events/Toast"
 import { FadeIn } from "@/components/FadeIn"
 
-import { getEventsAction } from "@/actions/events-airtable"
+import { getEventsAction } from "@/actions/events"
 import { Plus, Calendar } from "lucide-react"
 import { isEventUpcoming } from "@/lib/event-utils"
 import { Vortex } from "@/components/vortex"

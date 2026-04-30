@@ -609,31 +609,6 @@ export const CRM_COLLECTIONS = {
   CONTENT_POSTS: "crm_content_posts",
 } as const
 
-// Map Airtable table names to Firestore collections
-export const AIRTABLE_TO_FIRESTORE_MAP: Record<string, string> = {
-  "Client Records": CRM_COLLECTIONS.CLIENT_RECORDS,
-  "Opportunities": CRM_COLLECTIONS.OPPORTUNITIES,
-  "PM Records": CRM_COLLECTIONS.PM_RECORDS,
-  "Budget View": CRM_COLLECTIONS.BUDGET_VIEW,
-  "Master List": CRM_COLLECTIONS.MASTER_LIST,
-  "Daily Summary": CRM_COLLECTIONS.DAILY_SUMMARY,
-  "Jake's Task List": CRM_COLLECTIONS.TASKS_JAKE,
-  "PM Task List": CRM_COLLECTIONS.TASKS_PM,
-  "Marc's Task List": CRM_COLLECTIONS.TASKS_MARC,
-  "Stacy Task List": CRM_COLLECTIONS.TASKS_STACY,
-  "Jesse Task List": CRM_COLLECTIONS.TASKS_JESSE,
-  "Barb Task List": CRM_COLLECTIONS.TASKS_BARB,
-  "Teams Task List": CRM_COLLECTIONS.TASKS_TEAMS,
-  "Completed Task List": CRM_COLLECTIONS.TASKS_COMPLETED,
-  "Closed lost archived leads": CRM_COLLECTIONS.CLOSED_LOST_LEADS,
-  "Closed Won archive leads": CRM_COLLECTIONS.CLOSED_WON_LEADS,
-  "Archived Leads": CRM_COLLECTIONS.ARCHIVED_LEADS,
-  "Platforms": CRM_COLLECTIONS.PLATFORMS,
-  "Sales Rep's": CRM_COLLECTIONS.SALES_REPS,
-  "Barb Pie Chart": CRM_COLLECTIONS.BARB_PIE_CHART,
-  "Pie Slices": CRM_COLLECTIONS.PIE_SLICES,
-}
-
 // Type for CRM Dashboard Stats
 export interface CRMDashboardStats {
   totalClients: number
