@@ -1,6 +1,6 @@
 "use client"
 
-import { Search, Plus, Edit, Trash2, Mail, Phone, Users, Calendar, Building2, Filter, AlertCircle, Clock } from "lucide-react"
+import { Search, Plus, Mail, Phone, Users, Calendar, Filter, AlertCircle, Clock } from "lucide-react"
 import { formatDate, normalizeAssigneeName, TEAM_MEMBERS, getDueDateStatus } from "./types"
 import type { Client } from "./types"
 
@@ -14,7 +14,6 @@ interface ClientsViewProps {
   onAssigneeFilterChange: (assignee: string) => void
   onAddClient: () => void
   onEditClient: (client: Client) => void
-  onDeleteClient: (id: string) => void
 }
 
 export function ClientsView({
@@ -27,7 +26,6 @@ export function ClientsView({
   onAssigneeFilterChange,
   onAddClient,
   onEditClient,
-  onDeleteClient,
 }: ClientsViewProps) {
   // Use only the predefined team members for the dropdown
   // This ensures only full names appear, not partial names from data
@@ -164,18 +162,15 @@ export function ClientsView({
                 <th className="w-[40%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">
                   Primary Contact
                 </th>
-                <th className="w-[20%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell bg-gray-50">
+                <th className="w-[35%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell bg-gray-50">
                   Follow Up
-                </th>
-                <th className="w-[15%] px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">
-                  Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedClients.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={3} className="px-4 py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center gap-2">
                       <Users className="w-8 h-8 text-gray-300" />
                       <p className="text-sm">{clients.length === 0 ? "No clients yet. Add your first client!" : "No clients match your search"}</p>
@@ -188,7 +183,11 @@ export function ClientsView({
                   const contactCount = getContactCount(client)
                   
                   return (
-                    <tr key={client.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr
+                      key={client.id}
+                      onClick={() => onEditClient(client)}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
                       {/* Client */}
                       <td className="px-4 py-3.5">
                         <div className="min-w-0">
@@ -216,13 +215,21 @@ export function ClientsView({
                               )}
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 {primaryContact.email && (
-                                  <a href={`mailto:${primaryContact.email}`} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors">
+                                  <a
+                                    href={`mailto:${primaryContact.email}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                                  >
                                     <Mail className="w-3.5 h-3.5 flex-shrink-0" />
                                     <span className="truncate max-w-[180px]">{primaryContact.email}</span>
                                   </a>
                                 )}
                                 {primaryContact.phone && (
-                                  <a href={`tel:${primaryContact.phone}`} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors">
+                                  <a
+                                    href={`tel:${primaryContact.phone}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors"
+                                  >
                                     <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                                     <span className="whitespace-nowrap">{primaryContact.phone}</span>
                                   </a>
@@ -255,25 +262,6 @@ export function ClientsView({
                         ) : (
                           <span className="text-sm text-gray-400">—</span>
                         )}
-                      </td>
-                      {/* Actions */}
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="inline-flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => onEditClient(client)}
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Edit client"
-                          >
-                            <Edit className="w-4 h-4 text-gray-500" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteClient(client.id)}
-                            className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Delete client"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   )

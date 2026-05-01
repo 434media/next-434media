@@ -954,7 +954,6 @@ export default function SalesCRMPage() {
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}
-            onDeleteClient={handleDeleteClient}
           />
         )}
 
@@ -1040,6 +1039,7 @@ export default function SalesCRMPage() {
         onFormChange={setClientForm}
         onSave={handleSaveClient}
         onClose={() => closeClientDrawer()}
+        onDelete={handleDeleteClient}
         clientId={editingClient?.id ?? null}
       />
 

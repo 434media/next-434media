@@ -57,6 +57,8 @@ interface ClientDetailDrawerProps {
   onFormChange: (data: ClientFormData) => void
   onSave: () => void
   onClose: () => void
+  /** Destructive — only shown when editing an existing client. Confirms before firing. */
+  onDelete?: (id: string) => void | Promise<void>
   /** When set (and isEditing is true), enables the "360 view" tab. */
   clientId?: string | null
 }
@@ -75,6 +77,7 @@ export function ClientDetailDrawer({
   onFormChange,
   onSave,
   onClose,
+  onDelete,
   clientId,
 }: ClientDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
@@ -219,32 +222,51 @@ export function ClientDetailDrawer({
       subtitle={drawerSubtitle}
       width="lg"
       footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={isSaving || !formData.company_name}
-            className="flex items-center gap-2 px-5 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                {isEditing ? "Update Client" : "Add Client"}
-              </>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            {isEditing && onDelete && clientId && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm(`Permanently delete ${formData.company_name || "this client"}? This cannot be undone.`)) return
+                  await onDelete(clientId)
+                  onClose()
+                }}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete
+              </button>
             )}
-          </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={isSaving || !formData.company_name}
+              className="flex items-center gap-2 px-5 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  {isEditing ? "Update Client" : "Add Client"}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       }
     >

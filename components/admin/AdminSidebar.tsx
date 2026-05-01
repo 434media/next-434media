@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
   Home,
   Settings,
+  Globe,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -177,10 +178,10 @@ export function AdminSidebar({
           className="flex items-center gap-2 text-neutral-900 font-ggx88 text-sm tracking-wide"
           onClick={onNavigate}
         >
-          <span className="w-7 h-7 rounded-md bg-neutral-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-            434
+          <span className="w-7 h-7 rounded-md bg-neutral-900 text-white flex items-center justify-center shrink-0">
+            <Globe className="w-3.5 h-3.5" />
           </span>
-          {showLabels && <span className="truncate">ADMIN</span>}
+          {showLabels && <span className="truncate font-menda-black">434 ADMIN</span>}
         </Link>
         {!isMobile && (
           <button
