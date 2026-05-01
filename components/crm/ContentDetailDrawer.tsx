@@ -26,9 +26,10 @@ import {
   CONTENT_POST_STATUS_OPTIONS,
 } from "./types"
 import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser } from "./types"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 
-interface ContentFormModalProps {
-  isOpen: boolean
+interface ContentDetailDrawerProps {
+  open: boolean
   post: ContentPost | null
   isSaving: boolean
   currentUser?: CurrentUser | null
@@ -89,8 +90,8 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString()
 }
 
-export function ContentFormModal({
-  isOpen,
+export function ContentDetailDrawer({
+  open,
   post,
   isSaving,
   currentUser,
@@ -100,7 +101,7 @@ export function ContentFormModal({
   onAddComment,
   onDeleteComment,
   onEditComment,
-}: ContentFormModalProps) {
+}: ContentDetailDrawerProps) {
   const [formData, setFormData] = useState(getDefaultFormData())
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -112,7 +113,7 @@ export function ContentFormModal({
   const [editCommentContent, setEditCommentContent] = useState("")
 
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       if (post) {
         setFormData({
           user: post.user || "",
@@ -142,7 +143,7 @@ export function ContentFormModal({
       setNewComment("")
       setEditingCommentId(null)
     }
-  }, [isOpen, post])
+  }, [open, post])
 
   const fetchTeamMembers = useCallback(async () => {
     setIsLoadingMembers(true)
@@ -196,10 +197,10 @@ export function ContentFormModal({
   }, [])
 
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       fetchTeamMembers()
     }
-  }, [isOpen, fetchTeamMembers])
+  }, [open, fetchTeamMembers])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldType: "thumbnail" | "asset") => {
     const file = e.target.files?.[0]
@@ -349,46 +350,68 @@ export function ContentFormModal({
     })
   }
 
-  if (!isOpen) return null
+  if (!open) return null
+
+  const drawerTitle = post ? formData.title || "Content Post" : "New Content Post"
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-4xl max-h-[90vh] bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-neutral-100 rounded-lg">
-                  <Calendar className="w-5 h-5 text-neutral-700" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {post ? "Edit Content Post" : "Create Content Post"}
-                  </h3>
-                  <p className="text-xs text-gray-500">Schedule content for your social calendar</p>
-                </div>
-              </div>
-              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
+    <DetailDrawer
+      open={open}
+      onClose={onClose}
+      title={drawerTitle}
+      subtitle="Schedule content for your social calendar"
+      width="xl"
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            {post && onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(post.id)}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
               </button>
-            </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || !formData.user || !formData.title}
+              className="px-5 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+            >
+              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {post ? "Save Changes" : "Create Post"}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="p-5 space-y-6">
+        {/* Header strip — preserves the original Calendar icon identity */}
+        <div className="flex items-center gap-3 -mx-5 -mt-5 px-5 py-3 border-b border-neutral-200 bg-neutral-50">
+          <div className="p-2 bg-white rounded-lg border border-neutral-200 shrink-0">
+            <Calendar className="w-5 h-5 text-neutral-700" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[12px] text-neutral-500 font-medium uppercase tracking-wide">
+              {post ? "Edit Content Post" : "Create Content Post"}
+            </p>
+            <p className="text-[11px] text-neutral-400">Schedule content for your social calendar</p>
+          </div>
+        </div>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* Row 1: User & Platform */}
+        {/* Row 1: User & Platform */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">User *</label>
@@ -895,44 +918,7 @@ export function ContentFormModal({
                   </p>
                 )}
               </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
-              <div>
-                {post && onDelete && (
-                  <button 
-                    type="button" 
-                    onClick={() => onDelete(post.id)} 
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <button 
-                  type="button" 
-                  onClick={onClose} 
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isSaving || !formData.user || !formData.title}
-                  className="px-6 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-                >
-                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {post ? "Save Changes" : "Create Post"}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
+    </DetailDrawer>
   )
 }

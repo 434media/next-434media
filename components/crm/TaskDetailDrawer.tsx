@@ -40,6 +40,7 @@ import {
   SOCIAL_PLATFORM_OPTIONS
 } from "./types"
 import type { Task, TaskAttachment, TaskComment, CurrentUser, Brand, TeamMember, Disposition, DOC, SocialPlatform } from "./types"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 
 interface TaskFormData {
   title: string
@@ -78,8 +79,8 @@ interface ClientOption {
   name?: string
 }
 
-interface TaskModalProps {
-  isOpen: boolean
+interface TaskDetailDrawerProps {
+  open: boolean
   task: Task | null
   formData: TaskFormData
   attachments: TaskAttachment[]
@@ -109,8 +110,8 @@ interface TaskModalProps {
   showBackButton?: boolean  // Optional: show back button when opened from linked items
 }
 
-export function TaskModal({
-  isOpen,
+export function TaskDetailDrawer({
+  open,
   task,
   formData,
   attachments,
@@ -138,7 +139,7 @@ export function TaskModal({
   onClose,
   onBackToLinkedItems,
   showBackButton = false,
-}: TaskModalProps) {
+}: TaskDetailDrawerProps) {
   // State for team member management
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
@@ -243,12 +244,12 @@ export function TaskModal({
     }
   }, [])
 
-  // Fetch team members when modal opens
+  // Fetch team members when drawer opens
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       fetchTeamMembers()
     }
-  }, [isOpen, fetchTeamMembers])
+  }, [open, fetchTeamMembers])
 
   // Add new team member (for primary or secondary assignment)
   const handleAddMember = async (forSecondary = false) => {
@@ -387,61 +388,86 @@ export function TaskModal({
 
   const dueDateStatus = getDueDateStatus(task.due_date, task.status)
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-3xl max-h-[90vh] bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                {showBackButton && onBackToLinkedItems && (
-                  <button
-                    onClick={onBackToLinkedItems}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-                    title="Back to linked items"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
-                  </button>
-                )}
-                <h3 className="text-lg font-semibold text-gray-900">{task.id ? "Task" : "Add Task"}</h3>
-                {dueDateStatus === "overdue" && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-600 text-xs font-medium">
-                    <AlertCircle className="w-3 h-3" />
-                    Overdue
-                  </span>
-                )}
-                {dueDateStatus === "approaching" && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-600 text-xs font-medium">
-                    <Clock className="w-3 h-3" />
-                    Due Soon
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
+  const drawerTitle = task.id ? formData.title || "Task" : "New Task"
+  const dueBadge =
+    dueDateStatus === "overdue" ? (
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-100 text-red-600 text-xs font-medium">
+        <AlertCircle className="w-3 h-3" />
+        Overdue
+      </span>
+    ) : dueDateStatus === "approaching" ? (
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-600 text-xs font-medium">
+        <Clock className="w-3 h-3" />
+        Due Soon
+      </span>
+    ) : null
 
-            {/* Modal Body - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {/* Basic Info Section */}
+  return (
+    <DetailDrawer
+      open={open}
+      onClose={onClose}
+      title={drawerTitle}
+      subtitle={task.id ? "Edit task" : "Create a new task"}
+      badge={dueBadge}
+      width="xl"
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            {task.id && (
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {showBackButton && onBackToLinkedItems && (
+              <button
+                type="button"
+                onClick={onBackToLinkedItems}
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+                title="Back to linked items"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 shadow-sm"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {task.id ? "Saving…" : "Creating…"}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  {task.id ? "Save Changes" : "Create Task"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="p-4 space-y-6">
+        {/* Basic Info Section */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Title *</label>
@@ -1554,51 +1580,7 @@ export function TaskModal({
                   </p>
                 )}
               </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-between p-4 border-t border-gray-200 bg-gray-50">
-              {task.id ? (
-                <button
-                  onClick={onDelete}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Task
-                </button>
-              ) : (
-                <div /> // Spacer when no delete button
-              )}
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={onSave}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 shadow-sm"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {task.id ? "Saving..." : "Creating..."}
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      {task.id ? "Save Changes" : "Create Task"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
+    </DetailDrawer>
   )
 }

@@ -22,9 +22,9 @@ import {
   TasksView,
   SocialCalendarView,
   ClientDetailDrawer,
-  OpportunityFormModal,
-  TaskModal,
-  ContentFormModal,
+  OpportunityDetailDrawer,
+  TaskDetailDrawer,
+  ContentDetailDrawer,
   LinkedTasksPanel,
 } from "@/components/crm"
 
@@ -715,9 +715,9 @@ export default function SalesCRMPage() {
         )}
       </div>
 
-      {/* Content Post Form Modal */}
-      <ContentFormModal
-        isOpen={showContentPostForm}
+      {/* Content Post Detail Drawer */}
+      <ContentDetailDrawer
+        open={showContentPostForm}
         post={editingContentPost}
         isSaving={isSavingContentPost}
         currentUser={currentUser}
@@ -742,9 +742,9 @@ export default function SalesCRMPage() {
         clientId={editingClient?.id ?? null}
       />
 
-      {/* Opportunity Form Modal */}
-      <OpportunityFormModal
-        isOpen={showOpportunityForm}
+      {/* Opportunity Detail Drawer */}
+      <OpportunityDetailDrawer
+        open={showOpportunityForm}
         isSaving={isSavingOpportunity}
         existingClients={clients}
         formData={opportunityForm}
@@ -758,9 +758,9 @@ export default function SalesCRMPage() {
         onArchive={opportunityForm.existing_company_id ? () => handleArchiveOpportunity(opportunityForm.existing_company_id!) : undefined}
       />
 
-      {/* Task Modal */}
-      <TaskModal
-        isOpen={showTaskModal}
+      {/* Task Detail Drawer */}
+      <TaskDetailDrawer
+        open={showTaskModal}
         task={selectedTask}
         formData={taskForm}
         attachments={taskAttachments}

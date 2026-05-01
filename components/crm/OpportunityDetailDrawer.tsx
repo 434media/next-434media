@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { TEAM_MEMBERS, BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
 import type { Brand, TeamMember, Disposition, DOC, Client } from "./types"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 
 interface ContactFormData {
   id: string
@@ -66,8 +67,8 @@ interface OpportunityFormData {
   docs: string[]
 }
 
-interface OpportunityFormModalProps {
-  isOpen: boolean
+interface OpportunityDetailDrawerProps {
+  open: boolean
   isEditing?: boolean  // true when editing existing opportunity, false when creating new
   isSaving: boolean
   existingClients: Client[]
@@ -83,8 +84,8 @@ function generateContactId(): string {
   return `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
-export function OpportunityFormModal({
-  isOpen,
+export function OpportunityDetailDrawer({
+  open,
   isEditing = false,
   isSaving,
   existingClients,
@@ -93,7 +94,7 @@ export function OpportunityFormModal({
   onSave,
   onClose,
   onArchive,
-}: OpportunityFormModalProps) {
+}: OpportunityDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
   const [companySearchQuery, setCompanySearchQuery] = useState("")
@@ -301,12 +302,12 @@ export function OpportunityFormModal({
     }
   }, [])
 
-  // Fetch team members when modal opens
+  // Fetch team members when drawer opens
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       fetchTeamMembers()
     }
-  }, [isOpen, fetchTeamMembers])
+  }, [open, fetchTeamMembers])
 
   // Add new team member
   const handleAddMember = async () => {
@@ -527,45 +528,83 @@ export function OpportunityFormModal({
     setCompanySearchQuery("")
   }
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-lg max-h-[90vh] overflow-hidden bg-white rounded-xl border border-gray-200 shadow-2xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-sky-50 to-cyan-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Opportunity</h3>
-                  <p className="text-xs text-gray-500">Get that money and close that business</p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
+  const drawerTitle = isEditing
+    ? formData.company_name || "Opportunity"
+    : "New Opportunity"
+  const drawerSubtitle = isEditing
+    ? "Get that money and close that business"
+    : "Add a new opportunity"
+  const showArchive =
+    isEditing &&
+    !!onArchive &&
+    (formData.disposition === "closed_won" || formData.disposition === "closed_lost")
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              {/* Client Name - Dropdown with search */}
+  return (
+    <DetailDrawer
+      open={open}
+      onClose={onClose}
+      title={drawerTitle}
+      subtitle={drawerSubtitle}
+      width="lg"
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            {showArchive && (
+              <button
+                type="button"
+                onClick={onArchive}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                title="Archive this opportunity"
+              >
+                <Archive className="w-4 h-4" />
+                Archive
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={isSaving || !formData.company_name || !formData.brand}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-sky-700 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {isEditing ? "Saving…" : "Creating…"}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  {isEditing ? "Save Changes" : "Create Opportunity"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="p-4 space-y-5">
+        {/* Header strip — preserves the original gradient identity */}
+        <div className="flex items-center gap-3 -mx-4 -mt-4 px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-sky-50 to-cyan-50">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center shrink-0">
+            <Target className="w-5 h-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[12px] text-gray-500 font-medium uppercase tracking-wide">Opportunity</p>
+            <p className="text-[11px] text-gray-400">Get that money and close that business</p>
+          </div>
+        </div>
+
+        {/* Client Name - Dropdown with search */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   <span className="flex items-center gap-1.5">
@@ -1535,55 +1574,7 @@ export function OpportunityFormModal({
                 </div>
                 <p className="text-xs text-gray-400 mt-1">Drag corner to resize</p>
               </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-between gap-3 p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
-              {/* Left side - Archive button (only for closed opportunities when editing) */}
-              <div>
-                {isEditing && onArchive && (formData.disposition === "closed_won" || formData.disposition === "closed_lost") && (
-                  <button
-                    onClick={onArchive}
-                    disabled={isSaving}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
-                    title="Archive this opportunity"
-                  >
-                    <Archive className="w-4 h-4" />
-                    Archive
-                  </button>
-                )}
-              </div>
-
-              {/* Right side - Cancel and Save */}
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={onSave}
-                  disabled={isSaving || !formData.company_name || !formData.brand}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-sky-700 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {isEditing ? "Saving..." : "Creating..."}
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      {isEditing ? "Save Changes" : "Create Opportunity"}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
+    </DetailDrawer>
   )
 }
