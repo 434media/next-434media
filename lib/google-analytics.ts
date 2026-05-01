@@ -1,4 +1,5 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data"
+import { pctChange } from "../types/analytics"
 import type {
   AnalyticsSummary,
   PageViewsResponse,
@@ -500,6 +501,243 @@ export async function getGeographicData(
   } catch (error) {
     console.error("[GA4] Error in getGeographicData:", error)
     throw error
+  }
+}
+
+// ============================================
+// PORTFOLIO ROLLUP
+// (Phase 3c — aggregates all configured GA4 properties for a top-down view
+// across the 434 portfolio. Parallel fetch per property, single response.)
+// ============================================
+
+export interface PortfolioBrandRow {
+  /** Internal property id (numeric string). */
+  propertyId: string
+  /** Friendly name from ANALYTICS_PROPERTIES. */
+  name: string
+  totalSessions: number
+  totalUsers: number
+  totalPageViews: number
+  newUsers: number
+  engagementRate: number
+  averageEngagementTime: number
+  /** Per-brand period-over-period changes. Same convention as the summary endpoint. */
+  sessionsChange: number
+  usersChange: number
+  pageViewsChange: number
+  engagementRateChange: number
+  /** This brand's share of total portfolio sessions, 0–1. */
+  sessionShare: number
+  /** True when the GA4 query failed or the property has no configured env var. */
+  unavailable?: boolean
+  error?: string
+}
+
+export interface PortfolioSummary {
+  /** Aggregated totals across all configured properties. */
+  total: {
+    sessions: number
+    users: number
+    pageViews: number
+    newUsers: number
+    /** Weighted by sessions. */
+    engagementRate: number
+    /** Weighted by sessions. */
+    averageEngagementTime: number
+  }
+  /** Same shape, for the previous period of identical length. Drives portfolio-level deltas. */
+  previousPeriod: {
+    sessions: number
+    users: number
+    pageViews: number
+    newUsers: number
+    engagementRate: number
+    averageEngagementTime: number
+  }
+  /** Period-over-period changes computed from total + previousPeriod. */
+  totalSessionsChange: number
+  totalUsersChange: number
+  totalPageViewsChange: number
+  totalEngagementRateChange: number
+  /** One row per known property. Includes per-brand deltas + share-of-portfolio. */
+  brands: PortfolioBrandRow[]
+  /** Properties without env-var configuration are listed but flagged unavailable. */
+  configuredCount: number
+  totalCount: number
+  generatedAt: string
+}
+
+/**
+ * Roll up every configured GA4 property into a portfolio view. Parallel
+ * fetches; one slow property doesn't block the others. Failing properties
+ * surface as `unavailable: true` rows so the UI can show "couldn't reach X"
+ * rather than silently dropping them.
+ */
+export async function getPortfolioSummary(
+  startDate: string,
+  endDate: string,
+): Promise<PortfolioSummary> {
+  console.log("[GA4] getPortfolioSummary called with:", { startDate, endDate })
+
+  const properties = getAvailableProperties()
+  const configured = properties.filter((p) => p.isConfigured)
+
+  // Fetch each configured property's summary in parallel. The summary call
+  // itself already includes previous-period data (PR Phase 1.2), so each
+  // brand row gets period-over-period deltas for free.
+  const results = await Promise.allSettled(
+    configured.map(async (p) => {
+      const summary = await getAnalyticsSummary(startDate, endDate, p.id)
+      return { property: p, summary }
+    }),
+  )
+
+  // Aggregate totals + collect per-brand rows
+  let totalSessions = 0
+  let totalUsers = 0
+  let totalPageViews = 0
+  let totalNewUsers = 0
+  let weightedEngagementRateNumerator = 0 // sum of (engagementRate * sessions)
+  let weightedEngagementTimeNumerator = 0 // sum of (averageEngagementTime * sessions)
+
+  let prevSessions = 0
+  let prevUsers = 0
+  let prevPageViews = 0
+  let prevNewUsers = 0
+  let prevWeightedEngagementRateNum = 0
+  let prevWeightedEngagementTimeNum = 0
+
+  const brandRows: PortfolioBrandRow[] = []
+
+  for (let i = 0; i < configured.length; i++) {
+    const property = configured[i]
+    const result = results[i]
+
+    if (result.status === "rejected") {
+      brandRows.push({
+        propertyId: property.id,
+        name: property.name,
+        totalSessions: 0,
+        totalUsers: 0,
+        totalPageViews: 0,
+        newUsers: 0,
+        engagementRate: 0,
+        averageEngagementTime: 0,
+        sessionsChange: 0,
+        usersChange: 0,
+        pageViewsChange: 0,
+        engagementRateChange: 0,
+        sessionShare: 0,
+        unavailable: true,
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      })
+      continue
+    }
+
+    const { summary } = result.value
+    const prev = summary.previousPeriod
+
+    // Aggregate
+    totalSessions += summary.totalSessions
+    totalUsers += summary.totalUsers
+    totalPageViews += summary.totalPageViews
+    totalNewUsers += summary.newUsers
+    weightedEngagementRateNumerator += summary.engagementRate * summary.totalSessions
+    weightedEngagementTimeNumerator += summary.averageEngagementTime * summary.totalSessions
+
+    if (prev) {
+      prevSessions += prev.totalSessions
+      prevUsers += prev.totalUsers
+      prevPageViews += prev.totalPageViews
+      prevNewUsers += prev.newUsers
+      prevWeightedEngagementRateNum += prev.engagementRate * prev.totalSessions
+      prevWeightedEngagementTimeNum += prev.averageEngagementTime * prev.totalSessions
+    }
+
+    brandRows.push({
+      propertyId: property.id,
+      name: property.name,
+      totalSessions: summary.totalSessions,
+      totalUsers: summary.totalUsers,
+      totalPageViews: summary.totalPageViews,
+      newUsers: summary.newUsers,
+      engagementRate: summary.engagementRate,
+      averageEngagementTime: summary.averageEngagementTime,
+      sessionsChange: prev ? pctChange(summary.totalSessions, prev.totalSessions) : 0,
+      usersChange: prev ? pctChange(summary.totalUsers, prev.totalUsers) : 0,
+      pageViewsChange: prev ? pctChange(summary.totalPageViews, prev.totalPageViews) : 0,
+      engagementRateChange: prev ? pctChange(summary.engagementRate, prev.engagementRate) : 0,
+      // sessionShare gets computed in a second pass below now that we have totalSessions
+      sessionShare: 0,
+    })
+  }
+
+  // Add the never-configured properties as unavailable rows so the UI shows
+  // "AMPD not connected — set GA4_PROPERTY_ID_AMPD" instead of hiding them.
+  for (const property of properties) {
+    if (property.isConfigured) continue
+    brandRows.push({
+      propertyId: property.id,
+      name: property.name,
+      totalSessions: 0,
+      totalUsers: 0,
+      totalPageViews: 0,
+      newUsers: 0,
+      engagementRate: 0,
+      averageEngagementTime: 0,
+      sessionsChange: 0,
+      usersChange: 0,
+      pageViewsChange: 0,
+      engagementRateChange: 0,
+      sessionShare: 0,
+      unavailable: true,
+      error: `Not configured (set ${property.key ?? "GA4_PROPERTY_ID_*"} in env)`,
+    })
+  }
+
+  // Second pass — fill sessionShare now that totalSessions is final
+  for (const row of brandRows) {
+    row.sessionShare = totalSessions > 0 ? row.totalSessions / totalSessions : 0
+  }
+
+  // Sort brand rows: live first by session volume (desc), unavailable at the end.
+  brandRows.sort((a, b) => {
+    if (a.unavailable !== b.unavailable) return a.unavailable ? 1 : -1
+    return b.totalSessions - a.totalSessions
+  })
+
+  // Compute weighted-average engagement metrics (use sessions as weight).
+  // Falls back to 0 when total sessions is 0 to avoid NaN.
+  const aggregatedEngagementRate = totalSessions > 0 ? weightedEngagementRateNumerator / totalSessions : 0
+  const aggregatedEngagementTime = totalSessions > 0 ? weightedEngagementTimeNumerator / totalSessions : 0
+  const prevAggregatedEngagementRate = prevSessions > 0 ? prevWeightedEngagementRateNum / prevSessions : 0
+  const prevAggregatedEngagementTime = prevSessions > 0 ? prevWeightedEngagementTimeNum / prevSessions : 0
+
+  return {
+    total: {
+      sessions: totalSessions,
+      users: totalUsers,
+      pageViews: totalPageViews,
+      newUsers: totalNewUsers,
+      engagementRate: aggregatedEngagementRate,
+      averageEngagementTime: aggregatedEngagementTime,
+    },
+    previousPeriod: {
+      sessions: prevSessions,
+      users: prevUsers,
+      pageViews: prevPageViews,
+      newUsers: prevNewUsers,
+      engagementRate: prevAggregatedEngagementRate,
+      averageEngagementTime: prevAggregatedEngagementTime,
+    },
+    totalSessionsChange: pctChange(totalSessions, prevSessions),
+    totalUsersChange: pctChange(totalUsers, prevUsers),
+    totalPageViewsChange: pctChange(totalPageViews, prevPageViews),
+    totalEngagementRateChange: pctChange(aggregatedEngagementRate, prevAggregatedEngagementRate),
+    brands: brandRows,
+    configuredCount: configured.length,
+    totalCount: properties.length,
+    generatedAt: new Date().toISOString(),
   }
 }
 

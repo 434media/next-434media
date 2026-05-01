@@ -11,6 +11,7 @@ export type AnalyticsEndpoint =
   | "geographic"
   | "events"
   | "conversions"
+  | "portfolio"
 
 interface BuildOpts {
   endpoint: AnalyticsEndpoint
@@ -25,8 +26,8 @@ const SNAPSHOT_RANGE_MAP: Record<string, "7d" | "30d"> = {
 }
 
 // Endpoints with no precomputed snapshot — always route live.
-// Phase 2 events/conversions don't have a cron writing snapshots yet.
-const LIVE_ONLY_ENDPOINTS = new Set<AnalyticsEndpoint>(["events", "conversions"])
+// Events / conversions / portfolio don't have a cron writing snapshots yet.
+const LIVE_ONLY_ENDPOINTS = new Set<AnalyticsEndpoint>(["events", "conversions", "portfolio"])
 
 export function buildAnalyticsUrl(opts: BuildOpts): string {
   const { endpoint, dateRange, propertyId, useSnapshot } = opts

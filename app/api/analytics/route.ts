@@ -10,6 +10,7 @@ import {
   getRealtimeData,
   getTopEvents,
   getConversionsData,
+  getPortfolioSummary,
   getAvailableProperties,
 } from "@/lib/google-analytics"
 import { validateAnalyticsConfig, getConfigurationStatus } from "@/lib/analytics-config"
@@ -257,6 +258,14 @@ export async function GET(request: NextRequest) {
       case "key-events": {
         const conversions = await getConversionsData(startDate, endDate, propertyId)
         return NextResponse.json(conversions)
+      }
+
+      case "portfolio":
+      case "portfolio-summary": {
+        // Portfolio rollup ignores `propertyId` — it aggregates every
+        // configured property in parallel. Date range still applies.
+        const portfolio = await getPortfolioSummary(startDate, endDate)
+        return NextResponse.json(portfolio)
       }
 
       default:

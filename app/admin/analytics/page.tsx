@@ -24,6 +24,10 @@ const AnalyticsLoadingSkeleton = () => (
   </div>
 )
 
+const PortfolioAnalytics = dynamic(() => import("../analytics-portfolio/PortfolioAnalyticsClientPage"), {
+  ssr: false,
+  loading: () => <AnalyticsLoadingSkeleton />,
+})
 const GA4Analytics = dynamic(() => import("../analytics-web/AnalyticsClientPage"), {
   ssr: false,
   loading: () => <AnalyticsLoadingSkeleton />,
@@ -41,7 +45,7 @@ const LinkedInAnalytics = dynamic(() => import("../analytics-linkedin/LinkedInAn
   loading: () => <AnalyticsLoadingSkeleton />,
 })
 
-type TabKey = "ga4" | "instagram" | "mailchimp" | "linkedin"
+type TabKey = "portfolio" | "ga4" | "instagram" | "mailchimp" | "linkedin"
 
 interface TabConfig {
   key: TabKey
@@ -52,6 +56,7 @@ interface TabConfig {
 }
 
 const tabs: TabConfig[] = [
+  { key: "portfolio", label: "Portfolio", short: "Portfolio", icon: PortfolioIcon, color: "text-indigo-500" },
   { key: "ga4", label: "Google Analytics", short: "GA4", icon: GA4Icon, color: "text-emerald-500" },
   { key: "instagram", label: "Instagram", short: "Instagram", icon: InstagramIcon, color: "text-pink-500" },
   { key: "mailchimp", label: "Mailchimp", short: "Mailchimp", icon: MailchimpIcon, color: "text-yellow-500" },
@@ -62,7 +67,7 @@ export default function UnifiedAnalyticsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const initialTab = (searchParams?.get("tab") as TabKey) || ("ga4" as TabKey)
+  const initialTab = (searchParams?.get("tab") as TabKey) || ("portfolio" as TabKey)
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
   const [mounted, setMounted] = useState(false)
 
@@ -79,6 +84,7 @@ export default function UnifiedAnalyticsPage() {
   // Preload the other tabs after mount for snappier switching.
   useEffect(() => {
     const t = setTimeout(() => {
+      import("../analytics-web/AnalyticsClientPage")
       import("../analytics-instagram/InstagramAnalyticsClientPage")
       import("../analytics-mailchimp/MailchimpAnalyticsClientPage")
       import("../analytics-linkedin/LinkedInAnalyticsClientPage")
@@ -88,15 +94,17 @@ export default function UnifiedAnalyticsPage() {
 
   const ActiveComponent = useMemo(() => {
     switch (activeTab) {
+      case "ga4":
+        return <GA4Analytics />
       case "instagram":
         return <InstagramAnalytics />
       case "mailchimp":
         return <MailchimpAnalytics />
       case "linkedin":
         return <LinkedInAnalytics />
-      case "ga4":
+      case "portfolio":
       default:
-        return <GA4Analytics />
+        return <PortfolioAnalytics />
     }
   }, [activeTab])
 
@@ -155,6 +163,15 @@ export default function UnifiedAnalyticsPage() {
 }
 
 // --- Icons (kept local to avoid cross-import side effects) ---
+function PortfolioIcon(props: React.SVGProps<SVGSVGElement>) {
+  // Stacked layers — signals "rollup across multiple sources"
+  return (
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" {...props}>
+      <path d="M12 2 1 8.5 12 15l11-6.5L12 2zM3 13.5 12 19l9-5.5M3 18l9 5.5L21 18" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+}
+
 function GA4Icon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" {...props}>

@@ -113,6 +113,16 @@ const STATIC_ITEMS: CommandItem[] = [
     search: "leads contact forms registrations signups",
     run: (router) => router.push("/admin/leads"),
   },
+  // Portfolio rollup — every property in one view
+  {
+    id: "nav-analytics-portfolio",
+    label: "Analytics — Portfolio rollup",
+    hint: "All 434 GA4 properties aggregated, brand comparison",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics portfolio rollup all properties brand comparison cross-property",
+    run: (router) => router.push("/admin/analytics-portfolio?range=30d"),
+  },
   // GA4 web analytics — main 434 portfolio property
   {
     id: "nav-analytics-ga4",
