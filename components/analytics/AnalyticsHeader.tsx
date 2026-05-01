@@ -76,7 +76,7 @@ export function AnalyticsHeader({
   }
 
   return (
-    <div className="bg-white border-b border-neutral-200 w-full pt-20 relative z-10">
+    <div className="bg-white border-b border-neutral-200 w-full">
       {/* Main Header Row */}
       <div className="px-4 sm:px-5 lg:px-6 w-full">
         <div className="flex flex-col gap-4 py-4 sm:py-5">

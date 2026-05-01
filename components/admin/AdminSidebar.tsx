@@ -104,6 +104,11 @@ const SIDEBAR_ITEMS: SidebarEntry[] = [
     matchPrefix: "/admin/sops",
     roles: ["full_admin"],
   },
+]
+
+// Footer-pinned items render below "Back to site" — for configuration surfaces
+// that aren't part of daily navigation. Same role-gating rules as primary items.
+const FOOTER_ITEMS: SidebarLink[] = [
   {
     id: "settings",
     label: "Settings",
@@ -145,6 +150,7 @@ export function AdminSidebar({
   const grantedRoles: AdminRole[] =
     role === "crm_super_admin" ? ["crm_super_admin", "full_admin", "crm_only"] : [role]
   const items = SIDEBAR_ITEMS.filter((i) => i.roles.some((r) => grantedRoles.includes(r)))
+  const footerItems = FOOTER_ITEMS.filter((i) => i.roles.some((r) => grantedRoles.includes(r)))
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const out: Record<string, boolean> = {}
@@ -272,8 +278,34 @@ export function AdminSidebar({
         })}
       </nav>
 
+      {/* Footer-pinned items (configuration surfaces) */}
+      {footerItems.length > 0 && (
+        <div className="px-2 pt-2 pb-1 border-t border-neutral-200 space-y-0.5">
+          {footerItems.map((item) => {
+            const Icon = item.icon
+            const active = isActive(pathname, item.matchPrefix ?? item.href)
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                onClick={onNavigate}
+                title={!showLabels ? item.label : undefined}
+                className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+                  active
+                    ? "bg-neutral-900 text-white"
+                    : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {showLabels && <span className="truncate">{item.label}</span>}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+
       {/* Back to public site */}
-      <div className="px-2 pb-2 border-t border-neutral-200 pt-2">
+      <div className="px-2 pb-2 pt-1">
         <Link
           href="/"
           onClick={onNavigate}
@@ -290,7 +322,7 @@ export function AdminSidebar({
         </Link>
       </div>
 
-      {/* Footer */}
+      {/* User identity footer */}
       {showLabels && (
         <div className="px-3 py-2 border-t border-neutral-200 text-[10px] text-neutral-400">
           <span className="block truncate">{user.email}</span>

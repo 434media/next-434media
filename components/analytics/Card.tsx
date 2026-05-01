@@ -1,8 +1,13 @@
 import * as React from "react"
 import { cn } from "../../lib/utils"
 
+// `relative` is required so any `absolute inset-0` decoration inside a Card
+// (e.g., the gradient overlays in TopPagesTable/TrafficSourcesChart/GeographicMap)
+// stays scoped to the Card. Without it, those overlays escape to the nearest
+// `position: relative` ancestor — or the viewport — and intercept pointer
+// events on the rest of the page (sidebar, top nav, etc).
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-xl border bg-card text-card-foreground shadow w-full max-w-full min-w-0", className)} {...props} />
+  <div ref={ref} className={cn("relative rounded-xl border bg-card text-card-foreground shadow w-full max-w-full min-w-0 overflow-hidden", className)} {...props} />
 ))
 Card.displayName = "Card"
 

@@ -68,7 +68,7 @@ export function InstagramAnalyticsHeader({
   const currentAccount = instagramAccounts.find(a => a.id === selectedAccount) || instagramAccounts[0]
 
   return (
-    <div className="bg-white border-b border-neutral-200 pt-20 overflow-x-hidden">
+    <div className="bg-white border-b border-neutral-200 overflow-x-hidden">
       {/* Top Row: Title, Account Info, Actions */}
       <div className="px-3 sm:px-4 lg:px-6 overflow-x-hidden">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">

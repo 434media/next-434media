@@ -90,7 +90,7 @@ export function MailchimpHeader({
   }
 
   return (
-    <div className="bg-white border-b border-neutral-200 overflow-x-hidden w-full pt-20">
+    <div className="bg-white border-b border-neutral-200 overflow-x-hidden w-full">
       {/* Top Row: Title, Audience Info, Actions */}
       <div className="px-3 sm:px-4 lg:px-6 overflow-x-hidden w-full">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 py-3 sm:py-4">

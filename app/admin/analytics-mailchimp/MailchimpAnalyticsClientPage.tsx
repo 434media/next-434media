@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { MailchimpHeader } from "@/components/mailchimp/MailchimpHeader"
-import { DataSourceBanner } from "@/components/analytics/DataSourceBanner"
 import { MailchimpMetricsOverview } from "@/components/mailchimp/MailchimpMetricsOverview"
 import { MailchimpTopCampaignsTable } from "@/components/mailchimp/MailchimpTopCampaignsTable"
 import { MailchimpTagsOverview } from "@/components/mailchimp/MailchimpTagsOverview"
@@ -607,14 +606,6 @@ export default function MailchimpAnalyticsClientPage() {
 
       {/* Main Content */}
       <div ref={contentRef} className="px-3 sm:px-4 lg:px-6 py-6 sm:py-8 space-y-8 sm:space-y-10 w-full overflow-x-hidden">
-        <DataSourceBanner
-          dataSource={dataSource}
-          snapshotMeta={snapshotMeta}
-          onToggle={(next) => {
-            setSnapshotMeta(null)
-            setDataSource(next)
-          }}
-        />
         {/* Metrics Overview */}
         <div>
           <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">

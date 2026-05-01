@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { InstagramAnalyticsHeader } from "@/components/instagram/InstagramAnalyticsHeader"
-import { DataSourceBanner } from "@/components/analytics/DataSourceBanner"
 import { InstagramKeyMetrics } from "@/components/instagram/InstagramKeyMetrics"
 import { InstagramTopPostsTable } from "@/components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "@/components/instagram/InstagramAccountInfo"
@@ -716,16 +715,6 @@ export default function InstagramAnalyticsClientPage() {
 
       <div className="py-4 sm:py-6 w-full overflow-x-hidden">
         <div className="px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
-          <div className="mb-4">
-            <DataSourceBanner
-              dataSource={dataSource}
-              snapshotMeta={snapshotMeta}
-              onToggle={(next) => {
-                setSnapshotMeta(null)
-                setDataSource(next)
-              }}
-            />
-          </div>
           {/* Error Display */}
           {error && (
             <div className="mb-4">
