@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AdminSidebar, type SidebarUser } from "./AdminSidebar"
 import { AdminTopBar } from "./AdminTopBar"
+import { CommandPalette } from "./CommandPalette"
 
 interface AdminShellProps {
   user: SidebarUser & { picture?: string }
@@ -83,6 +84,9 @@ export function AdminShell({ user, onProfileUpdate, children }: AdminShellProps)
         />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+
+      {/* Cmd+K palette — global, available on every admin page */}
+      <CommandPalette />
     </div>
   )
 }

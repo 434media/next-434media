@@ -452,28 +452,41 @@ export function useClientHandlers({
     }
   }
 
-  // Archive opportunity
+  // Archive opportunity — fully optimistic.
   const handleArchiveOpportunity = async (clientId: string) => {
+    const previousClient = clients.find(c => c.id === clientId)
+    if (!previousClient) return
+
+    const archivedAt = new Date().toISOString()
+    // Optimistic update
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, is_archived: true, archived_at: archivedAt } : c))
+    setShowOpportunityForm(false)
+    setIsEditingOpportunity(false)
+
     try {
       const response = await fetch("/api/admin/crm/clients", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id: clientId, is_archived: true, archived_at: new Date().toISOString() }),
+        body: JSON.stringify({ id: clientId, is_archived: true, archived_at: archivedAt }),
       })
       if (!response.ok) throw new Error("Failed to archive opportunity")
-
-      setClients(prev => prev.map(c => c.id === clientId ? { ...c, is_archived: true, archived_at: new Date().toISOString() } : c))
       setToast({ message: "Opportunity archived", type: "success" })
-      setShowOpportunityForm(false)
-      setIsEditingOpportunity(false)
     } catch {
-      setToast({ message: "Failed to archive opportunity", type: "error" })
+      // Rollback
+      setClients(prev => prev.map(c => c.id === clientId ? previousClient : c))
+      setToast({ message: "Failed to archive opportunity — reverted", type: "error" })
     }
   }
 
-  // Restore archived opportunity
+  // Restore archived opportunity — fully optimistic.
   const handleRestoreOpportunity = async (clientId: string) => {
+    const previousClient = clients.find(c => c.id === clientId)
+    if (!previousClient) return
+
+    // Optimistic update
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, is_archived: false, archived_at: undefined } : c))
+
     try {
       const response = await fetch("/api/admin/crm/clients", {
         method: "PUT",
@@ -482,24 +495,38 @@ export function useClientHandlers({
         body: JSON.stringify({ id: clientId, is_archived: false, archived_at: null }),
       })
       if (!response.ok) throw new Error("Failed to restore opportunity")
-
-      setClients(prev => prev.map(c => c.id === clientId ? { ...c, is_archived: false, archived_at: undefined } : c))
       setToast({ message: "Opportunity restored to active pipeline", type: "success" })
     } catch {
-      setToast({ message: "Failed to restore opportunity", type: "error" })
+      setClients(prev => prev.map(c => c.id === clientId ? previousClient : c))
+      setToast({ message: "Failed to restore opportunity — reverted", type: "error" })
     }
   }
 
-  // Update client disposition via drag-and-drop in Kanban
+  // Update client disposition via drag-and-drop in Kanban — fully optimistic.
+  // The card lands in the new column instantly; rolls back if the API rejects.
   const handleUpdateClientDisposition = async (clientId: string, disposition: Disposition) => {
-    const currentClient = clients.find(c => c.id === clientId)
-    const wasClosedWon = currentClient?.disposition === "closed_won"
+    const previousClient = clients.find(c => c.id === clientId)
+    if (!previousClient) return
+
+    const wasClosedWon = previousClient.disposition === "closed_won"
     const shouldAutoSetDocTo100 = disposition === "closed_won"
     const shouldAutoSetDocTo25 = wasClosedWon && disposition === "pitched" || disposition === "closed_lost"
 
     let docValue: DOC | undefined = undefined
     if (shouldAutoSetDocTo100) docValue = "100" as DOC
     else if (shouldAutoSetDocTo25) docValue = "25" as DOC
+
+    // Optimistic update — drop the card in the new column immediately
+    setClients(prev =>
+      prev.map(c => {
+        if (c.id === clientId) {
+          const updates: Partial<Client> = { disposition }
+          if (docValue) updates.doc = docValue
+          return { ...c, ...updates }
+        }
+        return c
+      })
+    )
 
     try {
       const updatePayload: { id: string; disposition: Disposition; doc?: DOC } = { id: clientId, disposition }
@@ -513,17 +540,6 @@ export function useClientHandlers({
       })
       if (!response.ok) throw new Error("Failed to update client")
 
-      setClients(prev =>
-        prev.map(c => {
-          if (c.id === clientId) {
-            const updates: Partial<Client> = { disposition }
-            if (docValue) updates.doc = docValue
-            return { ...c, ...updates }
-          }
-          return c
-        })
-      )
-
       const successMessage = shouldAutoSetDocTo100
         ? "Opportunity moved to Closed Won (DOC set to 100%)"
         : shouldAutoSetDocTo25
@@ -531,7 +547,9 @@ export function useClientHandlers({
           : "Client moved"
       setToast({ message: successMessage, type: "success" })
     } catch {
-      setToast({ message: "Failed to move client", type: "error" })
+      // Rollback: restore the previous client snapshot
+      setClients(prev => prev.map(c => c.id === clientId ? previousClient : c))
+      setToast({ message: "Failed to move client — reverted", type: "error" })
     }
   }
 

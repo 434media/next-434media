@@ -506,6 +506,195 @@ export default function SalesCRMPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showClientForm, editingClient?.id])
 
+  // ?tab=<view> drives which tab renders. Lets the command palette and shared
+  // links land directly on Pipeline / Tasks / Social Calendar without a click.
+  const tabParam = searchParams?.get("tab") ?? null
+  useEffect(() => {
+    if (!tabParam) return
+    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks", "social-calendar"]
+    if (allowed.includes(tabParam as ViewMode) && tabParam !== viewMode) {
+      setViewMode(tabParam as ViewMode)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam])
+
+  // ?new=<entity> opens an empty create drawer (command palette quick actions).
+  // Strip the param immediately so re-renders don't reopen it after the user closes.
+  const newParam = searchParams?.get("new") ?? null
+  useEffect(() => {
+    if (!newParam) return
+    if (newParam === "client") {
+      setEditingClient(null)
+      setClientForm({
+        company_name: "",
+        department: "",
+        contacts: [],
+        status: "prospect",
+        next_followup_date: "",
+        notes: "",
+        source: "",
+        is_opportunity: false,
+        opportunity_id: "",
+        assigned_to: currentUser?.name || "",
+      })
+      setShowClientForm(true)
+    } else if (newParam === "opportunity") {
+      setIsEditingOpportunity(false)
+      setOpportunityForm({
+        company_name: "",
+        existing_company_id: null,
+        linked_company_id: null,
+        contacts: [],
+        title: "",
+        status: "prospect",
+        brand: "",
+        pitch_value: "",
+        next_followup_date: "",
+        assigned_to: currentUser?.name || "",
+        notes: "",
+        source: "",
+        is_opportunity: true,
+        disposition: "pitched",
+        doc: "",
+        web_links: [],
+        docs: [],
+      })
+      setShowOpportunityForm(true)
+    } else if (newParam === "task") {
+      handleAddTask()
+    } else if (newParam === "content") {
+      handleAddContentPost()
+    }
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.delete("new")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newParam])
+
+  // ?openOpportunity=<id> mirrors ?open= for opportunities. Same lifecycle:
+  // wait for clients to load, find the matching opportunity, hand it to the
+  // edit handler. opportunityForm.existing_company_id tracks which one is open.
+  const openOpportunityId = searchParams?.get("openOpportunity") ?? null
+  useEffect(() => {
+    if (!openOpportunityId) {
+      if (showOpportunityForm) {
+        setShowOpportunityForm(false)
+        setIsEditingOpportunity(false)
+      }
+      return
+    }
+    if (clients.length === 0) return
+    const target = clients.find((c) => c.id === openOpportunityId && c.is_opportunity)
+    if (!target) return
+    if (opportunityForm.existing_company_id === openOpportunityId && showOpportunityForm) return
+    handleEditOpportunity(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openOpportunityId, clients])
+
+  const closeOpportunityDrawer = () => {
+    setShowOpportunityForm(false)
+    setIsEditingOpportunity(false)
+    if (searchParams?.get("openOpportunity")) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("openOpportunity")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+  }
+
+  useEffect(() => {
+    if (!showOpportunityForm || !opportunityForm.existing_company_id) return
+    if (searchParams?.get("openOpportunity") === opportunityForm.existing_company_id) return
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("openOpportunity", opportunityForm.existing_company_id)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOpportunityForm, opportunityForm.existing_company_id])
+
+  // ?openTask=<id> — same pattern, against the tasks[] array.
+  const openTaskId = searchParams?.get("openTask") ?? null
+  useEffect(() => {
+    if (!openTaskId) {
+      if (showTaskModal) {
+        setShowTaskModal(false)
+        setSelectedTask(null)
+      }
+      return
+    }
+    if (tasks.length === 0) return
+    const target = tasks.find((t) => t.id === openTaskId)
+    if (!target) return
+    if (selectedTask?.id === openTaskId && showTaskModal) return
+    openTaskModal(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTaskId, tasks])
+
+  const closeTaskDrawer = () => {
+    setShowTaskModal(false)
+    setSelectedTask(null)
+    setTaskOpenedFromLinkedPanel(false)
+    setTaskForm(EMPTY_TASK_FORM)
+    setNewLink("")
+    setNewComment("")
+    setTaskAttachments([])
+    if (searchParams?.get("openTask")) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("openTask")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+  }
+
+  useEffect(() => {
+    if (!showTaskModal || !selectedTask?.id) return
+    if (searchParams?.get("openTask") === selectedTask.id) return
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("openTask", selectedTask.id)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTaskModal, selectedTask?.id])
+
+  // ?openContent=<id> — same pattern, against the contentPosts[] array.
+  // Note contentPosts only loads when viewMode === "social-calendar", so the
+  // ?tab= sync above must run first to populate the array.
+  const openContentId = searchParams?.get("openContent") ?? null
+  useEffect(() => {
+    if (!openContentId) {
+      if (showContentPostForm) {
+        setShowContentPostForm(false)
+        setEditingContentPost(null)
+      }
+      return
+    }
+    if (contentPosts.length === 0) return
+    const target = contentPosts.find((p) => p.id === openContentId)
+    if (!target) return
+    if (editingContentPost?.id === openContentId && showContentPostForm) return
+    handleOpenContentPost(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openContentId, contentPosts])
+
+  const closeContentDrawer = () => {
+    setShowContentPostForm(false)
+    setEditingContentPost(null)
+    if (searchParams?.get("openContent")) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("openContent")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+  }
+
+  useEffect(() => {
+    if (!showContentPostForm || !editingContentPost?.id) return
+    if (searchParams?.get("openContent") === editingContentPost.id) return
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("openContent", editingContentPost.id)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showContentPostForm, editingContentPost?.id])
+
   // Set default assignee filter based on logged-in user
   useEffect(() => {
     if (currentUser?.email && Object.keys(teamMembersMap).length > 0) {
@@ -723,10 +912,7 @@ export default function SalesCRMPage() {
         currentUser={currentUser}
         onSave={handleSaveContentPost}
         onDelete={editingContentPost ? handleDeleteContentPost : undefined}
-        onClose={() => {
-          setShowContentPostForm(false)
-          setEditingContentPost(null)
-        }}
+        onClose={closeContentDrawer}
       />
 
       {/* Client Detail Drawer */}
@@ -751,10 +937,7 @@ export default function SalesCRMPage() {
         isEditing={isEditingOpportunity}
         onFormChange={setOpportunityForm}
         onSave={handleSaveOpportunity}
-        onClose={() => {
-          setShowOpportunityForm(false)
-          setIsEditingOpportunity(false)
-        }}
+        onClose={closeOpportunityDrawer}
         onArchive={opportunityForm.existing_company_id ? () => handleArchiveOpportunity(opportunityForm.existing_company_id!) : undefined}
       />
 
@@ -792,37 +975,7 @@ export default function SalesCRMPage() {
         onRemoveAttachment={handleRemoveAttachment}
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
-        onClose={() => {
-          setShowTaskModal(false)
-          setSelectedTask(null)
-          setTaskOpenedFromLinkedPanel(false)
-          // Reset form state to prevent data carryover
-          setTaskForm({
-            title: "",
-            description: "",
-            assigned_to: "",
-            secondary_assigned_to: [],
-            brand: "",
-            status: "not_started",
-            priority: "medium",
-            due_date: "",
-            notes: "",
-            web_links: [],
-            tagged_users: [],
-            is_opportunity: false,
-            opportunity_id: "",
-            disposition: "",
-            doc: "",
-            client_id: "",
-            client_name: "",
-            is_social_post: false,
-            social_post_date: "",
-            social_platforms: [],
-          })
-          setNewLink("")
-          setNewComment("")
-          setTaskAttachments([])
-        }}
+        onClose={closeTaskDrawer}
       />
 
       {/* Linked Items Panel */}

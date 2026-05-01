@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { Menu } from "lucide-react"
-import { AdminUserMenu } from "@/components/AdminUserMenu"
+import { Menu, Search } from "lucide-react"
+import { NotificationsPopover } from "./NotificationsPopover"
+import { UserMenu } from "./UserMenu"
 
 interface AdminUser {
   email: string
@@ -44,16 +46,22 @@ function getPageLabel(pathname: string): string {
   return "Admin"
 }
 
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return "Good morning"
-  if (hour < 17) return "Good afternoon"
-  return "Good evening"
-}
-
 export function AdminTopBar({ user, onOpenMobileSidebar, onProfileUpdate }: AdminTopBarProps) {
   const pathname = usePathname() ?? "/admin"
   const label = getPageLabel(pathname)
+  const [isMac, setIsMac] = useState(false)
+
+  useEffect(() => {
+    setIsMac(/(Mac|iPhone|iPod|iPad)/i.test(navigator.platform))
+  }, [])
+
+  // Synthesize a Cmd+K keypress so the global handler in CommandPalette opens it.
+  // Avoids a parent-child binding contract while keeping the click affordance.
+  const triggerCommandPalette = () => {
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", metaKey: isMac, ctrlKey: !isMac, bubbles: true }),
+    )
+  }
 
   return (
     <header className="h-14 shrink-0 border-b border-neutral-200 bg-white flex items-center justify-between px-3 sm:px-5 gap-3">
@@ -71,8 +79,33 @@ export function AdminTopBar({ user, onOpenMobileSidebar, onProfileUpdate }: Admi
         </h1>
       </div>
 
-      <div className="shrink-0">
-        <AdminUserMenu user={user} greeting={getGreeting()} onProfileUpdate={onProfileUpdate} />
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={triggerCommandPalette}
+          aria-label="Open command palette"
+          title={`Open command palette (${isMac ? "⌘" : "Ctrl"}+K)`}
+          className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 border border-neutral-200 transition-colors"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span>Search…</span>
+          <kbd className="ml-2 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 bg-neutral-50 border border-neutral-200 rounded">
+            {isMac ? "⌘" : "Ctrl"} K
+          </kbd>
+        </button>
+
+        {/* Mobile-only icon search trigger */}
+        <button
+          type="button"
+          onClick={triggerCommandPalette}
+          aria-label="Open command palette"
+          className="sm:hidden p-2 rounded-md text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
+        <NotificationsPopover />
+        <UserMenu user={user} onProfileUpdate={onProfileUpdate} />
       </div>
     </header>
   )
