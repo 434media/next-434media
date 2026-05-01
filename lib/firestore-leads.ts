@@ -1,6 +1,7 @@
 import { Timestamp, FieldValue } from "firebase-admin/firestore"
 import { getDb } from "./firebase-admin"
 import { scoreLead } from "./score-lead"
+import { trackLeadCapture, trackLeadQualified } from "./ga4-events"
 import {
   CRM_COLLECTIONS,
   type Lead,
@@ -157,7 +158,20 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
 
   const ref = await db.collection(COLLECTION).add(doc)
   invalidate()
-  return normalize(ref.id, doc)
+  const created = normalize(ref.id, doc)
+  // Fire-and-forget GA4 server-side event. Never throws — see ga4-events.ts.
+  // We log the capture for every NEW lead created via any path (manual,
+  // public form fan-in, Mailchimp webhook, etc.).
+  trackLeadCapture({
+    email: created.email,
+    source: created.source,
+    platform: created.platform,
+    company: created.company,
+    score: created.score,
+  }).catch(() => {
+    /* swallowed — analytics must not break creation */
+  })
+  return created
 }
 
 export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Lead> {
@@ -198,7 +212,23 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
   await ref.update(update)
   invalidate()
   const after = await ref.get()
-  return normalize(id, after.data() ?? {})
+  const updatedLead = normalize(id, after.data() ?? {})
+
+  // GA4 server-side event on the `→ engaged` transition. We compare against
+  // the pre-update status so re-saves of an already-engaged lead don't fire
+  // duplicate qualification events.
+  if (current.status !== "engaged" && updatedLead.status === "engaged") {
+    trackLeadQualified({
+      email: updatedLead.email,
+      platform: updatedLead.platform,
+      score: updatedLead.score,
+      source: updatedLead.source,
+    }).catch(() => {
+      /* swallowed */
+    })
+  }
+
+  return updatedLead
 }
 
 export async function deleteLead(id: string): Promise<void> {

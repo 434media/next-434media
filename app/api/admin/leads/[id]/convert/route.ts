@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getLeadById, updateLead } from "@/lib/firestore-leads"
 import { createClient } from "@/lib/firestore-crm"
+import { trackLeadConverted } from "@/lib/ga4-events"
 import type { ClientContact, ClientRecord, ClientStatus } from "@/types/crm-types"
 
 export const runtime = "nodejs"
@@ -133,6 +134,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { status: 200 },
     )
   }
+
+  // Fire-and-forget GA4 server-side event. This is the high-value funnel
+  // event that lets us attribute revenue back to acquisition source.
+  trackLeadConverted(
+    {
+      email: lead.email,
+      platform: lead.platform,
+      score: lead.score,
+      source: lead.source,
+    },
+    createdClient.id,
+  ).catch(() => {
+    /* swallowed — analytics must not fail conversion */
+  })
 
   return NextResponse.json({ success: true, client: createdClient, lead: updatedLead })
 }

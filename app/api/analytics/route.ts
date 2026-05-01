@@ -8,10 +8,13 @@ import {
   getDeviceData,
   getGeographicData,
   getRealtimeData,
+  getTopEvents,
+  getConversionsData,
   getAvailableProperties,
 } from "@/lib/google-analytics"
 import { validateAnalyticsConfig, getConfigurationStatus } from "@/lib/analytics-config"
 import { getSession } from "@/lib/auth"
+import { pctChange } from "@/types/analytics"
 
 // Helper function to convert relative dates to YYYY-MM-DD format
 function formatDateForGA(dateString: string): string {
@@ -75,7 +78,6 @@ export async function GET(request: NextRequest) {
       configured: configStatus.configured,
       missingVariables: configStatus.missingVariables,
       hasServiceAccountKey: configStatus.hasServiceAccountKey,
-      hasAdminPassword: configStatus.hasAdminPassword,
       configuredProperties: configStatus.configuredProperties?.length || 0,
     })
 
@@ -157,23 +159,30 @@ export async function GET(request: NextRequest) {
         })
 
       case "summary":
-      case "overview":
-        console.log("[Analytics API] Fetching summary data...")
-        console.log("[Analytics API] About to call getAnalyticsSummary with:", { startDate, endDate, propertyId })
-
+      case "overview": {
         const summary = await getAnalyticsSummary(startDate, endDate, propertyId)
-        console.log("[Analytics API] Raw summary result:", summary)
 
+        // Compute period-over-period deltas. Previously hardcoded to 0, which
+        // hid the most important signal on the dashboard.
+        const prev = summary.previousPeriod
         const enhancedSummary = {
           ...summary,
-          pageViewsChange: 0,
-          sessionsChange: 0,
-          usersChange: 0,
-          bounceRateChange: 0,
           activeUsers: summary.totalUsers,
+          // Negative bounceRateChange = good (lower is better) — UI can decide
+          // how to color it via its `invertChange` prop on that card.
+          pageViewsChange: prev ? pctChange(summary.totalPageViews, prev.totalPageViews) : 0,
+          sessionsChange: prev ? pctChange(summary.totalSessions, prev.totalSessions) : 0,
+          usersChange: prev ? pctChange(summary.totalUsers, prev.totalUsers) : 0,
+          newUsersChange: prev ? pctChange(summary.newUsers, prev.newUsers) : 0,
+          bounceRateChange: prev ? pctChange(summary.bounceRate, prev.bounceRate) : 0,
+          engagementRateChange: prev ? pctChange(summary.engagementRate, prev.engagementRate) : 0,
+          engagedSessionsChange: prev ? pctChange(summary.engagedSessions, prev.engagedSessions) : 0,
+          averageEngagementTimeChange: prev
+            ? pctChange(summary.averageEngagementTime, prev.averageEngagementTime)
+            : 0,
         }
-        console.log("[Analytics API] Enhanced summary result:", enhancedSummary)
         return NextResponse.json(enhancedSummary)
+      }
 
       case "daily-metrics":
       case "chart":
@@ -237,6 +246,18 @@ export async function GET(request: NextRequest) {
         const realtimeData = await getRealtimeData(propertyId)
         console.log("[Analytics API] Realtime data result:", realtimeData)
         return NextResponse.json(realtimeData)
+
+      case "events":
+      case "top-events": {
+        const events = await getTopEvents(startDate, endDate, propertyId)
+        return NextResponse.json(events)
+      }
+
+      case "conversions":
+      case "key-events": {
+        const conversions = await getConversionsData(startDate, endDate, propertyId)
+        return NextResponse.json(conversions)
+      }
 
       default:
         console.error("[Analytics API] Invalid endpoint:", endpoint)

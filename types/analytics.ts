@@ -2,18 +2,28 @@
 export interface AnalyticsProperty {
   id: string
   name: string
+  /** Env var name that holds the GA4 property id (e.g. "GA4_PROPERTY_ID_TXMX"). */
+  key?: string
   isConfigured?: boolean
+  /** True for the property the dashboard should select on first load. */
+  isDefault?: boolean
 }
 
 export interface AnalyticsConnectionStatus {
-  configured: boolean
-  connected: boolean
+  configured?: boolean
+  connected?: boolean
   success?: boolean
   propertyId?: string
   dimensionCount?: number
   metricCount?: number
   error?: string
   lastChecked?: string
+  /** GCP project id of the service account — populated by the test-connection endpoint. */
+  projectId?: string
+  /** All known properties + their configured/default status. */
+  availableProperties?: AnalyticsProperty[]
+  /** The property id used when no property is selected. */
+  defaultPropertyId?: string
 }
 
 export interface DateRange {
@@ -181,4 +191,136 @@ export interface PerformanceBadge {
   change: number
   trend: "up" | "down" | "neutral"
   level: "excellent" | "good" | "average" | "poor"
+}
+
+// ============================================
+// GA4 LIB RESPONSE TYPES
+// (used by lib/google-analytics.ts and app/api/analytics/route.ts)
+// ============================================
+
+/** Helper — percent change from previous to current. Positive = growth. */
+export function pctChange(curr: number, prev: number): number {
+  if (!prev) return curr > 0 ? 100 : 0
+  return ((curr - prev) / prev) * 100
+}
+
+/**
+ * Per-period totals returned by getAnalyticsSummary. Now includes GA4-native
+ * engagement metrics (engagementRate, engagedSessions, averageEngagementTime)
+ * alongside legacy bounceRate. Engagement rate is the modern primary metric;
+ * bounce rate stays for back-compat.
+ */
+export interface AnalyticsSummary {
+  totalPageViews: number
+  totalSessions: number
+  totalUsers: number
+  newUsers: number
+  bounceRate: number
+  engagementRate: number
+  engagedSessions: number
+  /** Seconds */
+  averageSessionDuration: number
+  /** Seconds — GA4 native engagement time */
+  averageEngagementTime: number
+  propertyId: string
+  /**
+   * Same metrics for the immediately preceding period of the same length.
+   * Set when the summary call requests comparison; null otherwise.
+   */
+  previousPeriod?: {
+    totalPageViews: number
+    totalSessions: number
+    totalUsers: number
+    newUsers: number
+    bounceRate: number
+    engagementRate: number
+    engagedSessions: number
+    averageSessionDuration: number
+    averageEngagementTime: number
+  } | null
+  _source?: "google-analytics" | "snapshot"
+}
+
+export interface DailyMetricsRow {
+  date: string
+  pageViews: number
+  sessions: number
+  users: number
+  bounceRate: number
+  engagementRate: number
+}
+
+export interface DailyMetricsResponse {
+  data: DailyMetricsRow[]
+  totalPageViews: number
+  totalSessions: number
+  totalUsers: number
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+export interface PageViewsRow {
+  path: string
+  title: string
+  pageViews: number
+  sessions: number
+  bounceRate: number
+}
+
+export interface PageViewsResponse {
+  data: PageViewsRow[]
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+export interface TrafficSourceRow {
+  source: string
+  medium: string
+  /** GA4 default channel grouping — Direct/Organic Search/Organic Social/Email/Referral/Paid Search/Display/Other. */
+  channelGroup: string
+  sessions: number
+  users: number
+  newUsers: number
+  engagedSessions: number
+  engagementRate: number
+}
+
+export interface TrafficSourcesResponse {
+  data: TrafficSourceRow[]
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+export interface DeviceRow {
+  deviceCategory: string
+  sessions: number
+  users: number
+}
+
+export interface DeviceDataResponse {
+  data: DeviceRow[]
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+export interface GeographicRow {
+  country: string
+  city: string
+  sessions: number
+  users: number
+  newUsers: number
+}
+
+export interface GeographicDataResponse {
+  data: GeographicRow[]
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+export interface RealtimeData {
+  totalActiveUsers: number
+  topCountries: Array<{ country: string; activeUsers: number }>
+  topPages?: Array<{ path: string; activeUsers: number }>
+  propertyId: string
+  _source?: "google-analytics"
 }

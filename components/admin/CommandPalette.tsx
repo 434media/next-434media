@@ -113,14 +113,71 @@ const STATIC_ITEMS: CommandItem[] = [
     search: "leads contact forms registrations signups",
     run: (router) => router.push("/admin/leads"),
   },
+  // GA4 web analytics — main 434 portfolio property
   {
     id: "nav-analytics-ga4",
     label: "Analytics — Google Analytics",
-    hint: "Web traffic, sessions, top pages",
+    hint: "434 Media web traffic, last 30 days",
     icon: BarChart3,
     section: "Navigate",
-    search: "analytics google ga4 web traffic",
-    run: (router) => router.push("/admin/analytics?tab=ga4"),
+    search: "analytics google ga4 web traffic 434media",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=488543948"),
+  },
+  // Per-property GA4 deep-links. Uses ?range=30d&property=<id> URL state.
+  // Property ids match lib/google-analytics.ts ANALYTICS_PROPERTIES.
+  {
+    id: "nav-analytics-txmx",
+    label: "Analytics — TXMX Boxing",
+    hint: "GA4 web traffic, last 30 days",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics ga4 txmx boxing web traffic",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=492867424"),
+  },
+  {
+    id: "nav-analytics-vemos",
+    label: "Analytics — Vemos Vamos",
+    hint: "GA4 web traffic, last 30 days",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics ga4 vemos vamos web traffic",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=492895637"),
+  },
+  {
+    id: "nav-analytics-aim",
+    label: "Analytics — AIM Health R&D Summit",
+    hint: "GA4 web traffic, last 30 days",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics ga4 aim health summit web traffic",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=492925168"),
+  },
+  {
+    id: "nav-analytics-salute",
+    label: "Analytics — Salute to Troops",
+    hint: "GA4 web traffic, last 30 days",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics ga4 salute troops web traffic",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=492857375"),
+  },
+  {
+    id: "nav-analytics-ampd",
+    label: "Analytics — The AMPD Project",
+    hint: "GA4 web traffic, last 30 days",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics ga4 ampd project web traffic",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=488563710"),
+  },
+  {
+    id: "nav-analytics-digitalcanvas",
+    label: "Analytics — Digital Canvas",
+    hint: "GA4 web traffic, last 30 days",
+    icon: BarChart3,
+    section: "Navigate",
+    search: "analytics ga4 digital canvas web traffic",
+    run: (router) => router.push("/admin/analytics-web?range=30d&property=492925088"),
   },
   {
     id: "nav-analytics-instagram",
@@ -129,7 +186,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: BarChart3,
     section: "Navigate",
     search: "analytics instagram social ig",
-    run: (router) => router.push("/admin/analytics?tab=instagram"),
+    run: (router) => router.push("/admin/analytics-instagram"),
   },
   {
     id: "nav-analytics-mailchimp",
@@ -138,7 +195,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: BarChart3,
     section: "Navigate",
     search: "analytics mailchimp email campaigns subscribers",
-    run: (router) => router.push("/admin/analytics?tab=mailchimp"),
+    run: (router) => router.push("/admin/analytics-mailchimp"),
   },
   {
     id: "nav-analytics-linkedin",
@@ -147,7 +204,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: BarChart3,
     section: "Navigate",
     search: "analytics linkedin social",
-    run: (router) => router.push("/admin/analytics?tab=linkedin"),
+    run: (router) => router.push("/admin/analytics-linkedin"),
   },
   {
     id: "nav-feed",
@@ -290,58 +347,78 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
     if (!entities) return []
     const items: CommandItem[] = []
 
+    // Pick the first defined string from a list of candidate fields, with a
+    // fallback. Defensive against API responses where a field is unexpectedly
+    // non-string (number, object) — `||` would short-circuit to a truthy
+    // non-string and crash `.toLowerCase()` downstream.
+    const pickString = (...candidates: unknown[]): string => {
+      for (const c of candidates) {
+        if (typeof c === "string" && c.trim()) return c
+        if (typeof c === "number" && Number.isFinite(c)) return String(c)
+      }
+      return ""
+    }
+
     for (const c of entities.clients.slice(0, 30)) {
-      const label = c.company_name || c.name || "Unnamed client"
+      const label = pickString(c.company_name, c.name) || "Unnamed client"
+      const brand = pickString(c.brand)
       items.push({
         id: `client-${c.id}`,
         label,
-        hint: c.brand,
+        hint: brand || undefined,
         icon: Building2,
         section: "Clients",
-        search: `${label} ${c.brand ?? ""}`.toLowerCase(),
+        search: `${label} ${brand}`.toLowerCase(),
         run: (router) => router.push(`/admin/crm?tab=clients&open=${c.id}`),
       })
     }
 
     for (const o of entities.opportunities.slice(0, 30)) {
-      const label = o.name || o.client_name || "Unnamed opportunity"
-      const valueHint = o.value ? `$${o.value.toLocaleString()}` : ""
-      const stageHint = o.stage ? `${o.stage}` : ""
+      const label = pickString(o.name, o.client_name) || "Unnamed opportunity"
+      const stage = pickString(o.stage)
+      const clientName = pickString(o.client_name)
+      const valueHint = typeof o.value === "number" && Number.isFinite(o.value)
+        ? `$${o.value.toLocaleString()}`
+        : ""
       items.push({
         id: `opportunity-${o.id}`,
         label,
-        hint: [stageHint, valueHint].filter(Boolean).join(" · "),
+        hint: [stage, valueHint].filter(Boolean).join(" · "),
         icon: Sparkles,
         section: "Opportunities",
-        search: `${label} ${o.client_name ?? ""} ${o.stage ?? ""}`.toLowerCase(),
+        search: `${label} ${clientName} ${stage}`.toLowerCase(),
         run: (router) => router.push(`/admin/crm?tab=pipeline&openOpportunity=${o.id}`),
       })
     }
 
     for (const t of entities.tasks.slice(0, 30)) {
-      const label = t.title || "Untitled task"
+      const label = pickString(t.title) || "Untitled task"
+      const assignee = pickString(t.assigned_to)
+      const status = pickString(t.status)
       items.push({
         id: `task-${t.id}`,
         label,
-        hint: [t.assigned_to, t.status].filter(Boolean).join(" · "),
+        hint: [assignee, status].filter(Boolean).join(" · "),
         icon: CheckCircle2,
         section: "Tasks",
-        search: `${label} ${t.assigned_to ?? ""} ${t.status ?? ""}`.toLowerCase(),
+        search: `${label} ${assignee} ${status}`.toLowerCase(),
         run: (router) => router.push(`/admin/crm?tab=tasks&openTask=${t.id}`),
       })
     }
 
     for (const l of entities.leads.slice(0, 30)) {
-      const label = l.name || l.email || "Unnamed lead"
-      const scoreHint = typeof l.score === "number" ? `score ${l.score}` : ""
-      const statusHint = l.status ?? ""
+      const label = pickString(l.name, l.email) || "Unnamed lead"
+      const company = pickString(l.company)
+      const email = pickString(l.email)
+      const status = pickString(l.status)
+      const scoreHint = typeof l.score === "number" && Number.isFinite(l.score) ? `score ${l.score}` : ""
       items.push({
         id: `lead-${l.id}`,
         label,
-        hint: [l.company, statusHint, scoreHint].filter(Boolean).join(" · "),
+        hint: [company, status, scoreHint].filter(Boolean).join(" · "),
         icon: Sparkles,
         section: "Leads",
-        search: `${label} ${l.company ?? ""} ${l.email ?? ""} ${statusHint}`.toLowerCase(),
+        search: `${label} ${company} ${email} ${status}`.toLowerCase(),
         run: (router) => router.push(`/admin/crm?tab=leads&openLead=${l.id}`),
       })
     }
@@ -356,11 +433,13 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
     const q = query.trim().toLowerCase()
     const tokens = q.split(/\s+/).filter(Boolean)
     const matches = q
-      ? allItems.filter((item) =>
-          tokens.every(
-            (t) => item.label.toLowerCase().includes(t) || item.search.includes(t),
-          ),
-        )
+      ? allItems.filter((item) => {
+          // Defensive: even though entity builders coerce to string, a future
+          // entity type could miss the coercion and crash this filter.
+          const label = String(item.label ?? "").toLowerCase()
+          const search = String(item.search ?? "")
+          return tokens.every((t) => label.includes(t) || search.includes(t))
+        })
       : allItems
 
     // Group by section, preserving STATIC_ITEMS first, then entities

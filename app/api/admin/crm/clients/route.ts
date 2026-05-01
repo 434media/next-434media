@@ -8,6 +8,7 @@ import {
   deleteClient,
   getClientsByStatus,
 } from "@/lib/firestore-crm"
+import { trackOpportunityWon } from "@/lib/ga4-events"
 
 // Check admin access
 async function requireAdmin() {
@@ -155,21 +156,37 @@ export async function PUT(request: NextRequest) {
     }
 
     const { id, ...updates } = body
-    
-    // Debug: Log what's being updated
-    console.log("=== Client Update ===")
-    console.log("Client ID:", id)
-    console.log("Updates:", JSON.stringify(updates, null, 2))
-    
+
+    // Capture pre-update state so we only fire the won event on the actual
+    // transition (not on subsequent re-saves of an already-won opportunity).
+    const before = await getClientById(id)
+
     const client = await updateClient(id, updates)
-    
-    console.log("Updated client result:", {
-      id: client.id,
-      disposition: client.disposition,
-      pitch_value: client.pitch_value,
-      is_opportunity: client.is_opportunity,
-    })
-    console.log("=====================")
+
+    // Fire-and-forget GA4 server-side event when an opportunity transitions
+    // to closed_won. This is the highest-value event in the whole system —
+    // it ties revenue back to the original acquisition source.
+    if (
+      client.is_opportunity &&
+      client.disposition === "closed_won" &&
+      before?.disposition !== "closed_won"
+    ) {
+      const value = typeof client.pitch_value === "number"
+        ? client.pitch_value
+        : Number(client.pitch_value) || 0
+      const primaryEmail =
+        client.email ||
+        client.contacts?.find((c) => c.is_primary)?.email ||
+        client.contacts?.[0]?.email
+      trackOpportunityWon({
+        email: primaryEmail,
+        brand: client.brand,
+        value,
+        clientId: client.id,
+      }).catch(() => {
+        /* swallowed — analytics must not break the close */
+      })
+    }
 
     return NextResponse.json({ success: true, client })
   } catch (error) {

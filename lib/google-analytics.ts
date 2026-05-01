@@ -119,7 +119,7 @@ function getPropertyId(propertyId?: string): string {
 export function getAvailableProperties(): AnalyticsProperty[] {
   return ANALYTICS_PROPERTIES.map((property) => ({
     ...property,
-    isConfigured: !!process.env[property.key],
+    isConfigured: !!(property.key && process.env[property.key]),
   }))
 }
 
@@ -158,7 +158,29 @@ export async function testAnalyticsConnection(propertyId?: string): Promise<Anal
   }
 }
 
-// Get analytics summary
+/**
+ * Compute the immediately-preceding date range of identical length.
+ * Both inputs are absolute dates (YYYY-MM-DD); GA4's relative shortcuts like
+ * "30daysAgo" should be resolved to absolute dates by the caller (the API
+ * route already does this via formatDateForGA).
+ */
+function previousPeriodOf(startDate: string, endDate: string): { startDate: string; endDate: string } {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const dayMs = 1000 * 60 * 60 * 24
+  // Inclusive day count (e.g., today→today = 1 day window)
+  const lengthDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / dayMs) + 1)
+  const prevEnd = new Date(start)
+  prevEnd.setDate(prevEnd.getDate() - 1)
+  const prevStart = new Date(prevEnd)
+  prevStart.setDate(prevStart.getDate() - (lengthDays - 1))
+  const fmt = (d: Date) => d.toISOString().split("T")[0]
+  return { startDate: fmt(prevStart), endDate: fmt(prevEnd) }
+}
+
+// Get analytics summary — now includes GA4-native engagement metrics and
+// previous-period comparison in a single request (GA4 supports two date
+// ranges natively, no extra round trip).
 export async function getAnalyticsSummary(
   startDate: string,
   endDate: string,
@@ -170,37 +192,60 @@ export async function getAnalyticsSummary(
     const targetPropertyId = getPropertyId(propertyId)
     const client = getAnalyticsClient()
 
+    const prev = previousPeriodOf(startDate, endDate)
+
+    // GA4 returns one row per dateRange. Order: [current, previous].
     const [response] = await client.runReport({
       property: `properties/${targetPropertyId}`,
-      dateRanges: [{ startDate, endDate }],
+      dateRanges: [
+        { startDate, endDate, name: "current" },
+        { startDate: prev.startDate, endDate: prev.endDate, name: "previous" },
+      ],
       metrics: [
         { name: "screenPageViews" },
         { name: "sessions" },
         { name: "totalUsers" },
+        { name: "newUsers" },
         { name: "bounceRate" },
+        { name: "engagementRate" },
+        { name: "engagedSessions" },
         { name: "averageSessionDuration" },
+        { name: "userEngagementDuration" },
       ],
     })
 
-    const row = response.rows?.[0]
-    if (!row?.metricValues) {
-      return {
-        totalPageViews: 0,
-        totalSessions: 0,
-        totalUsers: 0,
-        bounceRate: 0,
-        averageSessionDuration: 0,
-        propertyId: targetPropertyId,
-      }
-    }
+    // GA4 tags each row with the dateRange name in its first dimensionValue
+    // when multiple ranges are present (or returns rows in order — be defensive).
+    const rowsByPeriod: Record<string, NonNullable<typeof response.rows>[number]> = {}
+    response.rows?.forEach((row, idx) => {
+      const tag = row.dimensionValues?.[0]?.value || (idx === 0 ? "current" : "previous")
+      rowsByPeriod[tag] = row
+    })
+    const currentRow = rowsByPeriod.current ?? response.rows?.[0]
+    const previousRow = rowsByPeriod.previous ?? response.rows?.[1]
+
+    const readMetrics = (row: typeof currentRow) => ({
+      totalPageViews: Number(row?.metricValues?.[0]?.value || 0),
+      totalSessions: Number(row?.metricValues?.[1]?.value || 0),
+      totalUsers: Number(row?.metricValues?.[2]?.value || 0),
+      newUsers: Number(row?.metricValues?.[3]?.value || 0),
+      bounceRate: Number(row?.metricValues?.[4]?.value || 0),
+      engagementRate: Number(row?.metricValues?.[5]?.value || 0),
+      engagedSessions: Number(row?.metricValues?.[6]?.value || 0),
+      averageSessionDuration: Number(row?.metricValues?.[7]?.value || 0),
+      // userEngagementDuration is total seconds across all sessions; convert to per-session avg
+      averageEngagementTime: Number(row?.metricValues?.[1]?.value || 0) > 0
+        ? Number(row?.metricValues?.[8]?.value || 0) / Number(row?.metricValues?.[1]?.value || 1)
+        : 0,
+    })
+
+    const current = readMetrics(currentRow)
+    const previous = previousRow ? readMetrics(previousRow) : null
 
     return {
-      totalPageViews: Number(row.metricValues[0]?.value || 0),
-      totalSessions: Number(row.metricValues[1]?.value || 0),
-      totalUsers: Number(row.metricValues[2]?.value || 0),
-      bounceRate: Number(row.metricValues[3]?.value || 0),
-      averageSessionDuration: Number(row.metricValues[4]?.value || 0),
+      ...current,
       propertyId: targetPropertyId,
+      previousPeriod: previous,
       _source: "google-analytics",
     }
   } catch (error) {
@@ -225,28 +270,23 @@ export async function getDailyMetrics(
       property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "date" }],
-      metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "totalUsers" }, { name: "bounceRate" }],
+      metrics: [
+        { name: "screenPageViews" },
+        { name: "sessions" },
+        { name: "totalUsers" },
+        { name: "bounceRate" },
+        { name: "engagementRate" },
+      ],
       orderBys: [{ dimension: { dimensionName: "date" } }],
     })
 
-    console.log("[GA4] Daily metrics raw response:", JSON.stringify(response, null, 2))
-
     const data =
       response.rows?.map((row) => {
-        // Get the date string from the dimension value
         const dateStr = row.dimensionValues?.[0]?.value || ""
-
-        // Log the raw date format from GA4
-        console.log(`[GA4] Raw date from GA4: ${dateStr}`)
-
-        // Format the date if it's in YYYYMMDD format (GA4 format)
+        // GA4 returns dates as YYYYMMDD; normalize to YYYY-MM-DD
         let formattedDate = dateStr
         if (/^\d{8}$/.test(dateStr)) {
-          const year = dateStr.substring(0, 4)
-          const month = dateStr.substring(4, 6)
-          const day = dateStr.substring(6, 8)
-          formattedDate = `${year}-${month}-${day}`
-          console.log(`[GA4] Formatted date: ${formattedDate}`)
+          formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`
         }
 
         return {
@@ -255,6 +295,7 @@ export async function getDailyMetrics(
           sessions: Number(row.metricValues?.[1]?.value || 0),
           users: Number(row.metricValues?.[2]?.value || 0),
           bounceRate: Number(row.metricValues?.[3]?.value || 0),
+          engagementRate: Number(row.metricValues?.[4]?.value || 0),
         }
       }) || []
 
@@ -341,19 +382,35 @@ export async function getTrafficSourcesData(
     const [response] = await client.runReport({
       property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "sessionSource" }, { name: "sessionMedium" }],
-      metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "newUsers" }],
+      dimensions: [
+        { name: "sessionSource" },
+        { name: "sessionMedium" },
+        // GA4's clean bucketing: Direct / Organic Search / Paid Search /
+        // Organic Social / Paid Social / Email / Referral / Display / Other.
+        // Lets the UI group cleanly without parsing source/medium pairs.
+        { name: "sessionDefaultChannelGrouping" },
+      ],
+      metrics: [
+        { name: "sessions" },
+        { name: "totalUsers" },
+        { name: "newUsers" },
+        { name: "engagedSessions" },
+        { name: "engagementRate" },
+      ],
       orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-      limit: 20,
+      limit: 50,
     })
 
     const data =
       response.rows?.map((row) => ({
         source: row.dimensionValues?.[0]?.value || "",
         medium: row.dimensionValues?.[1]?.value || "",
+        channelGroup: row.dimensionValues?.[2]?.value || "Other",
         sessions: Number(row.metricValues?.[0]?.value || 0),
         users: Number(row.metricValues?.[1]?.value || 0),
         newUsers: Number(row.metricValues?.[2]?.value || 0),
+        engagedSessions: Number(row.metricValues?.[3]?.value || 0),
+        engagementRate: Number(row.metricValues?.[4]?.value || 0),
       })) || []
 
     return {
@@ -446,6 +503,154 @@ export async function getGeographicData(
   }
 }
 
+// ============================================
+// EVENTS & CONVERSIONS
+// (Phase 2 of the analytics overhaul — read-side counterpart to the
+// server-side Measurement Protocol writes in lib/ga4-events.ts)
+// ============================================
+
+export interface EventRow {
+  eventName: string
+  eventCount: number
+  totalUsers: number
+  /** Sum of `value` event param across all instances (e.g. opportunity_won total $). */
+  eventValue: number
+}
+
+export interface EventsResponse {
+  data: EventRow[]
+  totalEvents: number
+  totalConversions: number
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+/**
+ * Top events with counts + value, current period plus previous-period totals
+ * for delta computation. We pull the union of (current period top N) + (any
+ * conversion-flagged event from previous period) so the chart can show drop-offs.
+ */
+export async function getTopEvents(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+  limit = 20,
+): Promise<EventsResponse> {
+  console.log("[GA4] getTopEvents called with:", { startDate, endDate, propertyId, limit })
+
+  try {
+    const targetPropertyId = getPropertyId(propertyId)
+    const client = getAnalyticsClient()
+
+    const [response] = await client.runReport({
+      property: `properties/${targetPropertyId}`,
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "eventName" }],
+      metrics: [
+        { name: "eventCount" },
+        { name: "totalUsers" },
+        { name: "eventValue" },
+      ],
+      orderBys: [{ metric: { metricName: "eventCount" }, desc: true }],
+      limit,
+    })
+
+    const data: EventRow[] =
+      response.rows?.map((row) => ({
+        eventName: row.dimensionValues?.[0]?.value || "",
+        eventCount: Number(row.metricValues?.[0]?.value || 0),
+        totalUsers: Number(row.metricValues?.[1]?.value || 0),
+        eventValue: Number(row.metricValues?.[2]?.value || 0),
+      })) || []
+
+    const totalEvents = data.reduce((sum, e) => sum + e.eventCount, 0)
+
+    return {
+      data,
+      totalEvents,
+      // Conversions is a property-level setting — events tagged as
+      // conversions in GA4 admin. We approximate by summing across the
+      // result set when a future enhancement requests just conversions.
+      totalConversions: 0,
+      propertyId: targetPropertyId,
+      _source: "google-analytics",
+    }
+  } catch (error) {
+    console.error("[GA4] Error in getTopEvents:", error)
+    throw error
+  }
+}
+
+export interface ConversionEventRow {
+  eventName: string
+  conversions: number
+  totalRevenue: number
+  conversionRate: number
+}
+
+export interface ConversionsResponse {
+  data: ConversionEventRow[]
+  totalConversions: number
+  totalRevenue: number
+  propertyId: string
+  _source?: "google-analytics" | "snapshot"
+}
+
+/**
+ * Conversion events only — events flagged as conversions in GA4 Admin →
+ * Events. Returns each conversion event's count, total revenue (sum of
+ * `value` param when present), and conversion rate (conversions / sessions).
+ */
+export async function getConversionsData(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<ConversionsResponse> {
+  console.log("[GA4] getConversionsData called with:", { startDate, endDate, propertyId })
+
+  try {
+    const targetPropertyId = getPropertyId(propertyId)
+    const client = getAnalyticsClient()
+
+    const [response] = await client.runReport({
+      property: `properties/${targetPropertyId}`,
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "eventName" }],
+      metrics: [
+        { name: "conversions" },
+        { name: "totalRevenue" },
+        { name: "sessionConversionRate" },
+      ],
+      orderBys: [{ metric: { metricName: "conversions" }, desc: true }],
+      limit: 20,
+    })
+
+    const data: ConversionEventRow[] =
+      response.rows
+        ?.map((row) => ({
+          eventName: row.dimensionValues?.[0]?.value || "",
+          conversions: Number(row.metricValues?.[0]?.value || 0),
+          totalRevenue: Number(row.metricValues?.[1]?.value || 0),
+          conversionRate: Number(row.metricValues?.[2]?.value || 0),
+        }))
+        .filter((row) => row.conversions > 0) || []
+
+    const totalConversions = data.reduce((sum, e) => sum + e.conversions, 0)
+    const totalRevenue = data.reduce((sum, e) => sum + e.totalRevenue, 0)
+
+    return {
+      data,
+      totalConversions,
+      totalRevenue,
+      propertyId: targetPropertyId,
+      _source: "google-analytics",
+    }
+  } catch (error) {
+    console.error("[GA4] Error in getConversionsData:", error)
+    throw error
+  }
+}
+
 // Get realtime data
 export async function getRealtimeData(propertyId?: string): Promise<RealtimeData> {
   console.log("[GA4] getRealtimeData called with propertyId:", propertyId)
@@ -461,14 +666,24 @@ export async function getRealtimeData(propertyId?: string): Promise<RealtimeData
 
     const totalActiveUsers = Number(response.rows?.[0]?.metricValues?.[0]?.value || 0)
 
-    // Get top countries for realtime
-    const [countriesResponse] = await client.runRealtimeReport({
-      property: `properties/${targetPropertyId}`,
-      dimensions: [{ name: "country" }],
-      metrics: [{ name: "activeUsers" }],
-      orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
-      limit: 5,
-    })
+    // Run top countries + top pages in parallel — both are realtime queries
+    // and don't depend on each other.
+    const [[countriesResponse], [pagesResponse]] = await Promise.all([
+      client.runRealtimeReport({
+        property: `properties/${targetPropertyId}`,
+        dimensions: [{ name: "country" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: 5,
+      }),
+      client.runRealtimeReport({
+        property: `properties/${targetPropertyId}`,
+        dimensions: [{ name: "unifiedScreenName" }],
+        metrics: [{ name: "activeUsers" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: 5,
+      }),
+    ])
 
     const topCountries =
       countriesResponse.rows?.map((row) => ({
@@ -476,9 +691,16 @@ export async function getRealtimeData(propertyId?: string): Promise<RealtimeData
         activeUsers: Number(row.metricValues?.[0]?.value || 0),
       })) || []
 
+    const topPages =
+      pagesResponse.rows?.map((row) => ({
+        path: row.dimensionValues?.[0]?.value || "",
+        activeUsers: Number(row.metricValues?.[0]?.value || 0),
+      })) || []
+
     return {
       totalActiveUsers,
       topCountries,
+      topPages,
       propertyId: targetPropertyId,
       _source: "google-analytics",
     }

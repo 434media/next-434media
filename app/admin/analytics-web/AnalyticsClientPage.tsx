@@ -1,14 +1,18 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader"
-import { MetricsOverview } from "@/components/analytics/MetricsOverview"
+import { HeroMetric } from "@/components/analytics/HeroMetric"
+import { WhatChangedPanel } from "@/components/analytics/WhatChangedPanel"
 import { PageViewsChart } from "@/components/analytics/PageViewsChart"
 import { TopPagesTable } from "@/components/analytics/TopPagesTable"
 import { TrafficSourcesChart } from "@/components/analytics/TrafficSourcesChart"
 import { DeviceBreakdown } from "@/components/analytics/DeviceBreakdown"
 import { GeographicMap } from "@/components/analytics/GeographicMap"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
+import { EventsConversionsPanel } from "@/components/analytics/EventsConversionsPanel"
+import { dateRangeFromUrl, rangeKeyFromDateRange } from "@/lib/analytics-url-state"
 import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "@/types/analytics"
 
 // Download analytics summary as CSV
@@ -479,20 +483,202 @@ async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, p
   }
 }
 
+/**
+ * Snapshot freshness indicator. Tells the rep whether they're looking at
+ * this morning's cached snapshot (default — fast) or a live GA4 query.
+ * Click to toggle between the two modes — also flips the `?live=1` URL param.
+ */
+function SnapshotPill({
+  meta,
+  useSnapshot,
+  onToggle,
+}: {
+  meta: { snapshotDate: string; generatedAt: string } | null
+  useSnapshot: boolean
+  onToggle: () => void
+}) {
+  const baseClasses =
+    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer hover:brightness-95"
+
+  if (!useSnapshot) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        title="Click to switch to cached snapshot (faster)"
+        className={`${baseClasses} bg-emerald-50 text-emerald-700 border border-emerald-100`}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+        Live data
+      </button>
+    )
+  }
+  if (!meta) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        title="Click to switch to live data"
+        className={`${baseClasses} bg-neutral-100 text-neutral-500 border border-neutral-200`}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
+        Loading snapshot…
+      </button>
+    )
+  }
+  let when = meta.generatedAt
+  try {
+    when = new Date(meta.generatedAt).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  } catch {
+    /* keep raw string */
+  }
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title="Click to switch to live data (slower, hits GA4 directly)"
+      className={`${baseClasses} bg-blue-50 text-blue-700 border border-blue-100`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+      Cached snapshot · {when}
+    </button>
+  )
+}
+
+/**
+ * Realtime active-users pill. Polls /api/analytics?endpoint=realtime every
+ * 30s. The endpoint already returns top countries + top pages; we surface
+ * just the headline number and reveal the rest in the title attribute for now.
+ * (Phase 3 will add a hover popover.)
+ */
+function RealtimePill({ propertyId }: { propertyId: string }) {
+  const [active, setActive] = useState<number | null>(null)
+  const [topPages, setTopPages] = useState<Array<{ path: string; activeUsers: number }>>([])
+
+  useEffect(() => {
+    if (!propertyId) return
+    let cancelled = false
+    const fetchRealtime = async () => {
+      try {
+        const res = await fetch(
+          `/api/analytics?endpoint=realtime&propertyId=${encodeURIComponent(propertyId)}`,
+          { cache: "no-store" },
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        setActive(typeof data.totalActiveUsers === "number" ? data.totalActiveUsers : 0)
+        setTopPages(Array.isArray(data.topPages) ? data.topPages.slice(0, 3) : [])
+      } catch {
+        /* silent — pill is non-critical */
+      }
+    }
+    fetchRealtime()
+    const id = setInterval(fetchRealtime, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [propertyId])
+
+  if (active === null) return null
+
+  const tooltip = topPages.length > 0
+    ? `Top: ${topPages.map((p) => `${p.path} (${p.activeUsers})`).join(", ")}`
+    : undefined
+
+  return (
+    <span
+      title={tooltip}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100"
+    >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+      </span>
+      <span className="tabular-nums">{active}</span>
+      <span>active now</span>
+    </span>
+  )
+}
+
 export default function AnalyticsClientPage() {
+  // URL-driven state — refresh restores, share-link works, Cmd+K can deep-link.
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedDateRange, setSelectedDateRange] = useState<DateRange>({
-    startDate: "30daysAgo",
-    endDate: "today",
-    label: "Last 30 days",
-  })
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
+  // Seed from URL on first render. The `?range=` key drives the date selector;
+  // `?start=`/`?end=` apply when range=custom; `?property=` drives the GA4
+  // property dropdown; `?live=1` flips data source to live (default snapshot).
+  const [selectedDateRange, setSelectedDateRange] = useState<DateRange>(() =>
+    dateRangeFromUrl(new URLSearchParams(searchParams?.toString() ?? "")),
+  )
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(
+    () => searchParams?.get("property") ?? "",
+  )
   const [availableProperties, setAvailableProperties] = useState<AnalyticsProperty[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<AnalyticsConnectionStatus | null>(null)
-  const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
+  const [dataSource, setDataSource] = useState<"snapshot" | "live">(
+    () => (searchParams?.get("live") === "1" ? "live" : "snapshot"),
+  )
   const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
   const useSnapshot = dataSource === "snapshot"
+
+  // Push state changes back to the URL. Avoids re-render loops by checking
+  // each param against its current URL value before pushing.
+  useEffect(() => {
+    const current = new URLSearchParams(searchParams?.toString() ?? "")
+    const next = new URLSearchParams(current.toString())
+
+    const desiredRangeKey = rangeKeyFromDateRange(selectedDateRange)
+    next.set("range", desiredRangeKey)
+    if (desiredRangeKey === "custom") {
+      next.set("start", selectedDateRange.startDate)
+      next.set("end", selectedDateRange.endDate)
+    } else {
+      next.delete("start")
+      next.delete("end")
+    }
+
+    if (selectedPropertyId) {
+      next.set("property", selectedPropertyId)
+    } else {
+      next.delete("property")
+    }
+
+    if (dataSource === "live") {
+      next.set("live", "1")
+    } else {
+      next.delete("live")
+    }
+
+    if (next.toString() !== current.toString()) {
+      const qs = next.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDateRange, selectedPropertyId, dataSource])
+
+  // React to back/forward URL changes from the browser. Mostly a no-op since
+  // user-initiated changes already round-trip via the effect above, but
+  // necessary for "share this view" links and browser nav to work.
+  useEffect(() => {
+    const next = dateRangeFromUrl(new URLSearchParams(searchParams?.toString() ?? ""))
+    if (next.label !== selectedDateRange.label) setSelectedDateRange(next)
+    const propertyParam = searchParams?.get("property") ?? ""
+    if (propertyParam && propertyParam !== selectedPropertyId) setSelectedPropertyId(propertyParam)
+    const liveParam = searchParams?.get("live") === "1" ? "live" : "snapshot"
+    if (liveParam !== dataSource) setDataSource(liveParam)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // Load properties on component mount
   useEffect(() => {
@@ -649,21 +835,51 @@ export default function AnalyticsClientPage() {
             </div>
           )}
 
+          {/* Status row — snapshot freshness + realtime active users.
+              Tells the rep at a glance whether they're on cached or live data
+              and how many people are on the site right now. */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <SnapshotPill
+              meta={snapshotMeta}
+              useSnapshot={useSnapshot}
+              onToggle={() => setDataSource(useSnapshot ? "live" : "snapshot")}
+            />
+            <RealtimePill propertyId={selectedPropertyId} />
+          </div>
+
           {/* Analytics Dashboard - Always show components */}
           <>
-            {/* Metrics Overview */}
+            {/* Hero metric — Sessions front and center with sparkline + delta,
+                three secondary metrics stacked on the right. Replaces the old
+                4-card equal-weight grid. (Phase 3b — Vercel pattern.) */}
             <div className="py-4 sm:py-6 relative z-10">
               <div className="flex items-center gap-2 mb-4 sm:mb-5">
                 <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Key Metrics</h2>
-                <InfoTooltip content="High-level overview of your website's performance. Users are unique visitors, Sessions are visits, Page Views are total pages loaded, and Bounce Rate is the percentage of single-page visits." />
+                <InfoTooltip content="Sessions is the lead metric — overall traffic volume. Users counts unique visitors. Page Views counts every page load. Engagement Rate is GA4's primary quality signal: % of sessions where users stayed engaged for 10+ seconds, viewed multiple pages, or triggered a key event. All deltas compare to the previous period of the same length." />
               </div>
-              <MetricsOverview
+              <HeroMetric
                 dateRange={selectedDateRange}
-                isLoading={isLoading}
-                setError={setError}
                 propertyId={selectedPropertyId}
                 useSnapshot={useSnapshot}
+                setError={setError}
                 onSnapshotMeta={setSnapshotMeta}
+              />
+            </div>
+
+            {/* "What changed" — biggest page-level risers and fallers vs the
+                previous period. (Phase 3b — Linear pattern.) Sits right under
+                the hero so the team's eye lands on the most actionable signal
+                before scrolling into the rest of the dashboard. */}
+            <div className="mt-2 sm:mt-4 w-full max-w-full relative z-10">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">What changed</h2>
+                <InfoTooltip content="Pages with the biggest week-over-week (or period-over-period) change in views. Filtered to pages with at least 20 views in either period to keep the noise out — a tiny page going from 1 to 5 views isn't a meaningful signal." />
+              </div>
+              <WhatChangedPanel
+                dateRange={selectedDateRange}
+                propertyId={selectedPropertyId}
+                useSnapshot={useSnapshot}
+                setError={setError}
               />
             </div>
 
@@ -682,6 +898,25 @@ export default function AnalyticsClientPage() {
                   useSnapshot={useSnapshot}
                 />
               </div>
+            </div>
+
+            {/* Events & Conversions — Phase 2: surfaces server-side measurement
+                protocol writes (lead_capture, lead_qualified, lead_converted,
+                opportunity_won) plus any client-side custom events */}
+            <div className="mt-8 sm:mt-12 w-full max-w-full">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">
+                  Events & Conversions
+                </h2>
+                <InfoTooltip content="Custom events fired from the public sites (page CTAs, form submits, video plays) and from CRM mutations server-side (lead_converted, opportunity_won). Conversion events are tagged in GA4 Admin → Events." />
+              </div>
+              <EventsConversionsPanel
+                dateRange={selectedDateRange}
+                propertyId={selectedPropertyId}
+                useSnapshot={useSnapshot}
+                isLoading={isLoading}
+                setError={setError}
+              />
             </div>
 
             {/* Top Pages and Traffic Sources - Stack on mobile */}
