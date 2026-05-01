@@ -11,7 +11,7 @@ import {
   Tag as TagIcon,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
+  Wand2,
   Send,
   ArrowRight,
   Trash2,
@@ -37,7 +37,7 @@ interface LeadDetailDrawerProps {
 
 const STATUS_OPTIONS: { value: LeadStatus; label: string; color: string }[] = [
   { value: "new", label: "New", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { value: "ready", label: "Ready", color: "bg-purple-100 text-purple-700 border-purple-200" },
+  { value: "ready", label: "Ready", color: "bg-sky-100 text-sky-700 border-sky-200" },
   { value: "contacted", label: "Contacted", color: "bg-amber-100 text-amber-700 border-amber-200" },
   { value: "engaged", label: "Engaged", color: "bg-green-100 text-green-700 border-green-200" },
   { value: "converted", label: "Converted", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -497,7 +497,7 @@ export function LeadDetailDrawer({
         </Section>
 
         {/* Outreach section */}
-        <Section title="Outreach" icon={Sparkles}>
+        <Section title="Outreach" icon={Wand2}>
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium text-neutral-600">Draft email</label>
@@ -517,7 +517,7 @@ export function LeadDetailDrawer({
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-3 h-3" />
+                        <Wand2 className="w-3 h-3" />
                         {form.outreach_draft ? "Regenerate" : "Generate"}
                       </>
                     )}

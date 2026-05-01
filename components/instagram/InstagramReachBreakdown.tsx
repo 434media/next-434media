@@ -13,7 +13,7 @@ interface InstagramReachBreakdownProps {
 const mediaTypeConfig: Record<keyof InstagramReachBreakdown, { icon: React.ElementType; label: string; color: string; bgColor: string }> = {
   FEED: { icon: Image, label: "Feed Posts", color: "text-blue-600", bgColor: "bg-blue-100" },
   REELS: { icon: Film, label: "Reels", color: "text-pink-600", bgColor: "bg-pink-100" },
-  STORY: { icon: Video, label: "Stories", color: "text-purple-600", bgColor: "bg-purple-100" },
+  STORY: { icon: Video, label: "Stories", color: "text-sky-600", bgColor: "bg-sky-100" },
   AD: { icon: Megaphone, label: "Promoted", color: "text-yellow-600", bgColor: "bg-yellow-100" },
 }
 

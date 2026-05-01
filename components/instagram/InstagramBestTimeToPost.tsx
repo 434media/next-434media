@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { Clock, TrendingUp, Sparkles } from "lucide-react"
+import { Clock, TrendingUp, Lightbulb } from "lucide-react"
 import type { InstagramOnlineFollowers } from "../../types/instagram-insights"
 
 interface InstagramBestTimeToPostProps {
@@ -71,7 +71,7 @@ export function InstagramBestTimeToPost({ onlineFollowers, isLoading }: Instagra
       {/* Best Times Highlight */}
       <div className="p-4 border-b border-neutral-200 bg-gradient-to-r from-pink-50 to-transparent">
         <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="w-4 h-4 text-pink-600" />
+          <Lightbulb className="w-4 h-4 text-pink-600" />
           <span className="text-pink-600 text-xs font-semibold uppercase tracking-wide">Optimal Posting Times</span>
         </div>
         <div className="flex flex-wrap gap-2">

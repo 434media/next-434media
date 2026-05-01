@@ -72,12 +72,28 @@ export function getSearchConsoleSite(propertyId: string): string | null {
   return process.env[`SEARCH_CONSOLE_SITE_${key}`] || null
 }
 
-async function searchConsoleFetch<T>(siteUrl: string, path: string, body: unknown): Promise<T> {
+/**
+ * Result tag for the fetch helper. We distinguish "configured but inaccessible"
+ * (403 — service account not granted in SC UI yet) from "not found" and from
+ * other transient errors so callers can return graceful empty-state UIs
+ * instead of bubbling 500s up to the dashboard.
+ */
+type SearchConsoleFetchResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number; reason: string }
+
+async function searchConsoleFetch<T>(
+  siteUrl: string,
+  path: string,
+  body: unknown,
+): Promise<SearchConsoleFetchResult<T>> {
   const auth = getAuth()
   const client = await auth.getClient()
   const tokenResponse = await client.getAccessToken()
   const token = tokenResponse.token
-  if (!token) throw new Error("Failed to get Search Console access token")
+  if (!token) {
+    return { ok: false, status: 401, reason: "Failed to get Search Console access token" }
+  }
 
   const url = `${SC_BASE}/sites/${encodeURIComponent(siteUrl)}${path}`
   const res = await fetch(url, {
@@ -91,9 +107,13 @@ async function searchConsoleFetch<T>(siteUrl: string, path: string, body: unknow
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "")
-    throw new Error(`Search Console ${res.status}: ${errText.slice(0, 200)}`)
+    return {
+      ok: false,
+      status: res.status,
+      reason: `${res.status}: ${errText.slice(0, 200)}`,
+    }
   }
-  return (await res.json()) as T
+  return { ok: true, data: (await res.json()) as T }
 }
 
 export interface SearchConsoleQueryRow {
@@ -149,8 +169,20 @@ export async function getSearchConsoleQueries(
     rows?: RawRow[]
   }
 
-  const response = await searchConsoleFetch<RawResponse>(siteUrl, "/searchAnalytics/query", body)
-  const rows = (response.rows ?? []).map((r) => ({
+  const result = await searchConsoleFetch<RawResponse>(siteUrl, "/searchAnalytics/query", body)
+  if (!result.ok) {
+    // 403/404/401 = "service account not yet granted access in SC UI" or
+    // "site not in this SC account" or "auth failed". Treat all as a soft
+    // "not accessible" — the UI shows the same empty state as "not configured"
+    // with messaging that covers both setup steps.
+    // Server-side log preserves the actual reason for debugging.
+    console.warn(
+      `[SearchConsole] ${siteUrl} returned ${result.status}: ${result.reason}`,
+    )
+    return null
+  }
+
+  const rows = (result.data.rows ?? []).map((r) => ({
     query: r.keys?.[0] ?? "(unknown)",
     clicks: r.clicks ?? 0,
     impressions: r.impressions ?? 0,

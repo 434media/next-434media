@@ -154,8 +154,8 @@ export default function PortfolioAnalyticsClientPage() {
       <div className="bg-white border-b border-neutral-200">
         <div className="px-4 sm:px-5 lg:px-6 py-4 sm:py-5">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
-              <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
+              <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600" />
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-lg font-bold text-neutral-900 leading-tight">
@@ -173,7 +173,7 @@ export default function PortfolioAnalyticsClientPage() {
         {/* Range chips */}
         <div className="border-t border-neutral-100 bg-neutral-50">
           <div className="px-4 sm:px-5 lg:px-6 py-3 flex flex-wrap items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-indigo-600 shrink-0" />
+            <CalendarDays className="h-4 w-4 text-teal-600 shrink-0" />
             {RANGE_OPTIONS.map((opt) => {
               const active = rangeKeyFromDateRange(selectedDateRange) === opt.key
               return (
@@ -192,7 +192,7 @@ export default function PortfolioAnalyticsClientPage() {
                   }}
                   className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
                     active
-                      ? "bg-indigo-600 text-white border border-indigo-600"
+                      ? "bg-teal-600 text-white border border-teal-600"
                       : "bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-100"
                   }`}
                 >
@@ -225,7 +225,7 @@ export default function PortfolioAnalyticsClientPage() {
                 <div
                   className={`absolute top-0 left-0 right-0 h-1 ${
                     data.totalSessionsChange >= 0
-                      ? "bg-gradient-to-r from-indigo-500 to-purple-500"
+                      ? "bg-gradient-to-r from-teal-500 to-emerald-500"
                       : "bg-gradient-to-r from-red-500 to-orange-500"
                   }`}
                 />
@@ -256,8 +256,8 @@ export default function PortfolioAnalyticsClientPage() {
                 />
                 <SecondaryStat
                   icon={Eye}
-                  iconColor="text-violet-600"
-                  iconBg="bg-violet-100"
+                  iconColor="text-sky-600"
+                  iconBg="bg-sky-100"
                   label="Total page views"
                   value={formatNumber(data.total.pageViews)}
                   change={data.totalPageViewsChange}
@@ -414,7 +414,7 @@ function BrandRow({ brand }: { brand: PortfolioBrandRow }) {
           </span>
           <div className="w-20 h-1 bg-neutral-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-indigo-500"
+              className="h-full bg-teal-500"
               style={{ width: `${(brand.sessionShare * 100).toFixed(1)}%` }}
             />
           </div>

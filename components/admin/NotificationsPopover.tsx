@@ -35,7 +35,7 @@ function getNotificationIcon(type: string) {
     case "assignment":
       return <UserPlus className="w-3.5 h-3.5 text-green-500" />
     case "tagged":
-      return <AtSign className="w-3.5 h-3.5 text-purple-500" />
+      return <AtSign className="w-3.5 h-3.5 text-amber-500" />
     default:
       return <Bell className="w-3.5 h-3.5 text-neutral-400" />
   }

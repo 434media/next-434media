@@ -79,7 +79,7 @@ export function NotificationBell({ onOpenTask, onOpenContentPost }: Notification
       case "assignment":
         return <UserPlus className="w-4 h-4 text-green-500" />
       case "tagged":
-        return <AtSign className="w-4 h-4 text-purple-500" />
+        return <AtSign className="w-4 h-4 text-amber-500" />
       default:
         return <Bell className="w-4 h-4 text-gray-500" />
     }

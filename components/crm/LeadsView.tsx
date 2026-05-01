@@ -5,7 +5,7 @@ import {
   Plus,
   Search,
   RefreshCw,
-  Sparkles,
+  Flag,
   Mail,
   Phone,
   Calendar,
@@ -37,7 +37,7 @@ const PRIORITY_BADGE: Record<LeadPriority, string> = {
 
 const STATUS_PILL: Record<LeadStatus, string> = {
   new: "bg-blue-50 text-blue-700 border-blue-100",
-  ready: "bg-purple-50 text-purple-700 border-purple-100",
+  ready: "bg-sky-50 text-sky-700 border-sky-100",
   contacted: "bg-amber-50 text-amber-700 border-amber-100",
   engaged: "bg-green-50 text-green-700 border-green-100",
   converted: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -173,7 +173,7 @@ export function LeadsView({
         <ViewChip
           active={view === "priority"}
           onClick={() => onViewChange("priority")}
-          icon={Sparkles}
+          icon={Flag}
           label="Priority queue"
           count={counts.priority}
         />
@@ -389,7 +389,7 @@ function EmptyState({
   }
   const config = {
     priority: {
-      icon: Sparkles,
+      icon: Flag,
       title: "No high-priority leads right now",
       hint: "Leads with score ≥ 65 in status New or Ready will appear here.",
     },

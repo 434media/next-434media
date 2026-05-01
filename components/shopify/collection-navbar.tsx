@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { ChevronDown, ArrowLeft, Search, Filter, X, ShoppingBag, Sparkles } from "lucide-react"
+import { ChevronDown, ArrowLeft, Search, Filter, X, ShoppingBag, Star } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import type { SortFilterItem } from "../../lib/constants"
 import type { Collection } from "../../lib/shopify/types"
@@ -160,7 +160,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                     }}
                     className="ml-2"
                   >
-                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    <Star className="w-3 h-3 text-emerald-400" />
                   </motion.div>
                 )}
               </motion.button>

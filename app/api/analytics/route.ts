@@ -12,6 +12,7 @@ import {
   getConversionsData,
   getPortfolioSummary,
   getCohortRetention,
+  getAnomalies,
   getAvailableProperties,
 } from "@/lib/google-analytics"
 import { getSearchConsoleQueries } from "@/lib/search-console"
@@ -278,6 +279,14 @@ export async function GET(request: NextRequest) {
         // configured property in parallel. Date range still applies.
         const portfolio = await getPortfolioSummary(startDate, endDate)
         return NextResponse.json(portfolio)
+      }
+
+      case "anomalies":
+      case "insights": {
+        // Phase 5a — current period vs trailing 3-period baseline. Single
+        // GA4 call with 4 date ranges; returns 0–N flagged metrics.
+        const anomalies = await getAnomalies(startDate, endDate, propertyId)
+        return NextResponse.json(anomalies)
       }
 
       case "cohort-retention":

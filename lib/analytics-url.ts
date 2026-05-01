@@ -15,6 +15,7 @@ export type AnalyticsEndpoint =
   | "search-queries"
   | "core-web-vitals"
   | "cohort-retention"
+  | "anomalies"
 
 interface BuildOpts {
   endpoint: AnalyticsEndpoint
@@ -49,6 +50,7 @@ const LIVE_ONLY_ENDPOINTS = new Set<AnalyticsEndpoint>([
   "search-queries",
   "core-web-vitals",
   "cohort-retention",
+  "anomalies",
 ])
 
 export function buildAnalyticsUrl(opts: BuildOpts): string {

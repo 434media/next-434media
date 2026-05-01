@@ -44,7 +44,7 @@ type EventTab = "upcoming" | "in-progress" | "completed" | "all"
 const STATUS_COLORS: Record<string, string> = {
   planning: "bg-amber-100 text-amber-700 border-amber-200",
   confirmed: "bg-blue-100 text-blue-700 border-blue-200",
-  "in-progress": "bg-purple-100 text-purple-700 border-purple-200",
+  "in-progress": "bg-sky-100 text-sky-700 border-sky-200",
   completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
 }
@@ -52,7 +52,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_BADGE_SOLID: Record<string, string> = {
   planning: "bg-amber-500 text-white",
   confirmed: "bg-blue-500 text-white",
-  "in-progress": "bg-purple-500 text-white",
+  "in-progress": "bg-sky-500 text-white",
   completed: "bg-emerald-500 text-white",
   cancelled: "bg-red-500 text-white",
 }
@@ -60,7 +60,7 @@ const STATUS_BADGE_SOLID: Record<string, string> = {
 const STATUS_DOT: Record<string, string> = {
   planning: "bg-amber-500",
   confirmed: "bg-blue-500",
-  "in-progress": "bg-purple-500",
+  "in-progress": "bg-sky-500",
   completed: "bg-emerald-500",
   cancelled: "bg-red-500",
 }
@@ -383,25 +383,25 @@ export default function EventsSection({ events, onDelete, onSave, showToast }: E
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl"
+          className="flex items-center gap-3 px-4 py-3 bg-sky-50 border border-sky-200 rounded-xl"
         >
           <div className="relative shrink-0">
             <span className="flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500" />
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-sm font-bold tracking-tight text-purple-800">
+            <span className="text-sm font-bold tracking-tight text-sky-800">
               {categorized["in-progress"].length} event{categorized["in-progress"].length > 1 ? "s" : ""} happening now
             </span>
-            <span className="text-sm text-purple-600 ml-2 font-medium">
+            <span className="text-sm text-sky-600 ml-2 font-medium">
               {categorized["in-progress"].map(e => e.name).join(", ")}
             </span>
           </div>
           <button
             onClick={() => setActiveTab("in-progress")}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-sky-700 bg-sky-100 hover:bg-sky-200 rounded-lg transition-colors"
           >
             View
             <ArrowRight className="w-3 h-3" />
@@ -563,7 +563,7 @@ function EventCard({ event, tab, index, onView, onEdit, onDelete, onStatusChange
       transition={{ delay: index * 0.025 }}
       className={`group relative overflow-hidden bg-white transition-all duration-200 rounded-xl cursor-pointer ${
         isLive
-          ? "border-2 border-purple-300 shadow-md shadow-purple-100/50 hover:border-purple-400"
+          ? "border-2 border-sky-300 shadow-md shadow-sky-100/50 hover:border-sky-400"
           : tab === "completed"
           ? "border border-neutral-200 opacity-75 hover:opacity-100 hover:border-neutral-300"
           : "border border-neutral-200 hover:border-neutral-400 hover:shadow-sm"
@@ -572,13 +572,13 @@ function EventCard({ event, tab, index, onView, onEdit, onDelete, onStatusChange
     >
       {/* Live top accent */}
       {isLive && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-purple-500 via-purple-400 to-purple-500 animate-pulse" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-sky-500 via-sky-400 to-sky-500 animate-pulse" />
       )}
 
       <div className="flex items-stretch">
         {/* Left: Thumbnail */}
         <div className={`relative w-28 sm:w-36 shrink-0 overflow-hidden ${
-          isLive ? "bg-purple-50" : "bg-neutral-50"
+          isLive ? "bg-sky-50" : "bg-neutral-50"
         }`}>
           {event.photo_banner || event.img_ai ? (
             <img
@@ -590,14 +590,14 @@ function EventCard({ event, tab, index, onView, onEdit, onDelete, onStatusChange
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <Calendar className={`w-8 h-8 ${isLive ? "text-purple-300" : "text-neutral-300"}`} />
+              <Calendar className={`w-8 h-8 ${isLive ? "text-sky-300" : "text-neutral-300"}`} />
             </div>
           )}
           {isLive && (
             <div className="absolute top-2 left-2">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" />
               </span>
             </div>
           )}
@@ -720,7 +720,7 @@ function EventCard({ event, tab, index, onView, onEdit, onDelete, onStatusChange
           {days !== null && tab !== "completed" && (
             <div className={`text-center px-3 py-1.5 rounded-lg ${
               days <= 0
-                ? "bg-purple-50 text-purple-700"
+                ? "bg-sky-50 text-sky-700"
                 : days <= 7
                 ? "bg-red-50 text-red-700"
                 : days <= 30
@@ -832,7 +832,7 @@ function EventTable({
                   key={event.id}
                   className={`transition-colors cursor-pointer ${
                     isLive
-                      ? "bg-purple-50/50 hover:bg-purple-50"
+                      ? "bg-sky-50/50 hover:bg-sky-50"
                       : tab === "completed"
                       ? "hover:bg-neutral-50 opacity-70 hover:opacity-100"
                       : "hover:bg-neutral-50"
@@ -843,8 +843,8 @@ function EventTable({
                     <td className="px-4 py-3">
                       {isLive && (
                         <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" />
                         </span>
                       )}
                       {tab === "completed" && (

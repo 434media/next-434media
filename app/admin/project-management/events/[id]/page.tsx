@@ -29,7 +29,7 @@ import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 const STATUS_COLORS: Record<string, string> = {
   planning: "bg-amber-100 text-amber-700 border-amber-200",
   confirmed: "bg-blue-100 text-blue-700 border-blue-200",
-  "in-progress": "bg-purple-100 text-purple-700 border-purple-200",
+  "in-progress": "bg-sky-100 text-sky-700 border-sky-200",
   completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
   cancelled: "bg-red-100 text-red-700 border-red-200",
 }
@@ -227,7 +227,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 {!isLive && event.status !== "in-progress" && !isCompleted && (
                   <button
                     onClick={() => handleStatusChange("in-progress")}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5" />
                     Mark Live
@@ -267,7 +267,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
           {/* Title & Status */}
           <div>
-            <div className={`w-12 h-1.5 mb-4 rounded-full ${isLive ? "bg-purple-400" : "bg-yellow-400"}`} />
+            <div className={`w-12 h-1.5 mb-4 rounded-full ${isLive ? "bg-sky-400" : "bg-yellow-400"}`} />
             <h1 className="text-3xl font-bold text-neutral-900 leading-tight">{event.name}</h1>
             <div className="flex items-center gap-3 mt-3 flex-wrap">
               <span
@@ -277,8 +277,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               >
                 {isLive && (
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500" />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
                   </span>
                 )}
                 {event.status}

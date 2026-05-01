@@ -5,9 +5,10 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./Card"
 import { ChartContainer, ChartTooltip } from "./Chart"
-import { XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart } from "recharts"
+import { XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart, ReferenceLine, Label as RechartsLabel } from "recharts"
 import { TrendingUp, Loader2, Calendar } from "lucide-react"
 import type { DateRange, AnalyticsFilters } from "../../types/analytics"
+import type { ChartAnnotation } from "./AnnotationManager"
 import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface PageViewsChartProps {
@@ -17,6 +18,8 @@ interface PageViewsChartProps {
   propertyId?: string
   useSnapshot?: boolean
   filters?: AnalyticsFilters
+  /** Annotations to render as vertical flag markers on the chart. */
+  annotations?: ChartAnnotation[]
 }
 
 export function PageViewsChart({
@@ -26,6 +29,7 @@ export function PageViewsChart({
   propertyId,
   useSnapshot,
   filters,
+  annotations,
 }: PageViewsChartProps) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -271,6 +275,35 @@ export function PageViewsChart({
                         fill: "#1E40AF",
                       }}
                     />
+                    {/* Phase 5b — annotation markers. Each annotation renders
+                        as a dashed vertical line at its date with the label
+                        floating near the top of the chart. The chart's X-axis
+                        is the formatted display date, so we look up the
+                        matching display string from the data array (which
+                        stores raw `originalDate` alongside the formatted one). */}
+                    {(annotations ?? []).map((a) => {
+                      const match = data.find((d) => d.originalDate === a.date)
+                      if (!match) return null // annotation outside the visible date range
+                      return (
+                        <ReferenceLine
+                          key={a.id}
+                          x={match.date}
+                          stroke="#64748b"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 4"
+                          ifOverflow="extendDomain"
+                        >
+                          <RechartsLabel
+                            value={a.label}
+                            position="insideTopLeft"
+                            offset={8}
+                            fill="#475569"
+                            fontSize={10}
+                            fontWeight={600}
+                          />
+                        </ReferenceLine>
+                      )
+                    })}
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartContainer>

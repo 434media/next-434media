@@ -250,7 +250,7 @@ export function InstagramDashboardHeader({
 
       {/* Additional floating elements */}
       <div className="absolute top-1/2 left-8 w-12 h-12 sm:w-16 sm:h-16 bg-red-400/20 rounded-full blur-lg animate-pulse delay-300" />
-      <div className="absolute bottom-1/3 right-12 w-14 h-14 sm:w-18 sm:h-18 bg-indigo-400/25 rounded-full blur-lg animate-pulse delay-900" />
+      <div className="absolute bottom-1/3 right-12 w-14 h-14 sm:w-18 sm:h-18 bg-sky-400/25 rounded-full blur-lg animate-pulse delay-900" />
       <div className="absolute top-3/4 left-1/3 w-10 h-10 sm:w-14 sm:h-14 bg-pink-400/20 rounded-full blur-lg animate-pulse delay-1200" />
 
       {/* Mobile Layout (< sm) */}

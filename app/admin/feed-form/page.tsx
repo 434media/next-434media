@@ -10,7 +10,7 @@ import { Marked } from 'marked'
 import { Toast } from "@/components/crm/Toast"
 import type { Toast as ToastType, CurrentUser, TeamMember } from "@/components/crm/types"
 import { TEAM_MEMBERS } from "@/components/crm/types"
-import { Loader2, Send, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Sparkles, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
+import { Loader2, Send, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Wand2, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
 import { RichTextEditor } from "@/components/RichTextEditor"
 import { ImageUpload } from "@/components/ImageUpload"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
@@ -677,7 +677,7 @@ export default function FeedFormPage() {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "video":
-        return "bg-purple-100 text-purple-800"
+        return "bg-sky-100 text-sky-800"
       case "article":
         return "bg-sky-100 text-sky-800"
       case "podcast":
@@ -1232,7 +1232,7 @@ export default function FeedFormPage() {
                             ? type === "newsletter"
                               ? "bg-orange-600 text-white shadow-sm"
                               : type === "video"
-                              ? "bg-purple-600 text-white shadow-sm"
+                              ? "bg-sky-600 text-white shadow-sm"
                               : type === "article"
                               ? "bg-sky-600 text-white shadow-sm"
                               : type === "podcast"
@@ -1392,7 +1392,7 @@ export default function FeedFormPage() {
                             <div className="flex items-center justify-between gap-1 mb-1.5">
                               <span className={`text-[10px] font-bold uppercase tracking-wide ${
                                 item.type === "newsletter" ? "text-orange-600" :
-                                item.type === "video" ? "text-purple-600" :
+                                item.type === "video" ? "text-sky-600" :
                                 item.type === "article" ? "text-sky-600" :
                                 "text-pink-600"
                               }`}>
@@ -1887,7 +1887,7 @@ export default function FeedFormPage() {
                 {!editingId && !formData.title && (
                   <div className="mb-4 p-5 bg-linear-to-br from-sky-50 to-sky-50 border-2 border-sky-200 rounded-xl">
                     <h3 className="text-base font-bold text-sky-900 mb-2 flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-sky-600" />
+                      <Wand2 className="h-5 w-5 text-sky-600" />
                       Creating a New Newsletter
                     </h3>
                     <p className="text-sm text-sky-700 leading-relaxed mb-3">
@@ -1913,7 +1913,7 @@ export default function FeedFormPage() {
                 
                 <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-purple-500" />
+                    <Wand2 className="h-4 w-4 text-amber-500" />
                     <span className="text-sm font-semibold text-neutral-700">Newsletter Sections</span>
                     <span className="text-xs text-neutral-500">({openSections.size} expanded)</span>
                   </div>
@@ -2300,11 +2300,11 @@ export default function FeedFormPage() {
 
                       <div className="border-t border-neutral-200 pt-6">
                         <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-purple-500" />
+                          <Wand2 className="h-4 w-4 text-amber-500" />
                           Featured Post
                         </h4>
                         <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Highlight your most important content with a featured post section.</p>
-                        <div className="space-y-5 bg-purple-50/50 rounded-xl p-5 border-2 border-purple-100">
+                        <div className="space-y-5 bg-amber-50/50 rounded-xl p-5 border-2 border-amber-100">
                           <PreviewField label="Featured Post Title" value={formData.featured_post_title || ""} isPreview={previewMode && !!editingId}>
                             <div>
                               <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
@@ -2312,7 +2312,7 @@ export default function FeedFormPage() {
                                 type="text"
                                 value={formData.featured_post_title || ""}
                                 onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-400 text-base font-medium transition-all"
+                                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-400 text-base font-medium transition-all"
                                 placeholder="Enter featured post title"
                               />
                             </div>
@@ -2449,7 +2449,7 @@ export default function FeedFormPage() {
                       id={`spotlight${num}`}
                       title={`Spotlight ${num}`}
                       description={`Highlight section ${num} with image and call-to-action`}
-                      icon={<Sparkles className="h-5 w-5" />}
+                      icon={<Wand2 className="h-5 w-5" />}
                       isOpen={openSections.has(`spotlight${num}`)}
                       onToggle={() => toggleSection(`spotlight${num}`)}
                       isComplete={isSectionComplete(`spotlight${num}`)}
@@ -2538,7 +2538,7 @@ export default function FeedFormPage() {
                       type="button"
                       variant="outline"
                       onClick={loadMockData}
-                      className="text-purple-600 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300"
+                      className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300"
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       Load Test Data

@@ -124,8 +124,8 @@ export function LinkedInKeyMetrics({ insights, dateRange, connectionStatus }: Li
           />
         </svg>
       ),
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
+      color: "text-sky-600",
+      bgColor: "bg-sky-100",
     },
   ]
 

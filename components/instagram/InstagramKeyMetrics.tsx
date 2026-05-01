@@ -138,7 +138,7 @@ export function InstagramKeyMetrics({ insights, dateRange, connectionStatus }: I
       title: "Posts Published",
       value: isConnected ? formatNumber(insights.media_count) : "--",
       subtitle: "Total media count",
-      color: "text-purple-400",
+      color: "text-sky-400",
     },
   ]
 

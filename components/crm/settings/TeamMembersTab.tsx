@@ -27,7 +27,7 @@ interface TeamMember {
 }
 
 const ROLE_LABELS: Record<AdminRole, { label: string; color: string }> = {
-  crm_super_admin: { label: "Super Admin", color: "bg-violet-50 text-violet-700 border-violet-200" },
+  crm_super_admin: { label: "Super Admin", color: "bg-amber-50 text-amber-700 border-amber-200" },
   full_admin: { label: "Full Admin", color: "bg-blue-50 text-blue-700 border-blue-200" },
   crm_only: { label: "CRM Only", color: "bg-neutral-100 text-neutral-600 border-neutral-200" },
 }
@@ -274,7 +274,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
               >
                 <div className="shrink-0 w-8 h-8 rounded-full bg-neutral-100 text-neutral-500 flex items-center justify-center">
                   {member.role === "crm_super_admin" ? (
-                    <ShieldCheck className="w-4 h-4 text-violet-600" />
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
                   ) : member.role === "full_admin" ? (
                     <Shield className="w-4 h-4 text-blue-600" />
                   ) : (

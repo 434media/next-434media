@@ -15,6 +15,9 @@ import { EventsConversionsPanel } from "@/components/analytics/EventsConversions
 import { SearchPerformancePanel } from "@/components/analytics/SearchPerformancePanel"
 import { CoreWebVitalsPanel } from "@/components/analytics/CoreWebVitalsPanel"
 import { CohortRetentionPanel } from "@/components/analytics/CohortRetentionPanel"
+import { InsightsPanel } from "@/components/analytics/InsightsPanel"
+import { AnnotationManager, type ChartAnnotation } from "@/components/analytics/AnnotationManager"
+import { GoalsKpiPanel } from "@/components/analytics/GoalsKpiPanel"
 import { AnalyticsFilterBar } from "@/components/analytics/AnalyticsFilterBar"
 import { dateRangeFromUrl, rangeKeyFromDateRange } from "@/lib/analytics-url-state"
 import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty, AnalyticsFilters } from "@/types/analytics"
@@ -646,6 +649,10 @@ export default function AnalyticsClientPage() {
     country: searchParams?.get("country") || undefined,
   }))
 
+  // PR 5b — annotations state. Lives at the page level so the Traffic Trend
+  // chart can render markers and the manager popover can mutate the list.
+  const [annotations, setAnnotations] = useState<ChartAnnotation[]>([])
+
   // Push state changes back to the URL. Avoids re-render loops by checking
   // each param against its current URL value before pushing.
   useEffect(() => {
@@ -892,6 +899,25 @@ export default function AnalyticsClientPage() {
 
           {/* Analytics Dashboard - Always show components */}
           <>
+            {/* Phase 5c — Goals/KPI panel. Renders only when goals are
+                configured for this property (or portfolio-wide). Pinned at
+                the very top so the BD team's eye lands on "are we hitting
+                targets?" before any of the diagnostic data below. */}
+            {selectedPropertyId && <GoalsKpiPanel propertyId={selectedPropertyId} />}
+
+            {/* Phase 5a — Insights panel. Renders only when current period
+                deviates >20% from trailing 3-period average on a key metric.
+                First thing the eye lands on, since "what should I look at"
+                is the highest-leverage question on a dashboard. Quiet by
+                design — when nothing's anomalous, this whole block disappears. */}
+            {selectedPropertyId && (
+              <InsightsPanel
+                dateRange={selectedDateRange}
+                propertyId={selectedPropertyId}
+                filters={filters}
+              />
+            )}
+
             {/* PR 3d filter bar — narrows audience charts (hero / what-changed /
                 page-views chart / top-pages) by device, channel, country.
                 Source/device/geography breakdown charts intentionally exempt. */}
@@ -942,9 +968,19 @@ export default function AnalyticsClientPage() {
 
             {/* Page Views Chart */}
             <div className="mt-2 sm:mt-4 w-full max-w-full min-w-0 relative z-10">
-              <div className="flex items-center gap-2 mb-4 sm:mb-5">
-                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Traffic Trend</h2>
-                <InfoTooltip content="Daily page view trends showing traffic patterns over time. Use this to identify peak traffic days and overall growth trends." />
+              <div className="flex items-center justify-between gap-2 mb-4 sm:mb-5">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Traffic Trend</h2>
+                  <InfoTooltip content="Daily page view trends showing traffic patterns over time. Use this to identify peak traffic days and overall growth trends. Annotations let you pin context — campaign launches, redesigns, outages — directly on the chart." />
+                </div>
+                {/* PR 5b — annotation manager. Owns the list, exposes it via
+                    onAnnotationsChange so the chart can render markers. */}
+                {selectedPropertyId && (
+                  <AnnotationManager
+                    propertyId={selectedPropertyId}
+                    onAnnotationsChange={setAnnotations}
+                  />
+                )}
               </div>
               <div className="w-full max-w-full">
                 <PageViewsChart
@@ -954,6 +990,7 @@ export default function AnalyticsClientPage() {
                   propertyId={selectedPropertyId}
                   useSnapshot={useSnapshot}
                   filters={filters}
+                  annotations={annotations}
                 />
               </div>
             </div>

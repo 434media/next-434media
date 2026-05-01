@@ -10,7 +10,7 @@ import {
   TrendingDown,
   CheckCircle2,
   XCircle,
-  Sparkles,
+  Target,
   AlertTriangle,
   Clock,
   Activity,
@@ -63,8 +63,8 @@ const TIMELINE_ICONS: Record<TimelineEntryKind, { icon: typeof Mail; color: stri
   email_signup: { icon: Mail, color: "text-blue-700", bg: "bg-blue-50" },
   contact_form: { icon: Send, color: "text-amber-700", bg: "bg-amber-50" },
   mailchimp_signup: { icon: Mail, color: "text-pink-700", bg: "bg-pink-50" },
-  opportunity_created: { icon: Sparkles, color: "text-violet-700", bg: "bg-violet-50" },
-  opportunity_stage_change: { icon: Activity, color: "text-violet-700", bg: "bg-violet-50" },
+  opportunity_created: { icon: Target, color: "text-emerald-700", bg: "bg-emerald-50" },
+  opportunity_stage_change: { icon: Activity, color: "text-emerald-700", bg: "bg-emerald-50" },
   opportunity_won: { icon: TrendingUp, color: "text-emerald-700", bg: "bg-emerald-50" },
   opportunity_lost: { icon: TrendingDown, color: "text-rose-700", bg: "bg-rose-50" },
 }
@@ -80,12 +80,12 @@ function StatTile({
   value: string | number
   sub?: string
   icon: typeof Mail
-  tone?: "neutral" | "emerald" | "violet" | "blue" | "amber"
+  tone?: "neutral" | "emerald" | "teal" | "blue" | "amber"
 }) {
   const tones = {
     neutral: "border-neutral-200 bg-white",
     emerald: "border-emerald-200 bg-emerald-50/40",
-    violet: "border-violet-200 bg-violet-50/40",
+    teal: "border-teal-200 bg-teal-50/40",
     blue: "border-blue-200 bg-blue-50/40",
     amber: "border-amber-200 bg-amber-50/40",
   }
@@ -258,8 +258,8 @@ export function Customer360Panel({ clientId }: Customer360PanelProps) {
           label="Open pipeline"
           value={fmtCurrency(summary.pipelineValue)}
           sub={`${summary.opportunitiesOpen} ${summary.opportunitiesOpen === 1 ? "deal" : "deals"}`}
-          icon={Sparkles}
-          tone="violet"
+          icon={Target}
+          tone="teal"
         />
         <StatTile
           label="Won"

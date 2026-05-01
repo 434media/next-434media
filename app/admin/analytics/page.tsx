@@ -56,7 +56,7 @@ interface TabConfig {
 }
 
 const tabs: TabConfig[] = [
-  { key: "portfolio", label: "Portfolio", short: "Portfolio", icon: PortfolioIcon, color: "text-indigo-500" },
+  { key: "portfolio", label: "Portfolio", short: "Portfolio", icon: PortfolioIcon, color: "text-teal-500" },
   { key: "ga4", label: "Google Analytics", short: "GA4", icon: GA4Icon, color: "text-emerald-500" },
   { key: "instagram", label: "Instagram", short: "Instagram", icon: InstagramIcon, color: "text-pink-500" },
   { key: "mailchimp", label: "Mailchimp", short: "Mailchimp", icon: MailchimpIcon, color: "text-yellow-500" },

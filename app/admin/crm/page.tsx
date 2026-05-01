@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Calendar,
-  Sparkles,
+  Flag,
 } from "lucide-react"
 
 // Import CRM components
@@ -830,7 +830,7 @@ export default function SalesCRMPage() {
         <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-200 pb-4">
           {[
             { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
-            { id: "leads", label: "Leads", icon: Sparkles, badge: null },
+            { id: "leads", label: "Leads", icon: Flag, badge: null },
             { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
             { id: "clients", label: "Clients", icon: Users, badge: null },
             { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },

@@ -237,8 +237,8 @@ export function HeroMetric({
         />
         <SecondaryCard
           icon={Eye}
-          iconColor="text-violet-600"
-          iconBg="bg-violet-100"
+          iconColor="text-sky-600"
+          iconBg="bg-sky-100"
           label="Page views"
           value={formatNumber(summary.totalPageViews)}
           change={summary.pageViewsChange}

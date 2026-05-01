@@ -26,7 +26,7 @@ export default function ScrollSpinLogo() {
     <div className="relative group">
       {/* Outer cosmic glow ring */}
       <div
-        className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-500 blur-2xl opacity-70 group-hover:opacity-90 transition-all duration-700 animate-pulse"
+        className="absolute inset-0 rounded-full bg-gradient-to-r from-sky-500 via-sky-500 to-sky-500 blur-2xl opacity-70 group-hover:opacity-90 transition-all duration-700 animate-pulse"
         style={{
           transform: `scale(${isHovered ? 1.4 : 1.2})`,
           background: `conic-gradient(from ${rotation * 0.5}deg, #8b5cf6, #3b82f6, #6366f1, #8b5cf6)`,
@@ -93,11 +93,11 @@ export default function ScrollSpinLogo() {
             style={{ animationDelay: "1s" }}
           />
           <div
-            className="absolute bottom-8 left-6 w-1.5 h-1.5 bg-purple-300 rounded-full animate-ping"
+            className="absolute bottom-8 left-6 w-1.5 h-1.5 bg-sky-300 rounded-full animate-ping"
             style={{ animationDelay: "1.5s" }}
           />
           <div
-            className="absolute top-1/2 left-2 w-1 h-1 bg-indigo-300 rounded-full animate-bounce"
+            className="absolute top-1/2 left-2 w-1 h-1 bg-sky-300 rounded-full animate-bounce"
             style={{ animationDelay: "0.3s" }}
           />
           <div
@@ -141,13 +141,13 @@ export default function ScrollSpinLogo() {
         style={{ animationDuration: "20s" }}
       />
       <div
-        className="absolute -inset-12 border border-purple-300/20 rounded-full animate-spin opacity-20"
+        className="absolute -inset-12 border border-sky-300/20 rounded-full animate-spin opacity-20"
         style={{ animationDuration: "30s", animationDirection: "reverse" }}
       />
 
       {/* Hover effect overlay */}
       {isHovered && (
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400/20 via-blue-400/20 to-indigo-400/20 animate-pulse" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-sky-400/20 via-blue-400/20 to-sky-400/20 animate-pulse" />
       )}
     </div>
   )

@@ -27,14 +27,14 @@ interface CohortPayload {
  * as retention rises. Week 0 is always 100% so we render it as a baseline.
  */
 function cellStyle(pct: number, isWeekZero: boolean): { bg: string; text: string } {
-  if (isWeekZero) return { bg: "bg-indigo-700", text: "text-white" }
+  if (isWeekZero) return { bg: "bg-teal-700", text: "text-white" }
   if (pct === 0) return { bg: "bg-neutral-50", text: "text-neutral-300" }
-  if (pct >= 0.5) return { bg: "bg-indigo-600", text: "text-white" }
-  if (pct >= 0.3) return { bg: "bg-indigo-500", text: "text-white" }
-  if (pct >= 0.2) return { bg: "bg-indigo-400", text: "text-white" }
-  if (pct >= 0.1) return { bg: "bg-indigo-200", text: "text-indigo-900" }
-  if (pct >= 0.05) return { bg: "bg-indigo-100", text: "text-indigo-800" }
-  return { bg: "bg-indigo-50", text: "text-indigo-700" }
+  if (pct >= 0.5) return { bg: "bg-teal-600", text: "text-white" }
+  if (pct >= 0.3) return { bg: "bg-teal-500", text: "text-white" }
+  if (pct >= 0.2) return { bg: "bg-teal-400", text: "text-white" }
+  if (pct >= 0.1) return { bg: "bg-teal-200", text: "text-teal-900" }
+  if (pct >= 0.05) return { bg: "bg-teal-100", text: "text-teal-800" }
+  return { bg: "bg-teal-50", text: "text-teal-700" }
 }
 
 function formatPct(v: number): string {

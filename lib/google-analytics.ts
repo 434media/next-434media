@@ -556,6 +556,174 @@ export async function getGeographicData(
 }
 
 // ============================================
+// ANOMALY DETECTION
+// (Phase 5a — compare current period to 3 prior periods of same length,
+// flag metrics that deviate from trailing average by > 20%. Single GA4
+// call with 4 date ranges — no extra round trips.)
+// ============================================
+
+export type AnomalySeverity = "low" | "medium" | "high"
+
+export interface Anomaly {
+  /** Display label, e.g. "Sessions". */
+  metric: string
+  /** Stable key for client-side dedupe / icon lookup. */
+  metricKey: "sessions" | "users" | "pageViews" | "engagementRate" | "bounceRate"
+  /** Current-period value. */
+  current: number
+  /** Trailing 3-period average. */
+  expected: number
+  /** Signed % change from `expected` (positive = current is higher). */
+  change: number
+  /** "high" = > 50% deviation. "medium" = 30–50%. "low" = 20–30%. */
+  severity: AnomalySeverity
+  /** True when the deviation is bad (e.g., sessions dropped, bounce rate rose). */
+  bad: boolean
+  /** Short human-readable explanation. */
+  message: string
+}
+
+export interface AnomaliesResponse {
+  data: Anomaly[]
+  baselinePeriods: number
+  current: { startDate: string; endDate: string }
+  propertyId: string
+}
+
+interface AnomalyMetricSpec {
+  key: Anomaly["metricKey"]
+  label: string
+  metricName: string
+  /** True when an INCREASE is bad (e.g., bounce rate). Default false. */
+  invertGoodness?: boolean
+}
+
+const ANOMALY_METRICS: AnomalyMetricSpec[] = [
+  { key: "sessions", label: "Sessions", metricName: "sessions" },
+  { key: "users", label: "Users", metricName: "totalUsers" },
+  { key: "pageViews", label: "Page views", metricName: "screenPageViews" },
+  { key: "engagementRate", label: "Engagement rate", metricName: "engagementRate" },
+  { key: "bounceRate", label: "Bounce rate", metricName: "bounceRate", invertGoodness: true },
+]
+
+const DEVIATION_THRESHOLD = 20 // percent
+const SEVERITY_THRESHOLDS = { high: 50, medium: 30 } as const
+
+function severityFor(absChange: number): AnomalySeverity {
+  if (absChange >= SEVERITY_THRESHOLDS.high) return "high"
+  if (absChange >= SEVERITY_THRESHOLDS.medium) return "medium"
+  return "low"
+}
+
+/**
+ * Build N preceding periods of the same length as [startDate, endDate].
+ * Period 0 = immediately previous; period N-1 = oldest.
+ */
+function priorPeriods(startDate: string, endDate: string, n: number): { startDate: string; endDate: string }[] {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const dayMs = 1000 * 60 * 60 * 24
+  const lengthDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / dayMs) + 1)
+
+  const periods: { startDate: string; endDate: string }[] = []
+  for (let i = 1; i <= n; i++) {
+    const periodEnd = new Date(start)
+    periodEnd.setDate(periodEnd.getDate() - 1 - (i - 1) * lengthDays)
+    const periodStart = new Date(periodEnd)
+    periodStart.setDate(periodStart.getDate() - (lengthDays - 1))
+    const fmt = (d: Date) => d.toISOString().split("T")[0]
+    periods.push({ startDate: fmt(periodStart), endDate: fmt(periodEnd) })
+  }
+  return periods
+}
+
+/**
+ * Detect anomalies in current period vs trailing baseline. Returns 0–N
+ * Anomaly entries — empty array means everything's within normal range.
+ */
+export async function getAnomalies(
+  startDate: string,
+  endDate: string,
+  propertyId?: string,
+): Promise<AnomaliesResponse> {
+  const targetPropertyId = getPropertyId(propertyId)
+  const client = getAnalyticsClient()
+
+  // GA4 caps runReport at 4 date ranges. Current + 3 baselines = 4 total.
+  const baselines = priorPeriods(startDate, endDate, 3)
+  const allRanges = [
+    { startDate, endDate, name: "current" },
+    ...baselines.map((p, i) => ({ startDate: p.startDate, endDate: p.endDate, name: `baseline_${i}` })),
+  ]
+
+  const [response] = await client.runReport({
+    property: `properties/${targetPropertyId}`,
+    dateRanges: allRanges,
+    metrics: ANOMALY_METRICS.map((m) => ({ name: m.metricName })),
+  })
+
+  // Pivot rows by name. GA4 tags each row with its dateRange name in
+  // dimensionValues[0] when multiple ranges are present.
+  const valuesByPeriod: Record<string, number[]> = {}
+  response.rows?.forEach((row, idx) => {
+    const tag = row.dimensionValues?.[0]?.value || allRanges[idx]?.name || `unknown_${idx}`
+    valuesByPeriod[tag] = (row.metricValues ?? []).map((v) => Number(v.value || 0))
+  })
+
+  const currentValues = valuesByPeriod.current ?? response.rows?.[0]?.metricValues?.map((v) => Number(v.value || 0)) ?? []
+
+  const anomalies: Anomaly[] = []
+  ANOMALY_METRICS.forEach((spec, metricIdx) => {
+    const current = currentValues[metricIdx] ?? 0
+    const baselineValues = baselines.map((_, i) => valuesByPeriod[`baseline_${i}`]?.[metricIdx] ?? 0)
+    const validBaselines = baselineValues.filter((v) => v > 0)
+    if (validBaselines.length === 0) return // no baseline data — skip
+
+    const expected = validBaselines.reduce((sum, v) => sum + v, 0) / validBaselines.length
+    if (expected === 0) return
+
+    const change = ((current - expected) / expected) * 100
+    const absChange = Math.abs(change)
+    if (absChange < DEVIATION_THRESHOLD) return // within normal range — not an anomaly
+
+    // Bad direction depends on whether higher is good or bad for this metric.
+    // For bounce rate (invertGoodness), a rise (positive change) is bad.
+    // For everything else, a drop (negative change) is bad.
+    const bad = spec.invertGoodness ? change > 0 : change < 0
+
+    const direction = change > 0 ? "up" : "down"
+    const message = `${spec.label} ${direction} ${absChange.toFixed(0)}% vs trailing average`
+
+    anomalies.push({
+      metric: spec.label,
+      metricKey: spec.key,
+      current,
+      expected,
+      change,
+      severity: severityFor(absChange),
+      bad,
+      message,
+    })
+  })
+
+  // Surface the most-anomalous first, with bad outranking good at equal severity.
+  const severityRank: Record<AnomalySeverity, number> = { high: 3, medium: 2, low: 1 }
+  anomalies.sort((a, b) => {
+    const rankDiff = severityRank[b.severity] - severityRank[a.severity]
+    if (rankDiff !== 0) return rankDiff
+    if (a.bad !== b.bad) return a.bad ? -1 : 1
+    return Math.abs(b.change) - Math.abs(a.change)
+  })
+
+  return {
+    data: anomalies,
+    baselinePeriods: baselines.length,
+    current: { startDate, endDate },
+    propertyId: targetPropertyId,
+  }
+}
+
+// ============================================
 // COHORT RETENTION
 // (Phase 4c — weekly acquisition cohorts × weekly retention buckets,
 // pulled in a single runReport via GA4's native cohortSpec)
@@ -618,16 +786,24 @@ export async function getCohortRetention(
   const targetPropertyId = getPropertyId(propertyId)
   const client = getAnalyticsClient()
 
-  // Build cohort date ranges going back from the most recent COMPLETE week
-  // (the current in-progress week is excluded — it'd skew week 0 ratios).
+  // Build cohort date ranges. GA4's cohortSpec applies one observation
+  // window (endOffset) to ALL cohorts, so the latest cohort must be old
+  // enough that its full window fits in already-completed weeks.
+  // Latest cohort = lastCompletedMonday - (weeksObserved - 1) weeks → its
+  // week (weeksObserved-1) ends exactly on lastCompletedSunday.
+  // Without this, the latest cohort's observation runs into the future
+  // and GA4 rejects the whole report with INVALID_ARGUMENT.
   const today = new Date()
   const thisMondayIso = isoMonday(today)
   const lastCompletedMonday = new Date(thisMondayIso)
   lastCompletedMonday.setUTCDate(lastCompletedMonday.getUTCDate() - 7)
 
+  const latestCohortStart = new Date(lastCompletedMonday)
+  latestCohortStart.setUTCDate(latestCohortStart.getUTCDate() - (weeksObserved - 1) * 7)
+
   const cohorts: { name: string; startDate: string; endDate: string }[] = []
   for (let i = 0; i < cohortCount; i++) {
-    const start = new Date(lastCompletedMonday)
+    const start = new Date(latestCohortStart)
     start.setUTCDate(start.getUTCDate() - i * 7)
     const startIso = isoMonday(start)
     const endIso = isoSunday(startIso)

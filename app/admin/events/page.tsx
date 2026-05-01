@@ -19,7 +19,7 @@ import {
   AlertCircle,
   ExternalLink,
   Globe,
-  Sparkles,
+  Star,
   DollarSign,
   Building2
 } from "lucide-react"
@@ -784,7 +784,7 @@ export default function EventsAdminPage() {
         <div className="bg-linear-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 sm:p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-amber-600" />
+              <Star className="w-4 h-4 text-amber-600" />
             </div>
             <h3 className="font-semibold text-neutral-900">Quick Import</h3>
           </div>
