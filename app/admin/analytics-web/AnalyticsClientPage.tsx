@@ -12,6 +12,9 @@ import { DeviceBreakdown } from "@/components/analytics/DeviceBreakdown"
 import { GeographicMap } from "@/components/analytics/GeographicMap"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import { EventsConversionsPanel } from "@/components/analytics/EventsConversionsPanel"
+import { SearchPerformancePanel } from "@/components/analytics/SearchPerformancePanel"
+import { CoreWebVitalsPanel } from "@/components/analytics/CoreWebVitalsPanel"
+import { CohortRetentionPanel } from "@/components/analytics/CohortRetentionPanel"
 import { AnalyticsFilterBar } from "@/components/analytics/AnalyticsFilterBar"
 import { dateRangeFromUrl, rangeKeyFromDateRange } from "@/lib/analytics-url-state"
 import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty, AnalyticsFilters } from "@/types/analytics"
@@ -972,6 +975,51 @@ export default function AnalyticsClientPage() {
                 isLoading={isLoading}
                 setError={setError}
               />
+            </div>
+
+            {/* Phase 4a — Search Console organic-search performance.
+                Sits next to Events because both surface intent (events =
+                site-side action signals; queries = pre-arrival intent).
+                Renders an empty-state when SEARCH_CONSOLE_SITE_<key> isn't set. */}
+            <div className="mt-8 sm:mt-12 w-full max-w-full">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">
+                  Organic search
+                </h2>
+                <InfoTooltip content="Top queries that drove organic search clicks to this site, with impressions, CTR, and average position. Pulled from Google Search Console — different data source from GA4. Position is averaged weighted by impressions." />
+              </div>
+              <SearchPerformancePanel
+                dateRange={selectedDateRange}
+                propertyId={selectedPropertyId}
+                setError={setError}
+              />
+            </div>
+
+            {/* Phase 4b — Core Web Vitals via CrUX. Real-user p75 LCP / INP /
+                CLS / TTFB / FCP from Chrome's anonymous usage telemetry.
+                28-day rolling window — no date selector needed (CrUX ignores
+                custom ranges). Renders empty state until CRUX_API_KEY is set. */}
+            <div className="mt-8 sm:mt-12 w-full max-w-full">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">
+                  Core Web Vitals
+                </h2>
+                <InfoTooltip content="Real-user performance from Chrome (p75 across the last 28 days). LCP measures loading, INP measures responsiveness, CLS measures visual stability — these three are Google's official Core Web Vitals and directly affect search ranking. Green = Good, amber = Needs improvement, red = Poor." />
+              </div>
+              <CoreWebVitalsPanel propertyId={selectedPropertyId} setError={setError} />
+            </div>
+
+            {/* Phase 4c — Cohort retention. Weekly acquisition cohorts × weekly
+                retention buckets. The triangle that tells you whether content
+                creates an audience or just generates one-and-done traffic. */}
+            <div className="mt-8 sm:mt-12 w-full max-w-full">
+              <div className="flex items-center gap-2 mb-4 sm:mb-5">
+                <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">
+                  Audience retention
+                </h2>
+                <InfoTooltip content="Each row = users whose first session fell in that week (a cohort). Each column = % of that cohort that came back N weeks later. Higher right-side numbers = stickier audience. For media businesses, week-1 retention above 20% is healthy; above 30% is excellent." />
+              </div>
+              <CohortRetentionPanel propertyId={selectedPropertyId} setError={setError} />
             </div>
 
             {/* Top Pages and Traffic Sources - Stack on mobile */}

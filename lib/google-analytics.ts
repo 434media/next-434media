@@ -556,6 +556,137 @@ export async function getGeographicData(
 }
 
 // ============================================
+// COHORT RETENTION
+// (Phase 4c — weekly acquisition cohorts × weekly retention buckets,
+// pulled in a single runReport via GA4's native cohortSpec)
+// ============================================
+
+export interface CohortRetentionRow {
+  /** ISO date — first day of the acquisition week (Mon). */
+  cohortStart: string
+  /** Display label, e.g. "Mar 4 – Mar 10". */
+  cohortLabel: string
+  /** Initial cohort size (week 0 active users — these are 100% by definition). */
+  size: number
+  /** Per-week retention. Index = weeks since acquisition. Value = % retained (0–1). */
+  retention: number[]
+}
+
+export interface CohortRetentionResponse {
+  data: CohortRetentionRow[]
+  /** Number of weeks observed per cohort (typically 5). */
+  weeks: number
+  propertyId: string
+}
+
+function isoMonday(date: Date): string {
+  const d = new Date(date)
+  d.setUTCHours(0, 0, 0, 0)
+  // GA4 cohorts work in UTC; Mon-start matches GA4's default week semantics
+  const day = d.getUTCDay() // 0 = Sun
+  const offset = day === 0 ? -6 : 1 - day // distance back to Monday
+  d.setUTCDate(d.getUTCDate() + offset)
+  return d.toISOString().split("T")[0]
+}
+
+function isoSunday(monday: string): string {
+  const d = new Date(monday)
+  d.setUTCDate(d.getUTCDate() + 6)
+  return d.toISOString().split("T")[0]
+}
+
+function shortDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
+}
+
+/**
+ * Pull weekly user-retention cohorts. Each cohort = users whose first session
+ * fell in a given calendar week; subsequent weeks measure how many of those
+ * users came back. The classic SaaS / media-company retention triangle.
+ *
+ * Defaults: 8 cohorts × 5-week observation window. Tweak via args; GA4
+ * caps at 12 cohorts and 12 buckets per request.
+ */
+export async function getCohortRetention(
+  propertyId?: string,
+  cohortCount = 8,
+  weeksObserved = 5,
+): Promise<CohortRetentionResponse> {
+  console.log("[GA4] getCohortRetention called with:", { propertyId, cohortCount, weeksObserved })
+
+  const targetPropertyId = getPropertyId(propertyId)
+  const client = getAnalyticsClient()
+
+  // Build cohort date ranges going back from the most recent COMPLETE week
+  // (the current in-progress week is excluded — it'd skew week 0 ratios).
+  const today = new Date()
+  const thisMondayIso = isoMonday(today)
+  const lastCompletedMonday = new Date(thisMondayIso)
+  lastCompletedMonday.setUTCDate(lastCompletedMonday.getUTCDate() - 7)
+
+  const cohorts: { name: string; startDate: string; endDate: string }[] = []
+  for (let i = 0; i < cohortCount; i++) {
+    const start = new Date(lastCompletedMonday)
+    start.setUTCDate(start.getUTCDate() - i * 7)
+    const startIso = isoMonday(start)
+    const endIso = isoSunday(startIso)
+    cohorts.unshift({ name: `cohort_${cohortCount - 1 - i}`, startDate: startIso, endDate: endIso })
+  }
+
+  const [response] = await client.runReport({
+    property: `properties/${targetPropertyId}`,
+    cohortSpec: {
+      cohorts: cohorts.map((c) => ({
+        name: c.name,
+        dateRange: { startDate: c.startDate, endDate: c.endDate },
+      })),
+      cohortsRange: {
+        granularity: "WEEKLY",
+        startOffset: 0,
+        endOffset: weeksObserved - 1,
+      },
+      cohortReportSettings: { accumulate: false },
+    },
+    dimensions: [{ name: "cohort" }, { name: "cohortNthWeek" }],
+    metrics: [{ name: "cohortActiveUsers" }],
+  })
+
+  // Pivot rows into a 2D map: cohortName → weekIndex → activeUsers
+  const grid = new Map<string, Map<number, number>>()
+  for (const row of response.rows ?? []) {
+    const cohortName = row.dimensionValues?.[0]?.value ?? ""
+    const weekStr = row.dimensionValues?.[1]?.value ?? "0"
+    const weekIdx = Number.parseInt(weekStr, 10)
+    const value = Number(row.metricValues?.[0]?.value ?? 0)
+    if (!grid.has(cohortName)) grid.set(cohortName, new Map())
+    grid.get(cohortName)!.set(weekIdx, value)
+  }
+
+  const data: CohortRetentionRow[] = cohorts.map((c) => {
+    const cohortGrid = grid.get(c.name) ?? new Map()
+    const week0 = cohortGrid.get(0) ?? 0
+    const retention: number[] = []
+    for (let w = 0; w < weeksObserved; w++) {
+      const value = cohortGrid.get(w) ?? 0
+      retention.push(week0 > 0 ? value / week0 : 0)
+    }
+    return {
+      cohortStart: c.startDate,
+      cohortLabel: `${shortDate(c.startDate)} – ${shortDate(c.endDate)}`,
+      size: week0,
+      retention,
+    }
+  })
+
+  return {
+    data,
+    weeks: weeksObserved,
+    propertyId: targetPropertyId,
+  }
+}
+
+// ============================================
 // PORTFOLIO ROLLUP
 // (Phase 3c — aggregates all configured GA4 properties for a top-down view
 // across the 434 portfolio. Parallel fetch per property, single response.)

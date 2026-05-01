@@ -11,8 +11,11 @@ import {
   getTopEvents,
   getConversionsData,
   getPortfolioSummary,
+  getCohortRetention,
   getAvailableProperties,
 } from "@/lib/google-analytics"
+import { getSearchConsoleQueries } from "@/lib/search-console"
+import { getCoreWebVitals, type CruxFormFactor } from "@/lib/crux"
 import { validateAnalyticsConfig, getConfigurationStatus } from "@/lib/analytics-config"
 import { getSession } from "@/lib/auth"
 import { pctChange } from "@/types/analytics"
@@ -275,6 +278,58 @@ export async function GET(request: NextRequest) {
         // configured property in parallel. Date range still applies.
         const portfolio = await getPortfolioSummary(startDate, endDate)
         return NextResponse.json(portfolio)
+      }
+
+      case "cohort-retention":
+      case "cohorts": {
+        // Phase 4c — weekly acquisition cohorts × weekly retention buckets.
+        // Date range params are ignored — cohorts are derived from "the most
+        // recent N completed weeks." Optional ?cohorts=N&weeks=M to tune.
+        const cohortsParam = Number.parseInt(searchParams.get("cohorts") ?? "8", 10)
+        const weeksParam = Number.parseInt(searchParams.get("weeks") ?? "5", 10)
+        const cohortCount = Number.isFinite(cohortsParam) ? Math.min(Math.max(cohortsParam, 2), 12) : 8
+        const weeksObserved = Number.isFinite(weeksParam) ? Math.min(Math.max(weeksParam, 2), 12) : 5
+        const cohort = await getCohortRetention(propertyId, cohortCount, weeksObserved)
+        return NextResponse.json(cohort)
+      }
+
+      case "core-web-vitals":
+      case "crux": {
+        // Phase 4b — Chrome User Experience Report. Date range is ignored —
+        // CrUX returns the most recent 28-day rolling window per origin.
+        // Optional `?formFactor=PHONE|DESKTOP|TABLET` for device-specific p75.
+        if (!propertyId) {
+          return NextResponse.json(
+            { error: "propertyId required for core-web-vitals endpoint" },
+            { status: 400 },
+          )
+        }
+        const ffParam = searchParams.get("formFactor") as CruxFormFactor | null
+        const formFactor: CruxFormFactor =
+          ffParam === "PHONE" || ffParam === "DESKTOP" || ffParam === "TABLET"
+            ? ffParam
+            : "ALL_FORM_FACTORS"
+        const cwv = await getCoreWebVitals(propertyId, formFactor)
+        return NextResponse.json(cwv)
+      }
+
+      case "search-queries":
+      case "search-console": {
+        // Phase 4a — Google Search Console organic-search performance.
+        // Returns null when SEARCH_CONSOLE_SITE_<KEY> isn't set for this
+        // property; we surface a 200 with `configured: false` so the UI can
+        // render its empty state without treating it as an error.
+        if (!propertyId) {
+          return NextResponse.json(
+            { error: "propertyId required for search-queries endpoint" },
+            { status: 400 },
+          )
+        }
+        const result = await getSearchConsoleQueries(startDate, endDate, propertyId)
+        if (!result) {
+          return NextResponse.json({ configured: false, propertyId })
+        }
+        return NextResponse.json({ configured: true, ...result })
       }
 
       default:

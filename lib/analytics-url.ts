@@ -12,6 +12,9 @@ export type AnalyticsEndpoint =
   | "events"
   | "conversions"
   | "portfolio"
+  | "search-queries"
+  | "core-web-vitals"
+  | "cohort-retention"
 
 interface BuildOpts {
   endpoint: AnalyticsEndpoint
@@ -38,8 +41,15 @@ const SNAPSHOT_RANGE_MAP: Record<string, "7d" | "30d"> = {
 }
 
 // Endpoints with no precomputed snapshot — always route live.
-// Events / conversions / portfolio don't have a cron writing snapshots yet.
-const LIVE_ONLY_ENDPOINTS = new Set<AnalyticsEndpoint>(["events", "conversions", "portfolio"])
+// Events / conversions / portfolio / search-queries don't have a cron writing snapshots yet.
+const LIVE_ONLY_ENDPOINTS = new Set<AnalyticsEndpoint>([
+  "events",
+  "conversions",
+  "portfolio",
+  "search-queries",
+  "core-web-vitals",
+  "cohort-retention",
+])
 
 export function buildAnalyticsUrl(opts: BuildOpts): string {
   const { endpoint, dateRange, propertyId, useSnapshot, filters } = opts
