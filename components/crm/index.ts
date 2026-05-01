@@ -14,6 +14,8 @@ export { ClientDetailDrawer } from "./ClientDetailDrawer"
 export { OpportunityDetailDrawer } from "./OpportunityDetailDrawer"
 export { TaskDetailDrawer } from "./TaskDetailDrawer"
 export { ContentDetailDrawer } from "./ContentDetailDrawer"
+export { LeadsView } from "./LeadsView"
+export { LeadDetailDrawer } from "./LeadDetailDrawer"
 export { NotificationBell } from "./NotificationBell"
 export { default as LinkedTasksPanel } from "./LinkedTasksPanel"
 

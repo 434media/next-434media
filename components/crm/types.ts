@@ -266,7 +266,7 @@ export interface MigrationResult {
   }>
 }
 
-export type ViewMode = "dashboard" | "pipeline" | "clients" | "tasks" | "social-calendar"
+export type ViewMode = "dashboard" | "pipeline" | "clients" | "tasks" | "social-calendar" | "leads"
 
 // Social Media Platform type
 export type SocialPlatform = "instagram" | "youtube" | "tiktok" | "linkedin" | "facebook"

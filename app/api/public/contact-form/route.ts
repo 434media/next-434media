@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
+import { captureLeadFromContactForm } from "@/lib/firestore-leads"
 import { headers } from "next/headers"
 
 // Valid sources that can submit contact forms
@@ -125,6 +126,19 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    // Fan into the leads collection (dedupes by email, never throws).
+    // Public form submission stays the source of truth in `contact_forms`;
+    // `leads` is the upstream queue the BD team works from.
+    await captureLeadFromContactForm({
+      firstName: firstName?.trim() || "",
+      lastName: lastName?.trim() || "",
+      company: company?.trim() || "",
+      email: email.toLowerCase().trim(),
+      phone: phone?.trim() || "",
+      message: message?.trim() || "",
+      source,
+    })
 
     return NextResponse.json({
       success: true,

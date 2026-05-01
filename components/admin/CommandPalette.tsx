@@ -29,7 +29,7 @@ interface CommandItem {
   hint?: string
   icon: LucideIcon
   /** Section grouping in the rendered list. */
-  section: "Quick actions" | "Navigate" | "Clients" | "Opportunities" | "Tasks"
+  section: "Quick actions" | "Navigate" | "Clients" | "Opportunities" | "Tasks" | "Leads"
   /** Lower-cased haystack used for fuzzy matching. */
   search: string
   /** Action to run on Enter. Receives router so callers don't need to capture it. */
@@ -74,6 +74,24 @@ const STATIC_ITEMS: CommandItem[] = [
     section: "Quick actions",
     search: "create new content post social",
     run: (router) => router.push("/admin/crm?tab=social-calendar&new=content"),
+  },
+  {
+    id: "create-lead",
+    label: "Create lead",
+    hint: "Open the new-lead form",
+    icon: Sparkles,
+    section: "Quick actions",
+    search: "create new lead prospect",
+    run: (router) => router.push("/admin/crm?tab=leads&new=lead"),
+  },
+  {
+    id: "nav-leads-priority",
+    label: "Leads — Priority queue",
+    hint: "High-priority new and ready leads",
+    icon: Sparkles,
+    section: "Navigate",
+    search: "leads priority queue prospects high",
+    run: (router) => router.push("/admin/crm?tab=leads"),
   },
 
   // Navigate — primary admin sections
@@ -182,6 +200,7 @@ interface EntityCache {
   clients: Array<{ id: string; name: string; company_name?: string; brand?: string }>
   opportunities: Array<{ id: string; name: string; client_name?: string; stage?: string; value?: number }>
   tasks: Array<{ id: string; title: string; assigned_to?: string; status?: string; due_date?: string }>
+  leads: Array<{ id: string; name: string; company?: string; email?: string; score?: number; status?: string; priority?: string }>
   fetchedAt: number
 }
 
@@ -192,15 +211,17 @@ async function loadEntities(): Promise<EntityCache> {
   if (entityCache && Date.now() - entityCache.fetchedAt < CACHE_TTL_MS) {
     return entityCache
   }
-  const [clientsRes, opportunitiesRes, tasksRes] = await Promise.all([
+  const [clientsRes, opportunitiesRes, tasksRes, leadsRes] = await Promise.all([
     fetch("/api/admin/crm/clients").then((r) => r.json()).catch(() => ({})),
     fetch("/api/admin/crm/opportunities").then((r) => r.json()).catch(() => ({})),
     fetch("/api/admin/crm/tasks").then((r) => r.json()).catch(() => ({})),
+    fetch("/api/admin/leads").then((r) => r.json()).catch(() => ({})),
   ])
   entityCache = {
     clients: clientsRes.clients ?? [],
     opportunities: opportunitiesRes.opportunities ?? [],
     tasks: tasksRes.tasks ?? [],
+    leads: leadsRes.leads ?? [],
     fetchedAt: Date.now(),
   }
   return entityCache
@@ -307,6 +328,21 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
         section: "Tasks",
         search: `${label} ${t.assigned_to ?? ""} ${t.status ?? ""}`.toLowerCase(),
         run: (router) => router.push(`/admin/crm?tab=tasks&openTask=${t.id}`),
+      })
+    }
+
+    for (const l of entities.leads.slice(0, 30)) {
+      const label = l.name || l.email || "Unnamed lead"
+      const scoreHint = typeof l.score === "number" ? `score ${l.score}` : ""
+      const statusHint = l.status ?? ""
+      items.push({
+        id: `lead-${l.id}`,
+        label,
+        hint: [l.company, statusHint, scoreHint].filter(Boolean).join(" · "),
+        icon: Sparkles,
+        section: "Leads",
+        search: `${label} ${l.company ?? ""} ${l.email ?? ""} ${statusHint}`.toLowerCase(),
+        run: (router) => router.push(`/admin/crm?tab=leads&openLead=${l.id}`),
       })
     }
 

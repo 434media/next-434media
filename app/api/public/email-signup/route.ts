@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { saveEmailSignup } from "@/lib/firestore-email-signups"
+import { captureLeadFromEmailSignup } from "@/lib/firestore-leads"
 import { headers } from "next/headers"
 
 // Valid sources that can submit emails
@@ -120,6 +121,16 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    // Fan into the leads collection (dedupes by email, never throws).
+    // Newsletter signups enter as low-score leads; Mailchimp engagement
+    // signals will lift their priority over time via the Resend webhook.
+    await captureLeadFromEmailSignup({
+      email: email.toLowerCase().trim(),
+      source,
+      tags: tags || [],
+      pageUrl,
+    })
 
     return NextResponse.json({
       success: true,

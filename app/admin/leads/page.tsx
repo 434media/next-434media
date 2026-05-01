@@ -30,6 +30,7 @@ import {
   Check,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
 
 // ── Types ──
 
@@ -154,8 +155,11 @@ export default function EmailListsPage() {
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-neutral-600" />
                 <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
-                  LEADS & REGISTRATIONS
+                  SUBMISSIONS
                 </h1>
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-2 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
+                  raw inbound — to work a lead, open it in the CRM
+                </span>
               </div>
             </div>
 
@@ -237,6 +241,7 @@ function EmailListsTab({
   setToast: (t: Toast | null) => void
   initialSearch?: string
 }) {
+  const leadsByEmail = useLeadsByEmail()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [signups, setSignups] = useState<EmailSignup[]>([])
@@ -703,6 +708,7 @@ function EmailListsTab({
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight truncate">
                         {signup.email}
+                        <LeadCrossLink email={signup.email} mapping={leadsByEmail} />
                       </p>
                     </div>
                     <button
@@ -829,6 +835,7 @@ function ContactFormsTab({
   setToast: (t: Toast | null) => void
   initialSearch?: string
 }) {
+  const leadsByEmail = useLeadsByEmail()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<ContactFormSubmission[]>([])
@@ -1147,6 +1154,7 @@ function ContactFormsTab({
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
                         {sub.firstName} {sub.lastName}
+                        <LeadCrossLink email={sub.email} mapping={leadsByEmail} />
                       </p>
                       <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
                         {sub.email}
@@ -1600,6 +1608,7 @@ function EventRegistrationsTab({
   initialSearch?: string
   initialEvent?: string
 }) {
+  const leadsByEmail = useLeadsByEmail()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [registrations, setRegistrations] = useState<EventRegistration[]>([])
@@ -1893,6 +1902,7 @@ function EventRegistrationsTab({
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
                         {reg.firstName} {reg.lastName}
+                        <LeadCrossLink email={reg.email} mapping={leadsByEmail} />
                       </p>
                       <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
                         {reg.email}

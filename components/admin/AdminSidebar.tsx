@@ -62,19 +62,19 @@ const SIDEBAR_ITEMS: SidebarEntry[] = [
     roles: ["full_admin", "crm_only"],
   },
   {
-    id: "leads",
-    label: "Leads",
-    icon: Inbox,
-    href: "/admin/leads",
-    matchPrefix: "/admin/leads",
-    roles: ["full_admin"],
-  },
-  {
     id: "analytics",
     label: "Analytics",
     icon: BarChart3,
     href: "/admin/analytics",
     matchPrefix: "/admin/analytics",
+    roles: ["full_admin"],
+  },
+  {
+    id: "submissions",
+    label: "Submissions",
+    icon: Inbox,
+    href: "/admin/leads",
+    matchPrefix: "/admin/leads",
     roles: ["full_admin"],
   },
   {

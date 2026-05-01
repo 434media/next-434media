@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Calendar,
+  Sparkles,
 } from "lucide-react"
 
 // Import CRM components
@@ -25,6 +26,8 @@ import {
   OpportunityDetailDrawer,
   TaskDetailDrawer,
   ContentDetailDrawer,
+  LeadsView,
+  LeadDetailDrawer,
   LinkedTasksPanel,
 } from "@/components/crm"
 
@@ -45,6 +48,10 @@ import { useTaskHandlers, EMPTY_TASK_FORM } from "@/hooks/useTaskHandlers"
 import type { TaskFormData } from "@/hooks/useTaskHandlers"
 import { useClientHandlers, EMPTY_CLIENT_FORM, EMPTY_OPPORTUNITY_FORM } from "@/hooks/useClientHandlers"
 import type { ClientFormData, OpportunityFormData } from "@/hooks/useClientHandlers"
+import { useLeadHandlers } from "@/hooks/useLeadHandlers"
+import type { Lead } from "@/types/crm-types"
+
+type LeadView = "priority" | "all" | "followup"
 
 export default function SalesCRMPage() {
   // State
@@ -63,6 +70,14 @@ export default function SalesCRMPage() {
   // Content Post Modal state
   const [showContentPostForm, setShowContentPostForm] = useState(false)
   const [editingContentPost, setEditingContentPost] = useState<ContentPost | null>(null)
+
+  // Leads state
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [showLeadDrawer, setShowLeadDrawer] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [leadView, setLeadView] = useState<LeadView>("priority")
+  const [leadSearch, setLeadSearch] = useState("")
+  const [isSavingLead, setIsSavingLead] = useState(false)
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard")
@@ -419,6 +434,26 @@ export default function SalesCRMPage() {
     setViewMode,
   })
 
+  // ---- Hook: Lead handlers ----
+  const {
+    loadLeads,
+    openLead,
+    openNewLeadForm,
+    saveLead,
+    archiveLead,
+    deleteLead,
+    generateDraft,
+    sendOutreach,
+    convertToClient,
+  } = useLeadHandlers({
+    leads,
+    setLeads,
+    setToast,
+    selectedLead,
+    setSelectedLead,
+    setShowLeadDrawer,
+  })
+
   // ======== useEffects ========
 
   // Load data on mount
@@ -511,7 +546,7 @@ export default function SalesCRMPage() {
   const tabParam = searchParams?.get("tab") ?? null
   useEffect(() => {
     if (!tabParam) return
-    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks", "social-calendar"]
+    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks", "social-calendar", "leads"]
     if (allowed.includes(tabParam as ViewMode) && tabParam !== viewMode) {
       setViewMode(tabParam as ViewMode)
     }
@@ -564,6 +599,8 @@ export default function SalesCRMPage() {
       handleAddTask()
     } else if (newParam === "content") {
       handleAddContentPost()
+    } else if (newParam === "lead") {
+      openNewLeadForm()
     }
     const params = new URLSearchParams(searchParams?.toString() ?? "")
     params.delete("new")
@@ -727,8 +764,50 @@ export default function SalesCRMPage() {
       loadTasks()
     } else if (viewMode === "social-calendar") {
       loadContentPosts()
+    } else if (viewMode === "leads") {
+      loadLeads()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode])
+
+  // ?openLead=<id> — same pattern as ?openOpportunity, against the leads[] array.
+  const openLeadId = searchParams?.get("openLead") ?? null
+  useEffect(() => {
+    if (!openLeadId) {
+      if (showLeadDrawer) {
+        setShowLeadDrawer(false)
+        setSelectedLead(null)
+      }
+      return
+    }
+    if (leads.length === 0) return
+    const target = leads.find((l) => l.id === openLeadId)
+    if (!target) return
+    if (selectedLead?.id === openLeadId && showLeadDrawer) return
+    openLead(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openLeadId, leads])
+
+  const closeLeadDrawer = () => {
+    setShowLeadDrawer(false)
+    setSelectedLead(null)
+    if (searchParams?.get("openLead")) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("openLead")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+  }
+
+  // Keep ?openLead= in sync when the drawer opens via direct interaction
+  useEffect(() => {
+    if (!showLeadDrawer || !selectedLead?.id) return
+    if (searchParams?.get("openLead") === selectedLead.id) return
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("openLead", selectedLead.id)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLeadDrawer, selectedLead?.id])
 
   if (isLoading) {
     return (
@@ -751,6 +830,7 @@ export default function SalesCRMPage() {
         <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-200 pb-4">
           {[
             { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
+            { id: "leads", label: "Leads", icon: Sparkles, badge: null },
             { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
             { id: "clients", label: "Clients", icon: Users, badge: null },
             { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
@@ -902,6 +982,20 @@ export default function SalesCRMPage() {
             onAddPost={handleAddContentPost}
           />
         )}
+
+        {/* Leads View */}
+        {viewMode === "leads" && (
+          <LeadsView
+            leads={leads}
+            view={leadView}
+            searchQuery={leadSearch}
+            onViewChange={setLeadView}
+            onSearchChange={setLeadSearch}
+            onRefresh={loadLeads}
+            onOpenLead={openLead}
+            onCreateLead={openNewLeadForm}
+          />
+        )}
       </div>
 
       {/* Content Post Detail Drawer */}
@@ -913,6 +1007,27 @@ export default function SalesCRMPage() {
         onSave={handleSaveContentPost}
         onDelete={editingContentPost ? handleDeleteContentPost : undefined}
         onClose={closeContentDrawer}
+      />
+
+      {/* Lead Detail Drawer */}
+      <LeadDetailDrawer
+        open={showLeadDrawer}
+        lead={selectedLead}
+        isSaving={isSavingLead}
+        onClose={closeLeadDrawer}
+        onSave={async (patch) => {
+          setIsSavingLead(true)
+          try {
+            return await saveLead(patch)
+          } finally {
+            setIsSavingLead(false)
+          }
+        }}
+        onArchive={archiveLead}
+        onDelete={deleteLead}
+        onGenerateDraft={generateDraft}
+        onSendOutreach={sendOutreach}
+        onConvertToClient={convertToClient}
       />
 
       {/* Client Detail Drawer */}

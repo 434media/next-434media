@@ -607,7 +607,125 @@ export const CRM_COLLECTIONS = {
   BARB_PIE_CHART: "crm_barb_pie_chart",
   PIE_SLICES: "crm_pie_slices",
   CONTENT_POSTS: "crm_content_posts",
+  LEADS: "leads",
 } as const
+
+// ============================================
+// LEADS — upstream layer before opportunities
+// ============================================
+
+export type LeadStatus =
+  | "new"
+  | "ready"
+  | "contacted"
+  | "engaged"
+  | "converted"
+  | "archived"
+
+export type LeadSource =
+  | "event"
+  | "web"
+  | "manual"
+  | "newsletter"
+  | "referral"
+
+export type LeadPriority = "high" | "medium" | "low"
+
+export type LeadPlatform =
+  | "434 Media"
+  | "TXMX"
+  | "VemosVamos"
+  | "DevSA"
+  | "MilCity"
+
+export interface LeadScoreBreakdown {
+  geography?: number
+  industry?: number
+  title?: number
+  event?: number
+  engagement?: number
+  sponsor?: number
+}
+
+export interface Lead extends BaseRecord {
+  // Contact
+  name: string
+  company: string
+  title?: string
+  email: string
+  phone?: string
+  linkedin?: string
+
+  // Qualification
+  source: LeadSource
+  industry?: string
+  location?: string
+  platform?: LeadPlatform
+
+  // Scoring (computed inline on every write)
+  score: number
+  priority: LeadPriority
+  score_breakdown: LeadScoreBreakdown
+
+  // Workflow
+  status: LeadStatus
+  assigned_to?: string
+
+  // Outreach
+  outreach_draft?: string
+  draft_generated_at?: string
+  last_contacted_at?: string
+  next_followup_date?: string
+
+  // Resend tracking
+  resend_email_id?: string
+  email_opens: number
+  email_clicks: number
+
+  // Classification
+  tags?: string[]
+  notes?: string
+
+  // Provenance
+  created_by?: string
+  enriched_at?: string
+
+  // Conversion link (set when promoted to crm_clients)
+  converted_to_client_id?: string
+  converted_at?: string
+}
+
+/**
+ * Shape accepted by the create-lead API. Score, priority, breakdown, status,
+ * and engagement counters are server-computed and not accepted from the client.
+ */
+export type LeadCreateInput = Omit<
+  Lead,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "score"
+  | "priority"
+  | "score_breakdown"
+  | "email_opens"
+  | "email_clicks"
+  | "enriched_at"
+  | "resend_email_id"
+  | "converted_to_client_id"
+  | "converted_at"
+  | "status"
+> & {
+  // Status defaults to "new" if omitted (most public form submissions).
+  status?: LeadStatus
+}
+
+/**
+ * Shape accepted by the update-lead API. All fields optional; server recomputes
+ * score on every write so editors can't skew it.
+ */
+export type LeadUpdateInput = Partial<
+  Omit<Lead, "id" | "created_at" | "score" | "priority" | "score_breakdown" | "enriched_at">
+>
 
 // Type for CRM Dashboard Stats
 export interface CRMDashboardStats {
