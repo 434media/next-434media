@@ -290,6 +290,7 @@ export interface PageViewsRow {
   pageViews: number
   sessions: number
   bounceRate: number
+  engagementRate: number
 }
 
 export interface PageViewsResponse {

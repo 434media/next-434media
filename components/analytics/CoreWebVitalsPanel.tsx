@@ -86,11 +86,29 @@ export function CoreWebVitalsPanel({ propertyId, setError }: CoreWebVitalsPanelP
         // Append formFactor manually (buildAnalyticsUrl doesn't model it)
         const qs = formFactor === "ALL_FORM_FACTORS" ? "" : `&formFactor=${formFactor}`
         const res = await fetch(`${url}${qs}`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        // 4xx — render the empty state ("CrUX not connected" / "no data")
+        // rather than throwing into the page-level error toast.
+        if (!res.ok) {
+          if (!cancelled) {
+            setPayload({
+              available: false,
+              reason: res.status === 400
+                ? "CrUX request rejected (origin missing or invalid)"
+                : `CrUX HTTP ${res.status}`,
+            })
+          }
+          if (res.status >= 500 && setError) {
+            setError(`Core Web Vitals: HTTP ${res.status}`)
+          }
+          return
+        }
         const data = (await res.json()) as CruxPayload
         if (!cancelled) setPayload(data)
       } catch (err) {
-        if (setError) setError(err instanceof Error ? err.message : "CrUX fetch failed")
+        console.warn("[CoreWebVitalsPanel] fetch failed:", err)
+        if (!cancelled) {
+          setPayload({ available: false, reason: "CrUX request failed" })
+        }
       } finally {
         if (!cancelled) setIsLoading(false)
       }

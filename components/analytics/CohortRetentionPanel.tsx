@@ -20,6 +20,8 @@ interface CohortPayload {
   data: CohortRow[]
   weeks: number
   propertyId: string
+  unavailable?: boolean
+  reason?: string
 }
 
 /**
@@ -59,11 +61,22 @@ export function CohortRetentionPanel({ propertyId, setError }: CohortRetentionPa
           propertyId,
         })
         const res = await fetch(url)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        // 4xx from cohort spec usually means "property too new / not enough
+        // historical data for an 8-cohort × 5-week observation window."
+        // Render the empty state quietly — server-side logs hold the detail.
+        if (!res.ok) {
+          if (!cancelled) setPayload(null)
+          if (res.status >= 500 && setError) {
+            setError(`Cohort retention: HTTP ${res.status}`)
+          }
+          return
+        }
         const data = (await res.json()) as CohortPayload
         if (!cancelled) setPayload(data)
       } catch (err) {
-        if (setError) setError(err instanceof Error ? err.message : "Cohort fetch failed")
+        // Network-level failure — log but don't toast.
+        console.warn("[CohortRetentionPanel] fetch failed:", err)
+        if (!cancelled) setPayload(null)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -82,13 +95,14 @@ export function CohortRetentionPanel({ propertyId, setError }: CohortRetentionPa
     )
   }
 
-  if (!payload || payload.data.length === 0) {
+  if (!payload || payload.data.length === 0 || payload.unavailable) {
     return (
       <div className="bg-white border border-neutral-200 rounded-xl p-8 text-center">
         <Repeat className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
         <p className="text-sm font-medium text-neutral-700">No cohort data</p>
-        <p className="text-xs text-neutral-500 mt-1">
-          GA4 needs enough historical user activity to build cohorts.
+        <p className="text-xs text-neutral-500 mt-1 max-w-md mx-auto">
+          {payload?.reason ??
+            "GA4 needs enough historical user activity to build an 8-cohort × 5-week retention view."}
         </p>
       </div>
     )

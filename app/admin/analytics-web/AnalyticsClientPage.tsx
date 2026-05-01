@@ -22,93 +22,244 @@ import { AnalyticsFilterBar } from "@/components/analytics/AnalyticsFilterBar"
 import { dateRangeFromUrl, rangeKeyFromDateRange } from "@/lib/analytics-url-state"
 import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty, AnalyticsFilters } from "@/types/analytics"
 
-// Download analytics summary as CSV
-async function downloadAnalyticsCSV(dateRange: DateRange, propertyId?: string, propertyName?: string) {
+/**
+ * CSV export — refreshed for Phases 2–5. Honors the active filter set,
+ * includes engagement metrics, channel grouping, period-over-period deltas,
+ * conversions, geographic, and goals progress when present. Stamps the
+ * header with the active filters so the recipient knows what they're looking at.
+ */
+async function downloadAnalyticsCSV(
+  dateRange: DateRange,
+  propertyId?: string,
+  propertyName?: string,
+  filters?: AnalyticsFilters,
+) {
   try {
-    // Fetch all data in parallel
-    const [summaryResponse, pagesResponse, trafficResponse, devicesResponse] = await Promise.all([
-      fetch(`/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=top-pages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`)
-    ])
-    
-    if (!summaryResponse.ok) {
-      throw new Error('Failed to fetch analytics data')
+    // Build filter query suffix once — applies only to filter-aware endpoints.
+    const filterParams = new URLSearchParams()
+    if (filters?.deviceCategory) filterParams.set("device", filters.deviceCategory)
+    if (filters?.channelGroup) filterParams.set("channel", filters.channelGroup)
+    if (filters?.country) filterParams.set("country", filters.country)
+    const filterSuffix = filterParams.toString() ? `&${filterParams.toString()}` : ""
+
+    const url = (endpoint: string, withFilters: boolean) =>
+      `/api/analytics?endpoint=${endpoint}&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ""}${withFilters ? filterSuffix : ""}`
+
+    // Parallel fetch — summary/pages respect filters, source/device/geo/conversions/goals don't
+    const [summaryRes, pagesRes, trafficRes, devicesRes, geoRes, conversionsRes, goalsRes] =
+      await Promise.all([
+        fetch(url("summary", true)),
+        fetch(url("top-pages", true)),
+        fetch(url("trafficsources", false)),
+        fetch(url("devices", false)),
+        fetch(url("geographic", false)),
+        fetch(url("conversions", false)),
+        propertyId
+          ? fetch(`/api/admin/analytics/goals/evaluate?propertyId=${encodeURIComponent(propertyId)}`)
+          : Promise.resolve(null),
+      ])
+
+    if (!summaryRes.ok) {
+      throw new Error("Failed to fetch analytics data")
     }
-    
-    const data = await summaryResponse.json()
-    const pagesData = pagesResponse.ok ? await pagesResponse.json() : { data: [] }
-    const trafficData = trafficResponse.ok ? await trafficResponse.json() : { data: [] }
-    const devicesData = devicesResponse.ok ? await devicesResponse.json() : { data: [] }
-    
-    const topPages = pagesData.data?.slice(0, 10) || []
-    const trafficSources = trafficData.data?.slice(0, 6) || []
-    const devices = devicesData.data || []
-    
-    // Determine property ID and name
-    const displayPropertyId = propertyId || data.propertyId || '488543948'
-    const displayPropertyName = propertyName || PROPERTY_NAMES[displayPropertyId] || '434 MEDIA'
-    
-    // Format the date for filename
-    const today = new Date().toISOString().split('T')[0]
-    const labelSlug = (dateRange.label || 'custom').replace(/\s+/g, '-').toLowerCase()
-    const propertySlug = displayPropertyName.replace(/\s+/g, '-').toLowerCase()
+
+    const summary = await summaryRes.json()
+    const pages = pagesRes.ok ? (await pagesRes.json()).data ?? [] : []
+    const traffic = trafficRes.ok ? (await trafficRes.json()).data ?? [] : []
+    const devices = devicesRes.ok ? (await devicesRes.json()).data ?? [] : []
+    const geo = geoRes.ok ? (await geoRes.json()).data ?? [] : []
+    const conversions = conversionsRes.ok ? (await conversionsRes.json()).data ?? [] : []
+    const goals = goalsRes && goalsRes.ok ? (await goalsRes.json()).evaluations ?? [] : []
+
+    // Property identification
+    const displayPropertyId = propertyId || summary.propertyId || "488543948"
+    const displayPropertyName = propertyName || PROPERTY_NAMES[displayPropertyId] || "434 MEDIA"
+
+    // Filename: <brand>-analytics-<range>-<today>.csv
+    const today = new Date().toISOString().split("T")[0]
+    const labelSlug = (dateRange.label || "custom").replace(/\s+/g, "-").toLowerCase()
+    const propertySlug = displayPropertyName.replace(/\s+/g, "-").toLowerCase()
     const filename = `${propertySlug}-analytics-${labelSlug}-${today}.csv`
-    
-    // Metrics to exclude from CSV export
-    const csvExcludedMetrics = ['pageViewsChange', 'sessionsChange', 'usersChange', 'bounceRateChange', '_source', 'source', 'propertyId', 'averageSessionDuration', 'activeUsers', 'avgSessionDuration']
-    
-    // Create CSV content
-    let csvContent = `${displayPropertyName} Analytics Report\n`
-    csvContent += `Property ID: ${displayPropertyId}\n`
-    csvContent += `Date Range: ${dateRange.label || 'Custom'}\n`
-    csvContent += `Generated: ${new Date().toLocaleString()}\n\n`
-    
-    // Key Metrics Section
-    csvContent += "=== KEY METRICS ===\n"
-    csvContent += "Metric,Value\n"
-    
-    const metrics = data.metrics || data
-    Object.entries(metrics).forEach(([key, value]) => {
-      if (typeof value !== 'object' && !csvExcludedMetrics.some(excluded => key.toLowerCase().includes(excluded.toLowerCase()))) {
-        const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()
-        csvContent += `${formattedKey},${formatMetricValue(key, value as number | string)}\n`
+
+    // CSV value formatters
+    const fmtPct = (v: number) => (typeof v === "number" ? `${(v * 100).toFixed(1)}%` : "")
+    const fmtDuration = (s: number) => {
+      if (!s) return "0s"
+      if (s < 60) return `${Math.round(s)}s`
+      const m = Math.floor(s / 60)
+      const r = Math.round(s % 60)
+      return r > 0 ? `${m}m ${r}s` : `${m}m`
+    }
+    const fmtChange = (v: number) => (typeof v === "number" && v !== 0 ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : "")
+    const csvEscape = (v: string | number | undefined) => {
+      const str = String(v ?? "")
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+    }
+
+    // Build CSV content
+    let csv = ""
+
+    // Header block — context the recipient needs
+    csv += `${displayPropertyName} Analytics Report\n`
+    csv += `Property ID: ${displayPropertyId}\n`
+    csv += `Date Range: ${dateRange.label || "Custom"} (${dateRange.startDate} to ${dateRange.endDate})\n`
+    if (filterParams.toString()) {
+      const activeFilters: string[] = []
+      if (filters?.deviceCategory) activeFilters.push(`Device = ${filters.deviceCategory}`)
+      if (filters?.channelGroup) activeFilters.push(`Channel = ${filters.channelGroup}`)
+      if (filters?.country) activeFilters.push(`Country = ${filters.country}`)
+      csv += `Active filters: ${activeFilters.join(" · ")}\n`
+    }
+    csv += `Generated: ${new Date().toLocaleString()}\n\n`
+
+    // === Key Metrics === — current + previous + delta in three columns
+    csv += "=== KEY METRICS ===\n"
+    csv += "Metric,Current,Previous,Change %\n"
+    const prev = summary.previousPeriod
+    const metricRows: Array<[string, number | string, number | string, string]> = [
+      ["Sessions", summary.totalSessions, prev?.totalSessions ?? "", fmtChange(summary.sessionsChange)],
+      ["Users", summary.totalUsers, prev?.totalUsers ?? "", fmtChange(summary.usersChange)],
+      ["New users", summary.newUsers, prev?.newUsers ?? "", fmtChange(summary.newUsersChange)],
+      ["Page views", summary.totalPageViews, prev?.totalPageViews ?? "", fmtChange(summary.pageViewsChange)],
+      ["Engaged sessions", summary.engagedSessions, prev?.engagedSessions ?? "", fmtChange(summary.engagedSessionsChange)],
+      ["Engagement rate", fmtPct(summary.engagementRate), prev ? fmtPct(prev.engagementRate) : "", fmtChange(summary.engagementRateChange)],
+      ["Avg engagement time", fmtDuration(summary.averageEngagementTime), prev ? fmtDuration(prev.averageEngagementTime) : "", fmtChange(summary.averageEngagementTimeChange)],
+      ["Bounce rate", fmtPct(summary.bounceRate), prev ? fmtPct(prev.bounceRate) : "", fmtChange(summary.bounceRateChange)],
+    ]
+    for (const row of metricRows) {
+      csv += row.map(csvEscape).join(",") + "\n"
+    }
+
+    // === Top Pages === — now with engagement rate
+    if (pages.length > 0) {
+      csv += "\n=== TOP PAGES ===\n"
+      csv += "Path,Title,Views,Sessions,Engagement Rate\n"
+      for (const page of pages.slice(0, 20)) {
+        csv +=
+          [
+            csvEscape(page.path || "/"),
+            csvEscape(page.title || ""),
+            page.pageViews ?? 0,
+            page.sessions ?? 0,
+            fmtPct(page.engagementRate ?? 0),
+          ].join(",") + "\n"
       }
-    })
-    
-    // Top Pages Section
-    if (topPages.length > 0) {
-      csvContent += "\n=== TOP PAGES ===\n"
-      csvContent += "Page,Views\n"
-      topPages.forEach((page: { pagePath?: string; path?: string; pageViews?: number; views?: number }) => {
-        const pagePath = page.pagePath || page.path || '/'
-        const views = page.pageViews || page.views || 0
-        csvContent += `"${pagePath}",${views}\n`
-      })
     }
-    
-    // Traffic Sources Section
-    if (trafficSources.length > 0) {
-      csvContent += "\n=== TRAFFIC SOURCES ===\n"
-      csvContent += "Source,Sessions,Users\n"
-      trafficSources.forEach((source: { source: string; sessions: number; users: number }) => {
-        csvContent += `"${source.source}",${source.sessions},${source.users}\n`
-      })
+
+    // === Traffic by Channel === — bucket source/medium rows by channelGroup,
+    // sessions-weighted engagement rate. Same logic as the dashboard panel.
+    if (traffic.length > 0) {
+      type SourceRow = {
+        source: string
+        medium: string
+        channelGroup: string
+        sessions: number
+        users: number
+        engagedSessions: number
+      }
+      const buckets = new Map<string, { sessions: number; users: number; engaged: number }>()
+      for (const row of traffic as SourceRow[]) {
+        const key = row.channelGroup || "Other"
+        const b = buckets.get(key) || { sessions: 0, users: 0, engaged: 0 }
+        b.sessions += row.sessions || 0
+        b.users += row.users || 0
+        b.engaged += row.engagedSessions || 0
+        buckets.set(key, b)
+      }
+      csv += "\n=== TRAFFIC BY CHANNEL ===\n"
+      csv += "Channel,Sessions,Users,Engagement Rate,Share %\n"
+      const totalSessions = Array.from(buckets.values()).reduce((s, b) => s + b.sessions, 0)
+      const sortedBuckets = Array.from(buckets.entries()).sort((a, b) => b[1].sessions - a[1].sessions)
+      for (const [channel, b] of sortedBuckets) {
+        const engRate = b.sessions > 0 ? b.engaged / b.sessions : 0
+        const share = totalSessions > 0 ? b.sessions / totalSessions : 0
+        csv +=
+          [csvEscape(channel), b.sessions, b.users, fmtPct(engRate), fmtPct(share)].join(",") + "\n"
+      }
     }
-    
-    // Device Types Section
+
+    // === Device Types === — share % column
     if (devices.length > 0) {
-      csvContent += "\n=== DEVICE TYPES ===\n"
-      csvContent += "Device,Sessions,Users\n"
-      devices.forEach((device: { deviceCategory: string; sessions: number; users: number }) => {
-        csvContent += `"${device.deviceCategory}",${device.sessions},${device.users}\n`
-      })
+      csv += "\n=== DEVICE TYPES ===\n"
+      csv += "Device,Sessions,Users,Share %\n"
+      const total = devices.reduce(
+        (sum: number, d: { sessions?: number }) => sum + (d.sessions || 0),
+        0,
+      )
+      for (const device of devices) {
+        const share = total > 0 ? device.sessions / total : 0
+        csv +=
+          [csvEscape(device.deviceCategory), device.sessions ?? 0, device.users ?? 0, fmtPct(share)].join(",") +
+          "\n"
+      }
     }
-    
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
+
+    // === Geographic — Top 15 ===
+    if (geo.length > 0) {
+      // Aggregate by country (GA4 returns country/city pairs)
+      const countryMap = new Map<string, { sessions: number; newUsers: number }>()
+      for (const row of geo as Array<{ country: string; city: string; sessions: number; newUsers: number }>) {
+        if (!row.country || row.country === "(not set)") continue
+        const c = countryMap.get(row.country) || { sessions: 0, newUsers: 0 }
+        c.sessions += row.sessions || 0
+        c.newUsers += row.newUsers || 0
+        countryMap.set(row.country, c)
+      }
+      const totalGeoSessions = Array.from(countryMap.values()).reduce((s, c) => s + c.sessions, 0)
+      const sortedCountries = Array.from(countryMap.entries())
+        .sort((a, b) => b[1].sessions - a[1].sessions)
+        .slice(0, 15)
+      if (sortedCountries.length > 0) {
+        csv += "\n=== GEOGRAPHIC — TOP COUNTRIES ===\n"
+        csv += "Country,Sessions,New Users,Share %\n"
+        for (const [country, c] of sortedCountries) {
+          const share = totalGeoSessions > 0 ? c.sessions / totalGeoSessions : 0
+          csv += [csvEscape(country), c.sessions, c.newUsers, fmtPct(share)].join(",") + "\n"
+        }
+      }
+    }
+
+    // === Conversions === (only when present)
+    if (conversions.length > 0) {
+      csv += "\n=== CONVERSIONS ===\n"
+      csv += "Event,Conversions,Total Revenue,Conversion Rate\n"
+      for (const c of conversions as Array<{
+        eventName: string
+        conversions: number
+        totalRevenue: number
+        conversionRate: number
+      }>) {
+        csv +=
+          [
+            csvEscape(c.eventName),
+            c.conversions,
+            c.totalRevenue ? `$${c.totalRevenue.toFixed(2)}` : "",
+            fmtPct(c.conversionRate ?? 0),
+          ].join(",") + "\n"
+      }
+    }
+
+    // === Goals Progress === (only when goals exist)
+    if (goals.length > 0) {
+      csv += "\n=== GOALS PROGRESS ===\n"
+      csv += "Name,Source,Period,Current,Target,% to Goal,Status\n"
+      for (const g of goals) {
+        csv +=
+          [
+            csvEscape(g.goal.name),
+            csvEscape(g.goal.source),
+            csvEscape(g.goal.period),
+            g.current,
+            g.goal.target,
+            `${(g.progress * 100).toFixed(1)}%`,
+            csvEscape(g.status),
+          ].join(",") + "\n"
+      }
+    }
+
+    // Trigger download
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
     link.href = URL.createObjectURL(blob)
     link.download = filename
     document.body.appendChild(link)
@@ -119,39 +270,6 @@ async function downloadAnalyticsCSV(dateRange: DateRange, propertyId?: string, p
     alert('Failed to download analytics report. Please try again.')
   }
 }
-
-// Helper to format numbers with commas
-function formatNumber(num: number): string {
-  return num.toLocaleString()
-}
-
-// Helper to format metric values for display
-function formatMetricValue(key: string, value: number | string): string {
-  const numValue = typeof value === 'number' ? value : parseFloat(String(value))
-  
-  // Format bounce rate as percentage
-  if (key.toLowerCase().includes('bouncerate') || key.toLowerCase().includes('bounce_rate')) {
-    if (numValue <= 1) {
-      return `${(numValue * 100).toFixed(1)}%`
-    }
-    return `${numValue.toFixed(1)}%`
-  }
-  
-  // Format other percentages
-  if (key.toLowerCase().includes('rate') || key.toLowerCase().includes('percentage')) {
-    return `${numValue.toFixed(1)}%`
-  }
-  
-  // Format regular numbers
-  if (typeof value === 'number') {
-    return formatNumber(value)
-  }
-  
-  return String(value)
-}
-
-// Metrics to exclude from PNG export (including average session duration and active users)
-const EXCLUDED_METRICS = ['pageViewsChange', 'sessionsChange', 'usersChange', 'bounceRateChange', '_source', 'source', 'propertyId', 'averageSessionDuration', 'activeUsers', 'avgSessionDuration']
 
 // Property name lookup map
 const PROPERTY_NAMES: Record<string, string> = {
@@ -164,331 +282,10 @@ const PROPERTY_NAMES: Record<string, string> = {
   '492925088': 'Digital Canvas',
 }
 
-// Download analytics as PNG using Canvas API (avoids CSS color parsing issues)
-async function downloadAnalyticsPNG(dateRange: DateRange, propertyId?: string, propertyName?: string) {
-  try {
-    // Fetch all data in parallel
-    const [summaryResponse, pagesResponse, trafficResponse, devicesResponse] = await Promise.all([
-      fetch(`/api/analytics?endpoint=summary&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=top-pages&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=trafficsources&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`),
-      fetch(`/api/analytics?endpoint=devices&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${propertyId ? `&propertyId=${propertyId}` : ''}`)
-    ])
-    
-    if (!summaryResponse.ok) {
-      throw new Error('Failed to fetch analytics data')
-    }
-    
-    const data = await summaryResponse.json()
-    const pagesData = pagesResponse.ok ? await pagesResponse.json() : { data: [] }
-    const trafficData = trafficResponse.ok ? await trafficResponse.json() : { data: [] }
-    const devicesData = devicesResponse.ok ? await devicesResponse.json() : { data: [] }
-    
-    const topPages = pagesData.data?.slice(0, 5) || []
-    const trafficSources = trafficData.data?.slice(0, 5) || []
-    const devices = devicesData.data || []
-    
-    // Determine property ID and name
-    const displayPropertyId = propertyId || data.propertyId || '488543948'
-    const displayPropertyName = propertyName || PROPERTY_NAMES[displayPropertyId] || '434 MEDIA'
-    
-    // Create canvas
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      alert('Unable to create canvas. Please try again.')
-      return
-    }
-    
-    // Calculate dynamic canvas height based on content
-    const hasPages = topPages.length > 0
-    const hasSources = trafficSources.length > 0
-    const hasDevices = devices.length > 0
-    let canvasHeight = 500 // Base height for header + metrics
-    if (hasPages) canvasHeight += 280 // Top pages section
-    if (hasSources || hasDevices) canvasHeight += 300 // Traffic sources and devices section
-    
-    // Set canvas size
-    canvas.width = 1200
-    canvas.height = canvasHeight
-    
-    // Draw background
-    ctx.fillStyle = '#0a0a0a'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    
-    // Draw gradient accent bar at top
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0)
-    gradient.addColorStop(0, '#10b981')
-    gradient.addColorStop(1, '#14b8a6')
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, canvas.width, 6)
-    
-    // Draw header with property name
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 36px system-ui, -apple-system, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.fillText(`${displayPropertyName} Analytics Report`, 60, 70)
-    
-    // Draw property info (ID)
-    ctx.fillStyle = '#9ca3af'
-    ctx.font = '14px system-ui, -apple-system, sans-serif'
-    ctx.fillText(`Property ID: ${displayPropertyId}`, 60, 100)
-    
-    // Draw date range
-    ctx.fillStyle = '#9ca3af'
-    ctx.font = '18px system-ui, -apple-system, sans-serif'
-    ctx.fillText(`Date Range: ${dateRange.label || 'Custom'}`, 60, 130)
-    
-    // Draw generated date
-    ctx.fillStyle = '#6b7280'
-    ctx.font = '14px system-ui, -apple-system, sans-serif'
-    ctx.textAlign = 'right'
-    ctx.fillText(`Generated: ${new Date().toLocaleString()}`, canvas.width - 60, 70)
-    
-    // Draw divider
-    ctx.strokeStyle = '#374151'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(60, 160)
-    ctx.lineTo(canvas.width - 60, 160)
-    ctx.stroke()
-    
-    // Extract metrics from data, filtering out excluded ones
-    const metrics = data.metrics || data
-    const metricsArray = Object.entries(metrics)
-      .filter(([key, value]) => 
-        typeof value !== 'object' && 
-        !EXCLUDED_METRICS.includes(key) &&
-        !key.startsWith('_')
-      )
-    
-    // Draw metrics cards
-    const cardWidth = 250
-    const cardHeight = 120
-    const cardsPerRow = 4
-    const startX = 60
-    const startY = 200
-    const gapX = 30
-    const gapY = 30
-    
-    metricsArray.slice(0, 8).forEach(([key, value], index) => {
-      const row = Math.floor(index / cardsPerRow)
-      const col = index % cardsPerRow
-      const x = startX + col * (cardWidth + gapX)
-      const y = startY + row * (cardHeight + gapY)
-      
-      // Card background
-      ctx.fillStyle = '#1f2937'
-      ctx.beginPath()
-      ctx.roundRect(x, y, cardWidth, cardHeight, 12)
-      ctx.fill()
-      
-      // Card border
-      ctx.strokeStyle = '#374151'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.roundRect(x, y, cardWidth, cardHeight, 12)
-      ctx.stroke()
-      
-      // Metric label
-      ctx.fillStyle = '#9ca3af'
-      ctx.font = '12px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'left'
-      const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim()
-      ctx.fillText(formattedKey.toUpperCase(), x + 20, y + 35)
-      
-      // Metric value (with proper formatting)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif'
-      const displayValue = formatMetricValue(key, value as number | string)
-      ctx.fillText(displayValue, x + 20, y + 80)
-    })
-    
-    // Calculate Y position after metrics cards
-    const metricsRows = Math.ceil(Math.min(metricsArray.length, 8) / cardsPerRow)
-    let currentY = startY + metricsRows * (cardHeight + gapY) + 20
-    
-    // Draw Top Pages section if available
-    if (topPages.length > 0) {
-      // Section header
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
-      ctx.textAlign = 'left'
-      ctx.fillText('Top Pages', 60, currentY + 30)
-      
-      currentY += 60
-      
-      // Draw top pages table
-      const tableX = 60
-      const tableWidth = canvas.width - 120
-      const rowHeight = 40
-      
-      // Table header
-      ctx.fillStyle = '#1f2937'
-      ctx.fillRect(tableX, currentY, tableWidth, rowHeight)
-      
-      ctx.fillStyle = '#9ca3af'
-      ctx.font = 'bold 12px system-ui, -apple-system, sans-serif'
-      ctx.fillText('PAGE', tableX + 20, currentY + 25)
-      ctx.textAlign = 'right'
-      ctx.fillText('VIEWS', tableX + tableWidth - 20, currentY + 25)
-      
-      currentY += rowHeight
-      
-      // Table rows
-      topPages.forEach((page: { pagePath?: string; path?: string; pageViews?: number; views?: number }, index: number) => {
-        // Alternating row background
-        ctx.fillStyle = index % 2 === 0 ? '#111827' : '#0a0a0a'
-        ctx.fillRect(tableX, currentY, tableWidth, rowHeight)
-        
-        // Page path
-        ctx.fillStyle = '#e5e7eb'
-        ctx.font = '14px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'left'
-        const pagePath = page.pagePath || page.path || '/'
-        const truncatedPath = pagePath.length > 60 ? pagePath.substring(0, 57) + '...' : pagePath
-        ctx.fillText(truncatedPath, tableX + 20, currentY + 25)
-        
-        // Page views
-        ctx.fillStyle = '#3b82f6'
-        ctx.font = 'bold 14px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'right'
-        const views = page.pageViews || page.views || 0
-        ctx.fillText(formatNumber(views), tableX + tableWidth - 20, currentY + 25)
-        
-        currentY += rowHeight
-      })
-      
-      currentY += 30 // Add spacing after top pages
-    }
-    
-    // Draw Traffic Sources and Device Types side by side
-    if (trafficSources.length > 0 || devices.length > 0) {
-      const sectionWidth = (canvas.width - 140) / 2
-      const tableX = 60
-      const rowHeight = 35
-      
-      // Traffic Sources Section (left side)
-      if (trafficSources.length > 0) {
-        // Section header
-        ctx.fillStyle = '#ffffff'
-        ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'left'
-        ctx.fillText('Traffic Sources', tableX, currentY + 25)
-        
-        let sourceY = currentY + 50
-        
-        // Table header
-        ctx.fillStyle = '#1f2937'
-        ctx.fillRect(tableX, sourceY, sectionWidth, rowHeight)
-        
-        ctx.fillStyle = '#9ca3af'
-        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'left'
-        ctx.fillText('SOURCE', tableX + 15, sourceY + 22)
-        ctx.textAlign = 'right'
-        ctx.fillText('SESSIONS', tableX + sectionWidth - 15, sourceY + 22)
-        
-        sourceY += rowHeight
-        
-        // Traffic source rows
-        trafficSources.forEach((source: { source: string; sessions: number; users: number }, index: number) => {
-          ctx.fillStyle = index % 2 === 0 ? '#111827' : '#0a0a0a'
-          ctx.fillRect(tableX, sourceY, sectionWidth, rowHeight)
-          
-          ctx.fillStyle = '#e5e7eb'
-          ctx.font = '13px system-ui, -apple-system, sans-serif'
-          ctx.textAlign = 'left'
-          const sourceName = source.source === '(direct)' ? 'Direct' : source.source
-          const truncatedSource = sourceName.length > 25 ? sourceName.substring(0, 22) + '...' : sourceName
-          ctx.fillText(truncatedSource, tableX + 15, sourceY + 22)
-          
-          ctx.fillStyle = '#10b981'
-          ctx.font = 'bold 13px system-ui, -apple-system, sans-serif'
-          ctx.textAlign = 'right'
-          ctx.fillText(formatNumber(source.sessions), tableX + sectionWidth - 15, sourceY + 22)
-          
-          sourceY += rowHeight
-        })
-      }
-      
-      // Device Types Section (right side)
-      if (devices.length > 0) {
-        const deviceX = tableX + sectionWidth + 20
-        
-        // Section header
-        ctx.fillStyle = '#ffffff'
-        ctx.font = 'bold 18px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'left'
-        ctx.fillText('Device Types', deviceX, currentY + 25)
-        
-        let deviceY = currentY + 50
-        
-        // Table header
-        ctx.fillStyle = '#1f2937'
-        ctx.fillRect(deviceX, deviceY, sectionWidth, rowHeight)
-        
-        ctx.fillStyle = '#9ca3af'
-        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
-        ctx.textAlign = 'left'
-        ctx.fillText('DEVICE', deviceX + 15, deviceY + 22)
-        ctx.textAlign = 'right'
-        ctx.fillText('SESSIONS', deviceX + sectionWidth - 15, deviceY + 22)
-        
-        deviceY += rowHeight
-        
-        // Device type rows
-        devices.forEach((device: { deviceCategory: string; sessions: number; users: number }, index: number) => {
-          ctx.fillStyle = index % 2 === 0 ? '#111827' : '#0a0a0a'
-          ctx.fillRect(deviceX, deviceY, sectionWidth, rowHeight)
-          
-          ctx.fillStyle = '#e5e7eb'
-          ctx.font = '13px system-ui, -apple-system, sans-serif'
-          ctx.textAlign = 'left'
-          const deviceName = device.deviceCategory.charAt(0).toUpperCase() + device.deviceCategory.slice(1)
-          ctx.fillText(deviceName, deviceX + 15, deviceY + 22)
-          
-          ctx.fillStyle = '#8b5cf6'
-          ctx.font = 'bold 13px system-ui, -apple-system, sans-serif'
-          ctx.textAlign = 'right'
-          ctx.fillText(formatNumber(device.sessions), deviceX + sectionWidth - 15, deviceY + 22)
-          
-          deviceY += rowHeight
-        })
-      }
-    }
-    
-    // Draw footer
-    ctx.fillStyle = '#6b7280'
-    ctx.font = '12px system-ui, -apple-system, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('Powered by Google Analytics 4 • 434 Media', canvas.width / 2, canvas.height - 40)
-    
-    // Draw decorative gradient line at bottom
-    const bottomGradient = ctx.createLinearGradient(0, canvas.height - 6, canvas.width, canvas.height - 6)
-    bottomGradient.addColorStop(0, '#10b981')
-    bottomGradient.addColorStop(1, '#14b8a6')
-    ctx.fillStyle = bottomGradient
-    ctx.fillRect(0, canvas.height - 6, canvas.width, 6)
-    
-    // Format the date for filename
-    const today = new Date().toISOString().split('T')[0]
-    const labelSlug = (dateRange.label || 'custom').replace(/\s+/g, '-').toLowerCase()
-    const propertySlug = displayPropertyName.replace(/\s+/g, '-').toLowerCase()
-    const filename = `${propertySlug}-analytics-${labelSlug}-${today}.png`
-    
-    // Create and download the file
-    const link = document.createElement('a')
-    link.download = filename
-    link.href = canvas.toDataURL('image/png')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  } catch (error) {
-    console.error('PNG download failed:', error)
-    alert('Failed to download analytics report. Please try again.')
-  }
-}
+// PNG export removed (was 270+ LOC of canvas drawing that drifted out of
+// sync with everything we built in Phases 2–5). Replaced with Copy share
+// link, which leverages the URL state from PR 3a — better for "show this
+// to someone" use cases than a static raster.
 
 /**
  * Snapshot freshness indicator. Tells the rep whether they're looking at
@@ -858,11 +655,17 @@ export default function AnalyticsClientPage() {
           onRangeChange={handleDateRangeChange}
           onDownloadCSV={() => {
             const selectedProperty = availableProperties.find(p => p.id === selectedPropertyId)
-            downloadAnalyticsCSV(selectedDateRange, selectedPropertyId, selectedProperty?.name)
+            // Pass current filters so the CSV reflects the same view the user
+            // is looking at on screen (and the CSV header stamps which filters
+            // were active so the recipient knows what they're getting).
+            downloadAnalyticsCSV(selectedDateRange, selectedPropertyId, selectedProperty?.name, filters)
           }}
-          onDownloadPNG={() => {
-            const selectedProperty = availableProperties.find(p => p.id === selectedPropertyId)
-            downloadAnalyticsPNG(selectedDateRange, selectedPropertyId, selectedProperty?.name)
+          onCopyShareLink={() => {
+            // PR 3a baked every filter + range + property into the URL —
+            // sharing the live view is now just copying the URL.
+            navigator.clipboard.writeText(window.location.href).catch((err) => {
+              console.warn("Failed to copy share link:", err)
+            })
           }}
         />
       </div>
@@ -1059,45 +862,31 @@ export default function AnalyticsClientPage() {
               <CohortRetentionPanel propertyId={selectedPropertyId} setError={setError} />
             </div>
 
-            {/* Top Pages and Traffic Sources - Stack on mobile */}
-            <div className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 py-8 sm:py-12 w-full max-w-full overflow-hidden">
-              <div className="min-w-0 max-w-full overflow-hidden">
-                <div className="flex items-center gap-2 mb-4 sm:mb-5">
-                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Top Performing Pages</h2>
-                  <InfoTooltip content="Your most visited pages ranked by views. This helps identify your most valuable content and where users spend their time." />
-                </div>
-                <TopPagesTable
-                  dateRange={selectedDateRange}
-                  isLoading={isLoading}
-                  setError={setError}
-                  propertyId={selectedPropertyId}
-                  useSnapshot={useSnapshot}
-                  filters={filters}
-                />
-              </div>
-
-              <div className="min-w-0 max-w-full overflow-hidden">
-                <div className="flex items-center gap-2 mb-4 sm:mb-5">
-                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Traffic Sources</h2>
-                  <InfoTooltip content="Where your visitors are coming from. Referral traffic comes from other websites, organic is from search engines, and direct is when users type your URL directly." />
-                </div>
-                <TrafficSourcesChart
-                  dateRange={selectedDateRange}
-                  isLoading={isLoading}
-                  setError={setError}
-                  propertyId={selectedPropertyId}
-                  useSnapshot={useSnapshot}
-                />
-              </div>
+            {/* Top Pages + Traffic Sources — both panels self-headed via the
+                shared DashboardCard shell, so we drop the wrapper h2/InfoTooltip
+                rows. Two-up grid on desktop, stack on mobile. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-8 sm:mt-10 w-full max-w-full">
+              <TopPagesTable
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+                useSnapshot={useSnapshot}
+                filters={filters}
+              />
+              <TrafficSourcesChart
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+                useSnapshot={useSnapshot}
+              />
             </div>
 
-            {/* Geographic Distribution and Device Types - Stack on mobile */}
-            <div className="space-y-8 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 py-6 sm:py-12 w-full max-w-full overflow-hidden">
-              <div className="min-w-0 max-w-full overflow-hidden">
-                <div className="flex items-center gap-2 mb-4 sm:mb-5">
-                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Geographic Distribution</h2>
-                  <InfoTooltip content="Where your visitors are located geographically. This helps understand your audience's location and can inform regional content strategies." />
-                </div>
+            {/* Geographic + Devices — same self-headed pattern. Geographic is
+                wider since it has its own internal Countries|Cities split. */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 w-full max-w-full">
+              <div className="lg:col-span-2">
                 <GeographicMap
                   dateRange={selectedDateRange}
                   isLoading={isLoading}
@@ -1106,20 +895,13 @@ export default function AnalyticsClientPage() {
                   useSnapshot={useSnapshot}
                 />
               </div>
-
-              <div className="min-w-0 max-w-full overflow-hidden">
-                <div className="flex items-center gap-2 mb-4 sm:mb-5">
-                  <h2 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight leading-tight">Device Types</h2>
-                  <InfoTooltip content="The types of devices visitors use to access your site. This helps ensure your site is optimized for the most common device types." />
-                </div>
-                <DeviceBreakdown
-                  dateRange={selectedDateRange}
-                  isLoading={isLoading}
-                  setError={setError}
-                  propertyId={selectedPropertyId}
-                  useSnapshot={useSnapshot}
-                />
-              </div>
+              <DeviceBreakdown
+                dateRange={selectedDateRange}
+                isLoading={isLoading}
+                setError={setError}
+                propertyId={selectedPropertyId}
+                useSnapshot={useSnapshot}
+              />
             </div>
           </>
 

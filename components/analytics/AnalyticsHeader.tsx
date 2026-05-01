@@ -2,15 +2,15 @@
 
 import { useState } from "react"
 import { Button } from "./Button"
-import { 
-  Loader2, 
-  ChevronDown, 
-  Globe, 
+import {
+  Loader2,
+  ChevronDown,
+  Globe,
   Calendar,
   CalendarDays,
   FileText,
-  Image,
-  Download
+  Link2,
+  Check,
 } from "lucide-react"
 import type { AnalyticsProperty, DateRange } from "../../types/analytics"
 
@@ -23,9 +23,9 @@ interface AnalyticsHeaderProps {
   // Date range
   selectedRange: DateRange
   onRangeChange: (range: DateRange) => void
-  // Download options
+  // Export / share
   onDownloadCSV?: () => void
-  onDownloadPNG?: () => void
+  onCopyShareLink?: () => void
 }
 
 const dateRangeOptions: DateRange[] = [
@@ -43,11 +43,18 @@ export function AnalyticsHeader({
   selectedRange,
   onRangeChange,
   onDownloadCSV,
-  onDownloadPNG,
+  onCopyShareLink,
 }: AnalyticsHeaderProps) {
   const [showCustom, setShowCustom] = useState(false)
   const [customStartDate, setCustomStartDate] = useState("")
   const [customEndDate, setCustomEndDate] = useState("")
+  // Visual confirmation that the link landed in the clipboard.
+  const [shareCopied, setShareCopied] = useState(false)
+  const handleShareClick = () => {
+    onCopyShareLink?.()
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 1800)
+  }
 
   const selectedProperty = availableProperties.find((p) => p.id === selectedPropertyId)
   const isPropertiesLoading = !availableProperties.length && onPropertyChange
@@ -97,15 +104,35 @@ export function AnalyticsHeader({
               </div>
             </div>
 
-            {/* Right: Export Actions */}
-            {(onDownloadCSV || onDownloadPNG) && (
+            {/* Right: Share + Export */}
+            {(onDownloadCSV || onCopyShareLink) && (
               <div className="flex items-center gap-2 shrink-0">
+                {onCopyShareLink && (
+                  <button
+                    onClick={handleShareClick}
+                    disabled={isLoading}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-neutral-700 hover:text-neutral-900 bg-white hover:bg-neutral-50 rounded-lg border border-neutral-200 hover:border-neutral-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Copy a shareable link to this view (preserves date range, property, and active filters)"
+                  >
+                    {shareCopied ? (
+                      <>
+                        <Check className="h-4 w-4 text-emerald-600" />
+                        <span className="hidden sm:inline">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Copy link</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 {onDownloadCSV && (
                   <button
                     onClick={onDownloadCSV}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-neutral-700 hover:text-emerald-600 bg-neutral-100 hover:bg-emerald-50 rounded-lg border border-neutral-200 hover:border-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Export as CSV"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-neutral-700 hover:text-neutral-900 bg-white hover:bg-neutral-50 rounded-lg border border-neutral-200 hover:border-neutral-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Export current view as CSV (honors active filters)"
                   >
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -113,21 +140,6 @@ export function AnalyticsHeader({
                       <FileText className="h-4 w-4" />
                     )}
                     <span className="hidden sm:inline">CSV</span>
-                  </button>
-                )}
-                {onDownloadPNG && (
-                  <button
-                    onClick={onDownloadPNG}
-                    disabled={isLoading}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg border border-emerald-600 hover:border-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Export as PNG"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    <span className="hidden sm:inline">PNG</span>
                   </button>
                 )}
               </div>

@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "./Card"
-import { FileText, ExternalLink, Loader2, Eye } from "lucide-react"
+import { useEffect, useState } from "react"
+import { FileText, Loader2, ExternalLink } from "lucide-react"
 import type { DateRange, AnalyticsFilters } from "../../types/analytics"
 import { buildAnalyticsUrl } from "../../lib/analytics-url"
+import { DashboardCard } from "./DashboardCard"
 
 interface TopPagesTableProps {
   dateRange: DateRange
@@ -16,6 +16,38 @@ interface TopPagesTableProps {
   filters?: AnalyticsFilters
 }
 
+interface PageRow {
+  path: string
+  title: string
+  pageViews: number
+  sessions: number
+  bounceRate: number
+  engagementRate: number
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toLocaleString()
+}
+
+function formatPct(v: number): string {
+  if (!v) return "—"
+  return `${(v * 100).toFixed(0)}%`
+}
+
+/**
+ * Color the engagement rate cell so the eye finds high-engagement pages
+ * quickly. Same thresholds the GA4 community uses (>=60% green, 30-60% neutral,
+ * <30% amber).
+ */
+function engagementColor(rate: number): string {
+  if (!rate) return "text-neutral-300"
+  if (rate >= 0.6) return "text-emerald-700 font-semibold"
+  if (rate >= 0.3) return "text-neutral-700"
+  return "text-amber-700"
+}
+
 export function TopPagesTable({
   dateRange,
   isLoading: parentLoading = false,
@@ -24,106 +56,115 @@ export function TopPagesTable({
   useSnapshot,
   filters,
 }: TopPagesTableProps) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<PageRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     const loadData = async () => {
       setIsLoading(true)
       try {
         const url = buildAnalyticsUrl({ endpoint: "toppages", dateRange, propertyId, useSnapshot, filters })
-
         const response = await fetch(url)
-
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: response.statusText }))
-          console.error("Top pages API error:", response.status, errorData)
-          throw new Error(errorData.error || "Failed to fetch top pages data")
+          if (response.status >= 500) setError("Failed to load top pages")
+          if (!cancelled) setData([])
+          return
         }
-
         const result = await response.json()
-        setData(result.data)
-      } catch (error) {
-        console.error("Error loading top pages:", error)
-        setError("Failed to load top pages data")
+        if (!cancelled) setData(result.data ?? [])
+      } catch (err) {
+        console.warn("[TopPagesTable]", err)
+        if (!cancelled) setData([])
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
-
     loadData()
+    return () => {
+      cancelled = true
+    }
   }, [dateRange, setError, propertyId, useSnapshot, filters])
 
-  const totalViews = data.reduce((sum, page) => sum + page.pageViews, 0)
+  const rows = data.slice(0, 12)
+  const totalViews = rows.reduce((sum, r) => sum + r.pageViews, 0)
+  const topViews = rows[0]?.pageViews || 1
 
   return (
-    <div className="h-full w-full max-w-full min-w-0 overflow-hidden">
-      <Card className="border border-neutral-200 bg-white shadow-lg h-full overflow-hidden w-full max-w-full">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-transparent to-teal-50/50 rounded-lg" />
-
-        <CardHeader className="relative pb-4 sm:pb-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-3 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg sm:rounded-xl shadow-sm shrink-0 transition-transform hover:scale-105">
-              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-neutral-900 text-base sm:text-lg font-bold mb-0.5 leading-tight">Top Pages</CardTitle>
-              <p className="text-neutral-600 text-xs sm:text-sm font-medium truncate">
-                {totalViews.toLocaleString()} views • {data.length} pages
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="relative pt-0">
-          {isLoading || parentLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-            </div>
-          ) : (
-            <div className="space-y-2.5 sm:space-y-3 max-h-80 overflow-y-auto pr-1">
-              {data.slice(0, 10).map((page, index) => {
-                // Create a unique key using path, index, and pageViews to ensure uniqueness
-                const uniqueKey = `page-${index}-${(page.path || "unknown").replace(/[^a-zA-Z0-9]/g, "-")}-${page.pageViews || 0}`
-                const percentage = totalViews > 0 ? (page.pageViews / totalViews) * 100 : 0
-
-                return (
-                  <div
-                    key={uniqueKey}
-                    className="group p-3 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50/50 border border-neutral-200 hover:border-emerald-300 transition-all duration-300 hover:shadow-md"
-                  >
-                    <div className="flex items-start gap-2.5 sm:gap-3">
-                      <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0 mt-0.5">
-                        <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      </div>
+    <DashboardCard
+      title="Top pages"
+      icon={FileText}
+      subtitle={`${rows.length} ${rows.length === 1 ? "page" : "pages"} · ${formatNumber(totalViews)} views`}
+      flush
+    >
+      {isLoading || parentLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="py-12 text-center text-xs text-neutral-400">
+          No page data for this period
+        </div>
+      ) : (
+        <table className="w-full">
+          <thead className="bg-neutral-50">
+            <tr className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+              <th className="text-left px-4 py-2">Page</th>
+              <th className="text-right px-4 py-2 w-24">Views</th>
+              <th className="text-right px-4 py-2 w-20">Engaged</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {rows.map((row) => {
+              const widthPct = (row.pageViews / topViews) * 100
+              const isInternal = row.path.startsWith("/") || !row.path.startsWith("http")
+              const href = isInternal ? row.path : row.path
+              return (
+                <tr key={row.path} className="group hover:bg-neutral-50 transition-colors">
+                  <td className="px-4 py-2.5 max-w-0">
+                    <div className="flex items-start gap-1">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className="text-neutral-900 font-semibold text-xs sm:text-sm leading-tight line-clamp-2">{page.title || page.path}</h3>
-                          <ExternalLink className="h-3.5 w-3.5 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 hidden sm:block" />
+                        <div className="text-[13px] font-medium text-neutral-900 truncate">
+                          {row.title || row.path}
                         </div>
-                        <p className="text-neutral-500 text-[11px] sm:text-xs font-medium truncate mb-2">{page.path}</p>
-                        <div className="w-full bg-neutral-200 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            style={{ width: `${percentage}%` }}
-                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-700"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                          <p className="text-neutral-600 text-[11px] sm:text-xs font-semibold">{percentage.toFixed(1)}%</p>
-                          <div className="flex items-center gap-1">
-                            <span className="text-neutral-900 font-bold text-xs sm:text-sm">{page.pageViews.toLocaleString()}</span>
-                            <span className="text-neutral-500 text-[10px] sm:text-xs font-medium">views</span>
-                          </div>
+                        <div className="text-[11px] text-neutral-400 truncate font-mono">
+                          {row.path}
                         </div>
                       </div>
+                      {isInternal && row.path && (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="opacity-0 group-hover:opacity-100 text-neutral-300 hover:text-neutral-700 transition-opacity shrink-0 mt-0.5"
+                          aria-label="Open page"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="text-[13px] font-semibold text-neutral-900 tabular-nums">
+                      {formatNumber(row.pageViews)}
+                    </div>
+                    <div className="mt-0.5 h-0.5 w-full bg-neutral-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-neutral-700"
+                        style={{ width: `${widthPct.toFixed(1)}%` }}
+                      />
+                    </div>
+                  </td>
+                  <td className={`px-4 py-2.5 text-right text-[12px] tabular-nums ${engagementColor(row.engagementRate)}`}>
+                    {formatPct(row.engagementRate)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </DashboardCard>
   )
 }

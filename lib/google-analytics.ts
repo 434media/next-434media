@@ -394,7 +394,12 @@ export async function getPageViewsData(
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
       dimensionFilter: buildDimensionFilter(filters),
-      metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
+      metrics: [
+        { name: "screenPageViews" },
+        { name: "sessions" },
+        { name: "bounceRate" },
+        { name: "engagementRate" },
+      ],
       orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
       limit: 20,
     })
@@ -406,6 +411,7 @@ export async function getPageViewsData(
         pageViews: Number(row.metricValues?.[0]?.value || 0),
         sessions: Number(row.metricValues?.[1]?.value || 0),
         bounceRate: Number(row.metricValues?.[2]?.value || 0),
+        engagementRate: Number(row.metricValues?.[3]?.value || 0),
       })) || []
 
     return {
@@ -745,6 +751,10 @@ export interface CohortRetentionResponse {
   /** Number of weeks observed per cohort (typically 5). */
   weeks: number
   propertyId: string
+  /** Set when GA4 rejected the cohort spec (e.g. property too new for the
+   *  observation window). UI renders this as a quiet empty state with reason. */
+  unavailable?: boolean
+  reason?: string
 }
 
 function isoMonday(date: Date): string {
@@ -810,23 +820,53 @@ export async function getCohortRetention(
     cohorts.unshift({ name: `cohort_${cohortCount - 1 - i}`, startDate: startIso, endDate: endIso })
   }
 
-  const [response] = await client.runReport({
-    property: `properties/${targetPropertyId}`,
-    cohortSpec: {
-      cohorts: cohorts.map((c) => ({
-        name: c.name,
-        dateRange: { startDate: c.startDate, endDate: c.endDate },
-      })),
-      cohortsRange: {
-        granularity: "WEEKLY",
-        startOffset: 0,
-        endOffset: weeksObserved - 1,
+  // GA4 rejects cohort specs in several edge cases we can't pre-validate:
+  //  - Property is younger than the oldest cohort start date
+  //  - Property has a data discontinuity over the observation window
+  //  - Property's data retention is set shorter than the window
+  // Treat any GA4 rejection as "no data — render empty state" rather than
+  // bubbling up a 500 / 400 to the dashboard.
+  let response: protos.google.analytics.data.v1beta.IRunReportResponse
+  try {
+    const result = await client.runReport({
+      property: `properties/${targetPropertyId}`,
+      cohortSpec: {
+        cohorts: cohorts.map((c) => ({
+          name: c.name,
+          dateRange: { startDate: c.startDate, endDate: c.endDate },
+        })),
+        cohortsRange: {
+          granularity: "WEEKLY",
+          startOffset: 0,
+          endOffset: weeksObserved - 1,
+        },
+        cohortReportSettings: { accumulate: false },
       },
-      cohortReportSettings: { accumulate: false },
-    },
-    dimensions: [{ name: "cohort" }, { name: "cohortNthWeek" }],
-    metrics: [{ name: "cohortActiveUsers" }],
-  })
+      dimensions: [{ name: "cohort" }, { name: "cohortNthWeek" }],
+      metrics: [{ name: "cohortActiveUsers" }],
+    })
+    response = result[0]
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[GA4] cohort report rejected for property ${targetPropertyId}:`, message)
+    // Friendly translation of the most common GA4 cohort rejections.
+    let reason = "GA4 rejected the cohort spec for this property."
+    if (message.includes("INVALID_ARGUMENT")) {
+      reason =
+        "Property doesn't have enough historical data for an 8-cohort × 5-week retention view yet (typical for properties created within the last ~3 months)."
+    } else if (message.includes("PERMISSION_DENIED")) {
+      reason = "Service account lacks read access to this GA4 property."
+    } else if (message.includes("NOT_FOUND")) {
+      reason = "GA4 property not found. Check the property id in env."
+    }
+    return {
+      data: [],
+      weeks: weeksObserved,
+      propertyId: targetPropertyId,
+      unavailable: true,
+      reason,
+    }
+  }
 
   // Pivot rows into a 2D map: cohortName → weekIndex → activeUsers
   const grid = new Map<string, Map<number, number>>()

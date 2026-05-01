@@ -73,11 +73,20 @@ export function SearchPerformancePanel({
         const res = await fetch(
           buildAnalyticsUrl({ endpoint: "search-queries", dateRange, propertyId }),
         )
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        // 4xx — render the "not connected" empty state (matches the lib's
+        // graceful handling of 403/401/404 from Search Console itself).
+        if (!res.ok) {
+          if (!cancelled) setPayload({ configured: false })
+          if (res.status >= 500 && setError) {
+            setError(`Search Console: HTTP ${res.status}`)
+          }
+          return
+        }
         const data = (await res.json()) as SearchPerformancePayload
         if (!cancelled) setPayload(data)
       } catch (err) {
-        if (setError) setError(err instanceof Error ? err.message : "Search Console fetch failed")
+        console.warn("[SearchPerformancePanel] fetch failed:", err)
+        if (!cancelled) setPayload({ configured: false })
       } finally {
         if (!cancelled) setIsLoading(false)
       }
