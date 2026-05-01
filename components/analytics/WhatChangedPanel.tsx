@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { TrendingUp, TrendingDown, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react"
-import type { DateRange } from "../../types/analytics"
+import type { DateRange, AnalyticsFilters } from "../../types/analytics"
 import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface WhatChangedPanelProps {
   dateRange: DateRange
   propertyId: string
   useSnapshot?: boolean
+  filters?: AnalyticsFilters
   setError?: (e: string | null) => void
 }
 
@@ -73,6 +74,7 @@ export function WhatChangedPanel({
   dateRange,
   propertyId,
   useSnapshot,
+  filters,
   setError,
 }: WhatChangedPanelProps) {
   const [risers, setRisers] = useState<MoverRow[]>([])
@@ -100,8 +102,8 @@ export function WhatChangedPanel({
         // Previous-period data has no precomputed snapshot, so always go live
         // for that fetch. Current period respects the user's snapshot toggle.
         const [currentRes, previousRes] = await Promise.all([
-          fetch(buildAnalyticsUrl({ endpoint: "top-pages", dateRange, propertyId, useSnapshot })),
-          fetch(buildAnalyticsUrl({ endpoint: "top-pages", dateRange: prevRange, propertyId, useSnapshot: false })),
+          fetch(buildAnalyticsUrl({ endpoint: "top-pages", dateRange, propertyId, useSnapshot, filters })),
+          fetch(buildAnalyticsUrl({ endpoint: "top-pages", dateRange: prevRange, propertyId, useSnapshot: false, filters })),
         ])
 
         if (!currentRes.ok || !previousRes.ok) {
@@ -184,7 +186,7 @@ export function WhatChangedPanel({
     return () => {
       cancelled = true
     }
-  }, [dateRange, propertyId, useSnapshot, setError])
+  }, [dateRange, propertyId, useSnapshot, filters, setError])
 
   if (isLoading) {
     return (

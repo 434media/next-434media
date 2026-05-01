@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { ArrowUpRight, ArrowDownRight, Eye, Users, Activity, Loader2 } from "lucide-react"
-import type { DateRange } from "../../types/analytics"
+import type { DateRange, AnalyticsFilters } from "../../types/analytics"
 import { buildAnalyticsUrl } from "../../lib/analytics-url"
 
 interface HeroMetricProps {
   dateRange: DateRange
   propertyId: string
   useSnapshot?: boolean
+  filters?: AnalyticsFilters
   setError?: (e: string | null) => void
   onSnapshotMeta?: (meta: { snapshotDate: string; generatedAt: string } | null) => void
 }
@@ -111,6 +112,7 @@ export function HeroMetric({
   dateRange,
   propertyId,
   useSnapshot,
+  filters,
   setError,
   onSnapshotMeta,
 }: HeroMetricProps) {
@@ -128,8 +130,8 @@ export function HeroMetric({
         // Two parallel fetches — totals for the hero number/delta, daily
         // points for the sparkline. Both already-cached endpoints from PR 3a.
         const [summaryRes, dailyRes] = await Promise.all([
-          fetch(buildAnalyticsUrl({ endpoint: "summary", dateRange, propertyId, useSnapshot })),
-          fetch(buildAnalyticsUrl({ endpoint: "daily-metrics", dateRange, propertyId, useSnapshot })),
+          fetch(buildAnalyticsUrl({ endpoint: "summary", dateRange, propertyId, useSnapshot, filters })),
+          fetch(buildAnalyticsUrl({ endpoint: "daily-metrics", dateRange, propertyId, useSnapshot, filters })),
         ])
 
         if (summaryRes.ok) {
@@ -174,7 +176,7 @@ export function HeroMetric({
     return () => {
       cancelled = true
     }
-  }, [dateRange, propertyId, useSnapshot, setError, onSnapshotMeta])
+  }, [dateRange, propertyId, useSnapshot, filters, setError, onSnapshotMeta])
 
   if (isLoading || !summary) {
     return (

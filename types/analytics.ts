@@ -194,6 +194,31 @@ export interface PerformanceBadge {
 }
 
 // ============================================
+// GA4 ANALYTICS FILTERS
+// (Phase 3d — translated into GA4 dimensionFilter on the server)
+// ============================================
+
+/**
+ * Per-page filters that narrow every audience chart on the GA4 page.
+ * Three dimensions today (device / channel / country); add more by
+ * extending this interface and the buildDimensionFilter translator.
+ */
+export interface AnalyticsFilters {
+  /** "mobile" | "tablet" | "desktop" — GA4's deviceCategory closed enum. */
+  deviceCategory?: string
+  /** GA4's defaultChannelGroup (Direct / Organic Search / Email / …). */
+  channelGroup?: string
+  /** Country dimension value (e.g. "United States"). */
+  country?: string
+}
+
+/** True when at least one filter slot is populated. */
+export function hasAnyFilter(filters: AnalyticsFilters | undefined): boolean {
+  if (!filters) return false
+  return !!(filters.deviceCategory || filters.channelGroup || filters.country)
+}
+
+// ============================================
 // GA4 LIB RESPONSE TYPES
 // (used by lib/google-analytics.ts and app/api/analytics/route.ts)
 // ============================================

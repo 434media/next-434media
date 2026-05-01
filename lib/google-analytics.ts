@@ -2,6 +2,7 @@ import { BetaAnalyticsDataClient } from "@google-analytics/data"
 import { pctChange } from "../types/analytics"
 import type {
   AnalyticsSummary,
+  AnalyticsFilters,
   PageViewsResponse,
   TrafficSourcesResponse,
   DeviceDataResponse,
@@ -11,6 +12,49 @@ import type {
   AnalyticsConnectionStatus,
   AnalyticsProperty,
 } from "../types/analytics"
+import type { protos } from "@google-analytics/data"
+
+type FilterExpression = protos.google.analytics.data.v1beta.IFilterExpression
+
+/**
+ * Translate AnalyticsFilters into a GA4 FilterExpression. Multiple filters
+ * are AND-combined. Returns undefined when no filters are set, so callers
+ * can pass `dimensionFilter: buildDimensionFilter(filters)` and the GA4 SDK
+ * will treat undefined as "no filter".
+ */
+function buildDimensionFilter(filters?: AnalyticsFilters): FilterExpression | undefined {
+  if (!filters) return undefined
+  const expressions: FilterExpression[] = []
+
+  if (filters.deviceCategory) {
+    expressions.push({
+      filter: {
+        fieldName: "deviceCategory",
+        stringFilter: { value: filters.deviceCategory, matchType: "EXACT" },
+      },
+    })
+  }
+  if (filters.channelGroup) {
+    expressions.push({
+      filter: {
+        fieldName: "sessionDefaultChannelGrouping",
+        stringFilter: { value: filters.channelGroup, matchType: "EXACT" },
+      },
+    })
+  }
+  if (filters.country) {
+    expressions.push({
+      filter: {
+        fieldName: "country",
+        stringFilter: { value: filters.country, matchType: "EXACT" },
+      },
+    })
+  }
+
+  if (expressions.length === 0) return undefined
+  if (expressions.length === 1) return expressions[0]
+  return { andGroup: { expressions } }
+}
 
 // Initialize the client
 let analyticsDataClient: BetaAnalyticsDataClient | null = null
@@ -181,13 +225,15 @@ function previousPeriodOf(startDate: string, endDate: string): { startDate: stri
 
 // Get analytics summary — now includes GA4-native engagement metrics and
 // previous-period comparison in a single request (GA4 supports two date
-// ranges natively, no extra round trip).
+// ranges natively, no extra round trip). Optional `filters` param narrows
+// the result set via GA4's dimensionFilter.
 export async function getAnalyticsSummary(
   startDate: string,
   endDate: string,
   propertyId?: string,
+  filters?: AnalyticsFilters,
 ): Promise<AnalyticsSummary> {
-  console.log("[GA4] getAnalyticsSummary called with:", { startDate, endDate, propertyId })
+  console.log("[GA4] getAnalyticsSummary called with:", { startDate, endDate, propertyId, filters })
 
   try {
     const targetPropertyId = getPropertyId(propertyId)
@@ -202,6 +248,7 @@ export async function getAnalyticsSummary(
         { startDate, endDate, name: "current" },
         { startDate: prev.startDate, endDate: prev.endDate, name: "previous" },
       ],
+      dimensionFilter: buildDimensionFilter(filters),
       metrics: [
         { name: "screenPageViews" },
         { name: "sessions" },
@@ -260,8 +307,9 @@ export async function getDailyMetrics(
   startDate: string,
   endDate: string,
   propertyId?: string,
+  filters?: AnalyticsFilters,
 ): Promise<DailyMetricsResponse> {
-  console.log("[GA4] getDailyMetrics called with:", { startDate, endDate, propertyId })
+  console.log("[GA4] getDailyMetrics called with:", { startDate, endDate, propertyId, filters })
 
   try {
     const targetPropertyId = getPropertyId(propertyId)
@@ -271,6 +319,7 @@ export async function getDailyMetrics(
       property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "date" }],
+      dimensionFilter: buildDimensionFilter(filters),
       metrics: [
         { name: "screenPageViews" },
         { name: "sessions" },
@@ -332,8 +381,9 @@ export async function getPageViewsData(
   startDate: string,
   endDate: string,
   propertyId?: string,
+  filters?: AnalyticsFilters,
 ): Promise<PageViewsResponse> {
-  console.log("[GA4] getPageViewsData called with:", { startDate, endDate, propertyId })
+  console.log("[GA4] getPageViewsData called with:", { startDate, endDate, propertyId, filters })
 
   try {
     const targetPropertyId = getPropertyId(propertyId)
@@ -343,6 +393,7 @@ export async function getPageViewsData(
       property: `properties/${targetPropertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
+      dimensionFilter: buildDimensionFilter(filters),
       metrics: [{ name: "screenPageViews" }, { name: "sessions" }, { name: "bounceRate" }],
       orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
       limit: 20,

@@ -12,8 +12,9 @@ import { DeviceBreakdown } from "@/components/analytics/DeviceBreakdown"
 import { GeographicMap } from "@/components/analytics/GeographicMap"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import { EventsConversionsPanel } from "@/components/analytics/EventsConversionsPanel"
+import { AnalyticsFilterBar } from "@/components/analytics/AnalyticsFilterBar"
 import { dateRangeFromUrl, rangeKeyFromDateRange } from "@/lib/analytics-url-state"
-import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty } from "@/types/analytics"
+import type { DateRange, AnalyticsConnectionStatus, AnalyticsProperty, AnalyticsFilters } from "@/types/analytics"
 
 // Download analytics summary as CSV
 async function downloadAnalyticsCSV(dateRange: DateRange, propertyId?: string, propertyName?: string) {
@@ -632,6 +633,16 @@ export default function AnalyticsClientPage() {
   const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
   const useSnapshot = dataSource === "snapshot"
 
+  // PR 3d filter state. Seeded from URL — refresh + share-link work.
+  // Only summary / daily-metrics / top-pages chart components actually
+  // consume `filters` (see FILTER_AWARE_ENDPOINTS in lib/analytics-url.ts);
+  // breakdown charts (sources / devices / geographic) intentionally don't.
+  const [filters, setFilters] = useState<AnalyticsFilters>(() => ({
+    deviceCategory: searchParams?.get("device") || undefined,
+    channelGroup: searchParams?.get("channel") || undefined,
+    country: searchParams?.get("country") || undefined,
+  }))
+
   // Push state changes back to the URL. Avoids re-render loops by checking
   // each param against its current URL value before pushing.
   useEffect(() => {
@@ -660,12 +671,29 @@ export default function AnalyticsClientPage() {
       next.delete("live")
     }
 
+    // Filter chips → URL. Empty values delete their key for clean URLs.
+    if (filters.deviceCategory) {
+      next.set("device", filters.deviceCategory)
+    } else {
+      next.delete("device")
+    }
+    if (filters.channelGroup) {
+      next.set("channel", filters.channelGroup)
+    } else {
+      next.delete("channel")
+    }
+    if (filters.country) {
+      next.set("country", filters.country)
+    } else {
+      next.delete("country")
+    }
+
     if (next.toString() !== current.toString()) {
       const qs = next.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDateRange, selectedPropertyId, dataSource])
+  }, [selectedDateRange, selectedPropertyId, dataSource, filters])
 
   // React to back/forward URL changes from the browser. Mostly a no-op since
   // user-initiated changes already round-trip via the effect above, but
@@ -677,6 +705,18 @@ export default function AnalyticsClientPage() {
     if (propertyParam && propertyParam !== selectedPropertyId) setSelectedPropertyId(propertyParam)
     const liveParam = searchParams?.get("live") === "1" ? "live" : "snapshot"
     if (liveParam !== dataSource) setDataSource(liveParam)
+    const nextFilters: AnalyticsFilters = {
+      deviceCategory: searchParams?.get("device") || undefined,
+      channelGroup: searchParams?.get("channel") || undefined,
+      country: searchParams?.get("country") || undefined,
+    }
+    if (
+      nextFilters.deviceCategory !== filters.deviceCategory ||
+      nextFilters.channelGroup !== filters.channelGroup ||
+      nextFilters.country !== filters.country
+    ) {
+      setFilters(nextFilters)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
@@ -849,6 +889,18 @@ export default function AnalyticsClientPage() {
 
           {/* Analytics Dashboard - Always show components */}
           <>
+            {/* PR 3d filter bar — narrows audience charts (hero / what-changed /
+                page-views chart / top-pages) by device, channel, country.
+                Source/device/geography breakdown charts intentionally exempt. */}
+            {selectedPropertyId && (
+              <AnalyticsFilterBar
+                filters={filters}
+                onFiltersChange={setFilters}
+                dateRange={selectedDateRange}
+                propertyId={selectedPropertyId}
+              />
+            )}
+
             {/* Hero metric — Sessions front and center with sparkline + delta,
                 three secondary metrics stacked on the right. Replaces the old
                 4-card equal-weight grid. (Phase 3b — Vercel pattern.) */}
@@ -861,6 +913,7 @@ export default function AnalyticsClientPage() {
                 dateRange={selectedDateRange}
                 propertyId={selectedPropertyId}
                 useSnapshot={useSnapshot}
+                filters={filters}
                 setError={setError}
                 onSnapshotMeta={setSnapshotMeta}
               />
@@ -879,6 +932,7 @@ export default function AnalyticsClientPage() {
                 dateRange={selectedDateRange}
                 propertyId={selectedPropertyId}
                 useSnapshot={useSnapshot}
+                filters={filters}
                 setError={setError}
               />
             </div>
@@ -896,6 +950,7 @@ export default function AnalyticsClientPage() {
                   setError={setError}
                   propertyId={selectedPropertyId}
                   useSnapshot={useSnapshot}
+                  filters={filters}
                 />
               </div>
             </div>
@@ -932,6 +987,7 @@ export default function AnalyticsClientPage() {
                   setError={setError}
                   propertyId={selectedPropertyId}
                   useSnapshot={useSnapshot}
+                  filters={filters}
                 />
               </div>
 

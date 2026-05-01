@@ -111,6 +111,15 @@ export async function GET(request: NextRequest) {
     const propertyIdParam = searchParams.get("propertyId") // Get as string | null
     const propertyId = propertyIdParam || undefined // Convert null to undefined
 
+    // Phase 3d filter spec — applies only to summary / daily-metrics / top-pages.
+    // Empty/missing params are treated as "no filter".
+    const filters = {
+      deviceCategory: searchParams.get("device") || undefined,
+      channelGroup: searchParams.get("channel") || undefined,
+      country: searchParams.get("country") || undefined,
+    }
+    const hasFilters = !!(filters.deviceCategory || filters.channelGroup || filters.country)
+
     console.log("[Analytics API] Request parameters:", {
       endpoint,
       startDateParam,
@@ -161,7 +170,7 @@ export async function GET(request: NextRequest) {
 
       case "summary":
       case "overview": {
-        const summary = await getAnalyticsSummary(startDate, endDate, propertyId)
+        const summary = await getAnalyticsSummary(startDate, endDate, propertyId, hasFilters ? filters : undefined)
 
         // Compute period-over-period deltas. Previously hardcoded to 0, which
         // hid the most important signal on the dashboard.
@@ -189,7 +198,7 @@ export async function GET(request: NextRequest) {
       case "chart":
       case "pageviews":
         console.log("[Analytics API] Fetching daily metrics...")
-        const dailyMetrics = await getDailyMetrics(startDate, endDate, propertyId)
+        const dailyMetrics = await getDailyMetrics(startDate, endDate, propertyId, hasFilters ? filters : undefined)
         console.log("[Analytics API] Daily metrics result:", {
           dataLength: dailyMetrics.data.length,
           propertyId: dailyMetrics.propertyId,
@@ -200,7 +209,7 @@ export async function GET(request: NextRequest) {
       case "toppages":
       case "top-pages":
         console.log("[Analytics API] Fetching page views...")
-        const pageViews = await getPageViewsData(startDate, endDate, propertyId)
+        const pageViews = await getPageViewsData(startDate, endDate, propertyId, hasFilters ? filters : undefined)
         console.log("[Analytics API] Page views result:", {
           dataLength: pageViews.data.length,
           propertyId: pageViews.propertyId,
