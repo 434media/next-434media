@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import {
   Loader2,
   BarChart3,
@@ -20,7 +21,7 @@ import {
   ClientsView,
   TasksView,
   SocialCalendarView,
-  ClientFormModal,
+  ClientDetailDrawer,
   OpportunityFormModal,
   TaskModal,
   ContentFormModal,
@@ -75,6 +76,11 @@ export default function SalesCRMPage() {
   // Tags state
   const [availableTags, setAvailableTags] = useState<CRMTag[]>([])
   const [isLoadingTags, setIsLoadingTags] = useState(false)
+
+  // URL routing for deep-linkable detail drawer
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
 
   // Client form state
   const [showClientForm, setShowClientForm] = useState(false)
@@ -454,6 +460,52 @@ export default function SalesCRMPage() {
     }
   }, [isLoading, tasks])
 
+  // URL-driven Client drawer open state. ?open=<clientId> opens the drawer for
+  // that client (used by Customer 360 cross-section pills, notification
+  // deep-links, and refresh-restores-place behavior). When the drawer is open
+  // for a different client, replacing the URL swaps which client is shown.
+  const openClientId = searchParams?.get("open") ?? null
+  useEffect(() => {
+    if (!openClientId) {
+      // URL says no drawer should be open. If our local state is open, close it.
+      if (showClientForm) {
+        setShowClientForm(false)
+        setEditingClient(null)
+      }
+      return
+    }
+    // URL has ?open= but the matching client may not be loaded yet. Wait.
+    if (clients.length === 0) return
+    const target = clients.find((c) => c.id === openClientId)
+    if (!target) return // client doesn't exist or isn't visible to this user
+    if (editingClient?.id === openClientId && showClientForm) return // already open on this client
+    handleEditClient(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openClientId, clients])
+
+  // Helper: close the drawer AND strip ?open= from the URL
+  const closeClientDrawer = () => {
+    setShowClientForm(false)
+    setEditingClient(null)
+    if (searchParams?.get("open")) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("open")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+  }
+
+  // Keep ?open= in sync when the drawer opens via direct interaction
+  // (clicking a row in any view). Refresh / share / back button restores it.
+  useEffect(() => {
+    if (!showClientForm || !editingClient?.id) return
+    if (searchParams?.get("open") === editingClient.id) return
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("open", editingClient.id)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showClientForm, editingClient?.id])
+
   // Set default assignee filter based on logged-in user
   useEffect(() => {
     if (currentUser?.email && Object.keys(teamMembersMap).length > 0) {
@@ -677,16 +729,16 @@ export default function SalesCRMPage() {
         }}
       />
 
-      {/* Client Form Modal */}
-      <ClientFormModal
-        isOpen={showClientForm}
+      {/* Client Detail Drawer */}
+      <ClientDetailDrawer
+        open={showClientForm}
         isEditing={!!editingClient}
         isSaving={isSaving}
         formData={clientForm}
         opportunities={clients.filter(c => c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
         onFormChange={setClientForm}
         onSave={handleSaveClient}
-        onClose={() => setShowClientForm(false)}
+        onClose={() => closeClientDrawer()}
         clientId={editingClient?.id ?? null}
       />
 

@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { 
-  X, 
-  Loader2, 
-  CheckCircle2, 
-  Plus, 
-  Trash2, 
-  ChevronDown, 
+import {
+  Loader2,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  ChevronDown,
   ChevronUp,
   User,
   Users,
@@ -19,6 +18,7 @@ import {
 import { TEAM_MEMBERS } from "./types"
 import type { TeamMember } from "./types"
 import { Customer360Panel } from "./Customer360Panel"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 
 interface ContactFormData {
   id: string
@@ -48,8 +48,8 @@ interface ClientFormData {
   assigned_to: string
 }
 
-interface ClientFormModalProps {
-  isOpen: boolean
+interface ClientDetailDrawerProps {
+  open: boolean
   isEditing: boolean
   isSaving: boolean
   formData: ClientFormData
@@ -66,8 +66,8 @@ function generateContactId(): string {
   return `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
-export function ClientFormModal({
-  isOpen,
+export function ClientDetailDrawer({
+  open,
   isEditing,
   isSaving,
   formData,
@@ -76,17 +76,17 @@ export function ClientFormModal({
   onSave,
   onClose,
   clientId,
-}: ClientFormModalProps) {
+}: ClientDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const [activeTab, setActiveTab] = useState<"edit" | "360">("edit")
   const showCustomer360Tab = isEditing && !!clientId
 
-  // Reset to edit tab whenever the modal opens for a new client
+  // Reset to edit tab whenever the drawer opens for a new client
   useEffect(() => {
-    if (isOpen) setActiveTab("edit")
-  }, [isOpen, clientId])
+    if (open) setActiveTab("edit")
+  }, [open, clientId])
 
   // Fetch team members from Firestore
   const fetchTeamMembers = useCallback(async () => {
@@ -139,12 +139,12 @@ export function ClientFormModal({
     }
   }, [])
 
-  // Fetch team members when modal opens
+  // Fetch team members when drawer opens
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       fetchTeamMembers()
     }
-  }, [isOpen, fetchTeamMembers])
+  }, [open, fetchTeamMembers])
 
   // Toggle contact expansion
   const toggleContact = (contactId: string) => {
@@ -204,87 +204,87 @@ export function ClientFormModal({
     onFormChange({ ...formData, contacts: newContacts })
   }
 
+  const drawerTitle = isEditing
+    ? formData.company_name || "Client"
+    : "New Client"
+  const drawerSubtitle = isEditing
+    ? formData.department || "Update client information"
+    : "Add a new client"
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-lg md:max-w-2xl max-h-[90vh] overflow-hidden bg-white rounded-xl border border-gray-200 shadow-2xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+    <DetailDrawer
+      open={open}
+      onClose={onClose}
+      title={drawerTitle}
+      subtitle={drawerSubtitle}
+      width="lg"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-gray-200 flex-shrink-0 bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white rounded-lg border border-gray-200">
-                  <User className="w-5 h-5 text-gray-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {isEditing ? "Client" : "New Client"}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    {isEditing ? "Update client information" : "Add a new client"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            {showCustomer360Tab && (
-              <div className="flex border-b border-gray-200 bg-white px-4 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("edit")}
-                  className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
-                    activeTab === "edit"
-                      ? "border-blue-600 text-blue-700"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
-                  }`}
-                >
-                  Edit details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("360")}
-                  className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
-                    activeTab === "360"
-                      ? "border-blue-600 text-blue-700"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
-                  }`}
-                >
-                  Customer 360
-                </button>
-              </div>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving || !formData.company_name}
+            className="flex items-center gap-2 px-5 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                {isEditing ? "Update Client" : "Add Client"}
+              </>
             )}
+          </button>
+        </div>
+      }
+    >
+      {showCustomer360Tab && (
+        <div className="flex border-b border-neutral-200 bg-white px-4 sticky top-0 z-10">
+          <button
+            type="button"
+            onClick={() => setActiveTab("edit")}
+            className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === "edit"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Edit details
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("360")}
+            className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === "360"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Customer 360
+          </button>
+        </div>
+      )}
 
-            {/* Customer 360 Tab */}
-            {showCustomer360Tab && activeTab === "360" && (
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                <Customer360Panel clientId={clientId!} />
-              </div>
-            )}
+      {/* Customer 360 Tab */}
+      {showCustomer360Tab && activeTab === "360" && (
+        <div className="p-4 bg-gray-50">
+          <Customer360Panel clientId={clientId!} />
+        </div>
+      )}
 
-            {/* Scrollable Content (edit tab) */}
-            <div
-              className={`flex-1 overflow-y-auto p-4 space-y-5 ${
-                showCustomer360Tab && activeTab !== "edit" ? "hidden" : ""
-              }`}
-            >
-              {/* Client Name - Primary Field */}
+      {/* Scrollable Content (edit tab) */}
+      <div className={`p-4 space-y-5 ${showCustomer360Tab && activeTab !== "edit" ? "hidden" : ""}`}>
+        {/* Client Name - Primary Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Client Name *
@@ -632,35 +632,6 @@ export function ClientFormModal({
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex justify-end gap-3 p-4 border-t border-gray-200 flex-shrink-0 bg-gray-50">
-              <button
-                onClick={onClose}
-                className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onSave}
-                disabled={isSaving || !formData.company_name}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    {isEditing ? "Update Client" : "Add Client"}
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </DetailDrawer>
   )
 }
