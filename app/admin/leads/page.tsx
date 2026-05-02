@@ -28,9 +28,27 @@ import {
   Ticket,
   MapPin,
   Check,
+  Inbox,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
+import { MailchimpSubscribedPill, useMailchimpSubscribers } from "@/components/admin/MailchimpSubscribedPill"
+import { MailchimpTagsReference } from "@/components/admin/MailchimpTagsReference"
+import { CrossSourceDupesPanel } from "@/components/admin/CrossSourceDupesPanel"
+import { EventInsights } from "@/components/admin/EventInsights"
+import { InboxView } from "@/components/admin/InboxView"
+import {
+  StateBadge,
+  StateFilterChips,
+  BulkActionBar,
+  useSelection,
+  useSubmissionStates,
+  getStateOrNew,
+  type SubmissionState,
+  type SubmissionSource,
+} from "@/components/admin/SubmissionStateUI"
+import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
+import { Eye as EyeIcon, MessageSquare as MsgIcon, Archive as ArchiveIcon, Mail as MailIcon, UserPlus as UserPlusIcon, Ban as BanIcon } from "lucide-react"
 
 // ── Types ──
 
@@ -75,9 +93,9 @@ interface Toast {
   type: "success" | "error"
 }
 
-type ActiveTab = "emails" | "contact-forms" | "events"
+type ActiveTab = "inbox" | "emails" | "contact-forms" | "events"
 
-const VALID_TABS = new Set<ActiveTab>(["emails", "contact-forms", "events"])
+const VALID_TABS = new Set<ActiveTab>(["inbox", "emails", "contact-forms", "events"])
 
 // ── Main Component ──
 
@@ -86,7 +104,7 @@ export default function EmailListsPage() {
   const router = useRouter()
   const pathname = usePathname()
   const tabParam = searchParams?.get("tab") as ActiveTab | null
-  const initialTab: ActiveTab = tabParam && VALID_TABS.has(tabParam) ? tabParam : "contact-forms"
+  const initialTab: ActiveTab = tabParam && VALID_TABS.has(tabParam) ? tabParam : "inbox"
   const initialSearch = searchParams?.get("search") ?? ""
   const initialEvent = searchParams?.get("event") ?? ""
 
@@ -166,6 +184,22 @@ export default function EmailListsPage() {
             {/* Tab Navigation */}
             <nav className="flex gap-0 -mb-px">
               <button
+                onClick={() => switchTab("inbox")}
+                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                  activeTab === "inbox"
+                    ? "text-neutral-900"
+                    : "text-neutral-400 hover:text-neutral-600"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Inbox className="w-3.5 h-3.5" />
+                  Inbox
+                </span>
+                {activeTab === "inbox" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
+                )}
+              </button>
+              <button
                 onClick={() => switchTab("contact-forms")}
                 className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
                   activeTab === "contact-forms"
@@ -219,7 +253,22 @@ export default function EmailListsPage() {
 
         {/* Tab Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          {activeTab === "contact-forms" ? (
+          {/* Mailchimp tags reference — moved here from analytics-mailchimp
+              because tags are operational segmentation data (used to decide
+              who to push to which audience), not analytical data. Stays
+              collapsed by default; click to expand. */}
+          <MailchimpTagsReference />
+
+          {/* Cross-source dedupe panel — surfaces emails appearing in 2+
+              submission collections so the admin can merge them into a single
+              CRM lead in one click. Hidden when there are no dupes. */}
+          <CrossSourceDupesPanel
+            onToast={(message, type) => setToast({ message, type })}
+          />
+
+          {activeTab === "inbox" ? (
+            <InboxView setToast={setToast} initialSearch={initialSearch} />
+          ) : activeTab === "contact-forms" ? (
             <ContactFormsTab setToast={setToast} initialSearch={initialSearch} />
           ) : activeTab === "events" ? (
             <EventRegistrationsTab setToast={setToast} initialSearch={initialSearch} initialEvent={initialEvent} />
@@ -242,6 +291,8 @@ function EmailListsTab({
   initialSearch?: string
 }) {
   const leadsByEmail = useLeadsByEmail()
+  const subscriberMap = useMailchimpSubscribers()
+  const SUBMISSION_SOURCE: SubmissionSource = "email_signups"
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [signups, setSignups] = useState<EmailSignup[]>([])
@@ -250,6 +301,12 @@ function EmailListsTab({
   const [selectedSource, setSelectedSource] = useState<string>(initialSearch ? "" : "AIM")
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDownloading, setIsDownloading] = useState(false)
+  // PR 3 — state filter + per-row state badges
+  const [stateFilter, setStateFilter] = useState<"all" | SubmissionState>("all")
+  // PR 4 — bulk select
+  const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
+  // PR 5 — Mailchimp push modal
+  const [showPushModal, setShowPushModal] = useState(false)
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [datePreset, setDatePreset] = useState("")
@@ -402,7 +459,9 @@ function EmailListsTab({
   }
 
   // Filter signups
-  const filteredSignups = signups.filter((signup) => {
+  // Pre-state-filter set — used to fetch states (so chip counts include
+  // state-filtered-out rows in the count UI).
+  const filteredSignupsBeforeState = signups.filter((signup) => {
     if (searchQuery && !signup.email.toLowerCase().includes(searchQuery.toLowerCase())) return false
     if (startDate || endDate) {
       const signupDate = new Date(signup.created_at)
@@ -419,6 +478,98 @@ function EmailListsTab({
     }
     return true
   })
+
+  // Fetch sidecar states for visible rows in one batch.
+  const visibleIds = filteredSignupsBeforeState.map((s) => s.id)
+  const { states: submissionStates, refresh: refreshStates, setLocal, setLocalBulk } =
+    useSubmissionStates({ source: SUBMISSION_SOURCE, ids: visibleIds })
+
+  // Apply state filter on top
+  const filteredSignups = filteredSignupsBeforeState.filter((signup) => {
+    if (stateFilter === "all") return true
+    return getStateOrNew(submissionStates, signup.id) === stateFilter
+  })
+
+  // Counts per state — for the chip badges
+  const stateCounts: Partial<Record<"all" | SubmissionState, number>> = {
+    all: filteredSignupsBeforeState.length,
+    new: 0,
+    triaged: 0,
+    replied: 0,
+    archived: 0,
+    spam: 0,
+  }
+  for (const s of filteredSignupsBeforeState) {
+    const st = getStateOrNew(submissionStates, s.id)
+    stateCounts[st] = (stateCounts[st] ?? 0) + 1
+  }
+
+  // Bulk handler factory — shared shape for "mark all selected as X"
+  const runBulk = async (target: SubmissionState) => {
+    if (selected.size === 0) return
+    const updates = Array.from(selected).map((id) => ({
+      source: SUBMISSION_SOURCE,
+      id,
+      state: target,
+    }))
+    try {
+      const res = await fetch("/api/admin/submissions/states/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      })
+      if (!res.ok) {
+        setToast({ message: "Bulk update failed", type: "error" })
+        return
+      }
+      setLocalBulk(updates.map((u) => ({ id: u.id, state: u.state })))
+      setToast({
+        message: `${updates.length} signup${updates.length === 1 ? "" : "s"} marked ${target}`,
+        type: "success",
+      })
+      clearSelected()
+    } catch {
+      setToast({ message: "Bulk update failed", type: "error" })
+    }
+  }
+
+  // Convert selected signups into CRM leads. Existing leads (matched by email)
+  // get a tag/note refresh — counted as "updated" rather than "created".
+  const runConvert = async () => {
+    if (selected.size === 0) return
+    const items = signups
+      .filter((s) => selected.has(s.id) && s.email)
+      .map((s) => ({
+        id: s.id,
+        email: s.email,
+        sourceSite: s.source,
+      }))
+    if (items.length === 0) return
+    try {
+      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        setToast({ message: data?.error || "Convert failed", type: "error" })
+        return
+      }
+      const r = data.result as { created: number; updated: number; failed: number }
+      setToast({
+        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
+        type: r.failed === 0 ? "success" : "error",
+      })
+      if (r.failed === 0) clearSelected()
+    } catch {
+      setToast({ message: "Convert failed", type: "error" })
+    }
+  }
+
+  const allVisibleIds = filteredSignups.map((s) => s.id)
+  const allVisibleSelected =
+    allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
 
   const handleDatePreset = (preset: string) => {
     setDatePreset(preset)
@@ -663,6 +814,13 @@ function EmailListsTab({
         )}
       </div>
 
+      {/* PR 3 — state filter chips */}
+      {!isLoading && !error && (
+        <div className="mb-3">
+          <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
@@ -688,6 +846,26 @@ function EmailListsTab({
       {/* Email List */}
       {!isLoading && !error && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+          {/* Select-all header — appears when there are visible rows */}
+          {filteredSignups.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-neutral-100 bg-neutral-50">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={(e) => {
+                  if (e.target.checked) setSelected(allVisibleIds)
+                  else clearSelected()
+                }}
+                className="rounded border-neutral-300"
+                aria-label="Select all visible"
+              />
+              <span className="text-[11px] text-neutral-500">
+                {selected.size > 0
+                  ? `${selected.size} selected`
+                  : `${filteredSignups.length} visible`}
+              </span>
+            </div>
+          )}
           {/* ── Mobile Card View ── */}
           <div className="block sm:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
             {filteredSignups.length === 0 ? (
@@ -709,6 +887,7 @@ function EmailListsTab({
                       <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight truncate">
                         {signup.email}
                         <LeadCrossLink email={signup.email} mapping={leadsByEmail} />
+                        <MailchimpSubscribedPill email={signup.email} mapping={subscriberMap} />
                       </p>
                     </div>
                     <button
@@ -723,10 +902,23 @@ function EmailListsTab({
                       )}
                     </button>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2">
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(signup.id)}
+                      onChange={() => toggleSelect(signup.id)}
+                      className="rounded border-neutral-300"
+                      onClick={(e) => e.stopPropagation()}
+                    />
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
                       {signup.source}
                     </span>
+                    <StateBadge
+                      source={SUBMISSION_SOURCE}
+                      id={signup.id}
+                      state={getStateOrNew(submissionStates, signup.id)}
+                      onChange={(s) => setLocal(signup.id, s)}
+                    />
                     <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
                       {formatDate(signup.created_at)}
                     </span>
@@ -773,14 +965,34 @@ function EmailListsTab({
                   filteredSignups.map((signup) => (
                     <tr key={signup.id} className="hover:bg-neutral-50 transition-colors">
                       <td className="px-5 py-3.5">
-                        <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
-                          {signup.email}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(signup.id)}
+                            onChange={() => toggleSelect(signup.id)}
+                            className="rounded border-neutral-300 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${signup.email}`}
+                          />
+                          <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
+                            {signup.email}
+                          </span>
+                          <LeadCrossLink email={signup.email} mapping={leadsByEmail} />
+                          <MailchimpSubscribedPill email={signup.email} mapping={subscriberMap} />
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
-                          {signup.source}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                            {signup.source}
+                          </span>
+                          <StateBadge
+                            source={SUBMISSION_SOURCE}
+                            id={signup.id}
+                            state={getStateOrNew(submissionStates, signup.id)}
+                            onChange={(s) => setLocal(signup.id, s)}
+                          />
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
                         {formatDate(signup.created_at)}
@@ -822,6 +1034,36 @@ function EmailListsTab({
           )}
         </div>
       )}
+
+      {/* PR 4 — bulk action bar (sticky bottom, appears when selection > 0) */}
+      <BulkActionBar
+        count={selected.size}
+        onClear={clearSelected}
+        actions={[
+          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
+          { key: "convert-crm", label: "Convert to CRM", icon: UserPlusIcon, run: runConvert },
+          { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
+          { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
+          { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
+          { key: "spam", label: "Mark spam", icon: BanIcon, destructive: true, run: () => runBulk("spam") },
+        ]}
+      />
+
+      <MailchimpPushModal
+        open={showPushModal}
+        onClose={() => setShowPushModal(false)}
+        members={signups
+          .filter((s) => selected.has(s.id) && s.email)
+          .map<PushMember>((s) => ({ email: s.email }))}
+        defaultTag={`from-newsletter-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+        onComplete={(result) => {
+          setToast({
+            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
+            type: result.errors.length === 0 ? "success" : "error",
+          })
+          if (result.errors.length === 0) clearSelected()
+        }}
+      />
     </div>
   )
 }
@@ -836,11 +1078,16 @@ function ContactFormsTab({
   initialSearch?: string
 }) {
   const leadsByEmail = useLeadsByEmail()
+  const subscriberMap = useMailchimpSubscribers()
+  const SUBMISSION_SOURCE: SubmissionSource = "contact_forms"
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<ContactFormSubmission[]>([])
   const [sources, setSources] = useState<string[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
+  const [stateFilter, setStateFilter] = useState<"all" | SubmissionState>("all")
+  const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
+  const [showPushModal, setShowPushModal] = useState(false)
   const [selectedSource, setSelectedSource] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
@@ -995,7 +1242,7 @@ function ContactFormsTab({
     })
   }
 
-  const filteredSubmissions = submissions.filter((s) => {
+  const filteredSubmissionsBeforeState = submissions.filter((s) => {
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
     return (
@@ -1006,6 +1253,97 @@ function ContactFormsTab({
       (s.message || "").toLowerCase().includes(q)
     )
   })
+
+  const visibleIds = filteredSubmissionsBeforeState.map((s) => s.id)
+  const { states: submissionStates, setLocal, setLocalBulk } =
+    useSubmissionStates({ source: SUBMISSION_SOURCE, ids: visibleIds })
+
+  const filteredSubmissions = filteredSubmissionsBeforeState.filter((s) => {
+    if (stateFilter === "all") return true
+    return getStateOrNew(submissionStates, s.id) === stateFilter
+  })
+
+  const stateCounts: Partial<Record<"all" | SubmissionState, number>> = {
+    all: filteredSubmissionsBeforeState.length,
+    new: 0,
+    triaged: 0,
+    replied: 0,
+    archived: 0,
+    spam: 0,
+  }
+  for (const s of filteredSubmissionsBeforeState) {
+    const st = getStateOrNew(submissionStates, s.id)
+    stateCounts[st] = (stateCounts[st] ?? 0) + 1
+  }
+
+  const allVisibleIds = filteredSubmissions.map((s) => s.id)
+  const allVisibleSelected =
+    allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
+
+  const runBulk = async (target: SubmissionState) => {
+    if (selected.size === 0) return
+    const updates = Array.from(selected).map((id) => ({
+      source: SUBMISSION_SOURCE,
+      id,
+      state: target,
+    }))
+    try {
+      const res = await fetch("/api/admin/submissions/states/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      })
+      if (!res.ok) {
+        setToast({ message: "Bulk update failed", type: "error" })
+        return
+      }
+      setLocalBulk(updates.map((u) => ({ id: u.id, state: u.state })))
+      setToast({
+        message: `${updates.length} submission${updates.length === 1 ? "" : "s"} marked ${target}`,
+        type: "success",
+      })
+      clearSelected()
+    } catch {
+      setToast({ message: "Bulk update failed", type: "error" })
+    }
+  }
+
+  const runConvert = async () => {
+    if (selected.size === 0) return
+    const items = submissions
+      .filter((s) => selected.has(s.id) && s.email)
+      .map((s) => ({
+        id: s.id,
+        email: s.email,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        company: s.company,
+        phone: s.phone,
+        message: s.message,
+        sourceSite: s.source,
+      }))
+    if (items.length === 0) return
+    try {
+      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        setToast({ message: data?.error || "Convert failed", type: "error" })
+        return
+      }
+      const r = data.result as { created: number; updated: number; failed: number }
+      setToast({
+        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
+        type: r.failed === 0 ? "success" : "error",
+      })
+      if (r.failed === 0) clearSelected()
+    } catch {
+      setToast({ message: "Convert failed", type: "error" })
+    }
+  }
 
   const totalCount = selectedSource
     ? counts[selectedSource] || 0
@@ -1130,9 +1468,36 @@ function ContactFormsTab({
         </div>
       )}
 
+      {/* PR 3 — state filter chips */}
+      {!isLoading && !error && submissions.length > 0 && (
+        <div className="mb-3">
+          <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+        </div>
+      )}
+
       {/* Submissions List */}
       {!isLoading && !error && submissions.length > 0 && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+          {/* Select-all header */}
+          {filteredSubmissions.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-neutral-100 bg-neutral-50">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={(e) => {
+                  if (e.target.checked) setSelected(allVisibleIds)
+                  else clearSelected()
+                }}
+                className="rounded border-neutral-300"
+                aria-label="Select all visible"
+              />
+              <span className="text-[11px] text-neutral-500">
+                {selected.size > 0
+                  ? `${selected.size} selected`
+                  : `${filteredSubmissions.length} visible`}
+              </span>
+            </div>
+          )}
           {/* ── Mobile Card View ── */}
           <div className="block md:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
             {filteredSubmissions.length === 0 ? (
@@ -1151,16 +1516,32 @@ function ContactFormsTab({
                   onClick={() => setSelectedSubmission(sub)}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
-                        {sub.firstName} {sub.lastName}
-                        <LeadCrossLink email={sub.email} mapping={leadsByEmail} />
-                      </p>
-                      <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
-                        {sub.email}
-                      </p>
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(sub.id)}
+                        onChange={() => toggleSelect(sub.id)}
+                        className="rounded border-neutral-300 mt-1 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
+                          {sub.firstName} {sub.lastName}
+                          <LeadCrossLink email={sub.email} mapping={leadsByEmail} />
+                          <MailchimpSubscribedPill email={sub.email} mapping={subscriberMap} />
+                        </p>
+                        <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
+                          {sub.email}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-0.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <StateBadge
+                        source={SUBMISSION_SOURCE}
+                        id={sub.id}
+                        state={getStateOrNew(submissionStates, sub.id)}
+                        onChange={(s) => setLocal(sub.id, s)}
+                      />
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub) }}
                         className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
@@ -1248,9 +1629,21 @@ function ContactFormsTab({
                       onClick={() => setSelectedSubmission(sub)}
                     >
                       <td className="px-5 py-3.5">
-                        <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
-                          {sub.firstName} {sub.lastName}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(sub.id)}
+                            onChange={() => toggleSelect(sub.id)}
+                            className="rounded border-neutral-300 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${sub.firstName} ${sub.lastName}`}
+                          />
+                          <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
+                            {sub.firstName} {sub.lastName}
+                          </span>
+                          <LeadCrossLink email={sub.email} mapping={leadsByEmail} />
+                          <MailchimpSubscribedPill email={sub.email} mapping={subscriberMap} />
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="text-neutral-500 text-[13px] font-normal leading-snug">
@@ -1268,9 +1661,17 @@ function ContactFormsTab({
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
-                          {sub.source}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                            {sub.source}
+                          </span>
+                          <StateBadge
+                            source={SUBMISSION_SOURCE}
+                            id={sub.id}
+                            state={getStateOrNew(submissionStates, sub.id)}
+                            onChange={(s) => setLocal(sub.id, s)}
+                          />
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
                         {formatDate(sub.created_at)}
@@ -1593,6 +1994,39 @@ function ContactFormsTab({
           </div>
         </div>
       )}
+
+      <BulkActionBar
+        count={selected.size}
+        onClear={clearSelected}
+        actions={[
+          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
+          { key: "convert-crm", label: "Convert to CRM", icon: UserPlusIcon, run: runConvert },
+          { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
+          { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
+          { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
+          { key: "spam", label: "Mark spam", icon: BanIcon, destructive: true, run: () => runBulk("spam") },
+        ]}
+      />
+
+      <MailchimpPushModal
+        open={showPushModal}
+        onClose={() => setShowPushModal(false)}
+        members={submissions
+          .filter((s) => selected.has(s.id) && s.email)
+          .map<PushMember>((s) => ({
+            email: s.email,
+            firstName: s.firstName || undefined,
+            lastName: s.lastName || undefined,
+          }))}
+        defaultTag={`from-contact-form-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+        onComplete={(result) => {
+          setToast({
+            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
+            type: result.errors.length === 0 ? "success" : "error",
+          })
+          if (result.errors.length === 0) clearSelected()
+        }}
+      />
     </div>
   )
 }
@@ -1609,10 +2043,15 @@ function EventRegistrationsTab({
   initialEvent?: string
 }) {
   const leadsByEmail = useLeadsByEmail()
+  const subscriberMap = useMailchimpSubscribers()
+  const SUBMISSION_SOURCE: SubmissionSource = "event_registrations"
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [registrations, setRegistrations] = useState<EventRegistration[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
+  const [stateFilter, setStateFilter] = useState<"all" | SubmissionState>("all")
+  const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
+  const [showPushModal, setShowPushModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<string>(initialEvent)
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -1720,7 +2159,7 @@ function EventRegistrationsTab({
   }
 
   // Filter registrations
-  const filteredRegistrations = registrations.filter((r) => {
+  const filteredRegistrationsBeforeState = registrations.filter((r) => {
     if (selectedEvent && r.eventName !== selectedEvent) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -1734,6 +2173,98 @@ function EventRegistrationsTab({
     }
     return true
   }).sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+
+  const visibleIds = filteredRegistrationsBeforeState.map((r) => r.id ?? "").filter(Boolean) as string[]
+  const { states: submissionStates, setLocal, setLocalBulk } =
+    useSubmissionStates({ source: SUBMISSION_SOURCE, ids: visibleIds })
+
+  const filteredRegistrations = filteredRegistrationsBeforeState.filter((r) => {
+    if (stateFilter === "all") return true
+    if (!r.id) return stateFilter === "new"
+    return getStateOrNew(submissionStates, r.id) === stateFilter
+  })
+
+  const stateCounts: Partial<Record<"all" | SubmissionState, number>> = {
+    all: filteredRegistrationsBeforeState.length,
+    new: 0,
+    triaged: 0,
+    replied: 0,
+    archived: 0,
+    spam: 0,
+  }
+  for (const r of filteredRegistrationsBeforeState) {
+    const st = r.id ? getStateOrNew(submissionStates, r.id) : "new"
+    stateCounts[st] = (stateCounts[st] ?? 0) + 1
+  }
+
+  const allVisibleIds = filteredRegistrations.map((r) => r.id ?? "").filter(Boolean) as string[]
+  const allVisibleSelected =
+    allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
+
+  const runBulk = async (target: SubmissionState) => {
+    if (selected.size === 0) return
+    const updates = Array.from(selected).map((id) => ({
+      source: SUBMISSION_SOURCE,
+      id,
+      state: target,
+    }))
+    try {
+      const res = await fetch("/api/admin/submissions/states/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      })
+      if (!res.ok) {
+        setToast({ message: "Bulk update failed", type: "error" })
+        return
+      }
+      setLocalBulk(updates.map((u) => ({ id: u.id, state: u.state })))
+      setToast({
+        message: `${updates.length} registration${updates.length === 1 ? "" : "s"} marked ${target}`,
+        type: "success",
+      })
+      clearSelected()
+    } catch {
+      setToast({ message: "Bulk update failed", type: "error" })
+    }
+  }
+
+  const runConvert = async () => {
+    if (selected.size === 0) return
+    const items = registrations
+      .filter((r) => r.id && selected.has(r.id) && r.email)
+      .map((r) => ({
+        id: r.id,
+        email: r.email,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        company: r.company || undefined,
+        sourceSite: r.event,
+        eventName: r.eventName,
+        eventDate: r.eventDate,
+      }))
+    if (items.length === 0) return
+    try {
+      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        setToast({ message: data?.error || "Convert failed", type: "error" })
+        return
+      }
+      const r = data.result as { created: number; updated: number; failed: number }
+      setToast({
+        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
+        type: r.failed === 0 ? "success" : "error",
+      })
+      if (r.failed === 0) clearSelected()
+    } catch {
+      setToast({ message: "Convert failed", type: "error" })
+    }
+  }
 
   const totalCount = Object.values(counts).reduce((a, b) => a + b, 0)
 
@@ -1773,48 +2304,15 @@ function EventRegistrationsTab({
         </div>
       </div>
 
-      {/* Event Cards */}
-      {Object.keys(counts).length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 mb-6">
-          <button
-            onClick={() => handleFilterByEvent("")}
-            className={`p-3 rounded-xl border transition-all text-left ${
-              selectedEvent === ""
-                ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-            }`}
-          >
-            <div className="flex items-center gap-1.5 mb-1">
-              <Ticket className="w-3 h-3 opacity-50" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">All Events</span>
-            </div>
-            <div className="text-xl font-bold leading-tight">{totalCount.toLocaleString()}</div>
-            <div className="text-[11px] opacity-50 font-normal leading-snug">registrations</div>
-          </button>
-          {Object.entries(counts)
-            .sort(([, a], [, b]) => b - a)
-            .map(([eventName, count]) => (
-              <button
-                key={eventName}
-                onClick={() => handleFilterByEvent(eventName)}
-                className={`p-3 rounded-xl border transition-all text-left ${
-                  selectedEvent === eventName
-                    ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                    : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Ticket className="w-3 h-3 opacity-50" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider truncate">
-                    {eventName}
-                  </span>
-                </div>
-                <div className="text-xl font-bold leading-tight">{count.toLocaleString()}</div>
-                <div className="text-[11px] opacity-50 font-normal leading-snug">registrations</div>
-              </button>
-            ))}
-        </div>
-      )}
+      {/* Per-event insights — overview cards (no event selected) or stats
+          strip (event selected). Joins registrations against CRM leads and
+          Mailchimp subscribers so the card surface answers "how is this event
+          performing on conversion + activation?" not just "how many signed up". */}
+      <EventInsights
+        selectedEvent={selectedEvent}
+        onSelect={handleFilterByEvent}
+        totalRegistrationsFallback={totalCount}
+      />
 
       {/* Search */}
       {registrations.length > 0 && (
@@ -1878,9 +2376,35 @@ function EventRegistrationsTab({
         </div>
       )}
 
+      {/* PR 3 — state filter chips */}
+      {!isLoading && !error && registrations.length > 0 && (
+        <div className="mb-3">
+          <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+        </div>
+      )}
+
       {/* Registrations List */}
       {!isLoading && !error && registrations.length > 0 && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+          {filteredRegistrations.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-neutral-100 bg-neutral-50">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={(e) => {
+                  if (e.target.checked) setSelected(allVisibleIds)
+                  else clearSelected()
+                }}
+                className="rounded border-neutral-300"
+                aria-label="Select all visible"
+              />
+              <span className="text-[11px] text-neutral-500">
+                {selected.size > 0
+                  ? `${selected.size} selected`
+                  : `${filteredRegistrations.length} visible`}
+              </span>
+            </div>
+          )}
           {/* ── Mobile Card View ── */}
           <div className="block md:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
             {filteredRegistrations.length === 0 ? (
@@ -1899,16 +2423,34 @@ function EventRegistrationsTab({
                   onClick={() => setSelectedRegistration(reg)}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
-                        {reg.firstName} {reg.lastName}
-                        <LeadCrossLink email={reg.email} mapping={leadsByEmail} />
-                      </p>
-                      <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
-                        {reg.email}
-                      </p>
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={!!reg.id && selected.has(reg.id)}
+                        onChange={() => reg.id && toggleSelect(reg.id)}
+                        className="rounded border-neutral-300 mt-1 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
+                          {reg.firstName} {reg.lastName}
+                          <LeadCrossLink email={reg.email} mapping={leadsByEmail} />
+                          <MailchimpSubscribedPill email={reg.email} mapping={subscriberMap} />
+                        </p>
+                        <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
+                          {reg.email}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-0.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {reg.id && (
+                        <StateBadge
+                          source={SUBMISSION_SOURCE}
+                          id={reg.id}
+                          state={getStateOrNew(submissionStates, reg.id)}
+                          onChange={(s) => setLocal(reg.id!, s)}
+                        />
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedRegistration(reg) }}
                         className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
@@ -2001,9 +2543,21 @@ function EventRegistrationsTab({
                       onClick={() => setSelectedRegistration(reg)}
                     >
                       <td className="px-5 py-3.5">
-                        <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
-                          {reg.firstName} {reg.lastName}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={!!reg.id && selected.has(reg.id)}
+                            onChange={() => reg.id && toggleSelect(reg.id)}
+                            className="rounded border-neutral-300 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${reg.firstName} ${reg.lastName}`}
+                          />
+                          <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
+                            {reg.firstName} {reg.lastName}
+                          </span>
+                          <LeadCrossLink email={reg.email} mapping={leadsByEmail} />
+                          <MailchimpSubscribedPill email={reg.email} mapping={subscriberMap} />
+                        </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="text-neutral-500 text-[13px] font-normal leading-snug">
@@ -2016,9 +2570,19 @@ function EventRegistrationsTab({
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
-                          {reg.eventName}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                            {reg.eventName}
+                          </span>
+                          {reg.id && (
+                            <StateBadge
+                              source={SUBMISSION_SOURCE}
+                              id={reg.id}
+                              state={getStateOrNew(submissionStates, reg.id)}
+                              onChange={(s) => setLocal(reg.id!, s)}
+                            />
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
                         {formatDate(reg.registeredAt)}
@@ -2256,6 +2820,39 @@ function EventRegistrationsTab({
           </div>
         </div>
       )}
+
+      <BulkActionBar
+        count={selected.size}
+        onClear={clearSelected}
+        actions={[
+          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
+          { key: "convert-crm", label: "Convert to CRM", icon: UserPlusIcon, run: runConvert },
+          { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
+          { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
+          { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
+          { key: "spam", label: "Mark spam", icon: BanIcon, destructive: true, run: () => runBulk("spam") },
+        ]}
+      />
+
+      <MailchimpPushModal
+        open={showPushModal}
+        onClose={() => setShowPushModal(false)}
+        members={registrations
+          .filter((r) => r.id && selected.has(r.id) && r.email)
+          .map<PushMember>((r) => ({
+            email: r.email,
+            firstName: r.firstName || undefined,
+            lastName: r.lastName || undefined,
+          }))}
+        defaultTag={selectedEvent ? `event-${selectedEvent.toLowerCase().replace(/\s+/g, "-")}` : undefined}
+        onComplete={(result) => {
+          setToast({
+            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
+            type: result.errors.length === 0 ? "success" : "error",
+          })
+          if (result.errors.length === 0) clearSelected()
+        }}
+      />
     </div>
   )
 }

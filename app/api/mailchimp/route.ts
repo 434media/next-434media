@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       "realtime",
       "all-campaigns",
       "tags",
+      "properties",
     ]
 
     if (!availableEndpoints.includes(endpoint)) {
@@ -111,6 +112,23 @@ export async function GET(request: NextRequest) {
           tags: data.tags.map((t: { name: string; member_count?: number }) => `${t.name} (${t.member_count || 0})`).join(", "),
         })
         break
+
+      case "properties": {
+        // Audience selector for the Push-to-Mailchimp modal. Returns only the
+        // configured audiences, with the actual Mailchimp list_id as `id` so
+        // the caller can address the correct audience on the upsert.
+        const { getAvailableMailchimpProperties } = await import("@/lib/mailchimp-analytics")
+        const all = await getAvailableMailchimpProperties()
+        const properties = all
+          .filter((p) => p.isConfigured && p.list_id)
+          .map((p) => ({
+            id: p.list_id,
+            name: p.name,
+            member_count: p.member_count,
+          }))
+        data = { properties }
+        break
+      }
 
       default:
         return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 })

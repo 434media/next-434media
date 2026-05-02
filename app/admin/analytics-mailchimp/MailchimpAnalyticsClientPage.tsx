@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { MailchimpHeader } from "@/components/mailchimp/MailchimpHeader"
 import { MailchimpMetricsOverview } from "@/components/mailchimp/MailchimpMetricsOverview"
 import { MailchimpTopCampaignsTable } from "@/components/mailchimp/MailchimpTopCampaignsTable"
-import { MailchimpTagsOverview } from "@/components/mailchimp/MailchimpTagsOverview"
+// MailchimpTagsOverview moved — see /admin/leads (Submissions page).
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/analytics/Card"
 import { Badge } from "@/components/analytics/Badge"
 import { useToast } from "@/hooks/use-toast"
@@ -18,7 +18,6 @@ import type {
   MailchimpCampaignsResponse,
   MailchimpRealtimeData,
   MailchimpTag,
-  MailchimpTagsResponse,
 } from "@/types/mailchimp-analytics"
 
 interface MailchimpAnalyticsData {
@@ -30,7 +29,6 @@ interface MailchimpAnalyticsData {
   lists?: MailchimpListsResponse
   allCampaigns?: MailchimpCampaignsResponse
   realtime?: MailchimpRealtimeData
-  tags?: MailchimpTagsResponse
 }
 
 export default function MailchimpAnalyticsClientPage() {
@@ -41,7 +39,7 @@ export default function MailchimpAnalyticsClientPage() {
     endDate: new Date().toISOString().split("T")[0], // today
   })
   const [selectedAudienceId, setSelectedAudienceId] = useState<string>("")
-  const [selectedTag, setSelectedTag] = useState<string>("")
+  // Tag selection state removed — tags moved to /admin/leads.
   const [configStatus, setConfigStatus] = useState<any>(null)
   const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
   const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
@@ -132,7 +130,8 @@ export default function MailchimpAnalyticsClientPage() {
   const fetchAllData = async () => {
     setIsLoading(true)
     try {
-      const [summary, campaigns, subscribers, engagement, geographic, lists, allCampaigns, realtime, tags] =
+      // Tags moved to /admin/leads (operational segmentation, not analytics).
+      const [summary, campaigns, subscribers, engagement, geographic, lists, allCampaigns, realtime] =
         await Promise.all([
           fetchData("summary"),
           fetchData("campaigns"),
@@ -142,7 +141,6 @@ export default function MailchimpAnalyticsClientPage() {
           fetchData("lists", false),
           fetchData("all-campaigns"),
           fetchData("realtime", false),
-          fetchData("tags", false),
         ])
 
       setData({
@@ -154,7 +152,6 @@ export default function MailchimpAnalyticsClientPage() {
         lists,
         allCampaigns,
         realtime,
-        tags,
       })
 
       toast({
@@ -179,11 +176,6 @@ export default function MailchimpAnalyticsClientPage() {
 
   const handleAudienceChange = (audienceId: string) => {
     setSelectedAudienceId(audienceId)
-  }
-
-  const handleTagChange = (tagId: string) => {
-    setSelectedTag(tagId)
-    // When a tag is selected, we could filter campaigns in the future
   }
 
   // Download CSV function
@@ -622,18 +614,9 @@ export default function MailchimpAnalyticsClientPage() {
           )}
         </div>
 
-        {/* Tags Section - Full Width */}
-        <div>
-          <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
-            <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Audience Tags</h2>
-          </div>
-          <MailchimpTagsOverview
-            tags={data.tags?.tags || []}
-            selectedTag={selectedTag}
-            onTagSelect={handleTagChange}
-            totalSubscribers={data.summary?.totalSubscribers || 0}
-          />
-        </div>
+        {/* Audience Tags moved to /admin/leads — they're operational segmentation
+            data (used to decide which audience/tag to push contacts to), not
+            analytical data. Find them above the Submissions tabs. */}
 
         {/* Recent Campaigns - Full Width */}
         <div>

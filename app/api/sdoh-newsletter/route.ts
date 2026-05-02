@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import axios from "axios"
 import crypto from "crypto"
-import { checkBotId } from "botid/server"
 import { saveEmailSignup } from "@/lib/firestore-email-signups"
+import { requireHumanRequest } from "@/lib/botid-guard"
 
 const mailchimpApiKey = process.env.MAILCHIMP_API_KEY
 const mailchimpListId = process.env.MAILCHIMP_AUDIENCE_ID
@@ -13,12 +13,11 @@ const TAGS = ["web-434sdoh", "newsletter-signup"]
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json()
+    // BotID guard — block automated submissions before doing any work
+    const human = await requireHumanRequest()
+    if (!human.ok) return human.response
 
-    const verification = await checkBotId()
-    if (verification.isBot) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
+    const { email } = await request.json()
 
     const mailchimpEnabled = !!(mailchimpApiKey && mailchimpListId)
     if (!mailchimpEnabled) {

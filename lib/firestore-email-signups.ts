@@ -31,7 +31,11 @@ async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<Fi
       return {
         id: `aimsatx:${doc.id}`,
         email: data.email || "",
-        source: data.source || "AIM",
+        // Normalize source at READ time. The aimsatx DB stores "aim" (lowercase);
+        // tagging it as canonical "AIM" here collapses it into a single bucket
+        // alongside any default-DB rows that already use "AIM". No write to the
+        // source DB needed.
+        source: "AIM",
         created_at: data.created_at || "",
         mailchimp_synced: data.mailchimp_synced || false,
         mailchimp_tags: data.tags || data.mailchimp_tags || [],

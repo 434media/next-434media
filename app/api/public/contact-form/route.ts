@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
 import { captureLeadFromContactForm } from "@/lib/firestore-leads"
+import { requireHumanRequest } from "@/lib/botid-guard"
 import { headers } from "next/headers"
 
 // Valid sources that can submit contact forms
@@ -48,6 +49,10 @@ function validateApiKey(apiKey: string | null): boolean {
  */
 export async function POST(request: Request) {
   try {
+    // BotID guard — block automated submissions before doing any work
+    const human = await requireHumanRequest()
+    if (!human.ok) return human.response
+
     const headersList = await headers()
     const apiKey = headersList.get("x-api-key")
 

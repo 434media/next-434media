@@ -368,6 +368,59 @@ export async function captureLeadFromEmailSignup(
   }
 }
 
+interface EventRegistrationCapture {
+  email: string
+  firstName: string
+  lastName: string
+  company?: string
+  eventName: string
+  eventSlug: string
+  eventDate?: string
+  pageUrl?: string
+}
+
+/**
+ * Fan an event registration into the `leads` collection.
+ * Source is "event" (so scoring picks up the +event bonus). Tags the lead with
+ * `event:<slug>` for downstream filtering, and stores the event name in notes
+ * so the CRM card shows what they registered for.
+ *
+ * Same fail-safe behavior as the other captureLeadFrom* helpers.
+ */
+export async function captureLeadFromEventRegistration(
+  input: EventRegistrationCapture,
+): Promise<{ leadId: string | null; created: boolean }> {
+  try {
+    const email = input.email.trim().toLowerCase()
+    const existing = await findLeadByEmail(email)
+    const eventTag = `event:${input.eventSlug.toLowerCase()}`
+    const noteLine = `[${(input.eventDate || new Date().toISOString()).split("T")[0]}] Registered for ${input.eventName}`
+
+    if (existing) {
+      const tags = Array.from(new Set([...(existing.tags ?? []), eventTag]))
+      await updateLead(existing.id, {
+        tags,
+        notes: [existing.notes, noteLine].filter(Boolean).join("\n\n"),
+      })
+      return { leadId: existing.id, created: false }
+    }
+
+    const lead = await createLead({
+      name: `${input.firstName} ${input.lastName}`.trim() || email,
+      company: input.company || "",
+      email,
+      source: "event",
+      platform: inferPlatform(input.eventSlug),
+      tags: [eventTag],
+      notes: noteLine,
+    })
+    return { leadId: lead.id, created: true }
+  } catch (err) {
+    console.error("[captureLeadFromEventRegistration] swallowed error:", err)
+    return { leadId: null, created: false }
+  }
+}
+
 /**
  * Increment engagement counters from Resend webhook. Re-scores via updateLead
  * so the engagement bonus kicks in once thresholds are crossed.

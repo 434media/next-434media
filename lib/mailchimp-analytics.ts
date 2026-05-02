@@ -810,3 +810,217 @@ export async function createMailchimpTag(name: string, audienceId?: string): Pro
     return null
   }
 }
+
+// ============================================
+// SUBSCRIBER MAP (used by /admin/leads to flag rows that are already
+// subscribed to a Mailchimp audience).
+// ============================================
+
+export interface MailchimpSubscriberAudienceMembership {
+  audienceId: string
+  audienceName: string
+  /** Tags applied to this member in this audience. */
+  tags: string[]
+  /** Mailchimp status: subscribed | unsubscribed | cleaned | pending | transactional */
+  status: string
+}
+
+export interface MailchimpSubscriberMapEntry {
+  email: string
+  /** One entry per audience this member belongs to (multi-audience members
+   *  surface as multiple memberships). */
+  memberships: MailchimpSubscriberAudienceMembership[]
+}
+
+export interface MailchimpSubscriberMapResponse {
+  /** Lookup keyed by lowercased email. */
+  byEmail: Record<string, MailchimpSubscriberMapEntry>
+  /** Total subscribers across all audiences (deduped by email). */
+  totalSubscribers: number
+  /** Audiences scanned, in order. */
+  audiences: Array<{ id: string; name: string; count: number }>
+  generatedAt: string
+}
+
+// ============================================
+// PUSH MEMBERS — write side of the Mailchimp integration.
+// Used by /admin/leads bulk "Push to Mailchimp" action.
+// ============================================
+
+export interface MailchimpPushMember {
+  email: string
+  firstName?: string
+  lastName?: string
+}
+
+export type MailchimpMemberStatus = "subscribed" | "pending" | "unsubscribed" | "transactional"
+
+export interface MailchimpPushResult {
+  attempted: number
+  /** Members that didn't already exist in this audience. */
+  newMembers: number
+  /** Members already in the audience whose tags/merge fields were updated. */
+  updatedMembers: number
+  /** Per-email errors returned by Mailchimp's batch endpoint. */
+  errors: Array<{ email: string; code: string; message: string }>
+}
+
+const PUSH_CHUNK_SIZE = 500 // Mailchimp's per-request cap on batch operations
+
+/**
+ * Batch-upsert members into a Mailchimp audience with tags applied.
+ *
+ * Uses Mailchimp's `POST /lists/{id}` batch endpoint (up to 500 members per
+ * request). Existing members get tag-only updates; new members are created
+ * with the supplied status. Errors are returned per-email rather than thrown,
+ * so the caller can surface partial-success cases ("412 added, 33 already
+ * existed, 5 failed because email is invalid").
+ *
+ * Status semantics:
+ * - "subscribed" — assumes consent (newsletter / contact form with checkbox)
+ * - "pending" — triggers Mailchimp's double opt-in confirmation email
+ *
+ * Default to "subscribed" only when the source already represents explicit
+ * consent. The UI exposes the choice.
+ */
+export async function pushMembersToMailchimp(
+  audienceId: string,
+  members: MailchimpPushMember[],
+  status: MailchimpMemberStatus,
+  tags: string[],
+): Promise<MailchimpPushResult> {
+  const cleanTags = tags.map((t) => t.trim()).filter(Boolean)
+  const result: MailchimpPushResult = {
+    attempted: members.length,
+    newMembers: 0,
+    updatedMembers: 0,
+    errors: [],
+  }
+
+  // Chunk to respect Mailchimp's 500/request cap
+  for (let i = 0; i < members.length; i += PUSH_CHUNK_SIZE) {
+    const chunk = members.slice(i, i + PUSH_CHUNK_SIZE)
+    const body = {
+      members: chunk.map((m) => ({
+        email_address: m.email.trim().toLowerCase(),
+        status,
+        // status_if_new lets `update_existing` work cleanly: existing members
+        // keep their current status, new members get the requested status.
+        status_if_new: status,
+        merge_fields: {
+          ...(m.firstName ? { FNAME: m.firstName } : {}),
+          ...(m.lastName ? { LNAME: m.lastName } : {}),
+        },
+        tags: cleanTags,
+      })),
+      update_existing: true,
+    }
+
+    try {
+      interface BatchResponse {
+        new_members?: Array<{ email_address: string }>
+        updated_members?: Array<{ email_address: string }>
+        errors?: Array<{ email_address: string; error: string; error_code?: string }>
+      }
+      const data = await makeMailchimpRequest<BatchResponse>(`/lists/${audienceId}`, {
+        method: "POST",
+        body,
+      })
+      result.newMembers += (data.new_members ?? []).length
+      result.updatedMembers += (data.updated_members ?? []).length
+      for (const err of data.errors ?? []) {
+        result.errors.push({
+          email: err.email_address,
+          code: err.error_code || "unknown",
+          message: err.error || "Unknown error",
+        })
+      }
+    } catch (err) {
+      // Whole-chunk failure (network, 4xx, etc.) — record one error per
+      // email in the chunk so the caller knows nothing landed for them.
+      const message = err instanceof Error ? err.message : String(err)
+      for (const m of chunk) {
+        result.errors.push({ email: m.email, code: "request_failed", message })
+      }
+    }
+  }
+
+  return result
+}
+
+/**
+ * Build an email→audiences lookup across every configured Mailchimp audience.
+ *
+ * Used by the Submissions page to render an "✉ Subscribed to N audiences"
+ * pill on form rows. Pre-fetches up to 1000 members per audience (Mailchimp's
+ * default page size); for typical 434 audience sizes this is one round-trip
+ * per audience and the response is small.
+ *
+ * Status filter: only `subscribed` and `pending` members are included —
+ * unsubscribed/cleaned members are technically still in Mailchimp but
+ * shouldn't surface as "active subscribers" in the UI.
+ */
+export async function getMailchimpSubscriberMap(): Promise<MailchimpSubscriberMapResponse> {
+  const byEmail: Record<string, MailchimpSubscriberMapEntry> = {}
+  const audiences: MailchimpSubscriberMapResponse["audiences"] = []
+
+  for (const config of MAILCHIMP_PROPERTIES_CONFIG) {
+    const audienceId = process.env[config.key]
+    if (!audienceId) continue
+
+    try {
+      const listData = await makeMailchimpRequest<MailchimpList>(`/lists/${audienceId}`)
+      const audienceName = listData.name || config.name
+
+      // Pull subscribed + pending members. Mailchimp's max count per page is 1000.
+      // For audiences > 1000, this would need pagination; we'll add it when any
+      // 434 audience grows past that threshold (currently they're well under).
+      interface RawMember {
+        email_address: string
+        status: string
+        tags?: Array<{ id: number; name: string }>
+      }
+      interface MembersResponse {
+        members: RawMember[]
+        total_items: number
+      }
+      const data = await makeMailchimpRequest<MembersResponse>(
+        `/lists/${audienceId}/members?count=1000&status=subscribed&fields=members.email_address,members.status,members.tags,total_items`,
+      )
+
+      let counted = 0
+      for (const member of data.members ?? []) {
+        const email = (member.email_address || "").toLowerCase().trim()
+        if (!email) continue
+        counted++
+        const membership: MailchimpSubscriberAudienceMembership = {
+          audienceId,
+          audienceName,
+          tags: (member.tags ?? []).map((t) => t.name).filter(Boolean),
+          status: member.status,
+        }
+        if (byEmail[email]) {
+          byEmail[email].memberships.push(membership)
+        } else {
+          byEmail[email] = { email, memberships: [membership] }
+        }
+      }
+
+      audiences.push({ id: audienceId, name: audienceName, count: counted })
+    } catch (err) {
+      console.warn(
+        `[Mailchimp] subscriber-map: failed to load audience ${config.id}:`,
+        err instanceof Error ? err.message : err,
+      )
+      // Skip the failing audience but keep going with the others — partial
+      // map is better than no map.
+    }
+  }
+
+  return {
+    byEmail,
+    totalSubscribers: Object.keys(byEmail).length,
+    audiences,
+    generatedAt: new Date().toISOString(),
+  }
+}

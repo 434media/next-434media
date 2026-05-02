@@ -82,6 +82,18 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
   const registeredAt = data.createdAt?._seconds
     ? new Date(data.createdAt._seconds * 1000).toISOString()
     : data.createdAt || ""
+
+  // Normalize tech-fuel detection. The events array can contain any of
+  // "tech-fuel", "Tech Fuel", "techfuel", "tech_fuel", "TechFuel" etc. depending
+  // on how the registration form serialized it. Surface a canonical "tech-fuel"
+  // tag so the admin can filter on it consistently.
+  const events = Array.isArray(data.events) ? (data.events as string[]) : []
+  const hasTechFuel = events.some(
+    (e) => typeof e === "string" && e.toLowerCase().replace(/[\s_]/g, "-") === "tech-fuel",
+  )
+  const tags = ["sa-tech-day", ...events]
+  if (hasTechFuel && !tags.includes("tech-fuel")) tags.push("tech-fuel")
+
   return {
     id: `techday:${doc.id}`,
     email: data.email || "",
@@ -94,8 +106,11 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     eventName: "SA Tech Day 2026",
     eventDate: "2026-04-10",
     registeredAt,
-    source: "SATechDay",
-    tags: ["sa-tech-day", ...(data.events || [])],
+    // Canonical source label per the parent/child Firebase architecture: rows
+    // from the techday named DB surface as `source: "techday"` so the admin
+    // sees one bucket per child site.
+    source: "techday",
+    tags,
     pageUrl: "https://www.sanantoniotechday.com",
     checkedIn: data.checkedIn || false,
     checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
@@ -219,8 +234,15 @@ export async function getEventRegistrations(filters?: {
 
     const defaultRegs = defaultSnapshot.docs.map(mapDefaultDoc)
 
-    // If filtering by source and it's not SATechDay or digitalcanvas, only return default
-    if (filters?.source && filters.source !== "SATechDay" && filters.source !== "web-digitalcanvas") {
+    // If filtering by source and it's not one of the named-DB sources, only
+    // return default. Accept both new ("techday") and legacy ("SATechDay")
+    // labels for techday so existing bookmarks/links keep working.
+    if (
+      filters?.source &&
+      filters.source !== "techday" &&
+      filters.source !== "SATechDay" &&
+      filters.source !== "web-digitalcanvas"
+    ) {
       return defaultRegs
     }
 

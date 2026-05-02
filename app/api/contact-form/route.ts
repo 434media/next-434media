@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server"
-import { checkBotId } from "botid/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
+import { requireHumanRequest } from "@/lib/botid-guard"
 
 export async function POST(request: Request) {
   try {
-    const { firstName, lastName, company, email, phoneNumber, message } = await request.json()
+    // BotID guard — block automated submissions before doing any work
+    const human = await requireHumanRequest()
+    if (!human.ok) return human.response
 
-    const verification = await checkBotId()
-    if (verification.isBot) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
+    const { firstName, lastName, company, email, phoneNumber, message } = await request.json()
 
     if (!firstName || !lastName || !company || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
