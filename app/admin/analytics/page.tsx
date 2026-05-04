@@ -119,7 +119,7 @@ export default function UnifiedAnalyticsPage() {
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
-        {/* Horizontal tab bar — matches /admin/leads pattern */}
+        {/* Horizontal tab bar — matches /admin/submissions pattern */}
         <div className="bg-white border-b border-neutral-200">
           <div className="px-3 sm:px-4 lg:px-6">
             <nav

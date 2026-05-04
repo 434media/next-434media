@@ -84,7 +84,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Flag,
     section: "Quick actions",
     search: "create new lead prospect",
-    run: (router) => router.push("/admin/crm?tab=leads&new=lead"),
+    run: (router) => router.push("/admin/leads?new=lead"),
   },
   {
     id: "nav-leads-priority",
@@ -93,7 +93,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Flag,
     section: "Navigate",
     search: "leads priority queue prospects high",
-    run: (router) => router.push("/admin/crm?tab=leads"),
+    run: (router) => router.push("/admin/leads?view=priority"),
   },
 
   // Navigate — primary admin sections
@@ -108,12 +108,21 @@ const STATIC_ITEMS: CommandItem[] = [
   },
   {
     id: "nav-leads",
-    label: "Leads & Registrations",
+    label: "Leads — All",
+    hint: "Scored leads ready to be worked",
+    icon: Flag,
+    section: "Navigate",
+    search: "leads scored work pipeline",
+    run: (router) => router.push("/admin/leads"),
+  },
+  {
+    id: "nav-submissions",
+    label: "Submissions",
     hint: "Contact forms, event registrations, signups",
     icon: Inbox,
     section: "Navigate",
-    search: "leads contact forms registrations signups",
-    run: (router) => router.push("/admin/leads"),
+    search: "submissions contact forms registrations signups inbox raw inbound",
+    run: (router) => router.push("/admin/submissions"),
   },
   // Portfolio rollup — every property in one view
   {
@@ -431,7 +440,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
         icon: Flag,
         section: "Leads",
         search: `${label} ${company} ${email} ${status}`.toLowerCase(),
-        run: (router) => router.push(`/admin/crm?tab=leads&openLead=${l.id}`),
+        run: (router) => router.push(`/admin/leads?openLead=${l.id}`),
       })
     }
 

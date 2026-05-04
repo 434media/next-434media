@@ -213,7 +213,7 @@ export function Customer360Panel({ clientId }: Customer360PanelProps) {
         <div className="flex flex-wrap gap-2">
           {emails.length > 0 && (
             <Link
-              href={`/admin/leads?tab=emails&search=${encodeURIComponent(emails[0])}`}
+              href={`/admin/submissions?tab=emails&search=${encodeURIComponent(emails[0])}`}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[12px] font-medium hover:bg-blue-100 transition-colors"
             >
               <Mail className="w-3.5 h-3.5" />
@@ -223,7 +223,7 @@ export function Customer360Panel({ clientId }: Customer360PanelProps) {
           )}
           {emails.length > 0 && summary.contactFormCount > 0 && (
             <Link
-              href={`/admin/leads?tab=contact-forms&search=${encodeURIComponent(emails[0])}`}
+              href={`/admin/submissions?tab=contact-forms&search=${encodeURIComponent(emails[0])}`}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[12px] font-medium hover:bg-amber-100 transition-colors"
             >
               <FileText className="w-3.5 h-3.5" />

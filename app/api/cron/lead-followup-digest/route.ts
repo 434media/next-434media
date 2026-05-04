@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
         followUpDate: l.next_followup_date!.split("T")[0],
         daysOverdue: daysBetween(l.next_followup_date!, now),
         assignedTo: l.assigned_to ?? "unassigned",
-        url: `${baseUrl}/admin/crm?tab=leads&openLead=${encodeURIComponent(l.id)}`,
+        url: `${baseUrl}/admin/leads?openLead=${encodeURIComponent(l.id)}`,
       })
     }
 

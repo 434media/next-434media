@@ -62,7 +62,7 @@ export function LeadCrossLink({ email, mapping, variant = "pill" }: LeadCrossLin
   const id = mapping.get(email.toLowerCase())
   if (!id) return null
 
-  const href = `/admin/crm?tab=leads&openLead=${encodeURIComponent(id)}`
+  const href = `/admin/leads?openLead=${encodeURIComponent(id)}`
 
   if (variant === "icon") {
     return (

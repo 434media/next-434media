@@ -282,7 +282,7 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
                             return (
                               <Link
                                 key={src}
-                                href={`/admin/leads?tab=${Meta.tabSlug}&search=${encodeURIComponent(g.email)}`}
+                                href={`/admin/submissions?tab=${Meta.tabSlug}&search=${encodeURIComponent(g.email)}`}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-100 hover:bg-neutral-200 transition-colors text-[10px] font-medium text-neutral-700"
                                 title={`Filter ${Meta.label} tab to this email`}
                               >
@@ -302,7 +302,7 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
                         {isCrm ? (
                           g.crmLeadId ? (
                             <Link
-                              href={`/admin/crm?tab=leads&openLead=${encodeURIComponent(g.crmLeadId)}`}
+                              href={`/admin/leads?openLead=${encodeURIComponent(g.crmLeadId)}`}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-md hover:bg-neutral-50 transition-colors"
                             >
                               View lead

@@ -119,7 +119,7 @@ interface InboxViewProps {
 /**
  * Unified inbox — single list across all 3 submission collections with source
  * chips, state chips, and a unified bulk action bar that fans out per-source
- * to the existing batch endpoints. Default landing tab on /admin/leads.
+ * to the existing batch endpoints. Default landing tab on /admin/submissions.
  *
  * Each row is independent of the others; selection works across sources. The
  * bulk bar buckets the selected rows by source on submit.
@@ -636,7 +636,7 @@ function InboxRowItem({
             )}
             {row.crmLeadId && (
               <Link
-                href={`/admin/crm?tab=leads&openLead=${encodeURIComponent(row.crmLeadId)}`}
+                href={`/admin/leads?openLead=${encodeURIComponent(row.crmLeadId)}`}
                 onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 shrink-0"
                 title="Open lead in CRM"
