@@ -1,12 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Loader2, Mail, X, Check, AlertCircle, Tag as TagIcon, Send } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Loader2, Mail, X, Check, AlertCircle, Tag as TagIcon, Send, Sparkles } from "lucide-react"
+import { aggregateMailchimpSuggestions } from "@/lib/tag-taxonomy"
 
 export interface PushMember {
   email: string
   firstName?: string
   lastName?: string
+  /**
+   * Optional namespaced source tags from the originating record. Used to
+   * derive Mailchimp tag suggestions ("From source data" panel in modal).
+   * Not sent to Mailchimp directly — only the `tags` array on push body is.
+   */
+  sourceTags?: string[]
 }
 
 interface MailchimpAudience {
@@ -148,6 +155,22 @@ export function MailchimpPushModal({
   const tagSuggestions = existingTags
     .filter((t) => !tags.includes(t.name))
     .slice(0, 8)
+
+  // Source-derived suggestions: aggregate namespaced tags across all
+  // selected members and convert to Mailchimp-friendly labels. Empty when
+  // nothing in the selection has source tags.
+  const sourceSuggestions = useMemo(() => {
+    const all: string[] = []
+    for (const m of members) {
+      if (m.sourceTags) all.push(...m.sourceTags)
+    }
+    return aggregateMailchimpSuggestions(all).filter((s) => !tags.includes(s))
+  }, [members, tags])
+
+  const addAllSourceSuggestions = () => {
+    if (sourceSuggestions.length === 0) return
+    setTags(Array.from(new Set([...tags, ...sourceSuggestions])))
+  }
 
   return (
     <div
@@ -297,11 +320,40 @@ export function MailchimpPushModal({
                         key={t.id}
                         type="button"
                         onClick={() => addTag(t.name)}
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+                        className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
                       >
                         + {t.name}
                       </button>
                     ))}
+                  </div>
+                )}
+                {sourceSuggestions.length > 0 && (
+                  <div className="mt-2 p-2 rounded-md bg-indigo-50/60 border border-indigo-100">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sparkles className="w-3 h-3 text-indigo-500" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
+                        From source data
+                      </span>
+                      <button
+                        type="button"
+                        onClick={addAllSourceSuggestions}
+                        className="ml-auto text-[10px] font-medium text-indigo-600 hover:text-indigo-800"
+                      >
+                        Add all
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {sourceSuggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => addTag(s)}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-indigo-700 bg-white hover:bg-indigo-100 border border-indigo-200"
+                        >
+                          + {s}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

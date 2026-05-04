@@ -17,7 +17,6 @@ import {
   Globe,
   Users,
   MessageSquare,
-  X,
   Phone,
   Building2,
   User,
@@ -48,6 +47,9 @@ import {
   type SubmissionSource,
 } from "@/components/admin/SubmissionStateUI"
 import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
+import { TagList } from "@/components/admin/Tag"
+import { parseTag } from "@/lib/tag-taxonomy"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { Eye as EyeIcon, MessageSquare as MsgIcon, Archive as ArchiveIcon, Mail as MailIcon, UserPlus as UserPlusIcon, Ban as BanIcon } from "lucide-react"
 
 // ── Types ──
@@ -176,7 +178,7 @@ export default function EmailListsPage() {
                   SUBMISSIONS
                 </h1>
                 <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-2 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-                  raw inbound — to work a lead, open it in the CRM
+                  raw inbound — to work a lead, open it in Leads
                 </span>
               </div>
             </div>
@@ -1041,7 +1043,7 @@ function EmailListsTab({
         onClear={clearSelected}
         actions={[
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "convert-crm", label: "Convert to CRM", icon: UserPlusIcon, run: runConvert },
+          { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
@@ -1730,277 +1732,196 @@ function ContactFormsTab({
       )}
 
       {/* Submission Detail Modal */}
-      {selectedSubmission && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => { setSelectedSubmission(null); setIsEditing(false) }}
-        >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" />
-
-          {/* Modal */}
-          <div
-            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center text-sm font-bold">
-                  {(selectedSubmission.firstName?.[0] || "").toUpperCase()}
-                  {(selectedSubmission.lastName?.[0] || "").toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-semibold text-neutral-900 leading-tight">
-                    {isEditing ? "Edit Submission" : `${selectedSubmission.firstName} ${selectedSubmission.lastName}`}
-                  </h3>
-                  <span className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-neutral-400">
-                    <Clock className="w-3 h-3" />
-                    {formatDate(selectedSubmission.created_at)}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {!isEditing && (
-                  <button
-                    onClick={startEditing}
-                    className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                )}
+      <DetailDrawer
+        open={!!selectedSubmission}
+        onClose={() => { setSelectedSubmission(null); setIsEditing(false) }}
+        closeOnEscape={!isEditing}
+        closeOnOverlayClick={!isEditing}
+        title={
+          selectedSubmission
+            ? isEditing
+              ? "Edit submission"
+              : `${selectedSubmission.firstName} ${selectedSubmission.lastName}`.trim() ||
+                selectedSubmission.email
+            : ""
+        }
+        subtitle={
+          selectedSubmission ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              {formatDate(selectedSubmission.created_at)}
+            </span>
+          ) : null
+        }
+        footer={
+          selectedSubmission ? (
+            isEditing ? (
+              <div className="flex items-center justify-end gap-2">
                 <button
-                  onClick={() => { setSelectedSubmission(null); setIsEditing(false) }}
-                  className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
+                  onClick={() => setIsEditing(false)}
+                  className="px-3 py-1.5 text-[12px] font-medium text-neutral-600 hover:bg-neutral-100 rounded-sm transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdate}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  Save
                 </button>
               </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
-              {isEditing ? (
-                /* ── Edit Mode ── */
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">First Name</label>
-                      <input
-                        type="text"
-                        value={editForm.firstName || ""}
-                        onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Last Name</label>
-                      <input
-                        type="text"
-                        value={editForm.lastName || ""}
-                        onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={editForm.email || ""}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={editForm.phone || ""}
-                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Company</label>
-                      <input
-                        type="text"
-                        value={editForm.company || ""}
-                        onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
-                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Source</label>
-                    <input
-                      type="text"
-                      value={editForm.source || ""}
-                      onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-medium text-neutral-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">Message</label>
-                    <textarea
-                      value={editForm.message || ""}
-                      onChange={(e) => setEditForm({ ...editForm, message: e.target.value })}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-normal text-neutral-800 resize-none"
-                    />
-                  </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    handleDelete(selectedSubmission.id, selectedSubmission.email)
+                    setSelectedSubmission(null)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-rose-600 hover:bg-rose-50 rounded-sm transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={startEditing}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded-sm transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setSelectedSubmission(null)}
+                    className="px-3 py-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded-sm transition-colors"
+                  >
+                    Close
+                  </button>
                 </div>
-              ) : (
-                /* ── View Mode ── */
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <User className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">First Name</p>
-                        <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
-                          {selectedSubmission.firstName || "—"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <User className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Last Name</p>
-                        <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
-                          {selectedSubmission.lastName || "—"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <Mail className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Email</p>
-                        <a
-                          href={`mailto:${selectedSubmission.email}`}
-                          className="text-[13px] text-blue-600 hover:text-blue-700 font-medium mt-0.5 truncate block"
-                        >
-                          {selectedSubmission.email}
-                        </a>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <Phone className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Phone</p>
-                        {selectedSubmission.phone ? (
-                          <a
-                            href={`tel:${selectedSubmission.phone}`}
-                            className="text-[13px] text-blue-600 hover:text-blue-700 font-medium mt-0.5 truncate block"
-                          >
-                            {selectedSubmission.phone}
-                          </a>
-                        ) : (
-                          <p className="text-[13px] text-neutral-400 font-normal mt-0.5">—</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <Building2 className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Company</p>
-                        <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
-                          {selectedSubmission.company || "—"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <Globe className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Source</p>
-                        <span className="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-900 text-white tracking-wide">
-                          {selectedSubmission.source}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Message */}
-                  {selectedSubmission.message && (
-                    <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100">
-                      <div className="flex items-center gap-2 mb-2">
-                        <MessageSquare className="w-4 h-4 text-neutral-400" />
-                        <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Message</p>
-                      </div>
-                      <p className="text-[13px] text-neutral-700 font-normal leading-relaxed whitespace-pre-wrap">
-                        {selectedSubmission.message}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-100 bg-neutral-50/50">
-              {isEditing ? (
-                <>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleUpdate}
-                    disabled={isSaving}
-                    className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 disabled:opacity-50 transition-colors"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              </div>
+            )
+          ) : null
+        }
+      >
+        {selectedSubmission && (
+          <div className="px-5 py-4 space-y-4">
+            {isEditing ? (
+              /* ── Edit Mode ── */
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FieldInput
+                    label="First Name"
+                    value={editForm.firstName}
+                    onChange={(v) => setEditForm({ ...editForm, firstName: v })}
+                  />
+                  <FieldInput
+                    label="Last Name"
+                    value={editForm.lastName}
+                    onChange={(v) => setEditForm({ ...editForm, lastName: v })}
+                  />
+                </div>
+                <FieldInput
+                  type="email"
+                  label="Email"
+                  value={editForm.email}
+                  onChange={(v) => setEditForm({ ...editForm, email: v })}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FieldInput
+                    type="tel"
+                    label="Phone"
+                    value={editForm.phone}
+                    onChange={(v) => setEditForm({ ...editForm, phone: v })}
+                  />
+                  <FieldInput
+                    label="Company"
+                    value={editForm.company}
+                    onChange={(v) => setEditForm({ ...editForm, company: v })}
+                  />
+                </div>
+                <FieldInput
+                  label="Source"
+                  value={editForm.source}
+                  onChange={(v) => setEditForm({ ...editForm, source: v })}
+                />
+                <div>
+                  <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">
+                    Message
+                  </label>
+                  <textarea
+                    value={editForm.message || ""}
+                    onChange={(e) => setEditForm({ ...editForm, message: e.target.value })}
+                    rows={4}
+                    className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-sm focus:outline-none focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900 text-[13px] text-neutral-800 resize-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              /* ── View Mode ── */
+              <>
+                <dl className="divide-y divide-neutral-100 text-[13px]">
+                  <DetailRow icon={User} label="Name">
+                    {`${selectedSubmission.firstName ?? ""} ${selectedSubmission.lastName ?? ""}`.trim() || "—"}
+                  </DetailRow>
+                  <DetailRow icon={Mail} label="Email">
+                    <a
+                      href={`mailto:${selectedSubmission.email}`}
+                      className="text-neutral-900 hover:underline"
+                    >
+                      {selectedSubmission.email}
+                    </a>
+                  </DetailRow>
+                  <DetailRow icon={Phone} label="Phone">
+                    {selectedSubmission.phone ? (
+                      <a
+                        href={`tel:${selectedSubmission.phone}`}
+                        className="text-neutral-900 hover:underline"
+                      >
+                        {selectedSubmission.phone}
+                      </a>
                     ) : (
-                      <Save className="w-3.5 h-3.5" />
+                      "—"
                     )}
-                    Save Changes
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      handleDelete(selectedSubmission.id, selectedSubmission.email)
-                      setSelectedSubmission(null)
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={startEditing}
-                      className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setSelectedSubmission(null)}
-                      className="px-4 py-2 text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
-                    >
-                      Close
-                    </button>
+                  </DetailRow>
+                  <DetailRow icon={Building2} label="Company">
+                    {selectedSubmission.company || "—"}
+                  </DetailRow>
+                  <DetailRow icon={Globe} label="Source">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-neutral-100 text-neutral-700">
+                      {selectedSubmission.source}
+                    </span>
+                  </DetailRow>
+                </dl>
+
+                {/* Message */}
+                {selectedSubmission.message && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                      <MessageSquare className="w-3 h-3" />
+                      Message
+                    </div>
+                    <p className="text-[13px] text-neutral-700 leading-relaxed whitespace-pre-wrap p-3 bg-neutral-50 rounded-sm">
+                      {selectedSubmission.message}
+                    </p>
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
 
       <BulkActionBar
         count={selected.size}
         onClear={clearSelected}
         actions={[
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "convert-crm", label: "Convert to CRM", icon: UserPlusIcon, run: runConvert },
+          { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
@@ -2536,13 +2457,20 @@ function EventRegistrationsTab({
                     </td>
                   </tr>
                 ) : (
-                  filteredRegistrations.map((reg) => (
+                  filteredRegistrations.map((reg) => {
+                    // Filter event-context tags worth surfacing inline. site:/event:
+                    // are redundant with the event pill; keep role:/intent:/quality:.
+                    const inlineTags = (reg.tags ?? []).filter((t) => {
+                      const ns = parseTag(t).namespace
+                      return ns === "role" || ns === "intent" || ns === "quality"
+                    })
+                    return (
                     <tr
                       key={reg.id}
-                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                      className="group hover:bg-neutral-50 transition-colors cursor-pointer"
                       onClick={() => setSelectedRegistration(reg)}
                     >
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-2.5">
                         <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
@@ -2559,21 +2487,24 @@ function EventRegistrationsTab({
                           <MailchimpSubscribedPill email={reg.email} mapping={subscriberMap} />
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-2.5">
                         <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {reg.email}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                      <td className="px-5 py-2.5 hidden lg:table-cell">
                         <span className="text-neutral-500 text-[13px] font-normal leading-snug">
                           {reg.company || "—"}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
+                      <td className="px-5 py-2.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-medium bg-neutral-100 text-neutral-700 tracking-wide whitespace-nowrap">
                             {reg.eventName}
                           </span>
+                          {inlineTags.length > 0 && (
+                            <TagList tags={inlineTags} max={3} />
+                          )}
                           {reg.id && (
                             <StateBadge
                               source={SUBMISSION_SOURCE}
@@ -2584,24 +2515,24 @@ function EventRegistrationsTab({
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
+                      <td className="px-5 py-2.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap tabular-nums">
                         {formatDate(reg.registeredAt)}
                       </td>
-                      <td className="px-5 py-3.5 text-center hidden lg:table-cell">
+                      <td className="px-5 py-2.5 text-center hidden lg:table-cell">
                         {reg.subscribeToFeed ? (
                           <Check className="w-4 h-4 text-green-500 mx-auto" />
                         ) : (
                           <span className="text-neutral-300">—</span>
                         )}
                       </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="px-5 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
                               setSelectedRegistration(reg)
                             }}
-                            className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                            className="p-1.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-sm transition-colors"
                             title="View details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -2612,7 +2543,7 @@ function EventRegistrationsTab({
                               handleDelete(reg.id!, reg.email)
                             }}
                             disabled={isDeleting === reg.id}
-                            className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-sm transition-colors disabled:opacity-50"
                             title={`Delete ${reg.email}`}
                           >
                             {isDeleting === reg.id ? (
@@ -2624,7 +2555,8 @@ function EventRegistrationsTab({
                         </div>
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -2659,174 +2591,127 @@ function EventRegistrationsTab({
       )}
 
       {/* Registration Detail Modal */}
-      {selectedRegistration && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedRegistration(null)}
-        >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" />
-
-          <div
-            className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center text-sm font-bold">
-                  {(selectedRegistration.firstName?.[0] || "").toUpperCase()}
-                  {(selectedRegistration.lastName?.[0] || "").toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-semibold text-neutral-900 leading-tight">
-                    {selectedRegistration.fullName || `${selectedRegistration.firstName} ${selectedRegistration.lastName}`.trim()}
-                  </h3>
-                  <span className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-medium text-neutral-400">
-                    <Clock className="w-3 h-3" />
-                    Registered {formatDate(selectedRegistration.registeredAt)}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedRegistration(null)}
-                className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                  <User className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Name</p>
-                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
-                      {selectedRegistration.fullName || `${selectedRegistration.firstName} ${selectedRegistration.lastName}`.trim() || "—"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                  <Mail className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Email</p>
-                    <a
-                      href={`mailto:${selectedRegistration.email}`}
-                      className="text-[13px] text-blue-600 hover:text-blue-700 font-medium mt-0.5 truncate block"
-                    >
-                      {selectedRegistration.email}
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                  <Building2 className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Company</p>
-                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5 truncate">
-                      {selectedRegistration.company || "—"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                  <Globe className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Source</p>
-                    <span className="inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-900 text-white tracking-wide">
-                      {selectedRegistration.source}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Event Info */}
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <Ticket className="w-4 h-4 text-neutral-400" />
-                  <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Event Details</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Event</p>
-                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5">{selectedRegistration.eventName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Event Date</p>
-                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5">{formatDate(selectedRegistration.eventDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Subscribed to Feed</p>
-                    <p className="text-[13px] text-neutral-800 font-medium mt-0.5">
-                      {selectedRegistration.subscribeToFeed ? (
-                        <span className="inline-flex items-center gap-1 text-green-600">
-                          <Check className="w-3.5 h-3.5" /> Yes
-                        </span>
-                      ) : "No"}
-                    </p>
-                  </div>
-                  {selectedRegistration.tags?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Tags</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedRegistration.tags.map((tag) => (
-                          <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-200 text-neutral-600">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Page URL */}
-              {selectedRegistration.pageUrl && (
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-                  <MapPin className="w-4 h-4 text-neutral-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Registered From</p>
-                    <a
-                      href={selectedRegistration.pageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12px] text-blue-600 hover:text-blue-700 font-normal mt-0.5 truncate block"
-                    >
-                      {selectedRegistration.pageUrl.replace(/https?:\/\//, "").split("?")[0]}
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-neutral-100 bg-neutral-50/50">
+      <DetailDrawer
+        open={!!selectedRegistration}
+        onClose={() => setSelectedRegistration(null)}
+        title={
+          selectedRegistration
+            ? selectedRegistration.fullName ||
+              `${selectedRegistration.firstName} ${selectedRegistration.lastName}`.trim() ||
+              selectedRegistration.email
+            : ""
+        }
+        subtitle={
+          selectedRegistration ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              Registered {formatDate(selectedRegistration.registeredAt)}
+            </span>
+          ) : null
+        }
+        footer={
+          selectedRegistration ? (
+            <div className="flex items-center justify-between">
               <button
                 onClick={() => {
                   handleDelete(selectedRegistration.id!, selectedRegistration.email)
                   setSelectedRegistration(null)
                 }}
-                className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-rose-600 hover:bg-rose-50 rounded-sm transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete
               </button>
               <button
                 onClick={() => setSelectedRegistration(null)}
-                className="px-4 py-2 text-[13px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
+                className="px-3 py-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded-sm transition-colors"
               >
                 Close
               </button>
             </div>
+          ) : null
+        }
+      >
+        {selectedRegistration && (
+          <div className="px-5 py-4 space-y-4">
+            {/* Identity rows — flat, Linear-style */}
+            <dl className="divide-y divide-neutral-100 text-[13px]">
+              <DetailRow icon={User} label="Name">
+                {selectedRegistration.fullName ||
+                  `${selectedRegistration.firstName} ${selectedRegistration.lastName}`.trim() ||
+                  "—"}
+              </DetailRow>
+              <DetailRow icon={Mail} label="Email">
+                <a
+                  href={`mailto:${selectedRegistration.email}`}
+                  className="text-neutral-900 hover:underline"
+                >
+                  {selectedRegistration.email}
+                </a>
+              </DetailRow>
+              <DetailRow icon={Building2} label="Company">
+                {selectedRegistration.company || "—"}
+              </DetailRow>
+              <DetailRow icon={Globe} label="Source">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-neutral-100 text-neutral-700">
+                  {selectedRegistration.source}
+                </span>
+              </DetailRow>
+            </dl>
+
+            {/* Event block */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-2 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                <Ticket className="w-3 h-3" />
+                Event
+              </div>
+              <dl className="divide-y divide-neutral-100 text-[13px]">
+                <DetailRow label="Name">{selectedRegistration.eventName}</DetailRow>
+                <DetailRow label="Date">{formatDate(selectedRegistration.eventDate)}</DetailRow>
+                <DetailRow label="Feed">
+                  {selectedRegistration.subscribeToFeed ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-700">
+                      <Check className="w-3 h-3" /> Subscribed
+                    </span>
+                  ) : (
+                    <span className="text-neutral-400">No</span>
+                  )}
+                </DetailRow>
+                {selectedRegistration.tags?.length > 0 && (
+                  <DetailRow label="Tags">
+                    <TagList tags={selectedRegistration.tags} />
+                  </DetailRow>
+                )}
+              </dl>
+            </div>
+
+            {/* Page URL */}
+            {selectedRegistration.pageUrl && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                  <MapPin className="w-3 h-3" />
+                  Registered From
+                </div>
+                <a
+                  href={selectedRegistration.pageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12px] text-neutral-700 hover:text-neutral-900 hover:underline truncate block"
+                >
+                  {selectedRegistration.pageUrl.replace(/https?:\/\//, "").split("?")[0]}
+                </a>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </DetailDrawer>
 
       <BulkActionBar
         count={selected.size}
         onClear={clearSelected}
         actions={[
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "convert-crm", label: "Convert to CRM", icon: UserPlusIcon, run: runConvert },
+          { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
@@ -2843,6 +2728,7 @@ function EventRegistrationsTab({
             email: r.email,
             firstName: r.firstName || undefined,
             lastName: r.lastName || undefined,
+            sourceTags: r.tags && r.tags.length > 0 ? r.tags : undefined,
           }))}
         defaultTag={selectedEvent ? `event-${selectedEvent.toLowerCase().replace(/\s+/g, "-")}` : undefined}
         onComplete={(result) => {
@@ -2852,6 +2738,51 @@ function EventRegistrationsTab({
           })
           if (result.errors.length === 0) clearSelected()
         }}
+      />
+    </div>
+  )
+}
+
+// =====================================================================
+// Detail drawer helpers — Linear-style flat field rows + slim inputs.
+// =====================================================================
+
+interface DetailRowProps {
+  label: string
+  icon?: React.ComponentType<{ className?: string }>
+  children: React.ReactNode
+}
+
+function DetailRow({ label, icon: Icon, children }: DetailRowProps) {
+  return (
+    <div className="flex items-start gap-3 py-2">
+      <div className="w-24 shrink-0 flex items-center gap-1.5 text-[11px] font-medium text-neutral-500">
+        {Icon && <Icon className="w-3 h-3 text-neutral-400" />}
+        {label}
+      </div>
+      <div className="min-w-0 flex-1 text-neutral-800">{children}</div>
+    </div>
+  )
+}
+
+interface FieldInputProps {
+  label: string
+  value: string | undefined
+  onChange: (value: string) => void
+  type?: string
+}
+
+function FieldInput({ label, value, onChange, type = "text" }: FieldInputProps) {
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-sm focus:outline-none focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900 text-[13px] text-neutral-800"
       />
     </div>
   )

@@ -16,9 +16,10 @@ import {
   ArrowRight,
   Trash2,
   Loader2,
-  X,
 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { Tag } from "@/components/admin/Tag"
+import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource } from "@/types/crm-types"
 
 interface LeadDetailDrawerProps {
@@ -35,13 +36,13 @@ interface LeadDetailDrawerProps {
   onConvertToClient?: (id: string) => Promise<void> | void
 }
 
-const STATUS_OPTIONS: { value: LeadStatus; label: string; color: string }[] = [
-  { value: "new", label: "New", color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { value: "ready", label: "Ready", color: "bg-sky-100 text-sky-700 border-sky-200" },
-  { value: "contacted", label: "Contacted", color: "bg-amber-100 text-amber-700 border-amber-200" },
-  { value: "engaged", label: "Engaged", color: "bg-green-100 text-green-700 border-green-200" },
-  { value: "converted", label: "Converted", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  { value: "archived", label: "Archived", color: "bg-neutral-100 text-neutral-500 border-neutral-200" },
+const STATUS_OPTIONS: { value: LeadStatus; label: string; dot: string }[] = [
+  { value: "new", label: "New", dot: "bg-blue-500" },
+  { value: "ready", label: "Ready", dot: "bg-sky-500" },
+  { value: "contacted", label: "Contacted", dot: "bg-amber-500" },
+  { value: "engaged", label: "Engaged", dot: "bg-green-500" },
+  { value: "converted", label: "Converted", dot: "bg-emerald-500" },
+  { value: "archived", label: "Archived", dot: "bg-neutral-400" },
 ]
 
 const SOURCE_OPTIONS: LeadSource[] = ["event", "web", "manual", "newsletter", "referral"]
@@ -201,13 +202,17 @@ export function LeadDetailDrawer({
     setForm((f) => ({ ...f, [key]: value }))
 
   const addTag = () => {
-    const t = tagInput.trim()
-    if (!t) return
-    if (form.tags.includes(t)) {
+    const raw = tagInput.trim()
+    if (!raw) return
+    // Auto-namespace if the user just typed a value without a prefix.
+    // "sponsor" → "intent:sponsor"; un-mapped values fall back to a neutral
+    // chip so the user can still capture ad-hoc data.
+    const next = parseTag(raw).namespace ? raw : makeTag("intent", raw)
+    if (form.tags.includes(next)) {
       setTagInput("")
       return
     }
-    update("tags", [...form.tags, t])
+    update("tags", [...form.tags, next])
     setTagInput("")
   }
 
@@ -422,24 +427,13 @@ export function LeadDetailDrawer({
             options={[{ value: "", label: "(none)" }, ...PLATFORM_OPTIONS.map((p) => ({ value: p, label: p }))]}
           />
           <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1.5">Tags</label>
-            <div className="flex flex-wrap items-center gap-1.5 p-2 border border-neutral-200 rounded-md bg-white min-h-[38px]">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-neutral-600 mb-1.5">
+              <TagIcon className="w-3 h-3 text-neutral-400" />
+              Tags
+            </label>
+            <div className="flex flex-wrap items-center gap-1 p-2 border border-neutral-200 rounded-md bg-white min-h-[38px]">
               {form.tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-100 text-[11px] text-neutral-700"
-                >
-                  <TagIcon className="w-3 h-3 text-neutral-400" />
-                  {t}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="ml-0.5 text-neutral-400 hover:text-neutral-700"
-                    aria-label={`Remove ${t}`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
+                <Tag key={t} raw={t} onRemove={() => removeTag(t)} />
               ))}
               <input
                 value={tagInput}
@@ -451,8 +445,8 @@ export function LeadDetailDrawer({
                   }
                 }}
                 onBlur={addTag}
-                placeholder={form.tags.length === 0 ? "Add tag…" : ""}
-                className="flex-1 min-w-[80px] text-[12px] bg-transparent focus:outline-none"
+                placeholder={form.tags.length === 0 ? "intent:sponsor, role:speaker, …" : ""}
+                className="flex-1 min-w-[120px] text-[12px] bg-transparent focus:outline-none"
               />
             </div>
           </div>
@@ -468,12 +462,13 @@ export function LeadDetailDrawer({
                   key={s.value}
                   type="button"
                   onClick={() => update("status", s.value)}
-                  className={`px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-[12px] font-medium transition-colors ${
                     form.status === s.value
-                      ? s.color
-                      : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
+                      ? "bg-neutral-900 text-white"
+                      : "text-neutral-600 hover:bg-neutral-100"
                   }`}
                 >
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
                   {s.label}
                 </button>
               ))}

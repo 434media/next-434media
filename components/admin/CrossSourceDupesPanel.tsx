@@ -204,7 +204,7 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
                 {stats.duplicateEmails > 0 ? (
                   <>
                     {" "}
-                    · {stats.crmCovered} already in CRM
+                    · {stats.crmCovered} already in Leads
                   </>
                 ) : null}
               </>
@@ -331,7 +331,7 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
                             ) : (
                               <UserPlus className="w-3 h-3" />
                             )}
-                            Merge into CRM
+                            Merge into Leads
                           </button>
                         )}
                       </div>

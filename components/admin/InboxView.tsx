@@ -74,22 +74,22 @@ type SourceFilter = "all" | SubmissionSource
 
 const SOURCE_META: Record<
   SubmissionSource,
-  { label: string; icon: typeof Mail; pill: string }
+  { label: string; icon: typeof Mail; dot: string }
 > = {
   email_signups: {
     label: "Newsletter",
     icon: Mail,
-    pill: "bg-blue-50 text-blue-700 border-blue-100",
+    dot: "bg-blue-500",
   },
   contact_forms: {
     label: "Form",
     icon: MessageSquare,
-    pill: "bg-violet-50 text-violet-700 border-violet-100",
+    dot: "bg-violet-500",
   },
   event_registrations: {
     label: "Event",
     icon: Ticket,
-    pill: "bg-amber-50 text-amber-700 border-amber-100",
+    dot: "bg-amber-500",
   },
 }
 
@@ -347,8 +347,8 @@ export function InboxView({ setToast, initialSearch = "" }: InboxViewProps) {
         </div>
         <div className="flex items-center gap-2">
           {stats && (
-            <span className="text-[11px] text-neutral-400">
-              {stats.total.toLocaleString()} total · {stats.inCrm} in CRM
+            <span className="text-[11px] text-neutral-400 tabular-nums">
+              {stats.total.toLocaleString()} total · {stats.inCrm} in Leads
               {mcAvailable ? ` · ${stats.inMailchimp} in MC` : ""}
             </span>
           )}
@@ -474,7 +474,7 @@ export function InboxView({ setToast, initialSearch = "" }: InboxViewProps) {
           },
           {
             key: "convert-crm",
-            label: "Convert to CRM",
+            label: "Convert to Leads",
             icon: UserPlusIcon,
             run: runConvert,
           },
@@ -610,11 +610,10 @@ function InboxRowItem({
           className="mt-1 w-3.5 h-3.5 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 focus:ring-offset-0 cursor-pointer"
         />
 
-        {/* Source chip */}
-        <span
-          className={`mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-semibold shrink-0 ${sourceMeta.pill}`}
-        >
-          <SourceIcon className="w-2.5 h-2.5" />
+        {/* Source chip — Linear-style dot + neutral label */}
+        <span className="mt-0.5 inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-neutral-700 bg-neutral-100 shrink-0">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sourceMeta.dot}`} aria-hidden="true" />
+          <SourceIcon className="w-2.5 h-2.5 text-neutral-400" />
           {sourceMeta.label}
         </span>
 
@@ -638,19 +637,20 @@ function InboxRowItem({
               <Link
                 href={`/admin/leads?openLead=${encodeURIComponent(row.crmLeadId)}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 shrink-0"
-                title="Open lead in CRM"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 shrink-0"
+                title="Open in Leads"
               >
-                CRM
-                <ArrowUpRight className="w-2.5 h-2.5" />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" aria-hidden="true" />
+                Lead
+                <ArrowUpRight className="w-2.5 h-2.5 text-neutral-400" />
               </Link>
             )}
             {mcAvailable && row.mailchimpSubscribed && (
               <span
                 title="Subscribed in Mailchimp"
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-neutral-700 bg-neutral-100 shrink-0"
               >
-                <Mail className="w-2.5 h-2.5" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
                 MC
               </span>
             )}

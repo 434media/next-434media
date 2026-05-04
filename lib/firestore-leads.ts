@@ -2,6 +2,7 @@ import { Timestamp, FieldValue } from "firebase-admin/firestore"
 import { getDb } from "./firebase-admin"
 import { scoreLead } from "./score-lead"
 import { trackLeadCapture, trackLeadQualified } from "./ga4-events"
+import { makeTag, normalizeLegacyTags } from "./tag-taxonomy"
 import {
   CRM_COLLECTIONS,
   type Lead,
@@ -287,10 +288,12 @@ export async function captureLeadFromContactForm(
   try {
     const email = input.email.trim().toLowerCase()
     const existing = await findLeadByEmail(email)
-    const sourceTag = `form:${input.source.toLowerCase()}`
+    const captureTags = ["source:form", makeTag("site", input.source)]
 
     if (existing) {
-      const tags = Array.from(new Set([...(existing.tags ?? []), sourceTag]))
+      const tags = Array.from(
+        new Set([...normalizeLegacyTags(existing.tags), ...captureTags]),
+      )
       await updateLead(existing.id, {
         tags,
         // Append the new message to notes if there's a meaningful body
@@ -311,7 +314,7 @@ export async function captureLeadFromContactForm(
       phone: input.phone || undefined,
       source: "web",
       platform: inferPlatform(input.source),
-      tags: [sourceTag],
+      tags: captureTags,
       notes: input.message?.trim() || undefined,
     })
     return { leadId: lead.id, created: true }
@@ -342,12 +345,12 @@ export async function captureLeadFromEmailSignup(
   try {
     const email = input.email.trim().toLowerCase()
     const existing = await findLeadByEmail(email)
-    const sourceTag = `newsletter:${input.source.toLowerCase()}`
-    const incomingTags = (input.tags ?? []).map((t) => t.toLowerCase())
+    const captureTags = ["source:newsletter", makeTag("site", input.source)]
+    const incomingTags = normalizeLegacyTags(input.tags)
 
     if (existing) {
       const tags = Array.from(
-        new Set([...(existing.tags ?? []), sourceTag, ...incomingTags]),
+        new Set([...normalizeLegacyTags(existing.tags), ...captureTags, ...incomingTags]),
       )
       await updateLead(existing.id, { tags })
       return { leadId: existing.id, created: false }
@@ -359,7 +362,7 @@ export async function captureLeadFromEmailSignup(
       email,
       source: "newsletter",
       platform: inferPlatform(input.source),
-      tags: [sourceTag, ...incomingTags],
+      tags: [...captureTags, ...incomingTags],
     })
     return { leadId: lead.id, created: true }
   } catch (err) {
@@ -393,11 +396,13 @@ export async function captureLeadFromEventRegistration(
   try {
     const email = input.email.trim().toLowerCase()
     const existing = await findLeadByEmail(email)
-    const eventTag = `event:${input.eventSlug.toLowerCase()}`
+    const captureTags = ["source:event", makeTag("event", input.eventSlug)]
     const noteLine = `[${(input.eventDate || new Date().toISOString()).split("T")[0]}] Registered for ${input.eventName}`
 
     if (existing) {
-      const tags = Array.from(new Set([...(existing.tags ?? []), eventTag]))
+      const tags = Array.from(
+        new Set([...normalizeLegacyTags(existing.tags), ...captureTags]),
+      )
       await updateLead(existing.id, {
         tags,
         notes: [existing.notes, noteLine].filter(Boolean).join("\n\n"),
@@ -411,7 +416,7 @@ export async function captureLeadFromEventRegistration(
       email,
       source: "event",
       platform: inferPlatform(input.eventSlug),
-      tags: [eventTag],
+      tags: captureTags,
       notes: noteLine,
     })
     return { leadId: lead.id, created: true }

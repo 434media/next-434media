@@ -186,7 +186,7 @@ export function EventInsights({ selectedEvent, onSelect, totalRegistrationsFallb
           <code className="px-1 py-0.5 bg-neutral-100 rounded text-[10px]">
             event-{selectedEvent.toLowerCase().replace(/\s+/g, "-")}
           </code>{" "}
-          tag, or convert them all into CRM leads.
+          tag, or convert them all into Leads.
         </p>
       </div>
     )

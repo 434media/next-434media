@@ -1,4 +1,5 @@
 import type { Lead, LeadPriority, LeadScoreBreakdown } from "@/types/crm-types"
+import { isSponsorTagged } from "./tag-taxonomy"
 
 /**
  * Inline lead scoring (0–100). Runs on every write; no Cloud Function needed.
@@ -91,8 +92,9 @@ export function scoreLead(input: ScoreInput): ScoreResult {
     breakdown.engagement = 10
   }
 
-  // Sponsor/brand tag (+5) — manually flagged as a sponsorship target
-  if (input.tags?.includes("sponsor") || input.tags?.includes("brand")) {
+  // Sponsor intent (+5) — flagged as a sponsorship target. Reads
+  // `intent:sponsor` plus legacy aliases via the taxonomy helper.
+  if (isSponsorTagged(input.tags)) {
     score += 5
     breakdown.sponsor = 5
   }

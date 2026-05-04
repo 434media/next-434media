@@ -2,38 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, Check, ChevronDown, X, Inbox, Eye, MessageSquare, Archive, Ban } from "lucide-react"
+import type { DotColor } from "./StatusDot"
 
 export type SubmissionSource = "email_signups" | "contact_forms" | "event_registrations"
 export type SubmissionState = "new" | "triaged" | "replied" | "archived" | "spam"
 
 const ALL_STATES: SubmissionState[] = ["new", "triaged", "replied", "archived", "spam"]
 
-const STATE_META: Record<SubmissionState, { label: string; pill: string; icon: React.ComponentType<{ className?: string }> }> = {
-  new: {
-    label: "New",
-    pill: "bg-blue-50 text-blue-700 border-blue-100",
-    icon: Inbox,
-  },
-  triaged: {
-    label: "Triaged",
-    pill: "bg-amber-50 text-amber-700 border-amber-100",
-    icon: Eye,
-  },
-  replied: {
-    label: "Replied",
-    pill: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    icon: MessageSquare,
-  },
-  archived: {
-    label: "Archived",
-    pill: "bg-neutral-100 text-neutral-500 border-neutral-200",
-    icon: Archive,
-  },
-  spam: {
-    label: "Spam",
-    pill: "bg-rose-50 text-rose-700 border-rose-100",
-    icon: Ban,
-  },
+const STATE_META: Record<SubmissionState, { label: string; dot: DotColor; icon: React.ComponentType<{ className?: string }> }> = {
+  new: { label: "New", dot: "blue", icon: Inbox },
+  triaged: { label: "Triaged", dot: "amber", icon: Eye },
+  replied: { label: "Replied", dot: "emerald", icon: MessageSquare },
+  archived: { label: "Archived", dot: "neutral", icon: Archive },
+  spam: { label: "Spam", dot: "rose", icon: Ban },
+}
+
+const DOT_BG: Record<DotColor, string> = {
+  blue: "bg-blue-500",
+  sky: "bg-sky-500",
+  amber: "bg-amber-500",
+  emerald: "bg-emerald-500",
+  green: "bg-green-500",
+  rose: "bg-rose-500",
+  violet: "bg-violet-500",
+  indigo: "bg-indigo-500",
+  neutral: "bg-neutral-400",
 }
 
 // =====================================================================
@@ -121,7 +114,6 @@ export function StateBadge({ source, id, state, onChange }: StateBadgeProps) {
   const [open, setOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const meta = STATE_META[state]
-  const Icon = meta.icon
 
   const handlePick = async (next: SubmissionState) => {
     if (next === state) {
@@ -153,16 +145,16 @@ export function StateBadge({ source, id, state, onChange }: StateBadgeProps) {
           setOpen((o) => !o)
         }}
         disabled={isSaving}
-        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-semibold ${meta.pill} hover:brightness-95`}
+        className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm text-[11px] font-medium text-neutral-700 hover:bg-neutral-100"
         title="Change state"
       >
         {isSaving ? (
-          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+          <Loader2 className="w-2.5 h-2.5 animate-spin text-neutral-400" />
         ) : (
-          <Icon className="w-2.5 h-2.5" />
+          <span className={`w-1.5 h-1.5 rounded-full ${DOT_BG[meta.dot]}`} aria-hidden="true" />
         )}
         {meta.label}
-        <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+        <ChevronDown className="w-2.5 h-2.5 text-neutral-400" />
       </button>
       {open && (
         <>
@@ -208,7 +200,7 @@ interface StateFilterChipsProps {
 }
 
 export function StateFilterChips({ active, onChange, counts }: StateFilterChipsProps) {
-  const chips: Array<{ key: "all" | SubmissionState; label: string; pill?: string }> = [
+  const chips: Array<{ key: "all" | SubmissionState; label: string }> = [
     { key: "all", label: "All" },
     { key: "new", label: "New" },
     { key: "triaged", label: "Triaged" },
@@ -217,26 +209,30 @@ export function StateFilterChips({ active, onChange, counts }: StateFilterChipsP
     { key: "spam", label: "Spam" },
   ]
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1">
       {chips.map((chip) => {
         const isActive = active === chip.key
         const count = counts?.[chip.key]
+        const meta = chip.key === "all" ? null : STATE_META[chip.key]
         return (
           <button
             key={chip.key}
             type="button"
             onClick={() => onChange(chip.key)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-[12px] font-medium transition-colors ${
               isActive
-                ? "bg-neutral-900 text-white border-neutral-900"
-                : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-100"
             }`}
           >
+            {meta && (
+              <span className={`w-1.5 h-1.5 rounded-full ${DOT_BG[meta.dot]}`} aria-hidden="true" />
+            )}
             {chip.label}
             {typeof count === "number" && (
               <span
-                className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-semibold rounded-full ${
-                  isActive ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-500"
+                className={`text-[11px] tabular-nums ${
+                  isActive ? "text-neutral-300" : "text-neutral-400"
                 }`}
               >
                 {count}

@@ -35,13 +35,13 @@ const PRIORITY_BADGE: Record<LeadPriority, string> = {
   low: "bg-neutral-200 text-neutral-700",
 }
 
-const STATUS_PILL: Record<LeadStatus, string> = {
-  new: "bg-blue-50 text-blue-700 border-blue-100",
-  ready: "bg-sky-50 text-sky-700 border-sky-100",
-  contacted: "bg-amber-50 text-amber-700 border-amber-100",
-  engaged: "bg-green-50 text-green-700 border-green-100",
-  converted: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  archived: "bg-neutral-50 text-neutral-500 border-neutral-100",
+const STATUS_DOT: Record<LeadStatus, string> = {
+  new: "bg-blue-500",
+  ready: "bg-sky-500",
+  contacted: "bg-amber-500",
+  engaged: "bg-green-500",
+  converted: "bg-emerald-500",
+  archived: "bg-neutral-400",
 }
 
 function formatRelative(iso?: string): string {
@@ -290,7 +290,7 @@ function ViewChip({
 
 function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   const priorityClass = PRIORITY_BADGE[lead.priority] || PRIORITY_BADGE.low
-  const statusClass = STATUS_PILL[lead.status] || STATUS_PILL.new
+  const statusDot = STATUS_DOT[lead.status] || STATUS_DOT.new
   const today = todayIso()
   const followupOverdue =
     lead.next_followup_date && lead.next_followup_date.split("T")[0] < today
@@ -298,12 +298,12 @@ function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left grid grid-cols-1 md:grid-cols-[80px_1fr_140px_140px_120px_80px] gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors items-center"
+      className="group w-full text-left grid grid-cols-1 md:grid-cols-[60px_1fr_140px_140px_120px_80px] gap-3 px-4 py-2 hover:bg-neutral-50 transition-colors items-center"
     >
       {/* Score */}
       <div className="flex items-center gap-1.5">
         <span
-          className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-[13px] font-bold tabular-nums ${priorityClass}`}
+          className={`inline-flex items-center justify-center w-7 h-7 rounded-sm text-[12px] font-semibold tabular-nums ${priorityClass}`}
         >
           {lead.score}
         </span>
@@ -330,9 +330,10 @@ function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
         </div>
       </div>
 
-      {/* Status pill */}
+      {/* Status — Linear-style dot + neutral label */}
       <div>
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${statusClass}`}>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-neutral-700 capitalize">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDot}`} aria-hidden="true" />
           {lead.status}
         </span>
       </div>

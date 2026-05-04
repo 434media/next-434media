@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Mail } from "lucide-react"
 
 interface AudienceMembership {
   audienceId: string
@@ -86,10 +85,12 @@ export function MailchimpSubscribedPill({ email, mapping }: MailchimpSubscribedP
   return (
     <span
       title={tooltipLines.join("\n")}
-      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 ml-1.5 rounded-full text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100"
+      className="inline-flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-neutral-700 bg-neutral-100"
     >
-      <Mail className="w-2.5 h-2.5" />
-      {audienceLabel}
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+      MC
+      <span className="text-neutral-400">·</span>
+      <span className="truncate max-w-[10ch]">{audienceLabel}</span>
     </span>
   )
 }

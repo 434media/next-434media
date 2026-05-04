@@ -85,14 +85,16 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
 
   // Normalize tech-fuel detection. The events array can contain any of
   // "tech-fuel", "Tech Fuel", "techfuel", "tech_fuel", "TechFuel" etc. depending
-  // on how the registration form serialized it. Surface a canonical "tech-fuel"
-  // tag so the admin can filter on it consistently.
+  // on how the registration form serialized it. Surface a canonical
+  // `role:tech-fuel-attendee` tag so the admin can filter on it consistently.
   const events = Array.isArray(data.events) ? (data.events as string[]) : []
   const hasTechFuel = events.some(
     (e) => typeof e === "string" && e.toLowerCase().replace(/[\s_]/g, "-") === "tech-fuel",
   )
-  const tags = ["sa-tech-day", ...events]
-  if (hasTechFuel && !tags.includes("tech-fuel")) tags.push("tech-fuel")
+  const tags = ["site:techday", "event:sa-tech-day-2026", ...events]
+  if (hasTechFuel && !tags.includes("role:tech-fuel-attendee")) {
+    tags.push("role:tech-fuel-attendee")
+  }
 
   return {
     id: `techday:${doc.id}`,
