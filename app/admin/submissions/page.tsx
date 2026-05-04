@@ -32,7 +32,6 @@ import {
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
 import { MailchimpSubscribedPill, useMailchimpSubscribers } from "@/components/admin/MailchimpSubscribedPill"
-import { MailchimpTagsReference } from "@/components/admin/MailchimpTagsReference"
 import { CrossSourceDupesPanel } from "@/components/admin/CrossSourceDupesPanel"
 import { EventInsights } from "@/components/admin/EventInsights"
 import { InboxView } from "@/components/admin/InboxView"
@@ -255,15 +254,9 @@ export default function EmailListsPage() {
 
         {/* Tab Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          {/* Mailchimp tags reference — moved here from analytics-mailchimp
-              because tags are operational segmentation data (used to decide
-              who to push to which audience), not analytical data. Stays
-              collapsed by default; click to expand. */}
-          <MailchimpTagsReference />
-
           {/* Cross-source dedupe panel — surfaces emails appearing in 2+
               submission collections so the admin can merge them into a single
-              CRM lead in one click. Hidden when there are no dupes. */}
+              Lead in one click. Hidden when there are no dupes. */}
           <CrossSourceDupesPanel
             onToast={(message, type) => setToast({ message, type })}
           />

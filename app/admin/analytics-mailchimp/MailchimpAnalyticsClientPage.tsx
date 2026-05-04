@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { MailchimpHeader } from "@/components/mailchimp/MailchimpHeader"
 import { MailchimpMetricsOverview } from "@/components/mailchimp/MailchimpMetricsOverview"
 import { MailchimpTopCampaignsTable } from "@/components/mailchimp/MailchimpTopCampaignsTable"
-// MailchimpTagsOverview moved — see /admin/submissions (Submissions page).
+// MailchimpTagsOverview removed — superseded by the namespaced tag taxonomy
+// + the "From source data" suggestions in the push modal on /admin/submissions.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/analytics/Card"
 import { Badge } from "@/components/analytics/Badge"
 import { useToast } from "@/hooks/use-toast"
@@ -39,7 +40,7 @@ export default function MailchimpAnalyticsClientPage() {
     endDate: new Date().toISOString().split("T")[0], // today
   })
   const [selectedAudienceId, setSelectedAudienceId] = useState<string>("")
-  // Tag selection state removed — tags moved to /admin/submissions.
+  // Tag selection state removed — tag operations live in the push modal on /admin/submissions.
   const [configStatus, setConfigStatus] = useState<any>(null)
   const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
   const [snapshotMeta, setSnapshotMeta] = useState<{ snapshotDate: string; generatedAt: string } | null>(null)
@@ -130,7 +131,7 @@ export default function MailchimpAnalyticsClientPage() {
   const fetchAllData = async () => {
     setIsLoading(true)
     try {
-      // Tags moved to /admin/submissions (operational segmentation, not analytics).
+      // Tags fetch removed — tag operations live in the push modal on /admin/submissions.
       const [summary, campaigns, subscribers, engagement, geographic, lists, allCampaigns, realtime] =
         await Promise.all([
           fetchData("summary"),
@@ -613,10 +614,6 @@ export default function MailchimpAnalyticsClientPage() {
             />
           )}
         </div>
-
-        {/* Audience Tags moved to /admin/submissions — they're operational segmentation
-            data (used to decide which audience/tag to push contacts to), not
-            analytical data. Find them above the Submissions tabs. */}
 
         {/* Recent Campaigns - Full Width */}
         <div>

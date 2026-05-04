@@ -157,8 +157,20 @@ async function makeMailchimpRequest<T>(endpoint: string, options?: { method?: st
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error(`[Mailchimp] API Error: ${response.status} - ${errorText}`)
-    throw new Error(`Mailchimp API Error: ${response.status} - ${response.statusText}`)
+    // 404 on /lists/{id} is the expected outcome when an env-configured
+    // audience has been deleted from Mailchimp. Demote to debug so stale
+    // env vars don't spam the error log; the caller can still detect
+    // the 404 via the attached `status` property on the thrown error.
+    if (response.status === 404) {
+      console.debug(`[Mailchimp] ${endpoint} returned 404 (audience may have been deleted)`)
+    } else {
+      console.error(`[Mailchimp] API Error: ${response.status} - ${errorText}`)
+    }
+    const err = new Error(
+      `Mailchimp API Error: ${response.status} - ${response.statusText}`,
+    ) as Error & { status: number }
+    err.status = response.status
+    throw err
   }
 
   const data = await response.json()
@@ -1008,10 +1020,16 @@ export async function getMailchimpSubscriberMap(): Promise<MailchimpSubscriberMa
 
       audiences.push({ id: audienceId, name: audienceName, count: counted })
     } catch (err) {
-      console.warn(
-        `[Mailchimp] subscriber-map: failed to load audience ${config.id}:`,
-        err instanceof Error ? err.message : err,
-      )
+      const status = (err as { status?: number }).status
+      // 404 means the env var points to a deleted audience — tolerate silently
+      // so a stale config doesn't spam the log on every page load. Real errors
+      // (auth, rate limit, network) still surface as warnings.
+      if (status !== 404) {
+        console.warn(
+          `[Mailchimp] subscriber-map: failed to load audience ${config.id}:`,
+          err instanceof Error ? err.message : err,
+        )
+      }
       // Skip the failing audience but keep going with the others — partial
       // map is better than no map.
     }
