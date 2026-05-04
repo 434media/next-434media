@@ -22,6 +22,7 @@ export type TagNamespace =
   | "quality"
   | "geo"
   | "industry"
+  | "client"
 
 export interface ParsedTag {
   namespace: TagNamespace | null
@@ -38,6 +39,7 @@ const KNOWN_NAMESPACES = new Set<TagNamespace>([
   "quality",
   "geo",
   "industry",
+  "client",
 ])
 
 export function parseTag(raw: string): ParsedTag {
@@ -146,6 +148,12 @@ export function getTagStyle(tag: ParsedTag): TagStyle {
     case "event":
     case "role":
       return { className: "bg-indigo-50 text-indigo-700", label: display }
+
+    // Client engagements get their own subtle color so a Tech Day registrant
+    // tagged `client:techbloc` reads as "this contact is part of our Techbloc
+    // scope of work" without competing with the indigo event/role tags.
+    case "client":
+      return { className: "bg-sky-50 text-sky-700", label: display }
 
     case "intent":
       switch (tag.value) {

@@ -1,4 +1,5 @@
 import { getDb, getNamedDb, getDigitalCanvasDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
+import { getSaTechDay2026RoleTags } from "./event-roles/sa-tech-day-2026"
 
 // Event Registration interface
 export interface EventRegistration {
@@ -91,9 +92,28 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
   const hasTechFuel = events.some(
     (e) => typeof e === "string" && e.toLowerCase().replace(/[\s_]/g, "-") === "tech-fuel",
   )
-  const tags = ["site:techday", "event:sa-tech-day-2026", ...events]
-  if (hasTechFuel && !tags.includes("role:tech-fuel-attendee")) {
+
+  // Base tags: source-DB hint, event identifier, client engagement, and the
+  // raw `events` array passthrough. `client:techbloc` reflects that Tech Day
+  // is delivered as a scope of work for the Techbloc client engagement.
+  const tags: string[] = [
+    "site:techday",
+    "event:sa-tech-day-2026",
+    "client:techbloc",
+    ...events,
+  ]
+
+  // Role tags. Tech Fuel attendance is auto-detected from the events array;
+  // tech-day-attendee is the default for everyone in the techday `event-
+  // registration` collection. Speakers / pitch companies / semi-final judges
+  // are joined in from the role overlay file (email match).
+  if (hasTechFuel) {
     tags.push("role:tech-fuel-attendee")
+  } else {
+    tags.push("role:tech-day-attendee")
+  }
+  for (const roleTag of getSaTechDay2026RoleTags(data.email)) {
+    if (!tags.includes(roleTag)) tags.push(roleTag)
   }
 
   return {
