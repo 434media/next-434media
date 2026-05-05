@@ -19,6 +19,12 @@ export interface EventRegistration {
   pageUrl: string
   checkedIn?: boolean
   checkedInAt?: string
+  // Provenance stamps. Set by `updateEventRegistration` whenever a field is
+  // backfilled from the admin drawer so we can answer "who last touched this
+  // row and when?" without a separate audit collection.
+  enrichedAt?: string
+  enrichedBy?: string
+  enrichmentSource?: "manual" | "csv" | "api"
   _dbSource?: string // Track which database this came from
 }
 
@@ -71,6 +77,9 @@ function mapDefaultDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     pageUrl: data.pageUrl || data.page_url || "",
     checkedIn: data.checkedIn || false,
     checkedInAt: toISOString(data.checkedInAt || ""),
+    enrichedAt: data.enrichedAt ? toISOString(data.enrichedAt) : undefined,
+    enrichedBy: data.enrichedBy || undefined,
+    enrichmentSource: data.enrichmentSource || undefined,
     _dbSource: "default",
   }
 }
@@ -332,15 +341,50 @@ export async function getEventRegistrationCounts(): Promise<Record<string, numbe
   }
 }
 
+// Fields that may be edited freely (operational state).
+type FreeEditField = "checkedIn" | "checkedInAt" | "tags" | "source"
+// Fields that may only be BACKFILLED — if the existing value is non-empty,
+// the write is rejected. Prevents the drawer from rewriting captured history
+// (e.g. overwriting the company a registrant typed at signup with a "cleaner"
+// version) while still letting admins fill in the blanks on sparse rows.
+type BackfillField = "firstName" | "lastName" | "fullName" | "company"
+
+export type UpdateEventRegistrationFields = Partial<
+  Pick<EventRegistration, FreeEditField | BackfillField>
+>
+
+const BACKFILL_FIELDS: BackfillField[] = ["firstName", "lastName", "fullName", "company"]
+
+function isBlank(v: unknown): boolean {
+  return v === null || v === undefined || (typeof v === "string" && v.trim() === "")
+}
+
 /**
- * Update fields on an event registration (e.g. check-in status)
- * Supports default, techday, and digitalcanvas databases
+ * Update fields on an event registration.
+ *
+ * Two write modes:
+ *  - Free edit: `checkedIn`, `checkedInAt`, `tags`, `source` (operational
+ *    state, no provenance penalty for changing).
+ *  - Backfill only: `firstName`, `lastName`, `fullName`, `company` — the
+ *    write is REJECTED if the existing field already has a value. This
+ *    enforces the "fill in blanks, never rewrite history" rule from the
+ *    data-capture spec.
+ *
+ * On any successful write the function stamps `enrichedAt`, `enrichedBy`,
+ * `enrichmentSource` on the row so we can answer "who last touched this and
+ * when" without an audit collection.
+ *
+ * Backfill validation only runs on the default DB (the only one that owns
+ * persisted rows post-Sprint-2 ingest). Techday/Digital Canvas paths skip
+ * the read-then-write because they're updated through their own forms.
  */
 export async function updateEventRegistration(
   id: string,
-  fields: Partial<Pick<EventRegistration, "checkedIn" | "checkedInAt" | "tags" | "source">>
+  fields: UpdateEventRegistrationFields,
+  context?: { editorEmail?: string },
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // techday / Digital Canvas — pass through, no backfill enforcement.
     if (id.startsWith("techday:")) {
       const realId = id.replace("techday:", "")
       const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
@@ -353,8 +397,49 @@ export async function updateEventRegistration(
       await dcDb.collection("event-registrations").doc(realId).update(fields)
       return { success: true }
     }
+
     const db = getDb()
-    await db.collection(COLLECTION).doc(id).update(fields)
+    const docRef = db.collection(COLLECTION).doc(id)
+
+    // Server-side backfill enforcement: only fetch + check when the caller
+    // is touching one of the locked-down fields. Avoids an extra read for
+    // the common case (check-in toggle, tag edit) which is hot during day-of
+    // event ops.
+    const backfillKeys = Object.keys(fields).filter((k) =>
+      BACKFILL_FIELDS.includes(k as BackfillField),
+    ) as BackfillField[]
+
+    let willStampProvenance = backfillKeys.length > 0
+
+    if (backfillKeys.length > 0) {
+      const snapshot = await docRef.get()
+      if (!snapshot.exists) {
+        return { success: false, error: "Registration not found" }
+      }
+      const data = snapshot.data() ?? {}
+      for (const key of backfillKeys) {
+        const incoming = fields[key]
+        const existing = data[key]
+        if (isBlank(incoming)) continue
+        if (!isBlank(existing) && existing !== incoming) {
+          // Reject the write entirely rather than partially apply — keeps
+          // the client's mental model honest ("save failed, refresh").
+          return {
+            success: false,
+            error: `Field "${key}" already has a value. This admin only allows backfilling blanks.`,
+          }
+        }
+      }
+    }
+
+    const writeFields: Record<string, unknown> = { ...fields }
+    if (willStampProvenance) {
+      writeFields.enrichedAt = new Date().toISOString()
+      writeFields.enrichedBy = context?.editorEmail || "unknown"
+      writeFields.enrichmentSource = "manual"
+    }
+
+    await docRef.update(writeFields)
     return { success: true }
   } catch (error) {
     console.error("Error updating event registration:", error)

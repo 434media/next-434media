@@ -7,6 +7,7 @@ import {
   addEventRegistration,
   updateEventRegistration,
   eventRegistrationsToCSV,
+  type UpdateEventRegistrationFields,
 } from "@/lib/firestore-event-registrations"
 
 // Ensure this route is never cached — always fetch fresh data from Firestore
@@ -74,6 +75,12 @@ export async function GET(request: Request) {
   }
 }
 
+// Allowed fields for PATCH. Mirrors `UpdateEventRegistrationFields` server-side
+// — checkedIn/tags/source are free-edit, firstName/lastName/fullName/company
+// are backfill-only (the lib enforces blank-existing).
+const FREE_EDIT_KEYS = ["checkedIn", "tags", "source"] as const
+const BACKFILL_KEYS = ["firstName", "lastName", "fullName", "company"] as const
+
 export async function PATCH(request: Request) {
   try {
     const authResult = await requireAdmin()
@@ -82,22 +89,64 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { id, checkedIn } = body
+    const { id, ...rest } = body as Record<string, unknown> & { id?: string }
 
     if (!id) {
       return NextResponse.json({ error: "Missing registration ID" }, { status: 400 })
     }
 
-    const fields: { checkedIn: boolean; checkedInAt: string } = {
-      checkedIn: !!checkedIn,
-      checkedInAt: checkedIn ? new Date().toISOString() : "",
+    // Whitelist incoming keys. Anything not in the two lists is silently
+    // dropped so a confused client can't accidentally write `event` or
+    // `email` (which would corrupt identity / provenance).
+    const fields: UpdateEventRegistrationFields = {}
+    for (const k of FREE_EDIT_KEYS) {
+      if (k in rest && rest[k] !== undefined) {
+        if (k === "checkedIn") fields.checkedIn = !!rest[k]
+        else if (k === "source") fields.source = String(rest[k] ?? "")
+        else if (k === "tags" && Array.isArray(rest[k])) {
+          fields.tags = (rest[k] as unknown[]).map(String)
+        }
+      }
+    }
+    // Toggle-on check-in stamps the timestamp, toggle-off clears it. Mirrors
+    // the prior PATCH behavior so the inline check-in toggle keeps working.
+    if ("checkedIn" in rest) {
+      fields.checkedInAt = fields.checkedIn ? new Date().toISOString() : ""
+    }
+    for (const k of BACKFILL_KEYS) {
+      if (k in rest && typeof rest[k] === "string") {
+        const trimmed = (rest[k] as string).trim()
+        if (trimmed) fields[k] = trimmed
+      }
     }
 
-    const result = await updateEventRegistration(id, fields)
-    if (result.success) {
-      return NextResponse.json({ success: true, ...fields })
+    if (Object.keys(fields).length === 0) {
+      return NextResponse.json({ error: "No editable fields supplied" }, { status: 400 })
     }
-    return NextResponse.json({ error: result.error }, { status: 500 })
+
+    // Auto-derive fullName when first/last are backfilled and fullName itself
+    // wasn't provided — keeps the UI consistent without making the client
+    // compute it.
+    if (
+      fields.fullName === undefined &&
+      (fields.firstName !== undefined || fields.lastName !== undefined)
+    ) {
+      const fn = (fields.firstName as string | undefined) ?? ""
+      const ln = (fields.lastName as string | undefined) ?? ""
+      const composed = `${fn} ${ln}`.trim()
+      if (composed) fields.fullName = composed
+    }
+
+    const result = await updateEventRegistration(id, fields, {
+      editorEmail: authResult.session.email,
+    })
+    if (result.success) {
+      return NextResponse.json({ success: true, fields })
+    }
+    // Backfill-blocked writes return a structured 409 so the UI can surface
+    // "this field already has a value" without a generic 500.
+    const status = result.error?.startsWith("Field ") ? 409 : 500
+    return NextResponse.json({ error: result.error }, { status })
   } catch (error) {
     console.error("Error in event-registrations PATCH:", error)
     return NextResponse.json(

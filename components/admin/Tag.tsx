@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { X } from "lucide-react"
 import { parseTag, getTagStyle } from "@/lib/tag-taxonomy"
 
@@ -52,9 +53,14 @@ interface TagListProps {
 }
 
 export function TagList({ tags, max, size = "sm", onRemove }: TagListProps) {
+  // Click +N to expand the rest inline; click again to collapse. Inline
+  // expansion (rather than a hover popover) avoids positioning headaches
+  // inside virtualized rows where parent stacking contexts are unstable.
+  const [expanded, setExpanded] = useState(false)
   if (!tags || tags.length === 0) return null
-  const visible = typeof max === "number" ? tags.slice(0, max) : tags
-  const overflow = typeof max === "number" ? tags.length - max : 0
+  const showAll = expanded || typeof max !== "number"
+  const visible = showAll ? tags : tags.slice(0, max!)
+  const overflow = typeof max === "number" ? Math.max(0, tags.length - max) : 0
 
   return (
     <div className="inline-flex flex-wrap items-center gap-1">
@@ -67,9 +73,17 @@ export function TagList({ tags, max, size = "sm", onRemove }: TagListProps) {
         />
       ))}
       {overflow > 0 && (
-        <span className="text-[10px] text-neutral-400 font-medium tabular-nums">
-          +{overflow}
-        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpanded((v) => !v)
+          }}
+          className="text-[10px] text-neutral-500 font-medium tabular-nums px-1 py-0.5 rounded hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+          title={expanded ? "Show fewer" : `Show ${overflow} more tag${overflow === 1 ? "" : "s"}`}
+        >
+          {expanded ? "−" : "+"}{overflow}
+        </button>
       )}
     </div>
   )
