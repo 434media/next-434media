@@ -36,12 +36,8 @@ const InstagramAnalytics = dynamic(() => import("../analytics-instagram/Instagra
   ssr: false,
   loading: () => <AnalyticsLoadingSkeleton />,
 })
-const MailchimpAnalytics = dynamic(() => import("../analytics-mailchimp/MailchimpAnalyticsClientPage"), {
-  ssr: false,
-  loading: () => <AnalyticsLoadingSkeleton />,
-})
 
-type TabKey = "portfolio" | "ga4" | "instagram" | "mailchimp"
+type TabKey = "portfolio" | "ga4" | "instagram"
 
 interface TabConfig {
   key: TabKey
@@ -55,7 +51,6 @@ const tabs: TabConfig[] = [
   { key: "portfolio", label: "Portfolio", short: "Portfolio", icon: PortfolioIcon, color: "text-teal-500" },
   { key: "ga4", label: "Google Analytics", short: "GA4", icon: GA4Icon, color: "text-emerald-500" },
   { key: "instagram", label: "Instagram", short: "Instagram", icon: InstagramIcon, color: "text-pink-500" },
-  { key: "mailchimp", label: "Mailchimp", short: "Mailchimp", icon: MailchimpIcon, color: "text-yellow-500" },
 ]
 
 export default function UnifiedAnalyticsPage() {
@@ -81,7 +76,6 @@ export default function UnifiedAnalyticsPage() {
     const t = setTimeout(() => {
       import("../analytics-web/AnalyticsClientPage")
       import("../analytics-instagram/InstagramAnalyticsClientPage")
-      import("../analytics-mailchimp/MailchimpAnalyticsClientPage")
     }, 1500)
     return () => clearTimeout(t)
   }, [])
@@ -92,8 +86,6 @@ export default function UnifiedAnalyticsPage() {
         return <GA4Analytics />
       case "instagram":
         return <InstagramAnalytics />
-      case "mailchimp":
-        return <MailchimpAnalytics />
       case "portfolio":
       default:
         return <PortfolioAnalytics />
@@ -176,14 +168,6 @@ function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" {...props}>
       <path d="M7.03.084c-1.277.06-2.149.264-2.91.563a5.874 5.874 0 00-2.124 1.388 5.878 5.878 0 00-1.38 2.127C.321 4.926.12 5.8.064 7.076.008 8.354-.005 8.764.001 12.023c.007 3.259.021 3.667.083 4.947.061 1.277.264 2.149.563 2.911.308.789.72 1.457 1.388 2.123a5.872 5.872 0 002.129 1.38c.763.295 1.636.496 2.913.552 1.278.056 1.689.069 4.947.063 3.257-.007 3.668-.021 4.947-.082 1.28-.06 2.147-.265 2.91-.563a5.881 5.881 0 002.123-1.388 5.881 5.881 0 001.38-2.129c.295-.763.496-1.636.551-2.912.056-1.28.07-1.69.063-4.948-.006-3.258-.02-3.667-.081-4.947-.06-1.28-.264-2.148-.564-2.911a5.892 5.892 0 00-1.387-2.123 5.857 5.857 0 00-2.128-1.38C19.074.322 18.202.12 16.924.066 15.647.009 15.236-.006 11.977 0 8.718.008 8.31.021 7.03.084m.14 21.693c-1.17-.05-1.805-.245-2.228-.408a3.736 3.736 0 01-1.382-.895 3.695 3.695 0 01-.9-1.378c-.165-.423-.363-1.058-.417-2.228-.06-1.264-.072-1.644-.08-4.848-.006-3.204.006-3.583.061-4.848.05-1.169.246-1.805.408-2.228.216-.561.477-.96.895-1.382a3.705 3.705 0 011.379-.9c.423-.165 1.057-.361 2.227-.417 1.265-.06 1.644-.072 4.848-.08 3.203-.006 3.583.006 4.85.062 1.168.05 1.804.244 2.227.408.56.216.96.475 1.382.895.421.42.681.817.9 1.378.165.422.362 1.056.417 2.227.06 1.265.074 1.645.08 4.848.005 3.203-.006 3.583-.061 4.848-.051 1.17-.245 1.805-.408 2.23-.216.56-.477.96-.896 1.38a3.705 3.705 0 01-1.378.9c-.422.165-1.058.362-2.226.418-1.266.06-1.645.072-4.85.079-3.204.007-3.582-.006-4.848-.06m9.783-16.192a1.44 1.44 0 101.437-1.442 1.44 1.44 0 00-1.437 1.442M5.839 12.012a6.161 6.161 0 1012.323-.024 6.162 6.162 0 00-12.323.024M8 12.008A4 4 0 1112.008 16 4 4 0 018 12.008" />
-    </svg>
-  )
-}
-
-function MailchimpIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" {...props}>
-      <path d="M11.267 0C6.791-.015-1.82 10.246 1.397 12.964l.79.669a3.88 3.88 0 00-.22 1.792c.084.84.518 1.644 1.22 2.266.666.59 1.542.964 2.392.964 1.406 3.24 4.62 5.228 8.386 5.34 4.04.12 7.433-1.776 8.854-5.182.093-.24.488-1.316.488-2.267 0-.956-.54-1.352-.885-1.352-.01-.037-.078-.286-.172-.586-.093-.3-.19-.51-.19-.51.375-.563.382-1.065.332-1.35-.053-.353-.2-.653-.496-.964-.296-.311-.902-.63-1.753-.868l-.446-.124c-.002-.019-.024-1.053-.043-1.497-.014-.32-.042-.822-.197-1.315-.186-.668-.508-1.253-.911-1.627 1.112-1.152 1.806-2.422 1.804-3.511-.003-2.095-2.576-2.729-5.746-1.416l-.672.285A678.22 678.22 0 0012.7.504C12.304.159 11.817.002 11.267 0z" />
     </svg>
   )
 }

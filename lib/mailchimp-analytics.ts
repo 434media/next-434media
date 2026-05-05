@@ -996,8 +996,11 @@ export async function getMailchimpSubscriberMap(): Promise<MailchimpSubscriberMa
         members: RawMember[]
         total_items: number
       }
+      // Pull all-status members (subscribed + pending + unsubscribed + cleaned)
+      // so the Submissions permission ribbon can break down "can email today"
+      // vs "pending" vs "cannot email" without an extra round-trip.
       const data = await makeMailchimpRequest<MembersResponse>(
-        `/lists/${audienceId}/members?count=1000&status=subscribed&fields=members.email_address,members.status,members.tags,total_items`,
+        `/lists/${audienceId}/members?count=1000&fields=members.email_address,members.status,members.tags,total_items`,
       )
 
       let counted = 0
@@ -1041,4 +1044,277 @@ export async function getMailchimpSubscriberMap(): Promise<MailchimpSubscriberMa
     audiences,
     generatedAt: new Date().toISOString(),
   }
+}
+
+// =====================================================================
+// Per-member helpers — lookup, activity, tag toggle.
+// Powers the Mailchimp panel inside the lead/client drawer.
+// =====================================================================
+
+import { createHash } from "node:crypto"
+
+export interface MailchimpMemberAudienceProfile {
+  audienceId: string
+  audienceName: string
+  status: "subscribed" | "unsubscribed" | "cleaned" | "pending" | "transactional" | "archived" | string
+  tags: Array<{ id: number; name: string }>
+  rating?: number
+  timestampSignup?: string
+  timestampOpt?: string
+  lastChanged?: string
+  emailClient?: string
+  language?: string
+  source?: string
+  mergeFields?: Record<string, string | number | null>
+}
+
+export interface MailchimpMemberActivityEvent {
+  audienceId: string
+  audienceName: string
+  action: string
+  timestamp: string
+  campaignId?: string
+  campaignTitle?: string
+  url?: string
+}
+
+export interface MailchimpMemberLookupResponse {
+  email: string
+  found: boolean
+  audiences: MailchimpMemberAudienceProfile[]
+  activity: MailchimpMemberActivityEvent[]
+  generatedAt: string
+}
+
+function subscriberHash(email: string): string {
+  return createHash("md5").update(email.trim().toLowerCase()).digest("hex")
+}
+
+interface RawMemberResponse {
+  id: string
+  email_address: string
+  status: string
+  member_rating?: number
+  timestamp_signup?: string
+  timestamp_opt?: string
+  last_changed?: string
+  email_client?: string
+  language?: string
+  source?: string
+  tags?: Array<{ id: number; name: string }>
+  merge_fields?: Record<string, string | number | null>
+}
+
+interface RawActivityResponse {
+  activity?: Array<{
+    action: string
+    timestamp: string
+    type?: string
+    url?: string
+    ip?: string
+    campaign_id?: string
+    title?: string
+  }>
+}
+
+/**
+ * Per-email lookup across every configured audience. Returns subscription
+ * profile + a flattened, time-sorted activity feed (last 50 events per
+ * audience, capped to 50 in the merged feed). Designed for the lead/client
+ * drawer Mailchimp panel — the operator gets a quick read of "is this
+ * person subscribed, what tags do they carry, what did they last open."
+ */
+export async function getMailchimpMemberProfile(email: string): Promise<MailchimpMemberLookupResponse> {
+  const normalized = email.trim().toLowerCase()
+  const hash = subscriberHash(normalized)
+
+  const audiences: MailchimpMemberAudienceProfile[] = []
+  const activity: MailchimpMemberActivityEvent[] = []
+
+  for (const config of MAILCHIMP_PROPERTIES_CONFIG) {
+    const audienceId = process.env[config.key]
+    if (!audienceId) continue
+
+    let audienceName = config.name
+    try {
+      const listData = await makeMailchimpRequest<MailchimpList>(`/lists/${audienceId}`)
+      audienceName = listData.name || config.name
+    } catch {
+      // tolerate — fall back to env-config name
+    }
+
+    // Member fetch — 404 means the email isn't in this audience, which is fine.
+    let member: RawMemberResponse | null = null
+    try {
+      member = await makeMailchimpRequest<RawMemberResponse>(
+        `/lists/${audienceId}/members/${hash}?fields=id,email_address,status,member_rating,timestamp_signup,timestamp_opt,last_changed,email_client,language,source,tags,merge_fields`,
+      )
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      if (status !== 404) {
+        console.warn(`[Mailchimp] member fetch failed for ${audienceId}:`, err)
+      }
+    }
+
+    if (!member) continue
+
+    audiences.push({
+      audienceId,
+      audienceName,
+      status: member.status,
+      tags: member.tags ?? [],
+      rating: member.member_rating,
+      timestampSignup: member.timestamp_signup,
+      timestampOpt: member.timestamp_opt,
+      lastChanged: member.last_changed,
+      emailClient: member.email_client,
+      language: member.language,
+      source: member.source,
+      mergeFields: member.merge_fields,
+    })
+
+    // Activity fetch — best-effort. Members who only just joined will have empty activity.
+    try {
+      const act = await makeMailchimpRequest<RawActivityResponse>(
+        `/lists/${audienceId}/members/${hash}/activity-feed?count=50`,
+      )
+      for (const ev of act.activity ?? []) {
+        if (!ev?.action || !ev?.timestamp) continue
+        activity.push({
+          audienceId,
+          audienceName,
+          action: ev.action,
+          timestamp: ev.timestamp,
+          campaignId: ev.campaign_id,
+          campaignTitle: ev.title,
+          url: ev.url,
+        })
+      }
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      if (status !== 404) {
+        console.warn(`[Mailchimp] activity fetch failed for ${audienceId}:`, err)
+      }
+    }
+  }
+
+  // Newest first, cap at 50 across all audiences.
+  activity.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
+
+  return {
+    email: normalized,
+    found: audiences.length > 0,
+    audiences,
+    activity: activity.slice(0, 50),
+    generatedAt: new Date().toISOString(),
+  }
+}
+
+// =====================================================================
+// Last-campaign — used by the Submissions campaign-attribution strip.
+// Returns the most recent sent campaign across audiences with its open/click
+// counts. Optimized for ONE small response, not the analytics dashboard.
+// =====================================================================
+
+export interface MailchimpLastCampaign {
+  audienceId: string
+  audienceName: string
+  campaignId: string
+  title: string
+  subjectLine?: string
+  sendTime: string
+  emailsSent: number
+  opens: number
+  uniqueOpens: number
+  clicks: number
+  uniqueClicks: number
+  openRate: number
+  clickRate: number
+}
+
+interface RawCampaign {
+  id: string
+  send_time: string
+  settings?: { title?: string; subject_line?: string }
+  emails_sent?: number
+  report_summary?: {
+    opens?: number
+    unique_opens?: number
+    open_rate?: number
+    clicks?: number
+    subscriber_clicks?: number
+    click_rate?: number
+  }
+}
+
+/**
+ * Returns the single most recent sent campaign across all configured
+ * audiences. Picks the newest by send_time. Returns null if no audience has
+ * a recent sent campaign.
+ */
+export async function getLatestSentCampaign(): Promise<MailchimpLastCampaign | null> {
+  let best: MailchimpLastCampaign | null = null
+
+  for (const config of MAILCHIMP_PROPERTIES_CONFIG) {
+    const audienceId = process.env[config.key]
+    if (!audienceId) continue
+
+    let audienceName = config.name
+    try {
+      const list = await makeMailchimpRequest<MailchimpList>(`/lists/${audienceId}`)
+      audienceName = list.name || audienceName
+    } catch {
+      // tolerate
+    }
+
+    try {
+      const data = await makeMailchimpRequest<{ campaigns: RawCampaign[] }>(
+        `/campaigns?list_id=${audienceId}&status=sent&count=1&sort_field=send_time&sort_dir=DESC&fields=campaigns.id,campaigns.send_time,campaigns.settings.title,campaigns.settings.subject_line,campaigns.emails_sent,campaigns.report_summary`,
+      )
+      const c = data.campaigns?.[0]
+      if (!c?.id || !c?.send_time) continue
+
+      const candidate: MailchimpLastCampaign = {
+        audienceId,
+        audienceName,
+        campaignId: c.id,
+        title: c.settings?.title || c.settings?.subject_line || "Untitled campaign",
+        subjectLine: c.settings?.subject_line,
+        sendTime: c.send_time,
+        emailsSent: c.emails_sent ?? 0,
+        opens: c.report_summary?.opens ?? 0,
+        uniqueOpens: c.report_summary?.unique_opens ?? 0,
+        clicks: c.report_summary?.clicks ?? 0,
+        uniqueClicks: c.report_summary?.subscriber_clicks ?? 0,
+        openRate: c.report_summary?.open_rate ?? 0,
+        clickRate: c.report_summary?.click_rate ?? 0,
+      }
+      if (!best || candidate.sendTime > best.sendTime) best = candidate
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      if (status !== 404) {
+        console.warn(`[Mailchimp] last-campaign fetch failed for ${audienceId}:`, err)
+      }
+    }
+  }
+
+  return best
+}
+
+/**
+ * Toggle a single tag on a member. `state: "active"` adds the tag, "inactive"
+ * removes it. The Mailchimp endpoint accepts a batch but we keep this scoped
+ * to one audience + one tag for tighter UI feedback.
+ */
+export async function toggleMailchimpMemberTag(args: {
+  audienceId: string
+  email: string
+  tagName: string
+  state: "active" | "inactive"
+}): Promise<void> {
+  const hash = subscriberHash(args.email)
+  await makeMailchimpRequest(`/lists/${args.audienceId}/members/${hash}/tags`, {
+    method: "POST",
+    body: { tags: [{ name: args.tagName, status: args.state }] },
+  })
 }

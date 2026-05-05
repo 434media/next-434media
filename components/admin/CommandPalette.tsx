@@ -210,15 +210,6 @@ const STATIC_ITEMS: CommandItem[] = [
     run: (router) => router.push("/admin/analytics-instagram"),
   },
   {
-    id: "nav-analytics-mailchimp",
-    label: "Analytics — Mailchimp",
-    hint: "Campaigns, subscribers, engagement",
-    icon: BarChart3,
-    section: "Navigate",
-    search: "analytics mailchimp email campaigns subscribers",
-    run: (router) => router.push("/admin/analytics-mailchimp"),
-  },
-  {
     id: "nav-analytics-linkedin",
     label: "Analytics — LinkedIn",
     hint: "Company page, posts, followers",

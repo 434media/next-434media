@@ -62,6 +62,8 @@ import {
   type SubmissionSource,
 } from "@/components/admin/SubmissionStateUI"
 import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
+import { PermissionStateRibbon } from "@/components/admin/PermissionStateRibbon"
+import { CampaignAttributionStrip } from "@/components/admin/CampaignAttributionStrip"
 import { TagList } from "@/components/admin/Tag"
 import { parseTag } from "@/lib/tag-taxonomy"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
@@ -862,6 +864,15 @@ function EmailListsTab({
         </div>
       </div>
 
+      {/* Campaign attribution — surfaces the most recent Mailchimp send so
+          the operator can correlate signup spikes with campaign activity.
+          Counts in-view signups created after the campaign send time. */}
+      <div className="mb-3">
+        <CampaignAttributionStrip
+          signupTimestamps={filteredSignupsBeforeState.map((s) => s.created_at).filter(Boolean) as string[]}
+        />
+      </div>
+
       {/* Source insights — overview grid (no source selected) or drilldown
           stats strip (source selected). Mirrors EventInsights so the two
           tabs feel like siblings. */}
@@ -890,6 +901,19 @@ function EmailListsTab({
             : undefined
         }
       />
+
+      {/* Permission state ribbon — segmented bar over the currently filtered
+          signup set: subscribed (can email today) / pending (double-opt-in) /
+          unmailable (unsub/cleaned) / not in MC (push opportunity). */}
+      {filteredSignupsBeforeState.length > 0 && (
+        <div className="mb-3">
+          <PermissionStateRibbon
+            emails={filteredSignupsBeforeState.map((s) => s.email).filter(Boolean)}
+            subscriberMap={subscriberMap}
+            onPushNotInMc={() => setShowPushModal(true)}
+          />
+        </div>
+      )}
 
       {/* Search — flush, no card chrome (matches Events surface). */}
       <div className="relative mb-3">

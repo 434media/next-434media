@@ -24,7 +24,6 @@ const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
   { match: "/admin/submissions", label: "Submissions" },
   { match: "/admin/analytics-web", label: "Analytics · Web" },
   { match: "/admin/analytics-instagram", label: "Analytics · Instagram" },
-  { match: "/admin/analytics-mailchimp", label: "Analytics · Mailchimp" },
   { match: "/admin/analytics-linkedin", label: "Analytics · LinkedIn" },
   { match: "/admin/analytics", label: "Analytics" },
   { match: "/admin/feed-form", label: "Content · Feed" },

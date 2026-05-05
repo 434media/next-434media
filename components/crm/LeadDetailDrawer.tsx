@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { Tag } from "@/components/admin/Tag"
+import { MailchimpRecordPanel } from "@/components/crm/MailchimpRecordPanel"
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource } from "@/types/crm-types"
 
@@ -591,6 +592,16 @@ export function LeadDetailDrawer({
             className="w-full px-3 py-2 text-[13px] border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
           />
         </Section>
+
+        {/* Mailchimp profile — subscription state, tags, and recent campaign activity
+            for the lead's email. Reps can see open/click history before reaching out. */}
+        {isEditing && lead.email && (
+          <MailchimpRecordPanel
+            email={lead.email}
+            firstName={(form.name || "").split(" ")[0]}
+            lastName={(form.name || "").split(" ").slice(1).join(" ")}
+          />
+        )}
 
         {/* Activity (read-only) */}
         {isEditing && (

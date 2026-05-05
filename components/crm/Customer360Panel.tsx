@@ -19,6 +19,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 import type { Customer360, TimelineEntry, TimelineEntryKind } from "@/lib/customer-360"
+import { MailchimpRecordPanel } from "@/components/crm/MailchimpRecordPanel"
 
 const BRAND_TO_IG_ACCOUNT: Record<string, string> = {
   "TXMX Boxing": "txmx",
@@ -318,47 +319,17 @@ export function Customer360Panel({ clientId }: Customer360PanelProps) {
         )}
       </div>
 
-      {/* Mailchimp subscriptions */}
+      {/* Mailchimp subscriptions — per-email panel with status, tags, and
+          recent campaign activity. One panel per unique subscriber email
+          tied to this client (clients can have multiple contacts). */}
       {mailchimpSubscribers.length > 0 && (
         <div>
           <h3 className="text-[13px] font-semibold text-neutral-800 uppercase tracking-wide mb-2">
-            Mailchimp subscriptions
+            Mailchimp
           </h3>
-          <div className="space-y-2">
-            {mailchimpSubscribers.map((m, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-neutral-200 bg-white p-3 text-[12px] flex items-start justify-between gap-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-neutral-800">{m.audienceName || m.audienceId}</div>
-                  <div className="text-neutral-500">{m.email}</div>
-                  {m.tags && m.tags.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {m.tags.map((t, ti) => (
-                        <span
-                          key={ti}
-                          className="inline-block px-1.5 py-0.5 rounded bg-pink-50 border border-pink-200 text-pink-700 text-[10px] font-medium"
-                        >
-                          {t.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="shrink-0 text-right">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide ${
-                      m.status === "subscribed"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-neutral-100 text-neutral-600 border border-neutral-200"
-                    }`}
-                  >
-                    {m.status}
-                  </span>
-                  <div className="text-neutral-400 text-[10px] mt-1">since {fmtDate(m.timestampSignup)}</div>
-                </div>
-              </div>
+          <div className="space-y-3">
+            {Array.from(new Set(mailchimpSubscribers.map((m) => m.email).filter(Boolean))).map((emailAddr) => (
+              <MailchimpRecordPanel key={emailAddr} email={emailAddr} />
             ))}
           </div>
         </div>
