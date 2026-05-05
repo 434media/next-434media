@@ -1,11 +1,10 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
+import { BRAND } from "@/lib/seo/brand"
 
-// Route segment config
-export const runtime = "edge"
+export const runtime = "nodejs"
 
-// Image metadata
-export const alt = "434 MEDIA"
+export const alt = `${BRAND.name} — ${BRAND.shortTagline}`
 export const size = {
   width: 1200,
   height: 630,
@@ -15,105 +14,118 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
 
-    // Get dynamic params
-    const title = searchParams.get("title") || "434 MEDIA"
-    const subtitle = searchParams.get("subtitle") || "Creative Media and Smart Marketing Solutions"
-    const locale = searchParams.get("locale") || "en"
+    // Per-page customization. When no title is provided we fall back to the
+    // canonical brand headline so the image still feels on-brand.
+    const title = searchParams.get("title") || BRAND.headline
+    const subtitle = searchParams.get("subtitle") || BRAND.headline2
     const path = searchParams.get("path") || ""
+    const locale = searchParams.get("locale") || "en"
 
-    // Font
-    const fontData = await fetch(new URL("../../../fonts/Menda-Black.otf", import.meta.url)).then((res) =>
-      res.arrayBuffer(),
+    const fontData = await fetch(new URL("../../../fonts/Menda-Black.otf", import.meta.url)).then(
+      (res) => res.arrayBuffer(),
     )
 
     return new ImageResponse(
       <div
         style={{
-          fontSize: 48,
-          background: "linear-gradient(to bottom right, #0891b2, #0e7490)",
           width: "100%",
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 48,
+          justifyContent: "space-between",
+          background: "linear-gradient(135deg, #0891b2 0%, #0e7490 60%, #06414e 100%)",
+          padding: 72,
+          fontFamily: "Menda",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 24,
-          }}
-        >
-          {/* Logo placeholder - replace with your actual logo */}
+        {/* Brand mark */}
+        <div style={{ display: "flex", alignItems: "center" }}>
           <div
             style={{
-              width: 120,
-              height: 120,
+              width: 80,
+              height: 80,
               background: "white",
-              borderRadius: "50%",
+              borderRadius: 20,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              marginRight: 24,
-              fontSize: 32,
-              fontWeight: "bold",
+              fontSize: 30,
+              color: "#0e7490",
+              fontWeight: 900,
+              letterSpacing: -1,
             }}
           >
             434
           </div>
           <div
             style={{
-              fontSize: 32,
+              marginLeft: 20,
               color: "white",
-              fontWeight: "bold",
+              fontSize: 30,
+              fontWeight: 700,
+              letterSpacing: 2,
             }}
           >
-            434 MEDIA
+            {BRAND.name}
           </div>
         </div>
-        <div
-          style={{
-            fontSize: 64,
-            fontWeight: "bold",
-            color: "white",
-            marginBottom: 24,
-            textAlign: "center",
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{
-            fontSize: 36,
-            color: "rgba(255, 255, 255, 0.9)",
-            textAlign: "center",
-          }}
-        >
-          {subtitle}
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            bottom: 48,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "calc(100% - 96px)",
-            borderTop: "1px solid rgba(255, 255, 255, 0.2)",
-            paddingTop: 24,
-          }}
-        >
+
+        {/* Page-specific headline */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
           <div
             style={{
-              color: "rgba(255, 255, 255, 0.8)",
-              fontSize: 24,
+              color: "white",
+              fontSize: 80,
+              fontWeight: 900,
+              lineHeight: 1.05,
+              letterSpacing: -2,
+              maxWidth: 1050,
             }}
           >
-            www.434media.com/{path ? `${locale}/${path}` : ""}
+            {title}
+          </div>
+          <div
+            style={{
+              color: "rgba(255,255,255,0.92)",
+              fontSize: 80,
+              fontWeight: 900,
+              lineHeight: 1.05,
+              letterSpacing: -2,
+              maxWidth: 1050,
+            }}
+          >
+            {subtitle}
+          </div>
+          <div
+            style={{
+              marginTop: 24,
+              color: "rgba(255,255,255,0.85)",
+              fontSize: 24,
+              fontWeight: 400,
+              lineHeight: 1.35,
+              maxWidth: 1000,
+            }}
+          >
+            {BRAND.description}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderTop: "1px solid rgba(255,255,255,0.25)",
+            paddingTop: 22,
+          }}
+        >
+          <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 22, fontWeight: 700 }}>
+            {BRAND.domain}
+            {path ? `/${locale === "en" ? "" : `${locale}/`}${path}` : ""}
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 20, letterSpacing: 2 }}>
+            {BRAND.location}
           </div>
         </div>
       </div>,

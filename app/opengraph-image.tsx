@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og"
+import { BRAND } from "@/lib/seo/brand"
 
-export const runtime = "edge"
-export const alt = "434 MEDIA — Creative Media and Smart Marketing Solutions in San Antonio, TX"
+export const runtime = "nodejs"
+export const alt = `${BRAND.name} — ${BRAND.shortTagline} ${BRAND.description}`
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 
@@ -81,11 +82,14 @@ export default async function OpengraphImage() {
           style={{
             marginTop: 28,
             color: "rgba(255,255,255,0.85)",
-            fontSize: 32,
+            fontSize: 26,
             fontWeight: 400,
+            lineHeight: 1.35,
+            maxWidth: 1000,
           }}
         >
-          From brand campaigns, to event production, we help the world's most innovative firms find their voice and amplify their impact through bold storytelling and experiences.        </div>
+          {BRAND.description}
+        </div>
       </div>
 
       <div
@@ -100,8 +104,8 @@ export default async function OpengraphImage() {
         <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 26, fontWeight: 700 }}>
           www.434media.com
         </div>
-        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 22 }}>
-          San Antonio · Texas
+        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 22, letterSpacing: 2 }}>
+          {BRAND.location}
         </div>
       </div>
     </div>,

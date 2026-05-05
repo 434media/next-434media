@@ -32,10 +32,10 @@ export const metadata: Metadata = {
     siteName: "434 MEDIA",
     images: [
       {
-        url: `${siteUrl}/api/og?title=434+MEDIA&subtitle=Creative+Media+%26+Smart+Marketing+Solutions`,
+        url: `${siteUrl}/api/og`,
         width: 1200,
         height: 630,
-        alt: "434 MEDIA — Creative Media & Smart Marketing Solutions in San Antonio, TX",
+        alt: "434 MEDIA — Bold Stories. Proven Impact.",
       },
     ],
     locale: "en_US",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     title: "434 MEDIA | Creative Media & Smart Marketing in San Antonio",
     description:
       "ROI-driven brand media strategies that move audiences and deliver measurable results.",
-    images: [`${siteUrl}/api/og?title=434+MEDIA&subtitle=Creative+Media+%26+Smart+Marketing+Solutions`],
+    images: [`${siteUrl}/api/og`],
     creator: "@434media",
     site: "@434media",
   },

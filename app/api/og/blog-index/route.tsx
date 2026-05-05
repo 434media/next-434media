@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og"
+import { BRAND } from "@/lib/seo/brand"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 export async function GET() {
   return new ImageResponse(
@@ -106,15 +107,29 @@ export async function GET() {
         {/* Subtitle */}
         <p
           style={{
-            fontSize: "28px",
-            color: "#94a3b8",
-            margin: "0 0 40px 0",
-            maxWidth: "800px",
+            fontSize: "26px",
+            color: "#cbd5e1",
+            margin: "0 0 28px 0",
+            maxWidth: "880px",
             lineHeight: "1.4",
           }}
         >
-          Creative Media & Smart Marketing Strategies
+          {BRAND.description}
         </p>
+
+        {/* Brand tagline */}
+        <div
+          style={{
+            fontSize: "22px",
+            fontWeight: 700,
+            letterSpacing: "3px",
+            color: "#a78bfa",
+            textTransform: "uppercase",
+            marginBottom: "32px",
+          }}
+        >
+          {BRAND.shortTagline}
+        </div>
 
         {/* Gradient line */}
         <div

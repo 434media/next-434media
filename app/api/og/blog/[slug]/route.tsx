@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
+import { BRAND } from "@/lib/seo/brand"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 // Add proper font loading
 async function loadGoogleFont(font: string, text: string) {
@@ -25,9 +26,12 @@ async function loadGoogleFont(font: string, text: string) {
   return null
 }
 
-export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> },
+) {
   try {
-  const { slug } = params
+    const { slug } = await params
     const { searchParams } = new URL(request.url)
 
     // Get parameters with proper defaults
@@ -176,9 +180,22 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
               height: "4px",
               background: "linear-gradient(90deg, #6366f1, #8b5cf6)",
               borderRadius: "2px",
-              marginBottom: "32px",
+              marginBottom: "20px",
             }}
           />
+
+          {/* Brand tagline */}
+          <div
+            style={{
+              fontSize: "18px",
+              fontWeight: 700,
+              letterSpacing: "3px",
+              color: "#a78bfa",
+              textTransform: "uppercase",
+            }}
+          >
+            {BRAND.shortTagline}
+          </div>
         </div>
 
         {/* Footer with author and date */}
@@ -297,29 +314,31 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
           style={{
             fontSize: "72px",
             fontWeight: "700",
-            marginBottom: "24px",
+            marginBottom: "16px",
             textShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
           }}
         >
-          434 MEDIA
+          {BRAND.name}
         </div>
         <div
           style={{
-            fontSize: "32px",
-            fontWeight: "500",
-            opacity: 0.9,
+            fontSize: "30px",
+            fontWeight: "700",
+            opacity: 0.95,
+            letterSpacing: 2,
+            textTransform: "uppercase",
           }}
         >
-          Creative Media & Smart Marketing
+          {BRAND.shortTagline}
         </div>
         <div
           style={{
             fontSize: "18px",
-            marginTop: "32px",
+            marginTop: "24px",
             opacity: 0.7,
           }}
         >
-          www.434media.com
+          {BRAND.domain}
         </div>
       </div>,
       {

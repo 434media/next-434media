@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
+import { BRAND } from "@/lib/seo/brand"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 const size = {
   width: 1200,
@@ -189,11 +190,26 @@ export async function GET(req: NextRequest) {
               fontSize: 28,
               color: "rgba(255,255,255,0.75)",
               lineHeight: 1.4,
-              maxWidth: 700,
+              maxWidth: 760,
               display: "flex",
+              marginBottom: 18,
             }}
           >
             {config.subtitle}
+          </div>
+
+          {/* Brand tagline */}
+          <div
+            style={{
+              fontSize: 20,
+              color: config.accent,
+              fontWeight: 700,
+              letterSpacing: 3,
+              textTransform: "uppercase",
+              display: "flex",
+            }}
+          >
+            {BRAND.shortTagline}
           </div>
         </div>
 
@@ -217,7 +233,7 @@ export async function GET(req: NextRequest) {
               display: "flex",
             }}
           >
-            www.434media.com/{page}
+            {BRAND.domain}/{page}
           </div>
           <div
             style={{
@@ -228,7 +244,7 @@ export async function GET(req: NextRequest) {
               display: "flex",
             }}
           >
-            SAN ANTONIO, TX
+            {BRAND.location}
           </div>
         </div>
       </div>,
