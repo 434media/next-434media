@@ -256,7 +256,7 @@ const workItems: WorkItem[] = [
     description:
       "Conferences, workshops, and AI-driven experiences. Built with 434 MEDIA × DEVSA.",
     category: "Tech & Community",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/digitalcanvas.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Fmhth-cover.JPG?alt=media",
     logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digital-canvas-ymas.svg",
     logoDark: true,
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digitalcanvas.mov",
@@ -270,7 +270,7 @@ const workItems: WorkItem[] = [
     description:
       "San Antonio's developer community — events, workshops, and pipeline building.",
     category: "Tech & Community",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/devsa-space.webp",
+    image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Fdevsa-cover.jpg?alt=media",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/DEVSA%20Web%20Banner.mp4",
     href: "https://www.devsa.community",
     tags: ["Developers", "Community"],
@@ -281,7 +281,7 @@ const workItems: WorkItem[] = [
     description:
       "Economic development and advocacy growing the San Antonio tech ecosystem.",
     category: "Tech & Community",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/techday.png",
+    image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Ftechday-cover.jpeg?alt=media",
     bgColor: "bg-neutral-50",
     href: "https://www.sanantoniotechday.com/",
     tags: ["Advocacy", "Tech"],
@@ -355,18 +355,15 @@ const workItems: WorkItem[] = [
 // ─── Video Modal ──────────────────────────────────────────────────────────────
 
 function VideoModal({
-  videoUrl,
-  title,
-  aspectRatio = "16:9",
+  item,
   onClose,
 }: {
-  videoUrl: string
-  title: string
-  aspectRatio?: "16:9" | "4:5"
+  item: WorkItem
   onClose: () => void
 }) {
-  const isPortrait = aspectRatio === "4:5"
+  const isPortrait = item.videoAspectRatio === "4:5"
   const overlayRef = useRef<HTMLDivElement>(null)
+  const isExternal = item.href?.startsWith("http")
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -383,40 +380,139 @@ function VideoModal({
   return (
     <motion.div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 md:p-8"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.25 }}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose()
       }}
     >
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+      {/* Light, blurred backdrop matching the page palette */}
+      <div className="absolute inset-0 bg-white/75 backdrop-blur-2xl" />
+
+      {/* Subtle dot grid for depth — same texture used in the hero/CTA */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black, transparent 75%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 70% 70% at 50% 50%, black, transparent 75%)",
+        }}
+      />
+
       <motion.div
-        className={`relative overflow-hidden rounded-xl bg-black ring-1 ring-white/10 ${
-          isPortrait ? "w-full max-w-sm aspect-4/5" : "w-full max-w-4xl aspect-video"
-        }`}
-        initial={{ scale: 0.96, opacity: 0, y: 12 }}
+        initial={{ scale: 0.97, opacity: 0, y: 18 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.96, opacity: 0, y: 12 }}
-        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        exit={{ scale: 0.97, opacity: 0, y: 18 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className={`relative my-auto w-full ${isPortrait ? "max-w-5xl" : "max-w-5xl"}`}
       >
+        <div
+          className={`relative overflow-hidden rounded-xl bg-white ring-1 ring-neutral-200 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)] ${
+            isPortrait ? "md:grid md:grid-cols-[auto_1fr]" : ""
+          }`}
+        >
+          {/* Video pane */}
+          <div
+            className={`relative bg-neutral-950 ${
+              isPortrait
+                ? "aspect-4/5 md:aspect-auto md:h-[min(78vh,720px)]"
+                : "aspect-video"
+            }`}
+            style={isPortrait ? { aspectRatio: "4 / 5" } : undefined}
+          >
+            <video
+              src={item.videoUrl}
+              autoPlay
+              controls
+              playsInline
+              className="absolute inset-0 h-full w-full object-cover"
+              aria-label={`${item.title} video`}
+            />
+          </div>
+
+          {/* Metadata pane */}
+          <div
+            className={`flex flex-col gap-5 p-6 md:p-8 ${
+              isPortrait
+                ? "md:max-w-md md:justify-center"
+                : "border-t border-neutral-200/80"
+            }`}
+          >
+            {/* Eyebrow: now-playing + category */}
+            <div className="flex items-center gap-2 font-geist-mono text-[10px] font-medium uppercase tracking-[0.22em] text-neutral-500">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.15, type: "spring", stiffness: 400, damping: 20 }}
+                className="grid h-1.5 w-1.5 place-items-center rounded-full bg-emerald-500"
+              />
+              <span className="font-geist-mono">Now playing · {item.category}</span>
+            </div>
+
+            {/* Title */}
+            <h2 className="font-ggx88 text-2xl font-black leading-[0.98] tracking-[-0.02em] text-neutral-950 md:text-3xl">
+              {item.title}
+            </h2>
+
+            {/* Tags as pills */}
+            {item.tags && item.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-700"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Description */}
+            <p className="text-balance font-geist-sans text-sm leading-relaxed text-neutral-600 md:text-[15px]">
+              {item.description}
+            </p>
+
+            {/* Actions */}
+            <div className="mt-1 flex flex-wrap items-center gap-2.5 pt-1">
+              {item.href && (
+                <Link
+                  href={item.href}
+                  className="group inline-flex items-center gap-2 rounded-full bg-neutral-950 px-4 py-2 font-geist-sans text-xs font-medium text-white transition-all duration-200 hover:gap-2.5 hover:bg-neutral-800"
+                  {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                >
+                  Visit project
+                  <ArrowUpRightIcon className="h-3 w-3 transition-transform duration-200 group-hover:rotate-12" />
+                </Link>
+              )}
+              <button
+                onClick={onClose}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2 font-geist-sans text-xs font-medium text-neutral-700 ring-1 ring-neutral-300 transition-all duration-200 hover:bg-neutral-100 hover:text-neutral-950"
+              >
+                Close
+                <kbd className="rounded bg-neutral-100 px-1.5 py-px font-geist-mono text-[9px] font-medium tracking-wider text-neutral-500">
+                  Esc
+                </kbd>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Floating close button — outside the panel for easy reach */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white/70 ring-1 ring-white/15 backdrop-blur-md transition-all duration-200 hover:bg-black/70 hover:text-white"
+          className="absolute -top-3 -right-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-white text-neutral-700 ring-1 ring-neutral-200 shadow-lg transition-all duration-200 hover:scale-105 hover:text-neutral-950"
           aria-label="Close video"
         >
           <XIcon className="h-4 w-4" />
         </button>
-        <video
-          src={videoUrl}
-          autoPlay
-          controls
-          playsInline
-          className="h-full w-full object-cover"
-          aria-label={`${title} video`}
-        />
       </motion.div>
     </motion.div>
   )
@@ -429,13 +525,13 @@ function WorkCard({
   onPlayVideo,
 }: {
   item: WorkItem
-  onPlayVideo: (videoUrl: string, title: string, aspectRatio?: "16:9" | "4:5") => void
+  onPlayVideo: (item: WorkItem) => void
 }) {
   const isMediaCard = !!item.image || !!item.logoDark
 
   const handleClick = () => {
     if (item.videoUrl) {
-      onPlayVideo(item.videoUrl, item.title, item.videoAspectRatio)
+      onPlayVideo(item)
     }
   }
 
@@ -573,11 +669,7 @@ function WorkCard({
 // ─── Page Client ──────────────────────────────────────────────────────────────
 
 export default function WorkClient() {
-  const [activeVideo, setActiveVideo] = useState<{
-    url: string
-    title: string
-    aspectRatio?: "16:9" | "4:5"
-  } | null>(null)
+  const [activeItem, setActiveItem] = useState<WorkItem | null>(null)
   const [activeCategory, setActiveCategory] = useState<Category>(CATEGORIES[0].id)
 
   const heroRef = useRef<HTMLDivElement>(null)
@@ -636,14 +728,11 @@ export default function WorkClient() {
     }))
   }, [])
 
-  const handlePlayVideo = useCallback(
-    (url: string, title: string, aspectRatio?: "16:9" | "4:5") => {
-      setActiveVideo({ url, title, aspectRatio })
-    },
-    [],
-  )
+  const handlePlayVideo = useCallback((item: WorkItem) => {
+    setActiveItem(item)
+  }, [])
 
-  const handleCloseVideo = useCallback(() => setActiveVideo(null), [])
+  const handleCloseVideo = useCallback(() => setActiveItem(null), [])
 
   const activeMeta = CATEGORIES.find((c) => c.id === activeCategory) || CATEGORIES[0]
 
@@ -904,14 +993,7 @@ export default function WorkClient() {
       </main>
 
       <AnimatePresence>
-        {activeVideo && (
-          <VideoModal
-            videoUrl={activeVideo.url}
-            title={activeVideo.title}
-            aspectRatio={activeVideo.aspectRatio}
-            onClose={handleCloseVideo}
-          />
-        )}
+        {activeItem && <VideoModal item={activeItem} onClose={handleCloseVideo} />}
       </AnimatePresence>
     </>
   )

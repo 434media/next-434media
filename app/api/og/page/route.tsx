@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 import { BRAND } from "@/lib/seo/brand"
 
 export const runtime = "nodejs"
@@ -64,9 +66,7 @@ export async function GET(req: NextRequest) {
 
     const config = pageConfig[page] || pageConfig.shop
 
-    const fontData = await fetch(
-      new URL("../../../../fonts/Menda-Black.otf", import.meta.url)
-    ).then((res) => res.arrayBuffer())
+    const fontData = await readFile(path.join(process.cwd(), "fonts", "Menda-Black.otf"))
 
     return new ImageResponse(
       <div

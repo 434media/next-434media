@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og"
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 import { BRAND } from "@/lib/seo/brand"
 
 export const runtime = "nodejs"
@@ -7,9 +9,9 @@ export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 
 export default async function OpengraphImage() {
-  const fontData = await fetch(new URL("../fonts/Menda-Black.otf", import.meta.url)).then((res) =>
-    res.arrayBuffer(),
-  )
+  // node fetch can't resolve file:// URLs from import.meta.url at prerender time.
+  // Read the font from the project filesystem instead.
+  const fontData = await readFile(path.join(process.cwd(), "fonts", "Menda-Black.otf"))
 
   return new ImageResponse(
     <div
