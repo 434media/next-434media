@@ -781,12 +781,12 @@ export default function WorkClient() {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-              className="font-ggx88 text-[clamp(3rem,9vw,7.5rem)] font-black leading-[0.92] tracking-[-0.04em] text-neutral-950"
+              className="font-ggx88 text-[clamp(2.5rem,9vw,7.5rem)] md:text-[clamp(3rem,9vw,7.5rem)] font-black leading-[0.92] tracking-[-0.04em] text-neutral-950"
             >
-              Receipts.
+              Brand Stories
               <br />
               <span className="bg-linear-to-br from-neutral-950 via-neutral-700 to-neutral-400 bg-clip-text text-transparent">
-                Not pitches.
+                Aren&apos;t Accidental
               </span>
             </motion.h1>
 
@@ -796,7 +796,7 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="mt-8 max-w-2xl text-balance font-geist-sans text-lg leading-relaxed tracking-tight text-neutral-600 md:text-xl"
             >
-              A working portfolio from the studio — brand campaigns, event production,
+              Brand campaigns, event production,
               broadcast partnerships, and original IP produced alongside the firms, founders,
               and institutions shaping their categories. This is what bold stories look like
               in production.

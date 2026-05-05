@@ -287,7 +287,7 @@ export default function EnhancedSearch() {
         {isLoading && (
           <div className="absolute bottom-0 left-0 h-0.5 w-full overflow-hidden">
             <motion.div
-              className="h-full bg-gradient-to-r from-emerald-500 to-blue-500"
+              className="h-full bg-linear-to-r from-emerald-500 to-blue-500"
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: 1.5, ease: "easeInOut" }}
@@ -304,7 +304,7 @@ export default function EnhancedSearch() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="fixed left-0 right-0 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 z-[100]"
+            className="fixed left-0 right-0 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 z-100"
             style={{ top: "auto", marginTop: "10px" }}
             ref={resultsRef}
           >
@@ -355,7 +355,7 @@ export default function EnhancedSearch() {
                               className="w-full flex items-start space-x-3 p-2 rounded-md hover:bg-white/10 text-left text-white transition-colors"
                             >
                               {/* Product image */}
-                              <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded bg-neutral-800">
+                              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded bg-neutral-800">
                                 <Image
                                   src={getProductImageUrl(product) || "/placeholder.svg"}
                                   alt={product.title}
@@ -483,7 +483,7 @@ export default function EnhancedSearch() {
                                     className="object-cover transition-transform duration-300 group-hover:scale-105"
                                   />
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-3">
+                                <div className="absolute inset-0 bg-linear-to-t from-black/80 to-transparent flex items-end p-3">
                                   <span className="text-white font-medium">{collection.text}</span>
                                 </div>
                               </div>
