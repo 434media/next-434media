@@ -5,11 +5,13 @@ import { buildServicesItemListLd } from "@/lib/seo/services"
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
 export const metadata: Metadata = {
-  title: "Our Work | Bold Creative Portfolio",
+  title: "Our Work | Bold Stories. Proven Impact.",
   description:
-    "Explore the bold, strategic work by 434 MEDIA. From brand storytelling to event production, see how we deliver proven impact for VCs, accelerators, and startups.",
+    "From brand campaigns, to event production, we help the world's most innovative firms find their voice and amplify their impact through bold storytelling and experiences.",
   keywords: [
     "434 MEDIA portfolio",
+    "bold stories",
+    "proven impact",
     "creative agency work",
     "brand storytelling examples",
     "event production portfolio",
@@ -21,9 +23,9 @@ export const metadata: Metadata = {
     canonical: "/work",
   },
   openGraph: {
-    title: "Our Work | 434 MEDIA — Bold Creative Portfolio",
+    title: "Our Work | 434 MEDIA — Bold Stories. Proven Impact.",
     description:
-      "Explore the bold, strategic work by 434 MEDIA. From brand storytelling to event production, see how we deliver proven impact.",
+      "From brand campaigns, to event production, we help the world's most innovative firms find their voice and amplify their impact through bold storytelling and experiences.",
     url: `${siteUrl}/work`,
     siteName: "434 MEDIA",
     images: [
@@ -31,7 +33,7 @@ export const metadata: Metadata = {
         url: `${siteUrl}/api/og/page?page=work`,
         width: 1200,
         height: 630,
-        alt: "434 MEDIA — Our Work & Creative Portfolio",
+        alt: "434 MEDIA — Bold Stories. Proven Impact.",
       },
     ],
     locale: "en_US",
@@ -39,9 +41,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Our Work | 434 MEDIA — Bold Creative Portfolio",
+    title: "Our Work | 434 MEDIA — Bold Stories. Proven Impact.",
     description:
-      "From brand storytelling to event production — see how we deliver proven impact for VCs, accelerators, and startups.",
+      "From brand campaigns, to event production, we help the world's most innovative firms find their voice and amplify their impact through bold storytelling and experiences.",
     images: [`${siteUrl}/api/og/page?page=work`],
     creator: "@434media",
     site: "@434media",

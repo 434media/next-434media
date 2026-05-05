@@ -1,142 +1,150 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+  useSpring,
+  useMotionValueEvent,
+} from "motion/react"
 import Link from "next/link"
 import { XIcon, PlayIcon, ArrowUpRightIcon } from "lucide-react"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type BentoSize = "sm" | "md" | "lg" | "wide" | "tall"
+type Category =
+  | "Brand & Culture"
+  | "Health & Bio Innovation"
+  | "Capital & Founders"
+  | "Tech & Community"
+  | "Media & Storytelling"
 
-interface BentoItem {
+interface WorkItem {
   id: string
   title: string
   description: string
-  size: BentoSize
-  // Visual
+  category: Category
   image?: string
   imagePosition?: string
   logo?: string
-  logoDark?: boolean // true = logo has white fill, needs dark bg
+  logoDark?: boolean
   bgColor?: string
-  // Interaction
   videoUrl?: string
   videoAspectRatio?: "16:9" | "4:5"
   href?: string
   tags?: string[]
-  priority?: boolean // true = fetchPriority high, eager loading
+  priority?: boolean
 }
+
+// ─── Category metadata ────────────────────────────────────────────────────────
+
+interface CategoryMeta {
+  id: Category
+  eyebrow: string
+  headline: string
+  subline: string
+}
+
+const CATEGORIES: CategoryMeta[] = [
+  {
+    id: "Brand & Culture",
+    eyebrow: "01 — Brand & Culture",
+    headline: "Original IP and creator-led brands.",
+    subline:
+      "Lifestyle, music, and identity work where we build brands from the ground up — not just market them.",
+  },
+  {
+    id: "Health & Bio Innovation",
+    eyebrow: "02 — Health & Bio Innovation",
+    headline: "Vertical depth in healthcare and life sciences.",
+    subline:
+      "Storytelling and media for the institutions, programs, and founders shaping the future of human health.",
+  },
+  {
+    id: "Capital & Founders",
+    eyebrow: "03 — Capital & Founders",
+    headline: "Built for the people who back bold ideas.",
+    subline: "Content, brand, and event work for venture firms and angel networks across South Texas.",
+  },
+  {
+    id: "Tech & Community",
+    eyebrow: "04 — Tech & Community",
+    headline: "Connecting technology, talent, and place.",
+    subline:
+      "Conferences, communities, and tools that grow the regional tech ecosystem and the people inside it.",
+  },
+  {
+    id: "Media & Storytelling",
+    eyebrow: "05 — Media & Storytelling",
+    headline: "Cross-cultural, cross-platform storytelling.",
+    subline:
+      "Bilingual, broadcast, and mission-driven media reaching audiences that legacy outlets miss.",
+  },
+]
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-const bentoItems: BentoItem[] = [
+const workItems: WorkItem[] = [
+  // 01 — Brand & Culture
   {
     id: "vanita-leo",
     title: "Vanita Leo",
-    description: "Texas Cumbia artist blending traditional sounds with modern storytelling. Media production, brand partnerships, and content strategy amplifying her unique voice and cultural impact.",
-    size: "wide",
+    description:
+      "Texas Cumbia artist — media, partnerships, and content amplifying a singular voice.",
+    category: "Brand & Culture",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/vanita.png",
     imagePosition: "left",
     priority: true,
     href: "https://www.instagram.com/p/DRK7SlZj4wP/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA%3D%3D",
     bgColor: "bg-amber-50",
-    tags: ["Cumbia", "Artist"],
-  },
-    {
-    id: "builders-vc",
-    title: "Builders VC",
-    description: "Venture capital firm backing bold founders. Content strategy and brand storytelling for portfolio amplification.",
-    size: "sm",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/builders-dark.svg",
-    bgColor: "bg-neutral-50",
-    href: "https://www.builders.vc/",
-    tags: ["VC", "Startups"],
-  },
-  {
-    id: "wifttx",
-    title: "WIFT TX",
-    description: "Women in Film & Television Texas. Amplifying women's voices in media through event coverage and creative partnerships.",
-    size: "sm",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/wifttx.avif",
-    bgColor: "bg-rose-950",
-    logoDark: true,
-    href: "https://www.digitalcanvas.community/thefeed/1.5B-Reasons-to-Film-in-Texas",
-    tags: ["Film", "Women in Media"],
-  },
-  {
-    id: "velocity-tx",
-    title: "VelocityTX",
-    description: "Innovation hub fueling biotech and life science startups. Brand partnerships, event coverage, and impact reporting.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/vtx.png",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20MAIN%20RGB%20(1).png",
-    bgColor: "bg-white",
-    href: "https://www.digitalcanvas.community/thefeed/434-crashes-sasw-10th-year",
-    tags: ["Biotech", "Startups"],
-  },
-  {
-    id: "mission-road",
-    title: "Mission Road Ministries",
-    description: "Nonprofit partner serving individuals with disabilities. Media production amplifying mission-driven stories of resilience.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/missionroad.png",
-    bgColor: "bg-neutral-50",
-    href: "https://www.missionroadministries.org/",
-    tags: ["Nonprofit", "Impact"],
-  },
-  {
-    id: "univision",
-    title: "Univision",
-    description: "Spanish-language media coverage. Cross-platform content partnerships reaching millions of Hispanic and Latino audiences.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/univision.png",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/univision-logo.svg",
-    bgColor: "bg-purple-950",
-    logoDark: true,
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alejandro%20Ferna%CC%81ndez%20Concert%20.mov",
-    videoAspectRatio: "4:5",
-    href: "https://www.digitalcanvas.community/thefeed/capturing-a-milestone",
-    tags: ["Media", "Broadcast"],
-  },
-  {
-    id: "alamo-angels",
-    title: "Alamo Angels",
-    description: "Angel investor network. Event production, pitch coverage, and founder storytelling for South Texas's startup ecosystem.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/angels3.png",
-    bgColor: "bg-neutral-50",
-    href: "https://www.digitalcanvas.community/thefeed/built-for-the-triangle",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alamo%20Angles.mp4",
-    tags: ["VC", "Angels"],
+    tags: ["Music", "Brand"],
   },
   {
     id: "txmx-boxing",
     title: "TXMX Boxing",
-    description: "TXMX Boxing is a fight culture brand inspired by Texas and Mexico — built to celebrate boxing, community, and the fighters who live it. We create lifestyle content, events, and gear that capture the spirit of the sport, connecting fans and fighters through storytelling, culture, and style.",
-    size: "tall",
+    description:
+      "Original fight-culture brand spanning content, events, and gear — Texas and Mexico.",
+    category: "Brand & Culture",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/txmx.png",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20DROP%20TEASER%20V2.mp4",
     href: "/shop",
+    priority: true,
     tags: ["Brand", "E-Commerce"],
   },
   {
-    id: "altbionics",
-    title: "Alt-Bionics",
-    description: "Transforming the fields of prosthetics and humanoid robotics with cutting-edge, yet affordable bionic hands.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/altbionics.png",
+    id: "rise-of-a-champion",
+    title: "Rise of a Champion",
+    description:
+      "Curated room of athletes, entertainers, and leaders. Built with Icontalks x TXMX.",
+    category: "Brand & Culture",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/rise.png",
     bgColor: "bg-neutral-900",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/AltBionics%20.mov",
-    videoAspectRatio: "4:5",
-    href: "https://www.altbionics.com/",
-    tags: ["humanoid", "robotics"],
+    logoDark: true,
+    href: "https://www.digitalcanvas.community/thefeed/loud-about-legacy",
+    tags: ["Documentary", "Sports"],
   },
+  {
+    id: "adornthebay",
+    title: "Adorn the Bay",
+    description:
+      "Murals revitalizing Tampa Bay businesses and community spaces hit by recent hurricanes.",
+    category: "Brand & Culture",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/adornbay.png",
+    bgColor: "bg-sky-50",
+    href: "https://adornmurals.com/home",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/ampd.mp4",
+    tags: ["Public Art", "Impact"],
+  },
+
+  // 02 — Health & Bio Innovation
   {
     id: "mhm",
     title: "Methodist Healthcare Ministries",
-    description: "We are broadening the definition of health care beyond providing high-quality care when people are sick to address systemic inequities so that more people can reach their full potential for health and life.",
-    size: "tall",
+    description:
+      "Broadening healthcare beyond clinical care — addressing systemic inequities at scale.",
+    category: "Health & Bio Innovation",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-accelerator.jpg",
     logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/mhm.png",
     bgColor: "bg-white",
@@ -145,63 +153,45 @@ const bentoItems: BentoItem[] = [
     tags: ["Healthcare", "Nonprofit"],
   },
   {
-    id: "rise-of-a-champion",
-    title: "Rise of a Champion",
-    description: "Icontalks x TXMX Boxing brought together a curated room of athletes, entertainers, and industry leaders to celebrate greatness and build meaningful connections.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/rise.png",
-    bgColor: "bg-neutral-900",
-    logoDark: true,
-    href: "https://www.digitalcanvas.community/thefeed/loud-about-legacy",
-    tags: ["Documentary", "Sports"],
-  },
-  {
-    id: "vemos-vamos",
-    title: "Vemos Vamos",
-    description: "Bilingual storytelling initiative connecting communities through shared vision. Event production, brand strategy, and content creation.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/vemos-vamos/vemosinsights.jpg",
-    href: "https://www.vemosvamos.com/about",
-    tags: ["Agency", "Bilingual"],
-  },
-  {
-    id: "tech-bloc",
-    title: "Tech Bloc",
-    description: "A non-profit dedicated to fostering economic development and advocacy, helping connect and grow the tech ecosystem in San Antonio and Central Texas.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/techday.png",
-    bgColor: "bg-neutral-50",
-    href: "https://www.sanantoniotechday.com/",
-    tags: ["Advocacy", "Tech"],
-  },
-  {
-    id: "digital-canvas",
-    title: "Digital Canvas",
-    description: "Powered by 434 MEDIA x DEVSA, Digital Canvas designs and produces conferences, workshops, and AI-driven experiences that help organizations connect creativity, community, and technology — at scale.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/digitalcanvas.png",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digital-canvas-ymas.svg",
-    logoDark: true,
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digitalcanvas.mov",
-    bgColor: "bg-neutral-900",
-    href: "https://www.digitalcanvas.community/",
-    tags: ["Conferences", "Workshops"],
+    id: "sdoh",
+    title: "¿Qué es SDOH?",
+    description:
+      "Bilingual multimedia campaigns turning social-determinants awareness into action.",
+    category: "Health & Bio Innovation",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/sdoh2.png",
+    videoUrl:
+      "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/SDOH%20ACCELERATOR%20PROGRAM%20RECAP_2025.mp4",
+    href: "/en/sdoh",
+    tags: ["Health", "Bilingual"],
   },
   {
     id: "health-cell",
     title: "The Health Cell",
-    description: "The Health Cell was formed by and for San Antonio’s biotechnology, medical, military and academic leadership to promote professional development and collaboration across the City’s health sector.",
-    size: "tall",
+    description:
+      "San Antonio's biotech, medical, and military health sector — collaboration at the table.",
+    category: "Health & Bio Innovation",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/healthcell.png",
     bgColor: "bg-neutral-50",
     href: "https://www.434media.com/blog/44b-and-counting-the-health-cell-2025",
     tags: ["Health", "Innovation"],
   },
-    {
+  {
+    id: "velocity-tx",
+    title: "VelocityTX",
+    description:
+      "Innovation hub fueling biotech and life-science startups in South Texas.",
+    category: "Health & Bio Innovation",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/vtx.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20MAIN%20RGB%20(1).png",
+    bgColor: "bg-white",
+    href: "https://www.digitalcanvas.community/thefeed/434-crashes-sasw-10th-year",
+    tags: ["Biotech", "Startups"],
+  },
+  {
     id: "nucleate-texas",
     title: "Nucleate Texas",
-    description: "Biotech student organization. Event coverage and brand storytelling for the next generation of life science founders.",
-    size: "tall",
+    description: "Brand storytelling for the next generation of biotech student founders.",
+    category: "Health & Bio Innovation",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/nucleate.png",
     bgColor: "bg-indigo-950",
     logoDark: true,
@@ -211,8 +201,9 @@ const bentoItems: BentoItem[] = [
   {
     id: "aimsatx",
     title: "AIM Health R&D Summit",
-    description: "Join military and civilian leaders, researchers, and innovators to explore breakthrough technologies, share cutting-edge research, and forge partnerships that will transform healthcare for our service members and beyond.",
-    size: "tall",
+    description:
+      "Where military, civilian, and research leaders converge on the future of military health.",
+    category: "Health & Bio Innovation",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/posters.jpg",
     bgColor: "bg-neutral-900",
     logoDark: true,
@@ -220,31 +211,87 @@ const bentoItems: BentoItem[] = [
     tags: ["Military", "Innovation"],
   },
   {
+    id: "altbionics",
+    title: "Alt-Bionics",
+    description:
+      "Affordable bionic hands — transforming prosthetics and humanoid robotics.",
+    category: "Health & Bio Innovation",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/altbionics.png",
+    bgColor: "bg-neutral-900",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/AltBionics%20.mov",
+    videoAspectRatio: "4:5",
+    href: "https://www.altbionics.com/",
+    tags: ["Robotics", "Prosthetics"],
+  },
+
+  // 03 — Capital & Founders
+  {
+    id: "builders-vc",
+    title: "Builders VC",
+    description:
+      "Venture firm backing bold founders. Content and storytelling for portfolio amplification.",
+    category: "Capital & Founders",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/builders-dark.svg",
+    bgColor: "bg-neutral-50",
+    href: "https://www.builders.vc/",
+    tags: ["VC", "Startups"],
+  },
+  {
+    id: "alamo-angels",
+    title: "Alamo Angels",
+    description:
+      "South Texas angel network — pitch coverage, events, and founder storytelling.",
+    category: "Capital & Founders",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/angels3.png",
+    bgColor: "bg-neutral-50",
+    href: "https://www.digitalcanvas.community/thefeed/built-for-the-triangle",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alamo%20Angles.mp4",
+    tags: ["Angel", "Startups"],
+  },
+
+  // 04 — Tech & Community
+  {
+    id: "digital-canvas",
+    title: "Digital Canvas",
+    description:
+      "Conferences, workshops, and AI-driven experiences. Built with 434 MEDIA × DEVSA.",
+    category: "Tech & Community",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/digitalcanvas.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digital-canvas-ymas.svg",
+    logoDark: true,
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digitalcanvas.mov",
+    bgColor: "bg-neutral-900",
+    href: "https://www.digitalcanvas.community/",
+    tags: ["Conferences", "AI"],
+  },
+  {
     id: "devsa",
     title: "DEVSA",
-    description: "Empowering San Antonio's developer community through events, workshops, and networking that bridge the gap between talent and opportunity.",
-    size: "tall",
+    description:
+      "San Antonio's developer community — events, workshops, and pipeline building.",
+    category: "Tech & Community",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/devsa-space.webp",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/DEVSA%20Web%20Banner.mp4",
     href: "https://www.devsa.community",
-    tags: ["Community", "Tech"],
+    tags: ["Developers", "Community"],
   },
   {
-    id: "sdoh",
-    title: "¿Qué es SDOH?",
-    description: "Turning awareness into action. Multimedia campaigns addressing social determinants of health through accelerator programs, bootcamps, and demo days.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/sdoh2.png",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/SDOH%20ACCELERATOR%20PROGRAM%20RECAP_2025.mp4",
-    href: "/en/sdoh",
-    tags: ["Health", "Impact"],
+    id: "tech-bloc",
+    title: "Tech Bloc",
+    description:
+      "Economic development and advocacy growing the San Antonio tech ecosystem.",
+    category: "Tech & Community",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/techday.png",
+    bgColor: "bg-neutral-50",
+    href: "https://www.sanantoniotechday.com/",
+    tags: ["Advocacy", "Tech"],
   },
-
   {
     id: "learn2ai",
     title: "Learn2AI",
-    description: "AI literacy for everyone. Master AI skills through practical learning and hands-on projects. Turn knowledge into real-world results and future opportunities.",
-    size: "tall",
+    description:
+      "AI literacy for everyone — practical learning, hands-on projects, real-world results.",
+    category: "Tech & Community",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/ai2.png",
     logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Learn2ai.svg",
     bgColor: "bg-neutral-50",
@@ -252,36 +299,58 @@ const bentoItems: BentoItem[] = [
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Learn2AI%20-%20081825%20G.mp4",
     tags: ["AI", "Education"],
   },
+
+  // 05 — Media & Storytelling
   {
-    id: "adornthebay",
-    title: "Adorn the Bay",
-    description: "Revitalize Tampa Bay area businesses, non-profits, and municipal facilities that have been damaged or destroyed by recent hurricanes.",
-    size: "tall",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/adornbay.png",
-    bgColor: "bg-sky-50",
-    href: "https://adornmurals.com/home",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/ampd.mp4",
-    tags: ["Murals", "Art"],
+    id: "univision",
+    title: "Univision",
+    description:
+      "Spanish-language broadcast partnerships reaching millions of Hispanic audiences.",
+    category: "Media & Storytelling",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/univision.png",
+    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/univision-logo.svg",
+    bgColor: "bg-purple-950",
+    logoDark: true,
+    videoUrl:
+      "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alejandro%20Ferna%CC%81ndez%20Concert%20.mov",
+    videoAspectRatio: "4:5",
+    href: "https://www.digitalcanvas.community/thefeed/capturing-a-milestone",
+    tags: ["Broadcast", "Hispanic"],
+  },
+  {
+    id: "wifttx",
+    title: "WIFT TX",
+    description:
+      "Women in Film & Television Texas — amplifying women's voices through media partnerships.",
+    category: "Media & Storytelling",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/wifttx.avif",
+    bgColor: "bg-rose-950",
+    logoDark: true,
+    href: "https://www.digitalcanvas.community/thefeed/1.5B-Reasons-to-Film-in-Texas",
+    tags: ["Film", "Advocacy"],
+  },
+  {
+    id: "vemos-vamos",
+    title: "Vemos Vamos",
+    description:
+      "Bilingual storytelling initiative connecting communities through shared vision.",
+    category: "Media & Storytelling",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/vemos-vamos/vemosinsights.jpg",
+    href: "https://www.vemosvamos.com/about",
+    tags: ["Bilingual", "Agency"],
+  },
+  {
+    id: "mission-road",
+    title: "Mission Road Ministries",
+    description:
+      "Mission-driven media for a nonprofit serving individuals with disabilities.",
+    category: "Media & Storytelling",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/missionroad.png",
+    bgColor: "bg-neutral-50",
+    href: "https://www.missionroadministries.org/",
+    tags: ["Nonprofit", "Impact"],
   },
 ]
-
-// ─── Grid helpers ─────────────────────────────────────────────────────────────
-
-function getGridClasses(size: BentoSize) {
-  // Mobile: all items uniform (1×1). Desktop: original bento sizing.
-  switch (size) {
-    case "lg":
-      return "lg:col-span-2 lg:row-span-2"
-    case "wide":
-      return "lg:col-span-2"
-    case "tall":
-      return "lg:row-span-2"
-    case "md":
-    case "sm":
-    default:
-      return ""
-  }
-}
 
 // ─── Video Modal ──────────────────────────────────────────────────────────────
 
@@ -325,29 +394,27 @@ function VideoModal({
     >
       <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
       <motion.div
-        className={`relative overflow-hidden bg-black ${
-          isPortrait
-            ? "w-full max-w-sm aspect-4/5"
-            : "w-full max-w-4xl aspect-video"
+        className={`relative overflow-hidden rounded-xl bg-black ring-1 ring-white/10 ${
+          isPortrait ? "w-full max-w-sm aspect-4/5" : "w-full max-w-4xl aspect-video"
         }`}
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
+        initial={{ scale: 0.96, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 12 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 text-white/60 hover:text-white p-1.5 rounded-full bg-black/40 hover:bg-black/60 transition-colors duration-200"
+          className="absolute top-3 right-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white/70 ring-1 ring-white/15 backdrop-blur-md transition-all duration-200 hover:bg-black/70 hover:text-white"
           aria-label="Close video"
         >
-          <XIcon className="w-5 h-5" />
+          <XIcon className="h-4 w-4" />
         </button>
         <video
           src={videoUrl}
           autoPlay
           controls
           playsInline
-          className="w-full h-full object-cover"
+          className="h-full w-full object-cover"
           aria-label={`${title} video`}
         />
       </motion.div>
@@ -355,16 +422,16 @@ function VideoModal({
   )
 }
 
-// ─── Bento Card ───────────────────────────────────────────────────────────────
+// ─── Card ─────────────────────────────────────────────────────────────────────
 
-function BentoCard({
+function WorkCard({
   item,
   onPlayVideo,
 }: {
-  item: BentoItem
+  item: WorkItem
   onPlayVideo: (videoUrl: string, title: string, aspectRatio?: "16:9" | "4:5") => void
 }) {
-  const isDarkCard = !!item.image || !!item.logoDark
+  const isMediaCard = !!item.image || !!item.logoDark
 
   const handleClick = () => {
     if (item.videoUrl) {
@@ -372,130 +439,102 @@ function BentoCard({
     }
   }
 
-  const descClamp =
-    item.size === "lg" || item.size === "tall"
-      ? "line-clamp-3"
-      : "line-clamp-2"
-
   const inner = (
     <div
-      className={`group relative w-full h-full overflow-hidden ${
-        item.image ? "bg-neutral-950" : item.bgColor || "bg-neutral-950"
+      className={`group relative aspect-4/5 w-full overflow-hidden rounded-md ring-1 ring-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:ring-neutral-300 hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.18)] ${
+        item.image ? "bg-neutral-950" : item.bgColor || "bg-neutral-50"
       }`}
     >
-      {/* Background image */}
       {item.image && (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={item.image}
           alt=""
           draggable={false}
           loading={item.priority ? "eager" : "lazy"}
           fetchPriority={item.priority ? "high" : "auto"}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          style={{ objectPosition: item.imagePosition || 'center' }}
+          className="absolute inset-0 h-full w-full object-cover transition-[transform,filter] duration-700 ease-out group-hover:scale-[1.04] group-hover:brightness-110"
+          style={{ objectPosition: item.imagePosition || "center" }}
         />
       )}
 
-      {/* Image gradient overlay */}
       {item.image && (
-        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-black/10" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-black/0 transition-opacity duration-500 group-hover:from-black/90" />
       )}
 
-      {/* Hover darken overlay for readability */}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors duration-300 z-1" />
-
-      {/* Logo centered (logo-only cards) */}
       {item.logo && !item.image && (
         <div className="absolute inset-0 flex items-center justify-center p-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={item.logo}
             alt={`${item.title} logo`}
-            className="max-h-12 md:max-h-16 w-auto object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+            className="max-h-12 w-auto object-contain opacity-50 transition-all duration-500 group-hover:opacity-100 group-hover:scale-105 md:max-h-16"
             draggable={false}
           />
         </div>
       )}
 
-      {/* Mobile logo overlay — items with both logo + image */}
       {item.logo && item.image && (
-        <div className="absolute inset-0 flex items-center justify-center z-3 bg-black/30 lg:hidden">
+        <div className="absolute inset-0 z-3 flex items-center justify-center bg-black/35 backdrop-blur-[2px] lg:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={item.logo}
-            alt={`${item.title}`}
+            alt={item.title}
             className="max-h-10 w-auto object-contain drop-shadow-lg"
             draggable={false}
           />
         </div>
       )}
 
-      {/* Text-only title */}
       {!item.logo && !item.image && (
         <div className="absolute inset-0 flex items-center justify-center p-6">
-          <h3
-            className={`font-ggx88 font-black text-xl md:text-2xl tracking-tighter leading-none text-center ${
-              isDarkCard ? "text-white/80" : "text-neutral-800"
-            }`}
-          >
+          <h3 className="text-center font-ggx88 text-xl font-black leading-none tracking-tighter text-neutral-900 md:text-2xl">
             {item.title}
           </h3>
         </div>
       )}
 
-      {/* Play icon */}
-      {item.videoUrl && (
-        <div className="absolute top-3 right-3 z-10 ">
-          <div className="w-7 h-7 rounded-full border border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <PlayIcon className="w-3 h-3 text-white fill-white" />
-          </div>
+      {/* Top-right action chip */}
+      <div className="absolute top-3 right-3 z-10">
+        <div
+          className={`grid h-7 w-7 place-items-center rounded-full ring-1 backdrop-blur-md transition-all duration-300 ${
+            isMediaCard
+              ? "bg-white/10 text-white ring-white/20 opacity-0 group-hover:opacity-100"
+              : "bg-neutral-950/5 text-neutral-700 ring-neutral-950/15 opacity-0 group-hover:opacity-100"
+          } group-hover:scale-105`}
+        >
+          {item.videoUrl ? (
+            <PlayIcon className="h-3 w-3 fill-current" />
+          ) : item.href ? (
+            <ArrowUpRightIcon className="h-3.5 w-3.5" />
+          ) : null}
         </div>
-      )}
+      </div>
 
-      {/* External link arrow */}
-      {item.href && !item.videoUrl && (
-        <div className="absolute top-3 right-3 z-10 ">
-          <ArrowUpRightIcon
-            className={`w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-              isDarkCard ? "text-white/50" : "text-neutral-400"
-            }`}
-          />
-        </div>
-      )}
-
-      {/* Hover info overlay */}
-      <div className="absolute inset-x-0 bottom-0 p-4 z-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out">
-        {/* Tags */}
+      {/* Persistent bottom info */}
+      <div className="absolute inset-x-0 bottom-0 z-2 p-4">
         {item.tags && item.tags.length > 0 && (
           <p
-            className={`font-geist-sans text-[10px] font-medium tracking-widest uppercase mb-1.5 ${
-              isDarkCard || item.image
-                ? "text-white/60"
-                : "text-white/60"
+            className={`mb-1.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
+              isMediaCard ? "text-white/55 group-hover:text-white/80" : "text-neutral-400 group-hover:text-neutral-600"
             }`}
           >
             {item.tags.join(" · ")}
           </p>
         )}
 
-        {/* Title (when logo or image present) */}
-        {(item.image || item.logo) && (
-          <h3
-            className={`font-geist-sans text-sm font-semibold leading-tight tracking-tight ${
-              isDarkCard || item.image
-                ? "text-white"
-                : "text-white"
-            }`}
-          >
-            {item.title}
-          </h3>
-        )}
-
-        {/* Description */}
-        <p
-          className={`font-geist-sans text-xs leading-normal mt-1 ${descClamp} ${
-            isDarkCard || item.image
-              ? "text-white/70"
-              : "text-white/70"
+        <h3
+          className={`text-balance font-geist-sans text-sm font-semibold leading-tight tracking-tight transition-colors duration-300 ${
+            isMediaCard ? "text-white" : "text-neutral-900"
           }`}
+        >
+          {item.title}
+        </h3>
+
+        <p
+          className={`font-geist-sans text-xs leading-snug tracking-tight transition-all duration-500 ${
+            isMediaCard ? "text-white/65" : "text-neutral-500"
+          } line-clamp-2 max-h-0 overflow-hidden opacity-0 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100`}
         >
           {item.description}
         </p>
@@ -507,7 +546,7 @@ function BentoCard({
     return (
       <button
         onClick={handleClick}
-        className="cursor-pointer text-left w-full h-full"
+        className="block w-full cursor-pointer text-left"
         aria-label={`Play ${item.title} video`}
       >
         {inner}
@@ -520,17 +559,15 @@ function BentoCard({
     return (
       <Link
         href={item.href}
-        className="block w-full h-full"
-        {...(isExternal
-          ? { target: "_blank", rel: "noopener noreferrer" }
-          : {})}
+        className="block w-full"
+        {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       >
         {inner}
       </Link>
     )
   }
 
-  return <div className="w-full h-full">{inner}</div>
+  return <div className="w-full">{inner}</div>
 }
 
 // ─── Page Client ──────────────────────────────────────────────────────────────
@@ -541,76 +578,331 @@ export default function WorkClient() {
     title: string
     aspectRatio?: "16:9" | "4:5"
   } | null>(null)
+  const [activeCategory, setActiveCategory] = useState<Category>(CATEGORIES[0].id)
 
-  const handlePlayVideo = useCallback((url: string, title: string, aspectRatio?: "16:9" | "4:5") => {
-    setActiveVideo({ url, title, aspectRatio })
+  const heroRef = useRef<HTMLDivElement>(null)
+  const sectionRefs = useRef<Record<Category, HTMLElement | null>>({
+    "Brand & Culture": null,
+    "Health & Bio Innovation": null,
+    "Capital & Founders": null,
+    "Tech & Community": null,
+    "Media & Storytelling": null,
+  })
+
+  // Hero scroll parallax
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  })
+  const heroOpacity = useTransform(heroProgress, [0, 0.85], [1, 0])
+  const heroY = useTransform(heroProgress, [0, 1], [0, -80])
+  const heroScale = useTransform(heroProgress, [0, 1], [1, 0.96])
+
+  // Top scroll progress bar
+  const { scrollYProgress: pageProgress } = useScroll()
+  const smoothProgress = useSpring(pageProgress, { stiffness: 120, damping: 24, mass: 0.4 })
+  const [showChip, setShowChip] = useState(false)
+  useMotionValueEvent(pageProgress, "change", (latest) => {
+    setShowChip(latest > 0.06 && latest < 0.95)
+  })
+
+  // Track active category as user scrolls
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting)
+        if (visible.length > 0) {
+          // Pick the section whose top is closest to the viewport top
+          const top = visible.sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          )[0]
+          const id = top.target.getAttribute("data-category") as Category | null
+          if (id) setActiveCategory(id)
+        }
+      },
+      { rootMargin: "-30% 0px -55% 0px", threshold: 0 },
+    )
+
+    Object.values(sectionRefs.current).forEach((el) => {
+      if (el) observer.observe(el)
+    })
+    return () => observer.disconnect()
   }, [])
 
-  const handleCloseVideo = useCallback(() => {
-    setActiveVideo(null)
+  const grouped = useMemo(() => {
+    return CATEGORIES.map((cat) => ({
+      ...cat,
+      items: workItems.filter((i) => i.category === cat.id),
+    }))
   }, [])
+
+  const handlePlayVideo = useCallback(
+    (url: string, title: string, aspectRatio?: "16:9" | "4:5") => {
+      setActiveVideo({ url, title, aspectRatio })
+    },
+    [],
+  )
+
+  const handleCloseVideo = useCallback(() => setActiveVideo(null), [])
+
+  const activeMeta = CATEGORIES.find((c) => c.id === activeCategory) || CATEGORIES[0]
 
   return (
     <>
+      {/* Top scroll-progress bar */}
+      <motion.div
+        className="fixed inset-x-0 top-0 z-40 h-px origin-left bg-neutral-950"
+        style={{ scaleX: smoothProgress }}
+      />
+
       <main className="min-h-dvh bg-white text-neutral-950">
-        {/* Header */}
-        <div className="pt-28 md:pt-36 pb-12 md:pb-16 px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
+        {/* ── Hero ───────────────────────────────────────────────────────────── */}
+        <section
+          ref={heroRef}
+          className="relative overflow-hidden border-b border-neutral-200/70 px-6 pt-32 pb-20 lg:px-8 lg:pt-40 lg:pb-28"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 opacity-[0.04]"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)",
+              backgroundSize: "56px 56px",
+              maskImage: "radial-gradient(ellipse 70% 70% at 50% 0%, black, transparent 70%)",
+              WebkitMaskImage:
+                "radial-gradient(ellipse 70% 70% at 50% 0%, black, transparent 70%)",
+            }}
+          />
+
+          <motion.div
+            style={{ opacity: heroOpacity, y: heroY, scale: heroScale }}
+            className="mx-auto max-w-7xl"
+          >
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-8 flex items-center gap-2 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500"
             >
-              <p className="font-geist-sans text-xs font-medium tracking-widest uppercase text-neutral-400 mb-4">
-                Build Your Impact
-              </p>
-              <h1 className="font-ggx88 font-black text-neutral-950 text-5xl md:text-6xl lg:text-7xl tracking-tighter leading-[0.92] mb-5">
-                Work That Matters
-              </h1>
-              <p className="font-geist-sans text-neutral-500 text-lg md:text-xl font-normal leading-relaxed tracking-tight max-w-2xl mb-8">
-                Where creativity meets community. A portfolio of brand
-                narratives, immersive events, and campaigns designed to
-                challenge the status quo.
-              </p>
+              <span className="grid h-1.5 w-1.5 place-items-center rounded-full bg-neutral-900" />
+              Selected Work · 434 MEDIA
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+              className="font-ggx88 text-[clamp(3rem,9vw,7.5rem)] font-black leading-[0.92] tracking-[-0.04em] text-neutral-950"
+            >
+              Bold Stories.
+              <br />
+              <span className="bg-linear-to-br from-neutral-950 via-neutral-700 to-neutral-400 bg-clip-text text-transparent">
+                Proven Impact.
+              </span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-8 max-w-2xl text-balance font-geist-sans text-lg leading-relaxed tracking-tight text-neutral-600 md:text-xl"
+            >
+              From brand campaigns, to event production, we help the world&apos;s most innovative
+              firms find their voice and amplify their impact through bold storytelling and
+              experiences.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-10 flex flex-wrap items-center gap-3"
+            >
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 font-geist-sans text-sm font-medium text-white bg-neutral-950 px-5 py-2.5 rounded-md hover:bg-neutral-800 transition-colors duration-200"
+                className="group inline-flex items-center gap-2 rounded-full bg-neutral-950 px-5 py-2.5 font-geist-sans text-sm font-medium text-white transition-all duration-200 hover:gap-3 hover:bg-neutral-800"
               >
-                Work with us
-                <ArrowUpRightIcon className="w-3.5 h-3.5" />
+                Start a project
+                <ArrowUpRightIcon className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12" />
               </Link>
+              <a
+                href="#work"
+                className="group inline-flex items-center gap-2 rounded-full px-5 py-2.5 font-geist-sans text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 transition-all duration-200 hover:bg-neutral-100 hover:text-neutral-950"
+              >
+                Browse the portfolio
+                <span aria-hidden className="transition-transform duration-200 group-hover:translate-y-px">
+                  ↓
+                </span>
+              </a>
+            </motion.div>
+
+            <motion.dl
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-16 grid max-w-3xl grid-cols-3 gap-x-8 border-t border-neutral-200/70 pt-8"
+            >
+              {[
+                { v: workItems.length, l: "Projects shipped" },
+                { v: CATEGORIES.length, l: "Practice areas" },
+                { v: "SATX", l: "Built in" },
+              ].map((s) => (
+                <div key={s.l}>
+                  <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                    {s.l}
+                  </dt>
+                  <dd className="mt-1 font-ggx88 text-3xl font-black tracking-tight tabular-nums text-neutral-950 md:text-4xl">
+                    {s.v}
+                  </dd>
+                </div>
+              ))}
+            </motion.dl>
+          </motion.div>
+        </section>
+
+        {/* Sticky category chip */}
+        <AnimatePresence>
+          {showChip && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="pointer-events-none fixed top-20 left-1/2 z-30 -translate-x-1/2"
+            >
+              <motion.div
+                key={activeCategory}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center gap-2 rounded-full bg-white/85 px-3.5 py-1.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.2em] text-neutral-700 shadow-sm ring-1 ring-neutral-200 backdrop-blur-md"
+              >
+                <span className="grid h-1.5 w-1.5 place-items-center rounded-full bg-emerald-500" />
+                {activeMeta.eyebrow}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Grouped sections ────────────────────────────────────────────────── */}
+        <div id="work" className="relative">
+          {grouped.map((group, groupIndex) => (
+            <section
+              key={group.id}
+              ref={(el) => {
+                sectionRefs.current[group.id] = el
+              }}
+              data-category={group.id}
+              className={`px-6 lg:px-8 ${
+                groupIndex === 0 ? "pt-16 lg:pt-24" : "pt-20 lg:pt-28"
+              } pb-12 lg:pb-16 ${
+                groupIndex === grouped.length - 1
+                  ? "border-b border-neutral-200/70"
+                  : "border-b border-neutral-100"
+              }`}
+            >
+              <div className="mx-auto max-w-7xl">
+                {/* Section header */}
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                  className="mb-10 grid items-end gap-6 md:mb-14 md:grid-cols-12"
+                >
+                  <div className="md:col-span-8">
+                    <p className="mb-3 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500">
+                      {group.eyebrow}
+                    </p>
+                    <h2 className="font-ggx88 text-3xl font-black leading-[0.95] tracking-[-0.02em] text-neutral-950 md:text-5xl">
+                      {group.headline}
+                    </h2>
+                  </div>
+                  <p className="font-geist-sans text-sm leading-relaxed text-neutral-500 md:col-span-4 md:text-base">
+                    {group.subline}
+                  </p>
+                </motion.div>
+
+                {/* Uniform card grid: 1 / 2 / 4 cols, all aspect-[4/5] */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+                  {group.items.map((item, idx) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 24 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, margin: "-60px" }}
+                      transition={{
+                        duration: 0.55,
+                        delay: Math.min(idx * 0.04, 0.32),
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                    >
+                      <WorkCard item={item} onPlayVideo={handlePlayVideo} />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+
+        {/* ── CTA ─────────────────────────────────────────────────────────────── */}
+        <section className="relative overflow-hidden bg-neutral-50">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 opacity-[0.05]"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+              maskImage: "radial-gradient(ellipse 60% 60% at 50% 50%, black, transparent 75%)",
+              WebkitMaskImage:
+                "radial-gradient(ellipse 60% 60% at 50% 50%, black, transparent 75%)",
+            }}
+          />
+          <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="grid items-end gap-10 md:grid-cols-12"
+            >
+              <div className="md:col-span-7">
+                <p className="mb-4 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500">
+                  Let&apos;s build yours
+                </p>
+                <h2 className="font-ggx88 text-4xl font-black leading-[0.95] tracking-[-0.03em] text-neutral-950 md:text-6xl">
+                  Bold stories aren&apos;t accidental.
+                </h2>
+                <p className="mt-6 max-w-xl font-geist-sans text-base leading-relaxed text-neutral-600 md:text-lg">
+                  We help the world&apos;s most innovative firms find their voice and amplify their
+                  impact through brand campaigns, event production, and storytelling that earns
+                  attention.
+                </p>
+              </div>
+              <div className="md:col-span-5 md:justify-self-end">
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row md:flex-col md:items-end">
+                  <Link
+                    href="/contact"
+                    className="group inline-flex items-center justify-center gap-2 rounded-full bg-neutral-950 px-6 py-3 font-geist-sans text-sm font-medium text-white transition-all duration-200 hover:gap-3 hover:bg-neutral-800"
+                  >
+                    Start a project
+                    <ArrowUpRightIcon className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12" />
+                  </Link>
+                  <a
+                    href="mailto:build@434media.com"
+                    className="group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-geist-sans text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 transition-all duration-200 hover:bg-white hover:text-neutral-950"
+                  >
+                    build@434media.com
+                  </a>
+                </div>
+              </div>
             </motion.div>
           </div>
-        </div>
-
-        {/* Grid Section */}
-        <div className="px-6 lg:px-8 pt-12 md:pt-0 pb-20 md:pb-28">
-          <div className="max-w-7xl mx-auto relative">
-            {/* Grid with visible 1px line structure */}
-            <div className="bg-neutral-200 p-px">
-              <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[160px] lg:auto-rows-[200px] gap-px">
-                {bentoItems.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    viewport={{ once: true, margin: "-40px" }}
-                    transition={{
-                      duration: 0.5,
-                      delay: Math.min(index * 0.03, 0.3),
-                    }}
-                    className={getGridClasses(item.size)}
-                  >
-                    <BentoCard item={item} onPlayVideo={handlePlayVideo} />
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
       </main>
 
-      {/* Video Modal */}
       <AnimatePresence>
         {activeVideo && (
           <VideoModal

@@ -35,7 +35,8 @@ const pageConfig: Record<
   },
   work: {
     title: "OUR WORK",
-    subtitle: "Bold, Strategic Creative — Proven Impact",
+    subtitle:
+      "From brand campaigns to event production — helping the world's most innovative firms find their voice and amplify their impact.",
     accent: "#f97316",
     gradient: "linear-gradient(135deg, #0c0a09, #1c1917, #0c0a09)",
     icon: "🎬",
