@@ -28,27 +28,20 @@ export const metadata: Metadata = {
     title: "434 MEDIA | Creative Media & Smart Marketing in San Antonio",
     description:
       "ROI-driven brand media strategies — video production, web development, event production — that move audiences and deliver measurable results.",
-    url: siteUrl,
+    url: `${siteUrl}/`,
     siteName: "434 MEDIA",
-    images: [
-      {
-        url: `${siteUrl}/api/og`,
-        width: 1200,
-        height: 630,
-        alt: "434 MEDIA — Bold Stories. Proven Impact.",
-      },
-    ],
     locale: "en_US",
     type: "website",
+    // Image is auto-wired by app/opengraph-image.tsx (statically prerendered).
   },
   twitter: {
     card: "summary_large_image",
     title: "434 MEDIA | Creative Media & Smart Marketing in San Antonio",
     description:
       "ROI-driven brand media strategies that move audiences and deliver measurable results.",
-    images: [`${siteUrl}/api/og`],
     creator: "@434media",
     site: "@434media",
+    // Image is auto-wired by app/twitter-image.tsx.
   },
 }
 
