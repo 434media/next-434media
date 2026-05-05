@@ -10,6 +10,8 @@ import { InstagramStoryAnalytics, type StoryAnalyticsData } from "@/components/i
 import { InstagramAttributedLeads, type AttributedLeadsData } from "@/components/instagram/InstagramAttributedLeads"
 import { InstagramBestTimeToPost } from "@/components/instagram/InstagramBestTimeToPost"
 import { InstagramDemographics } from "@/components/instagram/InstagramDemographics"
+import { InstagramGoals } from "@/components/instagram/InstagramGoals"
+import { InstagramReelsAnalytics } from "@/components/instagram/InstagramReelsAnalytics"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import type {
   InstagramTimeRange,
@@ -645,6 +647,10 @@ export default function InstagramAnalyticsClientPage() {
                 shares: media.insights?.shares || 0,
                 saves: media.insights?.saves || 0,
                 videoViews: media.insights?.video_views || 0,
+                reels_plays: media.insights?.reels_plays,
+                reels_avg_watch_time_ms: media.insights?.reels_avg_watch_time_ms,
+                reels_total_watch_time_ms: media.insights?.reels_total_watch_time_ms,
+                reels_replays: media.insights?.reels_replays,
                 _source: "instagram_api",
               },
               engagement_rate: media.engagement_rate || 0,
@@ -921,6 +927,31 @@ export default function InstagramAnalyticsClientPage() {
             </div>
           ) : (
             <>
+              {/* Goals — per-account targets for the active period.
+                  Persisted in localStorage; renders progress against current values. */}
+              {connectionStatus?.success && (
+                <div className="mb-10 sm:mb-12">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                    <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Goals</h2>
+                    <InfoTooltip content="Set period targets for the metrics that matter most. Goals are saved per Instagram account in your browser and are scoped to the selected date range." />
+                  </div>
+                  <InstagramGoals
+                    account={selectedAccount}
+                    rangeLabel={getDateRangeLabel(dateRange)}
+                    isConnected={!!connectionStatus?.success}
+                    current={{
+                      reach: insightsData?.reach || 0,
+                      engagement_rate:
+                        insightsData && insightsData.followers_count > 0
+                          ? (insightsData.content_interactions / insightsData.followers_count) * 100
+                          : 0,
+                      website_clicks: insightsData?.website_clicks || 0,
+                      new_followers: insightsData?.follows || 0,
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Key Metrics - Primary KPIs for Sales & Marketing */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
@@ -1016,6 +1047,20 @@ export default function InstagramAnalyticsClientPage() {
                   media={mediaData}
                   followerCount={accountData?.followers_count || 0}
                   connectionStatus={connectionStatus}
+                />
+              </div>
+
+              {/* Reels — Instagram Graph exposes a richer set of metrics for video
+                  posts (plays, avg watch time, replays). Surfaced here so video
+                  performance gets attention separate from the photo-heavy top-posts grid. */}
+              <div className="mb-10 sm:mb-12">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Reels</h2>
+                  <InfoTooltip content="Reels-specific metrics from Instagram Graph: total plays, average watch time, replays, and total watch time. Shown for VIDEO posts in the selected period." />
+                </div>
+                <InstagramReelsAnalytics
+                  media={mediaData}
+                  isConnected={!!connectionStatus?.success}
                 />
               </div>
 

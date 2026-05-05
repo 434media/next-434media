@@ -1,16 +1,17 @@
 "use client"
 
+import { useState, useMemo } from "react"
 import { motion } from "motion/react"
-import { 
-  Heart, 
-  MessageCircle, 
-  Share2, 
-  Eye, 
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  Eye,
   ExternalLink,
-  Trophy,
   Target,
   Zap,
-  BarChart3
+  BarChart3,
+  ChevronDown,
 } from "lucide-react"
 import {
   formatNumber,
@@ -19,6 +20,23 @@ import {
   calculateMediaEngagementRate,
 } from "../../lib/instagram-utils"
 import type { InstagramMedia, InstagramMediaInsights } from "../../types/instagram-insights"
+
+type MediaTypeFilter = "all" | "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM"
+type SortKey = "engagement" | "reach" | "saves" | "shares"
+
+const FILTER_OPTIONS: Array<{ id: MediaTypeFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "IMAGE", label: "Feed" },
+  { id: "VIDEO", label: "Reels" },
+  { id: "CAROUSEL_ALBUM", label: "Carousel" },
+]
+
+const SORT_OPTIONS: Array<{ id: SortKey; label: string }> = [
+  { id: "engagement", label: "Engagement" },
+  { id: "reach", label: "Reach" },
+  { id: "saves", label: "Saves" },
+  { id: "shares", label: "Shares" },
+]
 
 interface InstagramTopPostsTableProps {
   media: Array<
@@ -36,21 +54,52 @@ interface InstagramTopPostsTableProps {
 }
 
 export function InstagramTopPostsTable({ media, followerCount, connectionStatus }: InstagramTopPostsTableProps) {
-  // Sort by engagement (likes + comments)
-  const sortedMedia = [...media]
-    .sort((a, b) => {
-      const aEngagement = (a.like_count || 0) + (a.comments_count || 0)
-      const bEngagement = (b.like_count || 0) + (b.comments_count || 0)
-      return bEngagement - aEngagement
-    })
-    .slice(0, 6) // Top 6 posts for grid
+  const [typeFilter, setTypeFilter] = useState<MediaTypeFilter>("all")
+  const [sortKey, setSortKey] = useState<SortKey>("engagement")
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
 
-  // Calculate aggregate metrics for summary
+  // Filter then sort. Limit to top 6 for the grid; counts in the filter chips
+  // reflect the unfiltered population so the user can see the available pool.
+  const sortedMedia = useMemo(() => {
+    const filtered =
+      typeFilter === "all" ? media : media.filter((p) => p.media_type === typeFilter)
+
+    const compare = (a: typeof media[number], b: typeof media[number]) => {
+      switch (sortKey) {
+        case "reach":
+          return (b.insights?.reach || 0) - (a.insights?.reach || 0)
+        case "saves":
+          return (b.insights?.saves || 0) - (a.insights?.saves || 0)
+        case "shares":
+          return (b.insights?.shares || 0) - (a.insights?.shares || 0)
+        case "engagement":
+        default:
+          return (
+            (b.like_count || 0) + (b.comments_count || 0) -
+            ((a.like_count || 0) + (a.comments_count || 0))
+          )
+      }
+    }
+
+    return [...filtered].sort(compare).slice(0, 6)
+  }, [media, typeFilter, sortKey])
+
+  // Counts per filter (unfiltered population, for chip badges)
+  const counts = useMemo(() => {
+    return {
+      all: media.length,
+      IMAGE: media.filter((p) => p.media_type === "IMAGE").length,
+      VIDEO: media.filter((p) => p.media_type === "VIDEO").length,
+      CAROUSEL_ALBUM: media.filter((p) => p.media_type === "CAROUSEL_ALBUM").length,
+    } as Record<MediaTypeFilter, number>
+  }, [media])
+
+  // Calculate aggregate metrics for summary (over filtered+sorted top 6)
   const totalReach = sortedMedia.reduce((sum, p) => sum + (p.insights?.reach || 0), 0)
   const totalEngagement = sortedMedia.reduce((sum, p) => sum + (p.like_count || 0) + (p.comments_count || 0), 0)
   const totalShares = sortedMedia.reduce((sum, p) => sum + (p.insights?.shares || 0), 0)
-  const avgEngagementRate = sortedMedia.length > 0 
-    ? sortedMedia.reduce((sum, p) => sum + calculateMediaEngagementRate(p, followerCount), 0) / sortedMedia.length 
+  const avgEngagementRate = sortedMedia.length > 0
+    ? sortedMedia.reduce((sum, p) => sum + calculateMediaEngagementRate(p, followerCount), 0) / sortedMedia.length
     : 0
 
   const truncateCaption = (caption: string, maxLength = 100): string => {
@@ -79,7 +128,8 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
     )
   }
 
-  if (sortedMedia.length === 0) {
+  // No media at all — surface a single empty card.
+  if (media.length === 0) {
     return (
       <div className="w-full rounded-md bg-white ring-1 ring-neutral-200/70 p-6 sm:p-8 text-center text-neutral-500">
         No posts found
@@ -116,7 +166,84 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
         </div>
       </div>
 
-      {/* Post Cards */}
+      {/* Filter + sort controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex h-9 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
+          {FILTER_OPTIONS.map((opt) => {
+            const isActive = typeFilter === opt.id
+            const count = counts[opt.id]
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setTypeFilter(opt.id)}
+                className={`inline-flex items-center gap-1.5 px-3 text-xs font-medium whitespace-nowrap transition-colors ${
+                  isActive
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                {opt.label}
+                <span
+                  className={`text-[10px] tabular-nums ${
+                    isActive ? "text-white/70" : "text-neutral-400"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Sort dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setSortMenuOpen((v) => !v)}
+            onBlur={() => setTimeout(() => setSortMenuOpen(false), 120)}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+            aria-haspopup="listbox"
+            aria-expanded={sortMenuOpen}
+          >
+            <span className="text-neutral-500">Sort:</span>
+            {SORT_OPTIONS.find((o) => o.id === sortKey)?.label}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${sortMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+          {sortMenuOpen && (
+            <div
+              role="listbox"
+              className="absolute right-0 top-full mt-1 z-10 min-w-36 rounded-md ring-1 ring-neutral-200 bg-white shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] py-1"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  role="option"
+                  aria-selected={sortKey === opt.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    setSortKey(opt.id)
+                    setSortMenuOpen(false)
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors ${
+                    sortKey === opt.id ? "bg-neutral-100 text-neutral-900" : "text-neutral-700 hover:bg-neutral-50"
+                  }`}
+                >
+                  {opt.label}
+                  {sortKey === opt.id && (
+                    <span className="inline-block h-1 w-1 rounded-full bg-neutral-900" aria-hidden="true" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Post Cards (or empty filtered state) */}
+      {sortedMedia.length === 0 ? (
+        <div className="rounded-md bg-white ring-1 ring-neutral-200/70 p-6 text-center text-sm text-neutral-500">
+          No {FILTER_OPTIONS.find((o) => o.id === typeFilter)?.label.toLowerCase()} posts in this period
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sortedMedia.map((post, index) => {
           const engagementRate = calculateMediaEngagementRate(post, followerCount)
@@ -229,6 +356,7 @@ export function InstagramTopPostsTable({ media, followerCount, connectionStatus 
           )
         })}
       </div>
+      )}
     </div>
   )
 }

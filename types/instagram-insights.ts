@@ -36,6 +36,12 @@ export interface InstagramMediaInsights {
   shares: number
   saves: number
   videoViews: number
+  // Reels-specific (only populated for VIDEO/REEL media types). All optional —
+  // older posts and non-video media will leave these undefined.
+  reels_plays?: number
+  reels_avg_watch_time_ms?: number
+  reels_total_watch_time_ms?: number
+  reels_replays?: number
   _source: string
 }
 

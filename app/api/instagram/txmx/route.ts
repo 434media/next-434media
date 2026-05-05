@@ -1610,6 +1610,32 @@ export async function GET(request: NextRequest) {
                     (m.like_count || 0) + (m.comments_count || 0),
                     m.insights.reach || 1,
                   )
+
+                  // Reels-specific metrics — separate fetch so a failure here
+                  // doesn't break the standard insights above. Only meaningful
+                  // for VIDEO/REEL media; non-video falls through silently.
+                  if (m.media_type === "VIDEO") {
+                    try {
+                      const reelsMetrics = "ig_reels_avg_watch_time,ig_reels_video_view_total_time,clips_replays_count,ig_reels_aggregated_all_plays_count"
+                      const reelsRes = await fetchInstagramData(`${m.id}/insights`, accessToken, {
+                        metric: reelsMetrics,
+                        period: "lifetime",
+                      }, 1)
+                      if (Array.isArray(reelsRes?.data)) {
+                        const rmap: Record<string, number> = {}
+                        reelsRes.data.forEach((d: any) => {
+                          const v = d?.values?.[0]?.value
+                          rmap[d.name] = typeof v === 'number' ? v : 0
+                        })
+                        m.insights.reels_avg_watch_time_ms = rmap.ig_reels_avg_watch_time
+                        m.insights.reels_total_watch_time_ms = rmap.ig_reels_video_view_total_time
+                        m.insights.reels_replays = rmap.clips_replays_count
+                        m.insights.reels_plays = rmap.ig_reels_aggregated_all_plays_count
+                      }
+                    } catch (reelsErr) {
+                      if (debug) console.warn(`[Instagram API] Reels metrics unavailable for ${m.id}:`, reelsErr)
+                    }
+                  }
                 }
               } catch (err) {
                 console.warn(`[Instagram API] Failed to fetch insights for media ${m.id} (${m.media_type}):`, err)
