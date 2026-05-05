@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { usePathname } from "next/navigation"
+import { ArrowUpRight } from "lucide-react"
 import CartModal from "./shopify/cart/modal"
 import { useCart } from "./shopify/cart/cart-context"
 import { ScrambleText } from "./ScrambleText"
@@ -15,12 +16,12 @@ type CombinedNavbarProps = {
   menu?: Menu[]
 }
 
+// Internal links lead — they keep visitors on the application.
+// External destinations follow and are visually marked with ↗.
 const desktopLinks = [
   { href: "/work", label: "Work" },
-  { href: "https://www.digitalcanvas.community/thefeed", label: "The Feed" },
   { href: "/shop", label: "Shop" },
-  { href: "https://www.devsa.community/events", label: "Events" },
-  { href: "/contact", label: "Contact" },
+  { href: "https://www.digitalcanvas.community/thefeed", label: "The Feed" },
 ]
 
 // Custom hook to check if component has mounted
@@ -101,9 +102,9 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
               />
             </Link>
 
-            {/* Desktop Nav Links + Cart */}
+            {/* Desktop Nav Links + Contact CTA + Cart */}
             {hasMounted && !isMobile && (
-              <div className="hidden md:flex items-center gap-1">
+              <div className="hidden md:flex items-center gap-2">
                 <nav className="flex items-center gap-1">
                   {desktopLinks.map((link) => {
                     const isActive = pathname === link.href || pathname?.startsWith(link.href + "/")
@@ -113,17 +114,41 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                         key={link.href}
                         href={link.href}
                         {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                        className={`font-geist-sans text-[13px] font-medium leading-none px-3 py-1.5 rounded-md transition-all duration-200 ${
+                        className={`group inline-flex items-center gap-1 font-geist-sans text-[13px] font-medium leading-none px-3 py-1.5 rounded-md transition-all duration-200 ${
                           isActive
                             ? "text-white bg-white/10"
                             : "text-white/60 hover:text-white hover:bg-white/5"
                         }`}
                       >
                         {link.label}
+                        {isExternal && (
+                          <ArrowUpRight
+                            className="h-3 w-3 text-white/40 transition-all duration-200 group-hover:text-white/80 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                            aria-hidden="true"
+                          />
+                        )}
                       </Link>
                     )
                   })}
                 </nav>
+
+                {/* Contact CTA — visually distinct, treated as the closing prompt */}
+                <Link
+                  href="/contact"
+                  className={`group ml-1 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 font-geist-sans text-[13px] font-medium leading-none transition-all duration-200 ${
+                    pathname === "/contact"
+                      ? "bg-white text-neutral-950"
+                      : "bg-white text-neutral-950 hover:bg-neutral-200 hover:gap-2"
+                  }`}
+                  aria-label="Contact 434 MEDIA"
+                >
+                  Contact
+                  <ArrowUpRight
+                    className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12"
+                    aria-hidden="true"
+                  />
+                </Link>
+
                 {(isInShop || hasCartItems) && (
                   <div className="flex items-center ml-1">
                     <CartModal />

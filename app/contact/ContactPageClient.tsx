@@ -4,6 +4,14 @@ import { motion } from "motion/react"
 import { useEffect, useState, useRef, useCallback } from "react"
 import { ContactForm } from "@/components/ContactForm"
 
+// Single-purpose contact page. Conversion is the only job.
+// Removes the black-box feeling after submitting a contact form.
+const NEXT_STEPS = [
+  { label: "01", title: "Reply within one business day", body: "We read every inbound personally." },
+  { label: "02", title: "30-min discovery call", body: "Goals, scope, timing, and fit. No pitch deck." },
+  { label: "03", title: "Scoped proposal", body: "Concrete deliverables, milestones, and pricing within a week." },
+]
+
 const trustedByLogos = [
   {
     name: "Builders VC",
@@ -192,8 +200,8 @@ export function ContactPageClient() {
                 transition={{ duration: 0.8, delay: 1.5 }}
                 className="pt-4 border-t border-gray-100"
               >
-                <p className="font-geist-sans text-[11px] text-gray-400 font-semibold tracking-widest uppercase mb-3.5">
-                  Trusted by <span className="font-medium text-gray-700">leading organizations</span>
+                <p className="font-geist-mono text-[11px] text-gray-500 font-semibold uppercase tracking-[0.22em] mb-3.5">
+                  Producing with <span className="text-gray-900">enterprise &amp; civic brands</span>
                 </p>
 
                 {/* Mobile: scrolling marquee */}
@@ -258,8 +266,46 @@ export function ContactPageClient() {
                 <ContactForm
                   isVisible={mounted}
                   className="relative z-10 w-full"
-                />             
+                />
               </div>
+
+              {/* What happens next — kills the black-box anxiety post-submit */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="mt-6 rounded-lg bg-gray-50 p-5 ring-1 ring-gray-200"
+              >
+                <div className="flex items-baseline justify-between gap-3 mb-3">
+                  <p className="font-geist-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+                    What happens next
+                  </p>
+                  <a
+                    href="mailto:build@434media.com"
+                    className="font-geist-mono text-[10px] font-medium tracking-wide text-gray-400 hover:text-gray-900 transition-colors"
+                  >
+                    build@434media.com
+                  </a>
+                </div>
+                <ol className="space-y-2.5">
+                  {NEXT_STEPS.map((step) => (
+                    <li key={step.label} className="flex gap-3">
+                      <span className="font-geist-mono text-[11px] font-semibold tabular-nums text-gray-400 pt-0.5 shrink-0">
+                        {step.label}
+                      </span>
+                      <div>
+                        <p className="font-geist-sans text-[13px] font-semibold text-gray-900 leading-tight">
+                          {step.title}
+                        </p>
+                        <p className="font-geist-sans text-[12px] text-gray-500 leading-snug mt-0.5">
+                          {step.body}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </motion.div>
             </motion.div>
           </div>
         </div>

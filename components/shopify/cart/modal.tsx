@@ -6,6 +6,7 @@ import { createUrl } from "../../../lib/utils"
 import Image from "next/image"
 import Link from "next/link"
 import { Fragment, useEffect, useRef, useState } from "react"
+import { ShoppingCart, X } from "lucide-react"
 import { createCartAndSetCookie, getCheckoutUrl } from "./actions"
 import { useCart } from "./cart-context"
 import { DeleteItemButton } from "./delete-item-button"
@@ -312,10 +313,10 @@ export default function CartModal() {
         <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-black">
           <div className="w-16 h-16 mb-4 rounded-sm bg-black border-2 border-white flex items-center justify-center group relative overflow-hidden">
             <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
-            <i
-              className="ri-shopping-cart-line text-3xl text-white group-hover:text-black relative z-10 transition-colors duration-500"
+            <ShoppingCart
+              className="h-7 w-7 text-white group-hover:text-black relative z-10 transition-colors duration-500"
               aria-hidden="true"
-            ></i>
+            />
           </div>
           <p className="text-xl font-black tracking-wider uppercase mb-2 text-white">Your cart is empty</p>
           <p className="text-white/70 mb-6 font-medium">Looks like you haven't added anything to your cart yet.</p>
@@ -516,10 +517,10 @@ export default function CartModal() {
                   className="group relative overflow-hidden bg-black border-2 border-white p-2 transition-all duration-500 hover:text-black"
                 >
                   <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
-                  <i
-                    className="ri-close-line text-xl text-white group-hover:text-black relative z-10 transition-colors duration-500"
+                  <X
+                    className="h-5 w-5 text-white group-hover:text-black relative z-10 transition-colors duration-500"
                     aria-hidden="true"
-                  ></i>
+                  />
                 </button>
               </div>
               {renderCartContent()}

@@ -5,6 +5,7 @@ import { motion } from "motion/react"
 import type { Product, ProductVariant } from "../../../lib/shopify/types"
 // import type { MetaPixelAddToCartData } from "../../../types/meta-pixel"
 import clsx from "clsx"
+import { Plus } from "lucide-react"
 import { addItem } from "./actions"
 import { useProduct } from "../product/product-context"
 import { useCart } from "./cart-context"
@@ -145,7 +146,7 @@ function SubmitButton({
     return (
       <button aria-label="Please select an option" disabled className={clsx(buttonClasses, disabledClasses)}>
         <div className="absolute left-0 ml-4">
-          <i className="ri-add-line h-5 w-5" aria-hidden="true"></i>
+          <Plus className="h-5 w-5" aria-hidden="true" />
         </div>
         Add To Cart
       </button>
@@ -180,7 +181,7 @@ function SubmitButton({
             ></path>
           </svg>
         ) : (
-          <i className="ri-add-line h-5 w-5" aria-hidden="true"></i>
+          <Plus className="h-5 w-5" aria-hidden="true" />
         )}
       </div>
       {buttonText}

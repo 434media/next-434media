@@ -1,6 +1,5 @@
 import type React from "react"
 import "../globals.css"
-import "remixicon/fonts/remixicon.css"
 import { i18n } from "../../i18n-config"
 
 // Generate static params for all supported locales

@@ -1,5 +1,6 @@
 "use client"
 
+import { X } from "lucide-react"
 import { removeItem } from "./actions"
 import type { CartItem } from "../../../lib/shopify/types"
 import { useActionState } from "react"
@@ -28,11 +29,10 @@ export function DeleteItemButton({
         className="group relative overflow-hidden flex h-6 w-6 items-center justify-center bg-black border-2 border-white text-white transition-all duration-500 hover:text-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
       >
         <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
-        <i
-          className="ri-close-line text-sm text-white group-hover:text-black relative z-10 transition-colors duration-500"
-          style={{ lineHeight: 0 }}
+        <X
+          className="h-3.5 w-3.5 text-white group-hover:text-black relative z-10 transition-colors duration-500"
           aria-hidden="true"
-        ></i>
+        />
       </button>
       <p aria-live="polite" className="sr-only" role="status">
         {message}

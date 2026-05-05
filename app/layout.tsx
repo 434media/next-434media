@@ -3,8 +3,8 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import localFont from "next/font/local"
 import "./globals.css"
-import "remixicon/fonts/remixicon.css"
 import { CombinedNavbar } from "@/components/combined-navbar"
+import { BRAND } from "@/lib/seo/brand"
 import Footer from "@/components/Footer"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
@@ -41,29 +41,34 @@ const ggx88Font = localFont({
 // Define the base URL for the site
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
+const defaultTitle = `${BRAND.name} — ${BRAND.shortTagline}`
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    template: "%s | 434 MEDIA",
-    default: "434 MEDIA | Creative Media and Smart Marketing Solutions in San Antonio, TX",
+    template: `%s | ${BRAND.name}`,
+    default: defaultTitle,
   },
-  description:
-    "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies that move audiences and deliver measurable results.",
+  description: BRAND.description,
   keywords: [
-    "434 MEDIA",
-    "San Antonio",
-    "Texas",
-    "creative media",
-    "smart marketing",
+    BRAND.name,
+    "Bold Stories",
+    "Proven Impact",
+    "brand campaigns",
+    "event production",
+    "creative media agency",
     "brand storytelling",
-    "media strategy",
     "video production",
     "web development",
-    "event production",
+    "programmatic advertising",
+    "OTT and CTV",
+    "San Antonio",
+    "South Texas",
+    "Texas",
   ],
-  authors: [{ name: "434 MEDIA" }],
-  creator: "434 MEDIA",
-  publisher: "434 MEDIA",
+  authors: [{ name: BRAND.name }],
+  creator: BRAND.name,
+  publisher: BRAND.name,
   formatDetection: {
     email: false,
     address: false,
@@ -80,17 +85,17 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: siteUrl,
-    siteName: "434 MEDIA",
-    title: "434 MEDIA | Creative Media and Smart Marketing Solutions in San Antonio, TX",
-    description:
-      "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies that move audiences and deliver measurable results.",
+    siteName: BRAND.name,
+    title: defaultTitle,
+    description: BRAND.description,
     // Image is auto-wired by app/opengraph-image.tsx (Next file convention)
   },
   twitter: {
     card: "summary_large_image",
-    title: "434 MEDIA | Creative Media and Smart Marketing Solutions in San Antonio, TX",
-    description:
-      "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies that move audiences and deliver measurable results.",
+    title: defaultTitle,
+    description: BRAND.description,
+    creator: "@434media",
+    site: "@434media",
     // Image is auto-wired by app/twitter-image.tsx (Next file convention)
   },
   robots: {
@@ -244,7 +249,10 @@ export default async function RootLayout({
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'Organization',
-              name: '434 MEDIA',
+              name: BRAND.name,
+              alternateName: '434 Media',
+              slogan: BRAND.shortTagline,
+              description: BRAND.description,
               url: siteUrl,
               logo: `${siteUrl}/api/og`,
               sameAs: [
@@ -285,14 +293,14 @@ export default async function RootLayout({
               '@context': 'https://schema.org',
               '@type': 'ProfessionalService',
               '@id': `${siteUrl}/#localbusiness`,
-              name: '434 MEDIA',
+              name: BRAND.name,
               alternateName: '434 Media',
+              slogan: BRAND.shortTagline,
               url: siteUrl,
               image: `${siteUrl}/api/og`,
               logo: `${siteUrl}/api/og`,
               email: 'build@434media.com',
-              description:
-                '434 MEDIA is a creative media and smart marketing agency in San Antonio, TX, delivering ROI-driven brand strategy, video production, web development, programmatic and OTT advertising, and event production for enterprises across South Texas.',
+              description: BRAND.description,
               address: {
                 '@type': 'PostalAddress',
                 streetAddress: '816 Camaron St., Suite 1.11',

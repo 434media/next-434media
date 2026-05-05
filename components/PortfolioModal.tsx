@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "motion/react"
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
+import { X, Play } from "lucide-react"
 
 interface PortfolioItem {
   showVideo: boolean
@@ -109,7 +110,7 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
               className="absolute right-4 top-4 p-2 text-white/60 hover:text-white rounded-full bg-black/20 hover:bg-black/40 transition-colors z-10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-neutral-900"
               aria-label="Close modal"
             >
-              <i className="ri-close-line text-2xl" />
+              <X className="h-6 w-6" />
             </button>
 
             <div className="max-h-[80vh] overflow-y-auto">
@@ -143,7 +144,7 @@ export function PortfolioModal({ item, onClose }: PortfolioModalProps) {
                         aria-label="Play video"
                       >
                         <div className="bg-white/20 rounded-full p-4 group-hover:bg-white/30 transition-colors">
-                          <i className="ri-play-fill text-4xl text-white" />
+                          <Play className="h-10 w-10 fill-white text-white" />
                         </div>
                       </button>
                     )}

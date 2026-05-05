@@ -774,7 +774,7 @@ export default function WorkClient() {
               className="mb-8 flex items-center gap-2 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500"
             >
               <span className="grid h-1.5 w-1.5 place-items-center rounded-full bg-neutral-900" />
-              Selected Work · 434 MEDIA
+              Portfolio · 434 MEDIA
             </motion.div>
 
             <motion.h1
@@ -783,10 +783,10 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
               className="font-ggx88 text-[clamp(3rem,9vw,7.5rem)] font-black leading-[0.92] tracking-[-0.04em] text-neutral-950"
             >
-              Bold Stories.
+              Receipts.
               <br />
               <span className="bg-linear-to-br from-neutral-950 via-neutral-700 to-neutral-400 bg-clip-text text-transparent">
-                Proven Impact.
+                Not pitches.
               </span>
             </motion.h1>
 
@@ -796,9 +796,10 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="mt-8 max-w-2xl text-balance font-geist-sans text-lg leading-relaxed tracking-tight text-neutral-600 md:text-xl"
             >
-              From brand campaigns, to event production, we help the world&apos;s most innovative
-              firms find their voice and amplify their impact through bold storytelling and
-              experiences.
+              A working portfolio from the studio — brand campaigns, event production,
+              broadcast partnerships, and original IP produced alongside the firms, founders,
+              and institutions shaping their categories. This is what bold stories look like
+              in production.
             </motion.p>
 
             <motion.div

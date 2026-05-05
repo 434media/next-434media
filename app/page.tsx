@@ -2,43 +2,45 @@ import type { Metadata } from "next"
 import HomeClient from "./HomeClient"
 import { buildServicesItemListLd } from "@/lib/seo/services"
 import { buildFaqPageLd } from "@/lib/seo/faq"
+import { BRAND } from "@/lib/seo/brand"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
+const homeTitle = `${BRAND.name} — ${BRAND.shortTagline}`
 
 export const metadata: Metadata = {
-  title: "434 MEDIA | Creative Media and Smart Marketing Solutions in San Antonio, TX",
-  description:
-    "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies — video production, web development, event production, and smart marketing that delivers measurable results.",
+  title: homeTitle,
+  description: BRAND.description,
   keywords: [
-    "434 MEDIA",
-    "San Antonio marketing agency",
-    "creative media San Antonio",
-    "video production Texas",
+    BRAND.name,
+    "Bold Stories",
+    "Proven Impact",
+    "brand campaigns",
+    "event production",
+    "creative media agency",
     "brand storytelling",
-    "event production San Antonio",
-    "web development South Texas",
-    "digital marketing agency",
-    "ROI-driven marketing",
-    "smart marketing solutions",
+    "video production",
+    "web development",
+    "programmatic advertising",
+    "OTT and CTV",
+    "San Antonio marketing agency",
+    "South Texas",
   ],
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "434 MEDIA | Creative Media & Smart Marketing in San Antonio",
-    description:
-      "ROI-driven brand media strategies — video production, web development, event production — that move audiences and deliver measurable results.",
+    title: homeTitle,
+    description: BRAND.description,
     url: `${siteUrl}/`,
-    siteName: "434 MEDIA",
+    siteName: BRAND.name,
     locale: "en_US",
     type: "website",
     // Image is auto-wired by app/opengraph-image.tsx (statically prerendered).
   },
   twitter: {
     card: "summary_large_image",
-    title: "434 MEDIA | Creative Media & Smart Marketing in San Antonio",
-    description:
-      "ROI-driven brand media strategies that move audiences and deliver measurable results.",
+    title: homeTitle,
+    description: BRAND.description,
     creator: "@434media",
     site: "@434media",
     // Image is auto-wired by app/twitter-image.tsx.

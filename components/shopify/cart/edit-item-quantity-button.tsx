@@ -1,6 +1,7 @@
 "use client"
 
 import clsx from "clsx"
+import { Plus, Minus } from "lucide-react"
 import { updateItemQuantity } from "./actions"
 import type { CartItem } from "../../../lib/shopify/types"
 import { useActionState } from "react"
@@ -21,15 +22,15 @@ function SubmitButton({ type }: { type: "plus" | "minus" }) {
     >
       <div className="absolute inset-0 bg-white transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out"></div>
       {type === "plus" ? (
-        <i
-          className="ri-add-line h-4 w-4 text-white group-hover:text-black relative z-10 transition-colors duration-500"
+        <Plus
+          className="h-4 w-4 text-white group-hover:text-black relative z-10 transition-colors duration-500"
           aria-hidden="true"
-        ></i>
+        />
       ) : (
-        <i
-          className="ri-subtract-line h-4 w-4 text-white group-hover:text-black relative z-10 transition-colors duration-500"
+        <Minus
+          className="h-4 w-4 text-white group-hover:text-black relative z-10 transition-colors duration-500"
           aria-hidden="true"
-        ></i>
+        />
       )}
     </button>
   )

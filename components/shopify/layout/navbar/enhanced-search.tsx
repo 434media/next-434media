@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
+import { Search as SearchIcon, X, Clock, Flame } from "lucide-react"
 
 // Types for search suggestions
 type SearchSuggestion = {
@@ -266,7 +267,7 @@ export default function EnhancedSearch() {
                 whileTap={{ scale: 0.9 }}
                 aria-label="Clear search"
               >
-                <i className="ri-close-line text-lg" aria-hidden="true"></i>
+                <X className="h-4 w-4" aria-hidden="true" />
               </motion.button>
             ) : (
               <motion.button
@@ -276,7 +277,7 @@ export default function EnhancedSearch() {
                 whileTap={{ scale: 0.9 }}
                 aria-label="Submit search"
               >
-                <i className="ri-search-line text-lg" aria-hidden="true"></i>
+                <SearchIcon className="h-4 w-4" aria-hidden="true" />
               </motion.button>
             )}
           </div>
@@ -391,7 +392,7 @@ export default function EnhancedSearch() {
                     {!isLoading && query.trim().length >= 2 && searchResults.length === 0 && (
                       <div className="py-8 text-center">
                         <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-neutral-800/50 mb-3">
-                          <i className="ri-search-line text-2xl text-neutral-400"></i>
+                          <SearchIcon className="h-6 w-6 text-neutral-400" aria-hidden="true" />
                         </div>
                         <h4 className="text-lg font-medium text-white">No results found</h4>
                         <p className="mt-1 text-sm text-neutral-400">
@@ -428,7 +429,7 @@ export default function EnhancedSearch() {
                               transition={{ delay: index * 0.05 }}
                               whileHover={{ x: 5 }}
                             >
-                              <i className="ri-history-line mr-2 text-neutral-400" aria-hidden="true"></i>
+                              <Clock className="mr-2 h-4 w-4 text-neutral-400" aria-hidden="true" />
                               <span>{search}</span>
                             </motion.button>
                           ))}
@@ -450,7 +451,7 @@ export default function EnhancedSearch() {
                             transition={{ delay: index * 0.05 }}
                             whileHover={{ x: 5 }}
                           >
-                            <i className="ri-fire-line mr-2 text-orange-400" aria-hidden="true"></i>
+                            <Flame className="mr-2 h-4 w-4 text-orange-400" aria-hidden="true" />
                             <span>{suggestion.text}</span>
                           </motion.button>
                         ))}

@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { usePathname } from "next/navigation"
+import Link from "next/link"
+import { ArrowUpRight, Mail, MapPin } from "lucide-react"
 import { ScrambleText } from "./ScrambleText"
 import { Newsletter } from "./Newsletter"
-import Link from "next/link"
+import { BRAND } from "@/lib/seo/brand"
 
 export default function Footer() {
   const pathname = usePathname()
@@ -18,20 +20,20 @@ export default function Footer() {
     return null
   }
 
-  const navLinks = [
-    { label: "Work", href: "/work" },
-    { label: "The Feed", href: "https://digitalcanvas.community/thefeed", external: true },
-    { label: "Events", href: "https://devsa.community/events", external: true },
-    { label: "Shop", href: "/shop" },
-    { label: "Contact", href: "/contact" },
+  // "Build with us" — close the loop on this page.
+  const buildLinks = [
+    { label: "Start a project", href: "/contact", emphasis: true },
+    { label: "Our work", href: "/work" },
+    { label: "Shop TXMX", href: "/shop" },
   ]
 
   const legalLinks = [
-    { label: "Privacy Policy", href: "/privacy-policy" },
-    { label: "Terms of Service", href: "/terms-of-service" },
+    { label: "Privacy", href: "/privacy-policy" },
+    { label: "Terms", href: "/terms-of-service" },
   ]
 
-  const networkLinks = [
+  // Sub-brands and partners we operate or co-produce with.
+  const subBrands = [
     { label: "TXMX Boxing", href: "https://www.txmxboxing.com/", external: true },
     { label: "Vemos Vamos", href: "https://www.vemosvamos.com/", external: true },
     { label: "Digital Canvas", href: "https://www.digitalcanvas.community", external: true },
@@ -93,13 +95,13 @@ export default function Footer() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6 }}
             >
-              {/* Main footer grid — Brand / Nav / Network / Newsletter */}
+              {/* Main footer grid — Brand / Build / Sub-brands / Newsletter */}
               <div className="py-12 md:py-16 border-b border-white/10">
                 <div className="grid grid-cols-2 md:grid-cols-12 gap-y-10 gap-x-6 md:gap-x-8">
-                  {/* Brand */}
+                  {/* Brand column — elevator pitch + social */}
                   <div className="col-span-2 md:col-span-3">
-                    <h2 id="footer-heading" className="font-menda-black text-white text-2xl leading-none mb-3">
-                      <Link href="/" aria-label="434 Media - Home">
+                    <h2 id="footer-heading" className="font-menda-black text-white text-2xl leading-none mb-4">
+                      <Link href="/" aria-label="434 Media — Home">
                         <ScrambleText
                           text="434 MEDIA"
                           className="inline-block cursor-pointer"
@@ -108,8 +110,11 @@ export default function Footer() {
                         />
                       </Link>
                     </h2>
-                    <p className="font-geist-sans text-sm text-neutral-500 leading-relaxed max-w-xs mb-5">
-                      Where creativity meets community. Bold stories, proven impact.
+                    <p className="font-geist-sans text-sm text-white font-medium leading-snug max-w-xs mb-2">
+                      {BRAND.shortTagline}
+                    </p>
+                    <p className="font-geist-sans text-sm text-neutral-400 leading-relaxed max-w-xs mb-5">
+                      {BRAND.description}
                     </p>
                     {/* Social */}
                     <div className="flex items-center gap-3">
@@ -118,7 +123,7 @@ export default function Footer() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-neutral-500 hover:text-white transition-colors duration-200"
-                        aria-label="Follow 434 Media on LinkedIn"
+                        aria-label="Follow 434 MEDIA on LinkedIn"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -136,59 +141,73 @@ export default function Footer() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-neutral-500 hover:text-white transition-colors duration-200"
-                        aria-label="Follow 434 Media on Instagram"
+                        aria-label="Follow 434 MEDIA on Instagram"
                       >
                         <InstagramIcon className="w-4.5 h-4.5" />
                       </a>
                     </div>
                   </div>
 
-                  {/* Nav Links */}
-                  <nav className="md:col-span-2" aria-label="Footer navigation">
-                    <p className="font-geist-sans text-[11px] font-semibold text-neutral-500 uppercase tracking-widest mb-4 leading-none">
-                      Navigate
+                  {/* Build with us — internal CTAs + NAP */}
+                  <nav className="md:col-span-3" aria-label="Footer site links">
+                    <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
+                      Build with us
                     </p>
-                    <ul className="space-y-2.5">
-                      {navLinks.map((link) => (
+                    <ul className="space-y-2.5 mb-6">
+                      {buildLinks.map((link) => (
                         <li key={link.label}>
-                          {link.external ? (
-                            <a
-                              href={link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200 leading-tight"
-                            >
-                              {link.label}
-                            </a>
-                          ) : (
-                            <Link
-                              href={link.href}
-                              className="font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200 leading-tight"
-                            >
-                              {link.label}
-                            </Link>
-                          )}
+                          <Link
+                            href={link.href}
+                            className={`font-geist-sans text-sm transition-colors duration-200 leading-tight ${
+                              link.emphasis
+                                ? "text-white font-medium hover:text-neutral-300"
+                                : "text-neutral-400 hover:text-white"
+                            }`}
+                          >
+                            {link.label}
+                          </Link>
                         </li>
                       ))}
                     </ul>
+                    <div className="space-y-2 pt-5 border-t border-white/5">
+                      <a
+                        href="mailto:build@434media.com"
+                        className="group flex items-start gap-2 font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200"
+                      >
+                        <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>build@434media.com</span>
+                      </a>
+                      <p className="flex items-start gap-2 font-geist-sans text-sm text-neutral-500 leading-snug">
+                        <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>
+                          816 Camaron St., Suite 1.11
+                          <br />
+                          San Antonio, TX 78212
+                        </span>
+                      </p>
+                    </div>
                   </nav>
 
-                  {/* Network Links */}
+                  {/* Sub-brands */}
                   <div className="md:col-span-3">
-                    <p className="font-geist-sans text-[11px] font-semibold text-neutral-500 uppercase tracking-widest mb-4 leading-none">
-                      Network
+                    <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
+                      Sub-brands
                     </p>
-                    <ul className="grid grid-cols-2 md:grid-cols-2 gap-x-6 gap-y-2.5">
-                      {networkLinks.map((link) => (
+                    <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                      {subBrands.map((link) => (
                         <li key={link.label}>
                           {link.external ? (
                             <a
                               href={link.href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200 leading-tight"
+                              className="group inline-flex items-center gap-1 font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200 leading-tight"
                             >
-                              {link.label}
+                              <span>{link.label}</span>
+                              <ArrowUpRight
+                                className="h-3 w-3 text-neutral-600 transition-all duration-200 group-hover:text-white group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                                aria-hidden="true"
+                              />
                             </a>
                           ) : (
                             <Link
@@ -203,34 +222,45 @@ export default function Footer() {
                     </ul>
                   </div>
 
-                  {/* Newsletter */}
-                  <div className="col-span-2 md:col-span-4">
-                    <p className="font-geist-sans text-[11px] font-semibold text-neutral-500 uppercase tracking-widest mb-4 leading-none">
-                      Subscribe to The Feed
+                  {/* Newsletter — value-prop-led copy */}
+                  <div className="col-span-2 md:col-span-3">
+                    <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
+                      The Feed · Newsletter
                     </p>
-                    <p className="font-geist-sans text-sm text-neutral-500 leading-relaxed mb-4 max-w-sm">
-                      The latest newsletters and community spotlights from 434 MEDIA x DEVSA.
+                    <p className="font-geist-sans text-sm text-neutral-400 leading-relaxed mb-4 max-w-sm">
+                      Field notes from the studio — what we&apos;re producing, what&apos;s launching,
+                      who&apos;s working on it.
                     </p>
                     <Newsletter />
+                    <p className="mt-3 font-geist-mono text-[10px] uppercase tracking-[0.18em] text-neutral-600">
+                      No spam · 1 send/month
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Copyright + Legal */}
-              <div className="py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              {/* Bottom strip — copyright, legal, contact echo */}
+              <div className="py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="font-geist-sans text-xs text-neutral-600 leading-none">
-                  &copy; {currentYear} 434 MEDIA. All rights reserved.
+                  &copy; {currentYear} 434 MEDIA · {BRAND.shortTagline}
                 </p>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {legalLinks.map((link) => (
                     <Link
                       key={link.label}
                       href={link.href}
-                      className="font-geist-sans text-xs text-neutral-600 hover:text-neutral-400 transition-colors duration-200 leading-none"
+                      className="font-geist-sans text-xs text-neutral-600 hover:text-neutral-300 transition-colors duration-200 leading-none"
                     >
                       {link.label}
                     </Link>
                   ))}
+                  <span className="font-geist-sans text-xs text-neutral-700 leading-none" aria-hidden="true">·</span>
+                  <a
+                    href="mailto:build@434media.com"
+                    className="font-geist-sans text-xs text-neutral-600 hover:text-neutral-300 transition-colors duration-200 leading-none"
+                  >
+                    build@434media.com
+                  </a>
                 </div>
               </div>
             </motion.div>

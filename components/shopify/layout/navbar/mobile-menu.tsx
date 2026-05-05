@@ -4,6 +4,7 @@ import { Dialog, Transition, DialogPanel, TransitionChild } from "@headlessui/re
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { Fragment, Suspense, useEffect, useState } from "react"
+import { Menu as MenuIcon, X } from "lucide-react"
 
 import type { Menu } from "../../../../lib/shopify/types"
 import Search, { SearchSkeleton } from "./search"
@@ -36,7 +37,7 @@ export default function MobileMenu({ menu }: { menu: Menu[] }) {
         aria-label="Open mobile menu"
         className="flex h-11 w-11 items-center justify-center rounded-md border border-neutral-700 text-white transition-colors md:hidden"
       >
-        <i className="ri-menu-line h-4 w-4" aria-hidden="true"></i>
+        <MenuIcon className="h-5 w-5" aria-hidden="true" />
       </button>
       <Transition show={isOpen}>
         <Dialog onClose={closeMobileMenu} className="relative z-50">
@@ -67,7 +68,7 @@ export default function MobileMenu({ menu }: { menu: Menu[] }) {
                   onClick={closeMobileMenu}
                   aria-label="Close mobile menu"
                 >
-                  <i className="ri-close-line h-6 w-6" aria-hidden="true"></i>
+                  <X className="h-6 w-6" aria-hidden="true" />
                 </button>
 
                 <div className="mb-4 w-full">
