@@ -84,21 +84,14 @@ export const metadata: Metadata = {
     title: "434 MEDIA | Creative Media and Smart Marketing Solutions in San Antonio, TX",
     description:
       "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies that move audiences and deliver measurable results.",
-    images: [
-      {
-        url: `${siteUrl}/opengraph-image.png`,
-        width: 1200,
-        height: 630,
-        alt: "434 MEDIA logo",
-      },
-    ],
+    // Image is auto-wired by app/opengraph-image.tsx (Next file convention)
   },
   twitter: {
     card: "summary_large_image",
     title: "434 MEDIA | Creative Media and Smart Marketing Solutions in San Antonio, TX",
     description:
       "434 MEDIA connects enterprises in San Antonio and South Texas through ROI-driven brand media strategies that move audiences and deliver measurable results.",
-    images: [`${siteUrl}/opengraph-image.png`],
+    // Image is auto-wired by app/twitter-image.tsx (Next file convention)
   },
   robots: {
     index: true,
@@ -253,7 +246,7 @@ export default async function RootLayout({
               '@type': 'Organization',
               name: '434 MEDIA',
               url: siteUrl,
-              logo: `${siteUrl}/opengraph-image.png`,
+              logo: `${siteUrl}/api/og`,
               sameAs: [
                 'https://www.facebook.com/434media',
                 'https://www.linkedin.com/company/434media',
@@ -282,6 +275,56 @@ export default async function RootLayout({
                 target: `${siteUrl}/search?q={search_term_string}`,
                 'query-input': 'required name=search_term_string'
               }
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'ProfessionalService',
+              '@id': `${siteUrl}/#localbusiness`,
+              name: '434 MEDIA',
+              alternateName: '434 Media',
+              url: siteUrl,
+              image: `${siteUrl}/api/og`,
+              logo: `${siteUrl}/api/og`,
+              email: 'build@434media.com',
+              description:
+                '434 MEDIA is a creative media and smart marketing agency in San Antonio, TX, delivering ROI-driven brand strategy, video production, web development, programmatic and OTT advertising, and event production for enterprises across South Texas.',
+              address: {
+                '@type': 'PostalAddress',
+                streetAddress: '816 Camaron St., Suite 1.11',
+                addressLocality: 'San Antonio',
+                addressRegion: 'TX',
+                postalCode: '78212',
+                addressCountry: 'US'
+              },
+              areaServed: [
+                { '@type': 'City', name: 'San Antonio' },
+                { '@type': 'State', name: 'Texas' },
+                { '@type': 'Place', name: 'South Texas' }
+              ],
+              knowsAbout: [
+                'Creative media',
+                'Brand storytelling',
+                'Video production',
+                'Web development',
+                'Programmatic advertising',
+                'OTT and CTV advertising',
+                'Event production',
+                'Multichannel marketing',
+                'Smart marketing',
+                'Media strategy',
+                'Digital marketing'
+              ],
+              sameAs: [
+                'https://www.facebook.com/434media',
+                'https://www.linkedin.com/company/434media',
+                'https://x.com/434media',
+                'https://www.instagram.com/digitalcanvas.community'
+              ]
             })
           }}
         />

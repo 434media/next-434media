@@ -1,11 +1,30 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
+
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "Privacy policy for 434 Media - Learn how we collect, use, and protect your personal information.",
   alternates: {
     canonical: "/privacy-policy",
+  },
+  openGraph: {
+    title: "Privacy Policy | 434 MEDIA",
+    description: "How 434 MEDIA collects, uses, and protects your personal information.",
+    url: `${siteUrl}/privacy-policy`,
+    siteName: "434 MEDIA",
+    images: [`${siteUrl}/api/og?title=Privacy+Policy&subtitle=434+MEDIA`],
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Policy | 434 MEDIA",
+    description: "How 434 MEDIA collects, uses, and protects your personal information.",
+    images: [`${siteUrl}/api/og?title=Privacy+Policy&subtitle=434+MEDIA`],
+    creator: "@434media",
+    site: "@434media",
   },
 }
 

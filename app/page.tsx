@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 import HomeClient from "./HomeClient"
+import { buildServicesItemListLd } from "@/lib/seo/services"
+import { buildFaqPageLd } from "@/lib/seo/faq"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
@@ -51,5 +53,21 @@ export const metadata: Metadata = {
 }
 
 export default function HomePage() {
-  return <HomeClient />
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(buildServicesItemListLd(siteUrl, `${siteUrl}/`)),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(buildFaqPageLd()),
+        }}
+      />
+      <HomeClient />
+    </>
+  )
 }

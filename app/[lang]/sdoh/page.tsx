@@ -32,7 +32,7 @@ export async function generateMetadata(props: { params: Promise<{ lang: Locale }
       type: 'website',
       images: [
         {
-          url: `${baseUrl}/opengraph-image.png`,
+          url: `${baseUrl}/api/og?title=${encodeURIComponent(title)}&locale=${lang}&path=sdoh`,
           width: 1200,
           height: 630,
           alt: title,
@@ -43,7 +43,7 @@ export async function generateMetadata(props: { params: Promise<{ lang: Locale }
       card: 'summary_large_image',
       title,
       description,
-      images: [`${baseUrl}/opengraph-image.png`],
+      images: [`${baseUrl}/api/og?title=${encodeURIComponent(title)}&locale=${lang}&path=sdoh`],
     },
   }
 }

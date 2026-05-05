@@ -25,9 +25,34 @@ export async function generateMetadata({ params }: { params: { collection: strin
 
   if (!collection) return notFound()
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
+  const title = collection.seo?.title || collection.title
+  const description = collection.seo?.description || collection.description || `${collection.title} products`
+  const ogImage = `${siteUrl}/api/og?title=${encodeURIComponent(title)}&subtitle=${encodeURIComponent("Shop the collection")}`
+
   return {
-    title: collection.seo?.title || collection.title,
-    description: collection.seo?.description || collection.description || `${collection.title} products`,
+    title,
+    description,
+    alternates: {
+      canonical: `/search/${params.collection}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `${siteUrl}/search/${params.collection}`,
+      siteName: "434 MEDIA",
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+      type: "website",
+      locale: "en_US",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+      creator: "@434media",
+      site: "@434media",
+    },
   }
 }
 

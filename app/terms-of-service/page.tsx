@@ -1,11 +1,30 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
+
 export const metadata: Metadata = {
   title: "Terms of Service",
   description: "Terms of service for 434 Media - The rules, guidelines, and agreements for using our services.",
   alternates: {
     canonical: "/terms-of-service",
+  },
+  openGraph: {
+    title: "Terms of Service | 434 MEDIA",
+    description: "Rules, guidelines, and agreements for using 434 MEDIA services.",
+    url: `${siteUrl}/terms-of-service`,
+    siteName: "434 MEDIA",
+    images: [`${siteUrl}/api/og?title=Terms+of+Service&subtitle=434+MEDIA`],
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service | 434 MEDIA",
+    description: "Rules, guidelines, and agreements for using 434 MEDIA services.",
+    images: [`${siteUrl}/api/og?title=Terms+of+Service&subtitle=434+MEDIA`],
+    creator: "@434media",
+    site: "@434media",
   },
 }
 

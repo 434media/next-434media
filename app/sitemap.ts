@@ -54,6 +54,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    {
+      url: `${baseUrl}/en/sdoh`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+      alternates: {
+        languages: {
+          "en-US": `${baseUrl}/en/sdoh`,
+          "es-ES": `${baseUrl}/es/sdoh`,
+        },
+      },
+    },
+    {
+      url: `${baseUrl}/es/sdoh`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+      alternates: {
+        languages: {
+          "en-US": `${baseUrl}/en/sdoh`,
+          "es-ES": `${baseUrl}/es/sdoh`,
+        },
+      },
+    },
   ]
 
   // Fetch dynamic content (in parallel)

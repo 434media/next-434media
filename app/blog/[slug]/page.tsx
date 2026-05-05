@@ -107,7 +107,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         publisher: {
           '@type': 'Organization',
           name: '434 MEDIA',
-          logo: { '@type': 'ImageObject', url: `${baseUrl}/opengraph-image.png` }
+          logo: { '@type': 'ImageObject', url: `${baseUrl}/api/og` }
         },
         mainEntityOfPage: `${baseUrl}/blog/${slug}`,
         articleSection: post.category || 'Technology',
@@ -125,34 +125,48 @@ export default async function BlogPostPage({ params }: Props) {
     notFound()
   }
 
-  // Pass params as a Promise to match the expected type
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'
+
   return (
     <>
-      {/* Inject structured data from metadata.other if present for crawlers */}
       {post.status === 'published' && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Article',
-            headline: post.title,
-            description: post.excerpt || post.meta_description || '',
-            image: post.featured_image || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'}/opengraph-image.png`,
-            datePublished: post.created_at,
-            dateModified: post.updated_at || post.created_at,
-            author: [{ '@type': 'Person', name: post.author || '434 Media' }],
-            publisher: {
-              '@type': 'Organization',
-              name: '434 MEDIA',
-              logo: { '@type': 'ImageObject', url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'}/opengraph-image.png` }
-            },
-            mainEntityOfPage: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.434media.com'}/blog/${slug}`,
-            articleSection: post.category || 'Technology',
-            keywords: (Array.isArray(post.tags) ? post.tags : []).join(', ')
-          }) }}
-        />
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Article',
+              headline: post.title,
+              description: post.excerpt || post.meta_description || '',
+              image: post.featured_image || `${baseUrl}/api/og`,
+              datePublished: post.created_at,
+              dateModified: post.updated_at || post.created_at,
+              author: [{ '@type': 'Person', name: post.author || '434 Media' }],
+              publisher: {
+                '@type': 'Organization',
+                name: '434 MEDIA',
+                logo: { '@type': 'ImageObject', url: `${baseUrl}/api/og` }
+              },
+              mainEntityOfPage: `${baseUrl}/blog/${slug}`,
+              articleSection: post.category || 'Technology',
+              keywords: (Array.isArray(post.tags) ? post.tags : []).join(', ')
+            }) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: `${baseUrl}/` },
+                { '@type': 'ListItem', position: 2, name: 'Blog', item: `${baseUrl}/blog` },
+                { '@type': 'ListItem', position: 3, name: post.title, item: `${baseUrl}/blog/${slug}` }
+              ]
+            }) }}
+          />
+        </>
       )}
-  <BlogPostPageClient params={{ slug }} />
+      <BlogPostPageClient params={{ slug }} />
     </>
   )
 }

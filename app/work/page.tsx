@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import WorkClient from "./WorkClient"
+import { buildServicesItemListLd } from "@/lib/seo/services"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
@@ -48,5 +49,30 @@ export const metadata: Metadata = {
 }
 
 export default function WorkPage() {
-  return <WorkClient />
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(buildServicesItemListLd(siteUrl, `${siteUrl}/work`)),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "Our Work | 434 MEDIA",
+            url: `${siteUrl}/work`,
+            description:
+              "Selected portfolio of brand storytelling, video, event production, and integrated campaign work by 434 MEDIA.",
+            isPartOf: { "@id": `${siteUrl}/#localbusiness` },
+            about: { "@id": `${siteUrl}/#localbusiness` },
+          }),
+        }}
+      />
+      <WorkClient />
+    </>
+  )
 }
