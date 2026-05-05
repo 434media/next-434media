@@ -633,6 +633,11 @@ export type LeadSource =
   // a single record) because the provenance is wholesale and the lead
   // hasn't expressed direct intent to us — useful for scoring.
   | "partner"
+  // Inbound from a social platform (Instagram, LinkedIn, TikTok, etc.).
+  // Used for cross-channel attribution back to the social analytics surfaces.
+  // The specific platform should be inferred from `platform`, UTM params on
+  // the originating page_url, or by tagging the lead directly.
+  | "social"
 
 export type LeadPriority = "high" | "medium" | "low"
 

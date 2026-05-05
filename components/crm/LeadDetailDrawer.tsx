@@ -45,7 +45,7 @@ const STATUS_OPTIONS: { value: LeadStatus; label: string; dot: string }[] = [
   { value: "archived", label: "Archived", dot: "bg-neutral-400" },
 ]
 
-const SOURCE_OPTIONS: LeadSource[] = ["event", "web", "manual", "newsletter", "referral"]
+const SOURCE_OPTIONS: LeadSource[] = ["event", "web", "social", "manual", "newsletter", "referral"]
 const PLATFORM_OPTIONS: LeadPlatform[] = ["434 Media", "TXMX", "VemosVamos", "DevSA", "MilCity"]
 
 const PRIORITY_BADGE: Record<string, { bg: string; label: string }> = {

@@ -1318,6 +1318,147 @@ export async function GET(request: NextRequest) {
           )
         }
 
+      case "stories":
+        // Active Instagram stories (24h window) plus per-story insights.
+        // Stories disappear from the API after 24h unless saved as highlights —
+        // for historical aggregation, the daily cron snapshot is the source of truth.
+        console.log("[Instagram API] Fetching stories with insights...")
+        try {
+          const instagramAccountId = await resolveInstagramBusinessAccountId()
+
+          const storiesData = await fetchInstagramData(`${instagramAccountId}/stories`, accessToken, {
+            fields: "id,media_type,media_url,permalink,thumbnail_url,timestamp",
+          })
+
+          const stories: any[] = storiesData?.data || []
+
+          if (stories.length === 0) {
+            return NextResponse.json({
+              success: true,
+              data: { stories: [], aggregates: null },
+              timestamp: new Date().toISOString(),
+            })
+          }
+
+          const storiesWithInsights = await Promise.all(
+            stories.map(async (story: any) => {
+              try {
+                const insightsResp = await fetchInstagramData(`${story.id}/insights`, accessToken, {
+                  metric: "views,reach,replies,total_interactions,navigation,shares,profile_visits",
+                })
+                const dataArr: any[] = insightsResp?.data || []
+                const get = (name: string): number => {
+                  const m = dataArr.find((d) => d.name === name)
+                  const v = m?.values?.[0]?.value
+                  return typeof v === "number" ? v : 0
+                }
+
+                const navEntry = dataArr.find((d) => d.name === "navigation")
+                const navValue: any = navEntry?.values?.[0]?.value ?? null
+                let taps_forward = 0
+                let taps_back = 0
+                let exits = 0
+                if (navValue && typeof navValue === "object") {
+                  taps_forward = Number(navValue.swipe_forward || navValue.tap_forward || 0)
+                  taps_back = Number(navValue.tap_back || 0)
+                  exits = Number(navValue.tap_exit || navValue.exit || 0)
+                }
+
+                const views = get("views") || get("impressions")
+                const reach = get("reach")
+                const replies = get("replies")
+                const totalInteractions = get("total_interactions")
+                const shares = get("shares")
+                const profileVisits = get("profile_visits")
+                const completionRate = views > 0 ? ((views - exits) / views) * 100 : 0
+                const exitRate = views > 0 ? (exits / views) * 100 : 0
+                const tapForwardRate = views > 0 ? (taps_forward / views) * 100 : 0
+                const replyRate = views > 0 ? (replies / views) * 100 : 0
+
+                return {
+                  ...story,
+                  insights: {
+                    views,
+                    reach,
+                    replies,
+                    taps_forward,
+                    taps_back,
+                    exits,
+                    shares,
+                    profile_visits: profileVisits,
+                    total_interactions: totalInteractions,
+                    completion_rate: completionRate,
+                    exit_rate: exitRate,
+                    tap_forward_rate: tapForwardRate,
+                    reply_rate: replyRate,
+                  },
+                }
+              } catch (storyErr) {
+                console.warn(`[Instagram API] Story insights failed for ${story.id}:`, storyErr)
+                return { ...story, insights: null }
+              }
+            }),
+          )
+
+          const valid = storiesWithInsights.filter((s: any) => s.insights)
+          const totals = valid.reduce(
+            (acc: any, s: any) => {
+              acc.views += s.insights.views
+              acc.reach += s.insights.reach
+              acc.replies += s.insights.replies
+              acc.taps_forward += s.insights.taps_forward
+              acc.taps_back += s.insights.taps_back
+              acc.exits += s.insights.exits
+              acc.shares += s.insights.shares
+              acc.profile_visits += s.insights.profile_visits
+              acc.total_interactions += s.insights.total_interactions
+              return acc
+            },
+            {
+              views: 0,
+              reach: 0,
+              replies: 0,
+              taps_forward: 0,
+              taps_back: 0,
+              exits: 0,
+              shares: 0,
+              profile_visits: 0,
+              total_interactions: 0,
+            },
+          )
+
+          const avgCompletionRate = totals.views > 0 ? ((totals.views - totals.exits) / totals.views) * 100 : 0
+          const avgExitRate = totals.views > 0 ? (totals.exits / totals.views) * 100 : 0
+          const accountReplyRate = totals.views > 0 ? (totals.replies / totals.views) * 100 : 0
+          const accountTapForwardRate = totals.views > 0 ? (totals.taps_forward / totals.views) * 100 : 0
+
+          return NextResponse.json({
+            success: true,
+            data: {
+              stories: storiesWithInsights,
+              aggregates: {
+                stories_count: stories.length,
+                ...totals,
+                avg_completion_rate: avgCompletionRate,
+                avg_exit_rate: avgExitRate,
+                reply_rate: accountReplyRate,
+                tap_forward_rate: accountTapForwardRate,
+              },
+            },
+            timestamp: new Date().toISOString(),
+          })
+        } catch (error) {
+          console.error("[Instagram API] Stories fetch failed:", error)
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Failed to fetch stories",
+              details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 },
+          )
+        }
+
   case "media":
       case "posts":
         console.log("[Instagram API] Fetching media...")

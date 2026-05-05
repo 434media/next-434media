@@ -2,10 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { InstagramAnalyticsHeader } from "@/components/instagram/InstagramAnalyticsHeader"
-import { InstagramKeyMetrics } from "@/components/instagram/InstagramKeyMetrics"
+import { InstagramKeyMetrics, InstagramMarketingFunnel } from "@/components/instagram/InstagramKeyMetrics"
 import { InstagramTopPostsTable } from "@/components/instagram/InstagramTopPostsTable"
 import { InstagramAccountInfo } from "@/components/instagram/InstagramAccountInfo"
 import { InstagramReachBreakdown } from "@/components/instagram/InstagramReachBreakdown"
+import { InstagramStoryAnalytics, type StoryAnalyticsData } from "@/components/instagram/InstagramStoryAnalytics"
+import { InstagramAttributedLeads, type AttributedLeadsData } from "@/components/instagram/InstagramAttributedLeads"
+import { InstagramBestTimeToPost } from "@/components/instagram/InstagramBestTimeToPost"
+import { InstagramDemographics } from "@/components/instagram/InstagramDemographics"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import type {
   InstagramTimeRange,
@@ -13,6 +17,8 @@ import type {
   InstagramMedia,
   InstagramMediaInsights,
   InstagramReachBreakdown as InstagramReachBreakdownType,
+  InstagramOnlineFollowers,
+  InstagramDemographics as InstagramDemographicsType,
 } from "@/types/instagram-insights"
 
 interface InstagramInsightsData {
@@ -436,6 +442,8 @@ export default function InstagramAnalyticsClientPage() {
 
   // Data states
   const [insightsData, setInsightsData] = useState<InstagramInsightsData | null>(null)
+  // Previous-period snapshot — same range length, immediately preceding. Powers PoP deltas.
+  const [previousInsightsData, setPreviousInsightsData] = useState<InstagramInsightsData | null>(null)
   const [accountData, setAccountData] = useState<InstagramAccount | null>(null)
   const [mediaData, setMediaData] = useState<InstagramMediaWithInsights[]>([])
   const [connectionStatus, setConnectionStatus] = useState<{
@@ -446,6 +454,14 @@ export default function InstagramAnalyticsClientPage() {
   
   // New analytics data states
   const [reachBreakdownData, setReachBreakdownData] = useState<InstagramReachBreakdownType | null>(null)
+  // Active stories — 24-hour live data, fetched on every load
+  const [storiesData, setStoriesData] = useState<StoryAnalyticsData | null>(null)
+  // CRM records attributed to Instagram during the selected date range
+  const [attributedLeads, setAttributedLeads] = useState<AttributedLeadsData | null>(null)
+  // Best-time-to-post — hourly distribution of online followers (UTC)
+  const [onlineFollowers, setOnlineFollowers] = useState<InstagramOnlineFollowers | null>(null)
+  // Audience demographics — countries / cities / age+gender of engaged audience
+  const [demographicsData, setDemographicsData] = useState<InstagramDemographicsType | null>(null)
 
   // Snapshot vs live toggle (snapshot serves cached account-info + media instantly)
   const [dataSource, setDataSource] = useState<"snapshot" | "live">("snapshot")
@@ -513,6 +529,9 @@ export default function InstagramAnalyticsClientPage() {
       const startDate = getStartDateForRange(dateRange)
       const endDate = "today"
 
+      // Same-length window immediately before the current period — for PoP deltas
+      const previousPeriod = getPreviousPeriodRange(dateRange)
+
       // account-info and media can come from snapshot (instant); insights still hits live
       const accountUrl =
         dataSource === "snapshot"
@@ -523,11 +542,13 @@ export default function InstagramAnalyticsClientPage() {
           ? `/api/instagram/snapshot?account=${selectedAccount}&endpoint=media`
           : `${apiRoute}?endpoint=media`
 
-      // Fetch data with individual error handling - don't fail entirely if one request fails
-      const [accountRes, insightsRes, mediaRes] = await Promise.all([
+      // Fetch data with individual error handling - don't fail entirely if one request fails.
+      // The previousInsights call is best-effort: if it fails, deltas just won't render.
+      const [accountRes, insightsRes, mediaRes, previousInsightsRes] = await Promise.all([
         fetch(accountUrl).catch(() => null),
         fetch(`${apiRoute}?endpoint=insights&startDate=${startDate}&endDate=${endDate}`).catch(() => null),
         fetch(mediaUrl).catch(() => null),
+        fetch(`${apiRoute}?endpoint=insights&startDate=${previousPeriod.startDate}&endDate=${previousPeriod.endDate}`).catch(() => null),
       ])
 
       // Process account data
@@ -569,6 +590,23 @@ export default function InstagramAnalyticsClientPage() {
         } catch {
           console.warn("Failed to parse insights data")
         }
+      }
+
+      // Process previous-period insights for PoP deltas. Failure is non-blocking —
+      // deltas simply hide if data is missing.
+      if (previousInsightsRes?.ok) {
+        try {
+          const previousResult = await previousInsightsRes.json()
+          if (previousResult.data) {
+            setPreviousInsightsData(previousResult.data)
+          } else {
+            setPreviousInsightsData(null)
+          }
+        } catch {
+          setPreviousInsightsData(null)
+        }
+      } else {
+        setPreviousInsightsData(null)
       }
 
       // Snapshot fallback for media if needed
@@ -639,6 +677,83 @@ export default function InstagramAnalyticsClientPage() {
       } catch (err) {
         console.warn("[ReachBreakdown] Fetch error:", err)
       }
+
+      // Fetch online-followers (best time to post). Requires 100+ followers; the
+      // section renders its own empty state when data isn't available.
+      try {
+        const onlineRes = await fetch(`${apiRoute}?endpoint=online-followers`)
+        if (onlineRes.ok) {
+          const onlineResult = await onlineRes.json()
+          setOnlineFollowers(onlineResult?.data ?? null)
+        } else {
+          setOnlineFollowers(null)
+        }
+      } catch (err) {
+        console.warn("[OnlineFollowers] Fetch error:", err)
+        setOnlineFollowers(null)
+      }
+
+      // Fetch demographics (countries / cities / age+gender). Requires 100+
+      // followers; section renders its own empty state when missing.
+      try {
+        const demoRes = await fetch(`${apiRoute}?endpoint=demographics`)
+        if (demoRes.ok) {
+          const demoResult = await demoRes.json()
+          setDemographicsData(demoResult?.data ?? null)
+        } else {
+          setDemographicsData(null)
+        }
+      } catch (err) {
+        console.warn("[Demographics] Fetch error:", err)
+        setDemographicsData(null)
+      }
+
+      // Fetch active stories (live, 24h window). Failure is non-blocking —
+      // the section renders an empty state when no data is available.
+      try {
+        const storiesRes = await fetch(`${apiRoute}?endpoint=stories`)
+        if (storiesRes.ok) {
+          const storiesResult = await storiesRes.json()
+          if (storiesResult?.data) {
+            setStoriesData(storiesResult.data)
+          } else {
+            setStoriesData(null)
+          }
+        } else {
+          setStoriesData(null)
+        }
+      } catch (err) {
+        console.warn("[Stories] Fetch error:", err)
+        setStoriesData(null)
+      }
+
+      // Fetch IG-attributed CRM records for the same date range. Joins are done
+      // server-side; the route returns leads + clients + email signups whose
+      // source/UTM signal points to Instagram. Failure is non-blocking.
+      try {
+        const days = dateRange === "1d" ? 1 : dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const periodStart = new Date(today)
+        periodStart.setDate(today.getDate() - days)
+        const fmt = (d: Date) => d.toISOString().split("T")[0]
+        const attributedRes = await fetch(
+          `/api/admin/instagram/attributed-leads?startDate=${fmt(periodStart)}&endDate=${fmt(today)}`,
+        )
+        if (attributedRes.ok) {
+          const attributedResult = await attributedRes.json()
+          if (attributedResult?.data) {
+            setAttributedLeads(attributedResult.data as AttributedLeadsData)
+          } else {
+            setAttributedLeads(null)
+          }
+        } else {
+          setAttributedLeads(null)
+        }
+      } catch (err) {
+        console.warn("[AttributedLeads] Fetch error:", err)
+        setAttributedLeads(null)
+      }
     } catch (err) {
       console.error("Error loading Instagram data:", err)
       setError(err instanceof Error ? err.message : "Failed to load Instagram data")
@@ -660,6 +775,25 @@ export default function InstagramAnalyticsClientPage() {
       default:
         return "30daysAgo"
     }
+  }
+
+  /**
+   * Returns the previous-period window for PoP comparison: same length as the current
+   * range, immediately preceding it. The IG API accepts ISO YYYY-MM-DD strings via
+   * formatDateForInstagram's default branch, so we pass real dates instead of keywords.
+   */
+  const getPreviousPeriodRange = (
+    range: InstagramTimeRange,
+  ): { startDate: string; endDate: string } => {
+    const days = range === "1d" ? 1 : range === "7d" ? 7 : range === "30d" ? 30 : 90
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const previousEnd = new Date(today)
+    previousEnd.setDate(today.getDate() - days)
+    const previousStart = new Date(previousEnd)
+    previousStart.setDate(previousEnd.getDate() - days)
+    const fmt = (d: Date) => d.toISOString().split("T")[0]
+    return { startDate: fmt(previousStart), endDate: fmt(previousEnd) }
   }
   
   const getDateRangeLabel = (range: InstagramTimeRange): string => {
@@ -743,9 +877,47 @@ export default function InstagramAnalyticsClientPage() {
           )}
 
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-neutral-500 text-sm">Loading Instagram analytics...</p>
+            <div className="space-y-10 sm:space-y-12">
+              {/* Account info skeleton */}
+              <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4 sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-neutral-100 animate-pulse" />
+                    <div className="space-y-2">
+                      <div className="h-4 w-32 bg-neutral-100 rounded animate-pulse" />
+                      <div className="h-3 w-20 bg-neutral-100 rounded animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex gap-8">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="space-y-2">
+                        <div className="h-6 w-16 bg-neutral-100 rounded animate-pulse" />
+                        <div className="h-2 w-12 bg-neutral-100 rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Key metrics skeleton */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-3">
+                    <div className="h-9 w-9 rounded-md bg-neutral-100 animate-pulse" />
+                    <div className="h-3 w-24 bg-neutral-100 rounded animate-pulse" />
+                    <div className="h-7 w-20 bg-neutral-100 rounded animate-pulse" />
+                    <div className="h-2 w-16 bg-neutral-100 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Section skeletons */}
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="bg-white rounded-md ring-1 ring-neutral-200/70 p-6 space-y-4">
+                  <div className="h-5 w-48 bg-neutral-100 rounded animate-pulse" />
+                  <div className="h-32 bg-neutral-100 rounded-md animate-pulse" />
+                </div>
+              ))}
             </div>
           ) : (
             <>
@@ -772,8 +944,39 @@ export default function InstagramAnalyticsClientPage() {
                       media_count: 0,
                     }
                   }
+                  previousInsights={previousInsightsData}
                   dateRange={dateRange}
                   connectionStatus={connectionStatus}
+                />
+              </div>
+
+              {/* Marketing Funnel — Reach → Profile Views → Website Clicks → New Followers.
+                  Standalone section so the conversion narrative reads top-down on its own. */}
+              {connectionStatus?.success && insightsData && (
+                <div className="mb-10 sm:mb-12">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                    <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Marketing Funnel</h2>
+                    <InfoTooltip content="Conversion narrative from reach to followers. Each stage's chip shows the period-over-period change for the same window length." />
+                  </div>
+                  <InstagramMarketingFunnel
+                    insights={insightsData}
+                    previousInsights={previousInsightsData}
+                    isConnected={!!connectionStatus?.success}
+                  />
+                </div>
+              )}
+
+              {/* CRM Attribution — closes the funnel by linking IG performance to CRM outcomes.
+                  Surfaces leads, clients, and email signups whose source/UTM points to Instagram. */}
+              <div className="mb-10 sm:mb-12">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">CRM Attribution</h2>
+                  <InfoTooltip content="CRM records (leads, clients, email signups) attributed to Instagram for the selected date range. Attribution rules: lead source = 'social', client source/lead_source contains 'instagram'/'ig'/'social', or email signup landing URL carries utm_source=instagram." />
+                </div>
+                <InstagramAttributedLeads
+                  data={attributedLeads}
+                  isLoading={isLoading}
+                  rangeLabel={getDateRangeLabel(dateRange)}
                 />
               </div>
 
@@ -790,6 +993,19 @@ export default function InstagramAnalyticsClientPage() {
                 />
               </div>
 
+              {/* Stories — live 24h window. Stories don't fall under the date-range filter
+                  because IG only exposes active (sub-24h) stories via the API. */}
+              <div className="mb-10 sm:mb-12">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Stories</h2>
+                  <InfoTooltip content="Active Instagram stories (last 24 hours) and their performance. Story metrics show completion rate, taps forward/back, exits, replies, and profile pivots — all critical for understanding hold attention and quality of audience attention." />
+                </div>
+                <InstagramStoryAnalytics
+                  data={storiesData}
+                  isConnected={!!connectionStatus?.success}
+                />
+              </div>
+
               {/* Top Posts */}
               <div className="mb-10 sm:mb-12">
                 <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
@@ -801,6 +1017,26 @@ export default function InstagramAnalyticsClientPage() {
                   followerCount={accountData?.followers_count || 0}
                   connectionStatus={connectionStatus}
                 />
+              </div>
+
+              {/* Audience Insights — when to post + who's engaging.
+                  IG returns these only for accounts with 100+ followers; both
+                  components render their own empty state otherwise. */}
+              <div className="mb-10 sm:mb-12">
+                <div className="flex items-center gap-2 mb-3 sm:mb-4 pt-2">
+                  <h2 className="text-sm sm:text-lg font-semibold text-neutral-900">Audience Insights</h2>
+                  <InfoTooltip content="When your followers are most active and where they're located. Both views require an account with 100+ followers." />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <InstagramBestTimeToPost
+                    onlineFollowers={onlineFollowers}
+                    isLoading={isLoading}
+                  />
+                  <InstagramDemographics
+                    demographics={demographicsData}
+                    isLoading={isLoading}
+                  />
+                </div>
               </div>
             </>
           )}
