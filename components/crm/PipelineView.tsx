@@ -88,52 +88,56 @@ function BrandGoalCard({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
+    <div className="rounded-md ring-1 ring-neutral-200/70 overflow-hidden bg-white">
       {/* Card Header - Clickable */}
       <button
         onClick={onToggle}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors"
       >
-        <div className="flex items-center gap-4">
-          <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: `${color}15` }}
-          >
-            <Target className="w-6 h-6" style={{ color }} />
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+            <Target className="w-4 h-4" />
           </div>
           <div className="text-left">
-            <h3 className="text-lg font-semibold text-gray-900">{brand}</h3>
-            <p className="text-sm text-gray-500">{description}</p>
+            <h3 className="inline-flex items-center gap-1.5 text-base font-medium text-neutral-900">
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: color }}
+                aria-hidden="true"
+              />
+              {brand}
+            </h3>
+            <p className="text-xs text-neutral-500 mt-0.5">{description}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-5">
           {/* Goal Progress */}
           <div className="text-right hidden sm:block">
-            <p className="text-xs text-gray-500">Goal</p>
-            <p className="text-xl font-bold" style={{ color }}>{formatCurrency(goal, true)}</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-neutral-400">Goal</p>
+            <p className="text-base font-semibold tabular-nums text-neutral-900">{formatCurrency(goal, true)}</p>
           </div>
-          
+
           {/* Progress */}
           <div className="hidden md:flex flex-col items-end gap-1 w-32">
             <div className="flex items-center justify-between w-full text-xs">
-              <span className="text-gray-500">{Math.round(progressPercent)}%</span>
-              <span className="text-emerald-600 font-medium">{formatCurrency(wonRevenue, true)}</span>
+              <span className="text-neutral-500 tabular-nums">{Math.round(progressPercent)}%</span>
+              <span className="text-neutral-900 font-medium tabular-nums">{formatCurrency(wonRevenue, true)}</span>
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%`, backgroundColor: color }}
+            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-neutral-900 transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
           </div>
 
           {/* Expand/Collapse */}
-          <div className="p-2 rounded-lg bg-gray-100">
+          <div className="grid h-9 w-9 place-items-center rounded-md text-neutral-500">
             {isExpanded ? (
-              <ChevronUp className="w-5 h-5 text-gray-500" />
+              <ChevronUp className="w-4 h-4" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-gray-500" />
+              <ChevronDown className="w-4 h-4" />
             )}
           </div>
         </div>
@@ -147,26 +151,26 @@ function BrandGoalCard({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="overflow-hidden border-t border-gray-200"
+            className="overflow-hidden border-t border-neutral-100"
           >
             <div className="p-4">
               {/* Stats Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="text-xs text-gray-500">Total Clients</p>
-                  <p className="text-lg font-semibold text-gray-900">{brandClients.length}</p>
+                <div className="p-3 rounded-md ring-1 ring-neutral-200/70">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Total Clients</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-neutral-900">{brandClients.length}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="text-xs text-gray-500">Total Pitched</p>
-                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(totalPitched, true)}</p>
+                <div className="p-3 rounded-md ring-1 ring-neutral-200/70">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Total Pitched</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-neutral-900">{formatCurrency(totalPitched, true)}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="text-xs text-gray-500">Won Revenue</p>
-                  <p className="text-lg font-semibold text-emerald-600">{formatCurrency(wonRevenue, true)}</p>
+                <div className="p-3 rounded-md ring-1 ring-neutral-200/70">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Won Revenue</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-neutral-900">{formatCurrency(wonRevenue, true)}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="text-xs text-gray-500">Remaining</p>
-                  <p className="text-lg font-semibold text-amber-600">{formatCurrency(Math.max(0, goal - wonRevenue), true)}</p>
+                <div className="p-3 rounded-md ring-1 ring-neutral-200/70">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Remaining</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-neutral-900">{formatCurrency(Math.max(0, goal - wonRevenue), true)}</p>
                 </div>
               </div>
 
@@ -174,57 +178,17 @@ function BrandGoalCard({
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3 overflow-x-auto pb-2">
                 {stages.map((stage) => {
                   const stageClients = brandClients.filter(c => getClientStage(c) === stage.id)
-                  
-                  return (
-                    <div 
-                      key={stage.id} 
-                      className="min-w-[180px]"
-                      onDrop={(e) => handleDrop(e, stage.id)}
-                      onDragOver={handleDragOver}
-                    >
-                      {/* Stage Header */}
-                      <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-gray-100">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stage.color }} />
-                        <span className="text-xs font-medium text-gray-700">{stage.label}</span>
-                        <span className="ml-auto text-xs text-gray-500">{stageClients.length}</span>
-                      </div>
 
-                      {/* Client Cards */}
-                      <div className="space-y-2 min-h-[100px]">
-                        {stageClients.length === 0 ? (
-                          <div className="p-3 rounded-lg border border-dashed border-gray-300 text-center text-xs text-gray-400">
-                            No clients
-                          </div>
-                        ) : (
-                          stageClients.map((client) => (
-                            <motion.div
-                              key={client.id}
-                              draggable
-                              onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, client)}
-                              onClick={() => onClientClick?.(client)}
-                              className="p-3 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing group"
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                            >
-                              <div className="flex items-start gap-2">
-                                <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate">{client.company_name || client.name}</p>
-                                  {client.pitch_value && (
-                                    <p className="text-xs text-emerald-600 font-medium mt-1">{formatCurrency(client.pitch_value, true)}</p>
-                                  )}
-                                  {client.next_followup_date && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      Follow up: {formatDate(client.next_followup_date)}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </motion.div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                  return (
+                    <DropColumn
+                      key={stage.id}
+                      stage={stage}
+                      stageClients={stageClients}
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      handleDragStart={handleDragStart}
+                      onClientClick={onClientClick}
+                    />
                   )
                 })}
               </div>
@@ -232,6 +196,87 @@ function BrandGoalCard({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// Single drop-target column. Lifted out so we can hold local dragOver state for drop-indicator.
+function DropColumn({
+  stage,
+  stageClients,
+  onDrop,
+  onDragOver,
+  handleDragStart,
+  onClientClick,
+}: {
+  stage: { id: string; label: string; color: string }
+  stageClients: Client[]
+  onDrop: (e: React.DragEvent, stageId: string) => void
+  onDragOver: (e: React.DragEvent) => void
+  handleDragStart: (e: React.DragEvent, client: Client) => void
+  onClientClick?: (client: Client) => void
+}) {
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  return (
+    <div
+      className={`min-w-45 rounded-md transition-colors ${
+        isDragOver ? "ring-2 ring-neutral-900 ring-offset-2" : ""
+      }`}
+      onDrop={(e) => {
+        setIsDragOver(false)
+        onDrop(e, stage.id)
+      }}
+      onDragOver={(e) => {
+        setIsDragOver(true)
+        onDragOver(e)
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+    >
+      {/* Stage Header — flat strip, dot + label · count */}
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <span
+          className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: stage.color }}
+          aria-hidden="true"
+        />
+        <span className="text-xs font-medium text-neutral-900 truncate">{stage.label}</span>
+        <span className="ml-auto text-xs tabular-nums text-neutral-500">({stageClients.length})</span>
+      </div>
+
+      {/* Client Cards */}
+      <div className="space-y-2 min-h-25">
+        {stageClients.length === 0 ? (
+          <div className="p-3 rounded-md border border-dashed border-neutral-200 text-center text-xs text-neutral-400">
+            {isDragOver ? "Release to drop" : "No clients"}
+          </div>
+        ) : (
+          stageClients.map((client) => (
+            <motion.div
+              key={client.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, client)}
+              onClick={() => onClientClick?.(client)}
+              className="p-3 rounded-md bg-white ring-1 ring-neutral-200/70 hover:ring-neutral-300 hover:-translate-y-0.5 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-[transform,box-shadow,outline-color] cursor-grab active:cursor-grabbing group"
+            >
+              <div className="flex items-start gap-2">
+                <GripVertical className="w-4 h-4 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900 truncate">{client.company_name || client.name}</p>
+                  {client.pitch_value && (
+                    <p className="text-xs text-neutral-900 font-medium tabular-nums mt-1">{formatCurrency(client.pitch_value, true)}</p>
+                  )}
+                  {client.next_followup_date && (
+                    <p className="text-xs text-neutral-500 tabular-nums mt-1">
+                      Follow up · {formatDate(client.next_followup_date)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
     </div>
   )
 }
@@ -247,14 +292,14 @@ export function PipelineView({ pipeline, clients = [], onRefresh, onClientClick,
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Sales Pipeline by Brand</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className="text-lg font-medium text-neutral-900">Sales Pipeline by Brand</h3>
+          <p className="text-sm text-neutral-500 mt-1">
             Click on a brand card to view and manage clients in a kanban-style layout. Drag clients between stages.
           </p>
         </div>
         <button
           onClick={onRefresh}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors self-start sm:self-auto shadow-sm"
+          className="inline-flex items-center gap-2 h-9 px-3 text-sm bg-white ring-1 ring-neutral-200 hover:bg-neutral-50 hover:ring-neutral-300 rounded-md transition-colors self-start sm:self-auto"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -280,34 +325,23 @@ export function PipelineView({ pipeline, clients = [], onRefresh, onClientClick,
         ))}
       </div>
 
-      {/* Traditional Pipeline Legend */}
+      {/* Pipeline Stages Legend — flat reference strip */}
       <div className="mt-8">
-        <h4 className="text-sm font-semibold mb-3 text-gray-500">Pipeline Stages Reference</h4>
-        <div className="flex flex-wrap gap-4 p-3 rounded-lg bg-white border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span>Lead</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-cyan-500" />
-            <span>Qualified</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-sky-500" />
-            <span>Proposal</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-amber-500" />
-            <span>Negotiation</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span>Closed Won</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <div className="w-3 h-3 rounded-full bg-slate-400" />
-            <span>Closed Lost</span>
-          </div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-3">Pipeline Stages</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-2 p-3 rounded-md bg-white ring-1 ring-neutral-200/70">
+          {[
+            { color: "bg-blue-500", label: "Lead" },
+            { color: "bg-cyan-500", label: "Qualified" },
+            { color: "bg-sky-500", label: "Proposal" },
+            { color: "bg-amber-500", label: "Negotiation" },
+            { color: "bg-green-500", label: "Closed Won" },
+            { color: "bg-slate-400", label: "Closed Lost" },
+          ].map((stage) => (
+            <div key={stage.label} className="flex items-center gap-1.5 text-xs text-neutral-600">
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${stage.color}`} aria-hidden="true" />
+              <span>{stage.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

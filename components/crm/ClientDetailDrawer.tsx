@@ -233,7 +233,7 @@ export function ClientDetailDrawer({
                   onClose()
                 }}
                 disabled={isSaving}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete
@@ -252,7 +252,7 @@ export function ClientDetailDrawer({
               type="button"
               onClick={onSave}
               disabled={isSaving || !formData.company_name}
-              className="flex items-center gap-2 px-5 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>
@@ -262,7 +262,7 @@ export function ClientDetailDrawer({
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  {isEditing ? "Update Client" : "Add Client"}
+                  {isEditing ? "Save changes" : "Add client"}
                 </>
               )}
             </button>
@@ -277,8 +277,8 @@ export function ClientDetailDrawer({
             onClick={() => setActiveTab("edit")}
             className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "edit"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+                ? "border-neutral-900 text-neutral-900"
+                : "border-transparent text-neutral-500 hover:text-neutral-900"
             }`}
           >
             Edit details
@@ -288,8 +288,8 @@ export function ClientDetailDrawer({
             onClick={() => setActiveTab("360")}
             className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "360"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-gray-500 hover:text-gray-800"
+                ? "border-neutral-900 text-neutral-900"
+                : "border-transparent text-neutral-500 hover:text-neutral-900"
             }`}
           >
             Customer 360
@@ -299,7 +299,7 @@ export function ClientDetailDrawer({
 
       {/* Customer 360 Tab */}
       {showCustomer360Tab && activeTab === "360" && (
-        <div className="p-4 bg-gray-50">
+        <div className="p-4 bg-neutral-50">
           <Customer360Panel clientId={clientId!} />
         </div>
       )}
@@ -308,31 +308,31 @@ export function ClientDetailDrawer({
       <div className={`p-4 space-y-5 ${showCustomer360Tab && activeTab !== "edit" ? "hidden" : ""}`}>
         {/* Client Name - Primary Field */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   Client Name *
                 </label>
                 <input
                   type="text"
                   value={formData.company_name}
                   onChange={(e) => onFormChange({ ...formData, company_name: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400"
                   placeholder="e.g., Velocity TX"
                 />
               </div>
 
               {/* Department - For large clients with multiple departments */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Department <span className="text-gray-400 font-normal">(optional - for large clients)</span>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                  Department <span className="text-neutral-400 font-normal">(optional - for large clients)</span>
                 </label>
                 <input
                   type="text"
                   value={formData.department || ""}
                   onChange={(e) => onFormChange({ ...formData, department: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400"
                   placeholder="e.g., Marketing, HR, IT, Sales..."
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-neutral-500 mt-1">
                   Use this for large organizations with multiple departments or divisions that need different admins.
                 </p>
               </div>
@@ -340,21 +340,21 @@ export function ClientDetailDrawer({
               {/* Contacts Section */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-neutral-700">
                     Contacts ({formData.contacts.length})
                   </label>
                   <button
                     type="button"
                     onClick={addContact}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-50 rounded-md transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Add Contact
+                    Add contact
                   </button>
                 </div>
 
                 {formData.contacts.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 text-sm border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <div className="p-4 text-center text-neutral-400 text-sm border border-dashed border-neutral-300 rounded-lg bg-neutral-50">
                     No contacts added yet. Click "Add Contact" to add your first contact.
                   </div>
                 ) : (
@@ -367,25 +367,26 @@ export function ClientDetailDrawer({
                       return (
                         <div
                           key={contact.id}
-                          className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
+                          className="rounded-md ring-1 ring-neutral-200/70 bg-white overflow-hidden"
                         >
                           {/* Contact Header - Always Visible */}
                           <button
                             type="button"
                             onClick={() => toggleContact(contact.id)}
-                            className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors"
+                            className="w-full flex items-center justify-between p-3 hover:bg-neutral-100 transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                <User className="w-4 h-4 text-gray-500" />
+                              <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                                <User className="w-4 h-4 text-neutral-500" />
                               </div>
                               <div className="text-left">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-gray-900">
+                                  <span className="text-sm font-medium text-neutral-900">
                                     {fullName || `Contact ${index + 1}`}
                                   </span>
                                   {contact.is_primary && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-600 rounded">
+                                    <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
+                                      <span className="inline-block h-1 w-1 rounded-full bg-blue-500" aria-hidden="true" />
                                       Primary
                                     </span>
                                   )}
@@ -393,13 +394,13 @@ export function ClientDetailDrawer({
                                 {hasContent && !isExpanded && (
                                   <div className="flex items-center gap-3 mt-0.5">
                                     {contact.email && (
-                                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                                      <span className="flex items-center gap-1 text-xs text-neutral-500">
                                         <Mail className="w-3 h-3" />
                                         <span className="truncate max-w-[120px]">{contact.email}</span>
                                       </span>
                                     )}
                                     {contact.phone && (
-                                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                                      <span className="flex items-center gap-1 text-xs text-neutral-500">
                                         <Phone className="w-3 h-3" />
                                         {contact.phone}
                                       </span>
@@ -410,9 +411,9 @@ export function ClientDetailDrawer({
                             </div>
                             <div className="flex items-center gap-2">
                               {isExpanded ? (
-                                <ChevronUp className="w-4 h-4 text-gray-400" />
+                                <ChevronUp className="w-4 h-4 text-neutral-400" />
                               ) : (
-                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                                <ChevronDown className="w-4 h-4 text-neutral-400" />
                               )}
                             </div>
                           </button>
@@ -427,83 +428,83 @@ export function ClientDetailDrawer({
                                 transition={{ duration: 0.2 }}
                                 className="overflow-hidden"
                               >
-                                <div className="p-3 pt-0 space-y-3 border-t border-gray-200">
-                                  <div className="pt-3 grid grid-cols-2 gap-3">
+                                <div className="p-3 pt-0 space-y-3 border-t border-neutral-200">
+                                  <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">First Name *</label>
                                       <input
                                         type="text"
                                         value={contact.first_name}
                                         onChange={(e) => updateContact(contact.id, "first_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="First name"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Last Name *</label>
                                       <input
                                         type="text"
                                         value={contact.last_name}
                                         onChange={(e) => updateContact(contact.id, "last_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="Last name"
                                       />
                                     </div>
                                   </div>
                                   
-                                  <div className="grid grid-cols-2 gap-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Email</label>
                                       <input
                                         type="email"
                                         value={contact.email}
                                         onChange={(e) => updateContact(contact.id, "email", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="email@company.com"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Phone</label>
                                       <input
                                         type="tel"
                                         value={contact.phone}
                                         onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="(555) 123-4567"
                                       />
                                     </div>
                                   </div>
 
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+                                    <label className="block text-xs font-medium text-neutral-600 mb-1">Role</label>
                                     <input
                                       type="text"
                                       value={contact.role}
                                       onChange={(e) => updateContact(contact.id, "role", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                       placeholder="e.g., CEO, Marketing Director"
                                     />
                                   </div>
 
                                   {/* Date of Birth */}
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Date of Birth</label>
+                                    <label className="block text-xs font-medium text-neutral-600 mb-1">Date of Birth</label>
                                     <input
                                       type="date"
                                       value={contact.date_of_birth || ""}
                                       onChange={(e) => updateContact(contact.id, "date_of_birth", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                     />
                                   </div>
 
                                   {/* Address */}
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+                                    <label className="block text-xs font-medium text-neutral-600 mb-1">Address</label>
                                     <input
                                       type="text"
                                       value={contact.address || ""}
                                       onChange={(e) => updateContact(contact.id, "address", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                       placeholder="Street address"
                                     />
                                   </div>
@@ -511,32 +512,32 @@ export function ClientDetailDrawer({
                                   {/* City, State, Zipcode */}
                                   <div className="grid grid-cols-3 gap-2">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">City</label>
                                       <input
                                         type="text"
                                         value={contact.city || ""}
                                         onChange={(e) => updateContact(contact.id, "city", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="City"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">State</label>
                                       <input
                                         type="text"
                                         value={contact.state || ""}
                                         onChange={(e) => updateContact(contact.id, "state", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="State"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Zipcode</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Zipcode</label>
                                       <input
                                         type="text"
                                         value={contact.zipcode || ""}
                                         onChange={(e) => updateContact(contact.id, "zipcode", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="Zipcode"
                                       />
                                     </div>
@@ -548,9 +549,9 @@ export function ClientDetailDrawer({
                                         type="checkbox"
                                         checked={contact.is_primary}
                                         onChange={(e) => updateContact(contact.id, "is_primary", e.target.checked)}
-                                        className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                                        className="w-4 h-4 rounded border-neutral-300 bg-white text-neutral-900 focus:ring-neutral-400 focus:ring-offset-0"
                                       />
-                                      <span className="text-xs text-gray-600">Set as primary contact</span>
+                                      <span className="text-xs text-neutral-600">Set as primary contact</span>
                                     </label>
                                     
                                     {formData.contacts.length > 1 && (
@@ -578,11 +579,11 @@ export function ClientDetailDrawer({
               {/* Source & Follow-up Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Source</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Source</label>
                   <select
                     value={formData.source || ""}
                     onChange={(e) => onFormChange({ ...formData, source: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   >
                     <option value="">Select source...</option>
                     <option value="existing">Existing</option>
@@ -595,9 +596,9 @@ export function ClientDetailDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                     <span className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-blue-600" />
+                      <Calendar className="w-4 h-4 text-neutral-400" />
                       Follow-up Date
                     </span>
                   </label>
@@ -605,43 +606,43 @@ export function ClientDetailDrawer({
                     type="date"
                     value={formData.next_followup_date}
                     onChange={(e) => onFormChange({ ...formData, next_followup_date: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   />
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">Notes</label>
                 <div className="relative">
                   <textarea
                     value={formData.notes}
                     onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
                     rows={4}
-                    className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
+                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400 resize-y min-h-30 max-h-75"
                     placeholder="Additional notes about this contact..."
                   />
-                  <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
+                  <div className="absolute bottom-2 right-2 pointer-events-none text-neutral-300">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 10 10">
                       <path d="M9 9H7v-1h1V7h1v2zm0-4H8V4h1v1zm-4 4H4V8h1v1zm4-8H8V0h1v1zM5 1H4V0h1v1zM1 9H0V7h1v2zm0-4H0V4h1v1zM1 1H0V0h1v1z" opacity="0.5"/>
                     </svg>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Drag corner to resize</p>
+                <p className="text-xs text-neutral-400 mt-1">Drag corner to resize</p>
               </div>
 
               {/* Assignee Dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   <span className="flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-blue-600" />
+                    <Users className="w-4 h-4 text-neutral-400" />
                     Assigned To
                   </span>
                 </label>
                 <select
                   value={formData.assigned_to || ""}
                   onChange={(e) => onFormChange({ ...formData, assigned_to: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   disabled={isLoadingMembers}
                 >
                   <option value="">{isLoadingMembers ? "Loading..." : "Select assignee..."}</option>

@@ -574,7 +574,7 @@ export function OpportunityDetailDrawer({
               type="button"
               onClick={onSave}
               disabled={isSaving || !formData.company_name || !formData.brand}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-lg text-sm font-medium hover:from-sky-700 hover:to-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md text-sm font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>
@@ -584,7 +584,7 @@ export function OpportunityDetailDrawer({
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  {isEditing ? "Save Changes" : "Create Opportunity"}
+                  {isEditing ? "Save changes" : "Create opportunity"}
                 </>
               )}
             </button>
@@ -593,22 +593,22 @@ export function OpportunityDetailDrawer({
       }
     >
       <div className="p-4 space-y-5">
-        {/* Header strip — preserves the original gradient identity */}
-        <div className="flex items-center gap-3 -mx-4 -mt-4 px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-sky-50 to-cyan-50">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center shrink-0">
-            <Target className="w-5 h-5 text-white" />
+        {/* Mono header strip — flat eyebrow + neutral icon tile */}
+        <div className="flex items-center gap-3 -mx-4 -mt-4 px-4 py-3 border-b border-neutral-100">
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700 shrink-0">
+            <Target className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-[12px] text-gray-500 font-medium uppercase tracking-wide">Opportunity</p>
-            <p className="text-[11px] text-gray-400">Get that money and close that business</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">Opportunity</p>
+            <p className="text-[11px] text-neutral-400">Edit details, contacts, and close-out fields</p>
           </div>
         </div>
 
         {/* Client Name - Dropdown with search */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   <span className="flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-gray-500" />
+                    <Building2 className="w-4 h-4 text-neutral-500" />
                     Client Name *
                   </span>
                 </label>
@@ -616,12 +616,12 @@ export function OpportunityDetailDrawer({
                   <button
                     type="button"
                     onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-                    className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-left focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-left focus:outline-none focus:ring-neutral-400 flex items-center justify-between"
                   >
-                    <span className={formData.company_name ? "text-gray-900" : "text-gray-400"}>
+                    <span className={formData.company_name ? "text-neutral-900" : "text-neutral-400"}>
                       {formData.company_name || "Select or create client..."}
                     </span>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`} />
                   </button>
 
                   <AnimatePresence>
@@ -630,10 +630,10 @@ export function OpportunityDetailDrawer({
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                        className="absolute z-30 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
                       >
                         {/* Search input */}
-                        <div className="p-2 border-b border-gray-100">
+                        <div className="p-2 border-b border-neutral-100">
                           <input
                             type="text"
                             value={companySearchQuery}
@@ -641,7 +641,7 @@ export function OpportunityDetailDrawer({
                               setCompanySearchQuery(e.target.value)
                             }}
                             placeholder="Search or type new client name..."
-                            className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                            className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                             autoFocus
                           />
                         </div>
@@ -663,12 +663,12 @@ export function OpportunityDetailDrawer({
                                   setShowCompanyDropdown(false)
                                   setCompanySearchQuery("")
                                 }}
-                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-blue-600 font-medium"
+                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 flex items-center gap-2 text-neutral-900 font-medium"
                               >
                                 <Plus className="w-4 h-4" />
                                 Create new: "{companySearchQuery}"
                               </button>
-                              <div className="border-t border-gray-100" />
+                              <div className="border-t border-neutral-100" />
                             </>
                           )}
 
@@ -680,22 +680,22 @@ export function OpportunityDetailDrawer({
                                   key={company.id}
                                   type="button"
                                   onClick={() => handleSelectCompany(company)}
-                                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                                 >
-                                  <span className="text-gray-900">{company.name}</span>
+                                  <span className="text-neutral-900">{company.name}</span>
                                   {formData.existing_company_id === company.id && (
-                                    <Check className="w-4 h-4 text-blue-600" />
+                                    <Check className="w-4 h-4 text-neutral-900" />
                                   )}
                                 </button>
                               ))}
                               {uniqueCompanies.length > 50 && (
-                                <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50">
+                                <div className="px-3 py-2 text-center text-xs text-neutral-500 bg-neutral-50">
                                   Showing {Math.min(50, filteredCompanies.length)} of {uniqueCompanies.length} clients. Type to search for more.
                                 </div>
                               )}
                             </>
                           ) : !companySearchQuery ? (
-                            <div className="px-3 py-4 text-center text-sm text-gray-500">
+                            <div className="px-3 py-4 text-center text-sm text-neutral-500">
                               No existing clients. Type to create one.
                             </div>
                           ) : null}
@@ -715,7 +715,7 @@ export function OpportunityDetailDrawer({
                   )}
                 </div>
                 {formData.linked_company_id && !isEditing && (
-                  <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                  <p className="text-xs text-neutral-700 mt-1 flex items-center gap-1">
                     <Check className="w-3 h-3" />
                     Linked to existing client (will create new opportunity)
                   </p>
@@ -724,9 +724,9 @@ export function OpportunityDetailDrawer({
 
               {/* Title Field */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   <span className="flex items-center gap-1.5">
-                    <Target className="w-4 h-4 text-gray-500" />
+                    <Target className="w-4 h-4 text-neutral-500" />
                     Opportunity Title *
                   </span>
                 </label>
@@ -734,7 +734,7 @@ export function OpportunityDetailDrawer({
                   type="text"
                   value={formData.title}
                   onChange={(e) => onFormChange({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400"
                   placeholder="Enter opportunity title..."
                 />
               </div>
@@ -742,13 +742,13 @@ export function OpportunityDetailDrawer({
               {/* Contacts Section */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-neutral-700">
                     Contacts ({formData.contacts.length})
                   </label>
                   <button
                     type="button"
                     onClick={addContact}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-50 rounded-md transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Contact
@@ -756,7 +756,7 @@ export function OpportunityDetailDrawer({
                 </div>
 
                 {formData.contacts.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 text-sm border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <div className="p-4 text-center text-neutral-400 text-sm border border-dashed border-neutral-300 rounded-lg bg-neutral-50">
                     No contacts added yet. Click "Add Contact" to add your first contact.
                   </div>
                 ) : (
@@ -769,25 +769,26 @@ export function OpportunityDetailDrawer({
                       return (
                         <div
                           key={contact.id}
-                          className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50"
+                          className="border border-neutral-200 rounded-lg overflow-hidden bg-neutral-50"
                         >
                           {/* Contact Header */}
                           <button
                             type="button"
                             onClick={() => toggleContact(contact.id)}
-                            className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors"
+                            className="w-full flex items-center justify-between p-3 hover:bg-neutral-100 transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                <User className="w-4 h-4 text-gray-500" />
+                              <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                                <User className="w-4 h-4 text-neutral-500" />
                               </div>
                               <div className="text-left">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-gray-900">
+                                  <span className="text-sm font-medium text-neutral-900">
                                     {fullName || `Contact ${index + 1}`}
                                   </span>
                                   {contact.is_primary && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-600 rounded">
+                                    <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
+                                      <span className="inline-block h-1 w-1 rounded-full bg-blue-500" aria-hidden="true" />
                                       Primary
                                     </span>
                                   )}
@@ -795,13 +796,13 @@ export function OpportunityDetailDrawer({
                                 {hasContent && !isExpanded && (
                                   <div className="flex items-center gap-3 mt-0.5">
                                     {contact.email && (
-                                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                                      <span className="flex items-center gap-1 text-xs text-neutral-500">
                                         <Mail className="w-3 h-3" />
                                         <span className="truncate max-w-[120px]">{contact.email}</span>
                                       </span>
                                     )}
                                     {contact.phone && (
-                                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                                      <span className="flex items-center gap-1 text-xs text-neutral-500">
                                         <Phone className="w-3 h-3" />
                                         {contact.phone}
                                       </span>
@@ -812,9 +813,9 @@ export function OpportunityDetailDrawer({
                             </div>
                             <div className="flex items-center gap-2">
                               {isExpanded ? (
-                                <ChevronUp className="w-4 h-4 text-gray-400" />
+                                <ChevronUp className="w-4 h-4 text-neutral-400" />
                               ) : (
-                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                                <ChevronDown className="w-4 h-4 text-neutral-400" />
                               )}
                             </div>
                           </button>
@@ -829,113 +830,113 @@ export function OpportunityDetailDrawer({
                                 transition={{ duration: 0.2 }}
                                 className="overflow-hidden"
                               >
-                                <div className="p-3 pt-0 space-y-3 border-t border-gray-200">
-                                  <div className="pt-3 grid grid-cols-2 gap-3">
+                                <div className="p-3 pt-0 space-y-3 border-t border-neutral-200">
+                                  <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">First Name *</label>
                                       <input
                                         type="text"
                                         value={contact.first_name}
                                         onChange={(e) => updateContact(contact.id, "first_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="First name"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Last Name *</label>
                                       <input
                                         type="text"
                                         value={contact.last_name}
                                         onChange={(e) => updateContact(contact.id, "last_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="Last name"
                                       />
                                     </div>
                                   </div>
                                   
-                                  <div className="grid grid-cols-2 gap-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Email</label>
                                       <input
                                         type="email"
                                         value={contact.email}
                                         onChange={(e) => updateContact(contact.id, "email", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="email@company.com"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Phone</label>
                                       <input
                                         type="tel"
                                         value={contact.phone}
                                         onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="(555) 123-4567"
                                       />
                                     </div>
                                   </div>
 
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+                                    <label className="block text-xs font-medium text-neutral-600 mb-1">Role</label>
                                     <input
                                       type="text"
                                       value={contact.role}
                                       onChange={(e) => updateContact(contact.id, "role", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                       placeholder="e.g., CEO, Marketing Director"
                                     />
                                   </div>
 
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Date of Birth</label>
+                                    <label className="block text-xs font-medium text-neutral-600 mb-1">Date of Birth</label>
                                     <input
                                       type="date"
                                       value={contact.date_of_birth || ""}
                                       onChange={(e) => updateContact(contact.id, "date_of_birth", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                     />
                                   </div>
 
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+                                    <label className="block text-xs font-medium text-neutral-600 mb-1">Address</label>
                                     <input
                                       type="text"
                                       value={contact.address || ""}
                                       onChange={(e) => updateContact(contact.id, "address", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                       placeholder="Street address"
                                     />
                                   </div>
 
                                   <div className="grid grid-cols-3 gap-2">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">City</label>
                                       <input
                                         type="text"
                                         value={contact.city || ""}
                                         onChange={(e) => updateContact(contact.id, "city", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="City"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">State</label>
                                       <input
                                         type="text"
                                         value={contact.state || ""}
                                         onChange={(e) => updateContact(contact.id, "state", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="State"
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 mb-1">Zipcode</label>
+                                      <label className="block text-xs font-medium text-neutral-600 mb-1">Zipcode</label>
                                       <input
                                         type="text"
                                         value={contact.zipcode || ""}
                                         onChange={(e) => updateContact(contact.id, "zipcode", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                                         placeholder="Zipcode"
                                       />
                                     </div>
@@ -947,9 +948,9 @@ export function OpportunityDetailDrawer({
                                         type="checkbox"
                                         checked={contact.is_primary}
                                         onChange={(e) => updateContact(contact.id, "is_primary", e.target.checked)}
-                                        className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                                        className="w-4 h-4 rounded border-neutral-300 bg-white text-neutral-900 focus:ring-neutral-400 focus:ring-offset-0"
                                       />
-                                      <span className="text-xs text-gray-600">Set as primary contact</span>
+                                      <span className="text-xs text-neutral-600">Set as primary contact</span>
                                     </label>
                                     
                                     {formData.contacts.length > 1 && (
@@ -975,13 +976,13 @@ export function OpportunityDetailDrawer({
               </div>
 
               {/* Source & Platform */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Source</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Source</label>
                   <select
                     value={formData.source || ""}
                     onChange={(e) => onFormChange({ ...formData, source: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   >
                     <option value="">Select source...</option>
                     <option value="existing">Existing</option>
@@ -994,11 +995,11 @@ export function OpportunityDetailDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Platform *</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Platform *</label>
                   <select
                     value={formData.brand}
                     onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   >
                     <option value="">Select platform...</option>
                     {BRANDS.map((brand) => {
@@ -1014,11 +1015,11 @@ export function OpportunityDetailDrawer({
               </div>
 
               {/* Pitch Value & Follow-up Date */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                     <span className="flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-emerald-600" />
+                      <DollarSign className="w-4 h-4 text-neutral-400" />
                       Pitch Value
                     </span>
                   </label>
@@ -1026,14 +1027,14 @@ export function OpportunityDetailDrawer({
                     type="number"
                     value={formData.pitch_value}
                     onChange={(e) => onFormChange({ ...formData, pitch_value: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                     placeholder="e.g., 50000"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                     <span className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-blue-600" />
+                      <Calendar className="w-4 h-4 text-neutral-400" />
                       Follow-up Date
                     </span>
                   </label>
@@ -1041,24 +1042,24 @@ export function OpportunityDetailDrawer({
                     type="date"
                     value={formData.next_followup_date}
                     onChange={(e) => onFormChange({ ...formData, next_followup_date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   />
                 </div>
               </div>
 
               {/* Assigned To */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Assigned To</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">Assigned To</label>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400 flex items-center justify-between"
                   >
-                    <span className={formData.assigned_to ? "text-gray-900" : "text-gray-400"}>
+                    <span className={formData.assigned_to ? "text-neutral-900" : "text-neutral-400"}>
                       {formData.assigned_to || "Select team member..."}
                     </span>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showAssigneeDropdown ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${showAssigneeDropdown ? "rotate-180" : ""}`} />
                   </button>
                   
                   <AnimatePresence>
@@ -1067,7 +1068,7 @@ export function OpportunityDetailDrawer({
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                        className="absolute z-20 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
                       >
                         <div className="max-h-64 overflow-y-auto">
                           <button
@@ -1076,24 +1077,24 @@ export function OpportunityDetailDrawer({
                               onFormChange({ ...formData, assigned_to: "Unassigned" })
                               setShowAssigneeDropdown(false)
                             }}
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                           >
-                            <span className="text-gray-500">Unassigned</span>
-                            {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-blue-600" />}
+                            <span className="text-neutral-500">Unassigned</span>
+                            {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-neutral-900" />}
                           </button>
                           
-                          <div className="border-t border-gray-100" />
+                          <div className="border-t border-neutral-100" />
                           
                           {isLoadingMembers ? (
                             <div className="px-3 py-4 text-center">
-                              <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
+                              <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
                             </div>
                           ) : (
                             <>
                               {teamMembers.map((member) => (
                                 <div
                                   key={member.id}
-                                  className="flex items-center justify-between hover:bg-gray-50 group"
+                                  className="flex items-center justify-between hover:bg-neutral-50 group"
                                 >
                                   <button
                                     type="button"
@@ -1104,12 +1105,12 @@ export function OpportunityDetailDrawer({
                                     className="flex-1 px-3 py-2 text-left text-sm flex items-center justify-between"
                                   >
                                     <div>
-                                      <span className="text-gray-900">{member.name}</span>
+                                      <span className="text-neutral-900">{member.name}</span>
                                       {member.email && (
-                                        <span className="text-gray-400 text-xs ml-2">{member.email}</span>
+                                        <span className="text-neutral-400 text-xs ml-2">{member.email}</span>
                                       )}
                                     </div>
-                                    {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600" />}
+                                    {formData.assigned_to === member.name && <Check className="w-4 h-4 text-neutral-900" />}
                                   </button>
                                   {!member.id.startsWith("default-") && (
                                     <button
@@ -1118,7 +1119,7 @@ export function OpportunityDetailDrawer({
                                         e.stopPropagation()
                                         handleDeleteMember(member)
                                       }}
-                                      className="px-2 py-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                                      className="px-2 py-2 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-opacity"
                                       title={`Remove ${member.name}`}
                                     >
                                       <UserMinus className="w-4 h-4" />
@@ -1129,7 +1130,7 @@ export function OpportunityDetailDrawer({
                             </>
                           )}
                           
-                          <div className="border-t border-gray-100" />
+                          <div className="border-t border-neutral-100" />
                           
                           <button
                             type="button"
@@ -1137,7 +1138,7 @@ export function OpportunityDetailDrawer({
                               setShowAddMember(true)
                               setShowAssigneeDropdown(false)
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+                            className="w-full px-3 py-2 text-left text-sm text-neutral-900 hover:bg-neutral-50 flex items-center gap-2"
                           >
                             <UserPlus className="w-4 h-4" />
                             Add new team member
@@ -1149,7 +1150,7 @@ export function OpportunityDetailDrawer({
                               setShowManageMembers(true)
                               setShowAssigneeDropdown(false)
                             }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-2"
+                            className="w-full px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50 flex items-center gap-2"
                           >
                             <Settings className="w-4 h-4" />
                             Manage team members
@@ -1169,15 +1170,15 @@ export function OpportunityDetailDrawer({
               </div>
 
               {/* Disposition & DOC */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Disposition <span className="text-gray-400 font-normal">(Stage)</span>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                    Disposition <span className="text-neutral-400 font-normal">(Stage)</span>
                   </label>
                   <select
                     value={formData.disposition || "pitched"}
                     onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   >
                     {DISPOSITION_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -1187,13 +1188,13 @@ export function OpportunityDetailDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    DOC <span className="text-gray-400 font-normal">(Confidence)</span>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                    DOC <span className="text-neutral-400 font-normal">(Confidence)</span>
                   </label>
                   <select
                     value={formData.doc || ""}
                     onChange={(e) => onFormChange({ ...formData, doc: e.target.value as DOC })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                   >
                     <option value="">Select probability...</option>
                     {DOC_OPTIONS.map((option) => (
@@ -1212,10 +1213,10 @@ export function OpportunityDetailDrawer({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="p-3 bg-blue-50 border border-blue-100 rounded-lg"
+                    className="p-3 bg-neutral-50 ring-1 ring-neutral-200 rounded-md"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-blue-900">Add New Team Member</h4>
+                      <h4 className="text-sm font-medium text-neutral-900">Add team member</h4>
                       <button
                         type="button"
                         onClick={() => {
@@ -1224,7 +1225,8 @@ export function OpportunityDetailDrawer({
                           setNewMemberEmail("")
                           setMemberError("")
                         }}
-                        className="text-blue-400 hover:text-blue-600"
+                        aria-label="Close add team member"
+                        className="grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 -mr-1"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1235,14 +1237,14 @@ export function OpportunityDetailDrawer({
                         value={newMemberName}
                         onChange={(e) => setNewMemberName(e.target.value)}
                         placeholder="Full name (required)"
-                        className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                       />
                       <input
                         type="email"
                         value={newMemberEmail}
                         onChange={(e) => setNewMemberEmail(e.target.value)}
                         placeholder="Email (optional)"
-                        className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
                       />
                       {memberError && (
                         <p className="text-xs text-red-600">{memberError}</p>
@@ -1277,10 +1279,10 @@ export function OpportunityDetailDrawer({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="p-4 bg-gray-50 border border-gray-200 rounded-lg"
+                    className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg"
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                      <h4 className="text-sm font-medium text-neutral-900 flex items-center gap-2">
                         <Settings className="w-4 h-4" />
                         Manage Team Members
                       </h4>
@@ -1290,7 +1292,7 @@ export function OpportunityDetailDrawer({
                           setShowManageMembers(false)
                           handleCancelEdit()
                         }}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-neutral-400 hover:text-neutral-600"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1305,18 +1307,18 @@ export function OpportunityDetailDrawer({
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {isLoadingMembers ? (
                         <div className="py-4 text-center">
-                          <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
-                          <p className="text-xs text-gray-500 mt-2">Loading team members...</p>
+                          <Loader2 className="w-5 h-5 animate-spin mx-auto text-neutral-400" />
+                          <p className="text-xs text-neutral-500 mt-2">Loading team members...</p>
                         </div>
                       ) : teamMembers.length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-4">
+                        <p className="text-sm text-neutral-500 text-center py-4">
                           No team members yet. Add one using the dropdown above.
                         </p>
                       ) : (
                         teamMembers.map((member) => (
                           <div
                             key={member.id}
-                            className="p-3 bg-white border border-gray-200 rounded-lg"
+                            className="p-3 bg-white border border-neutral-200 rounded-lg"
                           >
                             {editingMemberId === member.id ? (
                               <div className="space-y-2">
@@ -1325,14 +1327,14 @@ export function OpportunityDetailDrawer({
                                   value={editMemberName}
                                   onChange={(e) => setEditMemberName(e.target.value)}
                                   placeholder="Full name"
-                                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                  className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-300 text-sm text-neutral-900 focus:outline-none focus:border-blue-500"
                                 />
                                 <input
                                   type="email"
                                   value={editMemberEmail}
                                   onChange={(e) => setEditMemberEmail(e.target.value)}
                                   placeholder="Email address"
-                                  className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                  className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-300 text-sm text-neutral-900 focus:outline-none focus:border-blue-500"
                                 />
                                 <div className="flex gap-2">
                                   <button
@@ -1351,7 +1353,7 @@ export function OpportunityDetailDrawer({
                                   <button
                                     type="button"
                                     onClick={handleCancelEdit}
-                                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300"
+                                    className="px-3 py-1.5 bg-neutral-200 text-neutral-700 text-xs font-medium rounded-lg hover:bg-neutral-300"
                                   >
                                     Cancel
                                   </button>
@@ -1360,11 +1362,11 @@ export function OpportunityDetailDrawer({
                             ) : (
                               <div className="flex items-center justify-between">
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                  <p className="text-sm font-medium text-neutral-900 truncate">
                                     {member.name}
                                   </p>
                                   {member.email && (
-                                    <p className="text-xs text-gray-500 truncate">
+                                    <p className="text-xs text-neutral-500 truncate">
                                       {member.email}
                                     </p>
                                   )}
@@ -1375,7 +1377,8 @@ export function OpportunityDetailDrawer({
                                       <button
                                         type="button"
                                         onClick={() => handleStartEdit(member)}
-                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                        aria-label={`Edit ${member.name}`}
+                                        className="grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
                                         title="Edit member"
                                       >
                                         <Pencil className="w-4 h-4" />
@@ -1383,7 +1386,8 @@ export function OpportunityDetailDrawer({
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteMember(member)}
-                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        aria-label={`Remove ${member.name}`}
+                                        className="grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                                         title="Remove member"
                                       >
                                         <Trash2 className="w-4 h-4" />
@@ -1391,7 +1395,7 @@ export function OpportunityDetailDrawer({
                                     </>
                                   )}
                                   {member.id.startsWith("default-") && (
-                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                                    <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded">
                                       Default
                                     </span>
                                   )}
@@ -1409,7 +1413,7 @@ export function OpportunityDetailDrawer({
                         setShowManageMembers(false)
                         setShowAddMember(true)
                       }}
-                      className="w-full mt-3 px-3 py-2 border border-dashed border-gray-300 text-gray-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+                      className="w-full mt-3 px-3 py-2 border border-dashed border-neutral-300 text-neutral-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
                     >
                       <UserPlus className="w-4 h-4" />
                       Add new team member
@@ -1419,15 +1423,15 @@ export function OpportunityDetailDrawer({
               </AnimatePresence>
 
               {/* Web Links Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="pt-4 border-t border-neutral-200">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
                   <Link2 className="w-4 h-4 inline mr-2" />
                   Web Links
                 </label>
                 <div className="space-y-2">
                   {formData.web_links.map((link, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
-                      <ExternalLink className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
+                      <ExternalLink className="w-4 h-4 text-neutral-400 flex-shrink-0" />
                       <a 
                         href={link} 
                         target="_blank" 
@@ -1439,9 +1443,9 @@ export function OpportunityDetailDrawer({
                       <button
                         type="button"
                         onClick={() => handleRemoveLink(index)}
-                        className="p-1 rounded hover:bg-gray-200 transition-colors"
+                        className="p-1 rounded hover:bg-neutral-200 transition-colors"
                       >
-                        <X className="w-4 h-4 text-gray-400" />
+                        <X className="w-4 h-4 text-neutral-400" />
                       </button>
                     </div>
                   ))}
@@ -1452,23 +1456,23 @@ export function OpportunityDetailDrawer({
                       onChange={(e) => setNewLink(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddLink())}
                       placeholder="Add a link (https://...)"
-                      className="flex-1 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      className="flex-1 px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                     />
                     <button
                       type="button"
                       onClick={handleAddLink}
                       disabled={!newLink.trim()}
-                      className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition-colors disabled:opacity-50"
+                      className="px-3 py-2 bg-neutral-200 hover:bg-neutral-300 rounded-lg text-sm transition-colors disabled:opacity-50"
                     >
-                      <Plus className="w-4 h-4 text-gray-700" />
+                      <Plus className="w-4 h-4 text-neutral-700" />
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* File Attachments Section */}
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="pt-4 border-t border-neutral-200">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
                   <Upload className="w-4 h-4 inline mr-2" />
                   Attachments
                 </label>
@@ -1477,7 +1481,7 @@ export function OpportunityDetailDrawer({
                 {formData.docs.length > 0 && (
                   <div className="space-y-2 mb-3">
                     {formData.docs.map((doc, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
+                      <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
                         <FileText className={`w-4 h-4 flex-shrink-0 ${doc.startsWith("/uploads/") ? "text-emerald-600" : "text-blue-600"}`} />
                         <a 
                           href={doc} 
@@ -1496,9 +1500,9 @@ export function OpportunityDetailDrawer({
                             const newDocs = formData.docs.filter((_, i) => i !== index)
                             onFormChange({ ...formData, docs: newDocs })
                           }}
-                          className="p-1 rounded hover:bg-gray-200 transition-colors"
+                          className="p-1 rounded hover:bg-neutral-200 transition-colors"
                         >
-                          <X className="w-4 h-4 text-gray-400" />
+                          <X className="w-4 h-4 text-neutral-400" />
                         </button>
                       </div>
                     ))}
@@ -1506,16 +1510,16 @@ export function OpportunityDetailDrawer({
                 )}
 
                 {/* Upload Button */}
-                <label className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 bg-gray-50 cursor-pointer transition-colors">
+                <label className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-neutral-300 hover:border-neutral-400 bg-neutral-50 cursor-pointer transition-colors">
                   {isUploadingFile ? (
                     <>
-                      <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                      <span className="text-sm text-gray-500">Uploading...</span>
+                      <Loader2 className="w-5 h-5 text-neutral-400 animate-spin" />
+                      <span className="text-sm text-neutral-500">Uploading...</span>
                     </>
                   ) : (
                     <>
-                      <Upload className="w-5 h-5 text-gray-400" />
-                      <span className="text-sm text-gray-500">
+                      <Upload className="w-5 h-5 text-neutral-400" />
+                      <span className="text-sm text-neutral-500">
                         Drop a file or click to upload
                       </span>
                     </>
@@ -1550,20 +1554,20 @@ export function OpportunityDetailDrawer({
                   </div>
                 )}
                 
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-neutral-500 mt-2">
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">Notes</label>
                 <div className="relative">
                   <textarea
                     value={formData.notes}
                     onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
                     rows={4}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
+                    className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
                     placeholder="Additional notes about this opportunity..."
                   />
                   <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
@@ -1572,7 +1576,7 @@ export function OpportunityDetailDrawer({
                     </svg>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Drag corner to resize</p>
+                <p className="text-xs text-neutral-400 mt-1">Drag corner to resize</p>
               </div>
       </div>
     </DetailDrawer>

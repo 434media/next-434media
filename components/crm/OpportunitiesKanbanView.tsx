@@ -96,45 +96,46 @@ function PlatformGoalsSummary({
   onToggle: () => void
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden mb-6">
       <button
         onClick={onToggle}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-white" />
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+            <TrendingUp className="w-4 h-4" />
           </div>
           <div className="text-left">
-            <h3 className="text-base font-semibold text-gray-900">Platform Goals & Progress</h3>
-            <p className="text-sm text-gray-500">View annual targets by brand</p>
+            <h3 className="text-sm font-medium text-neutral-900">Platform Goals & Progress</h3>
+            <p className="text-xs text-neutral-500">Annual targets by brand</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-6">
+          <div className="hidden sm:flex items-center gap-5">
             {BRAND_GOALS.map((goal) => {
               const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
               const wonRevenue = brandClients
                 .filter(c => c.disposition === "closed_won")
                 .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
               const progress = Math.min(100, (wonRevenue / goal.annualGoal) * 100)
-              
+
               return (
-                <div key={goal.brand} className="flex items-center gap-2">
-                  <div 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: goal.color }} 
+                <div key={goal.brand} className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: goal.color }}
+                    aria-hidden="true"
                   />
-                  <span className="text-xs font-medium text-gray-600">{Math.round(progress)}%</span>
+                  <span className="text-xs font-medium tabular-nums text-neutral-600">{Math.round(progress)}%</span>
                 </div>
               )
             })}
           </div>
-          <div className="p-2 rounded-lg bg-gray-100">
+          <div className="grid h-9 w-9 place-items-center rounded-md text-neutral-500">
             {isExpanded ? (
-              <ChevronUp className="w-5 h-5 text-gray-500" />
+              <ChevronUp className="w-4 h-4" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-gray-500" />
+              <ChevronDown className="w-4 h-4" />
             )}
           </div>
         </div>
@@ -147,14 +148,14 @@ function PlatformGoalsSummary({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-gray-200"
+            className="overflow-hidden border-t border-neutral-100"
           >
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {BRAND_GOALS.map((goal) => {
                 const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
                 const brandTasks = tasks.filter(t => matchesBrandGoal(t.brand, goal) && t.is_opportunity)
                 const totalItems = brandClients.length + brandTasks.length
-                
+
                 const wonRevenue = brandClients
                   .filter(c => c.disposition === "closed_won")
                   .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
@@ -164,51 +165,55 @@ function PlatformGoalsSummary({
                 const progress = Math.min(100, (wonRevenue / goal.annualGoal) * 100)
 
                 // Display name - show combined label if there are included brands
-                const displayName = goal.includedBrands && goal.includedBrands.length > 1 
+                const displayName = goal.includedBrands && goal.includedBrands.length > 1
                   ? `${goal.brand} / ${goal.includedBrands.filter(b => b !== goal.brand).join(", ")}`
                   : goal.brand
 
                 return (
-                  <div 
+                  <div
                     key={goal.brand}
-                    className="p-4 rounded-xl border border-gray-200 bg-gray-50/50"
+                    className="p-4 rounded-md ring-1 ring-neutral-200/70 bg-white"
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      <div 
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${goal.color}15` }}
-                      >
-                        <Target className="w-4 h-4" style={{ color: goal.color }} />
+                      <div className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                        <Target className="w-4 h-4" />
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                        <p className="text-xs text-gray-500">{totalItems} opportunities</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-900 truncate">
+                          <span
+                            className="inline-block h-1.5 w-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: goal.color }}
+                            aria-hidden="true"
+                          />
+                          {displayName}
+                        </p>
+                        <p className="text-xs text-neutral-500 tabular-nums">{totalItems} opportunities</p>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Goal</span>
-                        <span className="font-medium text-gray-900">{formatCurrency(goal.annualGoal, true)}</span>
+                        <span className="text-neutral-500">Goal</span>
+                        <span className="font-medium tabular-nums text-neutral-900">{formatCurrency(goal.annualGoal, true)}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Won</span>
-                        <span className="font-medium text-emerald-600">{formatCurrency(wonRevenue, true)}</span>
+                        <span className="text-neutral-500">Won</span>
+                        <span className="font-medium tabular-nums text-neutral-900">{formatCurrency(wonRevenue, true)}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Pipeline</span>
-                        <span className="font-medium text-blue-600">{formatCurrency(pipelineValue, true)}</span>
+                        <span className="text-neutral-500">Pipeline</span>
+                        <span className="font-medium tabular-nums text-neutral-900">{formatCurrency(pipelineValue, true)}</span>
                       </div>
-                      
+
                       <div className="pt-2">
                         <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-gray-500">Progress <span className="text-gray-400">(Won/Goal)</span></span>
-                          <span className="font-medium" style={{ color: goal.color }}>{Math.round(progress)}%</span>
+                          <span className="text-neutral-500">Progress <span className="text-neutral-400">(Won / Goal)</span></span>
+                          <span className="font-medium tabular-nums text-neutral-900">{Math.round(progress)}%</span>
                         </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${progress}%`, backgroundColor: goal.color }}
+                        <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-neutral-900 transition-all duration-500"
+                            style={{ width: `${progress}%` }}
                           />
                         </div>
                       </div>
@@ -266,10 +271,10 @@ function KanbanCard({
         stiffness: 400, 
         damping: 25 
       }}
-      className={`group p-3 rounded-lg bg-white border border-gray-200 hover:border-gray-300 hover:shadow-md transition-colors cursor-grab active:cursor-grabbing ${
+      className={`group p-3 rounded-md bg-white ring-1 ring-neutral-200/70 hover:ring-neutral-300 hover:-translate-y-0.5 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-[transform,box-shadow,outline-color] cursor-grab active:cursor-grabbing ${
         isStacked && stackIndex > 0 ? "absolute inset-0" : "relative"
       } ${isStacked && stackIndex > 0 && !isHovered ? "pointer-events-none" : ""} ${
-        isLinkedClient ? "ring-2 ring-blue-200" : ""
+        isLinkedClient ? "ring-2 ring-neutral-900/30" : ""
       }`}
       style={{
         zIndex: isStacked ? 10 - stackIndex : 1,
@@ -278,29 +283,32 @@ function KanbanCard({
       <div className="flex items-start gap-2">
         <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          {/* Type badge for linked clients */}
+          {/* Linked-client pill */}
           {isLinkedClient && isStacked && stackIndex > 0 && (
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-100 text-blue-700">
+              <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
+                <span className="inline-block h-1 w-1 rounded-full bg-blue-500" aria-hidden="true" />
                 Linked Client
               </span>
             </div>
           )}
-          
-          {/* Type badge for linked tasks (not clients) */}
+
+          {/* Linked-task pill */}
           {!isLinkedClient && isStacked && stackIndex > 0 && (
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-teal-100 text-teal-700">
+              <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
+                <span className="inline-block h-1 w-1 rounded-full bg-teal-500" aria-hidden="true" />
                 Linked Task
               </span>
             </div>
           )}
-          
-          {/* DOC badge only - no Client/Task type badges */}
+
+          {/* DOC pill */}
           {docLabel && (
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700">
-                DOC: {docLabel}
+              <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700 tabular-nums">
+                <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                DOC · {docLabel}
               </span>
             </div>
           )}
@@ -318,14 +326,17 @@ function KanbanCard({
           )}
 
           {/* Meta info */}
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-2 mt-2">
             {item.value && item.value > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums text-neutral-900">
                 {formatCurrency(item.value, true)}
               </span>
             )}
+            {item.value && item.value > 0 && item.brand && (
+              <span className="text-neutral-300" aria-hidden="true">·</span>
+            )}
             {item.brand && (
-              <span className="text-xs text-gray-500 truncate">
+              <span className="text-xs text-neutral-500 truncate">
                 {item.brand}
               </span>
             )}
@@ -486,46 +497,52 @@ function KanbanColumn({
   )
 
   return (
-    <div 
-      className={`flex flex-col min-w-[300px] flex-1 rounded-xl transition-all ${
-        isDragOver ? "ring-2 ring-blue-400 ring-offset-2" : ""
+    <div
+      className={`flex flex-col min-w-[300px] flex-1 rounded-md transition-all ${
+        isDragOver ? "ring-2 ring-neutral-900 ring-offset-2" : ""
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Column Header */}
-      <div 
-        className="flex items-center justify-between p-3 rounded-t-xl"
-        style={{ backgroundColor: `${color}10` }}
-      >
-        <div className="flex items-center gap-2">
-          <div 
-            className="w-3 h-3 rounded-full" 
-            style={{ backgroundColor: color }} 
+      {/* Column Header — flat single-line strip, dot + label · count · total */}
+      <div className="flex items-center justify-between gap-2 px-1 pt-1 pb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="inline-block h-2 w-2 rounded-full shrink-0"
+            style={{ backgroundColor: color }}
+            aria-hidden="true"
           />
-          <h4 className="text-sm font-semibold text-gray-900">{label}</h4>
-          <span className="text-xs font-medium text-gray-500 bg-white/80 px-2 py-0.5 rounded-full">
-            {stackedItems.length}
+          <h4 className="text-sm font-medium text-neutral-900 truncate">{label}</h4>
+          <span className="text-xs tabular-nums text-neutral-500 shrink-0">
+            ({stackedItems.length}
             {totalItemsCount > stackedItems.length && (
-              <span className="text-sky-600 ml-1">+{totalItemsCount - stackedItems.length}</span>
+              <span className="text-neutral-400 ml-0.5">+{totalItemsCount - stackedItems.length}</span>
             )}
+            )
           </span>
         </div>
         {totalValue > 0 && (
-          <span className="text-xs font-medium" style={{ color }}>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums text-neutral-600 shrink-0">
+            <span className="text-neutral-300" aria-hidden="true">·</span>
             {formatCurrency(totalValue, true)}
           </span>
         )}
       </div>
 
-      {/* Cards Container */}
-      <div 
-        className="flex-1 p-2 space-y-3 bg-gray-50/50 rounded-b-xl border border-gray-200 border-t-0 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-visible"
+      {/* Cards Container — drop indicator surfaces on dragOver instead of a static gray-50 card */}
+      <div
+        className={`flex-1 p-2 space-y-3 rounded-md min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-visible transition-colors ${
+          isDragOver ? "bg-neutral-100" : "bg-neutral-50/40"
+        }`}
       >
         {stackedItems.length === 0 ? (
-          <div className="flex items-center justify-center h-24 border-2 border-dashed border-gray-200 rounded-lg">
-            <p className="text-xs text-gray-400">Drop items here</p>
+          <div
+            className={`flex items-center justify-center h-24 border border-dashed rounded-md transition-colors ${
+              isDragOver ? "border-neutral-400 bg-white" : "border-neutral-200"
+            }`}
+          >
+            <p className="text-xs text-neutral-400">{isDragOver ? "Release to drop" : "Drop items here"}</p>
           </div>
         ) : (
           stackedItems.map((stackedItem) => (
@@ -759,20 +776,21 @@ export function OpportunitiesKanbanView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Opportunities Pipeline</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className="text-lg font-medium text-neutral-900">Opportunities Pipeline</h3>
+          <p className="text-sm text-neutral-500 mt-1">
             Drag items between columns to update their status
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Assignee Filter */}
           {onAssigneeFilterChange && (
             <select
               value={assigneeFilter}
               onChange={(e) => onAssigneeFilterChange(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:outline-none focus:border-gray-400 min-w-[160px]"
+              className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400"
+              aria-label="Filter opportunities by assignee"
             >
-              <option value="all">All Assignees</option>
+              <option value="all">All assignees</option>
               {allAssignees.map((assignee) => (
                 <option key={assignee} value={assignee}>{assignee}</option>
               ))}
@@ -782,10 +800,10 @@ export function OpportunitiesKanbanView({
           {onAddOpportunity && (
             <button
               onClick={onAddOpportunity}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors shadow-sm font-medium"
+              className="inline-flex items-center gap-2 h-9 px-3.5 text-sm bg-neutral-900 text-white hover:bg-neutral-800 rounded-md transition-colors font-medium"
             >
               <Plus className="w-4 h-4" />
-              Add Opportunity
+              Add opportunity
             </button>
           )}
         </div>
@@ -818,14 +836,25 @@ export function OpportunitiesKanbanView({
         ))}
       </div>
 
-      {/* Empty State */}
+      {/* Empty State — single CTA, action-led */}
       {totalOpportunities === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
-          <Target className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">No opportunities yet</h4>
-          <p className="text-sm text-gray-500 max-w-md mx-auto">
-            Mark clients or tasks as "Opportunity" to track them in this pipeline view
+        <div className="text-center py-14 bg-white rounded-md ring-1 ring-neutral-200/70">
+          <div className="grid h-10 w-10 place-items-center rounded-md bg-neutral-100 text-neutral-700 mx-auto mb-4">
+            <Target className="w-5 h-5" />
+          </div>
+          <h4 className="text-base font-medium text-neutral-900 mb-1">No opportunities yet</h4>
+          <p className="text-sm text-neutral-500 max-w-md mx-auto mb-5">
+            Mark a client or task as an opportunity to start tracking it here.
           </p>
+          {onAddOpportunity && (
+            <button
+              onClick={onAddOpportunity}
+              className="inline-flex items-center gap-2 h-9 px-3.5 text-sm bg-neutral-900 text-white hover:bg-neutral-800 rounded-md transition-colors font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Add opportunity
+            </button>
+          )}
         </div>
       )}
 
