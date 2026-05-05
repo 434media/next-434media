@@ -628,6 +628,11 @@ export type LeadSource =
   | "manual"
   | "newsletter"
   | "referral"
+  // Imported from a partner-shared roster or a purchased contact list.
+  // Distinct from "referral" (one-off intro) and "manual" (admin typed in
+  // a single record) because the provenance is wholesale and the lead
+  // hasn't expressed direct intent to us — useful for scoring.
+  | "partner"
 
 export type LeadPriority = "high" | "medium" | "low"
 

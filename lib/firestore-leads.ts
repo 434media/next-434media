@@ -426,6 +426,104 @@ export async function captureLeadFromEventRegistration(
   }
 }
 
+interface PartnerListCapture {
+  email: string
+  firstName?: string
+  lastName?: string
+  preferredName?: string
+  company?: string
+  phone?: string
+  linkedin?: string
+  // Slug of the partner who shared the list (e.g. "alamo-angels"). Drives
+  // the `partner:<slug>` tag and the import-receipt note line.
+  partnerSlug: string
+  // Display name for the partner (e.g. "Alamo Angels"). Used in the note
+  // line so the CRM card is human-readable.
+  partnerName: string
+  // ISO date the row entered the partner's list. When provided, prefixes
+  // the import note. Otherwise today's date is used.
+  joinedAt?: string
+  // Free-form tags from the import (e.g. "member-tier:lifetime",
+  // "demographic:woman-investor"). Already-namespaced; passed through.
+  extraTags?: string[]
+  // Optional initial note (e.g. multi-contact org context: "Co-contact
+  // alongside Robby Brown at DOCUmation"). Appended to the note line.
+  noteSuffix?: string
+}
+
+/**
+ * Fan a partner-shared roster row into the `leads` collection.
+ *
+ * Distinct from event/form/newsletter captures because:
+ *  - Source is "partner" (no implied inbound intent — affects scoring).
+ *  - Tags include `source:partner` + `partner:<slug>` for filtering.
+ *  - Phone / LinkedIn flow through to first-class Lead fields, not notes.
+ *  - Preferred name (when present) seeds the lead `name` so the CRM card
+ *    shows what the contact actually goes by.
+ *
+ * Same fail-safe shape as the other captureLeadFrom* helpers — returns
+ * { leadId: null, created: false } on internal errors so a bulk import
+ * keeps going row-by-row.
+ *
+ * Idempotent: re-importing the same list updates tags/notes/missing
+ * fields on existing leads instead of duplicating. Phone and LinkedIn
+ * are backfilled only when the existing lead has no value (history-
+ * preserving — same rule we adopted for EventRegistration backfills).
+ */
+export async function captureLeadFromPartnerList(
+  input: PartnerListCapture,
+): Promise<{ leadId: string | null; created: boolean }> {
+  try {
+    const email = input.email.trim().toLowerCase()
+    const fullName =
+      input.preferredName?.trim() ||
+      `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim() ||
+      email
+    const existing = await findLeadByEmail(email)
+    const captureTags = [
+      "source:partner",
+      makeTag("partner", input.partnerSlug),
+      ...(input.extraTags ?? []),
+    ]
+    const stamp = (input.joinedAt || new Date().toISOString()).split("T")[0]
+    const noteLine = `[${stamp}] Imported from ${input.partnerName}${
+      input.noteSuffix ? ` — ${input.noteSuffix}` : ""
+    }`
+
+    if (existing) {
+      const tags = Array.from(
+        new Set([...normalizeLegacyTags(existing.tags), ...captureTags]),
+      )
+      // Backfill-only for phone / linkedin / company — never overwrite a
+      // value already on the lead, only fill blanks. Keeps history intact.
+      const patch: Parameters<typeof updateLead>[1] = {
+        tags,
+        notes: [existing.notes, noteLine].filter(Boolean).join("\n\n"),
+      }
+      if (!existing.phone && input.phone) patch.phone = input.phone
+      if (!existing.linkedin && input.linkedin) patch.linkedin = input.linkedin
+      if (!existing.company && input.company) patch.company = input.company
+      await updateLead(existing.id, patch)
+      return { leadId: existing.id, created: false }
+    }
+
+    const lead = await createLead({
+      name: fullName,
+      company: input.company || "",
+      email,
+      phone: input.phone,
+      linkedin: input.linkedin,
+      source: "partner",
+      tags: captureTags,
+      notes: noteLine,
+    })
+    return { leadId: lead.id, created: true }
+  } catch (err) {
+    console.error("[captureLeadFromPartnerList] swallowed error:", err)
+    return { leadId: null, created: false }
+  }
+}
+
 /**
  * Increment engagement counters from Resend webhook. Re-scores via updateLead
  * so the engagement bonus kicks in once thresholds are crossed.
