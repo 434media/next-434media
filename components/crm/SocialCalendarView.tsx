@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   CalendarDays,
   CalendarRange,
@@ -12,7 +12,6 @@ import {
   Plus,
   Filter,
   X,
-  Check
 } from "lucide-react"
 import type { ContentPost, SocialPlatform, ContentPostStatus, TeamMember } from "./types"
 import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS, TEAM_MEMBERS } from "./types"
@@ -65,23 +64,20 @@ function toDateString(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-function getStatusStyle(status: ContentPostStatus): { bg: string; border: string; text: string } {
-  switch (status) {
-    case "to_do":
-    case "planning":
-    case "in_progress":
-      return { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" }
-    case "needs_approval":
-      return { bg: "bg-red-50", border: "border-red-200", text: "text-red-700" }
-    case "approved":
-      return { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" }
-    case "scheduled":
-      return { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" }
-    case "posted":
-      return { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" }
-    default:
-      return { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" }
-  }
+// Mono dot map per status — replaces the legacy bg/border/text saturated triples.
+// Pill chrome stays mono everywhere; the dot color carries semantic meaning.
+const STATUS_DOT: Record<ContentPostStatus, string> = {
+  to_do: "bg-neutral-400",
+  planning: "bg-neutral-400",
+  in_progress: "bg-neutral-500",
+  needs_approval: "bg-red-500",
+  approved: "bg-blue-500",
+  scheduled: "bg-amber-500",
+  posted: "bg-emerald-500",
+}
+
+function getStatusDot(status: ContentPostStatus): string {
+  return STATUS_DOT[status] ?? "bg-neutral-400"
 }
 
 const PlatformIcon = ({ platform, className = "w-4 h-4", style }: { platform: SocialPlatform; className?: string; style?: React.CSSProperties }) => {
@@ -125,34 +121,36 @@ function PlatformBadge({ platform, size = "sm" }: { platform: SocialPlatform; si
   const platformConfig = SOCIAL_PLATFORM_OPTIONS.find(p => p.value === platform)
   if (!platformConfig) return null
   const sizeClasses = { sm: "w-3.5 h-3.5", md: "w-4 h-4", lg: "w-5 h-5" }
+  // Brand color stays on the SVG fill — it's semantic identifier, not chrome.
   return <PlatformIcon platform={platform} className={`${sizeClasses[size]} shrink-0`} style={{ color: platformConfig.color }} />
 }
 
 function PostCard({ post, onClick, compact = false }: { post: ContentPost; onClick: () => void; compact?: boolean }) {
-  const statusStyle = getStatusStyle(post.status)
+  const dotColor = getStatusDot(post.status)
   return (
     <motion.div
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={(e) => { e.stopPropagation(); onClick() }}
-      className={`group cursor-pointer rounded transition-all border ${statusStyle.bg} ${statusStyle.border} hover:shadow-sm hover:border-neutral-300 ${compact ? "px-1.5 py-1" : "px-2 py-1.5"}`}
+      className={`group cursor-pointer rounded bg-white ring-1 ring-neutral-200/70 hover:ring-neutral-300 transition-[box-shadow,outline-color] ${compact ? "px-1.5 py-1" : "px-2 py-1.5"}`}
     >
       <div className="flex items-center gap-1.5">
+        <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`} aria-hidden="true" />
         <div className="flex items-center gap-0.5 shrink-0">
           {post.social_platforms?.slice(0, compact ? 2 : 3).map(platform => (
             <PlatformBadge key={platform} platform={platform} size="sm" />
           ))}
           {post.social_platforms && post.social_platforms.length > (compact ? 2 : 3) && (
-            <span className="text-[9px] font-medium text-neutral-400">+{post.social_platforms.length - (compact ? 2 : 3)}</span>
+            <span className="text-[9px] font-medium tabular-nums text-neutral-400">+{post.social_platforms.length - (compact ? 2 : 3)}</span>
           )}
         </div>
-        <span className={`truncate leading-tight font-medium ${statusStyle.text} ${compact ? "text-[11px]" : "text-xs"}`}>{post.title}</span>
+        <span className={`truncate leading-tight font-medium text-neutral-900 ${compact ? "text-[11px]" : "text-xs"}`}>{post.title}</span>
       </div>
     </motion.div>
   )
 }
 
-function FilterSection({ title, options, selectedValues, onToggle, renderOption }: { 
+function FilterSection({ title, options, selectedValues, onToggle, renderOption }: {
   title: string
   options: { value: string; label: string; color?: string }[]
   selectedValues: Set<string>
@@ -161,7 +159,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">{title}</h4>
+      <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500">{title}</h4>
       <div className="flex flex-wrap gap-1.5">
         {options.map((option) => {
           const isSelected = selectedValues.has(option.value)
@@ -172,7 +170,11 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
             <button
               key={option.value}
               onClick={() => onToggle(option.value)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${isSelected ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                isSelected
+                  ? "bg-neutral-900 text-white"
+                  : "bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+              }`}
             >
               {option.label}
             </button>
@@ -191,7 +193,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set())
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  
+
   const fetchTeamMembers = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/team-members")
@@ -207,15 +209,15 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
       setTeamMembers(TEAM_MEMBERS.map((m, i) => ({ id: `default-${i}`, name: m.name, email: m.email, isActive: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })))
     }
   }, [])
-  
+
   useEffect(() => { fetchTeamMembers() }, [fetchTeamMembers])
-  
+
   const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
   const togglePlatform = (platform: string) => { setSelectedPlatforms(prev => { const next = new Set(prev); next.has(platform) ? next.delete(platform) : next.add(platform); return next }) }
   const toggleStatus = (status: string) => { setSelectedStatuses(prev => { const next = new Set(prev); next.has(status) ? next.delete(status) : next.add(status); return next }) }
   const clearAllFilters = () => { setSelectedUsers(new Set()); setSelectedPlatforms(new Set()); setSelectedStatuses(new Set()) }
   const hasActiveFilters = selectedUsers.size > 0 || selectedPlatforms.size > 0 || selectedStatuses.size > 0
-  
+
   const filteredPosts = useMemo(() => {
     return contentPosts.filter(post => {
       if (selectedUsers.size > 0 && !selectedUsers.has(post.user)) return false
@@ -224,7 +226,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
       return true
     })
   }, [contentPosts, selectedUsers, selectedPlatforms, selectedStatuses])
-  
+
   const postsByDate = useMemo(() => {
     const grouped: Record<string, ContentPost[]> = {}
     filteredPosts.forEach(post => {
@@ -236,13 +238,13 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     })
     return grouped
   }, [filteredPosts])
-  
+
   const calendarDays = useMemo(() => {
     if (viewMode === "day") return [currentDate]
     if (viewMode === "week") return getDaysInWeek(currentDate)
     return getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth())
   }, [currentDate, viewMode])
-  
+
   const goToPrevious = () => {
     const newDate = new Date(currentDate)
     if (viewMode === "day") newDate.setDate(currentDate.getDate() - 1)
@@ -250,7 +252,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     else newDate.setMonth(currentDate.getMonth() - 1)
     setCurrentDate(newDate)
   }
-  
+
   const goToNext = () => {
     const newDate = new Date(currentDate)
     if (viewMode === "day") newDate.setDate(currentDate.getDate() + 1)
@@ -258,11 +260,11 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     else newDate.setMonth(currentDate.getMonth() + 1)
     setCurrentDate(newDate)
   }
-  
+
   const goToToday = () => setCurrentDate(new Date())
   const isCurrentMonth = (date: Date) => date.getMonth() === currentDate.getMonth()
   const isToday = (date: Date) => toDateString(date) === toDateString(new Date())
-  
+
   const getHeaderText = () => {
     if (viewMode === "day") return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
     if (viewMode === "week") {
@@ -273,81 +275,143 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     }
     return currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
-  
+
   const platformStats = useMemo(() => {
     const stats: Record<SocialPlatform, number> = { instagram: 0, youtube: 0, tiktok: 0, linkedin: 0, facebook: 0 }
     filteredPosts.forEach(post => { post.social_platforms?.forEach(platform => { stats[platform]++ }) })
     return stats
   }, [filteredPosts])
-  
+
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
   const statusOptions = CONTENT_POST_STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label, color: s.color }))
   const brandOptions = BRANDS.map(b => ({ value: b, label: b }))
-  
+
   // Filter out specific users from the calendar filter list
   const EXCLUDED_USERS = ["barbara carreon", "elon john", "guna", "nichole snow", "testing"]
   const userOptions = teamMembers
     .filter(m => !EXCLUDED_USERS.some(excluded => m.name.toLowerCase() === excluded.toLowerCase()))
     .map(m => ({ value: m.name, label: m.name }))
-  
+
   return (
     <div className="space-y-4">
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-neutral-900">Content Calendar</h2>
-          <span className="text-sm text-neutral-500">{filteredPosts.length} post{filteredPosts.length !== 1 ? "s" : ""}</span>
+          <h2 className="text-lg font-medium text-neutral-900">Content Calendar</h2>
+          <span className="text-sm tabular-nums text-neutral-500">{filteredPosts.length} post{filteredPosts.length !== 1 ? "s" : ""}</span>
         </div>
-        <button onClick={onAddPost} className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium shadow-sm">
-          <Plus className="w-4 h-4" />Add Post
+        <button
+          onClick={onAddPost}
+          className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          Add post
         </button>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3 space-y-3">
+          {/* Toolbar — uniform h-9 segmented controls */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex items-center bg-white rounded-lg border border-neutral-200">
-                <button onClick={goToPrevious} className="p-2 hover:bg-neutral-100 rounded-l-lg transition-colors border-r border-neutral-200"><ChevronLeft className="w-4 h-4" /></button>
-                <button onClick={goToToday} className="px-3 py-2 text-sm font-medium hover:bg-neutral-100 transition-colors">Today</button>
-                <button onClick={goToNext} className="p-2 hover:bg-neutral-100 rounded-r-lg transition-colors border-l border-neutral-200"><ChevronRight className="w-4 h-4" /></button>
+              {/* Prev / Today / Next segmented group */}
+              <div className="inline-flex items-center h-9 rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
+                <button
+                  onClick={goToPrevious}
+                  aria-label="Previous period"
+                  className="grid place-items-center w-9 h-9 hover:bg-neutral-50 transition-colors text-neutral-700"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={goToToday}
+                  className="px-3 h-9 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={goToNext}
+                  aria-label="Next period"
+                  className="grid place-items-center w-9 h-9 hover:bg-neutral-50 transition-colors text-neutral-700"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-              <h2 className="text-base font-semibold text-neutral-900">{getHeaderText()}</h2>
+              <h3 className="text-base font-medium text-neutral-900">{getHeaderText()}</h3>
             </div>
-            <div className="flex items-center bg-white rounded-lg border border-neutral-200 p-0.5">
-              <button onClick={() => setViewMode("day")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "day" ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-600"}`}><CalendarDays className="w-4 h-4" />Day</button>
-              <button onClick={() => setViewMode("week")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "week" ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-600"}`}><CalendarRange className="w-4 h-4" />Week</button>
-              <button onClick={() => setViewMode("month")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "month" ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-600"}`}><LayoutGrid className="w-4 h-4" />Month</button>
+
+            {/* View toggle — Day / Week / Month, uniform h-9 segmented */}
+            <div className="inline-flex items-center h-9 rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
+              {[
+                { value: "day" as const, label: "Day", icon: CalendarDays },
+                { value: "week" as const, label: "Week", icon: CalendarRange },
+                { value: "month" as const, label: "Month", icon: LayoutGrid },
+              ].map(({ value, label, icon: Icon }) => {
+                const active = viewMode === value
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setViewMode(value)}
+                    aria-pressed={active}
+                    className={`inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium transition-colors ${
+                      active ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                )
+              })}
             </div>
           </div>
-          
+
+          {/* Day view */}
           {viewMode === "day" && (
-            <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-              <div className="p-4 border-b border-neutral-200 bg-neutral-50">
+            <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
+              <div className="px-4 py-3 border-b border-neutral-100">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-neutral-900">{currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
-                  <span className="text-sm text-neutral-500">{postsByDate[toDateString(currentDate)]?.length || 0} posts scheduled</span>
+                  <h3 className="text-sm font-medium text-neutral-900">{currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h3>
+                  <span className="text-xs tabular-nums text-neutral-500">{postsByDate[toDateString(currentDate)]?.length || 0} posts scheduled</span>
                 </div>
               </div>
               <div className="divide-y divide-neutral-100 max-h-150 overflow-y-auto">
                 {(postsByDate[toDateString(currentDate)] || []).length === 0 ? (
-                  <div className="p-8 text-center">
-                    <Calendar className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
-                    <p className="text-neutral-500">No posts scheduled for this day</p>
-                    <button onClick={onAddPost} className="mt-3 text-sm text-neutral-600 hover:text-neutral-900 font-medium">+ Add a post</button>
+                  <div className="py-12 text-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700 mx-auto mb-3">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <p className="text-sm text-neutral-500 mb-3">No posts scheduled for this day</p>
+                    <button
+                      onClick={onAddPost}
+                      className="inline-flex items-center gap-2 h-9 px-4 text-sm bg-neutral-900 hover:bg-neutral-800 text-white font-medium rounded-md transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add post
+                    </button>
                   </div>
                 ) : (
                   (postsByDate[toDateString(currentDate)] || []).map(post => {
-                    const statusStyle = getStatusStyle(post.status)
+                    const dotColor = getStatusDot(post.status)
                     const statusOption = CONTENT_POST_STATUS_OPTIONS.find(s => s.value === post.status)
                     return (
-                      <div key={post.id} onClick={() => onOpenPost(post)} className={`p-4 hover:bg-neutral-50 cursor-pointer transition-colors border-l-4 ${statusStyle.border.replace("border-", "border-l-")}`}>
+                      <div
+                        key={post.id}
+                        onClick={() => onOpenPost(post)}
+                        className="px-4 py-3 hover:bg-neutral-50 cursor-pointer transition-colors"
+                      >
                         <div className="flex items-start gap-3">
-                          <div className="flex items-center gap-1 shrink-0">{post.social_platforms?.map(platform => <PlatformBadge key={platform} platform={platform} size="lg" />)}</div>
+                          <span className={`mt-2 inline-block h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`} aria-hidden="true" />
+                          <div className="flex items-center gap-1 shrink-0 mt-1">
+                            {post.social_platforms?.map(platform => <PlatformBadge key={platform} platform={platform} size="lg" />)}
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-neutral-900">{post.title}</p>
+                            <p className="text-sm font-medium text-neutral-900">{post.title}</p>
                             {post.social_copy && <p className="text-sm text-neutral-500 mt-1 line-clamp-2">{post.social_copy}</p>}
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>{statusOption?.label || post.status}</span>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-700">
+                                <span className={`inline-block h-1 w-1 rounded-full ${dotColor}`} aria-hidden="true" />
+                                {statusOption?.label || post.status}
+                              </span>
                               {post.user && <span className="text-xs text-neutral-500">{post.user}</span>}
                               {post.platform && <span className="text-xs text-neutral-400">{post.platform}</span>}
                             </div>
@@ -360,14 +424,23 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
               </div>
             </div>
           )}
-          
+
+          {/* Week view */}
           {viewMode === "week" && (
-            <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-              <div className="grid grid-cols-7 bg-neutral-50 border-b border-neutral-200">
+            <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-neutral-100">
                 {calendarDays.map((date, i) => (
-                  <div key={i} className={`px-2 py-3 text-center border-r last:border-r-0 border-neutral-200 ${isToday(date) ? "bg-blue-50" : ""}`}>
-                    <p className="text-xs font-medium text-neutral-500 leading-tight">{weekDays[i]}</p>
-                    <p className={`text-lg font-semibold mt-0.5 leading-tight ${isToday(date) ? "text-blue-600" : "text-neutral-900"}`}>{date.getDate()}</p>
+                  <div key={i} className="px-2 py-2.5 text-center border-r last:border-r-0 border-neutral-100">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500 leading-tight">{weekDays[i]}</p>
+                    <p
+                      className={`text-base font-semibold tabular-nums mt-1 leading-tight inline-block ${
+                        isToday(date)
+                          ? "ring-1 ring-neutral-900 text-neutral-900 w-7 h-7 rounded-full grid place-items-center"
+                          : "text-neutral-900"
+                      }`}
+                    >
+                      {date.getDate()}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -376,8 +449,15 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                   const dateKey = toDateString(date)
                   const dayPosts = postsByDate[dateKey] || []
                   return (
-                    <div key={i} className={`p-2 border-r last:border-r-0 border-neutral-100 ${isToday(date) ? "bg-blue-50/50" : ""}`}>
-                      <div className="space-y-1 max-h-95 overflow-y-auto scrollbar-thin">
+                    <div
+                      key={i}
+                      className={`p-2 border-r last:border-r-0 border-neutral-100 transition-colors ${
+                        hoveredDay === dateKey ? "bg-neutral-50" : ""
+                      }`}
+                      onMouseEnter={() => setHoveredDay(dateKey)}
+                      onMouseLeave={() => setHoveredDay(null)}
+                    >
+                      <div className="space-y-1 max-h-95 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-200 scrollbar-track-transparent">
                         <AnimatePresence mode="popLayout">{dayPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} compact />)}</AnimatePresence>
                       </div>
                     </div>
@@ -386,11 +466,19 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
               </div>
             </div>
           )}
-          
+
+          {/* Month view */}
           {viewMode === "month" && (
-            <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-              <div className="grid grid-cols-7 bg-neutral-50 border-b border-neutral-200">
-                {weekDays.map(day => <div key={day} className="px-2 py-2.5 text-center text-xs font-semibold text-neutral-500 uppercase tracking-wide">{day}</div>)}
+            <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-neutral-100">
+                {weekDays.map(day => (
+                  <div
+                    key={day}
+                    className="px-2 py-2 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500"
+                  >
+                    {day}
+                  </div>
+                ))}
               </div>
               <div className="grid grid-cols-7">
                 {calendarDays.map((date, index) => {
@@ -399,15 +487,33 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                   const isCurrentMonthDay = isCurrentMonth(date)
                   const isTodayDate = isToday(date)
                   return (
-                    <div 
-                      key={index} 
-                      className={`min-h-25 max-h-35 border-b border-r border-neutral-100 p-1.5 transition-colors flex flex-col ${!isCurrentMonthDay ? "bg-neutral-50/50" : "bg-white"} ${isTodayDate ? "bg-blue-50/60" : ""} ${hoveredDay === dateKey ? "bg-neutral-50" : ""}`} 
-                      onMouseEnter={() => setHoveredDay(dateKey)} 
+                    <div
+                      key={index}
+                      className={`min-h-25 max-h-35 border-b border-r border-neutral-100 p-2 transition-colors flex flex-col ${
+                        !isCurrentMonthDay ? "bg-neutral-50/50" : "bg-white"
+                      } ${hoveredDay === dateKey ? "bg-neutral-50" : ""}`}
+                      onMouseEnter={() => setHoveredDay(dateKey)}
                       onMouseLeave={() => setHoveredDay(null)}
                     >
                       <div className="flex items-center justify-between mb-1.5 shrink-0">
-                        <span className={`text-xs font-semibold leading-none ${!isCurrentMonthDay ? "text-neutral-300" : isTodayDate ? "text-white" : "text-neutral-700"} ${isTodayDate ? "bg-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-[11px]" : ""}`}>{date.getDate()}</span>
-                        {dayPosts.length > 0 && !isTodayDate && <span className="text-[10px] font-medium text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded-full">{dayPosts.length}</span>}
+                        <span
+                          className={`text-xs font-semibold tabular-nums leading-none ${
+                            !isCurrentMonthDay
+                              ? "text-neutral-300"
+                              : "text-neutral-900"
+                          } ${
+                            isTodayDate
+                              ? "ring-1 ring-neutral-900 w-6 h-6 rounded-full grid place-items-center text-[11px]"
+                              : ""
+                          }`}
+                        >
+                          {date.getDate()}
+                        </span>
+                        {dayPosts.length > 0 && (
+                          <span className="text-[10px] font-medium tabular-nums text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded-full">
+                            {dayPosts.length}
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-1 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-200 scrollbar-track-transparent hover:scrollbar-thumb-neutral-300">
                         <AnimatePresence mode="popLayout">{dayPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} compact />)}</AnimatePresence>
@@ -419,38 +525,82 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
             </div>
           )}
         </div>
-        
+
+        {/* Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden sticky top-4">
-            <div className="p-3 border-b border-neutral-200 bg-neutral-50">
+          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden sticky top-4">
+            <div className="px-3 py-2.5 border-b border-neutral-100">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><Filter className="w-4 h-4 text-neutral-500" /><h3 className="font-semibold text-neutral-900 text-sm">Filters</h3></div>
-                {hasActiveFilters && <button onClick={clearAllFilters} className="text-xs text-neutral-600 hover:text-neutral-900 font-medium flex items-center gap-1"><X className="w-3 h-3" />Clear</button>}
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-neutral-500" />
+                  <h3 className="text-sm font-medium text-neutral-900">Filters</h3>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
-            <div className="p-3 space-y-4 max-h-[calc(100vh-400px)] overflow-y-auto">
+            <div className="p-3 space-y-4 max-h-[calc(100dvh-400px)] overflow-y-auto">
               <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
               <FilterSection title="Platform" options={brandOptions} selectedValues={selectedPlatforms} onToggle={togglePlatform} />
-              <FilterSection title="Status" options={statusOptions} selectedValues={selectedStatuses} onToggle={toggleStatus} renderOption={(option, isSelected) => {
-                const statusConfig = CONTENT_POST_STATUS_OPTIONS.find(s => s.value === option.value)
-                return (
-                  <span className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all inline-flex items-center gap-1 ${isSelected ? `${statusConfig?.bgColor || "bg-neutral-100"} ${statusConfig?.borderColor || "border-neutral-200"} border-2` : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`} style={isSelected ? { color: option.color } : undefined}>
-                    {isSelected && <Check className="w-3 h-3" />}{option.label}
-                  </span>
-                )
-              }} />
+              <FilterSection
+                title="Status"
+                options={statusOptions}
+                selectedValues={selectedStatuses}
+                onToggle={toggleStatus}
+                renderOption={(option, isSelected) => {
+                  const dotColor = STATUS_DOT[option.value as ContentPostStatus] ?? "bg-neutral-400"
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                        isSelected
+                          ? "bg-neutral-900 text-white"
+                          : "bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+                      }`}
+                    >
+                      <span className={`inline-block h-1 w-1 rounded-full ${dotColor}`} aria-hidden="true" />
+                      {option.label}
+                    </span>
+                  )
+                }}
+              />
             </div>
-            <div className="p-3 border-t border-neutral-200 bg-neutral-50">
-              <p className="text-xs text-neutral-500 mb-2">Status Legend</p>
-              <div className="space-y-1">
-                {CONTENT_POST_STATUS_OPTIONS.map(status => <div key={status.value} className="flex items-center gap-2 text-xs"><div className={`w-3 h-3 rounded ${status.bgColor} ${status.borderColor} border`} /><span className="text-neutral-600">{status.label}</span></div>)}
+            <div className="p-3 border-t border-neutral-100">
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">Status legend</p>
+              <div className="space-y-1.5">
+                {CONTENT_POST_STATUS_OPTIONS.map(status => (
+                  <div key={status.value} className="flex items-center gap-2 text-xs">
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[status.value as ContentPostStatus] ?? "bg-neutral-400"}`}
+                      aria-hidden="true"
+                    />
+                    <span className="text-neutral-700">{status.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="p-3 border-t border-neutral-200 bg-neutral-50">
-              <p className="text-xs text-neutral-500 mb-2">Platform breakdown</p>
+            <div className="p-3 border-t border-neutral-100">
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">Platform breakdown</p>
               <div className="flex flex-wrap gap-2">
-                {SOCIAL_PLATFORM_OPTIONS.map(platform => { const count = platformStats[platform.value]; if (count === 0) return null; return <div key={platform.value} className="flex items-center gap-1 text-xs"><PlatformBadge platform={platform.value} size="sm" /><span className="text-neutral-600">{count}</span></div> })}
-                {Object.values(platformStats).every(v => v === 0) && <span className="text-xs text-neutral-400">No posts yet</span>}
+                {SOCIAL_PLATFORM_OPTIONS.map(platform => {
+                  const count = platformStats[platform.value]
+                  if (count === 0) return null
+                  return (
+                    <div key={platform.value} className="inline-flex items-center gap-1 text-xs tabular-nums">
+                      <PlatformBadge platform={platform.value} size="sm" />
+                      <span className="text-neutral-700">{count}</span>
+                    </div>
+                  )
+                })}
+                {Object.values(platformStats).every(v => v === 0) && (
+                  <span className="text-xs text-neutral-400">No posts yet</span>
+                )}
               </div>
             </div>
           </div>
