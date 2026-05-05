@@ -55,7 +55,7 @@ export function RegistrationSparkline({
   height = 56,
   className = "",
 }: Props) {
-  const { buckets, max, eventBucketIndex } = useMemo(() => {
+  const { buckets, max, eventBucketIndex, trendPoints } = useMemo(() => {
     const days = new Map<string, number>()
     let minMs = Infinity
     let maxMs = -Infinity
@@ -69,7 +69,12 @@ export function RegistrationSparkline({
       days.set(k, (days.get(k) ?? 0) + 1)
     }
     if (!Number.isFinite(minMs)) {
-      return { buckets: [] as Bucket[], max: 0, eventBucketIndex: -1 }
+      return {
+        buckets: [] as Bucket[],
+        max: 0,
+        eventBucketIndex: -1,
+        trendPoints: [] as number[],
+      }
     }
 
     // Walk min→max in UTC-day steps so empty days appear as zero bars.
@@ -110,7 +115,24 @@ export function RegistrationSparkline({
     }
 
     const m = out.reduce((acc, b) => Math.max(acc, b.count), 0)
-    return { buckets: out, max: m, eventBucketIndex: evIdx }
+
+    // 7-day moving average — smooths the daily spikes into a trend line so
+    // the user sees direction (rising / steady / falling) without having
+    // to read individual bars. Only computed when the range is wide enough
+    // to make the average meaningful (>= 7 days).
+    const window = 7
+    const trend: number[] = []
+    if (out.length >= window) {
+      let sum = 0
+      for (let i = 0; i < out.length; i++) {
+        sum += out[i].count
+        if (i >= window) sum -= out[i - window].count
+        if (i >= window - 1) trend.push(sum / window)
+        else trend.push(NaN) // not enough data for the leading edge
+      }
+    }
+
+    return { buckets: out, max: m, eventBucketIndex: evIdx, trendPoints: trend }
   }, [timestamps, eventDate])
 
   if (buckets.length === 0 || max === 0) return null
@@ -170,21 +192,61 @@ export function RegistrationSparkline({
             </rect>
           )
         })}
+
+        {/* 7-day moving-average trend line — drawn on top of the bars in
+            indigo so the user sees rising / steady / falling at a glance.
+            NaN entries (leading edge) are skipped via M/L splitting. */}
+        {trendPoints.length > 0 && (() => {
+          const segments: string[] = []
+          let cursor = ""
+          for (let i = 0; i < trendPoints.length; i++) {
+            const v = trendPoints[i]
+            if (!Number.isFinite(v)) {
+              cursor = ""
+              continue
+            }
+            const cx = i * colW + colW / 2
+            const cy = height - Math.max(0, (v / max) * (height - 4)) - 0.5
+            cursor += `${cursor ? "L" : "M"}${cx.toFixed(2)} ${cy.toFixed(2)} `
+            // When the next point is NaN, flush the current path.
+            if (i === trendPoints.length - 1 || !Number.isFinite(trendPoints[i + 1])) {
+              segments.push(cursor.trim())
+              cursor = ""
+            }
+          }
+          return segments.map((d, idx) => (
+            <path
+              key={idx}
+              d={d}
+              fill="none"
+              stroke="rgb(99,102,241)"
+              strokeWidth={0.7}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.85}
+            />
+          ))
+        })()}
       </svg>
 
       {/* Caption: range + peak — keeps the chart legible without axis labels */}
       <div className="mt-1.5 flex items-center justify-between text-[10px] text-neutral-400 tabular-nums">
         <span>{buckets[0].label}</span>
-        <span>
-          peak <span className="text-neutral-700 font-medium">{max}</span>/day
+        <span className="flex items-center gap-2">
+          <span>
+            peak <span className="text-neutral-700 font-medium">{max}</span>/day
+          </span>
+          {trendPoints.length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-2 h-px bg-indigo-500" />
+              7d avg
+            </span>
+          )}
           {eventBucketIndex >= 0 && (
-            <>
-              {" "}·{" "}
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                event day
-              </span>
-            </>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              event day
+            </span>
           )}
         </span>
         <span>{buckets[buckets.length - 1].label}</span>

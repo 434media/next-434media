@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import {
   Loader2,
@@ -8,11 +8,13 @@ import {
   Mail,
   Filter,
   RefreshCw,
+  ChevronDown,
+  Layers,
+  Send,
   CheckCircle2,
   AlertCircle,
   Search,
   Calendar,
-  FileDown,
   Trash2,
   Globe,
   Users,
@@ -39,6 +41,15 @@ import {
   compareRows,
   type SortState,
 } from "@/components/admin/EventRegistrationsTable"
+import {
+  EmailSourceInsights,
+  type EmailAudienceFilter,
+} from "@/components/admin/EmailSourceInsights"
+import {
+  EmailSignupsTable,
+  compareSignupRows,
+  type SignupSortState,
+} from "@/components/admin/EmailSignupsTable"
 import { InboxView } from "@/components/admin/InboxView"
 import {
   StateBadge,
@@ -65,6 +76,9 @@ interface EmailSignup {
   email: string
   source: string
   created_at: string
+  // Optional — set on rows that have been pushed to Mailchimp. Surfaced in
+  // the drawer with the same TagList overflow component used in Events.
+  mailchimp_tags?: string[]
 }
 
 interface ContactFormSubmission {
@@ -303,7 +317,9 @@ function EmailListsTab({
   const [signups, setSignups] = useState<EmailSignup[]>([])
   const [sources, setSources] = useState<string[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
-  const [selectedSource, setSelectedSource] = useState<string>(initialSearch ? "" : "AIM")
+  // Default to "" (All sources). The previous AIM default surprised users
+  // entering the tab — now the overview cards are the navigation surface.
+  const [selectedSource, setSelectedSource] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDownloading, setIsDownloading] = useState(false)
   // PR 3 — state filter + per-row state badges
@@ -316,6 +332,29 @@ function EmailListsTab({
   const [endDate, setEndDate] = useState("")
   const [datePreset, setDatePreset] = useState("")
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  // Sprint A: audience filter (driven by drilldown stat tiles), table sort,
+  // detail drawer.
+  const [audienceFilter, setAudienceFilter] = useState<EmailAudienceFilter>("all")
+  const [signupSort, setSignupSort] = useState<SignupSortState>({
+    column: "created_at",
+    direction: "desc",
+  })
+  const [selectedSignup, setSelectedSignup] = useState<EmailSignup | null>(null)
+  // Single-row Mailchimp push — opens the existing modal preloaded with one
+  // member instead of forcing select-then-bulk-act for a one-off push.
+  const [singlePushTarget, setSinglePushTarget] = useState<string | null>(null)
+  // Sprint D — cross-collection signal map. Built from /cross-source-dupes
+  // so the drawer can answer "this email is also a contact form / event
+  // registrant" without a per-row fetch. Counts of OTHER collections only.
+  const [crossCollectionMap, setCrossCollectionMap] = useState<
+    Map<string, { contactForms: number; eventRegistrations: number }>
+  >(new Map())
+
+  // Reset audience filter when the user navigates between sources so a stale
+  // filter doesn't silently empty the next view.
+  useEffect(() => {
+    setAudienceFilter("all")
+  }, [selectedSource])
 
   const fetchSourcesAndCounts = useCallback(async () => {
     try {
@@ -332,37 +371,69 @@ function EmailListsTab({
     }
   }, [])
 
-  const fetchSignups = useCallback(
-    async (source?: string) => {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const url = source
-          ? `/api/admin/email-lists-firestore?source=${encodeURIComponent(source)}&_t=${Date.now()}`
-          : `/api/admin/email-lists-firestore?_t=${Date.now()}`
-        const res = await fetch(url, { cache: "no-store" })
-        const data = await res.json()
-        if (data.success) {
-          setSignups(data.signups)
-        } else {
-          setError(data.error || "Failed to fetch signups")
-        }
-      } catch {
-        setError("Failed to fetch email signups")
-      } finally {
-        setIsLoading(false)
+  // Always load ALL signups on mount so the source-cards can compute CRM /
+  // Mailchimp coverage per source via client-side join. Filtering by source
+  // happens in the render path. This trades a one-time wider fetch for
+  // accurate rollups + a fixed bug where selectedSource="" used to show
+  // an empty table.
+  const fetchSignups = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const res = await fetch(
+        `/api/admin/email-lists-firestore?_t=${Date.now()}`,
+        { cache: "no-store" },
+      )
+      const data = await res.json()
+      if (data.success) {
+        setSignups(data.signups)
+      } else {
+        setError(data.error || "Failed to fetch signups")
       }
-    },
-    []
-  )
+    } catch {
+      setError("Failed to fetch email signups")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // Cross-collection dupes — single fetch on tab mount. Result is consumed
+  // by the drawer's "Also in" row so the user sees when an email also lives
+  // in contact forms or event registrations. Silent failure: if the API
+  // hiccups, the badge just doesn't render — not load-bearing.
+  const fetchCrossCollectionMap = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/admin/submissions/cross-source-dupes?minSources=2`,
+        { cache: "no-store" },
+      )
+      if (!res.ok) return
+      const data = await res.json()
+      const groups = (data?.groups ?? []) as Array<{
+        email: string
+        counts: { email_signups: number; contact_forms: number; event_registrations: number }
+      }>
+      const next = new Map<string, { contactForms: number; eventRegistrations: number }>()
+      for (const g of groups) {
+        // Only surface groups that include an email_signups entry — otherwise
+        // there's no row in this tab to attach the badge to.
+        if (g.counts.email_signups <= 0) continue
+        next.set(g.email.toLowerCase(), {
+          contactForms: g.counts.contact_forms,
+          eventRegistrations: g.counts.event_registrations,
+        })
+      }
+      setCrossCollectionMap(next)
+    } catch {
+      // ignored — non-fatal
+    }
+  }, [])
 
   useEffect(() => {
     fetchSourcesAndCounts()
-  }, [fetchSourcesAndCounts])
-
-  useEffect(() => {
-    if (selectedSource) fetchSignups(selectedSource)
-  }, [selectedSource, fetchSignups])
+    fetchSignups()
+    fetchCrossCollectionMap()
+  }, [fetchSourcesAndCounts, fetchSignups, fetchCrossCollectionMap])
 
   const handleDeleteEmail = async (id: string, email: string) => {
     if (!confirm(`Delete ${email}? This cannot be undone.`)) return
@@ -377,7 +448,7 @@ function EmailListsTab({
       if (data.success) {
         setToast({ message: `Deleted ${email}`, type: "success" })
         await fetchSourcesAndCounts()
-        await fetchSignups(selectedSource)
+        await fetchSignups()
       } else {
         setToast({ message: data.error || "Failed to delete", type: "error" })
       }
@@ -410,6 +481,54 @@ function EmailListsTab({
     } finally {
       setIsDownloading(false)
     }
+  }
+
+  // Shared CSV builder — used by both Filtered and Selected exports below.
+  const buildAndDownloadCSV = (
+    rows: EmailSignup[],
+    filenameBase: string,
+    successLabel: string,
+  ) => {
+    try {
+      const headers = ["Email", "Source", "Signup Date"]
+      const rowsCsv = rows.map((signup) => [
+        signup.email,
+        signup.source,
+        signup.created_at ? new Date(signup.created_at).toLocaleDateString() : "",
+      ])
+      const csvContent = [
+        headers.join(","),
+        ...rowsCsv.map((row) =>
+          row
+            .map((cell) => {
+              const escaped = String(cell).replace(/"/g, '""')
+              return escaped.includes(",") || escaped.includes('"')
+                ? `"${escaped}"`
+                : escaped
+            })
+            .join(","),
+        ),
+      ].join("\n")
+      const blob = new Blob([csvContent], { type: "text/csv" })
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = downloadUrl
+      a.download = `${filenameBase}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(downloadUrl)
+      setToast({ message: `Downloaded ${rows.length} ${successLabel}`, type: "success" })
+    } catch {
+      setToast({ message: "Failed to download CSV", type: "error" })
+    }
+  }
+
+  const handleDownloadSelectedCSV = () => {
+    const rows = signups.filter((s) => selected.has(s.id))
+    if (rows.length === 0) return
+    const base = `selected-emails-${new Date().toISOString().split("T")[0]}`
+    buildAndDownloadCSV(rows, base, "selected emails")
   }
 
   const handleDownloadFilteredCSV = () => {
@@ -465,24 +584,36 @@ function EmailListsTab({
 
   // Filter signups
   // Pre-state-filter set — used to fetch states (so chip counts include
-  // state-filtered-out rows in the count UI).
-  const filteredSignupsBeforeState = signups.filter((signup) => {
-    if (searchQuery && !signup.email.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    if (startDate || endDate) {
-      const signupDate = new Date(signup.created_at)
-      if (startDate) {
-        const start = new Date(startDate)
-        start.setHours(0, 0, 0, 0)
-        if (signupDate < start) return false
+  // state-filtered-out rows in the count UI). Source filtering moved here
+  // (client-side) since Sprint A loads all signups upfront for the rollups.
+  const filteredSignupsBeforeState = signups
+    .filter((signup) => {
+      if (selectedSource && signup.source !== selectedSource) return false
+      if (searchQuery && !signup.email.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      if (startDate || endDate) {
+        const signupDate = new Date(signup.created_at)
+        if (startDate) {
+          const start = new Date(startDate)
+          start.setHours(0, 0, 0, 0)
+          if (signupDate < start) return false
+        }
+        if (endDate) {
+          const end = new Date(endDate)
+          end.setHours(23, 59, 59, 999)
+          if (signupDate > end) return false
+        }
       }
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999)
-        if (signupDate > end) return false
+      if (audienceFilter !== "all") {
+        const email = signup.email.toLowerCase()
+        const inCrm = leadsByEmail.has(email)
+        const inMc = subscriberMap.has(email)
+        if (audienceFilter === "in-crm" && !inCrm) return false
+        if (audienceFilter === "in-mailchimp" && !inMc) return false
+        if (audienceFilter === "untapped" && inCrm) return false
       }
-    }
-    return true
-  })
+      return true
+    })
+    .sort((a, b) => compareSignupRows(a, b, signupSort))
 
   // Fetch sidecar states for visible rows in one batch.
   const visibleIds = filteredSignupsBeforeState.map((s) => s.id)
@@ -572,9 +703,59 @@ function EmailListsTab({
     }
   }
 
+  // Convert ALL currently-visible signups (filtered set, not just selected) —
+  // wired to the drilldown header's "Convert all to leads" button. Backend
+  // is idempotent: existing leads get tag refreshes, not duplicates.
+  const runConvertAllSignups = async (rows: EmailSignup[]) => {
+    const items = rows
+      .filter((s) => s.email)
+      .map((s) => ({ id: s.id, email: s.email, sourceSite: s.source }))
+    if (items.length === 0) return
+    if (!confirm(`Convert ${items.length} signup${items.length === 1 ? "" : "s"} to leads? Existing leads will be updated, not duplicated.`)) return
+    try {
+      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        setToast({ message: data?.error || "Convert failed", type: "error" })
+        return
+      }
+      const r = data.result as { created: number; updated: number; failed: number }
+      setToast({
+        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
+        type: r.failed === 0 ? "success" : "error",
+      })
+    } catch {
+      setToast({ message: "Convert failed", type: "error" })
+    }
+  }
+
   const allVisibleIds = filteredSignups.map((s) => s.id)
   const allVisibleSelected =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
+
+  // Sprint C — cross-source dupes lookup, scoped to the email_signups
+  // collection. Built once per `signups` change and passed to the table
+  // for in-row badges. Keys are lowercased email; values are Set of every
+  // distinct source that carried a row for that email. Sets >= 2 mean the
+  // user signed up to multiple lists with the same email.
+  const sourcesByEmail = useMemo(() => {
+    const m = new Map<string, Set<string>>()
+    for (const s of signups) {
+      const k = (s.email || "").toLowerCase()
+      if (!k) continue
+      let set = m.get(k)
+      if (!set) {
+        set = new Set()
+        m.set(k, set)
+      }
+      set.add(s.source)
+    }
+    return m
+  }, [signups])
 
   const handleDatePreset = (preset: string) => {
     setDatePreset(preset)
@@ -650,174 +831,87 @@ function EmailListsTab({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => fetchSignups(selectedSource)}
+            onClick={() => fetchSignups()}
             disabled={isLoading}
             className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
-          <button
-            onClick={handleDownloadAllCSV}
+          <ExportMenu
             disabled={isDownloading || totalCount === 0}
-            className="flex items-center gap-2 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isDownloading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-            <span className="hidden sm:inline">Export All</span>
-          </button>
+            isDownloading={isDownloading}
+            allCount={totalCount}
+            filteredCount={filteredSignups.length}
+            selectedCount={selected.size}
+            onExportAll={handleDownloadAllCSV}
+            onExportFiltered={handleDownloadFilteredCSV}
+            onExportSelected={handleDownloadSelectedCSV}
+          />
         </div>
       </div>
 
-      {/* Source Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 mb-6">
-        {Object.entries(counts)
-          .sort(([, a], [, b]) => b - a)
-          .slice(0, 5)
-          .map(([source, count]) => (
-            <button
-              key={source}
-              onClick={() => setSelectedSource(source)}
-              className={`p-3 rounded-xl border transition-all text-left ${
-                selectedSource === source
-                  ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                  : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <Globe className="w-3 h-3 opacity-50" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider truncate">
-                  {source}
-                </span>
-              </div>
-              <div className="text-xl font-bold leading-tight">{count.toLocaleString()}</div>
-              <div className="text-[11px] opacity-50 font-normal leading-snug">emails</div>
-            </button>
-          ))}
+      {/* Source insights — overview grid (no source selected) or drilldown
+          stats strip (source selected). Mirrors EventInsights so the two
+          tabs feel like siblings. */}
+      <EmailSourceInsights
+        sourceCounts={counts}
+        allSignups={signups}
+        selectedSource={selectedSource}
+        onSelectSource={setSelectedSource}
+        audienceFilter={audienceFilter}
+        onAudienceFilterChange={setAudienceFilter}
+        onRefresh={() => { fetchSourcesAndCounts(); fetchSignups() }}
+        isLoading={isLoading}
+        onConvertAll={() => runConvertAllSignups(filteredSignupsBeforeState)}
+        onPushToMailchimp={() => setShowPushModal(true)}
+        convertAllDisabled={filteredSignupsBeforeState.length === 0}
+        pushToMailchimpDisabled={filteredSignupsBeforeState.length === 0}
+        // Timestamps from the FULL source set (no audience/state/date
+        // filter) so the sparkline shows true history regardless of the
+        // user's current view.
+        drilldownTimestamps={
+          selectedSource
+            ? signups
+                .filter((s) => s.source === selectedSource)
+                .map((s) => s.created_at)
+                .filter(Boolean)
+            : undefined
+        }
+      />
+
+      {/* Search — flush, no card chrome (matches Events surface). */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search emails..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
+        />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl border border-neutral-200 p-3 sm:p-4 mb-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-3 mb-3">
-          <div className="flex items-center gap-2 flex-1">
-            <Filter className="w-4 h-4 text-neutral-300 hidden sm:block" />
-            <select
-              value={selectedSource}
-              onChange={(e) => setSelectedSource(e.target.value)}
-              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent bg-white text-[13px] font-medium text-neutral-700"
-            >
-              <option value="">All Sources</option>
-              {sources.map((source) => (
-                <option key={source} value={source}>
-                  {source} ({counts[source] || 0})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300" />
-            <input
-              type="text"
-              placeholder="Search emails..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-normal text-neutral-700"
-            />
-          </div>
-        </div>
+      {/* Date preset chips — replaces the dropdown. "Custom" reveals from/to
+          inputs inline. Active preset / custom range gets a filled neutral-900
+          chip; idle chips are bordered ghosts. */}
+      <DatePresetChips
+        preset={datePreset}
+        startDate={startDate}
+        endDate={endDate}
+        onPresetChange={handleDatePreset}
+        onCustomChange={(s, e) => {
+          setStartDate(s)
+          setEndDate(e)
+          setDatePreset(s || e ? "custom" : "")
+        }}
+        onClear={() => {
+          setStartDate("")
+          setEndDate("")
+          setDatePreset("")
+        }}
+      />
 
-        <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-neutral-100">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-neutral-300 hidden sm:block" />
-            <select
-              value={datePreset}
-              onChange={(e) => handleDatePreset(e.target.value)}
-              className="px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent bg-white text-[13px] font-medium text-neutral-700"
-            >
-              <option value="">Date Range</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="last7days">Last 7 Days</option>
-              <option value="last30days">Last 30 Days</option>
-              <option value="thisMonth">This Month</option>
-              <option value="lastMonth">Last Month</option>
-              <option value="thisYear">This Year</option>
-              <option value="all">All Time</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-[12px] text-neutral-400 hidden sm:inline font-medium">From:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value)
-                setDatePreset("")
-              }}
-              className="flex-1 sm:flex-none px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent bg-white text-[13px] font-normal text-neutral-700"
-            />
-            <span className="text-[12px] text-neutral-400 font-medium">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value)
-                setDatePreset("")
-              }}
-              className="flex-1 sm:flex-none px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent bg-white text-[13px] font-normal text-neutral-700"
-            />
-          </div>
-          {(startDate || endDate) && (
-            <button
-              onClick={() => {
-                setStartDate("")
-                setEndDate("")
-                setDatePreset("")
-              }}
-              className="px-3 py-1.5 text-[12px] text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors font-medium"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Results Summary */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2 text-neutral-500">
-          <Users className="w-4 h-4" />
-          <span className="text-[13px] font-normal leading-snug">
-            Showing <strong className="text-neutral-900 font-semibold">{filteredSignups.length.toLocaleString()}</strong>{" "}
-            of <strong className="text-neutral-900 font-semibold">{totalCount.toLocaleString()}</strong> emails
-            {selectedSource && (
-              <>
-                {" "}from <strong className="text-neutral-900 font-semibold">{selectedSource}</strong>
-              </>
-            )}
-          </span>
-          {(startDate || endDate) && (
-            <span className="text-[11px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-medium">
-              {startDate && endDate
-                ? `${formatDate(startDate)} – ${formatDate(endDate)}`
-                : startDate
-                ? `From ${formatDate(startDate)}`
-                : `Until ${formatDate(endDate)}`}
-            </span>
-          )}
-        </div>
-        {filteredSignups.length > 0 && (searchQuery || startDate || endDate) && (
-          <button
-            onClick={handleDownloadFilteredCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
-          >
-            <FileDown className="w-3.5 h-3.5" />
-            Download Filtered ({filteredSignups.length})
-          </button>
-        )}
-      </div>
 
       {/* PR 3 — state filter chips */}
       {!isLoading && !error && (
@@ -832,7 +926,7 @@ function EmailListsTab({
           <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700 text-sm font-medium">{error}</p>
           <button
-            onClick={() => fetchSignups(selectedSource)}
+            onClick={() => fetchSignups()}
             className="mt-3 px-4 py-2 bg-red-600 text-white text-[13px] font-medium rounded-lg hover:bg-red-700 transition-colors"
           >
             Retry
@@ -842,7 +936,7 @@ function EmailListsTab({
 
       {/* Loading */}
       {isLoading && !error && (
-        <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center shadow-sm">
+        <div className="bg-white rounded-md border border-neutral-200/70 p-12 text-center">
           <Loader2 className="w-6 h-6 animate-spin text-neutral-300 mx-auto mb-3" />
           <p className="text-neutral-400 text-[13px] font-normal">Loading email signups...</p>
         </div>
@@ -850,27 +944,42 @@ function EmailListsTab({
 
       {/* Email List */}
       {!isLoading && !error && (
-        <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-md border border-neutral-200/70 overflow-hidden">
           {/* Select-all header — appears when there are visible rows */}
-          {filteredSignups.length > 0 && (
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-neutral-100 bg-neutral-50">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={(e) => {
-                  if (e.target.checked) setSelected(allVisibleIds)
-                  else clearSelected()
-                }}
-                className="rounded border-neutral-300"
-                aria-label="Select all visible"
-              />
-              <span className="text-[11px] text-neutral-500">
-                {selected.size > 0
-                  ? `${selected.size} selected`
-                  : `${filteredSignups.length} visible`}
-              </span>
-            </div>
-          )}
+          {filteredSignups.length > 0 && (() => {
+            // Surface hidden-by-filter when a state/audience filter pushes
+            // selected rows off the visible set — same affordance Events
+            // gained in Sprint 2.
+            const visibleSelected = allVisibleIds.reduce(
+              (n, id) => n + (selected.has(id) ? 1 : 0),
+              0,
+            )
+            const hiddenSelected = selected.size - visibleSelected
+            return (
+              <div className="flex items-center gap-3 px-4 py-2 border-b border-neutral-100 bg-neutral-50">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelected(allVisibleIds)
+                    else clearSelected()
+                  }}
+                  className="rounded border-neutral-300"
+                  aria-label="Select all visible"
+                />
+                <span className="text-[11px] text-neutral-500">
+                  {selected.size > 0
+                    ? `${selected.size} selected`
+                    : `${filteredSignups.length} visible`}
+                  {hiddenSelected > 0 && (
+                    <span className="ml-2 text-neutral-400">
+                      ({hiddenSelected} hidden by filter)
+                    </span>
+                  )}
+                </span>
+              </div>
+            )
+          })()}
           {/* ── Mobile Card View ── */}
           <div className="block sm:hidden divide-y divide-neutral-100 max-h-[65vh] overflow-y-auto">
             {filteredSignups.length === 0 ? (
@@ -885,14 +994,14 @@ function EmailListsTab({
               filteredSignups.map((signup) => (
                 <div
                   key={signup.id}
-                  className="px-4 py-3.5 hover:bg-neutral-50 transition-colors"
+                  onClick={() => setSelectedSignup(signup)}
+                  className="px-4 py-3.5 hover:bg-neutral-50 transition-colors cursor-pointer active:bg-neutral-100"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight truncate">
                         {signup.email}
                         <LeadCrossLink email={signup.email} mapping={leadsByEmail} />
-                        <MailchimpSubscribedPill email={signup.email} mapping={subscriberMap} />
                       </p>
                     </div>
                     <button
@@ -933,108 +1042,38 @@ function EmailListsTab({
             )}
           </div>
 
-          {/* ── Desktop Table View ── */}
-          <div className="hidden sm:block overflow-x-auto max-h-[65vh]">
-            <table className="w-full">
-              <thead className="bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
-                <tr>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    Email
-                  </th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    Source
-                  </th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      Date
-                    </span>
-                  </th>
-                  <th className="text-right px-5 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {filteredSignups.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-5 py-12 text-center text-neutral-400">
-                      <Mail className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
-                      <p className="text-sm font-medium text-neutral-500">No email signups found</p>
-                      {searchQuery && (
-                        <p className="text-[12px] mt-1 font-normal">Try adjusting your search</p>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredSignups.map((signup) => (
-                    <tr key={signup.id} className="hover:bg-neutral-50 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(signup.id)}
-                            onChange={() => toggleSelect(signup.id)}
-                            className="rounded border-neutral-300 shrink-0"
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select ${signup.email}`}
-                          />
-                          <span className="text-neutral-900 text-[13px] font-semibold leading-snug">
-                            {signup.email}
-                          </span>
-                          <LeadCrossLink email={signup.email} mapping={leadsByEmail} />
-                          <MailchimpSubscribedPill email={signup.email} mapping={subscriberMap} />
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 text-neutral-600 tracking-wide whitespace-nowrap">
-                            {signup.source}
-                          </span>
-                          <StateBadge
-                            source={SUBMISSION_SOURCE}
-                            id={signup.id}
-                            state={getStateOrNew(submissionStates, signup.id)}
-                            onChange={(s) => setLocal(signup.id, s)}
-                          />
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-neutral-400 text-[13px] font-normal whitespace-nowrap">
-                        {formatDate(signup.created_at)}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <button
-                          onClick={() => handleDeleteEmail(signup.id, signup.email)}
-                          disabled={isDeleting === signup.id}
-                          className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                          title={`Delete ${signup.email}`}
-                        >
-                          {isDeleting === signup.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Desktop — virtualized table (Sprint A) */}
+          <EmailSignupsTable
+            rows={filteredSignups}
+            sort={signupSort}
+            onSortChange={setSignupSort}
+            selected={selected}
+            onToggleSelect={toggleSelect}
+            source={SUBMISSION_SOURCE}
+            states={submissionStates}
+            onLocalState={setLocal}
+            leadsByEmail={leadsByEmail}
+            subscriberMap={subscriberMap}
+            sourcesByEmail={sourcesByEmail}
+            crossCollectionMap={crossCollectionMap}
+            onSelectRow={setSelectedSignup}
+            onDelete={handleDeleteEmail}
+            onPushOne={(email) => setSinglePushTarget(email)}
+            isDeleting={isDeleting}
+            searchQuery={searchQuery}
+          />
 
           {filteredSignups.length > 0 && (
-            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
-              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
-                {filteredSignups.length} email{filteredSignups.length !== 1 ? "s" : ""}
+            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5">
+              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed tabular-nums">
+                <strong className="text-neutral-700 font-semibold">
+                  {filteredSignups.length.toLocaleString()}
+                </strong>
+                {filteredSignups.length !== totalCount && (
+                  <> of {totalCount.toLocaleString()}</>
+                )}
+                {" "}email{filteredSignups.length !== 1 ? "s" : ""}
               </span>
-              <button
-                onClick={handleDownloadFilteredCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
-              >
-                <Download className="w-3 h-3" />
-                CSV
-              </button>
             </div>
           )}
         </div>
@@ -1069,6 +1108,210 @@ function EmailListsTab({
           if (result.errors.length === 0) clearSelected()
         }}
       />
+
+      {/* Single-row push modal — opens when the user clicks the per-row
+          Mailchimp action on an unsubscribed email. Reuses the same modal
+          component, scoped to one member, so the user gets the same tag
+          chooser and confirmation flow as bulk push. */}
+      <MailchimpPushModal
+        open={!!singlePushTarget}
+        onClose={() => setSinglePushTarget(null)}
+        members={singlePushTarget ? [{ email: singlePushTarget }] : []}
+        defaultTag={`from-newsletter-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+        onComplete={(result) => {
+          setToast({
+            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
+            type: result.errors.length === 0 ? "success" : "error",
+          })
+          setSinglePushTarget(null)
+        }}
+      />
+
+      {/* Email signup detail drawer — opens on row click. Slim version of
+          the Events drawer: email + Mailchimp pill, locked source/date,
+          editable state, footer with Open in CRM / Convert to lead. */}
+      <DetailDrawer
+        open={!!selectedSignup}
+        onClose={() => setSelectedSignup(null)}
+        title={selectedSignup ? selectedSignup.email : ""}
+        subtitle={
+          selectedSignup ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              Signed up {formatDate(selectedSignup.created_at)}
+            </span>
+          ) : null
+        }
+        footer={
+          selectedSignup ? (() => {
+            const existingLeadId = leadsByEmail.get(
+              selectedSignup.email.toLowerCase(),
+            )
+            const isSubscribed = subscriberMap.has(selectedSignup.email.toLowerCase())
+            return (
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => {
+                    handleDeleteEmail(selectedSignup.id, selectedSignup.email)
+                    setSelectedSignup(null)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+                <div className="flex items-center gap-1.5">
+                  {!isSubscribed && (
+                    <button
+                      type="button"
+                      onClick={() => setSinglePushTarget(selectedSignup.email)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded hover:bg-neutral-50 transition-colors"
+                      title="Push this email to Mailchimp"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Push to Mailchimp
+                    </button>
+                  )}
+                  {existingLeadId ? (
+                    <a
+                      href={`/admin/leads?openLead=${encodeURIComponent(existingLeadId)}`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
+                      title="Open this contact in the CRM"
+                    >
+                      <UserPlusIcon className="w-3.5 h-3.5" />
+                      Open in CRM
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await runConvertAllSignups([selectedSignup])
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
+                      title="Create a CRM lead for this person"
+                    >
+                      <UserPlusIcon className="w-3.5 h-3.5" />
+                      Convert to lead
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedSignup(null)}
+                    className="px-3 py-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )
+          })() : null
+        }
+      >
+        {selectedSignup && (
+          <div className="px-5 py-4 space-y-4">
+            <dl className="divide-y divide-neutral-100 text-[13px]">
+              <DetailRow icon={Mail} label="Email">
+                <span className="inline-flex items-center gap-2 flex-wrap">
+                  <a
+                    href={`mailto:${selectedSignup.email}`}
+                    className="text-neutral-900 hover:underline"
+                  >
+                    {selectedSignup.email}
+                  </a>
+                  <span
+                    title="Identity field — to change, delete and re-add"
+                    aria-label="Identity field, not editable"
+                  >
+                    <LockIcon className="w-3 h-3 text-neutral-300" />
+                  </span>
+                  <MailchimpSubscribedPill
+                    email={selectedSignup.email}
+                    mapping={subscriberMap}
+                  />
+                </span>
+              </DetailRow>
+              <DetailRow icon={Globe} label="Source">
+                <span className="inline-flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-neutral-100 text-neutral-700">
+                    {selectedSignup.source}
+                  </span>
+                  <span title="Provenance — captured at signup, not editable">
+                    <LockIcon className="w-3 h-3 text-neutral-300" />
+                  </span>
+                </span>
+              </DetailRow>
+              {(() => {
+                // Cross-collection signal — fold within-collection (other
+                // email_signups sources) and across-collection (contact
+                // forms / event registrations) into a single "Also in" row
+                // so the user has one place to scan for upstream dedup
+                // candidates.
+                const emailKey = selectedSignup.email.toLowerCase()
+                const set: Set<string> | undefined = sourcesByEmail.get(emailKey)
+                const otherSources: string[] = set
+                  ? Array.from(set).filter((s) => s !== selectedSignup.source)
+                  : []
+                const cross = crossCollectionMap.get(emailKey)
+                const hasCross = !!(cross && (cross.contactForms > 0 || cross.eventRegistrations > 0))
+                if (otherSources.length === 0 && !hasCross) return null
+                return (
+                  <DetailRow icon={Layers} label="Also in">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {otherSources.map((s) => (
+                        <span
+                          key={s}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-indigo-50 text-indigo-700"
+                          title={`Also signed up to ${s}`}
+                        >
+                          {s}
+                        </span>
+                      ))}
+                      {cross && cross.contactForms > 0 && (
+                        <a
+                          href={`/admin/submissions?tab=contact-forms&search=${encodeURIComponent(selectedSignup.email)}`}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                          title="View contact form submissions for this email"
+                        >
+                          {cross.contactForms} contact form{cross.contactForms === 1 ? "" : "s"}
+                        </a>
+                      )}
+                      {cross && cross.eventRegistrations > 0 && (
+                        <a
+                          href={`/admin/submissions?tab=events&search=${encodeURIComponent(selectedSignup.email)}`}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                          title="View event registrations for this email"
+                        >
+                          {cross.eventRegistrations} event reg{cross.eventRegistrations === 1 ? "" : "s"}
+                        </a>
+                      )}
+                    </div>
+                  </DetailRow>
+                )
+              })()}
+              <DetailRow icon={Calendar} label="Signed up">
+                <span className="inline-flex items-center gap-2">
+                  {formatDate(selectedSignup.created_at)}
+                  <span title="History field — not editable">
+                    <LockIcon className="w-3 h-3 text-neutral-300" />
+                  </span>
+                </span>
+              </DetailRow>
+              <DetailRow icon={Eye} label="State">
+                <StateBadge
+                  source={SUBMISSION_SOURCE}
+                  id={selectedSignup.id}
+                  state={getStateOrNew(submissionStates, selectedSignup.id)}
+                  onChange={(s) => setLocal(selectedSignup.id, s)}
+                />
+              </DetailRow>
+              {selectedSignup.mailchimp_tags && selectedSignup.mailchimp_tags.length > 0 && (
+                <DetailRow icon={Mail} label="MC tags">
+                  <TagList tags={selectedSignup.mailchimp_tags} max={4} />
+                </DetailRow>
+              )}
+            </dl>
+          </div>
+        )}
+      </DetailDrawer>
     </div>
   )
 }
@@ -2090,6 +2333,58 @@ function EventRegistrationsTab({
     }
   }
 
+  // Build a CSV from a row subset and trigger download. Powers the
+  // Filtered / Selected branches of the ExportMenu — All goes through the
+  // server route above so the export reflects the canonical dataset.
+  const buildAndDownloadRegCSV = (
+    rows: EventRegistration[],
+    filenameBase: string,
+    successLabel: string,
+  ) => {
+    try {
+      const headers = ["First Name", "Last Name", "Email", "Company", "Event", "Event Date", "Registered At", "Source"]
+      const csvRows = rows.map((r) => [
+        r.firstName,
+        r.lastName,
+        r.email,
+        r.company || "",
+        r.eventName,
+        r.eventDate,
+        r.registeredAt ? new Date(r.registeredAt).toLocaleDateString() : "",
+        r.source,
+      ])
+      const escape = (val: string) => {
+        const s = String(val).replace(/"/g, '""')
+        return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s}"` : s
+      }
+      const csv = [headers.join(","), ...csvRows.map((row) => row.map(escape).join(","))].join("\n")
+      const blob = new Blob([csv], { type: "text/csv" })
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = downloadUrl
+      a.download = `${filenameBase}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(downloadUrl)
+      setToast({ message: `Downloaded ${rows.length} ${successLabel}`, type: "success" })
+    } catch {
+      setToast({ message: "Failed to download CSV", type: "error" })
+    }
+  }
+
+  const handleDownloadFilteredRegCSV = () => {
+    const stamp = new Date().toISOString().split("T")[0]
+    buildAndDownloadRegCSV(filteredRegistrations, `event-registrations-filtered-${stamp}`, "registrations")
+  }
+
+  const handleDownloadSelectedRegCSV = () => {
+    const rows = registrations.filter((r) => selected.has(r.id!))
+    if (rows.length === 0) return
+    const stamp = new Date().toISOString().split("T")[0]
+    buildAndDownloadRegCSV(rows, `event-registrations-selected-${stamp}`, "registrations")
+  }
+
   // Backfill a blank field on a registration. Server enforces blank-existing
   // (returns 409 if another admin already filled it). On success we patch the
   // local registrations list AND the open drawer so the UI reflects the write
@@ -2331,18 +2626,16 @@ function EventRegistrationsTab({
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
-          <button
-            onClick={handleDownloadCSV}
+          <ExportMenu
             disabled={isDownloading || totalCount === 0}
-            className="flex items-center gap-2 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isDownloading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-            <span className="hidden sm:inline">Export CSV</span>
-          </button>
+            isDownloading={isDownloading}
+            allCount={totalCount}
+            filteredCount={filteredRegistrations.length}
+            selectedCount={selected.size}
+            onExportAll={handleDownloadCSV}
+            onExportFiltered={handleDownloadFilteredRegCSV}
+            onExportSelected={handleDownloadSelectedRegCSV}
+          />
         </div>
       </div>
 
@@ -2559,7 +2852,7 @@ function EventRegistrationsTab({
           />
 
           {filteredRegistrations.length > 0 && (
-            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
+            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5">
               <span className="text-[12px] text-neutral-400 font-normal leading-relaxed tabular-nums">
                 <strong className="text-neutral-700 font-semibold">
                   {filteredRegistrations.length.toLocaleString()}
@@ -2570,13 +2863,6 @@ function EventRegistrationsTab({
                 {" "}
                 registration{filteredRegistrations.length !== 1 ? "s" : ""}
               </span>
-              <button
-                onClick={handleDownloadCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
-              >
-                <Download className="w-3 h-3" />
-                CSV
-              </button>
             </div>
           )}
         </div>
@@ -2854,6 +3140,230 @@ function EventRegistrationsTab({
           if (result.errors.length === 0) clearSelected()
         }}
       />
+    </div>
+  )
+}
+
+// =====================================================================
+// Sprint B — export menu. Single button + dropdown collapses the three
+// previous CSV controls (Export All in header, Download Filtered in the
+// summary line, CSV in the table footer) into one canonical surface.
+// =====================================================================
+
+interface ExportMenuProps {
+  disabled?: boolean
+  isDownloading?: boolean
+  allCount: number
+  filteredCount: number
+  selectedCount: number
+  onExportAll: () => void
+  onExportFiltered: () => void
+  onExportSelected: () => void
+}
+
+function ExportMenu({
+  disabled,
+  isDownloading,
+  allCount,
+  filteredCount,
+  selectedCount,
+  onExportAll,
+  onExportFiltered,
+  onExportSelected,
+}: ExportMenuProps) {
+  const [open, setOpen] = useState(false)
+  // Filtered is only a useful option when it differs from the All count.
+  // Selected is only useful when something is selected.
+  const filteredDiffers = filteredCount !== allCount
+  const hasSelection = selectedCount > 0
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        disabled={disabled}
+        className="flex items-center gap-2 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        {isDownloading ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <Download className="w-3.5 h-3.5" />
+        )}
+        <span className="hidden sm:inline">Export</span>
+        <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 z-20 min-w-56 py-1 rounded-md border border-neutral-200 bg-white shadow-md"
+        >
+          <ExportMenuItem
+            label="Export all"
+            count={allCount}
+            onClick={() => {
+              setOpen(false)
+              onExportAll()
+            }}
+          />
+          {filteredDiffers && (
+            <ExportMenuItem
+              label="Export filtered"
+              count={filteredCount}
+              onClick={() => {
+                setOpen(false)
+                onExportFiltered()
+              }}
+            />
+          )}
+          {hasSelection && (
+            <ExportMenuItem
+              label="Export selected"
+              count={selectedCount}
+              onClick={() => {
+                setOpen(false)
+                onExportSelected()
+              }}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ExportMenuItem({
+  label,
+  count,
+  onClick,
+}: {
+  label: string
+  count: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className="w-full flex items-center justify-between gap-3 px-3 py-1.5 text-[12px] hover:bg-neutral-50 transition-colors text-left"
+    >
+      <span className="text-neutral-700">{label}</span>
+      <span className="text-[11px] text-neutral-400 tabular-nums">
+        {count.toLocaleString()}
+      </span>
+    </button>
+  )
+}
+
+// =====================================================================
+// Sprint B — date preset chips. Replaces the date-range dropdown with a
+// row of clickable chips: Today · 7d · 30d · This month · Custom. Active
+// preset gets a filled neutral-900 chip; idle chips are ghosts. "Custom"
+// reveals two date inputs inline + a Clear button.
+// =====================================================================
+
+interface DatePresetChipsProps {
+  preset: string
+  startDate: string
+  endDate: string
+  onPresetChange: (preset: string) => void
+  onCustomChange: (start: string, end: string) => void
+  onClear: () => void
+}
+
+const DATE_CHIPS: { value: string; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "last7days", label: "7d" },
+  { value: "last30days", label: "30d" },
+  { value: "thisMonth", label: "This month" },
+  { value: "lastMonth", label: "Last month" },
+  { value: "thisYear", label: "This year" },
+]
+
+function DatePresetChips({
+  preset,
+  startDate,
+  endDate,
+  onPresetChange,
+  onCustomChange,
+  onClear,
+}: DatePresetChipsProps) {
+  const customActive = preset === "custom" || (preset === "" && (!!startDate || !!endDate))
+  const anyActive = !!preset || !!startDate || !!endDate
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {DATE_CHIPS.map((chip) => {
+          const active = preset === chip.value
+          return (
+            <button
+              key={chip.value}
+              type="button"
+              onClick={() => onPresetChange(active ? "" : chip.value)}
+              className={`px-2.5 py-1 text-[12px] font-medium rounded transition-colors ${
+                active
+                  ? "bg-neutral-900 text-white"
+                  : "bg-white text-neutral-600 border border-neutral-200/70 hover:bg-neutral-50 hover:text-neutral-900"
+              }`}
+            >
+              {chip.label}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={() => {
+            // Toggle custom mode. When activating, leave dates blank — user
+            // picks them. When deactivating, clear everything.
+            if (customActive) onClear()
+            else onPresetChange("custom")
+          }}
+          className={`px-2.5 py-1 text-[12px] font-medium rounded transition-colors ${
+            customActive
+              ? "bg-neutral-900 text-white"
+              : "bg-white text-neutral-600 border border-neutral-200/70 hover:bg-neutral-50 hover:text-neutral-900"
+          }`}
+        >
+          Custom
+        </button>
+        {anyActive && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="px-2 py-1 text-[12px] font-medium text-neutral-400 hover:text-neutral-700 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Custom range inputs — only render when "Custom" is active. */}
+      {customActive && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => onCustomChange(e.target.value, endDate)}
+            className="px-2.5 py-1 text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
+            aria-label="Start date"
+          />
+          <span className="text-[12px] text-neutral-400">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => onCustomChange(startDate, e.target.value)}
+            className="px-2.5 py-1 text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
+            aria-label="End date"
+          />
+        </div>
+      )}
     </div>
   )
 }
