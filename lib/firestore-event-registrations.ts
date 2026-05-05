@@ -171,6 +171,20 @@ async function getDigitalCanvasRegistrations(filters?: { event?: string }): Prom
     const snapshot = await dcDb.collection("event-registrations").get()
     return snapshot.docs.map((doc) => {
       const data = doc.data()
+
+      // Canonical namespaced tags for every MHTH registrant. Mirrors the
+      // pattern used for techday: site:* (provenance / brand-owned property),
+      // event:* (event identifier with year), role:* (default attendee).
+      // Raw `data.tags` passthrough preserves any registration-form-specific
+      // tags so we don't lose data the form may have attached.
+      const incomingTags = Array.isArray(data.tags) ? (data.tags as string[]) : []
+      const tags: string[] = [
+        "site:digitalcanvas",
+        "event:more-human-than-human-2026",
+        "role:mhth-attendee",
+        ...incomingTags,
+      ]
+
       return {
         id: `dc:${doc.id}`,
         email: data.email || "",
@@ -184,7 +198,7 @@ async function getDigitalCanvasRegistrations(filters?: { event?: string }): Prom
         eventDate: toISOString(data.eventDate || "2026-02-28"),
         registeredAt: toISOString(data.registeredAt || data.createdAt || ""),
         source: data.source || "web-digitalcanvas",
-        tags: data.tags || [],
+        tags,
         pageUrl: data.pageUrl || "",
         checkedIn: data.checkedIn || false,
         checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
@@ -228,7 +242,7 @@ function deduplicateRegistrations(registrations: EventRegistration[]): EventRegi
 /**
  * Get event registrations with optional filtering
  * Merges results from:
- *  1. Default DB (groovy-ego) — event_registrations collection (migrated data)
+ *  1. Default DB (groovy-ego) — event_registrations collection
  *  2. Techday named DB (groovy-ego/techday) — registrations collection
  *  3. Digital Canvas project (media-analytics-proxy) — event-registrations collection
  */
@@ -268,8 +282,12 @@ export async function getEventRegistrations(filters?: {
       return defaultRegs
     }
 
-    // Merge and deduplicate across all three sources
-    const allRegs = deduplicateRegistrations([...defaultRegs, ...techdayRegs, ...dcRegs])
+    // Merge and deduplicate across default DB + named DBs + separate projects.
+    const allRegs = deduplicateRegistrations([
+      ...defaultRegs,
+      ...techdayRegs,
+      ...dcRegs,
+    ])
     return allRegs
   } catch (error) {
     console.error("Error fetching event registrations:", error)

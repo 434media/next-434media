@@ -23,6 +23,8 @@ export type TagNamespace =
   | "geo"
   | "industry"
   | "client"
+  | "feed"
+  | "partner"
 
 export interface ParsedTag {
   namespace: TagNamespace | null
@@ -40,6 +42,8 @@ const KNOWN_NAMESPACES = new Set<TagNamespace>([
   "geo",
   "industry",
   "client",
+  "feed",
+  "partner",
 ])
 
 export function parseTag(raw: string): ParsedTag {
@@ -155,6 +159,19 @@ export function getTagStyle(tag: ParsedTag): TagStyle {
     case "client":
       return { className: "bg-sky-50 text-sky-700", label: display }
 
+    // Feed subscriptions (8count, thefeed, culturedeck). Distinct color so
+    // an attendee tagged `feed:8count` reads as a content/email subscription
+    // signal rather than a role/event label.
+    case "feed":
+      return { className: "bg-amber-50 text-amber-700", label: display }
+
+    // Partner relationships (Nucleate TX, etc.) — collaborators that share
+    // event lists or co-host activities. Distinct from `client:` (delivery
+    // for a paid scope of work) and from `site:` (provenance). Teal reads as
+    // collaboration without competing visually with client (sky) or feed (amber).
+    case "partner":
+      return { className: "bg-teal-50 text-teal-700", label: display }
+
     case "intent":
       switch (tag.value) {
         case "sponsor":
@@ -240,6 +257,11 @@ export function tagToMailchimpLabel(rawTag: string): string | null {
     salute: "Salute to Troops",
     techday: "Tech Day",
     mhth: "More Human Than Human",
+    "8count": "8 Count",
+    thefeed: "The Feed",
+    culturedeck: "Culture Deck",
+    nucleate: "Nucleate Newsletter",
+    "nucleate-tx": "Nucleate TX",
   }
   if (upperValues[value]) return upperValues[value]
 
