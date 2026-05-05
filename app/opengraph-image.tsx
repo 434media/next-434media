@@ -8,10 +8,18 @@ export const alt = `${BRAND.name} — ${BRAND.shortTagline} ${BRAND.description}
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 
+const fontPath = (file: string) => path.join(process.cwd(), "fonts", file)
+
 export default async function OpengraphImage() {
-  // node fetch can't resolve file:// URLs from import.meta.url at prerender time.
-  // Read the font from the project filesystem instead.
-  const fontData = await readFile(path.join(process.cwd(), "fonts", "Menda-Black.otf"))
+  // Load REAL static weight files (not a variable-font master) so Satori
+  // can match each weight without synthesizing boldness — synthetic bold
+  // is what causes blurry, smeared edges in OG renders.
+  const [mendaBlack, geist400, geist600, geist800] = await Promise.all([
+    readFile(fontPath("Menda-Black.otf")),
+    readFile(fontPath("Geist-Regular.otf")),
+    readFile(fontPath("Geist-SemiBold.otf")),
+    readFile(fontPath("Geist-ExtraBold.otf")),
+  ])
 
   return new ImageResponse(
     <div
@@ -21,34 +29,32 @@ export default async function OpengraphImage() {
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        background: "linear-gradient(135deg, #0891b2 0%, #0e7490 60%, #06414e 100%)",
+        background: "#ffffff",
         padding: 72,
-        fontFamily: "Menda",
+        fontFamily: "Geist",
+        position: "relative",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center" }}>
+      {/* Subtle dot grid for texture (matches the page hero) */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0.06,
+          backgroundImage:
+            "radial-gradient(circle, #0a0a0a 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+          display: "flex",
+        }}
+      />
+
+      {/* Top: 434 MEDIA wordmark */}
+      <div style={{ display: "flex", alignItems: "center", zIndex: 1 }}>
         <div
           style={{
-            width: 96,
-            height: 96,
-            background: "white",
-            borderRadius: 24,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 36,
-            color: "#0e7490",
-            fontWeight: 900,
-            letterSpacing: -1,
-          }}
-        >
-          434
-        </div>
-        <div
-          style={{
-            marginLeft: 24,
-            color: "white",
-            fontSize: 36,
+            color: "#0a0a0a",
+            fontSize: 30,
+            fontFamily: "Menda",
             fontWeight: 700,
             letterSpacing: 2,
           }}
@@ -57,56 +63,59 @@ export default async function OpengraphImage() {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      {/* Middle: headline + description */}
+      <div style={{ display: "flex", flexDirection: "column", zIndex: 1 }}>
         <div
           style={{
-            color: "white",
-            fontSize: 84,
-            fontWeight: 900,
-            lineHeight: 1.05,
-            letterSpacing: -2,
+            color: "#0a0a0a",
+            fontSize: 96,
+            fontWeight: 800,
+            lineHeight: 1.0,
+            letterSpacing: -3,
           }}
         >
-          Bold Stories.
+          {BRAND.headline}
         </div>
         <div
           style={{
-            color: "rgba(255,255,255,0.92)",
-            fontSize: 84,
-            fontWeight: 900,
-            lineHeight: 1.05,
-            letterSpacing: -2,
+            color: "#737373",
+            fontSize: 96,
+            fontWeight: 800,
+            lineHeight: 1.0,
+            letterSpacing: -3,
           }}
         >
-          Proven Impact.
+          {BRAND.headline2}
         </div>
         <div
           style={{
-            marginTop: 28,
-            color: "rgba(255,255,255,0.85)",
+            marginTop: 32,
+            color: "#525252",
             fontSize: 26,
             fontWeight: 400,
-            lineHeight: 1.35,
-            maxWidth: 1000,
+            lineHeight: 1.4,
+            maxWidth: 980,
           }}
         >
           {BRAND.description}
         </div>
       </div>
 
+      {/* Footer: domain + location */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderTop: "1px solid rgba(255,255,255,0.25)",
+          borderTop: "1px solid #e5e5e5",
           paddingTop: 24,
+          zIndex: 1,
         }}
       >
-        <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 26, fontWeight: 700 }}>
-          www.434media.com
+        <div style={{ color: "#404040", fontSize: 22, fontWeight: 600 }}>
+          {BRAND.domain}
         </div>
-        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 22, letterSpacing: 2 }}>
+        <div style={{ color: "#737373", fontSize: 18, fontWeight: 600, letterSpacing: 3 }}>
           {BRAND.location}
         </div>
       </div>
@@ -114,12 +123,10 @@ export default async function OpengraphImage() {
     {
       ...size,
       fonts: [
-        {
-          name: "Menda",
-          data: fontData,
-          style: "normal",
-          weight: 700,
-        },
+        { name: "Menda", data: mendaBlack, style: "normal", weight: 700 },
+        { name: "Geist", data: geist400, style: "normal", weight: 400 },
+        { name: "Geist", data: geist600, style: "normal", weight: 600 },
+        { name: "Geist", data: geist800, style: "normal", weight: 800 },
       ],
     },
   )
