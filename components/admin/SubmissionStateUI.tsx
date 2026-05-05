@@ -39,6 +39,11 @@ interface UseSubmissionStatesArgs {
   ids: string[]
 }
 
+// Cap each request's ?ids= payload well under the ~8 KB URL limit that
+// browsers, proxies, and Vercel's edge enforce. With ~25 chars per encoded id,
+// 100 ids produces a query of ~2.5 KB — plenty of headroom.
+const STATES_BATCH_SIZE = 100
+
 export function useSubmissionStates({ source, ids }: UseSubmissionStatesArgs) {
   // Stringified id key — only re-fetch when the set actually changes
   const idsKey = useMemo(() => [...ids].sort().join(","), [ids])
@@ -50,14 +55,30 @@ export function useSubmissionStates({ source, ids }: UseSubmissionStatesArgs) {
       return
     }
     try {
-      const res = await fetch(
-        `/api/admin/submissions/states?source=${source}&ids=${encodeURIComponent(ids.join(","))}`,
+      // Chunk the id list so no single GET URL exceeds the proxy/browser limit.
+      // Without chunking, a list of ~2k ids produces a >50 KB URL that fails
+      // before reaching the route handler.
+      const chunks: string[][] = []
+      for (let i = 0; i < ids.length; i += STATES_BATCH_SIZE) {
+        chunks.push(ids.slice(i, i + STATES_BATCH_SIZE))
+      }
+
+      const responses = await Promise.all(
+        chunks.map((chunk) =>
+          fetch(
+            `/api/admin/submissions/states?source=${source}&ids=${encodeURIComponent(chunk.join(","))}`,
+          )
+            .then((res) => (res.ok ? (res.json() as Promise<{ states?: Record<string, SubmissionState> }>) : null))
+            .catch(() => null),
+        ),
       )
-      if (!res.ok) return
-      const data = (await res.json()) as { states?: Record<string, SubmissionState> }
+
       const next = new Map<string, SubmissionState>()
-      for (const [id, state] of Object.entries(data.states ?? {})) {
-        next.set(id, state)
+      for (const data of responses) {
+        if (!data?.states) continue
+        for (const [id, state] of Object.entries(data.states)) {
+          next.set(id, state)
+        }
       }
       setStates(next)
     } catch {
@@ -279,7 +300,7 @@ export function BulkActionBar({ count, actions, onClear }: BulkActionBarProps) {
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white rounded-xl shadow-2xl px-3 py-2 flex items-center gap-2 max-w-[calc(100vw-2rem)] flex-wrap">
+    <div className="fixed bottom-[max(env(safe-area-inset-bottom),1rem)] left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white rounded-xl shadow-2xl px-3 py-2 flex items-center gap-2 max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-2rem)] flex-wrap">
       <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-[11px] font-semibold rounded-full bg-white text-neutral-900 tabular-nums">
         {count}
       </span>

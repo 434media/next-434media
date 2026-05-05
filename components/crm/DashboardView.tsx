@@ -75,39 +75,39 @@ function KPICard({
   color?: "neutral" | "emerald" | "amber" | "blue" | "sky" | "red"
   trend?: { value: number; isPositive: boolean }
 }) {
-  const colorClasses = {
-    neutral: "bg-neutral-50 text-neutral-600",
-    emerald: "bg-emerald-50 text-emerald-600",
-    amber: "bg-amber-50 text-amber-600",
-    blue: "bg-blue-50 text-blue-600",
-    sky: "bg-sky-50 text-sky-600",
-    red: "bg-red-50 text-red-600",
-  }
-
-  const valueColors = {
-    neutral: "text-neutral-900",
-    emerald: "text-emerald-600",
-    amber: "text-amber-600",
-    blue: "text-blue-600",
-    sky: "text-sky-600",
-    red: "text-red-600",
+  // Monochrome icon tile + accent dot — Linear/Vercel pattern.
+  // The number is the message; the icon orients you; the small dot encodes intent.
+  const dotClasses: Record<typeof color, string> = {
+    neutral: "bg-neutral-400",
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    blue: "bg-blue-500",
+    sky: "bg-sky-500",
+    red: "bg-red-500",
   }
 
   return (
-    <div className="p-4 md:p-5 rounded-xl bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow">
+    <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70 transition-shadow hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]">
       <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="w-5 h-5" />
+        <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+          <Icon className="w-4 h-4" />
         </div>
-        {trend && (
-          <div className={`flex items-center gap-1 text-xs font-medium ${trend.isPositive ? "text-emerald-600" : "text-red-500"}`}>
+        {trend && trend.value !== 0 && (
+          <div
+            className={`flex items-center gap-1 text-xs font-medium tabular-nums ${
+              trend.isPositive ? "text-emerald-600" : "text-red-500"
+            }`}
+          >
             {trend.isPositive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
             {trend.value}%
           </div>
         )}
       </div>
-      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-2xl md:text-3xl font-bold tracking-tight ${valueColors[color]}`}>{value}</p>
+      <p className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-[0.18em] mb-1">
+        <span className={`inline-block h-1 w-1 rounded-full ${dotClasses[color]}`} aria-hidden="true" />
+        {label}
+      </p>
+      <p className="text-2xl md:text-3xl font-semibold tracking-tight tabular-nums text-neutral-900">{value}</p>
       {subLabel && <p className="text-xs text-neutral-400 mt-1">{subLabel}</p>}
     </div>
   )
@@ -135,14 +135,14 @@ function OpportunityProgressChart({
   const lostPercent = totalOpportunities > 0 ? (lostCount / totalOpportunities) * 100 : 0
 
   return (
-    <div className="p-4 md:p-5 rounded-xl bg-white border border-neutral-200 shadow-sm col-span-2 lg:col-span-1">
+    <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70 col-span-2 lg:col-span-1">
       <div className="flex items-center gap-2 mb-3">
-        <div className="p-2 rounded-lg bg-sky-50">
-          <Target className="w-4 h-4 text-sky-600" />
+        <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+          <Target className="w-4 h-4" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-neutral-900">Opportunity Flow</h3>
-          <p className="text-[10px] text-neutral-400">{totalOpportunities} total opportunities</p>
+          <h3 className="text-sm font-medium text-neutral-900">Opportunity Flow</h3>
+          <p className="text-[10px] text-neutral-400 tabular-nums">{totalOpportunities} total opportunities</p>
         </div>
       </div>
 
@@ -156,7 +156,7 @@ function OpportunityProgressChart({
                 style={{ width: `${wonPercent}%` }}
                 title={`Won: ${wonCount}`}
               >
-                {wonPercent >= 12 && <span className="text-[9px] font-bold text-white">{wonCount}</span>}
+                {wonPercent >= 12 && <span className="text-[9px] font-semibold tabular-nums text-white">{wonCount}</span>}
               </div>
             )}
             {pitchedPercent > 0 && (
@@ -165,7 +165,7 @@ function OpportunityProgressChart({
                 style={{ width: `${pitchedPercent}%` }}
                 title={`Pitched: ${pitchedCount}`}
               >
-                {pitchedPercent >= 12 && <span className="text-[9px] font-bold text-white">{pitchedCount}</span>}
+                {pitchedPercent >= 12 && <span className="text-[9px] font-semibold tabular-nums text-white">{pitchedCount}</span>}
               </div>
             )}
             {lostPercent > 0 && (
@@ -174,7 +174,7 @@ function OpportunityProgressChart({
                 style={{ width: `${lostPercent}%` }}
                 title={`Lost: ${lostCount}`}
               >
-                {lostPercent >= 12 && <span className="text-[9px] font-bold text-white">{lostCount}</span>}
+                {lostPercent >= 12 && <span className="text-[9px] font-semibold tabular-nums text-white">{lostCount}</span>}
               </div>
             )}
           </div>
@@ -196,7 +196,7 @@ function OpportunityProgressChart({
           </div>
 
           <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-center gap-1">
-            <span className="text-lg font-bold text-sky-600">{activeOpportunities}</span>
+            <span className="text-lg font-semibold tabular-nums text-neutral-900">{activeOpportunities}</span>
             <span className="text-xs text-neutral-500">active opportunities</span>
           </div>
         </>
@@ -260,14 +260,14 @@ function PipelineConfidence({
   }
 
   return (
-    <div className="p-4 md:p-5 rounded-xl bg-white border border-neutral-200 shadow-sm">
+    <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-teal-50">
-            <TrendingUp className="w-4 h-4 text-teal-600" />
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+            <TrendingUp className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-neutral-900">Pipeline Confidence</h3>
+            <h3 className="text-sm font-medium text-neutral-900">Pipeline Confidence</h3>
             <p className="text-[10px] text-neutral-500">Click to view deals by confidence</p>
           </div>
         </div>
@@ -289,9 +289,9 @@ function PipelineConfidence({
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-right">
-                  <span className="text-xs font-semibold text-neutral-900">{doc.count} deals</span>
+                  <span className="text-xs font-medium tabular-nums text-neutral-900">{doc.count} deals</span>
                   {doc.amount > 0 && (
-                    <span className="text-xs text-neutral-400 ml-1">• {formatCurrency(doc.amount, true)}</span>
+                    <span className="text-xs tabular-nums text-neutral-400 ml-1">• {formatCurrency(doc.amount, true)}</span>
                   )}
                 </div>
                 {doc.count > 0 && (
@@ -332,7 +332,7 @@ function PipelineConfidence({
         <div className="mt-4 pt-4 border-t border-neutral-100">
           <div className="flex items-center justify-between">
             <span className="text-xs text-neutral-500">Expected Close Value</span>
-            <span className="text-sm font-bold text-teal-600">{formatCurrency(expectedValue, true)}</span>
+            <span className="text-sm font-semibold tabular-nums text-neutral-900">{formatCurrency(expectedValue, true)}</span>
           </div>
           <p className="text-[10px] text-neutral-400 mt-1">Based on {totalActive} active opportunities × confidence %</p>
         </div>
@@ -362,15 +362,15 @@ function DispositionSummary({ clients }: { clients: Client[] }) {
       {DISPOSITION_OPTIONS.map(opt => (
         <div
           key={opt.value}
-          className="p-3 rounded-lg border border-neutral-200 bg-white hover:shadow-sm transition-shadow"
+          className="p-3 rounded-lg ring-1 ring-neutral-200/70 bg-white transition-shadow hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]"
         >
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: opt.color }} />
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: opt.color }} />
             <span className="text-xs font-medium text-neutral-600">{opt.label}</span>
           </div>
-          <p className="text-xl font-bold text-neutral-900">{counts[opt.value].count}</p>
+          <p className="text-xl font-semibold tabular-nums text-neutral-900">{counts[opt.value].count}</p>
           {counts[opt.value].value > 0 && (
-            <p className="text-xs text-neutral-400">{formatCurrency(counts[opt.value].value, true)}</p>
+            <p className="text-xs tabular-nums text-neutral-400">{formatCurrency(counts[opt.value].value, true)}</p>
           )}
         </div>
       ))}
@@ -441,28 +441,28 @@ function ActiveOpportunitiesList({
   })
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden">
       <div className="p-4 border-b border-neutral-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-neutral-500" />
-            <h3 className="text-sm font-semibold text-neutral-900">Active Opportunities</h3>
-            <span className="text-xs text-neutral-400">({activeOpportunities.length})</span>
+            <h3 className="text-sm font-medium text-neutral-900">Active Opportunities</h3>
+            <span className="text-xs tabular-nums text-neutral-400">({activeOpportunities.length})</span>
           </div>
           <button
             onClick={() => {
               onViewAll()
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            className="text-xs font-medium text-neutral-600 hover:text-neutral-950 flex items-center gap-1 transition-colors"
           >
-            View All
-            <ChevronRight className="w-3 h-3" />
+            View all
+            <ArrowUpRight className="w-3 h-3" />
           </button>
         </div>
       </div>
 
-      <div className="divide-y divide-neutral-100 max-h-[400px] overflow-y-auto">
+      <div className="divide-y divide-neutral-100 max-h-[60dvh] sm:max-h-[400px] overflow-y-auto">
         {activeOpportunities.length === 0 ? (
           <div className="p-6 text-center text-sm text-neutral-400">
             No active opportunities. Add clients as opportunities to track them here.
@@ -479,7 +479,7 @@ function ActiveOpportunitiesList({
                 <div className="flex-1 min-w-0 space-y-1.5">
                   {/* Title row */}
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold text-neutral-900 truncate">{item.title}</h4>
+                    <h4 className="text-sm font-medium text-neutral-900 truncate">{item.title}</h4>
                     {item.brand && (
                       <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-neutral-100 text-neutral-600">
                         {item.brand}
@@ -496,29 +496,28 @@ function ActiveOpportunitiesList({
                     )}
                     {item.contactName && <span>{item.contactName}</span>}
                   </p>
-                  {/* Due date row with emphasis */}
+                  {/* Due date row */}
                   {item.followUpDate && (
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                      <span className="text-xs font-medium text-amber-600">
-                        Follow-up: {formatDate(item.followUpDate)}
+                      <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                      <span className="text-xs font-medium tabular-nums text-neutral-600">
+                        Follow-up · {formatDate(item.followUpDate)}
                       </span>
                     </div>
                   )}
                 </div>
-                {/* Right side - Status and value */}
+                {/* Right side - Status and value (mono pill + colored dot) */}
                 <div className="shrink-0 text-right space-y-1">
-                  <span
-                    className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full"
-                    style={{
-                      backgroundColor: `${item.dispositionColor}15`,
-                      color: item.dispositionColor,
-                    }}
-                  >
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
+                    <span
+                      className="inline-block h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: item.dispositionColor }}
+                      aria-hidden="true"
+                    />
                     {item.disposition}
                   </span>
                   {item.value !== undefined && item.value > 0 && (
-                    <p className="text-sm font-bold text-neutral-900">{formatCurrency(item.value, true)}</p>
+                    <p className="text-sm font-semibold tabular-nums text-neutral-900">{formatCurrency(item.value, true)}</p>
                   )}
                 </div>
               </div>
@@ -563,17 +562,18 @@ function RecentClientsList({
     .slice(0, isSearching ? 15 : 5)
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden">
       <div className="p-4 border-b border-neutral-100">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-neutral-500" />
-            <h3 className="text-sm font-semibold text-neutral-900">Recent Clients</h3>
+            <h3 className="text-sm font-medium text-neutral-900">Recent Clients</h3>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onAdd}
-              className="p-1.5 rounded-lg hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700"
+              aria-label="Add client"
+              className="grid place-items-center h-8 w-8 rounded-md hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -582,10 +582,10 @@ function RecentClientsList({
                 onViewAll()
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
-              className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              className="text-xs font-medium text-neutral-600 hover:text-neutral-950 flex items-center gap-1 transition-colors"
             >
-              View All
-              <ChevronRight className="w-3 h-3" />
+              View all
+              <ArrowUpRight className="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -603,7 +603,7 @@ function RecentClientsList({
         </div>
       </div>
 
-      <div className="divide-y divide-neutral-100 max-h-[300px] overflow-y-auto">
+      <div className="divide-y divide-neutral-100 max-h-[60dvh] sm:max-h-[300px] overflow-y-auto">
         {recentClients.length === 0 ? (
           <div className="p-6 text-center text-sm text-neutral-400">
             {searchQuery.trim() 
@@ -774,22 +774,22 @@ function TaskSummaryCard({
   )
 
   return (
-    <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden">
       <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-neutral-500" />
-          <h3 className="text-sm font-semibold text-neutral-900">Task Summary</h3>
-          <span className="text-xs text-neutral-400">({tasks.filter(t => t.status !== "completed").length} pending)</span>
+          <h3 className="text-sm font-medium text-neutral-900">Task Summary</h3>
+          <span className="text-xs tabular-nums text-neutral-400">({tasks.filter(t => t.status !== "completed").length} pending)</span>
         </div>
         <button
           onClick={() => {
             onViewAll()
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
-          className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+          className="text-xs font-medium text-neutral-600 hover:text-neutral-950 flex items-center gap-1 transition-colors"
         >
-          View All
-          <ChevronRight className="w-3 h-3" />
+          View all
+          <ArrowUpRight className="w-3 h-3" />
         </button>
       </div>
 
@@ -800,13 +800,16 @@ function TaskSummaryCard({
           className="w-full p-3 hover:bg-neutral-50 transition-colors flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-50">
-              <Calendar className="w-4 h-4 text-blue-500" />
+            <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+              <Calendar className="w-4 h-4" />
             </div>
-            <span className="text-sm font-medium text-neutral-700">Due Today</span>
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+              Due Today
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-neutral-900">{tasksDueToday.length}</span>
+            <span className="text-lg font-semibold tabular-nums text-neutral-900">{tasksDueToday.length}</span>
             <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSection === "today" ? "rotate-180" : ""}`} />
           </div>
         </button>
@@ -815,16 +818,19 @@ function TaskSummaryCard({
         {/* Overdue */}
         <button
           onClick={() => toggleSection("overdue")}
-          className="w-full p-3 hover:bg-red-50/50 transition-colors flex items-center justify-between border-t border-neutral-100"
+          className="w-full p-3 hover:bg-neutral-50 transition-colors flex items-center justify-between border-t border-neutral-100"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-50">
-              <AlertCircle className="w-4 h-4 text-red-500" />
+            <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+              <AlertCircle className="w-4 h-4" />
             </div>
-            <span className="text-sm font-medium text-neutral-700">Overdue</span>
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true" />
+              Overdue
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-red-600">{tasksOverdue.length}</span>
+            <span className={`text-lg font-semibold tabular-nums ${tasksOverdue.length > 0 ? "text-red-600" : "text-neutral-900"}`}>{tasksOverdue.length}</span>
             <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSection === "overdue" ? "rotate-180" : ""}`} />
           </div>
         </button>
@@ -836,13 +842,16 @@ function TaskSummaryCard({
           className="w-full p-3 hover:bg-neutral-50 transition-colors flex items-center justify-between border-t border-neutral-100"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-50">
-              <Clock className="w-4 h-4 text-amber-500" />
+            <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+              <Clock className="w-4 h-4" />
             </div>
-            <span className="text-sm font-medium text-neutral-700">In Progress</span>
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+              In Progress
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-neutral-900">{tasksInProgress.length}</span>
+            <span className="text-lg font-semibold tabular-nums text-neutral-900">{tasksInProgress.length}</span>
             <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSection === "inProgress" ? "rotate-180" : ""}`} />
           </div>
         </button>
@@ -917,15 +926,6 @@ export function DashboardView({
   // Find opportunities in Closed Won that are NOT at 100% DOC (exceptions)
   const closedWonExceptions = opportunityClients
     .filter(c => c.disposition === "closed_won" && c.doc !== "100")
-
-  // Debug: Log opportunity data from clients
-  console.log("=== Dashboard Budget Debug (using clients.is_opportunity) ===")
-  console.log("Total clients:", clients.length)
-  console.log("Opportunity clients:", opportunityClients.length)
-  console.log("Closed Won at 100% DOC:", closedWon100DocRevenue)
-  console.log("Pitched at 90% DOC:", pitched90DocValue)
-  console.log("Closed Won Exceptions (not 100% DOC):", closedWonExceptions.length)
-  console.log("============================================================")
 
   return (
     <div className="space-y-6 md:space-y-8">

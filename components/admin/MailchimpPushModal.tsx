@@ -174,31 +174,40 @@ export function MailchimpPushModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40"
       onClick={handleClose}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white shadow-2xl w-full sm:max-w-md max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col rounded-t-xl sm:rounded-xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Push to Mailchimp"
       >
+        {/* Mobile drag handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-1 shrink-0" aria-hidden="true">
+          <div className="h-1 w-10 rounded-full bg-neutral-300" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-neutral-100">
-          <Mail className="w-4 h-4 text-emerald-600" />
+        <div className="flex items-center gap-2 px-4 sm:px-5 py-3 sm:py-4 border-b border-neutral-100">
+          <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
           <h2 className="text-sm font-semibold text-neutral-900">Push to Mailchimp</h2>
-          <span className="text-[11px] text-neutral-500 ml-1">
+          <span className="text-[11px] text-neutral-500 ml-1 truncate">
             {members.length} {members.length === 1 ? "member" : "members"}
           </span>
           <button
             type="button"
             onClick={handleClose}
             disabled={isPushing}
-            className="ml-auto text-neutral-400 hover:text-neutral-700 disabled:opacity-50"
+            aria-label="Close"
+            className="ml-auto grid place-items-center h-9 w-9 sm:h-8 sm:w-8 -mr-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 pb-[max(env(safe-area-inset-bottom),1rem)]">
           {result ? (
             // ============ Result view ============
             <div className="space-y-3">

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import {
-  Loader2,
   BarChart3,
   Target,
   Users,
@@ -45,6 +44,102 @@ import { useTaskHandlers, EMPTY_TASK_FORM } from "@/hooks/useTaskHandlers"
 import type { TaskFormData } from "@/hooks/useTaskHandlers"
 import { useClientHandlers, EMPTY_CLIENT_FORM, EMPTY_OPPORTUNITY_FORM } from "@/hooks/useClientHandlers"
 import type { ClientFormData, OpportunityFormData } from "@/hooks/useClientHandlers"
+
+/**
+ * Skeleton that mirrors the live DashboardView's KPI grid + 70/30 column layout.
+ * Used for the initial route-level load AND the secondary dashboard-data load
+ * so the page never blanks or flashes a spinner.
+ */
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 md:space-y-8 animate-pulse" aria-busy="true" aria-label="Loading dashboard">
+      {/* KPI row — 5 tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+        {[...Array(5)].map((_, i) => (
+          <div
+            key={i}
+            className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="h-9 w-9 rounded-md bg-neutral-200/80" />
+              <div className="h-3 w-10 rounded bg-neutral-200/70" />
+            </div>
+            <div className="h-2.5 w-20 rounded bg-neutral-200/70 mb-2" />
+            <div className="h-7 w-24 rounded bg-neutral-200/80" />
+          </div>
+        ))}
+      </div>
+
+      {/* Main grid — 2fr/1fr like the real layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        {/* Left column */}
+        <div className="space-y-6">
+          {/* Active opportunities list */}
+          <div className="rounded-lg bg-white ring-1 ring-neutral-200/70 overflow-hidden">
+            <div className="p-4 border-b border-neutral-100">
+              <div className="h-4 w-40 rounded bg-neutral-200/70" />
+            </div>
+            <div className="divide-y divide-neutral-100">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="h-4 w-2/3 rounded bg-neutral-200/70" />
+                    <div className="h-5 w-16 rounded-full bg-neutral-200/70" />
+                  </div>
+                  <div className="h-3 w-1/3 rounded bg-neutral-200/60" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Task summary */}
+          <div className="rounded-lg bg-white ring-1 ring-neutral-200/70 overflow-hidden">
+            <div className="p-4 border-b border-neutral-100">
+              <div className="h-4 w-32 rounded bg-neutral-200/70" />
+            </div>
+            <div>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="p-3 flex items-center justify-between border-t first:border-t-0 border-neutral-100">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-md bg-neutral-200/80" />
+                    <div className="h-3 w-24 rounded bg-neutral-200/70" />
+                  </div>
+                  <div className="h-5 w-8 rounded bg-neutral-200/70" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-6">
+          <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-9 w-9 rounded-md bg-neutral-200/80" />
+              <div className="h-4 w-36 rounded bg-neutral-200/70" />
+            </div>
+            <div className="space-y-1.5">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-10 rounded-md bg-neutral-100" />
+              ))}
+            </div>
+          </div>
+          <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70 space-y-3">
+            <div className="h-4 w-32 rounded bg-neutral-200/70" />
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="h-3 w-20 rounded bg-neutral-200/60" />
+                  <div className="h-3 w-12 rounded bg-neutral-200/60" />
+                </div>
+                <div className="h-2 rounded bg-neutral-100" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function SalesCRMPage() {
   // State
@@ -733,10 +828,19 @@ export default function SalesCRMPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-neutral-700">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span className="font-medium">Loading CRM...</span>
+      <div className="min-h-full bg-neutral-50 text-neutral-900">
+        {/* Skeleton tab strip — same shape as the live nav so the page doesn't reflow on hydration */}
+        <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-neutral-200/70">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex gap-2 py-3" aria-hidden="true">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-7 w-24 rounded-md bg-neutral-200/70 animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <DashboardSkeleton />
         </div>
       </div>
     )
@@ -747,35 +851,44 @@ export default function SalesCRMPage() {
       {/* Toast */}
       <Toast toast={toast} />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-8 border-b border-neutral-200 pb-4">
-          {[
-            { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
-            { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
-            { id: "clients", label: "Clients", icon: Users, badge: null },
-            { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
-            { id: "social-calendar", label: "Social Calendar", icon: Calendar, badge: null },
-          ].map(({ id, label, icon: Icon, badge }) => (
-            <button
-              key={id}
-              onClick={() => setViewMode(id as ViewMode)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                viewMode === id
-                  ? "bg-neutral-900 text-white shadow-sm"
-                  : "bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-              {badge && (
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 border border-amber-200">
-                  {badge}
-                </span>
-              )}
-            </button>
-          ))}
+      {/* Sticky tab nav — Linear/Vercel pattern. Stays in view as content scrolls. */}
+      <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-neutral-200/70">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <nav
+            className="flex gap-1 -mb-px overflow-x-auto py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="CRM views"
+          >
+            {[
+              { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
+              { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
+              { id: "clients", label: "Clients", icon: Users, badge: null },
+              { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
+              { id: "social-calendar", label: "Social Calendar", icon: Calendar, badge: null },
+            ].map(({ id, label, icon: Icon, badge }) => (
+              <button
+                key={id}
+                onClick={() => setViewMode(id as ViewMode)}
+                aria-current={viewMode === id ? "page" : undefined}
+                className={`shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                  viewMode === id
+                    ? "bg-neutral-900 text-white"
+                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+                {badge && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 tabular-nums">
+                    {badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* Error State */}
         {error && (
@@ -803,14 +916,9 @@ export default function SalesCRMPage() {
           />
         )}
 
-        {/* Dashboard loading state */}
+        {/* Dashboard loading state — skeleton, not a spinner */}
         {viewMode === "dashboard" && (!stats || !isClientsLoaded) && !isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center gap-3 text-neutral-500">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Loading dashboard data...</span>
-            </div>
-          </div>
+          <DashboardSkeleton />
         )}
 
         {/* Opportunities Kanban View */}

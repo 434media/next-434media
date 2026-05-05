@@ -165,25 +165,27 @@ export default function EmailListsPage() {
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
       <div className="min-dvh bg-neutral-50 text-neutral-900">
-        {/* Toast */}
+        {/* Toast — pinned to top edge on mobile, top-right on sm+ */}
         {toast && (
-          <div className="fixed top-20 right-4 z-50 animate-in fade-in slide-in-from-top-2">
+          <div className="fixed top-[max(env(safe-area-inset-top),0.75rem)] inset-x-3 sm:inset-x-auto sm:top-20 sm:right-4 z-50 animate-in fade-in slide-in-from-top-2 flex justify-center sm:block">
             <div
-              className={`flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
+              role="status"
+              className={`flex items-start gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium w-full sm:w-auto sm:max-w-sm ${
                 toast.type === "success"
                   ? "bg-green-600 text-white"
                   : "bg-red-600 text-white"
               }`}
             >
               {toast.type === "success" ? (
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
               ) : (
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               )}
-              <span>{toast.message}</span>
+              <span className="flex-1 break-words">{toast.message}</span>
               <button
                 onClick={() => setToast(null)}
-                className="ml-2 hover:opacity-80 text-lg leading-none"
+                aria-label="Dismiss notification"
+                className="-mr-1 -mt-1 grid h-7 w-7 place-items-center rounded-full hover:bg-white/15 text-lg leading-none shrink-0"
               >
                 ×
               </button>
@@ -206,11 +208,15 @@ export default function EmailListsPage() {
               </div>
             </div>
 
-            {/* Tab Navigation */}
-            <nav className="flex gap-0 -mb-px">
+            {/* Tab Navigation — horizontal scroll on overflow so all 4 tabs are reachable on narrow phones */}
+            <nav
+              className="flex gap-0 -mb-px overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              aria-label="Submission categories"
+            >
               <button
                 onClick={() => switchTab("inbox")}
-                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                aria-current={activeTab === "inbox" ? "page" : undefined}
+                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
                   activeTab === "inbox"
                     ? "text-neutral-900"
                     : "text-neutral-400 hover:text-neutral-600"
@@ -226,7 +232,8 @@ export default function EmailListsPage() {
               </button>
               <button
                 onClick={() => switchTab("contact-forms")}
-                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                aria-current={activeTab === "contact-forms" ? "page" : undefined}
+                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
                   activeTab === "contact-forms"
                     ? "text-neutral-900"
                     : "text-neutral-400 hover:text-neutral-600"
@@ -234,7 +241,8 @@ export default function EmailListsPage() {
               >
                 <span className="flex items-center gap-2">
                   <MessageSquare className="w-3.5 h-3.5" />
-                  Contact Forms
+                  <span className="hidden xs:inline sm:inline">Contact Forms</span>
+                  <span className="xs:hidden sm:hidden">Forms</span>
                 </span>
                 {activeTab === "contact-forms" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
@@ -242,7 +250,8 @@ export default function EmailListsPage() {
               </button>
               <button
                 onClick={() => switchTab("events")}
-                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                aria-current={activeTab === "events" ? "page" : undefined}
+                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
                   activeTab === "events"
                     ? "text-neutral-900"
                     : "text-neutral-400 hover:text-neutral-600"
@@ -258,7 +267,8 @@ export default function EmailListsPage() {
               </button>
               <button
                 onClick={() => switchTab("emails")}
-                className={`relative px-4 py-3 text-[13px] font-semibold tracking-wide transition-colors ${
+                aria-current={activeTab === "emails" ? "page" : undefined}
+                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
                   activeTab === "emails"
                     ? "text-neutral-900"
                     : "text-neutral-400 hover:text-neutral-600"
@@ -266,7 +276,8 @@ export default function EmailListsPage() {
               >
                 <span className="flex items-center gap-2">
                   <Mail className="w-3.5 h-3.5" />
-                  Email Lists
+                  <span className="hidden sm:inline">Email Lists</span>
+                  <span className="sm:hidden">Emails</span>
                 </span>
                 {activeTab === "emails" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
@@ -1007,7 +1018,8 @@ function EmailListsTab({
                     <button
                       onClick={() => handleDeleteEmail(signup.id, signup.email)}
                       disabled={isDeleting === signup.id}
-                      className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                      aria-label={`Delete ${signup.email}`}
+                      className="grid place-items-center h-10 w-10 sm:h-9 sm:w-9 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 shrink-0"
                     >
                       {isDeleting === signup.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1792,14 +1804,16 @@ function ContactFormsTab({
                       />
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub) }}
-                        className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                        aria-label={`View ${sub.email}`}
+                        className="grid place-items-center h-10 w-10 sm:h-9 sm:w-9 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(sub.id, sub.email) }}
                         disabled={isDeleting === sub.id}
-                        className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        aria-label={`Delete ${sub.email}`}
+                        className="grid place-items-center h-10 w-10 sm:h-9 sm:w-9 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       >
                         {isDeleting === sub.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1931,6 +1945,7 @@ function ContactFormsTab({
                               e.stopPropagation()
                               setSelectedSubmission(sub)
                             }}
+                            aria-label={`View details for ${sub.email}`}
                             className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
                             title="View details"
                           >
@@ -1942,6 +1957,7 @@ function ContactFormsTab({
                               handleDelete(sub.id, sub.email)
                             }}
                             disabled={isDeleting === sub.id}
+                            aria-label={`Delete ${sub.email}`}
                             className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title={`Delete ${sub.email}`}
                           >
@@ -2794,14 +2810,16 @@ function EventRegistrationsTab({
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedRegistration(reg) }}
-                        className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                        aria-label={`View ${reg.email}`}
+                        className="grid place-items-center h-10 w-10 sm:h-9 sm:w-9 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(reg.id!, reg.email) }}
                         disabled={isDeleting === reg.id}
-                        className="p-1.5 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        aria-label={`Delete ${reg.email}`}
+                        className="grid place-items-center h-10 w-10 sm:h-9 sm:w-9 text-neutral-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       >
                         {isDeleting === reg.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -3346,12 +3364,12 @@ function DatePresetChips({
 
       {/* Custom range inputs — only render when "Custom" is active. */}
       {customActive && (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           <input
             type="date"
             value={startDate}
             onChange={(e) => onCustomChange(e.target.value, endDate)}
-            className="px-2.5 py-1 text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
+            className="flex-1 min-w-[10rem] px-2.5 py-2 sm:py-1 text-[13px] sm:text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
             aria-label="Start date"
           />
           <span className="text-[12px] text-neutral-400">to</span>
@@ -3359,7 +3377,7 @@ function DatePresetChips({
             type="date"
             value={endDate}
             onChange={(e) => onCustomChange(startDate, e.target.value)}
-            className="px-2.5 py-1 text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
+            className="flex-1 min-w-[10rem] px-2.5 py-2 sm:py-1 text-[13px] sm:text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
             aria-label="End date"
           />
         </div>

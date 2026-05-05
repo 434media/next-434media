@@ -123,7 +123,7 @@ export function DetailDrawer({
             aria-hidden="true"
           />
 
-          {/* Panel */}
+          {/* Panel — full-width on mobile, constrained slide-over on md+ */}
           <motion.div
             ref={panelRef}
             tabIndex={-1}
@@ -134,7 +134,7 @@ export function DetailDrawer({
             className={`relative ml-auto h-full w-full ${WIDTH_CLASSES[width]} bg-white shadow-2xl flex flex-col outline-none`}
           >
             {/* Sticky header */}
-            <header className="shrink-0 flex items-start justify-between gap-3 px-5 py-4 border-b border-neutral-200 bg-white">
+            <header className="shrink-0 flex items-start justify-between gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-neutral-200 bg-white">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <h2 className="text-base font-semibold text-neutral-900 truncate">{title}</h2>
@@ -148,18 +148,18 @@ export function DetailDrawer({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="shrink-0 p-1.5 -mr-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
+                className="shrink-0 grid place-items-center h-9 w-9 sm:h-8 sm:w-8 -mr-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
               >
                 <X className="w-4 h-4" />
               </button>
             </header>
 
             {/* Scrollable body */}
-            <div className="flex-1 overflow-y-auto">{children}</div>
+            <div className="flex-1 overflow-y-auto overscroll-contain">{children}</div>
 
             {/* Sticky footer */}
             {footer && (
-              <footer className="shrink-0 px-5 py-3 border-t border-neutral-200 bg-white">
+              <footer className="shrink-0 px-4 sm:px-5 py-3 border-t border-neutral-200 bg-white pb-[max(env(safe-area-inset-bottom),0.75rem)]">
                 {footer}
               </footer>
             )}
