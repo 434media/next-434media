@@ -14,6 +14,8 @@ import { Loader2, Send, Calendar, FileText, Link as LinkIcon, Users, Tag, Image 
 import { RichTextEditor } from "@/components/RichTextEditor"
 import { ImageUpload } from "@/components/ImageUpload"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { FeedPrePublishChecklist } from "@/components/admin/FeedPrePublishChecklist"
+import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
 
 // Configure marked for consistent rendering with production
 const previewMarked = new Marked({ 
@@ -45,55 +47,37 @@ function CollapsibleSection({
   children
 }: CollapsibleSectionProps) {
   return (
-    <div className={`border-2 rounded-xl overflow-hidden transition-all duration-200 ${
-      isOpen 
-        ? 'border-sky-400 shadow-lg shadow-sky-100/50 bg-white' 
-        : isComplete 
-          ? 'border-green-300 bg-green-50/30 hover:border-green-400' 
-          : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'
-    }`}>
+    <div
+      className={`bg-white rounded-md ring-1 overflow-hidden transition-colors ${
+        isOpen ? "ring-neutral-900/40" : "ring-neutral-200/70 hover:ring-neutral-300"
+      }`}
+    >
       <button
         type="button"
         onClick={onToggle}
-        className="w-full px-5 py-4 flex items-center justify-between text-left transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between text-left transition-colors"
       >
-        <div className="flex items-center gap-4">
-          <div className={`p-2.5 rounded-xl transition-all ${
-            isOpen 
-              ? 'bg-sky-100 text-sky-600 shadow-sm' 
-              : isComplete 
-                ? 'bg-green-100 text-green-600' 
-                : 'bg-neutral-100 text-neutral-500'
-          }`}>
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
             {icon}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className={`text-base font-bold tracking-tight ${
-                isOpen ? 'text-sky-900' : isComplete ? 'text-green-800' : 'text-neutral-900'
-              }`}>
-                {title}
-              </h3>
-            </div>
-            <p className="text-sm text-neutral-500 mt-0.5 leading-relaxed">{description}</p>
+            <h3 className="text-sm font-medium text-neutral-900">{title}</h3>
+            <p className="text-xs text-neutral-500 mt-0.5">{description}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isComplete && !isOpen && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-              <CheckCircle2 className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium uppercase tracking-[0.16em]">
+              <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
               Complete
             </span>
           )}
-          <div className={`p-1.5 rounded-full transition-all ${
-            isOpen ? 'bg-sky-100 rotate-0' : 'bg-neutral-100'
-          }`}>
-            {isOpen ? (
-              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'text-sky-600' : 'text-neutral-400'}`} />
-            ) : (
-              <ChevronRight className={`h-5 w-5 ${isComplete ? 'text-green-500' : 'text-neutral-400'}`} />
-            )}
-          </div>
+          {isOpen ? (
+            <ChevronDown className="h-4 w-4 text-neutral-400" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-neutral-400" />
+          )}
         </div>
       </button>
       <AnimatePresence initial={false}>
@@ -104,9 +88,7 @@ function CollapsibleSection({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
           >
-            <div className="px-5 pb-6 pt-3 border-t border-sky-100 bg-linear-to-b from-sky-50/30 to-transparent">
-              {children}
-            </div>
+            <div className="px-4 pb-5 pt-3 border-t border-neutral-100">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -718,6 +700,35 @@ export default function FeedFormPage() {
       return dateB - dateA
     })
 
+  // Keyboard shortcuts — only active in create/edit tab.
+  // ⌘S saves (always); ⌘↩ publishes (sets status then saves); ⌘P opens preview
+  // in a new tab (requires editingId — preview reads from saved data); Esc
+  // cancels back to view.
+  useFeedFormShortcuts({
+    enabled: activeTab === "create",
+    onSave: () => {
+      if (isSubmitting) return
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+    },
+    onPublish: () => {
+      if (isSubmitting) return
+      setFormData((prev) => ({ ...prev, status: "published" }))
+      // Defer one tick so the status flip lands before submit
+      setTimeout(() => handleSubmit({ preventDefault: () => {} } as React.FormEvent), 0)
+    },
+    onPreview: () => {
+      if (editingId) {
+        window.open(`/admin/feed-form/preview/${editingId}`, "_blank", "noopener,noreferrer")
+      } else {
+        setToast({ message: "Save the item first to preview it", type: "error" })
+      }
+    },
+    onCancel: () => {
+      if (editingId) handleCancelEdit()
+      setActiveTab("view")
+    },
+  })
+
   const handleInputChange = (field: keyof FeedFormData, value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -1158,151 +1169,137 @@ export default function FeedFormPage() {
       <Toast toast={toast} />
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
-        <div className="mb-8">
-          <div className="">
-            <h1 className="max-w-3xl uppercase text-5xl md:text-6xl mb-3 font-black md:font-menda-black tracking-tight">
-              The Feed
-            </h1>
-            <p className="max-w-xl text-lg text-neutral-600 mb-6">
-              Manage and schedule content for <span className="font-semibold text-neutral-900">Digital Canvas</span>.
+        <div className="mb-6 flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900">The Feed</h1>
+            <p className="text-sm text-neutral-500 mt-1">
+              Content management for{" "}
+              <span className="font-medium text-neutral-700">digitalcanvas.community/thefeed</span>
             </p>
-            
-            {/* Header Bar */}
-            <div className="rounded-xl p-6 shadow-lg bg-linear-to-r from-black to-sky-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-white text-lg font-bold">The Feed — Digital Canvas</h2>
-                  <p className="text-white/80 text-sm mt-1">Content feed management</p>
-                </div>
-                <Button 
-                  onClick={loadFeedItems} 
-                  variant="outline" 
-                  disabled={isLoading} 
-                  size="sm"
-                  className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
           </div>
+          <button
+            onClick={loadFeedItems}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
 
         {/* Filter Tags - Only show when viewing */}
         {activeTab === "view" && (
-            <div className="bg-white border border-neutral-200 rounded-lg p-4 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Status Filter */}
-                <div>
-                  <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-wide">Status</label>
-                  <div className="flex flex-wrap gap-2">
-                    {["all", "draft", "published", "archived"].map((status) => (
+          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Status Filter */}
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                  Status
+                </p>
+                <div className="inline-flex h-8 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
+                  {["all", "draft", "published", "archived"].map((status) => {
+                    const isActive = filterStatus === status
+                    return (
                       <button
                         key={status}
                         onClick={() => setFilterStatus(status)}
-                        className={`px-3 py-1 text-xs font-semibold transition-all ${
-                          filterStatus === status
-                            ? status === "published"
-                              ? "bg-green-600 text-white shadow-sm"
-                              : status === "draft"
-                              ? "bg-yellow-500 text-white shadow-sm"
-                              : status === "archived"
-                              ? "bg-neutral-600 text-white shadow-sm"
-                              : "bg-sky-600 text-white shadow-sm"
-                            : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                        className={`inline-flex items-center px-3 text-xs font-medium whitespace-nowrap transition-colors ${
+                          isActive
+                            ? "bg-neutral-900 text-white"
+                            : "bg-white text-neutral-700 hover:bg-neutral-50"
                         }`}
                       >
                         {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
                       </button>
-                    ))}
-                  </div>
+                    )
+                  })}
                 </div>
+              </div>
 
-                {/* Type Filter */}
-                <div>
-                  <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-wide">Type</label>
-                  <div className="flex flex-wrap gap-2">
-                    {["all", "newsletter", "video", "article", "podcast"].map((type) => (
+              {/* Type Filter */}
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                  Type
+                </p>
+                <div className="inline-flex h-8 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
+                  {["all", "newsletter", "video", "article", "podcast"].map((type) => {
+                    const isActive = filterType === type
+                    return (
                       <button
                         key={type}
                         onClick={() => setFilterType(type)}
-                        className={`px-3 py-1 text-xs font-semibold transition-all ${
-                          filterType === type
-                            ? type === "newsletter"
-                              ? "bg-orange-600 text-white shadow-sm"
-                              : type === "video"
-                              ? "bg-sky-600 text-white shadow-sm"
-                              : type === "article"
-                              ? "bg-sky-600 text-white shadow-sm"
-                              : type === "podcast"
-                              ? "bg-pink-600 text-white shadow-sm"
-                              : "bg-neutral-900 text-white shadow-sm"
-                            : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                        className={`inline-flex items-center px-3 text-xs font-medium whitespace-nowrap transition-colors ${
+                          isActive
+                            ? "bg-neutral-900 text-white"
+                            : "bg-white text-neutral-700 hover:bg-neutral-50"
                         }`}
                       >
                         {type === "all" ? "All" : type.charAt(0).toUpperCase() + type.slice(1)}
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Date Range */}
-                <div>
-                  <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-wide">Date Range</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={dateFilter.start}
-                      onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-sky-500 focus:border-transparent"
-                    />
-                    <input
-                      type="date"
-                      value={dateFilter.end}
-                      onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
-                      className="flex-1 px-2 py-1 border border-neutral-300 text-xs focus:ring-1 focus:ring-sky-500 focus:border-transparent"
-                    />
-                  </div>
-                  {(dateFilter.start || dateFilter.end) && (
-                    <button
-                      onClick={() => setDateFilter({ start: "", end: "" })}
-                      className="text-xs text-sky-600 hover:text-sky-700 mt-1 font-medium"
-                    >
-                      Clear dates
-                    </button>
-                  )}
+                    )
+                  })}
                 </div>
               </div>
-              
-              {/* Active Filter Summary */}
-              {(filterStatus !== "all" || filterType !== "all" || dateFilter.start || dateFilter.end) && (
-                <div className="mt-3 pt-3 border-t border-neutral-200">
-                  <p className="text-xs text-neutral-600">
-                    Showing <span className="font-bold text-neutral-900">{filteredFeedItems.length}</span> of <span className="font-bold text-neutral-900">{feedItems.length}</span> feeds
-                  </p>
+
+              {/* Date Range */}
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                  Date range
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={dateFilter.start}
+                    onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
+                    className="flex-1 h-8 px-2 rounded-md ring-1 ring-neutral-200 bg-white text-xs text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                  />
+                  <input
+                    type="date"
+                    value={dateFilter.end}
+                    onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
+                    className="flex-1 h-8 px-2 rounded-md ring-1 ring-neutral-200 bg-white text-xs text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                  />
                 </div>
-              )}
+                {(dateFilter.start || dateFilter.end) && (
+                  <button
+                    onClick={() => setDateFilter({ start: "", end: "" })}
+                    className="text-[11px] text-neutral-700 hover:text-neutral-900 mt-1.5 font-medium"
+                  >
+                    Clear dates
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Active Filter Summary */}
+            {(filterStatus !== "all" || filterType !== "all" || dateFilter.start || dateFilter.end) && (
+              <div className="mt-3 pt-3 border-t border-neutral-100">
+                <p className="text-xs text-neutral-500 tabular-nums">
+                  Showing <span className="font-semibold text-neutral-900">{filteredFeedItems.length}</span>{" "}
+                  of <span className="font-semibold text-neutral-900">{feedItems.length}</span> feeds
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons - Below Filters */}
-        <div className="flex gap-2 py-3 mb-6">
+        <div className="flex gap-2 mb-4">
           <button
             onClick={() => setActiveTab("view")}
-            className={`flex-1 md:flex-initial px-6 py-3.5 text-base font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-              activeTab === "view" 
-                ? "bg-neutral-900 text-white shadow-lg shadow-neutral-900/25 scale-[1.02]" 
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
+            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "view"
+                ? "bg-neutral-900 text-white"
+                : "bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
             }`}
           >
-            <List className={`h-5 w-5 ${activeTab === "view" ? "text-white" : "text-neutral-500"}`} />
+            <List className="h-4 w-4" />
             <span>View Feeds</span>
-            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
-              activeTab === "view" 
-                ? "bg-white/20 text-white" 
-                : "bg-neutral-300 text-neutral-700"
-            }`}>
+            <span
+              className={`tabular-nums text-[10px] ${
+                activeTab === "view" ? "text-white/70" : "text-neutral-400"
+              }`}
+            >
               {feedItems.length}
             </span>
           </button>
@@ -1311,16 +1308,16 @@ export default function FeedFormPage() {
               setActiveTab("create")
               setEditingId(null)
             }}
-            className={`flex-1 md:flex-initial px-6 py-3.5 text-base font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
-              activeTab === "create" 
-                ? "bg-linear-to-r from-sky-600 to-sky-600 text-white shadow-lg shadow-sky-600/25 scale-[1.02]" 
-                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
+            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "create"
+                ? "bg-neutral-900 text-white"
+                : "bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
             }`}
           >
-            <FileText className={`h-5 w-5 ${activeTab === "create" ? "text-white" : "text-neutral-500"}`} />
+            <FileText className="h-4 w-4" />
             <span>{editingId ? "Edit Feed" : "Create New"}</span>
             {activeTab === "create" && (
-              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+              <span className="w-1 h-1 bg-white/70 rounded-full" aria-hidden="true" />
             )}
           </button>
         </div>
@@ -1348,30 +1345,35 @@ export default function FeedFormPage() {
                   </div>
                 ) : (
                   <>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {filteredFeedItems.map((item) => {
                       const displayImage = item.featured_post_image || item.hero_image_desktop || item.og_image
                       const isCommentOpen = !!(item.id && expandedFeedComments.has(item.id))
-                      
+                      const statusDot =
+                        item.status === "published"
+                          ? "bg-emerald-500"
+                          : item.status === "draft"
+                          ? "bg-amber-500"
+                          : "bg-neutral-400"
+
                       return (
                         <React.Fragment key={item.id}>
                         <div
-                          className={`bg-white border-2 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 group relative ${
+                          className={`bg-white rounded-md ring-1 overflow-hidden transition-[box-shadow,outline-color] ${
                             isCommentOpen
-                              ? "border-sky-400 shadow-lg shadow-sky-100/50 ring-2 ring-sky-200/50"
-                              : "border-neutral-200 hover:border-neutral-300"
-                          }`}
+                              ? "ring-neutral-900/40"
+                              : "ring-neutral-200/70 hover:ring-neutral-300 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]"
+                          } group relative`}
                         >
-                          {/* Image - Always show (with fallback) */}
-                          <div className="h-20 md:h-24 relative overflow-hidden bg-neutral-100">
+                          {/* Image */}
+                          <div className="aspect-video relative overflow-hidden bg-neutral-100">
                             {displayImage ? (
                               <img
                                 src={displayImage}
                                 alt={item.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  // Hide broken image and show fallback
-                                  e.currentTarget.style.display = 'none'
+                                  e.currentTarget.style.display = "none"
                                 }}
                               />
                             ) : (
@@ -1379,73 +1381,73 @@ export default function FeedFormPage() {
                                 <ImageIcon className="h-6 w-6 text-neutral-300" />
                               </div>
                             )}
-                            {/* Status indicator dot */}
-                            <div className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full shadow-sm ${
-                              item.status === "published" ? "bg-green-500" :
-                              item.status === "draft" ? "bg-amber-500" : "bg-neutral-400"
-                            }`} title={item.status} />
+                            {/* Status dot */}
+                            <span
+                              className={`absolute top-2 right-2 inline-block h-1.5 w-1.5 rounded-full ${statusDot}`}
+                              title={item.status}
+                              aria-hidden="true"
+                            />
                           </div>
-                          
+
                           {/* Content */}
                           <div className="p-3">
-                            {/* Header row */}
-                            <div className="flex items-center justify-between gap-1 mb-1.5">
-                              <span className={`text-[10px] font-bold uppercase tracking-wide ${
-                                item.type === "newsletter" ? "text-orange-600" :
-                                item.type === "video" ? "text-sky-600" :
-                                item.type === "article" ? "text-sky-600" :
-                                "text-pink-600"
-                              }`}>
-                                {item.type}
-                              </span>
-                            </div>
-                            
-                            {/* Title */}
-                            <h3 className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-2 mb-1 group-hover:text-sky-600 transition-colors">
+                            <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500 mb-1.5">
+                              <span className={`inline-block h-1 w-1 rounded-full ${statusDot}`} aria-hidden="true" />
+                              {item.type}
+                            </p>
+
+                            <h3 className="text-sm font-medium text-neutral-900 leading-snug line-clamp-2 mb-1">
                               {item.title}
                             </h3>
-                            
-                            {/* Date */}
-                            <p className="text-[11px] text-neutral-400 mb-2">
+
+                            <p className="text-[11px] text-neutral-500 tabular-nums mb-3">
                               {formatDate(item.published_date)}
                             </p>
-                            
+
                             {/* Action buttons */}
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1">
                               <button
                                 onClick={() => handleEdit(item)}
-                                className="flex-1 px-2 py-1.5 text-[11px] font-medium text-neutral-600 bg-neutral-50 hover:bg-sky-50 hover:text-sky-600 rounded transition-colors"
+                                className="flex-1 h-7 px-2 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-200 bg-white hover:bg-neutral-50 rounded-md transition-colors"
                               >
                                 Edit
                               </button>
+                              {item.id && (
+                                <a
+                                  href={`/admin/feed-form/preview/${item.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center h-7 w-7 text-neutral-500 ring-1 ring-neutral-200 bg-white hover:bg-neutral-50 hover:text-neutral-900 rounded-md transition-colors"
+                                  title="Preview"
+                                  aria-label="Preview"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </a>
+                              )}
                               <button
                                 onClick={() => item.id && toggleFeedComments(item.id)}
-                                className={`px-2 py-1.5 text-[11px] font-medium rounded transition-colors flex items-center gap-1 ${
+                                className={`inline-flex items-center justify-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium transition-colors ${
                                   isCommentOpen
-                                    ? "bg-sky-500 text-white shadow-sm"
-                                    : "text-neutral-400 hover:bg-sky-50 hover:text-sky-600"
+                                    ? "bg-neutral-900 text-white"
+                                    : "text-neutral-500 ring-1 ring-neutral-200 bg-white hover:bg-neutral-50 hover:text-neutral-900"
                                 }`}
+                                title="Comments"
                               >
                                 <MessageSquare className="h-3 w-3" />
                                 {(item.comments?.length || 0) > 0 && (
-                                  <span className="text-[10px]">{item.comments!.length}</span>
+                                  <span className="text-[10px] tabular-nums">{item.comments!.length}</span>
                                 )}
                               </button>
                               <button
                                 onClick={() => handleDelete(item.id!)}
-                                className="px-2 py-1.5 text-[11px] font-medium text-neutral-400 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
+                                className="inline-flex items-center justify-center h-7 w-7 text-neutral-400 ring-1 ring-neutral-200 bg-white hover:bg-red-50 hover:text-red-600 hover:ring-red-200 rounded-md transition-colors"
+                                title="Delete"
+                                aria-label="Delete"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>
                             </div>
                           </div>
-
-                          {/* Arrow indicator when comments are open */}
-                          {isCommentOpen && (
-                            <div className="absolute -bottom-2.25 left-1/2 -translate-x-1/2 z-10">
-                              <div className="w-4 h-4 bg-sky-50 border-b-2 border-r-2 border-sky-400 rotate-45 transform" />
-                            </div>
-                          )}
                         </div>
 
                         {/* Inline Comment Panel - appears directly below card's row via col-span-full */}
@@ -1463,25 +1465,26 @@ export default function FeedFormPage() {
                                 }
                               }}
                             >
-                    <div className="bg-white border-2 border-sky-400 rounded-xl shadow-lg shadow-sky-100/30 overflow-hidden">
+                    <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
                       {/* Comment Header */}
-                      <div className="flex items-center justify-between px-5 py-3 bg-sky-50 border-b border-sky-200">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
                         <div className="flex items-center gap-3">
-                          <div className="p-1.5 rounded-lg bg-sky-100">
-                            <MessageSquare className="h-4 w-4 text-sky-600" />
+                          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                            <MessageSquare className="h-4 w-4" />
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold text-neutral-900">{item.title}</h4>
-                            <p className="text-xs text-sky-600 font-medium">
-                              {(item.comments?.length || 0)} comment{(item.comments?.length || 0) !== 1 ? 's' : ''}
+                            <h4 className="text-sm font-medium text-neutral-900">{item.title}</h4>
+                            <p className="text-[11px] text-neutral-500 tabular-nums">
+                              {item.comments?.length || 0} comment{(item.comments?.length || 0) !== 1 ? "s" : ""}
                             </p>
                           </div>
                         </div>
                         <button
                           onClick={() => item.id && toggleFeedComments(item.id)}
-                          className="p-1.5 rounded-lg hover:bg-sky-100 transition-colors"
+                          className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors"
+                          aria-label="Close"
                         >
-                          <X className="h-4 w-4 text-neutral-400" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
 
@@ -1712,225 +1715,244 @@ export default function FeedFormPage() {
         {activeTab === "create" && (
           <div className="relative">
             {/* Sticky Header Bar - Always visible while scrolling */}
-            <div className="sticky top-16 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur-sm border-b border-neutral-200 shadow-sm mb-6">
+            <div className="sticky top-16 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur-sm border-b border-neutral-200 mb-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 {/* Left: Status & Info */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Status:</label>
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${
+                        formData.status === "published"
+                          ? "bg-emerald-500"
+                          : formData.status === "draft"
+                          ? "bg-amber-500"
+                          : "bg-neutral-400"
+                      }`}
+                      aria-hidden="true"
+                    />
                     <select
                       value={formData.status}
                       onChange={(e) => handleInputChange("status", e.target.value)}
-                      className={`px-3 py-1.5 text-sm font-semibold rounded-lg border-2 focus:ring-2 focus:ring-offset-1 focus:outline-none transition-all ${
-                        formData.status === "published" 
-                          ? "bg-green-50 border-green-300 text-green-700 focus:ring-green-500"
-                          : formData.status === "draft"
-                          ? "bg-amber-50 border-amber-300 text-amber-700 focus:ring-amber-500"
-                          : "bg-neutral-50 border-neutral-300 text-neutral-700 focus:ring-neutral-500"
-                      }`}
+                      className="h-8 px-2 text-xs font-medium rounded-md ring-1 ring-neutral-200 bg-white text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                      aria-label="Status"
                     >
-                      <option value="draft">📝 Draft</option>
-                      <option value="published">✅ Published</option>
-                      <option value="archived">📦 Archived</option>
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                      <option value="archived">Archived</option>
                     </select>
                   </div>
-                  
+
                   {/* Completion Indicator */}
                   {formData.type === "newsletter" && (
                     <div className="hidden sm:flex items-center gap-2">
-                      <div className="w-24 h-2 bg-neutral-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            getCompletionPercentage() === 100 
-                              ? 'bg-green-500' 
-                              : getCompletionPercentage() >= 50 
-                                ? 'bg-sky-500' 
-                                : 'bg-amber-500'
+                      <div className="w-24 h-1 bg-neutral-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-[width] ${
+                            getCompletionPercentage() === 100 ? "bg-emerald-500" : "bg-neutral-900"
                           }`}
                           style={{ width: `${getCompletionPercentage()}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-neutral-500">
+                      <span className="text-[11px] tabular-nums text-neutral-500">
                         {getCompletionPercentage()}%
                       </span>
                     </div>
                   )}
 
-                  {/* Draft indicator */}
-                  {hasDraft && !editingId && (
-                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
-                      <Save className="h-3 w-3 mr-1" />
-                      Draft saved
-                    </Badge>
-                  )}
-                  
                   {/* Auto-save status indicator */}
                   {formData.status === "draft" && formData.title?.trim() && formData.summary?.trim() && (
                     <div className="flex items-center gap-2">
                       {isAutoSaving ? (
-                        <Badge className="bg-sky-100 text-sky-700 border-sky-200 text-xs animate-pulse">
-                          <Cloud className="h-3 w-3 mr-1" />
-                          Saving to cloud...
-                        </Badge>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium tabular-nums">
+                          <span className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse" aria-hidden="true" />
+                          <Cloud className="h-3 w-3" />
+                          Saving
+                        </span>
                       ) : lastSavedAt ? (
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Badge>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium tabular-nums">
+                          <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                          Saved {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       ) : hasUnsavedChanges ? (
-                        <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Unsaved changes
-                        </Badge>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium">
+                          <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                          Unsaved
+                        </span>
                       ) : null}
-                      
-                      {/* Manual save button */}
+
                       {hasUnsavedChanges && !isAutoSaving && (
                         <button
                           type="button"
                           onClick={autoSaveToFirestore}
-                          className="px-2 py-1 text-xs font-medium text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded transition-colors"
+                          className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-0.5 rounded transition-colors"
                         >
                           Save now
                         </button>
                       )}
                     </div>
                   )}
+
+                  {/* Pre-publish checklist — only renders when status is published */}
+                  <FeedPrePublishChecklist
+                    formData={formData}
+                    feedItems={feedItems}
+                    editingId={editingId}
+                  />
                 </div>
 
                 {/* Right: Action Buttons */}
                 <div className="flex items-center gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
+                  {/* Preview — only when editing an existing item (needs an id) */}
+                  {editingId && (
+                    <a
+                      href={`/admin/feed-form/preview/${editingId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                      title={`Preview (${MOD_KEY_LABEL}P)`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Preview
+                    </a>
+                  )}
+                  <button
+                    type="button"
                     onClick={() => {
                       if (editingId) handleCancelEdit()
                       setActiveTab("view")
                     }}
-                    className="text-neutral-600"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                    title="Cancel (Esc)"
                   >
-                    <X className="h-4 w-4 mr-1" />
+                    <X className="h-3.5 w-3.5" />
                     Cancel
-                  </Button>
-                  <Button 
+                  </button>
+                  <button
                     type="button"
-                    size="sm"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className={`font-semibold transition-all ${
-                      editingId 
-                        ? 'bg-sky-600 hover:bg-sky-700' 
-                        : 'bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
-                    } text-white shadow-md hover:shadow-lg`}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                    title={`Save (${MOD_KEY_LABEL}S)`}
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        {editingId ? "Updating..." : "Saving..."}
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        {editingId ? "Updating…" : "Saving…"}
+                      </>
+                    ) : editingId ? (
+                      <>
+                        <Save className="h-3.5 w-3.5" />
+                        Update
+                      </>
+                    ) : formData.status === "published" ? (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        Publish
                       </>
                     ) : (
                       <>
-                        {editingId ? (
-                          <><Save className="h-4 w-4 mr-1.5" />Update</>
-                        ) : formData.status === "published" ? (
-                          <><Send className="h-4 w-4 mr-1.5" />Publish</>
-                        ) : (
-                          <><Save className="h-4 w-4 mr-1.5" />Save Draft</>
-                        )}
+                        <Save className="h-3.5 w-3.5" />
+                        Save Draft
                       </>
                     )}
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* Draft Notification */}
             {hasDraft && !editingId && (
-              <div className="mb-4 p-4 bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="mb-4 p-3 bg-white rounded-md ring-1 ring-neutral-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 bg-amber-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-amber-600" />
+                  <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700 shrink-0">
+                    <FileText className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="font-semibold text-amber-900">Draft Available</p>
-                    <p className="text-sm text-amber-700">You have an unfinished feed item saved locally.</p>
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">
+                      <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                      Draft available
+                    </p>
+                    <p className="text-sm text-neutral-700 mt-0.5">
+                      You have an unfinished feed item saved locally.
+                    </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
+                <div className="flex gap-2 shrink-0">
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={loadDraft}
-                    className="bg-white border-amber-300 text-amber-700 hover:bg-amber-50"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
                   >
-                    Load Draft
-                  </Button>
-                  <Button
+                    Load draft
+                  </button>
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={clearDraft}
-                    className="text-red-600 hover:bg-red-50 hover:border-red-300"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-red-50 hover:text-red-600 hover:ring-red-200 transition-colors"
+                    aria-label="Clear draft"
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             )}
 
             {/* Section Toggle Controls */}
             {formData.type === "newsletter" && (
-              <div className="mb-6">
+              <div className="mb-5">
                 {/* Intro Panel for New Feeds */}
                 {!editingId && !formData.title && (
-                  <div className="mb-4 p-5 bg-linear-to-br from-sky-50 to-sky-50 border-2 border-sky-200 rounded-xl">
-                    <h3 className="text-base font-bold text-sky-900 mb-2 flex items-center gap-2">
-                      <Wand2 className="h-5 w-5 text-sky-600" />
-                      Creating a New Newsletter
-                    </h3>
-                    <p className="text-sm text-sky-700 leading-relaxed mb-3">
-                      Fill out each section below to create your newsletter. Click on any section header to expand it. 
-                      <strong>Required fields are marked with a red asterisk (*)</strong>.
+                  <div className="mb-3 p-4 bg-white rounded-md ring-1 ring-neutral-200/70">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900" aria-hidden="true" />
+                      New newsletter
                     </p>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-sky-700 border border-sky-200">
-                        <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                        Active section
+                    <p className="text-sm text-neutral-700 mb-3">
+                      Click any section header below to expand and edit it. Required fields are marked with{" "}
+                      <span className="text-red-500">*</span>.
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
+                        <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                        Complete
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-green-700 border border-green-200">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Completed section
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
+                        <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+                        Collapsed
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-neutral-600 border border-neutral-200">
-                        <ChevronRight className="h-3 w-3" />
-                        Collapsed section
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
+                        <kbd className="px-1 rounded bg-white ring-1 ring-neutral-200 font-mono text-[10px]">{MOD_KEY_LABEL}S</kbd>
+                        Save
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
+                        <kbd className="px-1 rounded bg-white ring-1 ring-neutral-200 font-mono text-[10px]">{MOD_KEY_LABEL}P</kbd>
+                        Preview
                       </span>
                     </div>
                   </div>
                 )}
-                
-                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl border border-neutral-200">
-                  <div className="flex items-center gap-2">
-                    <Wand2 className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm font-semibold text-neutral-700">Newsletter Sections</span>
-                    <span className="text-xs text-neutral-500">({openSections.size} expanded)</span>
-                  </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">
+                    Newsletter sections{" "}
+                    <span className="text-neutral-400 normal-case tracking-normal">
+                      ({openSections.size} open)
+                    </span>
+                  </p>
                   <div className="flex gap-1">
                     <button
                       type="button"
                       onClick={expandAllSections}
-                      className="text-xs text-sky-600 hover:text-sky-700 font-semibold px-3 py-1.5 hover:bg-sky-100 rounded-lg transition-all border border-transparent hover:border-sky-200"
+                      className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded transition-colors"
                     >
-                      Expand All
+                      Expand all
                     </button>
                     <button
                       type="button"
                       onClick={collapseAllSections}
-                      className="text-xs text-neutral-500 hover:text-neutral-700 font-semibold px-3 py-1.5 hover:bg-neutral-200 rounded-lg transition-all border border-transparent hover:border-neutral-300"
+                      className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded transition-colors"
                     >
-                      Collapse All
+                      Collapse all
                     </button>
                   </div>
                 </div>
