@@ -183,7 +183,7 @@ export default function EmailListsPage() {
               ) : (
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               )}
-              <span className="flex-1 break-words">{toast.message}</span>
+              <span className="flex-1 wrap-break-word">{toast.message}</span>
               <button
                 onClick={() => setToast(null)}
                 aria-label="Dismiss notification"
