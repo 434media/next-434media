@@ -1,28 +1,29 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
-import { 
-  Bold, 
-  Italic, 
-  Link as LinkIcon, 
-  List, 
-  ListOrdered, 
-  Code, 
-  Heading1, 
-  Heading2, 
+import {
+  Bold,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Code,
+  Heading1,
+  Heading2,
   Heading3,
   Quote,
   Eye,
   Edit3,
   HelpCircle,
-  ExternalLink,
   Minus,
   Undo,
   Redo,
   SplitSquareVertical,
-  X
+  X,
+  Image as ImageIcon,
 } from "lucide-react"
 import { Marked } from 'marked'
+import { ImageUpload } from "./ImageUpload"
 
 interface RichTextEditorProps {
   value: string
@@ -99,6 +100,12 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
   const [linkText, setLinkText] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
+  // Image insertion — reuses the shared ImageUpload component which already
+  // handles file uploads to Vercel Blob and URL paste. The resulting URL is
+  // inserted as a markdown image at the cursor position.
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
+  const [imageAlt, setImageAlt] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
   const [undoStack, setUndoStack] = useState<string[]>([])
   const [redoStack, setRedoStack] = useState<string[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -228,6 +235,28 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
     setLinkUrl('')
   }, [linkText, linkUrl, insertMarkdown])
 
+  // Open image dialog — pre-fills alt with any selected text
+  const openImageDialog = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = value.substring(start, end)
+    setImageAlt(selectedText)
+    setImageUrl('')
+    setImageDialogOpen(true)
+  }, [value])
+
+  // Insert image from dialog — produces markdown ![alt](url) at the cursor
+  const insertImage = useCallback(() => {
+    if (!imageUrl) return
+    const altText = imageAlt.trim() || "image"
+    insertMarkdown(`![${altText}](`, ")", imageUrl)
+    setImageDialogOpen(false)
+    setImageAlt('')
+    setImageUrl('')
+  }, [imageAlt, imageUrl, insertMarkdown])
+
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.metaKey || e.ctrlKey) {
@@ -283,13 +312,13 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
     }
   }, [value])
 
-  const ToolbarButton = ({ 
-    onClick, 
-    title, 
-    children, 
+  const ToolbarButton = ({
+    onClick,
+    title,
+    children,
     active = false,
-    disabled = false 
-  }: { 
+    disabled = false,
+  }: {
     onClick: () => void
     title: string
     children: React.ReactNode
@@ -300,12 +329,12 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`p-2 rounded-md transition-all ${
+      className={`inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
         disabled
-          ? 'text-gray-300 cursor-not-allowed'
-          : active 
-            ? 'bg-sky-100 text-sky-700 shadow-sm' 
-            : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
+          ? 'text-neutral-300 cursor-not-allowed'
+          : active
+            ? 'bg-neutral-900 text-white'
+            : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
       }`}
       title={title}
     >
@@ -313,16 +342,16 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
     </button>
   )
 
-  const ToolbarDivider = () => <div className="w-px h-6 bg-gray-200 mx-1" />
+  const ToolbarDivider = () => <div className="w-px h-5 bg-neutral-200 mx-0.5" />
 
   const ViewModeButton = ({ mode, icon, label }: { mode: 'edit' | 'preview' | 'split'; icon: React.ReactNode; label: string }) => (
     <button
       type="button"
       onClick={() => setViewMode(mode)}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-        viewMode === mode 
-          ? "bg-sky-100 text-sky-700 shadow-sm" 
-          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+      className={`inline-flex items-center gap-1.5 px-2.5 text-xs font-medium whitespace-nowrap transition-colors ${
+        viewMode === mode
+          ? "bg-neutral-900 text-white"
+          : "bg-white text-neutral-700 hover:bg-neutral-50"
       }`}
     >
       {icon}
@@ -331,9 +360,9 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
   )
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm relative">
+    <div className="ring-1 ring-neutral-200/70 rounded-md overflow-hidden bg-white relative">
       {/* Toolbar */}
-      <div className="bg-gray-50 border-b border-gray-200 p-2 flex items-center gap-1 flex-wrap">
+      <div className="bg-neutral-50/50 border-b border-neutral-100 px-2 py-1.5 flex items-center gap-0.5 flex-wrap">
         {/* Undo/Redo */}
         <ToolbarButton 
           onClick={handleUndo} 
@@ -394,68 +423,81 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
         
         <ToolbarDivider />
         
-        {/* Link */}
-        <ToolbarButton onClick={openLinkDialog} title="Insert Link (⌘K)">
+        {/* Link + Image */}
+        <ToolbarButton onClick={openLinkDialog} title="Insert link (⌘K)">
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
-        
+        <ToolbarButton onClick={openImageDialog} title="Insert image">
+          <ImageIcon className="h-4 w-4" />
+        </ToolbarButton>
+
         {/* Spacer */}
         <div className="flex-1" />
-        
+
         {/* Help */}
-        <ToolbarButton onClick={() => setShowHelp(!showHelp)} title="Markdown Help" active={showHelp}>
+        <ToolbarButton onClick={() => setShowHelp(!showHelp)} title="Markdown help" active={showHelp}>
           <HelpCircle className="h-4 w-4" />
         </ToolbarButton>
-        
-        {/* View mode toggles */}
-        <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-200 ml-2">
-          <ViewModeButton mode="edit" icon={<Edit3 className="h-3.5 w-3.5" />} label="Edit" />
-          <ViewModeButton mode="split" icon={<SplitSquareVertical className="h-3.5 w-3.5" />} label="Split" />
-          <ViewModeButton mode="preview" icon={<Eye className="h-3.5 w-3.5" />} label="Preview" />
+
+        {/* View mode segmented control */}
+        <div className="inline-flex h-7 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white ml-1.5">
+          <ViewModeButton mode="edit" icon={<Edit3 className="h-3 w-3" />} label="Edit" />
+          <ViewModeButton mode="split" icon={<SplitSquareVertical className="h-3 w-3" />} label="Split" />
+          <ViewModeButton mode="preview" icon={<Eye className="h-3 w-3" />} label="Preview" />
         </div>
       </div>
 
       {/* Link Dialog */}
       {linkDialogOpen && (
-        <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-50" onClick={() => setLinkDialogOpen(false)}>
-          <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+        <div
+          className="absolute inset-0 bg-black/20 flex items-center justify-center z-50"
+          onClick={() => setLinkDialogOpen(false)}
+          onKeyDown={(e) => e.key === "Escape" && setLinkDialogOpen(false)}
+        >
+          <div className="bg-white rounded-md ring-1 ring-neutral-200 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18)] p-5 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <LinkIcon className="h-5 w-5 text-sky-600" />
-                Insert Link
-              </h3>
-              <button onClick={() => setLinkDialogOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-5 w-5" />
+              <div className="flex items-center gap-2">
+                <div className="grid h-7 w-7 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                  <LinkIcon className="h-3.5 w-3.5" />
+                </div>
+                <h3 className="text-sm font-medium text-neutral-900">Insert link</h3>
+              </div>
+              <button
+                onClick={() => setLinkDialogOpen(false)}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Link Text</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">Link text</label>
                 <input
                   type="text"
                   value={linkText}
                   onChange={(e) => setLinkText(e.target.value)}
                   placeholder="Display text for the link"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  className="w-full h-10 px-3 ring-1 ring-neutral-200 rounded-md focus:ring-2 focus:ring-neutral-900 focus:outline-none text-sm bg-white"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">URL</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">URL</label>
                 <input
                   type="url"
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                  onKeyDown={(e) => e.key === 'Enter' && insertLink()}
+                  className="w-full h-10 px-3 ring-1 ring-neutral-200 rounded-md focus:ring-2 focus:ring-neutral-900 focus:outline-none text-sm bg-white font-mono"
+                  onKeyDown={(e) => e.key === "Enter" && insertLink()}
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setLinkDialogOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -463,10 +505,77 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
                   type="button"
                   onClick={insertLink}
                   disabled={!linkUrl}
-                  className="px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  Insert Link
+                  Insert link
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Dialog — reuses the shared ImageUpload component (file-first by
+          default). Resulting URL becomes ![alt](url) at the cursor. */}
+      {imageDialogOpen && (
+        <div
+          className="absolute inset-0 bg-black/20 flex items-center justify-center z-50 p-4 overflow-y-auto"
+          onClick={() => setImageDialogOpen(false)}
+        >
+          <div
+            className="bg-white rounded-md ring-1 ring-neutral-200 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18)] p-5 w-full max-w-lg my-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="grid h-7 w-7 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                </div>
+                <h3 className="text-sm font-medium text-neutral-900">Insert image</h3>
+              </div>
+              <button
+                onClick={() => setImageDialogOpen(false)}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                  Alt text
+                  <span className="ml-1.5 text-[11px] font-normal text-neutral-400">· describes the image for screen readers and SEO</span>
+                </label>
+                <input
+                  type="text"
+                  value={imageAlt}
+                  onChange={(e) => setImageAlt(e.target.value)}
+                  placeholder="A photo of…"
+                  className="w-full h-10 px-3 ring-1 ring-neutral-200 rounded-md focus:ring-2 focus:ring-neutral-900 focus:outline-none text-sm bg-white"
+                />
+              </div>
+              <ImageUpload
+                value={imageUrl}
+                onChange={setImageUrl}
+                label="Image"
+                hideUrl
+              />
+              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setImageDialogOpen(false)}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={insertImage}
+                  disabled={!imageUrl}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Insert image
                 </button>
               </div>
             </div>
@@ -476,54 +585,55 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
 
       {/* Help panel */}
       {showHelp && (
-        <div className="bg-linear-to-r from-sky-50 to-blue-50 border-b border-sky-200 p-4 text-sm">
-          <h4 className="font-semibold text-sky-900 mb-3 flex items-center gap-2">
-            <HelpCircle className="h-4 w-4" />
-            Markdown Quick Reference
-          </h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sky-800">
+        <div className="bg-neutral-50/50 border-b border-neutral-100 px-4 py-3 text-sm">
+          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-3">
+            <HelpCircle className="h-3 w-3" />
+            Markdown reference
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-neutral-700 text-xs">
             <div className="space-y-1.5">
-              <p className="font-medium text-sky-900 text-xs uppercase tracking-wide">Formatting</p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">**bold**</code> → <strong>bold</strong></p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">*italic*</code> → <em>italic</em></p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">`code`</code> → <code className="bg-gray-200 px-1 rounded text-xs">code</code></p>
+              <p className="font-medium text-neutral-900 text-[10px] uppercase tracking-[0.18em]">Formatting</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">**bold**</code> → <strong>bold</strong></p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">*italic*</code> → <em>italic</em></p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">`code`</code> → <code className="bg-neutral-100 px-1 rounded text-[11px]">code</code></p>
             </div>
             <div className="space-y-1.5">
-              <p className="font-medium text-sky-900 text-xs uppercase tracking-wide">Links</p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">[text](url)</code> → link</p>
-              <p className="text-xs text-sky-600">Or use ⌘K shortcut</p>
+              <p className="font-medium text-neutral-900 text-[10px] uppercase tracking-[0.18em]">Links & images</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">[text](url)</code> → link</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">![alt](url)</code> → image</p>
+              <p className="text-[11px] text-neutral-500">Or use ⌘K / image button</p>
             </div>
             <div className="space-y-1.5">
-              <p className="font-medium text-sky-900 text-xs uppercase tracking-wide">Structure</p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs"># Heading 1</code></p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">## Heading 2</code></p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">---</code> → horizontal line</p>
+              <p className="font-medium text-neutral-900 text-[10px] uppercase tracking-[0.18em]">Structure</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono"># Heading 1</code></p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">## Heading 2</code></p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">---</code> → horizontal line</p>
             </div>
             <div className="space-y-1.5">
-              <p className="font-medium text-sky-900 text-xs uppercase tracking-wide">Lists</p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">- item</code> → bullet</p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">1. item</code> → numbered</p>
-              <p><code className="bg-sky-100 px-1 rounded text-xs">&gt; quote</code> → blockquote</p>
+              <p className="font-medium text-neutral-900 text-[10px] uppercase tracking-[0.18em]">Lists</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">- item</code> → bullet</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">1. item</code> → numbered</p>
+              <p><code className="bg-neutral-100 px-1 rounded text-[11px] font-mono">&gt; quote</code> → blockquote</p>
             </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-sky-200">
-            <p className="text-sky-600 text-xs flex items-center gap-2 flex-wrap">
-              <kbd className="bg-sky-100 px-1.5 py-0.5 rounded text-xs font-mono">⌘B</kbd> Bold
-              <span className="text-sky-300">•</span>
-              <kbd className="bg-sky-100 px-1.5 py-0.5 rounded text-xs font-mono">⌘I</kbd> Italic
-              <span className="text-sky-300">•</span>
-              <kbd className="bg-sky-100 px-1.5 py-0.5 rounded text-xs font-mono">⌘K</kbd> Link
-              <span className="text-sky-300">•</span>
-              <kbd className="bg-sky-100 px-1.5 py-0.5 rounded text-xs font-mono">⌘Z</kbd> Undo
-              <span className="text-sky-300">•</span>
-              <kbd className="bg-sky-100 px-1.5 py-0.5 rounded text-xs font-mono">⌘⇧Z</kbd> Redo
+          <div className="mt-3 pt-3 border-t border-neutral-100">
+            <p className="text-[11px] text-neutral-500 flex items-center gap-2 flex-wrap">
+              <kbd className="bg-white ring-1 ring-neutral-200 px-1.5 py-0.5 rounded text-[10px] font-mono">⌘B</kbd> Bold
+              <span className="text-neutral-300">·</span>
+              <kbd className="bg-white ring-1 ring-neutral-200 px-1.5 py-0.5 rounded text-[10px] font-mono">⌘I</kbd> Italic
+              <span className="text-neutral-300">·</span>
+              <kbd className="bg-white ring-1 ring-neutral-200 px-1.5 py-0.5 rounded text-[10px] font-mono">⌘K</kbd> Link
+              <span className="text-neutral-300">·</span>
+              <kbd className="bg-white ring-1 ring-neutral-200 px-1.5 py-0.5 rounded text-[10px] font-mono">⌘Z</kbd> Undo
+              <span className="text-neutral-300">·</span>
+              <kbd className="bg-white ring-1 ring-neutral-200 px-1.5 py-0.5 rounded text-[10px] font-mono">⌘⇧Z</kbd> Redo
             </p>
           </div>
         </div>
       )}
 
       {/* Editor / Preview Area */}
-      <div className={`${viewMode === 'split' ? 'grid grid-cols-2 divide-x divide-gray-200' : ''}`}>
+      <div className={`${viewMode === 'split' ? 'grid grid-cols-2 divide-x divide-neutral-100' : ''}`}>
         {/* Editor */}
         {(viewMode === 'edit' || viewMode === 'split') && (
           <div className="relative">
@@ -532,16 +642,15 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder || "Write your content here using Markdown...\n\nTip: Use **bold**, *italic*, [links](url), and more!\n\nLine breaks are preserved. Use blank lines for new paragraphs."}
+              placeholder={placeholder || "Write in Markdown…\n\n**bold**, *italic*, [links](url), ![alt](url) for images.\n\nBlank lines start new paragraphs."}
               rows={minRows}
-              className="w-full px-4 py-4 focus:outline-none focus:ring-2 focus:ring-sky-500/20 resize-y font-mono text-sm leading-relaxed text-gray-800 placeholder:text-gray-400 min-h-50 bg-white"
+              className="w-full px-4 py-4 focus:outline-none resize-y font-mono text-sm leading-relaxed text-neutral-800 placeholder:text-neutral-400 min-h-50 bg-white"
               style={{ minHeight: `${Math.max(minRows * 1.75, 12)}rem` }}
             />
-            {/* Editor label */}
             {viewMode === 'split' && (
-              <div className="absolute top-2 right-2 bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-md font-medium">
+              <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 text-[10px] font-medium uppercase tracking-[0.16em]">
                 Markdown
-              </div>
+              </span>
             )}
           </div>
         )}
@@ -549,20 +658,19 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
         {/* Preview */}
         {(viewMode === 'preview' || viewMode === 'split') && (
           <div className="relative bg-white">
-            {/* Preview label */}
             {viewMode === 'split' && (
-              <div className="absolute top-2 right-2 bg-sky-100 text-sky-700 text-xs px-2 py-1 rounded-md font-medium z-10">
+              <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 text-[10px] font-medium uppercase tracking-[0.16em] z-10">
                 Preview
-              </div>
+              </span>
             )}
-            <div 
-              className="px-6 py-4 min-h-50 overflow-auto prose prose-sm max-w-none 
-                prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 
+            <div
+              className="px-6 py-4 min-h-50 overflow-auto prose prose-sm max-w-none
+                prose-headings:text-neutral-900 prose-p:text-neutral-700 prose-strong:text-neutral-900
                 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-                prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:rounded prose-code:px-1
-                prose-pre:bg-gray-900 prose-pre:text-gray-100
-                prose-blockquote:text-gray-600 prose-blockquote:border-gray-300
-                prose-ul:text-gray-700 prose-ol:text-gray-700 prose-li:text-gray-700"
+                prose-code:text-neutral-800 prose-code:bg-neutral-100 prose-code:rounded prose-code:px-1
+                prose-pre:bg-neutral-900 prose-pre:text-neutral-100
+                prose-blockquote:text-neutral-600 prose-blockquote:border-neutral-300
+                prose-ul:text-neutral-700 prose-ol:text-neutral-700 prose-li:text-neutral-700"
               style={{ minHeight: `${Math.max(minRows * 1.75, 12)}rem` }}
               dangerouslySetInnerHTML={{ __html: renderedPreview }}
             />
@@ -571,29 +679,22 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
       </div>
 
       {/* Status bar */}
-      <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 flex items-center justify-between text-xs text-gray-500">
-        <div className="flex items-center gap-3">
-          <span className="font-medium">
-            {value.length.toLocaleString()} chars
-          </span>
-          <span className="text-gray-300">•</span>
-          <span>
-            {value.split(/\s+/).filter(Boolean).length.toLocaleString()} words
-          </span>
-          <span className="text-gray-300">•</span>
-          <span>
-            {value.split('\n').length} lines
-          </span>
+      <div className="bg-neutral-50/50 border-t border-neutral-100 px-4 py-1.5 flex items-center justify-between text-[11px] text-neutral-500">
+        <div className="flex items-center gap-2 tabular-nums">
+          <span>{value.length.toLocaleString()} chars</span>
+          <span className="text-neutral-300">·</span>
+          <span>{value.split(/\s+/).filter(Boolean).length.toLocaleString()} words</span>
+          <span className="text-neutral-300">·</span>
+          <span>{value.split('\n').length} lines</span>
         </div>
         <div className="flex items-center gap-2">
           {viewMode === 'split' && (
-            <span className="text-sky-600 font-medium">
-              ✓ Live preview matches production
+            <span className="inline-flex items-center gap-1.5 text-neutral-500">
+              <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+              Live preview matches production
             </span>
           )}
-          <span className="text-gray-400">
-            Markdown
-          </span>
+          <span className="text-neutral-400 uppercase tracking-[0.16em] text-[10px] font-medium">Markdown</span>
         </div>
       </div>
     </div>

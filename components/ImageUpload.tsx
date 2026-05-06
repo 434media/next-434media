@@ -22,7 +22,10 @@ export function ImageUpload({
   hideUrl = false
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadMethod, setUploadMethod] = useState<"url" | "file">("url")
+  // File-first default — matches the dominant editor flow (drop a Figma export)
+  // and the convention used by Notion / Linear / Vercel / Sanity / Contentful.
+  // Paste URL stays as the fallback for stock images already hosted elsewhere.
+  const [uploadMethod, setUploadMethod] = useState<"url" | "file">("file")
   const [preview, setPreview] = useState<string>(value)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -163,56 +166,44 @@ export function ImageUpload({
   }
 
   return (
-    <div className="space-y-3">
-      <label className="block text-sm font-semibold text-neutral-800 tracking-tight leading-none">{label}</label>
-      
-      {/* Method Toggle - Enhanced Visual Feedback */}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setUploadMethod("url")}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border-2 transition-all duration-200 ${
-            uploadMethod === "url" 
-              ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200" 
-              : "bg-white border-neutral-200 text-neutral-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-          }`}
-        >
-          <LinkIcon className="h-4 w-4" />
-          <span>Paste URL</span>
-          {uploadMethod === "url" && (
-            <span className="hidden sm:inline-flex w-2 h-2 bg-white rounded-full animate-pulse" />
-          )}
-        </button>
+    <div className="space-y-2.5">
+      <label className="block text-sm font-medium text-neutral-700">{label}</label>
+
+      {/* Method toggle — segmented control matching the rest of admin.
+          Upload File leads (primary flow); Paste URL is the fallback. */}
+      <div className="inline-flex h-8 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
         <button
           type="button"
           onClick={() => setUploadMethod("file")}
-          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border-2 transition-all duration-200 ${
-            uploadMethod === "file" 
-              ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200" 
-              : "bg-white border-neutral-200 text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600"
+          className={`inline-flex items-center gap-1.5 px-3 text-xs font-medium whitespace-nowrap transition-colors ${
+            uploadMethod === "file"
+              ? "bg-neutral-900 text-white"
+              : "bg-white text-neutral-700 hover:bg-neutral-50"
           }`}
         >
-          <Upload className="h-4 w-4" />
-          <span>Upload File</span>
-          {uploadMethod === "file" && (
-            <span className="hidden sm:inline-flex w-2 h-2 bg-white rounded-full animate-pulse" />
-          )}
+          <Upload className="h-3.5 w-3.5" />
+          Upload File
+        </button>
+        <button
+          type="button"
+          onClick={() => setUploadMethod("url")}
+          className={`inline-flex items-center gap-1.5 px-3 text-xs font-medium whitespace-nowrap transition-colors ${
+            uploadMethod === "url"
+              ? "bg-neutral-900 text-white"
+              : "bg-white text-neutral-700 hover:bg-neutral-50"
+          }`}
+        >
+          <LinkIcon className="h-3.5 w-3.5" />
+          Paste URL
         </button>
       </div>
-      
-      {/* Method Description Helper */}
-      <p className="text-xs text-neutral-500 leading-relaxed">
-        {uploadMethod === "url" 
-          ? "Paste an image URL from the web (e.g., from Unsplash, Google Drive, or any public image link)"
-          : "Upload an image from your device (JPG, PNG, GIF, WebP • Max 10MB)"}
-      </p>
 
       {/* URL Input */}
       {uploadMethod === "url" && (
         <div className="flex gap-2">
           {hideUrl && value ? (
-            <div className="flex-1 px-4 py-3 border-2 border-green-200 rounded-lg bg-green-50 text-green-700 text-sm font-medium flex items-center gap-2">
-              <LinkIcon className="h-4 w-4 text-green-500" />
+            <div className="flex-1 h-10 px-3 ring-1 ring-neutral-200 rounded-md bg-neutral-50 text-neutral-700 text-sm flex items-center gap-2">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
               <span>Image URL added</span>
             </div>
           ) : (
@@ -220,7 +211,7 @@ export function ImageUpload({
               type="url"
               value={value}
               onChange={(e) => handleUrlChange(e.target.value)}
-              className="flex-1 px-4 py-3 border-2 border-neutral-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-400 text-sm font-medium placeholder:text-neutral-400 transition-all"
+              className="flex-1 h-10 px-3 ring-1 ring-neutral-200 rounded-md focus:ring-2 focus:ring-neutral-900 focus:outline-none text-sm bg-white font-mono"
               placeholder="https://example.com/image.jpg"
             />
           )}
@@ -228,7 +219,8 @@ export function ImageUpload({
             <button
               type="button"
               onClick={handleClear}
-              className="px-3 py-2 border-2 border-neutral-200 rounded-lg text-neutral-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all"
+              className="inline-flex items-center justify-center h-10 w-10 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-red-50 hover:text-red-600 hover:ring-red-200 transition-colors"
+              aria-label="Clear image"
             >
               <X className="h-4 w-4" />
             </button>
@@ -247,52 +239,49 @@ export function ImageUpload({
             className="hidden"
             disabled={isUploading}
           />
-          <div 
+          <div
             ref={dropZoneRef}
             onClick={() => !isUploading && fileInputRef.current?.click()}
             onDragEnter={handleDragEnter}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`relative flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
+            className={`relative flex flex-col items-center justify-center gap-2.5 p-6 ring-1 rounded-md cursor-pointer transition-colors ${
               isDragging
-                ? "bg-sky-50 border-sky-400 ring-4 ring-sky-100 scale-[1.02]"
-                : isUploading 
-                  ? "bg-emerald-50 border-emerald-300" 
-                  : value 
-                    ? "bg-green-50 border-green-300 hover:bg-green-100"
-                    : "bg-neutral-50 border-neutral-300 hover:border-emerald-400 hover:bg-emerald-50"
+                ? "bg-neutral-50 ring-2 ring-neutral-900"
+                : isUploading
+                ? "bg-neutral-50 ring-neutral-200"
+                : "bg-white ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-50"
             }`}
           >
             {isDragging ? (
               <>
-                <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center animate-bounce">
-                  <Upload className="h-6 w-6 text-sky-600" />
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                  <Upload className="h-5 w-5" />
                 </div>
-                <span className="text-sm font-semibold text-sky-700">Drop your image here!</span>
+                <span className="text-sm font-medium text-neutral-900">Drop your image here</span>
               </>
             ) : isUploading ? (
               <>
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 </div>
-                <span className="text-sm font-medium text-emerald-700">Uploading your file...</span>
+                <span className="text-sm font-medium text-neutral-700">Uploading…</span>
               </>
             ) : (
               <>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  value ? "bg-green-100" : "bg-neutral-200"
-                }`}>
-                  <Upload className={`h-5 w-5 ${value ? "text-green-600" : "text-neutral-500"}`} />
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-neutral-100 text-neutral-700">
+                  <Upload className="h-5 w-5" />
                 </div>
                 <div className="text-center">
-                  <span className={`text-sm font-semibold ${
-                    value ? "text-green-700" : "text-neutral-700"
-                  }`}>
-                    {value ? "File uploaded! Click or drag to replace" : "Drop image here or click to browse"}
-                  </span>
-                  <p className="text-xs text-neutral-500 mt-1">
-                    JPG, PNG, GIF, WebP • Max {maxSize}MB
+                  <p className="text-sm font-medium text-neutral-900 flex items-center justify-center gap-1.5">
+                    {value && (
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                    )}
+                    {value ? "File uploaded · click or drag to replace" : "Drop image here or click to browse"}
+                  </p>
+                  <p className="text-[11px] text-neutral-500 mt-1">
+                    JPG, PNG, GIF, WebP · max {maxSize}MB
                   </p>
                 </div>
               </>
@@ -303,7 +292,7 @@ export function ImageUpload({
               type="button"
               onClick={(e) => { e.stopPropagation(); handleClear(); }}
               disabled={isUploading}
-              className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
+              className="text-[11px] text-neutral-500 hover:text-red-600 font-medium flex items-center gap-1 transition-colors"
             >
               <X className="h-3 w-3" />
               Remove file
@@ -314,14 +303,14 @@ export function ImageUpload({
 
       {/* Preview */}
       {preview && getSafeImageUrl(preview) && (
-        <div className="relative border-2 border-neutral-200 rounded-xl overflow-hidden bg-neutral-50 p-3">
+        <div className="relative rounded-md ring-1 ring-neutral-200/70 overflow-hidden bg-neutral-50 p-3">
           <div className="absolute top-3 right-3 z-10">
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-              Image ready
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white ring-1 ring-neutral-200 text-neutral-700 text-[10px] font-medium uppercase tracking-[0.16em]">
+              <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+              Ready
             </span>
           </div>
-          <div className="relative w-full h-48 flex items-center justify-center bg-white rounded-lg">
+          <div className="relative w-full h-48 flex items-center justify-center bg-white rounded-md">
             <img
               src={getSafeImageUrl(preview) || ''}
               alt="Preview"
@@ -330,25 +319,21 @@ export function ImageUpload({
             />
           </div>
           {value && !hideUrl && (
-            <div className="mt-3 p-2 bg-white rounded-lg border border-neutral-200 text-xs text-neutral-600 break-all font-mono">
+            <div className="mt-3 p-2 bg-white rounded-md ring-1 ring-neutral-200 text-[11px] text-neutral-600 break-all font-mono">
               {value}
             </div>
           )}
         </div>
       )}
 
-      {/* Empty State - Only show for URL method when no preview */}
+      {/* Empty State — only for URL method when no preview */}
       {!preview && uploadMethod === "url" && (
-        <div className="border-2 border-dashed border-neutral-200 rounded-xl p-8 text-center bg-neutral-50/50">
-          <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-3">
-            <ImageIcon className="h-6 w-6 text-neutral-400" />
+        <div className="rounded-md ring-1 ring-neutral-200/70 p-6 text-center bg-neutral-50/40">
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700 mx-auto mb-2">
+            <ImageIcon className="h-4 w-4" />
           </div>
-          <p className="text-sm font-medium text-neutral-600">
-            No image added yet
-          </p>
-          <p className="text-xs text-neutral-400 mt-1">
-            Paste an image URL in the field above
-          </p>
+          <p className="text-sm font-medium text-neutral-700">No image added yet</p>
+          <p className="text-[11px] text-neutral-500 mt-0.5">Paste an image URL in the field above</p>
         </div>
       )}
     </div>

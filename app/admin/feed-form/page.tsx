@@ -1,436 +1,34 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/analytics/Button"
-import { Badge } from "@/components/analytics/Badge"
-import { Marked } from 'marked'
 
 import { Toast } from "@/components/crm/Toast"
 import type { Toast as ToastType, CurrentUser, TeamMember } from "@/components/crm/types"
 import { TEAM_MEMBERS } from "@/components/crm/types"
-import { Loader2, Send, Calendar, FileText, Link as LinkIcon, Users, Tag, Image as ImageIcon, RefreshCw, Eye, List, Edit, Trash2, Save, X, ChevronDown, ChevronRight, CheckCircle2, Wand2, Star, Pencil, Cloud, Clock, MessageSquare } from "lucide-react"
-import { RichTextEditor } from "@/components/RichTextEditor"
-import { ImageUpload } from "@/components/ImageUpload"
+import {
+  Loader2,
+  Send,
+  FileText,
+  Image as ImageIcon,
+  RefreshCw,
+  Eye,
+  Trash2,
+  X,
+  Pencil,
+  MessageSquare,
+  ChevronRight,
+} from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
-import { FeedPrePublishChecklist } from "@/components/admin/FeedPrePublishChecklist"
 import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
+import { FeedPrePublishChecklist } from "@/components/admin/FeedPrePublishChecklist"
 import { FeedCardStatusMenu, formatRelative, formatScheduledIn } from "@/components/admin/FeedCardStatusMenu"
-
-// Configure marked for consistent rendering with production
-const previewMarked = new Marked({ 
-  async: false, 
-  gfm: true,
-  breaks: true
-})
-
-// Collapsible Section Component
-interface CollapsibleSectionProps {
-  id: string
-  title: string
-  description: string
-  icon: React.ReactNode
-  isOpen: boolean
-  onToggle: () => void
-  isComplete?: boolean
-  children: React.ReactNode
-}
-
-function CollapsibleSection({ 
-  id, 
-  title, 
-  description, 
-  icon, 
-  isOpen, 
-  onToggle, 
-  isComplete = false,
-  children
-}: CollapsibleSectionProps) {
-  return (
-    <div
-      className={`bg-white rounded-md ring-1 overflow-hidden transition-colors ${
-        isOpen ? "ring-neutral-900/40" : "ring-neutral-200/70 hover:ring-neutral-300"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between text-left transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-            {icon}
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-900">{title}</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">{description}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {isComplete && !isOpen && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium uppercase tracking-[0.16em]">
-              <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
-              Complete
-            </span>
-          )}
-          {isOpen ? (
-            <ChevronDown className="h-4 w-4 text-neutral-400" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-neutral-400" />
-          )}
-        </div>
-      </button>
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-          >
-            <div className="px-4 pb-5 pt-3 border-t border-neutral-100">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// Preview Field Component - shows value in preview mode with ability to edit individual fields
-interface PreviewFieldProps {
-  label: string
-  value: string
-  isPreview: boolean
-  required?: boolean
-  children: React.ReactNode
-  isRichText?: boolean
-}
-
-function PreviewField({ label, value, isPreview, required, children, isRichText }: PreviewFieldProps) {
-  const [isEditing, setIsEditing] = useState(false)
-
-  // Render markdown using the same library as production
-  const renderedHtml = useMemo(() => {
-    if (!value || !isRichText) return null
-    try {
-      return previewMarked.parse(value) as string
-    } catch {
-      return value.replace(/\n/g, '<br />')
-    }
-  }, [value, isRichText])
-
-  // If not in preview mode globally, or if this field is being edited, show the edit form
-  if (!isPreview || isEditing) {
-    return (
-      <div className="relative">
-        {isPreview && isEditing && (
-          <div className="flex justify-end mb-2">
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-600 hover:text-green-700 px-3 py-1.5 bg-green-50 hover:bg-green-100 rounded-lg transition-all border border-green-200"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Done Editing
-            </button>
-          </div>
-        )}
-        {children}
-      </div>
-    )
-  }
-
-  // For rich text, render HTML using marked (matches production)
-  const renderValue = () => {
-    if (!value) {
-      return <span className="text-neutral-400 italic text-sm">Click to add content</span>
-    }
-    if (isRichText && renderedHtml) {
-      return (
-        <div 
-          className="prose prose-sm max-w-none text-neutral-700 leading-relaxed
-            prose-headings:text-gray-900 prose-strong:text-gray-900
-            prose-a:text-blue-600 prose-a:underline
-            prose-code:bg-gray-100 prose-code:rounded prose-code:px-1
-            prose-blockquote:border-gray-300 prose-blockquote:text-gray-600
-            prose-ul:my-2 prose-ol:my-2 prose-li:my-0"
-          dangerouslySetInnerHTML={{ __html: renderedHtml }}
-        />
-      )
-    }
-    return <span className="text-neutral-800 font-medium">{value}</span>
-  }
-
-  return (
-    <div 
-      className="group cursor-pointer"
-      onClick={() => setIsEditing(true)}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-semibold text-neutral-600 group-hover:text-sky-600 transition-colors tracking-tight">
-          {label} {required && <span className="text-red-500">*</span>}
-        </label>
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-400 group-hover:text-sky-600 px-2.5 py-1 rounded-lg group-hover:bg-sky-50 transition-all border border-transparent group-hover:border-sky-200">
-          <Pencil className="h-3 w-3" />
-          <span className="hidden group-hover:inline">Click to edit</span>
-        </span>
-      </div>
-      <div className="px-4 py-3 bg-neutral-50 border-2 border-neutral-200 rounded-xl min-h-13 group-hover:border-sky-300 group-hover:bg-sky-50/30 transition-all flex items-center">
-        {renderValue()}
-      </div>
-    </div>
-  )
-}
-
-type FeedType = "video" | "article" | "podcast" | "newsletter"
-// "scheduled" is a real status — items in this state have a scheduled_at and
-// will be flipped to "published" by /api/cron/feed-publish when their time arrives.
-type FeedStatus = "draft" | "scheduled" | "published" | "archived"
-
-// Comment interface for feed items (follows CRM TaskComment pattern)
-interface FeedComment {
-  id: string
-  content: string
-  author_name: string
-  author_email: string
-  author_avatar?: string
-  created_at: string
-  updated_at?: string
-}
+import { FeedFormBody } from "@/components/feed/FeedFormBody"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import type { FeedItem, FeedFormData, FeedStatus, FeedComment } from "@/components/feed/feed-types"
 
 const FEED_TABLE = "THEFEED"
-
-// =====================================================================
-// SpotlightFields — extracted from the [1, 2, 3].map copy-paste loop. One
-// rendering of the Spotlight N section (title, description, image, CTA pair).
-// Caller wraps in a CollapsibleSection. Kills three identical 75-line blocks.
-// =====================================================================
-interface SpotlightFieldsProps {
-  num: 1 | 2 | 3
-  // The form state shape varies, so we accept a generic record-shaped object
-  // and a single setter. Same pattern as the rest of the form.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  formData: any
-  onFieldChange: (field: string, value: string) => void
-  previewMode: boolean
-  editingId: string | null
-}
-
-function SpotlightFields({ num, formData, onFieldChange, previewMode, editingId }: SpotlightFieldsProps) {
-  const titleKey = `spotlight_${num}_title`
-  const descKey = `spotlight_${num}_description`
-  const imageKey = `spotlight_${num}_image`
-  const ctaTextKey = `spotlight_${num}_cta_text`
-  const ctaLinkKey = `spotlight_${num}_cta_link`
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">
-          Create a spotlight section to highlight specific content, products, or features.
-        </p>
-
-        <PreviewField
-          label={`Spotlight ${num} Title`}
-          value={(formData[titleKey] as string) || ""}
-          isPreview={previewMode && !!editingId}
-        >
-          <div>
-            <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
-            <input
-              type="text"
-              value={(formData[titleKey] as string) || ""}
-              onChange={(e) => onFieldChange(titleKey, e.target.value)}
-              className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
-              placeholder={`Enter spotlight ${num} title`}
-            />
-          </div>
-        </PreviewField>
-      </div>
-
-      <PreviewField
-        label={`Spotlight ${num} Description`}
-        value={(formData[descKey] as string) || ""}
-        isPreview={previewMode && !!editingId}
-        isRichText
-      >
-        <div>
-          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Description</label>
-          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">
-            A brief description of what you're spotlighting. Supports Markdown.
-          </p>
-          <RichTextEditor
-            value={(formData[descKey] as string) || ""}
-            onChange={(value: string) => onFieldChange(descKey, value)}
-            placeholder={`Spotlight ${num} description`}
-            minRows={4}
-          />
-        </div>
-      </PreviewField>
-
-      <ImageUpload
-        value={(formData[imageKey] as string) || ""}
-        onChange={(value) => onFieldChange(imageKey, value)}
-        label={`Spotlight ${num} Image`}
-        hideUrl
-      />
-
-      <div className="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200">
-        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-          <LinkIcon className="h-4 w-4 text-neutral-500" />
-          Call-to-Action Button
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <PreviewField
-            label="Button Text"
-            value={(formData[ctaTextKey] as string) || ""}
-            isPreview={previewMode && !!editingId}
-          >
-            <div>
-              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Text</label>
-              <input
-                type="text"
-                value={(formData[ctaTextKey] as string) || ""}
-                onChange={(e) => onFieldChange(ctaTextKey, e.target.value)}
-                className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
-                placeholder="Learn More"
-              />
-            </div>
-          </PreviewField>
-          <PreviewField
-            label="Button Link"
-            value={(formData[ctaLinkKey] as string) || ""}
-            isPreview={previewMode && !!editingId}
-          >
-            <div>
-              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Link</label>
-              <input
-                type="url"
-                value={(formData[ctaLinkKey] as string) || ""}
-                onChange={(e) => onFieldChange(ctaLinkKey, e.target.value)}
-                className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-mono transition-all"
-                placeholder="https://example.com/link"
-              />
-            </div>
-          </PreviewField>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface FeedItem {
-  id?: string
-  published_date: string
-  title: string
-  type: FeedType
-  summary: string
-  authors: string[]
-  topics: string[]
-  slug: string
-  og_image?: string
-  og_title?: string
-  og_description?: string
-  status: FeedStatus
-  // Persisted by Firestore on every write — surfaced on list cards as
-  // "Updated Xh ago" so editors can sort their attention to in-flight drafts.
-  created_at?: string
-  updated_at?: string
-  // ISO datetime; only meaningful when status === "scheduled". The cron at
-  // /api/cron/feed-publish flips status → published when scheduled_at <= now.
-  scheduled_at?: string
-  
-  // Newsletter-specific fields
-  hero_image_desktop?: string
-  hero_image_mobile?: string
-  founders_note_text?: string
-  founders_note_image?: string
-  last_month_gif?: string
-  the_drop_gif?: string
-  featured_post_title?: string
-  featured_post_image?: string
-  featured_post_content?: string
-  upcoming_event_title?: string
-  upcoming_event_description?: string
-  upcoming_event_image_desktop?: string
-  upcoming_event_image_mobile?: string
-  upcoming_event_cta_text?: string
-  upcoming_event_cta_link?: string
-  
-  // Spotlight fields
-  spotlight_1_title?: string
-  spotlight_1_description?: string
-  spotlight_1_image?: string
-  spotlight_1_cta_text?: string
-  spotlight_1_cta_link?: string
-  
-  spotlight_2_title?: string
-  spotlight_2_description?: string
-  spotlight_2_image?: string
-  spotlight_2_cta_text?: string
-  spotlight_2_cta_link?: string
-  
-  spotlight_3_title?: string
-  spotlight_3_description?: string
-  spotlight_3_image?: string
-  spotlight_3_cta_text?: string
-  spotlight_3_cta_link?: string
-  
-  // Comments
-  comments?: FeedComment[]
-}
-
-interface FeedFormData {
-  title: string
-  type: FeedType
-  summary: string
-  authors: string[]
-  topics: string[]
-  slug: string
-  published_date: string
-  status: FeedStatus
-  scheduled_at?: string
-  og_image?: string
-  og_title?: string
-  og_description?: string
-  
-  // Newsletter-specific fields
-  hero_image_desktop?: string
-  hero_image_mobile?: string
-  founders_note_text?: string
-  founders_note_image?: string
-  last_month_gif?: string
-  the_drop_gif?: string
-  featured_post_title?: string
-  featured_post_image?: string
-  featured_post_content?: string
-  upcoming_event_title?: string
-  upcoming_event_description?: string
-  upcoming_event_image_desktop?: string
-  upcoming_event_image_mobile?: string
-  upcoming_event_cta_text?: string
-  upcoming_event_cta_link?: string
-  
-  // Spotlight fields (3 items)
-  spotlight_1_title?: string
-  spotlight_1_description?: string
-  spotlight_1_image?: string
-  spotlight_1_cta_text?: string
-  spotlight_1_cta_link?: string
-  
-  spotlight_2_title?: string
-  spotlight_2_description?: string
-  spotlight_2_image?: string
-  spotlight_2_cta_text?: string
-  spotlight_2_cta_link?: string
-  
-  spotlight_3_title?: string
-  spotlight_3_description?: string
-  spotlight_3_image?: string
-  spotlight_3_cta_text?: string
-  spotlight_3_cta_link?: string
-}
 
 export default function FeedFormPage() {
   const router = useRouter()
@@ -653,27 +251,37 @@ export default function FeedFormPage() {
 
   // Auto-save draft to Firestore every 30 seconds
   const autoSaveToFirestore = useCallback(async () => {
-    // Only auto-save if:
-    // 1. Not currently editing an existing published/archived item
-    // 2. Form has meaningful content (title AND summary)
-    // 3. Status is draft
-    // 4. There are unsaved changes
-    if (formData.status !== "draft") return
+    // Auto-save fires when:
+    // - Form has meaningful content (title AND summary)
+    // - There are unsaved changes
+    // - One of: editing an existing item (any status), OR creating a new draft
+    //
+    // For new items, status must be draft (we don't want autosave to silently
+    // publish a half-finished new newsletter). For existing items being edited,
+    // we preserve whatever status the user has set — typo fixes on a published
+    // item save back as published.
+    const isEditingExisting = !!editingId
+    if (!isEditingExisting && formData.status !== "draft") return
     if (!formData.title?.trim() || !formData.summary?.trim()) return
     if (!hasUnsavedChanges && autoSaveDraftId) return
-    
+
     const currentFormString = JSON.stringify(formData)
     if (currentFormString === lastSavedFormData.current) return
 
     setIsAutoSaving(true)
     try {
-      // If we already have a draft ID, update it; otherwise create new
-      const isUpdating = autoSaveDraftId !== null || editingId !== null
+      // If we already have an autosave-draft ID or are editing an existing item,
+      // PATCH; otherwise POST a new draft.
+      const isUpdating = autoSaveDraftId !== null || isEditingExisting
       const method = isUpdating ? "PATCH" : "POST"
       const draftId = autoSaveDraftId || editingId
-      
-      const body = isUpdating 
-        ? { id: draftId, ...formData, status: "draft" }
+
+      // For new items the body forces status=draft. For existing-item edits we
+      // preserve formData.status as-is.
+      const body = isUpdating
+        ? isEditingExisting
+          ? { id: draftId, ...formData }
+          : { id: draftId, ...formData, status: "draft" }
         : { ...formData, status: "draft" }
 
       const response = await fetch(`/api/feed-submit?table=${FEED_TABLE}`, {
@@ -685,15 +293,12 @@ export default function FeedFormPage() {
       const result = await response.json()
 
       if (result.success) {
-        // Store the draft ID for future updates
         if (!isUpdating && result.data?.id) {
           setAutoSaveDraftId(result.data.id)
         }
         setLastSavedAt(new Date())
         setHasUnsavedChanges(false)
         lastSavedFormData.current = currentFormString
-        
-        // Refresh feed items list to show the draft
         loadFeedItems()
       }
     } catch (error) {
@@ -703,26 +308,30 @@ export default function FeedFormPage() {
     }
   }, [formData, autoSaveDraftId, editingId, hasUnsavedChanges])
 
-  // Auto-save to Firestore every 30 seconds when there's content
+  // Auto-save to Firestore every 30 seconds when there's content. Fires for
+  // both create-mode drafts and existing-item edits in the drawer.
   useEffect(() => {
-    if (activeTab !== "create") return
+    const inEditFlow = activeTab === "create" || !!editingId
+    if (!inEditFlow) return
     if (!formData.title?.trim() || !formData.summary?.trim()) return
-    if (formData.status !== "draft") return
+    if (!editingId && formData.status !== "draft") return
 
     const autoSaveInterval = setInterval(() => {
       autoSaveToFirestore()
-    }, 30000) // 30 seconds
+    }, 30000)
 
     return () => clearInterval(autoSaveInterval)
-  }, [activeTab, formData.title, formData.summary, formData.status, autoSaveToFirestore])
+  }, [activeTab, editingId, formData.title, formData.summary, formData.status, autoSaveToFirestore])
 
   // Save to Firestore when leaving the page (beforeunload)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges && formData.title?.trim() && formData.summary?.trim() && formData.status === "draft") {
-        // Trigger save
+      const eligible =
+        formData.title?.trim() &&
+        formData.summary?.trim() &&
+        (!!editingId || formData.status === "draft")
+      if (hasUnsavedChanges && eligible) {
         autoSaveToFirestore()
-        // Show browser warning
         e.preventDefault()
         e.returnValue = "You have unsaved changes. Are you sure you want to leave?"
         return e.returnValue
@@ -731,7 +340,7 @@ export default function FeedFormPage() {
 
     window.addEventListener("beforeunload", handleBeforeUnload)
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [hasUnsavedChanges, formData, autoSaveToFirestore])
+  }, [hasUnsavedChanges, formData, editingId, autoSaveToFirestore])
 
   // Load feed items on mount
   useEffect(() => {
@@ -1105,8 +714,9 @@ export default function FeedFormPage() {
       spotlight_3_cta_text: item.spotlight_3_cta_text,
       spotlight_3_cta_link: item.spotlight_3_cta_link,
     })
-    setActiveTab("create")
-    
+    // Edit-mode renders inside a drawer overlay — keep activeTab on "view"
+    // so the list stays visible behind it.
+
     // Reset auto-save state when editing existing item
     setAutoSaveDraftId(null)
     setLastSavedAt(null)
@@ -1348,14 +958,42 @@ export default function FeedFormPage() {
               <span className="font-medium text-neutral-700">digitalcanvas.community/thefeed</span>
             </p>
           </div>
-          <button
-            onClick={loadFeedItems}
-            disabled={isLoading}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {activeTab === "create" && !editingId ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab("view")}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                title="Back to feeds (Esc)"
+              >
+                <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                Back to feeds
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={loadFeedItems}
+                  disabled={isLoading}
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
+                  title="Refresh"
+                  aria-label="Refresh"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("create")
+                    setEditingId(null)
+                  }}
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Create New Feed
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Filter Tags - Only show when viewing */}
@@ -1454,45 +1092,6 @@ export default function FeedFormPage() {
           </div>
         )}
 
-        {/* Action Buttons - Below Filters */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab("view")}
-            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "view"
-                ? "bg-neutral-900 text-white"
-                : "bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
-            }`}
-          >
-            <List className="h-4 w-4" />
-            <span>View Feeds</span>
-            <span
-              className={`tabular-nums text-[10px] ${
-                activeTab === "view" ? "text-white/70" : "text-neutral-400"
-              }`}
-            >
-              {feedItems.length}
-            </span>
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("create")
-              setEditingId(null)
-            }}
-            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "create"
-                ? "bg-neutral-900 text-white"
-                : "bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
-            }`}
-          >
-            <FileText className="h-4 w-4" />
-            <span>{editingId ? "Edit Feed" : "Create New"}</span>
-            {activeTab === "create" && (
-              <span className="w-1 h-1 bg-white/70 rounded-full" aria-hidden="true" />
-            )}
-          </button>
-        </div>
-
         {/* View Section */}
         {activeTab === "view" && (
           <div className="space-y-4">
@@ -1510,7 +1109,7 @@ export default function FeedFormPage() {
                     <h3 className="text-xl font-bold text-neutral-900 mb-1">No feed items found</h3>
                     <p className="text-neutral-500 text-sm">
                       {feedItems.length === 0
-                        ? "Get started by using the Create New button above."
+                        ? 'Click "New newsletter" in the page header to get started.'
                         : "No items match your current filters."}
                     </p>
                   </div>
@@ -1932,835 +1531,146 @@ export default function FeedFormPage() {
           </div>
         )}
 
-        {/* Create Section */}
-        {activeTab === "create" && (
-          <div className="relative">
-            {/* Sticky Header Bar - Always visible while scrolling */}
-            <div className="sticky top-16 z-40 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur-sm border-b border-neutral-200 mb-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Left: Status & Info */}
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full ${
-                        formData.status === "published"
-                          ? "bg-emerald-500"
-                          : formData.status === "scheduled"
-                          ? "bg-blue-500"
-                          : formData.status === "draft"
-                          ? "bg-amber-500"
-                          : "bg-neutral-400"
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <select
-                      value={formData.status}
-                      onChange={(e) => {
-                        const next = e.target.value as FeedStatus
-                        // Default a scheduled_at when flipping to scheduled — anchor on
-                        // published_date at 9am CST so the editor doesn't see an empty input.
-                        if (next === "scheduled" && !formData.scheduled_at) {
-                          const base = formData.published_date || new Date().toISOString().split("T")[0]
-                          // datetime-local format: YYYY-MM-DDTHH:MM
-                          const defaultIso = `${base}T09:00`
-                          setFormData((prev) => ({ ...prev, status: next, scheduled_at: defaultIso }))
-                        } else {
-                          handleInputChange("status", next)
-                        }
-                      }}
-                      className="h-8 px-2 text-xs font-medium rounded-md ring-1 ring-neutral-200 bg-white text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                      aria-label="Status"
-                    >
-                      <option value="draft">Draft</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="published">Published</option>
-                      <option value="archived">Archived</option>
-                    </select>
-
-                    {/* Schedule picker — only renders when scheduled */}
-                    {formData.status === "scheduled" && (
-                      <input
-                        type="datetime-local"
-                        value={formData.scheduled_at || ""}
-                        onChange={(e) => handleInputChange("scheduled_at", e.target.value)}
-                        className="h-8 px-2 text-xs rounded-md ring-1 ring-neutral-200 bg-white text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none tabular-nums"
-                        aria-label="Scheduled publish time"
-                      />
-                    )}
-                  </div>
-
-                  {/* Completion Indicator */}
-                  {formData.type === "newsletter" && (
-                    <div className="hidden sm:flex items-center gap-2">
-                      <div className="w-24 h-1 bg-neutral-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-[width] ${
-                            getCompletionPercentage() === 100 ? "bg-emerald-500" : "bg-neutral-900"
-                          }`}
-                          style={{ width: `${getCompletionPercentage()}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] tabular-nums text-neutral-500">
-                        {getCompletionPercentage()}%
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Auto-save status indicator */}
-                  {formData.status === "draft" && formData.title?.trim() && formData.summary?.trim() && (
-                    <div className="flex items-center gap-2">
-                      {isAutoSaving ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium tabular-nums">
-                          <span className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse" aria-hidden="true" />
-                          <Cloud className="h-3 w-3" />
-                          Saving
-                        </span>
-                      ) : lastSavedAt ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium tabular-nums">
-                          <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
-                          Saved {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      ) : hasUnsavedChanges ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium">
-                          <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
-                          Unsaved
-                        </span>
-                      ) : null}
-
-                      {hasUnsavedChanges && !isAutoSaving && (
-                        <button
-                          type="button"
-                          onClick={autoSaveToFirestore}
-                          className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-0.5 rounded transition-colors"
-                        >
-                          Save now
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Pre-publish checklist — only renders when status is published */}
-                  <FeedPrePublishChecklist
-                    formData={formData}
-                    feedItems={feedItems}
-                    editingId={editingId}
-                  />
-                </div>
-
-                {/* Right: Action Buttons */}
-                <div className="flex items-center gap-2">
-                  {/* Preview — only when editing an existing item (needs an id) */}
-                  {editingId && (
-                    <a
-                      href={`/admin/feed-form/preview/${editingId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-                      title={`Preview (${MOD_KEY_LABEL}P)`}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Preview
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editingId) handleCancelEdit()
-                      setActiveTab("view")
-                    }}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-                    title="Cancel (Esc)"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
-                    title={`Save (${MOD_KEY_LABEL}S)`}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        {editingId ? "Updating…" : "Saving…"}
-                      </>
-                    ) : editingId ? (
-                      <>
-                        <Save className="h-3.5 w-3.5" />
-                        Update
-                      </>
-                    ) : formData.status === "published" ? (
-                      <>
-                        <Send className="h-3.5 w-3.5" />
-                        Publish
-                      </>
-                    ) : formData.status === "scheduled" ? (
-                      <>
-                        <Calendar className="h-3.5 w-3.5" />
-                        Schedule
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-3.5 w-3.5" />
-                        Save Draft
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Draft Notification */}
-            {hasDraft && !editingId && (
-              <div className="mb-4 p-3 bg-white rounded-md ring-1 ring-neutral-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700 shrink-0">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">
-                      <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
-                      Draft available
-                    </p>
-                    <p className="text-sm text-neutral-700 mt-0.5">
-                      You have an unfinished feed item saved locally.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={loadDraft}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
-                  >
-                    Load draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearDraft}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-red-50 hover:text-red-600 hover:ring-red-200 transition-colors"
-                    aria-label="Clear draft"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Section Toggle Controls */}
-            {formData.type === "newsletter" && (
-              <div className="mb-5">
-                {/* Intro Panel for New Feeds */}
-                {!editingId && !formData.title && (
-                  <div className="mb-3 p-4 bg-white rounded-md ring-1 ring-neutral-200/70">
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900" aria-hidden="true" />
-                      New newsletter
-                    </p>
-                    <p className="text-sm text-neutral-700 mb-3">
-                      Click any section header below to expand and edit it. Required fields are marked with{" "}
-                      <span className="text-red-500">*</span>.
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-[11px]">
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
-                        <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
-                        Complete
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
-                        <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
-                        Collapsed
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
-                        <kbd className="px-1 rounded bg-white ring-1 ring-neutral-200 font-mono text-[10px]">{MOD_KEY_LABEL}S</kbd>
-                        Save
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
-                        <kbd className="px-1 rounded bg-white ring-1 ring-neutral-200 font-mono text-[10px]">{MOD_KEY_LABEL}P</kbd>
-                        Preview
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">
-                    Newsletter sections{" "}
-                    <span className="text-neutral-400 normal-case tracking-normal">
-                      ({openSections.size} open)
-                    </span>
-                  </p>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={expandAllSections}
-                      className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded transition-colors"
-                    >
-                      Expand all
-                    </button>
-                    <button
-                      type="button"
-                      onClick={collapseAllSections}
-                      className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded transition-colors"
-                    >
-                      Collapse all
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Basic Information - Collapsible */}
-              <CollapsibleSection
-                id="basic"
-                title="Basic Information"
-                description="Title, type, summary, and publishing details"
-                icon={<FileText className="h-5 w-5" />}
-                isOpen={openSections.has("basic")}
-                onToggle={() => toggleSection("basic")}
-                isComplete={isSectionComplete("basic")}
-              >
-                <div className="space-y-4">
-                  <PreviewField label="Title" value={formData.title} isPreview={previewMode && !!editingId} required>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Title <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => handleInputChange("title", e.target.value)}
-                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent text-lg"
-                        placeholder="Enter feed item title"
-                        required
-                      />
-                    </div>
-                  </PreviewField>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <PreviewField label="Type" value={`${formData.type === 'video' ? '🎬' : formData.type === 'article' ? '📄' : formData.type === 'podcast' ? '🎙️' : '📰'} ${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}`} isPreview={previewMode && !!editingId}>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Type</label>
-                        <select
-                          value={formData.type}
-                          onChange={(e) => handleInputChange("type", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                        >
-                          <option value="video">🎬 Video</option>
-                          <option value="article">📄 Article</option>
-                          <option value="podcast">🎙️ Podcast</option>
-                          <option value="newsletter">📰 Newsletter</option>
-                        </select>
-                      </div>
-                    </PreviewField>
-
-                    <PreviewField label="Published Date" value={formData.published_date} isPreview={previewMode && !!editingId}>
-                      <div>
-                        <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                          <Calendar className="h-4 w-4" />
-                          Published Date
-                        </label>
-                        <input
-                          type="date"
-                          value={formData.published_date}
-                          onChange={(e) => handleInputChange("published_date", e.target.value)}
-                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                        />
-                      </div>
-                    </PreviewField>
-                  </div>
-
-                  <PreviewField label="Summary" value={formData.summary} isPreview={previewMode && !!editingId} required isRichText>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Summary <span className="text-red-500">*</span>
-                      </label>
-                      <RichTextEditor
-                        value={formData.summary}
-                        onChange={(value: string) => handleInputChange("summary", value)}
-                        placeholder="Enter a brief summary (supports Markdown)"
-                        minRows={4}
-                      />
-                    </div>
-                  </PreviewField>
-
-                  <PreviewField label="Slug" value={formData.slug} isPreview={previewMode && !!editingId}>
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <LinkIcon className="h-4 w-4" />
-                        Slug
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.slug}
-                        onChange={(e) => handleInputChange("slug", e.target.value)}
-                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-sm"
-                        placeholder="auto-generated-from-title"
-                      />
-                      <p className="text-xs text-neutral-500 mt-1">Auto-generated from title if left empty</p>
-                    </div>
-                  </PreviewField>
-                </div>
-              </CollapsibleSection>
-
-              {/* Metadata - Collapsible */}
-              <CollapsibleSection
-                id="metadata"
-                title="Metadata & Social Sharing"
-                description="Authors, topics, and Open Graph settings for social previews"
-                icon={<Tag className="h-5 w-5" />}
-                isOpen={openSections.has("metadata")}
-                onToggle={() => toggleSection("metadata")}
-                isComplete={isSectionComplete("metadata")}
-              >
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
-                        <Users className="h-4 w-4 text-neutral-500" />
-                        Authors
-                      </label>
-                      <p className="text-xs text-neutral-500 mb-2 leading-relaxed">
-                        Enter names separated by commas (e.g., Digital Canvas Team, Dev Team)
-                      </p>
-                      <input
-                        type="text"
-                        onChange={(e) => handleArrayInput("authors", e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all"
-                        placeholder="Digital Canvas Team, Dev Team"
-                      />
-                      {formData.authors.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {formData.authors.map((author, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-100 text-sky-800 text-sm font-medium rounded-full">
-                              {author}
-                              <button
-                                type="button"
-                                onClick={() => removeArrayItem("authors", idx)}
-                                className="ml-0.5 hover:text-sky-900 transition-colors"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
-                        <Tag className="h-4 w-4 text-neutral-500" />
-                        Topics
-                      </label>
-                      <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Enter tags separated by commas for categorization</p>
-                      <input
-                        type="text"
-                        onChange={(e) => handleArrayInput("topics", e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all"
-                        placeholder="Technology, Design, Business"
-                      />
-                      {formData.topics.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {formData.topics.map((topic, idx) => (
-                            <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-800 text-sm font-medium rounded-full">
-                              {topic}
-                              <button
-                                type="button"
-                                onClick={() => removeArrayItem("topics", idx)}
-                                className="ml-0.5 hover:text-emerald-900 transition-colors"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Open Graph Settings */}
-                  <div className="pt-4 border-t border-neutral-200">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-2 bg-linear-to-br from-sky-500 to-sky-600 rounded-lg">
-                        <LinkIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-neutral-800">Open Graph Settings</h4>
-                        <p className="text-xs text-neutral-500">Customize how this content appears when shared on social media</p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-linear-to-br from-sky-50 to-sky-100 rounded-xl p-5 border-2 border-sky-100 space-y-5">
-                      {/* OG Title */}
-                      <PreviewField label="OG Title" value={formData.og_title || ""} isPreview={previewMode && !!editingId}>
-                        <div>
-                          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
-                            Social Title
-                          </label>
-                          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Custom title for social sharing. Leave empty to use the main title.</p>
-                          <input
-                            type="text"
-                            value={formData.og_title || ""}
-                            onChange={(e) => handleInputChange("og_title", e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all"
-                            placeholder={formData.title || "Enter social title..."}
-                          />
-                        </div>
-                      </PreviewField>
-                      
-                      {/* OG Description */}
-                      <PreviewField label="OG Description" value={formData.og_description || ""} isPreview={previewMode && !!editingId}>
-                        <div>
-                          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">
-                            Social Description
-                          </label>
-                          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Custom description for social sharing. Leave empty to use the summary. (Max 160 characters recommended)</p>
-                          <textarea
-                            value={formData.og_description || ""}
-                            onChange={(e) => handleInputChange("og_description", e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base transition-all resize-y min-h-20"
-                            placeholder={formData.summary ? formData.summary.substring(0, 160) : "Enter social description..."}
-                            maxLength={200}
-                          />
-                          <p className="text-xs text-neutral-400 mt-1 text-right">
-                            {(formData.og_description || "").length}/200 characters
-                          </p>
-                        </div>
-                      </PreviewField>
-                      
-                      {/* OG Image */}
-                      <div>
-                        <ImageUpload
-                          value={formData.og_image || ""}
-                          onChange={(value) => handleInputChange("og_image", value)}
-                          label="Social Share Image (1200×630px)"
-                          hideUrl
-                        />
-                        <p className="text-xs text-sky-600 mt-2 leading-relaxed">
-                          <strong>Recommended:</strong> 1200×630 pixels (1.91:1 ratio). This image appears when your content is shared on Facebook, Twitter/X, LinkedIn, and other social platforms.
-                        </p>
-                      </div>
-                      
-                      {/* Preview Card */}
-                      {(formData.og_image || formData.og_title || formData.title) && (
-                        <div className="mt-4 pt-4 border-t border-sky-200">
-                          <p className="text-xs font-semibold text-neutral-600 mb-3 uppercase tracking-wide">Social Preview</p>
-                          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-sm max-w-md">
-                            {formData.og_image && (
-                              <div className="aspect-[1.91/1] bg-neutral-100 overflow-hidden">
-                                <img 
-                                  src={formData.og_image} 
-                                  alt="OG Preview" 
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="p-3">
-                              <p className="text-xs text-neutral-400 uppercase tracking-wide mb-1">digitalcanvas.community</p>
-                              <h5 className="text-sm font-bold text-neutral-900 line-clamp-2 mb-1">
-                                {formData.og_title || formData.title || "Your title here"}
-                              </h5>
-                              <p className="text-xs text-neutral-500 line-clamp-2">
-                                {formData.og_description || formData.summary || "Your description will appear here..."}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleSection>
-
-              {/* Newsletter-Specific Fields (conditional) */}
-              {formData.type === "newsletter" && (
-                <>
-                  {/* Hero & Founder's Note - Collapsible */}
-                  <CollapsibleSection
-                    id="hero"
-                    title="Hero & Founder's Note"
-                    description="Hero images and opening message"
-                    icon={<Star className="h-5 w-5" />}
-                    isOpen={openSections.has("hero")}
-                    onToggle={() => toggleSection("hero")}
-                    isComplete={isSectionComplete("hero")}
-                  >
-                    <div className="space-y-6">
-                      <div>
-                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <ImageIcon className="h-4 w-4 text-neutral-500" />
-                          Hero Images
-                        </h4>
-                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Upload separate hero images optimized for desktop and mobile devices.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <ImageUpload
-                            value={formData.hero_image_desktop || ""}
-                            onChange={(value) => handleInputChange("hero_image_desktop", value)}
-                            label="Desktop Hero (Recommended: 1920x1080)"
-                            hideUrl
-                          />
-                          <ImageUpload
-                            value={formData.hero_image_mobile || ""}
-                            onChange={(value) => handleInputChange("hero_image_mobile", value)}
-                            label="Mobile Hero (Recommended: 1080x1350)"
-                            hideUrl
-                          />
-                        </div>
-                      </div>
-
-                      <div className="border-t border-neutral-200 pt-6">
-                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <Edit className="h-4 w-4 text-neutral-500" />
-                          Founder's Note
-                        </h4>
-                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">A personal message from the founders. This appears prominently in the newsletter.</p>
-                        <PreviewField label="Founder's Note Content" value={formData.founders_note_text || ""} isPreview={previewMode && !!editingId} isRichText>
-                          <div>
-                            <RichTextEditor
-                              value={formData.founders_note_text || ""}
-                              onChange={(value: string) => handleInputChange("founders_note_text", value)}
-                              placeholder="Enter founder's note content (supports Markdown)"
-                              minRows={6}
-                            />
-                          </div>
-                        </PreviewField>
-
-                        <div className="mt-4">
-                          <ImageUpload
-                            value={formData.founders_note_image || ""}
-                            onChange={(value) => handleInputChange("founders_note_image", value)}
-                            label="Founder's Photo or Signature"
-                            hideUrl
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </CollapsibleSection>
-
-                  {/* GIFs & Featured Post - Collapsible */}
-                  <CollapsibleSection
-                    id="sections"
-                    title="Content Sections"
-                    description="Last Month, The Drop, and Featured Post"
-                    icon={<ImageIcon className="h-5 w-5" />}
-                    isOpen={openSections.has("sections")}
-                    onToggle={() => toggleSection("sections")}
-                    isComplete={isSectionComplete("sections")}
-                  >
-                    <div className="space-y-6">
-                      <div>
-                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <ImageIcon className="h-4 w-4 text-neutral-500" />
-                          GIF Animations
-                        </h4>
-                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Add animated GIFs for the "Last Month" and "The Drop" sections.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <ImageUpload
-                            value={formData.last_month_gif || ""}
-                            onChange={(value) => handleInputChange("last_month_gif", value)}
-                            label="Last Month GIF"
-                            hideUrl
-                          />
-                          <ImageUpload
-                            value={formData.the_drop_gif || ""}
-                            onChange={(value) => handleInputChange("the_drop_gif", value)}
-                            label="The Drop GIF"
-                            hideUrl
-                          />
-                        </div>
-                      </div>
-
-                      <div className="border-t border-neutral-200 pt-6">
-                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <Wand2 className="h-4 w-4 text-amber-500" />
-                          Featured Post
-                        </h4>
-                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Highlight your most important content with a featured post section.</p>
-                        <div className="space-y-5 bg-amber-50/50 rounded-xl p-5 border-2 border-amber-100">
-                          <PreviewField label="Featured Post Title" value={formData.featured_post_title || ""} isPreview={previewMode && !!editingId}>
-                            <div>
-                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
-                              <input
-                                type="text"
-                                value={formData.featured_post_title || ""}
-                                onChange={(e) => handleInputChange("featured_post_title", e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-400 text-base font-medium transition-all"
-                                placeholder="Enter featured post title"
-                              />
-                            </div>
-                          </PreviewField>
-                          <ImageUpload
-                            value={formData.featured_post_image || ""}
-                            onChange={(value) => handleInputChange("featured_post_image", value)}
-                            label="Featured Post Image"
-                            hideUrl
-                          />
-                          <PreviewField label="Featured Post Content" value={formData.featured_post_content || ""} isPreview={previewMode && !!editingId} isRichText>
-                            <div>
-                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Content</label>
-                              <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Write the main content for your featured post. Supports Markdown.</p>
-                              <RichTextEditor
-                                value={formData.featured_post_content || ""}
-                                onChange={(value: string) => handleInputChange("featured_post_content", value)}
-                                placeholder="Featured post content (supports Markdown)"
-                                minRows={6}
-                              />
-                            </div>
-                          </PreviewField>
-                        </div>
-                      </div>
-                    </div>
-                  </CollapsibleSection>
-
-                  {/* Upcoming Event - Collapsible */}
-                  <CollapsibleSection
-                    id="event"
-                    title="Upcoming Event"
-                    description="Event details and call-to-action"
-                    icon={<Calendar className="h-5 w-5" />}
-                    isOpen={openSections.has("event")}
-                    onToggle={() => toggleSection("event")}
-                    isComplete={isSectionComplete("event")}
-                  >
-                    <div className="space-y-6">
-                      <div>
-                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-neutral-500" />
-                          Event Details
-                        </h4>
-                        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Promote your upcoming event with details and a clear call-to-action.</p>
-                        
-                        <PreviewField label="Event Title" value={formData.upcoming_event_title || ""} isPreview={previewMode && !!editingId}>
-                          <div>
-                            <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Event Title</label>
-                            <input
-                              type="text"
-                              value={formData.upcoming_event_title || ""}
-                              onChange={(e) => handleInputChange("upcoming_event_title", e.target.value)}
-                              className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
-                              placeholder="Enter event title"
-                            />
-                          </div>
-                        </PreviewField>
-                      </div>
-                      
-                      <PreviewField label="Event Description" value={formData.upcoming_event_description || ""} isPreview={previewMode && !!editingId} isRichText>
-                        <div>
-                          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Event Description</label>
-                          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">Describe the event details, schedule, and what attendees can expect.</p>
-                          <RichTextEditor
-                            value={formData.upcoming_event_description || ""}
-                            onChange={(value: string) => handleInputChange("upcoming_event_description", value)}
-                            placeholder="Event description (supports Markdown)"
-                            minRows={6}
-                          />
-                        </div>
-                      </PreviewField>
-                      
-                      <div>
-                        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                          <ImageIcon className="h-4 w-4 text-neutral-500" />
-                          Event Images
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <ImageUpload
-                            value={formData.upcoming_event_image_desktop || ""}
-                            onChange={(value) => handleInputChange("upcoming_event_image_desktop", value)}
-                            label="Desktop Image (1920x1080)"
-                            hideUrl
-                          />
-                          <ImageUpload
-                            value={formData.upcoming_event_image_mobile || ""}
-                            onChange={(value) => handleInputChange("upcoming_event_image_mobile", value)}
-                            label="Mobile Image (1080x1350)"
-                            hideUrl
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="bg-sky-50/50 rounded-xl p-5 border-2 border-sky-100">
-                        <h4 className="text-sm font-bold text-sky-800 mb-3 flex items-center gap-2">
-                          <LinkIcon className="h-4 w-4" />
-                          Call-to-Action Button
-                        </h4>
-                        <p className="text-xs text-sky-600 mb-4 leading-relaxed">Add a button that links to your event registration or details page.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <PreviewField label="Button Text" value={formData.upcoming_event_cta_text || ""} isPreview={previewMode && !!editingId}>
-                            <div>
-                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Text</label>
-                              <input
-                                type="text"
-                                value={formData.upcoming_event_cta_text || ""}
-                                onChange={(e) => handleInputChange("upcoming_event_cta_text", e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
-                                placeholder="Register Now"
-                              />
-                            </div>
-                          </PreviewField>
-                          <PreviewField label="Button Link" value={formData.upcoming_event_cta_link || ""} isPreview={previewMode && !!editingId}>
-                            <div>
-                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Link</label>
-                              <input
-                                type="url"
-                                value={formData.upcoming_event_cta_link || ""}
-                                onChange={(e) => handleInputChange("upcoming_event_cta_link", e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium font-mono transition-all"
-                                placeholder="https://example.com/register"
-                              />
-                            </div>
-                          </PreviewField>
-                        </div>
-                      </div>
-                    </div>
-                  </CollapsibleSection>
-
-                  {/* Spotlights — extracted to <SpotlightFields/> to kill the
-                      former 3× copy-paste. Each iteration only sets the num. */}
-                  {([1, 2, 3] as const).map((num) => (
-                    <CollapsibleSection
-                      key={num}
-                      id={`spotlight${num}`}
-                      title={`Spotlight ${num}`}
-                      description={`Highlight section ${num} with image and call-to-action`}
-                      icon={<Wand2 className="h-5 w-5" />}
-                      isOpen={openSections.has(`spotlight${num}`)}
-                      onToggle={() => toggleSection(`spotlight${num}`)}
-                      isComplete={isSectionComplete(`spotlight${num}`)}
-                    >
-                      <SpotlightFields
-                        num={num}
-                        formData={formData}
-                        onFieldChange={(field, value) => handleInputChange(field as keyof FeedFormData, value)}
-                        previewMode={previewMode}
-                        editingId={editingId}
-                      />
-                    </CollapsibleSection>
-                  ))}
-                </>
-              )}
-
-              {/* Bottom Action Bar - For additional options */}
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-4 mt-6 border-t border-neutral-200">
-                <div className="flex flex-wrap gap-2">
-                  {!editingId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={loadMockData}
-                      className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Load Test Data
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </form>
-          </div>
+        {/* Create Section (inline, full-page) — only when creating new and not
+            editing an existing item. Edit-mode opens the drawer below instead. */}
+        {activeTab === "create" && !editingId && (
+          <FeedFormBody
+            formData={formData}
+            setFormData={setFormData}
+            feedItems={feedItems}
+            editingId={editingId}
+            isSubmitting={isSubmitting}
+            previewMode={previewMode}
+            openSections={openSections}
+            setOpenSections={setOpenSections}
+            hasDraft={hasDraft}
+            loadDraft={loadDraft}
+            clearDraft={clearDraft}
+            loadMockData={loadMockData}
+            isAutoSaving={isAutoSaving}
+            lastSavedAt={lastSavedAt}
+            hasUnsavedChanges={hasUnsavedChanges}
+            autoSaveToFirestore={autoSaveToFirestore}
+            onSubmit={handleSubmit}
+            onCancel={() => setActiveTab("view")}
+            variant="page"
+          />
         )}
       </motion.div>
+
+      {/* Edit drawer — opens whenever an existing feed item is being edited.
+          List stays visible behind it. Form renders without its own sticky
+          header (drawer provides one) and without its inline action bar
+          (drawer footer provides Save/Cancel). */}
+      <DetailDrawer
+        open={!!editingId}
+        onClose={handleCancelEdit}
+        title={formData.title || "Edit feed item"}
+        subtitle={
+          (() => {
+            // Pull updated_at from the source-of-truth feedItems list — formData
+            // doesn't carry it (the form payload omits server-managed fields).
+            const editing = feedItems.find((f) => f.id === editingId)
+            const lastEdited = formatRelative(editing?.updated_at)
+            return (
+              <span className="text-xs text-neutral-500 flex items-center gap-2 flex-wrap">
+                <span className="capitalize">{formData.type}</span>
+                <span className="text-neutral-300">·</span>
+                <span className="capitalize">{formData.status}</span>
+                {lastEdited && (
+                  <>
+                    <span className="text-neutral-300">·</span>
+                    <span title={editing?.updated_at}>Updated {lastEdited}</span>
+                  </>
+                )}
+              </span>
+            )
+          })()
+        }
+        width="xl"
+        closeOnEscape
+        footer={
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              {editingId && (
+                <a
+                  href={`/admin/feed-form/preview/${editingId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                  title={`Preview (${MOD_KEY_LABEL}P)`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Preview
+                </a>
+              )}
+              {/* Pre-publish checklist surfaces here so warnings sit next to
+                  the action that triggers them. Component self-hides when
+                  status is draft. */}
+              <FeedPrePublishChecklist
+                formData={formData}
+                feedItems={feedItems}
+                editingId={editingId}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                title="Cancel (Esc)"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                title={`Update (${MOD_KEY_LABEL}S)`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating…
+                  </>
+                ) : (
+                  <>
+                    Update
+                    <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
+                      {MOD_KEY_LABEL}S
+                    </kbd>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        }
+      >
+        {editingId && (
+          <FeedFormBody
+            formData={formData}
+            setFormData={setFormData}
+            feedItems={feedItems}
+            editingId={editingId}
+            isSubmitting={isSubmitting}
+            previewMode={previewMode}
+            openSections={openSections}
+            setOpenSections={setOpenSections}
+            hasDraft={false}
+            loadDraft={loadDraft}
+            clearDraft={clearDraft}
+            loadMockData={loadMockData}
+            isAutoSaving={isAutoSaving}
+            lastSavedAt={lastSavedAt}
+            hasUnsavedChanges={hasUnsavedChanges}
+            autoSaveToFirestore={autoSaveToFirestore}
+            onSubmit={handleSubmit}
+            onCancel={handleCancelEdit}
+            variant="drawer"
+          />
+        )}
+      </DetailDrawer>
     </div>
     </AdminRoleGuard>
   )
