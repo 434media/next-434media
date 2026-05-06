@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import {
   ChevronLeft,
   Plus,
   Search,
   Edit,
+  Eye,
   Trash2,
   Save,
   X,
@@ -23,6 +24,9 @@ import {
 import { RichTextEditor } from "@/components/RichTextEditor"
 import { ImageUpload } from "@/components/ImageUpload"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { TaxonomyChipInput } from "@/components/feed/TaxonomyChipInput"
+import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
+import { BlogPrePublishChecklist } from "@/components/admin/BlogPrePublishChecklist"
 import type { BlogPost } from "@/types/blog-types"
 
 // Blog categories
@@ -63,6 +67,7 @@ export default function BlogAdminPage() {
   // Form state
   const [formData, setFormData] = useState({
     title: "",
+    slug: "",
     content: "",
     excerpt: "",
     featured_image: "",
@@ -72,10 +77,16 @@ export default function BlogAdminPage() {
     status: "draft" as "draft" | "published",
     author: "434 Media"
   })
-  const [tagInput, setTagInput] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+
+  // Autosave state — fires every 30s while editing an existing post (any
+  // status) or while drafting a new one. Mirrors the feed-form pattern.
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const lastSavedFormData = useRef<string>("")
 
   // Load posts on mount
   useEffect(() => {
@@ -108,6 +119,7 @@ export default function BlogAdminPage() {
   const resetForm = () => {
     setFormData({
       title: "",
+      slug: "",
       content: "",
       excerpt: "",
       featured_image: "",
@@ -117,9 +129,18 @@ export default function BlogAdminPage() {
       status: "draft",
       author: "434 Media"
     })
-    setTagInput("")
     setSelectedPost(null)
   }
+
+  // Auto-generate slug from title (URL-safe, lowercase, hyphenated)
+  const generateSlug = (title: string): string =>
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9 -]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .trim()
+
 
   const handleCreateNew = () => {
     resetForm()
@@ -130,6 +151,7 @@ export default function BlogAdminPage() {
     setSelectedPost(post)
     setFormData({
       title: post.title,
+      slug: post.slug || "",
       content: post.content,
       excerpt: post.excerpt || "",
       featured_image: post.featured_image || "",
@@ -221,20 +243,128 @@ export default function BlogAdminPage() {
     }
   }
 
-  const addTag = () => {
-    const tag = tagInput.trim().toLowerCase()
-    if (tag && !formData.tags.includes(tag)) {
-      setFormData(prev => ({ ...prev, tags: [...prev.tags, tag] }))
-      setTagInput("")
+  // Track unsaved changes — set whenever form drifts from the last saved snapshot
+  useEffect(() => {
+    if (view !== "edit" && view !== "create") return
+    const currentFormString = JSON.stringify(formData)
+    if (lastSavedFormData.current && currentFormString !== lastSavedFormData.current) {
+      setHasUnsavedChanges(true)
     }
-  }
+  }, [formData, view])
 
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      tags: prev.tags.filter(tag => tag !== tagToRemove) 
-    }))
-  }
+  // Reset autosave bookkeeping when leaving the editor
+  useEffect(() => {
+    if (view === "list") {
+      setLastSavedAt(null)
+      setHasUnsavedChanges(false)
+      lastSavedFormData.current = ""
+    } else if (view === "edit" || view === "create") {
+      lastSavedFormData.current = JSON.stringify(formData)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedPost?.id])
+
+  // Autosave handler — PATCHes existing post (preserves status), or POSTs a
+  // new draft. Mirrors feed-form's pattern. Skipped if no meaningful content
+  // or no unsaved changes.
+  const autoSaveToBackend = useCallback(async () => {
+    const isEditingExisting = !!selectedPost?.id
+    if (!isEditingExisting && formData.status !== "draft") return
+    if (!formData.title?.trim() || !formData.content?.trim()) return
+    if (!hasUnsavedChanges) return
+
+    const currentFormString = JSON.stringify(formData)
+    if (currentFormString === lastSavedFormData.current) return
+
+    setIsAutoSaving(true)
+    try {
+      const res = isEditingExisting
+        ? await fetch(`/api/blog/${selectedPost!.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formData),
+          })
+        : await fetch("/api/blog", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...formData, status: "draft" }),
+          })
+
+      if (!res.ok) return
+      const json = await res.json()
+
+      // For new drafts, latch onto the resulting id so subsequent autosaves PATCH
+      if (!isEditingExisting && json.post?.id) {
+        setSelectedPost(json.post as BlogPost)
+      }
+      setLastSavedAt(new Date())
+      setHasUnsavedChanges(false)
+      lastSavedFormData.current = currentFormString
+      // Refresh the underlying list so timestamps stay current
+      loadPosts()
+    } catch (err) {
+      console.error("Autosave failed:", err)
+    } finally {
+      setIsAutoSaving(false)
+    }
+  }, [formData, selectedPost, hasUnsavedChanges])
+
+  // Run autosave every 30s while editing
+  useEffect(() => {
+    if (view !== "edit" && view !== "create") return
+    if (!formData.title?.trim() || !formData.content?.trim()) return
+    if (!selectedPost?.id && formData.status !== "draft") return
+
+    const interval = setInterval(() => {
+      autoSaveToBackend()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [view, selectedPost?.id, formData.title, formData.content, formData.status, autoSaveToBackend])
+
+  // beforeunload — try to flush + warn the user when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const eligible =
+        formData.title?.trim() &&
+        formData.content?.trim() &&
+        (!!selectedPost?.id || formData.status === "draft")
+      if (hasUnsavedChanges && eligible) {
+        autoSaveToBackend()
+        e.preventDefault()
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?"
+        return e.returnValue
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedChanges, formData, selectedPost?.id, autoSaveToBackend])
+
+  // Editor keyboard shortcuts: ⌘S save, ⌘↩ publish (sets status then submits),
+  // ⌘P open preview in new tab, Esc cancel back to list. Only fires when in
+  // an editor view; the hook ignores keystrokes inside inputs/textareas for Esc.
+  useFeedFormShortcuts({
+    enabled: view === "edit" || view === "create",
+    onSave: () => {
+      if (isSaving) return
+      handleSave()
+    },
+    onPublish: () => {
+      if (isSaving) return
+      setFormData((prev) => ({ ...prev, status: "published" }))
+      setTimeout(() => handleSave(), 0)
+    },
+    onPreview: () => {
+      if (view === "edit" && selectedPost?.id) {
+        window.open(`/admin/blog/preview/${selectedPost.id}`, "_blank", "noopener,noreferrer")
+      } else {
+        setToast({ message: "Save the post first to preview it", type: "error" })
+      }
+    },
+    onCancel: () => {
+      setView("list")
+      resetForm()
+    },
+  })
 
   // Filter posts
   const filteredPosts = posts.filter(post => {
@@ -474,6 +604,27 @@ export default function BlogAdminPage() {
     </div>
   )
 
+  // Tag taxonomy — deduped existing tags across all posts. Powers the chip
+  // input's autocomplete so editors don't recreate "tutorial" / "Tutorial" /
+  // "tutorials" as three separate tags.
+  const tagSuggestions = (() => {
+    const set = new Set<string>()
+    for (const p of posts) for (const t of p.tags ?? []) if (t) set.add(t)
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  })()
+
+  // Slug collision check — finds an existing post using the same slug,
+  // excluding the post being edited. Used for inline feedback under the slug input.
+  const slugCollision = (() => {
+    const slug = formData.slug.trim().toLowerCase()
+    if (!slug) return null
+    return (
+      posts.find(
+        (p) => p.slug?.trim().toLowerCase() === slug && p.id !== selectedPost?.id,
+      ) ?? null
+    )
+  })()
+
   // Render edit/create view
   const renderEditorView = () => (
     <div className="space-y-5">
@@ -498,11 +649,53 @@ export default function BlogAdminPage() {
               </p>
             )}
           </div>
+
+          {/* Autosave indicator */}
+          {(selectedPost?.id || formData.status === "draft") &&
+            formData.title?.trim() &&
+            formData.content?.trim() && (
+              <div className="hidden sm:flex items-center gap-1.5 ml-2 text-[11px]">
+                {isAutoSaving ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 tabular-nums">
+                    <span className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse" aria-hidden="true" />
+                    Saving
+                  </span>
+                ) : lastSavedAt ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 tabular-nums">
+                    <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                    Saved {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                ) : hasUnsavedChanges ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
+                    <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                    Unsaved
+                  </span>
+                ) : null}
+              </div>
+            )}
         </div>
         <div className="flex items-center gap-2">
+          {view === "edit" && selectedPost?.id && (
+            <a
+              href={`/admin/blog/preview/${selectedPost.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+              title={`Preview (${MOD_KEY_LABEL}P)`}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Preview
+            </a>
+          )}
+          <BlogPrePublishChecklist
+            formData={formData}
+            posts={posts}
+            editingId={selectedPost?.id ?? null}
+          />
           <button
             onClick={() => { setView("list"); resetForm() }}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+            title="Cancel (Esc)"
           >
             Cancel
           </button>
@@ -510,9 +703,15 @@ export default function BlogAdminPage() {
             onClick={handleSave}
             disabled={isSaving}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+            title={`Save (${MOD_KEY_LABEL}S)`}
           >
             {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {isSaving ? "Saving…" : view === "edit" ? "Update" : "Save post"}
+            {!isSaving && (
+              <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
+                {MOD_KEY_LABEL}S
+              </kbd>
+            )}
           </button>
         </div>
       </div>
@@ -529,10 +728,63 @@ export default function BlogAdminPage() {
             <input
               type="text"
               value={formData.title}
-              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+              onChange={(e) => {
+                const next = e.target.value
+                setFormData((prev) => ({
+                  ...prev,
+                  title: next,
+                  // Auto-generate slug only if it's empty (don't clobber a custom one)
+                  slug: prev.slug ? prev.slug : generateSlug(next),
+                }))
+              }}
               placeholder="Enter post title"
               className="w-full h-10 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-base text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
             />
+          </div>
+
+          {/* Slug */}
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">
+              Slug
+              <span className="ml-1.5 text-[11px] font-normal text-neutral-400">· auto-generated from title</span>
+            </label>
+            <input
+              type="text"
+              value={formData.slug}
+              onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
+              placeholder="auto-generated-from-title"
+              className={`w-full h-10 px-3 ring-1 rounded-md focus:ring-2 focus:outline-none font-mono text-sm bg-white ${
+                slugCollision
+                  ? "ring-amber-300 focus:ring-amber-500"
+                  : "ring-neutral-200 focus:ring-neutral-900"
+              }`}
+            />
+            {formData.slug.trim() && (
+              <p
+                className={`mt-1.5 text-[11px] flex items-center gap-1.5 ${
+                  slugCollision ? "text-amber-700" : "text-emerald-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-1 w-1 rounded-full ${
+                    slugCollision ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                  aria-hidden="true"
+                />
+                {slugCollision ? (
+                  <>
+                    Used by{" "}
+                    <span className="font-medium text-neutral-700">"{slugCollision.title}"</span>{" "}
+                    — pick a different slug
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium">Available</span>
+                    <span className="text-neutral-400">· /blog/{formData.slug}</span>
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           {/* Content */}
@@ -639,46 +891,19 @@ export default function BlogAdminPage() {
             <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
               <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
               Tags
+              {tagSuggestions.length > 0 && (
+                <span className="text-[11px] font-normal text-neutral-400 normal-case tracking-normal tabular-nums">
+                  · {tagSuggestions.length} known
+                </span>
+              )}
             </p>
-            <div className="flex gap-1.5 mb-2.5">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                placeholder="Add a tag"
-                className="flex-1 h-9 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                disabled={!tagInput.trim()}
-                className="inline-flex items-center justify-center h-9 w-9 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
-                aria-label="Add tag"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            {formData.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {formData.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-xs"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="ml-0.5 p-0.5 -mr-0.5 rounded text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200 transition-colors"
-                      aria-label={`Remove ${tag}`}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+            <TaxonomyChipInput
+              values={formData.tags}
+              onChange={(next) => setFormData((prev) => ({ ...prev, tags: next }))}
+              suggestions={tagSuggestions}
+              placeholder="Type to search or add"
+              ariaLabel="Tags"
+            />
           </div>
 
           {/* Author */}
