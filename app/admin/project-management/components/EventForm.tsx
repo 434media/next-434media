@@ -10,7 +10,6 @@ import {
   Trash2,
   ExternalLink,
   MapPin,
-  GripVertical,
   Link2,
   UserCircle,
   Building2,
@@ -21,12 +20,11 @@ import {
   CheckCircle2,
   Mail,
   Phone,
-  DollarSign,
   ChevronDown,
   Cloud,
 } from "lucide-react"
 import type { PMEvent, EventLink, EventClientContact, Vendor } from "@/types/project-management-types"
-import { PM_EVENT_STATUSES, VENDOR_CATEGORIES } from "@/types/project-management-types"
+import { PM_EVENT_STATUSES } from "@/types/project-management-types"
 import { ImageUpload } from "@/components/ImageUpload"
 import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
 import { EventPrePublishChecklist } from "@/components/admin/EventPrePublishChecklist"
@@ -43,9 +41,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
   const isNew = !event
   const [isSaving, setIsSaving] = useState(false)
 
-  // Autosave state — fires every 30s while editing an existing event. Mirrors
-  // feed-form / blog patterns. New events skip autosave (need to be saved
-  // explicitly the first time before a backend id exists to PATCH against).
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -82,9 +77,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  // ============================================
-  // Links Management
-  // ============================================
   const links: EventLink[] = form.links || []
 
   const addLink = () => {
@@ -109,9 +101,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     }))
   }
 
-  // ============================================
-  // Client Contacts Management
-  // ============================================
   const clientContacts: EventClientContact[] = form.client_contacts || []
 
   const addClientContact = () => {
@@ -139,9 +128,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     }))
   }
 
-  // ============================================
-  // Vendor Association
-  // ============================================
   const selectedVendorIds: string[] = form.vendor_ids || []
   const [vendorSearch, setVendorSearch] = useState("")
   const [vendorCategoryFilter, setVendorCategoryFilter] = useState<string>("all")
@@ -179,11 +165,8 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
       return (a.name || "").localeCompare(b.name || "")
     })
 
-  // Unique categories actually present in vendors
   const activeCategories = [...new Set(vendors.map((v) => v.category).filter(Boolean))].sort()
 
-  // ============================================
-  // Track unsaved changes — set whenever form drifts from the last saved snapshot
   useEffect(() => {
     if (isNew) return
     const currentFormString = JSON.stringify(form)
@@ -192,7 +175,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     }
   }, [form, isNew])
 
-  // Initialize lastSavedFormData on mount for existing events
   useEffect(() => {
     if (!isNew) {
       lastSavedFormData.current = JSON.stringify(form)
@@ -200,8 +182,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew])
 
-  // Autosave handler — PATCHes the existing event without leaving the page.
-  // Skipped if no name (required field) or no unsaved changes.
   const autoSaveToBackend = useCallback(async () => {
     if (isNew) return
     if (!form.name?.trim()) return
@@ -231,7 +211,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     }
   }, [form, isNew, hasUnsavedChanges, onSave])
 
-  // Run autosave every 30s while editing an existing event
   useEffect(() => {
     if (isNew) return
     if (!form.name?.trim()) return
@@ -239,7 +218,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     return () => clearInterval(interval)
   }, [isNew, form.name, autoSaveToBackend])
 
-  // beforeunload — flush + warn when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges && form.name?.trim() && !isNew) {
@@ -253,7 +231,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [hasUnsavedChanges, form.name, isNew, autoSaveToBackend])
 
-  // Editor keyboard shortcuts: ⌘S save, Esc cancel back to events list
   useFeedFormShortcuts({
     enabled: true,
     onSave: () => {
@@ -263,8 +240,6 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     onCancel: () => router.push("/admin/project-management"),
   })
 
-  // Submit
-  // ============================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name?.trim()) {
@@ -273,16 +248,13 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     }
     setIsSaving(true)
     try {
-      // Ensure date is synced with start_date
       const eventData = { ...form }
       if (eventData.start_date && !eventData.date) {
         eventData.date = eventData.start_date
       }
-      // Clean up empty links
       if (eventData.links) {
         eventData.links = eventData.links.filter((l) => l.label.trim() || l.url.trim())
       }
-      // Clean up empty client contacts
       if (eventData.client_contacts) {
         eventData.client_contacts = eventData.client_contacts.filter((c) => c.name.trim())
       }
@@ -296,9 +268,18 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
     }
   }
 
+  const inputClass =
+    "w-full h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+  const textareaClass =
+    "w-full px-3 py-2.5 rounded-md ring-1 ring-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-y"
+  const subInputClass =
+    "w-full h-8 px-2.5 rounded-md ring-1 ring-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+  const labelClass = "block text-xs font-medium text-neutral-700 mb-1.5"
+  const subLabelClass = "block text-[11px] font-medium text-neutral-500 mb-1"
+  const eyebrowClass = "text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500"
+
   return (
     <div className="min-h-dvh pt-20 bg-neutral-50 text-neutral-900">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-neutral-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3 h-16 flex-wrap">
@@ -315,23 +296,31 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
                 {isNew ? "New event" : `Edit · ${event?.name}`}
               </h1>
 
-              {/* Autosave indicator — only renders for existing events */}
               {!isNew && form.name?.trim() && (
                 <div className="hidden sm:flex items-center gap-1.5 ml-2 text-[11px]">
                   {isAutoSaving ? (
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 tabular-nums">
-                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse" aria-hidden="true" />
+                      <span
+                        className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse"
+                        aria-hidden="true"
+                      />
                       <Cloud className="h-3 w-3" />
                       Saving
                     </span>
                   ) : lastSavedAt ? (
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 tabular-nums">
-                      <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                      <span
+                        className="inline-block h-1 w-1 rounded-full bg-emerald-500"
+                        aria-hidden="true"
+                      />
                       Saved {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   ) : hasUnsavedChanges ? (
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
-                      <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                      <span
+                        className="inline-block h-1 w-1 rounded-full bg-amber-500"
+                        aria-hidden="true"
+                      />
                       Unsaved
                     </span>
                   ) : null}
@@ -353,7 +342,11 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
                 className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
                 title={`Save (${MOD_KEY_LABEL}S)`}
               >
-                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {isSaving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
                 {isSaving ? "Saving…" : isNew ? "Create event" : "Update"}
                 {!isSaving && (
                   <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
@@ -366,789 +359,695 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
         </div>
       </header>
 
-      {/* Form Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                Basic Information
-              </h2>
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-4">
+            <p className={eyebrowClass}>Basic information</p>
+            <div>
+              <label className={labelClass}>
+                Event name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.name || ""}
+                onChange={(e) => handleChange("name", e.target.value)}
+                className={inputClass}
+                required
+              />
             </div>
-            <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Event Name <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Status</label>
+                <select
+                  value={form.status || "planning"}
+                  onChange={(e) => handleChange("status", e.target.value)}
+                  className={inputClass}
+                >
+                  {PM_EVENT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Website URL</label>
                 <input
-                  type="text"
-                  value={form.name || ""}
-                  onChange={(e) => handleChange("name", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  required
+                  type="url"
+                  value={form.website_url || ""}
+                  onChange={(e) => handleChange("website_url", e.target.value)}
+                  placeholder="https://..."
+                  className={inputClass}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
-                  <select
-                    value={form.status || "planning"}
-                    onChange={(e) => handleChange("status", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
+                {form.website_url && (
+                  <a
+                    href={form.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-blue-600 hover:text-blue-800"
                   >
-                    {PM_EVENT_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s.charAt(0).toUpperCase() + s.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Website URL
-                  </label>
-                  <input
-                    type="url"
-                    value={form.website_url || ""}
-                    onChange={(e) => handleChange("website_url", e.target.value)}
-                    placeholder="https://..."
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                  {form.website_url && (
-                    <a
-                      href={form.website_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      Open link
-                    </a>
-                  )}
-                </div>
+                    <ExternalLink className="w-3 h-3" />
+                    Open link
+                  </a>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={5}
-                  value={form.description || ""}
-                  onChange={(e) => handleChange("description", e.target.value)}
-                  className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-30"
-                  placeholder="Describe the event details, purpose, and any important information..."
-                />
-              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Description</label>
+              <textarea
+                rows={5}
+                value={form.description || ""}
+                onChange={(e) => handleChange("description", e.target.value)}
+                className={`${textareaClass} min-h-30`}
+                placeholder="Describe the event details, purpose, and any important information…"
+              />
             </div>
           </section>
 
           {/* Date & Time */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                Date & Time
-              </h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={form.start_date || ""}
-                    onChange={(e) => handleChange("start_date", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={form.end_date || ""}
-                    onChange={(e) => handleChange("end_date", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-4">
+            <p className={eyebrowClass}>Date & time</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Start date</label>
+                <input
+                  type="date"
+                  value={form.start_date || ""}
+                  onChange={(e) => handleChange("start_date", e.target.value)}
+                  className={inputClass}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Start Time
-                  </label>
-                  <input
-                    type="time"
-                    value={form.start_time || ""}
-                    onChange={(e) => handleChange("start_time", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    End Time
-                  </label>
-                  <input
-                    type="time"
-                    value={form.end_time || ""}
-                    onChange={(e) => handleChange("end_time", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
+              <div>
+                <label className={labelClass}>End date</label>
+                <input
+                  type="date"
+                  value={form.end_date || ""}
+                  onChange={(e) => handleChange("end_date", e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Start time</label>
+                <input
+                  type="time"
+                  value={form.start_time || ""}
+                  onChange={(e) => handleChange("start_time", e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>End time</label>
+                <input
+                  type="time"
+                  value={form.end_time || ""}
+                  onChange={(e) => handleChange("end_time", e.target.value)}
+                  className={inputClass}
+                />
               </div>
             </div>
           </section>
 
           {/* Venue */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                Venue
-              </h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Venue Name
-                  </label>
-                  <input
-                    type="text"
-                    value={form.venue_name || ""}
-                    onChange={(e) => handleChange("venue_name", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    value={form.location || ""}
-                    onChange={(e) => handleChange("location", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
-              </div>
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-4">
+            <p className={eyebrowClass}>Venue</p>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Venue Address
-                </label>
+                <label className={labelClass}>Venue name</label>
                 <input
                   type="text"
-                  value={form.venue_address || ""}
-                  onChange={(e) => handleChange("venue_address", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
+                  value={form.venue_name || ""}
+                  onChange={(e) => handleChange("venue_name", e.target.value)}
+                  className={inputClass}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Map Link</label>
+                <label className={labelClass}>Location</label>
                 <input
-                  type="url"
-                  value={form.venue_map_link || ""}
-                  onChange={(e) => handleChange("venue_map_link", e.target.value)}
-                  placeholder="https://maps.google.com/..."
-                  className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
+                  type="text"
+                  value={form.location || ""}
+                  onChange={(e) => handleChange("location", e.target.value)}
+                  className={inputClass}
                 />
-                {form.venue_map_link && (
-                  <a
-                    href={form.venue_map_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2"
-                  >
-                    <MapPin className="w-3 h-3" />
-                    Open in Maps
-                  </a>
-                )}
               </div>
+            </div>
+            <div>
+              <label className={labelClass}>Venue address</label>
+              <input
+                type="text"
+                value={form.venue_address || ""}
+                onChange={(e) => handleChange("venue_address", e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Map link</label>
+              <input
+                type="url"
+                value={form.venue_map_link || ""}
+                onChange={(e) => handleChange("venue_map_link", e.target.value)}
+                placeholder="https://maps.google.com/..."
+                className={inputClass}
+              />
+              {form.venue_map_link && (
+                <a
+                  href={form.venue_map_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-blue-600 hover:text-blue-800"
+                >
+                  <MapPin className="w-3 h-3" />
+                  Open in Maps
+                </a>
+              )}
             </div>
           </section>
 
           {/* Budget */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                Budget
-              </h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Budget</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.budget ?? ""}
-                    onChange={(e) =>
-                      handleChange("budget", e.target.value ? parseFloat(e.target.value) : undefined)
-                    }
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">
-                    Estimated
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.estimated_expenses ?? ""}
-                    onChange={(e) =>
-                      handleChange(
-                        "estimated_expenses",
-                        e.target.value ? parseFloat(e.target.value) : undefined
-                      )
-                    }
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Actual</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.actual_expenses ?? ""}
-                    onChange={(e) =>
-                      handleChange(
-                        "actual_expenses",
-                        e.target.value ? parseFloat(e.target.value) : undefined
-                      )
-                    }
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                  />
-                </div>
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-4">
+            <p className={eyebrowClass}>Budget</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Budget</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.budget ?? ""}
+                  onChange={(e) =>
+                    handleChange("budget", e.target.value ? parseFloat(e.target.value) : undefined)
+                  }
+                  className={`${inputClass} tabular-nums`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Estimated</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.estimated_expenses ?? ""}
+                  onChange={(e) =>
+                    handleChange(
+                      "estimated_expenses",
+                      e.target.value ? parseFloat(e.target.value) : undefined
+                    )
+                  }
+                  className={`${inputClass} tabular-nums`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Actual</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.actual_expenses ?? ""}
+                  onChange={(e) =>
+                    handleChange(
+                      "actual_expenses",
+                      e.target.value ? parseFloat(e.target.value) : undefined
+                    )
+                  }
+                  className={`${inputClass} tabular-nums`}
+                />
               </div>
             </div>
           </section>
 
-          {/* Links Section (NEW) */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Link2 className="w-4 h-4 text-neutral-400" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                  Resource Links
-                </h2>
-              </div>
+          {/* Resource Links */}
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className={`${eyebrowClass} flex items-center gap-2`}>
+                <Link2 className="w-3.5 h-3.5" />
+                Resource links
+                {links.length > 0 && (
+                  <span className="ml-1 text-neutral-400 normal-case tracking-normal">
+                    {links.length}
+                  </span>
+                )}
+              </p>
               <button
                 type="button"
                 onClick={addLink}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md ring-1 ring-neutral-200 bg-white text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
-                Add Link
+                <Plus className="w-3 h-3" />
+                Add link
               </button>
             </div>
-            <div className="p-6">
-              {links.length === 0 ? (
-                <div className="text-center py-8">
-                  <Link2 className="w-10 h-10 text-neutral-200 mx-auto mb-3" />
-                  <p className="text-sm text-neutral-500 font-medium">No links added yet</p>
-                  <p className="text-xs text-neutral-400 mt-1">
-                    Add links to production briefs, budgets, shot lists, and other resources
-                  </p>
-                  <button
-                    type="button"
-                    onClick={addLink}
-                    className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
+            {links.length === 0 ? (
+              <div className="text-center py-6 rounded-md ring-1 ring-dashed ring-neutral-200">
+                <Link2 className="w-6 h-6 text-neutral-300 mx-auto mb-2" />
+                <p className="text-xs text-neutral-500">No links added yet</p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Production briefs, budgets, shot lists, and other resources
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {links.map((link, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 p-3 rounded-md ring-1 ring-neutral-200"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add First Link
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {links.map((link, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-100"
-                    >
-                      <div className="flex-1 grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Label
-                          </label>
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={subLabelClass}>Label</label>
+                        <input
+                          type="text"
+                          value={link.label}
+                          onChange={(e) => updateLink(index, "label", e.target.value)}
+                          placeholder="e.g., Production brief"
+                          className={subInputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={subLabelClass}>URL</label>
+                        <div className="flex items-center gap-1.5">
                           <input
-                            type="text"
-                            value={link.label}
-                            onChange={(e) => updateLink(index, "label", e.target.value)}
-                            placeholder="e.g., Production Brief"
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
+                            type="url"
+                            value={link.url}
+                            onChange={(e) => updateLink(index, "url", e.target.value)}
+                            placeholder="https://..."
+                            className={`${subInputClass} flex-1`}
                           />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            URL
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="url"
-                              value={link.url}
-                              onChange={(e) => updateLink(index, "url", e.target.value)}
-                              placeholder="https://..."
-                              className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                            />
-                            {link.url && (
-                              <a
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Open link"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
+                          {link.url && (
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"
+                              title="Open link"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeLink(index)}
-                        className="mt-6 p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remove link"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLink(index)}
+                      className="mt-5 inline-flex items-center justify-center h-8 w-8 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Remove link"
+                      aria-label="Remove link"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
-          {/* Client Contacts Section (NEW) */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <UserCircle className="w-4 h-4 text-neutral-400" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                  Client Contacts
-                </h2>
-              </div>
+          {/* Client Contacts */}
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className={`${eyebrowClass} flex items-center gap-2`}>
+                <UserCircle className="w-3.5 h-3.5" />
+                Client contacts
+                {clientContacts.length > 0 && (
+                  <span className="ml-1 text-neutral-400 normal-case tracking-normal">
+                    {clientContacts.length}
+                  </span>
+                )}
+              </p>
               <button
                 type="button"
                 onClick={addClientContact}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md ring-1 ring-neutral-200 bg-white text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
-                Add Contact
+                <Plus className="w-3 h-3" />
+                Add contact
               </button>
             </div>
-            <div className="p-6">
-              {clientContacts.length === 0 ? (
-                <div className="text-center py-8">
-                  <UserCircle className="w-10 h-10 text-neutral-200 mx-auto mb-3" />
-                  <p className="text-sm text-neutral-500 font-medium">No client contacts added</p>
-                  <p className="text-xs text-neutral-400 mt-1">
-                    Add the event&apos;s main POC and other client contacts
-                  </p>
-                  <button
-                    type="button"
-                    onClick={addClientContact}
-                    className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add First Contact
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {clientContacts.map((contact, index) => (
-                    <div
-                      key={index}
-                      className="p-4 bg-neutral-50 rounded-xl border border-neutral-100"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                          Contact {index + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeClientContact(index)}
-                          className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Remove contact"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+            {clientContacts.length === 0 ? (
+              <div className="text-center py-6 rounded-md ring-1 ring-dashed ring-neutral-200">
+                <UserCircle className="w-6 h-6 text-neutral-300 mx-auto mb-2" />
+                <p className="text-xs text-neutral-500">No client contacts added</p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Add the event&apos;s main POC and other client contacts
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {clientContacts.map((contact, index) => (
+                  <div key={index} className="rounded-md ring-1 ring-neutral-200 p-3">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-[0.18em]">
+                        Contact {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeClientContact(index)}
+                        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Remove contact"
+                        aria-label="Remove contact"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className={subLabelClass}>
+                          Name <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={contact.name}
+                          onChange={(e) => updateClientContact(index, "name", e.target.value)}
+                          placeholder="Contact name"
+                          className={subInputClass}
+                        />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Name <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={contact.name}
-                            onChange={(e) => updateClientContact(index, "name", e.target.value)}
-                            placeholder="Contact name"
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Title / Role
-                          </label>
-                          <input
-                            type="text"
-                            value={contact.title || ""}
-                            onChange={(e) => updateClientContact(index, "title", e.target.value)}
-                            placeholder="e.g., Event Director"
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            value={contact.email || ""}
-                            onChange={(e) => updateClientContact(index, "email", e.target.value)}
-                            placeholder="email@example.com"
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Phone
-                          </label>
-                          <input
-                            type="tel"
-                            value={contact.phone || ""}
-                            onChange={(e) => updateClientContact(index, "phone", e.target.value)}
-                            placeholder="(555) 123-4567"
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Company / Organization
-                          </label>
-                          <input
-                            type="text"
-                            value={contact.company || ""}
-                            onChange={(e) => updateClientContact(index, "company", e.target.value)}
-                            placeholder="Company name"
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-neutral-500 mb-1">
-                            Notes
-                          </label>
-                          <input
-                            type="text"
-                            value={contact.notes || ""}
-                            onChange={(e) => updateClientContact(index, "notes", e.target.value)}
-                            placeholder="Any additional notes about this contact..."
-                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                          />
-                        </div>
+                      <div>
+                        <label className={subLabelClass}>Title / role</label>
+                        <input
+                          type="text"
+                          value={contact.title || ""}
+                          onChange={(e) => updateClientContact(index, "title", e.target.value)}
+                          placeholder="e.g., Event Director"
+                          className={subInputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={subLabelClass}>Email</label>
+                        <input
+                          type="email"
+                          value={contact.email || ""}
+                          onChange={(e) => updateClientContact(index, "email", e.target.value)}
+                          placeholder="email@example.com"
+                          className={subInputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={subLabelClass}>Phone</label>
+                        <input
+                          type="tel"
+                          value={contact.phone || ""}
+                          onChange={(e) => updateClientContact(index, "phone", e.target.value)}
+                          placeholder="(555) 123-4567"
+                          className={subInputClass}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className={subLabelClass}>Company / organization</label>
+                        <input
+                          type="text"
+                          value={contact.company || ""}
+                          onChange={(e) => updateClientContact(index, "company", e.target.value)}
+                          placeholder="Company name"
+                          className={subInputClass}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className={subLabelClass}>Notes</label>
+                        <input
+                          type="text"
+                          value={contact.notes || ""}
+                          onChange={(e) => updateClientContact(index, "notes", e.target.value)}
+                          placeholder="Any additional notes about this contact…"
+                          className={subInputClass}
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
-          {/* Event Vendors Section */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-neutral-400" />
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                  Event Vendors
-                </h2>
-              </div>
+          {/* Vendors */}
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className={`${eyebrowClass} flex items-center gap-2`}>
+                <Building2 className="w-3.5 h-3.5" />
+                Event vendors
+              </p>
               {selectedVendorIds.length > 0 ? (
-                <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-full">
+                <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md ring-1 ring-blue-200 bg-blue-50 text-[11px] font-semibold text-blue-700">
                   <CheckCircle2 className="w-3 h-3" />
                   {selectedVendorIds.length} assigned
                 </span>
               ) : (
-                <span className="text-xs font-medium text-neutral-400">
-                  None assigned
-                </span>
+                <span className="text-[11px] text-neutral-400">None assigned</span>
               )}
             </div>
-            <div className="p-6">
-              {vendors.length === 0 ? (
-                <div className="text-center py-8">
-                  <Building2 className="w-10 h-10 text-neutral-200 mx-auto mb-3" />
-                  <p className="text-sm text-neutral-500 font-medium">No vendors available</p>
-                  <p className="text-xs text-neutral-400 mt-1">
-                    Add vendors in the Vendors tab first, then assign them to events
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Search & Filters */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                      <input
-                        type="text"
-                        placeholder="Search vendors by name, company, or email..."
-                        value={vendorSearch}
-                        onChange={(e) => setVendorSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
-                      />
-                      {vendorSearch && (
-                        <button
-                          type="button"
-                          onClick={() => setVendorSearch("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-neutral-400 hover:text-neutral-600 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
-                        <select
-                          value={vendorCategoryFilter}
-                          onChange={(e) => setVendorCategoryFilter(e.target.value)}
-                          className="pl-9 pr-8 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 appearance-none cursor-pointer"
-                        >
-                          <option value="all">All Categories</option>
-                          {activeCategories.map((cat) => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
-                      </div>
+            {vendors.length === 0 ? (
+              <div className="text-center py-6 rounded-md ring-1 ring-dashed ring-neutral-200">
+                <Building2 className="w-6 h-6 text-neutral-300 mx-auto mb-2" />
+                <p className="text-xs text-neutral-500">No vendors available</p>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Add vendors in the Vendors tab first
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Search & Filters */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search vendors by name, company, or email…"
+                      value={vendorSearch}
+                      onChange={(e) => setVendorSearch(e.target.value)}
+                      className="w-full h-9 pl-9 pr-8 rounded-md ring-1 ring-neutral-200 bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    />
+                    {vendorSearch && (
                       <button
                         type="button"
-                        onClick={() => setShowSelectedOnly(!showSelectedOnly)}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-lg border transition-all whitespace-nowrap ${
-                          showSelectedOnly
-                            ? "bg-blue-50 border-blue-200 text-blue-700"
-                            : "bg-neutral-50 border-neutral-200 text-neutral-600 hover:border-neutral-300"
-                        }`}
+                        onClick={() => setVendorSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-6 w-6 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+                        aria-label="Clear search"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Selected
+                        <X className="w-3.5 h-3.5" />
                       </button>
-                    </div>
-                  </div>
-
-                  {/* Results info */}
-                  <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>
-                      {filteredVendors.length} of {vendors.length} vendor{vendors.length !== 1 ? "s" : ""}
-                      {vendorSearch && ` matching "${vendorSearch}"`}
-                      {vendorCategoryFilter !== "all" && ` in ${vendorCategoryFilter}`}
-                    </span>
-                    {selectedVendorIds.length > 0 && !showSelectedOnly && (
-                      <span className="text-blue-600 font-medium">
-                        Selected vendors shown first
-                      </span>
                     )}
                   </div>
-
-                  {/* Vendor List */}
-                  {filteredVendors.length === 0 ? (
-                    <div className="text-center py-8 bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
-                      <Search className="w-8 h-8 text-neutral-200 mx-auto mb-2" />
-                      <p className="text-sm text-neutral-500 font-medium">
-                        {showSelectedOnly ? "No vendors assigned yet" : "No vendors match your search"}
-                      </p>
-                      <p className="text-xs text-neutral-400 mt-1">
-                        {showSelectedOnly
-                          ? "Select vendors from the full list to assign them"
-                          : "Try adjusting your search or filter"}
-                      </p>
-                      {(vendorSearch || vendorCategoryFilter !== "all" || showSelectedOnly) && (
-                        <button
-                          type="button"
-                          onClick={() => { setVendorSearch(""); setVendorCategoryFilter("all"); setShowSelectedOnly(false) }}
-                          className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                          Clear all filters
-                        </button>
-                      )}
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
+                      <select
+                        value={vendorCategoryFilter}
+                        onChange={(e) => setVendorCategoryFilter(e.target.value)}
+                        className="h-9 pl-9 pr-8 rounded-md ring-1 ring-neutral-200 bg-white text-sm text-neutral-700 focus:ring-2 focus:ring-neutral-900 focus:outline-none appearance-none cursor-pointer"
+                      >
+                        <option value="all">All categories</option>
+                        {activeCategories.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
                     </div>
-                  ) : (
-                    <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1 -mr-1">
-                      {filteredVendors.map((vendor) => {
-                        const isSelected = selectedVendorIds.includes(vendor.id)
-                        return (
-                          <label
-                            key={vendor.id}
-                            className={`group flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                              isSelected
-                                ? "bg-blue-50/80 border-blue-200 ring-1 ring-blue-100"
-                                : "bg-white border-neutral-150 hover:border-neutral-300 hover:bg-neutral-50"
-                            }`}
-                          >
-                            <div className={`relative flex items-center justify-center w-5 h-5 rounded-md border-2 transition-all shrink-0 ${
-                              isSelected
-                                ? "bg-blue-600 border-blue-600"
-                                : "border-neutral-300 group-hover:border-neutral-400"
-                            }`}>
-                              {isSelected && (
-                                <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleVendor(vendor.id)}
-                                className="sr-only"
-                              />
-                            </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowSelectedOnly(!showSelectedOnly)}
+                      className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 text-[11px] font-semibold transition-all whitespace-nowrap ${
+                        showSelectedOnly
+                          ? "ring-blue-200 bg-blue-50 text-blue-700"
+                          : "ring-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Selected
+                    </button>
+                  </div>
+                </div>
 
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className={`text-sm font-semibold truncate ${
-                                  isSelected ? "text-blue-900" : "text-neutral-900"
-                                }`}>{vendor.name}</p>
-                                <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${
-                                  isSelected
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-neutral-100 text-neutral-500"
-                                }`}>
-                                  {vendor.category}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-neutral-500">
-                                {vendor.company && (
-                                  <span className="flex items-center gap-1">
-                                    <Building2 className="w-3 h-3 text-neutral-400" />
-                                    <span className="truncate max-w-28">{vendor.company}</span>
-                                  </span>
-                                )}
-                                {vendor.email && (
-                                  <span className="flex items-center gap-1">
-                                    <Mail className="w-3 h-3 text-neutral-400" />
-                                    <span className="truncate max-w-36">{vendor.email}</span>
-                                  </span>
-                                )}
-                                {vendor.phone && (
-                                  <span className="flex items-center gap-1">
-                                    <Phone className="w-3 h-3 text-neutral-400" />
-                                    <span>{vendor.phone}</span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {vendor.rate ? (
-                              <div className={`text-right shrink-0 ${
-                                isSelected ? "text-blue-700" : "text-neutral-500"
-                              }`}>
-                                <p className="text-sm font-bold tabular-nums">
-                                  ${vendor.rate.toLocaleString()}
-                                </p>
-                                {vendor.rate_type && (
-                                  <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
-                                    per {vendor.rate_type}
-                                  </p>
-                                )}
-                              </div>
-                            ) : null}
-                          </label>
-                        )
-                      })}
-                    </div>
+                {/* Results info */}
+                <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                  <span>
+                    {filteredVendors.length} of {vendors.length} vendor
+                    {vendors.length !== 1 ? "s" : ""}
+                    {vendorSearch && ` matching "${vendorSearch}"`}
+                    {vendorCategoryFilter !== "all" && ` in ${vendorCategoryFilter}`}
+                  </span>
+                  {selectedVendorIds.length > 0 && !showSelectedOnly && (
+                    <span className="text-blue-600 font-medium">Selected shown first</span>
                   )}
                 </div>
-              )}
-            </div>
+
+                {/* Vendor List */}
+                {filteredVendors.length === 0 ? (
+                  <div className="text-center py-6 rounded-md ring-1 ring-dashed ring-neutral-200">
+                    <Search className="w-6 h-6 text-neutral-300 mx-auto mb-2" />
+                    <p className="text-xs text-neutral-500">
+                      {showSelectedOnly
+                        ? "No vendors assigned yet"
+                        : "No vendors match your search"}
+                    </p>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      {showSelectedOnly
+                        ? "Select vendors from the full list to assign them"
+                        : "Try adjusting your search or filter"}
+                    </p>
+                    {(vendorSearch || vendorCategoryFilter !== "all" || showSelectedOnly) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVendorSearch("")
+                          setVendorCategoryFilter("all")
+                          setShowSelectedOnly(false)
+                        }}
+                        className="mt-2 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        Clear all filters
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1 -mr-1">
+                    {filteredVendors.map((vendor) => {
+                      const isSelected = selectedVendorIds.includes(vendor.id)
+                      return (
+                        <label
+                          key={vendor.id}
+                          className={`group flex items-center gap-3 p-3 rounded-md ring-1 cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-blue-50/50 ring-blue-200"
+                              : "bg-white ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-50"
+                          }`}
+                        >
+                          <div
+                            className={`relative flex items-center justify-center w-4 h-4 rounded-sm ring-2 transition-all shrink-0 ${
+                              isSelected
+                                ? "bg-blue-600 ring-blue-600"
+                                : "bg-white ring-neutral-300 group-hover:ring-neutral-400"
+                            }`}
+                          >
+                            {isSelected && (
+                              <svg
+                                className="w-2.5 h-2.5 text-white"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                              >
+                                <path
+                                  d="M2.5 6L5 8.5L9.5 3.5"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleVendor(vendor.id)}
+                              className="sr-only"
+                            />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p
+                                className={`text-sm font-semibold truncate ${
+                                  isSelected ? "text-blue-900" : "text-neutral-900"
+                                }`}
+                              >
+                                {vendor.name}
+                              </p>
+                              {vendor.category && (
+                                <span
+                                  className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
+                                    isSelected
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-neutral-100 text-neutral-500"
+                                  }`}
+                                >
+                                  {vendor.category}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-[11px] text-neutral-500">
+                              {vendor.company && (
+                                <span className="flex items-center gap-1">
+                                  <Building2 className="w-3 h-3 text-neutral-400" />
+                                  <span className="truncate max-w-28">{vendor.company}</span>
+                                </span>
+                              )}
+                              {vendor.email && (
+                                <span className="flex items-center gap-1">
+                                  <Mail className="w-3 h-3 text-neutral-400" />
+                                  <span className="truncate max-w-36">{vendor.email}</span>
+                                </span>
+                              )}
+                              {vendor.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-neutral-400" />
+                                  <span>{vendor.phone}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {vendor.rate ? (
+                            <div
+                              className={`text-right shrink-0 ${
+                                isSelected ? "text-blue-700" : "text-neutral-600"
+                              }`}
+                            >
+                              <p className="text-sm font-bold tabular-nums">
+                                ${vendor.rate.toLocaleString()}
+                              </p>
+                              {vendor.rate_type && (
+                                <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                                  per {vendor.rate_type}
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Additional Details */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                Additional Details
-              </h2>
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-4">
+            <p className={eyebrowClass}>Additional details</p>
+            <div>
+              <label className={labelClass}>Agenda overview</label>
+              <textarea
+                rows={6}
+                value={form.agenda_overview || ""}
+                onChange={(e) => handleChange("agenda_overview", e.target.value)}
+                className={`${textareaClass} min-h-35`}
+                placeholder="Enter the event agenda, schedule, speakers, topics, etc…"
+              />
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Agenda Overview
-                </label>
-                <textarea
-                  rows={6}
-                  value={form.agenda_overview || ""}
-                  onChange={(e) => handleChange("agenda_overview", e.target.value)}
-                  className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-35"
-                  placeholder="Enter the event agenda, schedule, speakers, topics, etc..."
-                />
-                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                  <GripVertical className="w-3 h-3" />
-                  Drag the bottom-right corner to expand
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
-                <textarea
-                  rows={5}
-                  value={form.notes || ""}
-                  onChange={(e) => handleChange("notes", e.target.value)}
-                  className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200 resize-y min-h-30"
-                  placeholder="Internal notes, reminders, follow-ups..."
-                />
-                <p className="text-xs text-neutral-400 mt-1.5 flex items-center gap-1">
-                  <GripVertical className="w-3 h-3" />
-                  Drag the bottom-right corner to expand
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Banner Image */}
-          <section className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500">
-                Banner Image
-              </h2>
-            </div>
-            <div className="p-6">
-              <ImageUpload
-                value={form.photo_banner || ""}
-                onChange={(url) => handleChange("photo_banner", url)}
-                label="Event Banner"
-                accept="image/*,.gif"
-                maxSize={10}
+            <div>
+              <label className={labelClass}>Notes</label>
+              <textarea
+                rows={5}
+                value={form.notes || ""}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                className={`${textareaClass} min-h-30`}
+                placeholder="Internal notes, reminders, follow-ups…"
               />
             </div>
           </section>
 
-          {/* Bottom Actions */}
-          <div className="flex items-center justify-between py-6">
-            <Link
-              href="/admin/project-management"
-              className="px-5 py-2.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex items-center gap-2 px-8 py-3 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors shadow-sm disabled:opacity-50"
-            >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              {isNew ? "Create Event" : "Save Changes"}
-            </button>
-          </div>
+          {/* Banner Image */}
+          <section className="bg-white rounded-md ring-1 ring-neutral-200/70 p-5 space-y-3">
+            <p className={eyebrowClass}>Banner image</p>
+            <ImageUpload
+              value={form.photo_banner || ""}
+              onChange={(url) => handleChange("photo_banner", url)}
+              label="Event banner"
+              accept="image/*,.gif"
+              maxSize={10}
+            />
+          </section>
         </form>
       </main>
     </div>
