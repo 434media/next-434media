@@ -12,7 +12,8 @@ interface MinimalFeedItem {
 interface FeedFormSnapshot {
   title: string
   type: "video" | "article" | "podcast" | "newsletter"
-  status: "draft" | "published" | "archived"
+  status: "draft" | "scheduled" | "published" | "archived"
+  scheduled_at?: string
   slug: string
   summary: string
   og_image?: string
@@ -45,6 +46,33 @@ interface FeedPrePublishChecklistProps {
 
 function computeIssues(form: FeedFormSnapshot, feedItems: MinimalFeedItem[], editingId: string | null): ChecklistIssue[] {
   const issues: ChecklistIssue[] = []
+
+  // Scheduled-state issues — only when status is "scheduled"
+  if (form.status === "scheduled") {
+    const ts = form.scheduled_at ? new Date(form.scheduled_at).getTime() : NaN
+    if (!form.scheduled_at?.trim()) {
+      issues.push({
+        id: "no_schedule_time",
+        severity: "warn",
+        label: "No schedule time set",
+        detail: "Scheduled items need a publish date and time. The cron won't promote items without one.",
+      })
+    } else if (!Number.isFinite(ts)) {
+      issues.push({
+        id: "bad_schedule_time",
+        severity: "warn",
+        label: "Invalid schedule time",
+        detail: "The scheduled date/time can't be parsed. The item won't auto-publish.",
+      })
+    } else if (ts <= Date.now()) {
+      issues.push({
+        id: "past_schedule_time",
+        severity: "warn",
+        label: "Schedule time is in the past",
+        detail: "The item will publish on the next cron run. Set a future time if that's not what you want.",
+      })
+    }
+  }
 
   // OG image — recommended for any published item; non-blocking but high-value
   if (!form.og_image?.trim()) {
@@ -145,9 +173,9 @@ export function FeedPrePublishChecklist({
     [formData, feedItems, editingId],
   )
 
-  // Only render when status is set to published — that's when these checks matter.
-  // For drafts we don't want to nag.
-  if (formData.status !== "published") return null
+  // Only render when status is set to published or scheduled — that's when
+  // these checks matter. For drafts we don't want to nag.
+  if (formData.status !== "published" && formData.status !== "scheduled") return null
 
   const isAllClear = issues.length === 0
 

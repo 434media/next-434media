@@ -16,6 +16,7 @@ import { ImageUpload } from "@/components/ImageUpload"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { FeedPrePublishChecklist } from "@/components/admin/FeedPrePublishChecklist"
 import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
+import { FeedCardStatusMenu, formatRelative, formatScheduledIn } from "@/components/admin/FeedCardStatusMenu"
 
 // Configure marked for consistent rendering with production
 const previewMarked = new Marked({ 
@@ -183,7 +184,9 @@ function PreviewField({ label, value, isPreview, required, children, isRichText 
 }
 
 type FeedType = "video" | "article" | "podcast" | "newsletter"
-type FeedStatus = "draft" | "published" | "archived"
+// "scheduled" is a real status — items in this state have a scheduled_at and
+// will be flipped to "published" by /api/cron/feed-publish when their time arrives.
+type FeedStatus = "draft" | "scheduled" | "published" | "archived"
 
 // Comment interface for feed items (follows CRM TaskComment pattern)
 interface FeedComment {
@@ -198,6 +201,125 @@ interface FeedComment {
 
 const FEED_TABLE = "THEFEED"
 
+// =====================================================================
+// SpotlightFields — extracted from the [1, 2, 3].map copy-paste loop. One
+// rendering of the Spotlight N section (title, description, image, CTA pair).
+// Caller wraps in a CollapsibleSection. Kills three identical 75-line blocks.
+// =====================================================================
+interface SpotlightFieldsProps {
+  num: 1 | 2 | 3
+  // The form state shape varies, so we accept a generic record-shaped object
+  // and a single setter. Same pattern as the rest of the form.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  formData: any
+  onFieldChange: (field: string, value: string) => void
+  previewMode: boolean
+  editingId: string | null
+}
+
+function SpotlightFields({ num, formData, onFieldChange, previewMode, editingId }: SpotlightFieldsProps) {
+  const titleKey = `spotlight_${num}_title`
+  const descKey = `spotlight_${num}_description`
+  const imageKey = `spotlight_${num}_image`
+  const ctaTextKey = `spotlight_${num}_cta_text`
+  const ctaLinkKey = `spotlight_${num}_cta_link`
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs text-neutral-500 mb-4 leading-relaxed">
+          Create a spotlight section to highlight specific content, products, or features.
+        </p>
+
+        <PreviewField
+          label={`Spotlight ${num} Title`}
+          value={(formData[titleKey] as string) || ""}
+          isPreview={previewMode && !!editingId}
+        >
+          <div>
+            <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
+            <input
+              type="text"
+              value={(formData[titleKey] as string) || ""}
+              onChange={(e) => onFieldChange(titleKey, e.target.value)}
+              className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
+              placeholder={`Enter spotlight ${num} title`}
+            />
+          </div>
+        </PreviewField>
+      </div>
+
+      <PreviewField
+        label={`Spotlight ${num} Description`}
+        value={(formData[descKey] as string) || ""}
+        isPreview={previewMode && !!editingId}
+        isRichText
+      >
+        <div>
+          <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Description</label>
+          <p className="text-xs text-neutral-500 mb-2 leading-relaxed">
+            A brief description of what you're spotlighting. Supports Markdown.
+          </p>
+          <RichTextEditor
+            value={(formData[descKey] as string) || ""}
+            onChange={(value: string) => onFieldChange(descKey, value)}
+            placeholder={`Spotlight ${num} description`}
+            minRows={4}
+          />
+        </div>
+      </PreviewField>
+
+      <ImageUpload
+        value={(formData[imageKey] as string) || ""}
+        onChange={(value) => onFieldChange(imageKey, value)}
+        label={`Spotlight ${num} Image`}
+        hideUrl
+      />
+
+      <div className="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200">
+        <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
+          <LinkIcon className="h-4 w-4 text-neutral-500" />
+          Call-to-Action Button
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <PreviewField
+            label="Button Text"
+            value={(formData[ctaTextKey] as string) || ""}
+            isPreview={previewMode && !!editingId}
+          >
+            <div>
+              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Text</label>
+              <input
+                type="text"
+                value={(formData[ctaTextKey] as string) || ""}
+                onChange={(e) => onFieldChange(ctaTextKey, e.target.value)}
+                className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
+                placeholder="Learn More"
+              />
+            </div>
+          </PreviewField>
+          <PreviewField
+            label="Button Link"
+            value={(formData[ctaLinkKey] as string) || ""}
+            isPreview={previewMode && !!editingId}
+          >
+            <div>
+              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Link</label>
+              <input
+                type="url"
+                value={(formData[ctaLinkKey] as string) || ""}
+                onChange={(e) => onFieldChange(ctaLinkKey, e.target.value)}
+                className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-mono transition-all"
+                placeholder="https://example.com/link"
+              />
+            </div>
+          </PreviewField>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface FeedItem {
   id?: string
   published_date: string
@@ -211,6 +333,13 @@ interface FeedItem {
   og_title?: string
   og_description?: string
   status: FeedStatus
+  // Persisted by Firestore on every write — surfaced on list cards as
+  // "Updated Xh ago" so editors can sort their attention to in-flight drafts.
+  created_at?: string
+  updated_at?: string
+  // ISO datetime; only meaningful when status === "scheduled". The cron at
+  // /api/cron/feed-publish flips status → published when scheduled_at <= now.
+  scheduled_at?: string
   
   // Newsletter-specific fields
   hero_image_desktop?: string
@@ -261,6 +390,7 @@ interface FeedFormData {
   slug: string
   published_date: string
   status: FeedStatus
+  scheduled_at?: string
   og_image?: string
   og_title?: string
   og_description?: string
@@ -344,6 +474,21 @@ export default function FeedFormPage() {
     published_date: new Date().toISOString().split("T")[0],
     status: "draft",
   })
+
+  // Smart-expand on fresh newsletter — when the user opens "Create New" with
+  // no edit target and an empty title, auto-open the two sections they need
+  // first (Basic Information + Hero & Founder's Note). Reduces an 8-click
+  // scroll-and-expand startup to zero. Only fires when entering create mode
+  // from outside; once they've started typing, we leave their state alone.
+  useEffect(() => {
+    if (activeTab !== "create") return
+    if (editingId) return
+    if (formData.title) return
+    setOpenSections((prev) => {
+      if (prev.size > 0) return prev
+      return new Set(["basic", "hero"])
+    })
+  }, [activeTab, editingId, formData.title])
 
   // Toggle section open/close
   const toggleSection = (sectionId: string) => {
@@ -997,6 +1142,32 @@ export default function FeedFormPage() {
     })
   }
 
+  // Quick status change from a list card — PATCHes status only, optimistic UI
+  // update with rollback on error. Saves the user a full edit-mode round-trip
+  // for the most common state change (draft → published, published → archived).
+  const handleQuickStatusChange = async (id: string, nextStatus: FeedStatus) => {
+    const prev = feedItems
+    setFeedItems((items) =>
+      items.map((f) => (f.id === id ? { ...f, status: nextStatus } : f)),
+    )
+    try {
+      const res = await fetch(`/api/feed-submit?table=${FEED_TABLE}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: nextStatus }),
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.error || "Failed to update")
+      setToast({ message: `Status set to ${nextStatus}`, type: "success" })
+    } catch (err) {
+      setFeedItems(prev)
+      setToast({
+        message: err instanceof Error ? err.message : "Failed to update status",
+        type: "error",
+      })
+    }
+  }
+
   // Delete a feed item
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this feed item? This action cannot be undone.")) {
@@ -1197,7 +1368,7 @@ export default function FeedFormPage() {
                   Status
                 </p>
                 <div className="inline-flex h-8 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
-                  {["all", "draft", "published", "archived"].map((status) => {
+                  {["all", "draft", "scheduled", "published", "archived"].map((status) => {
                     const isActive = filterStatus === status
                     return (
                       <button
@@ -1345,21 +1516,26 @@ export default function FeedFormPage() {
                   </div>
                 ) : (
                   <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {filteredFeedItems.map((item) => {
                       const displayImage = item.featured_post_image || item.hero_image_desktop || item.og_image
                       const isCommentOpen = !!(item.id && expandedFeedComments.has(item.id))
                       const statusDot =
                         item.status === "published"
                           ? "bg-emerald-500"
+                          : item.status === "scheduled"
+                          ? "bg-blue-500"
                           : item.status === "draft"
                           ? "bg-amber-500"
                           : "bg-neutral-400"
+                      const visibleTopics = item.topics?.slice(0, 2) ?? []
+                      const extraTopicCount = (item.topics?.length ?? 0) - visibleTopics.length
+                      const lastEdited = formatRelative(item.updated_at)
 
                       return (
                         <React.Fragment key={item.id}>
                         <div
-                          className={`bg-white rounded-md ring-1 overflow-hidden transition-[box-shadow,outline-color] ${
+                          className={`bg-white rounded-md ring-1 overflow-hidden transition-[box-shadow,outline-color] flex flex-col ${
                             isCommentOpen
                               ? "ring-neutral-900/40"
                               : "ring-neutral-200/70 hover:ring-neutral-300 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]"
@@ -1378,34 +1554,79 @@ export default function FeedFormPage() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-neutral-300" />
+                                <ImageIcon className="h-8 w-8 text-neutral-300" />
                               </div>
                             )}
-                            {/* Status dot */}
-                            <span
-                              className={`absolute top-2 right-2 inline-block h-1.5 w-1.5 rounded-full ${statusDot}`}
-                              title={item.status}
-                              aria-hidden="true"
-                            />
                           </div>
 
                           {/* Content */}
-                          <div className="p-3">
-                            <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500 mb-1.5">
-                              <span className={`inline-block h-1 w-1 rounded-full ${statusDot}`} aria-hidden="true" />
-                              {item.type}
-                            </p>
+                          <div className="p-3 flex-1 flex flex-col">
+                            {/* Type eyebrow + inline status menu */}
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500 truncate">
+                                <span className={`inline-block h-1 w-1 rounded-full ${statusDot}`} aria-hidden="true" />
+                                {item.type}
+                              </p>
+                              {item.id && (
+                                <FeedCardStatusMenu
+                                  status={item.status}
+                                  onChange={(next) => handleQuickStatusChange(item.id!, next)}
+                                />
+                              )}
+                            </div>
 
-                            <h3 className="text-sm font-medium text-neutral-900 leading-snug line-clamp-2 mb-1">
+                            <h3 className="text-sm font-medium text-neutral-900 leading-snug line-clamp-2 mb-1.5">
                               {item.title}
                             </h3>
 
-                            <p className="text-[11px] text-neutral-500 tabular-nums mb-3">
-                              {formatDate(item.published_date)}
-                            </p>
+                            {/* Authors line */}
+                            {item.authors?.length > 0 && (
+                              <p className="text-[11px] text-neutral-500 truncate mb-1.5">
+                                <span className="text-neutral-400">By</span> {item.authors.join(", ")}
+                              </p>
+                            )}
+
+                            {/* Topics chips */}
+                            {visibleTopics.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {visibleTopics.map((t) => (
+                                  <span
+                                    key={t}
+                                    className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] truncate max-w-32"
+                                    title={t}
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                                {extraTopicCount > 0 && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 text-[10px] tabular-nums">
+                                    +{extraTopicCount}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Date row + last-edited */}
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-neutral-500 tabular-nums mt-auto pt-2">
+                              {item.status === "scheduled" && item.scheduled_at ? (
+                                <span
+                                  className="text-blue-600"
+                                  title={new Date(item.scheduled_at).toLocaleString()}
+                                >
+                                  Publishes {formatScheduledIn(item.scheduled_at)}
+                                </span>
+                              ) : (
+                                <span>{formatDate(item.published_date)}</span>
+                              )}
+                              {lastEdited && (
+                                <span className="text-neutral-400" title={`Updated ${item.updated_at}`}>
+                                  Updated {lastEdited}
+                                </span>
+                              )}
+                            </div>
 
                             {/* Action buttons */}
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 mt-3">
                               <button
                                 onClick={() => handleEdit(item)}
                                 className="flex-1 h-7 px-2 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-200 bg-white hover:bg-neutral-50 rounded-md transition-colors"
@@ -1724,6 +1945,8 @@ export default function FeedFormPage() {
                       className={`inline-block h-1.5 w-1.5 rounded-full ${
                         formData.status === "published"
                           ? "bg-emerald-500"
+                          : formData.status === "scheduled"
+                          ? "bg-blue-500"
                           : formData.status === "draft"
                           ? "bg-amber-500"
                           : "bg-neutral-400"
@@ -1732,14 +1955,38 @@ export default function FeedFormPage() {
                     />
                     <select
                       value={formData.status}
-                      onChange={(e) => handleInputChange("status", e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value as FeedStatus
+                        // Default a scheduled_at when flipping to scheduled — anchor on
+                        // published_date at 9am CST so the editor doesn't see an empty input.
+                        if (next === "scheduled" && !formData.scheduled_at) {
+                          const base = formData.published_date || new Date().toISOString().split("T")[0]
+                          // datetime-local format: YYYY-MM-DDTHH:MM
+                          const defaultIso = `${base}T09:00`
+                          setFormData((prev) => ({ ...prev, status: next, scheduled_at: defaultIso }))
+                        } else {
+                          handleInputChange("status", next)
+                        }
+                      }}
                       className="h-8 px-2 text-xs font-medium rounded-md ring-1 ring-neutral-200 bg-white text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
                       aria-label="Status"
                     >
                       <option value="draft">Draft</option>
+                      <option value="scheduled">Scheduled</option>
                       <option value="published">Published</option>
                       <option value="archived">Archived</option>
                     </select>
+
+                    {/* Schedule picker — only renders when scheduled */}
+                    {formData.status === "scheduled" && (
+                      <input
+                        type="datetime-local"
+                        value={formData.scheduled_at || ""}
+                        onChange={(e) => handleInputChange("scheduled_at", e.target.value)}
+                        className="h-8 px-2 text-xs rounded-md ring-1 ring-neutral-200 bg-white text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none tabular-nums"
+                        aria-label="Scheduled publish time"
+                      />
+                    )}
                   </div>
 
                   {/* Completion Indicator */}
@@ -1848,6 +2095,11 @@ export default function FeedFormPage() {
                       <>
                         <Send className="h-3.5 w-3.5" />
                         Publish
+                      </>
+                    ) : formData.status === "scheduled" ? (
+                      <>
+                        <Calendar className="h-3.5 w-3.5" />
+                        Schedule
                       </>
                     ) : (
                       <>
@@ -2464,8 +2716,9 @@ export default function FeedFormPage() {
                     </div>
                   </CollapsibleSection>
 
-                  {/* Spotlights - Collapsible */}
-                  {[1, 2, 3].map((num) => (
+                  {/* Spotlights — extracted to <SpotlightFields/> to kill the
+                      former 3× copy-paste. Each iteration only sets the num. */}
+                  {([1, 2, 3] as const).map((num) => (
                     <CollapsibleSection
                       key={num}
                       id={`spotlight${num}`}
@@ -2476,77 +2729,13 @@ export default function FeedFormPage() {
                       onToggle={() => toggleSection(`spotlight${num}`)}
                       isComplete={isSectionComplete(`spotlight${num}`)}
                     >
-                      <div className="space-y-5">
-                        <div>
-                          <p className="text-xs text-neutral-500 mb-4 leading-relaxed">Create a spotlight section to highlight specific content, products, or features.</p>
-                          
-                          <PreviewField label={`Spotlight ${num} Title`} value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
-                            <div>
-                              <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Title</label>
-                              <input
-                                type="text"
-                                value={formData[`spotlight_${num}_title` as keyof FeedFormData] as string || ""}
-                                onChange={(e) => handleInputChange(`spotlight_${num}_title` as keyof FeedFormData, e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
-                                placeholder={`Enter spotlight ${num} title`}
-                              />
-                            </div>
-                          </PreviewField>
-                        </div>
-                        
-                        <PreviewField label={`Spotlight ${num} Description`} value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId} isRichText>
-                          <div>
-                            <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Description</label>
-                            <p className="text-xs text-neutral-500 mb-2 leading-relaxed">A brief description of what you're spotlighting. Supports Markdown.</p>
-                            <RichTextEditor
-                              value={formData[`spotlight_${num}_description` as keyof FeedFormData] as string || ""}
-                              onChange={(value: string) => handleInputChange(`spotlight_${num}_description` as keyof FeedFormData, value)}
-                              placeholder={`Spotlight ${num} description`}
-                              minRows={4}
-                            />
-                          </div>
-                        </PreviewField>
-                        
-                        <ImageUpload
-                          value={formData[`spotlight_${num}_image` as keyof FeedFormData] as string || ""}
-                          onChange={(value) => handleInputChange(`spotlight_${num}_image` as keyof FeedFormData, value)}
-                          label={`Spotlight ${num} Image`}
-                          hideUrl
-                        />
-                        
-                        <div className="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200">
-                          <h4 className="text-sm font-bold text-neutral-800 mb-3 flex items-center gap-2">
-                            <LinkIcon className="h-4 w-4 text-neutral-500" />
-                            Call-to-Action Button
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <PreviewField label="Button Text" value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
-                              <div>
-                                <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Text</label>
-                                <input
-                                  type="text"
-                                  value={formData[`spotlight_${num}_cta_text` as keyof FeedFormData] as string || ""}
-                                  onChange={(e) => handleInputChange(`spotlight_${num}_cta_text` as keyof FeedFormData, e.target.value)}
-                                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-medium transition-all"
-                                  placeholder="Learn More"
-                                />
-                              </div>
-                            </PreviewField>
-                            <PreviewField label="Button Link" value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""} isPreview={previewMode && !!editingId}>
-                              <div>
-                                <label className="block text-sm font-semibold text-neutral-800 mb-2 tracking-tight">Button Link</label>
-                                <input
-                                  type="url"
-                                  value={formData[`spotlight_${num}_cta_link` as keyof FeedFormData] as string || ""}
-                                  onChange={(e) => handleInputChange(`spotlight_${num}_cta_link` as keyof FeedFormData, e.target.value)}
-                                  className="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-400 text-base font-mono transition-all"
-                                  placeholder="https://example.com/link"
-                                />
-                              </div>
-                            </PreviewField>
-                          </div>
-                        </div>
-                      </div>
+                      <SpotlightFields
+                        num={num}
+                        formData={formData}
+                        onFieldChange={(field, value) => handleInputChange(field as keyof FeedFormData, value)}
+                        previewMode={previewMode}
+                        editingId={editingId}
+                      />
                     </CollapsibleSection>
                   ))}
                 </>

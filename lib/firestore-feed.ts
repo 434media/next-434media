@@ -57,7 +57,10 @@ export interface FeedItem {
   og_image?: string
   og_title?: string
   og_description?: string
-  status: "draft" | "published" | "archived"
+  status: "draft" | "scheduled" | "published" | "archived"
+  /** ISO datetime; only meaningful when status === "scheduled". The cron at
+   *  /api/cron/feed-publish flips status → published when scheduled_at <= now. */
+  scheduled_at?: string
   
   // Newsletter-specific fields
   hero_image_desktop?: string
@@ -122,7 +125,11 @@ function mapFirestoreToFeedItem(doc: admin.firestore.DocumentSnapshot): FeedItem
     og_title: data.og_title || undefined,
     og_description: data.og_description || undefined,
     status: data.status || "draft",
-    
+    scheduled_at:
+      data.scheduled_at instanceof Timestamp
+        ? data.scheduled_at.toDate().toISOString()
+        : data.scheduled_at || undefined,
+
     // Newsletter-specific fields
     hero_image_desktop: data.hero_image_desktop || undefined,
     hero_image_mobile: data.hero_image_mobile || undefined,
