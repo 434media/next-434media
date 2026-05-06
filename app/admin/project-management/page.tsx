@@ -7,9 +7,8 @@ import {
   Calendar,
   Building2,
   Mic2,
-  CheckCircle2,
   AlertCircle,
-  X,
+  RefreshCw,
 } from "lucide-react"
 import type { PMEvent, Vendor, Speaker } from "@/types/project-management-types"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
@@ -90,6 +89,35 @@ export default function ProjectManagementPage() {
       else if (type === "speaker") setSpeakers(prev => prev.filter(s => s.id !== id))
     } catch {
       showToast("Failed to delete item", "error")
+    }
+  }
+
+  // Generic duplicate — strips id/created_at/updated_at, suffixes the name with
+  // "(copy)" so the editor sees a clear stub, then POSTs a new record. Same
+  // pattern across event/vendor/speaker since the API shape is uniform.
+  const handleDuplicate = async (
+    type: "event" | "vendor" | "speaker",
+    record: PMEvent | Vendor | Speaker,
+  ) => {
+    try {
+      const { id: _id, created_at: _ca, updated_at: _ua, airtable_id: _aid, ...rest } =
+        record as PMEvent & Vendor & Speaker
+      void _id; void _ca; void _ua; void _aid
+      const baseName = (rest as { name?: string }).name || ""
+      const data = {
+        ...rest,
+        name: baseName ? `${baseName} (copy)` : "Untitled (copy)",
+      }
+      const response = await fetch("/api/admin/project-management", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", type, data }),
+      })
+      if (!response.ok) throw new Error("Duplicate failed")
+      showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} duplicated`, "success")
+      await loadData()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to duplicate", "error")
     }
   }
 
@@ -194,26 +222,22 @@ export default function ProjectManagementPage() {
         <AnimatePresence>
           {toast && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className={`fixed top-4 right-4 z-60 flex items-center gap-3 px-5 py-3.5 rounded-xl border shadow-lg ${
-                toast.type === "success"
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : toast.type === "error"
-                  ? "bg-red-50 border-red-200 text-red-700"
-                  : "bg-amber-50 border-amber-200 text-amber-700"
-              }`}
+              exit={{ opacity: 0, y: -10 }}
+              className="fixed top-4 right-4 z-60 inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12)] text-sm"
             >
-              {toast.type === "success" ? (
-                <CheckCircle2 className="w-5 h-5" />
-              ) : (
-                <AlertCircle className="w-5 h-5" />
-              )}
-              <span className="font-medium text-sm tracking-wide">{toast.message}</span>
-              <button onClick={() => setToast(null)} className="ml-2 hover:opacity-70">
-                <X className="w-4 h-4" />
-              </button>
+              <span
+                className={`inline-block h-1.5 w-1.5 rounded-full ${
+                  toast.type === "success"
+                    ? "bg-emerald-500"
+                    : toast.type === "error"
+                    ? "bg-red-500"
+                    : "bg-amber-500"
+                }`}
+                aria-hidden="true"
+              />
+              <span className="text-neutral-900">{toast.message}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -221,12 +245,26 @@ export default function ProjectManagementPage() {
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-neutral-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <h1 className="text-lg font-bold tracking-tight text-neutral-900">
+            <div className="flex items-center justify-between gap-3 py-5 flex-wrap">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900">
                   Project Management
                 </h1>
+                <p className="text-sm text-neutral-500 mt-1 tabular-nums">
+                  {events.length} {events.length === 1 ? "event" : "events"} ·{" "}
+                  {vendors.length} {vendors.length === 1 ? "vendor" : "vendors"} ·{" "}
+                  {speakers.length} {speakers.length === 1 ? "speaker" : "speakers"}
+                </p>
               </div>
+              <button
+                onClick={loadData}
+                disabled={isLoading}
+                className="inline-flex items-center justify-center h-9 w-9 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
+                title="Refresh"
+                aria-label="Refresh"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              </button>
             </div>
           </div>
         </header>
@@ -234,40 +272,36 @@ export default function ProjectManagementPage() {
         {/* Navigation Tabs */}
         <div className="border-b border-neutral-200 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <nav className="flex gap-1" aria-label="Tabs">
+            <nav className="flex gap-0 -mb-px overflow-x-auto" aria-label="Tabs">
               {[
                 { id: "events" as const, label: "Events", icon: Calendar, count: events.length },
                 { id: "vendors" as const, label: "Vendors", icon: Building2, count: vendors.length },
                 { id: "speakers" as const, label: "Speakers", icon: Mic2, count: speakers.length },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveView(tab.id)}
-                  className={`relative flex items-center gap-2.5 px-5 py-4 text-sm font-semibold tracking-wide transition-all ${
-                    activeView === tab.id
-                      ? "text-neutral-900"
-                      : "text-neutral-500 hover:text-neutral-700"
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                  <span
-                    className={`px-2 py-0.5 text-xs font-bold rounded-full ${
-                      activeView === tab.id
-                        ? "bg-neutral-900 text-white"
-                        : "bg-neutral-100 text-neutral-600"
+              ].map((tab) => {
+                const isActive = activeView === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveView(tab.id)}
+                    className={`relative inline-flex items-center gap-2 px-4 py-3 text-[13px] font-medium tracking-wide whitespace-nowrap transition-colors ${
+                      isActive ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-700"
                     }`}
                   >
-                    {tab.count}
-                  </span>
-                  {activeView === tab.id && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900"
-                    />
-                  )}
-                </button>
-              ))}
+                    <tab.icon className="w-3.5 h-3.5" />
+                    <span>{tab.label}</span>
+                    <span
+                      className={`tabular-nums text-[10px] ${
+                        isActive ? "text-neutral-900" : "text-neutral-400"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                    {isActive && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
+                    )}
+                  </button>
+                )
+              })}
             </nav>
           </div>
         </div>
@@ -279,14 +313,18 @@ export default function ProjectManagementPage() {
               <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-              <p className="text-lg font-medium text-red-600">{error}</p>
+            <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-8 text-center">
+              <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700 mx-auto mb-3">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+              <p className="text-sm font-medium text-neutral-900 mb-1">Couldn't load data</p>
+              <p className="text-xs text-neutral-500 mb-3">{error}</p>
               <button
                 onClick={loadData}
-                className="mt-4 px-4 py-2 text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
               >
-                Try Again
+                <RefreshCw className="h-3.5 w-3.5" />
+                Try again
               </button>
             </div>
           ) : (
@@ -302,6 +340,7 @@ export default function ProjectManagementPage() {
                     events={events}
                     onDelete={(id: string) => handleDelete("event", id)}
                     onSave={handleSaveEvent}
+                    onDuplicate={(event: PMEvent) => handleDuplicate("event", event)}
                     showToast={showToast}
                   />
                 </motion.div>
@@ -318,6 +357,7 @@ export default function ProjectManagementPage() {
                     vendors={vendors}
                     onDelete={(id) => handleDelete("vendor", id)}
                     onSave={handleSaveVendor}
+                    onDuplicate={(vendor) => handleDuplicate("vendor", vendor)}
                     showToast={showToast}
                   />
                 </motion.div>
@@ -334,6 +374,7 @@ export default function ProjectManagementPage() {
                     speakers={speakers}
                     onDelete={(id) => handleDelete("speaker", id)}
                     onSave={handleSaveSpeaker}
+                    onDuplicate={(speaker) => handleDuplicate("speaker", speaker)}
                     showToast={showToast}
                   />
                 </motion.div>

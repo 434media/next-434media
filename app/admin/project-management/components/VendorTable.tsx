@@ -20,6 +20,7 @@ import {
   Trash2,
   Edit2,
   Eye,
+  Copy,
   X,
   Filter,
   Star,
@@ -31,11 +32,13 @@ import type { Vendor } from "@/types/project-management-types"
 import { VENDOR_CATEGORIES } from "@/types/project-management-types"
 import VendorFormModal from "./VendorFormModal"
 import VendorDetailSlideout from "./VendorDetailSlideout"
+import { formatRelative } from "@/components/admin/FeedCardStatusMenu"
 
 interface VendorTableProps {
   vendors: Vendor[]
   onDelete: (id: string) => void
   onSave: (vendor: Partial<Vendor>, isNew: boolean) => Promise<void>
+  onDuplicate?: (vendor: Vendor) => void
   showToast: (message: string, type: "success" | "error" | "warning") => void
 }
 
@@ -47,9 +50,11 @@ const CONTRACT_STATUSES = ["active", "pending", "inactive", "expired"] as const
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
 
-export default function VendorTable({ vendors, onDelete, onSave, showToast }: VendorTableProps) {
+export default function VendorTable({ vendors, onDelete, onSave, onDuplicate, showToast }: VendorTableProps) {
   // View state
-  const [layout, setLayout] = useState<ViewLayout>("table")
+  // Smart default: grid for small lists (recognition wins on visual content),
+  // table once you cross 12 vendors (density + scanning wins). User toggle is honored.
+  const [layout, setLayout] = useState<ViewLayout>(() => (vendors.length > 12 ? "table" : "grid"))
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -72,6 +77,14 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
   const categoriesInUse = useMemo(() => {
     const cats = new Set(vendors.map((v) => v.category).filter(Boolean))
     return Array.from(cats).sort()
+  }, [vendors])
+
+  // Specialty autocomplete source — deduped + sorted across all vendors. Powers
+  // the form's datalist so editors don't recreate "Photography" / "photographer".
+  const specialtySuggestions = useMemo(() => {
+    const set = new Set<string>()
+    for (const v of vendors) if (v.specialty) set.add(v.specialty)
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
   }, [vendors])
 
   // Filter + sort + paginate
@@ -173,18 +186,22 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
     )
   }
 
-  const getContractStatusColor = (status: string | undefined) => {
+  // Status pill chrome stays neutral; the contract-status dot below carries
+  // the visual signal. Keeps the system consistent with the rest of admin.
+  const getContractStatusColor = (_status: string | undefined) =>
+    "bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200"
+
+  const getContractStatusDot = (status: string | undefined) => {
     switch (status) {
       case "active":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200"
+        return "bg-emerald-500"
       case "pending":
-        return "bg-amber-50 text-amber-700 border-amber-200"
-      case "inactive":
-        return "bg-neutral-100 text-neutral-500 border-neutral-200"
+        return "bg-amber-500"
       case "expired":
-        return "bg-red-50 text-red-700 border-red-200"
+        return "bg-red-500"
+      case "inactive":
       default:
-        return "bg-neutral-100 text-neutral-500 border-neutral-200"
+        return "bg-neutral-400"
     }
   }
 
@@ -213,21 +230,22 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {/* Search */}
           <div className="relative flex-1 max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search vendors by name, company, specialty, city..."
+              placeholder="Search vendors by name, company, specialty, city…"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 handleFilterChange()
               }}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-100"
+              className="w-full h-9 pl-9 pr-9 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
             />
             {searchQuery && (
               <button
                 onClick={() => { setSearchQuery(""); handleFilterChange() }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-neutral-400 hover:text-neutral-600"
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-6 w-6 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
+                aria-label="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -238,49 +256,57 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium border rounded-lg transition-colors ${
+              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-xs font-medium transition-colors ${
                 showFilters || categoryFilter !== "all" || statusFilter !== "all"
-                  ? "bg-neutral-900 text-white border-neutral-900"
-                  : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50"
+                  ? "bg-neutral-900 text-white"
+                  : "bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
               }`}
             >
-              <Filter className="w-4 h-4" />
+              <Filter className="w-3.5 h-3.5" />
               Filters
               {(categoryFilter !== "all" || statusFilter !== "all") && (
-                <span className="w-5 h-5 text-xs font-bold rounded-full bg-white text-neutral-900 flex items-center justify-center">
-                  {(categoryFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0)}
+                <span className={`tabular-nums text-[10px] ${
+                  showFilters || categoryFilter !== "all" || statusFilter !== "all" ? "text-white/70" : "text-neutral-400"
+                }`}>
+                  · {(categoryFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0)}
                 </span>
               )}
             </button>
 
             {/* Layout toggle */}
-            <div className="flex items-center bg-white border border-neutral-200 rounded-lg overflow-hidden">
+            <div className="inline-flex h-9 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
               <button
                 onClick={() => setLayout("table")}
-                className={`p-2.5 transition-colors ${
-                  layout === "table" ? "bg-neutral-900 text-white" : "text-neutral-400 hover:text-neutral-700"
+                className={`inline-flex items-center justify-center w-9 transition-colors ${
+                  layout === "table"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
                 }`}
                 title="Table view"
+                aria-label="Table view"
               >
-                <LayoutList className="w-4 h-4" />
+                <LayoutList className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setLayout("grid")}
-                className={`p-2.5 transition-colors ${
-                  layout === "grid" ? "bg-neutral-900 text-white" : "text-neutral-400 hover:text-neutral-700"
+                className={`inline-flex items-center justify-center w-9 transition-colors ${
+                  layout === "grid"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
                 }`}
                 title="Grid view"
+                aria-label="Grid view"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <button
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Add Vendor
+              <Plus className="w-3.5 h-3.5" />
+              New vendor
             </button>
           </div>
         </div>
@@ -294,54 +320,65 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="flex flex-wrap items-center gap-3 p-4 bg-white border border-neutral-200 rounded-xl">
-                {/* Category filter */}
+              <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-md ring-1 ring-neutral-200/70">
+                {/* Category filter — kept as select since the list is open-ended */}
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Category</label>
+                  <label className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">Category</label>
                   <select
                     value={categoryFilter}
                     onChange={(e) => { setCategoryFilter(e.target.value); handleFilterChange() }}
-                    className="px-3 py-1.5 text-sm bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:border-neutral-400"
+                    className="h-8 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-xs text-neutral-700 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    aria-label="Category filter"
                   >
-                    <option value="all">All Categories</option>
+                    <option value="all">All categories</option>
                     {categoriesInUse.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="h-6 w-px bg-neutral-200" />
-
-                {/* Status filter */}
+                {/* Status filter — segmented chips with colored dot prefix */}
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Status</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => { setStatusFilter(e.target.value); handleFilterChange() }}
-                    className="px-3 py-1.5 text-sm bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-700 focus:outline-none focus:border-neutral-400"
-                  >
-                    <option value="all">All Statuses</option>
-                    {CONTRACT_STATUSES.map((s) => (
-                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                    ))}
-                  </select>
+                  <label className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">Status</label>
+                  <div className="inline-flex h-8 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
+                    {(["all", ...CONTRACT_STATUSES] as const).map((s) => {
+                      const isActive = statusFilter === s
+                      const dot =
+                        s === "active" ? "bg-emerald-500"
+                        : s === "pending" ? "bg-amber-500"
+                        : s === "expired" ? "bg-red-500"
+                        : s === "inactive" ? "bg-neutral-400"
+                        : "bg-neutral-300"
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => { setStatusFilter(s); handleFilterChange() }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 text-[11px] font-medium whitespace-nowrap transition-colors ${
+                            isActive ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"
+                          }`}
+                        >
+                          {s !== "all" && (
+                            <span className={`inline-block h-1 w-1 rounded-full ${dot}`} aria-hidden="true" />
+                          )}
+                          {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {/* Clear filters */}
                 {(categoryFilter !== "all" || statusFilter !== "all") && (
-                  <>
-                    <div className="h-6 w-px bg-neutral-200" />
-                    <button
-                      onClick={() => {
-                        setCategoryFilter("all")
-                        setStatusFilter("all")
-                        handleFilterChange()
-                      }}
-                      className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors"
-                    >
-                      Clear all filters
-                    </button>
-                  </>
+                  <button
+                    onClick={() => {
+                      setCategoryFilter("all")
+                      setStatusFilter("all")
+                      handleFilterChange()
+                    }}
+                    className="text-[11px] font-medium text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded transition-colors"
+                  >
+                    Clear filters
+                  </button>
                 )}
               </div>
             </motion.div>
@@ -374,7 +411,7 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
 
       {/* Table View */}
       {layout === "table" ? (
-        <div className="mt-4 bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="mt-4 bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -476,7 +513,8 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                       {/* Status */}
                       <td className="px-4 py-3">
                         {vendor.contract_status ? (
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full border ${getContractStatusColor(vendor.contract_status)}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] rounded-full ${getContractStatusColor(vendor.contract_status)}`}>
+                            <span className={`inline-block h-1 w-1 rounded-full ${getContractStatusDot(vendor.contract_status)}`} aria-hidden="true" />
                             {vendor.contract_status}
                           </span>
                         ) : (
@@ -568,6 +606,15 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
+                          {onDuplicate && (
+                            <button
+                              onClick={() => onDuplicate(vendor)}
+                              className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                              title="Duplicate vendor"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => onDelete(vendor.id)}
                             className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -642,7 +689,8 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                         {vendor.category}
                       </span>
                       {vendor.contract_status && (
-                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${getContractStatusColor(vendor.contract_status)}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] rounded-full ${getContractStatusColor(vendor.contract_status)}`}>
+                          <span className={`inline-block h-1 w-1 rounded-full ${getContractStatusDot(vendor.contract_status)}`} aria-hidden="true" />
                           {vendor.contract_status}
                         </span>
                       )}
@@ -658,6 +706,16 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                     {(vendor.city || vendor.state) && (
                       <p className="text-xs text-neutral-400 mt-2">
                         {[vendor.city, vendor.state].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+
+                    {/* Last edited */}
+                    {vendor.updated_at && (
+                      <p
+                        className="text-[11px] text-neutral-400 tabular-nums mt-1"
+                        title={`Updated ${vendor.updated_at}`}
+                      >
+                        Updated {formatRelative(vendor.updated_at)}
                       </p>
                     )}
 
@@ -707,6 +765,15 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
+                      {onDuplicate && (
+                        <button
+                          onClick={() => onDuplicate(vendor)}
+                          className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Duplicate"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => onDelete(vendor.id)}
                         className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
@@ -791,12 +858,13 @@ export default function VendorTable({ vendors, onDelete, onSave, showToast }: Ve
         </div>
       )}
 
-      {/* Form Modal */}
+      {/* Form drawer */}
       <VendorFormModal
         isOpen={formModalOpen}
         vendor={editingVendor}
         onClose={() => { setFormModalOpen(false); setEditingVendor(null) }}
         onSave={handleFormSave}
+        specialtySuggestions={specialtySuggestions}
       />
 
       {/* Detail Slideout */}

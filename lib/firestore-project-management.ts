@@ -10,6 +10,37 @@ export const PM_COLLECTIONS = {
 } as const
 
 // ============================================
+// Airtable wrapper unwrap — some PM fields were synced from Airtable while
+// computed/formula fields hadn't resolved, so they land in Firestore as
+// `{ errorType, state, isStale, value }` wrappers instead of raw primitives.
+// Unwrap defensively at the read boundary so the rest of the app sees clean
+// primitives by contract.
+// ============================================
+
+function unwrapValue<T>(v: unknown, expected: "string" | "number" | "boolean"): T | undefined {
+  if (v == null) return undefined
+  if (typeof v === expected) return v as T
+  if (typeof v === "object" && v !== null && "value" in (v as Record<string, unknown>)) {
+    const inner = (v as { value: unknown }).value
+    if (typeof inner === expected) return inner as T
+  }
+  return undefined
+}
+
+const str = (v: unknown): string | undefined => unwrapValue<string>(v, "string")
+const num = (v: unknown): number | undefined => unwrapValue<number>(v, "number")
+
+function strArray(v: unknown): string[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out: string[] = []
+  for (const item of v) {
+    const s = str(item)
+    if (s) out.push(s)
+  }
+  return out.length > 0 ? out : undefined
+}
+
+// ============================================
 // SIMPLE IN-MEMORY CACHE (reduces Firestore reads)
 // ============================================
 interface CacheEntry<T> {
@@ -57,36 +88,38 @@ function mapFirestoreToPMEvent(doc: admin.firestore.DocumentSnapshot): PMEvent {
 
   return {
     id: doc.id,
-    airtable_id: data.airtable_id,
-    name: data.name || "",
-    date: data.date || "",
-    start_date: data.start_date,
-    end_date: data.end_date,
-    start_time: data.start_time,
-    end_time: data.end_time,
-    location: data.location,
-    venue_name: data.venue_name,
-    venue_location: data.venue_location,
-    venue_address: data.venue_address,
-    venue_map_link: data.venue_map_link,
-    description: data.description,
-    agenda_overview: data.agenda_overview,
-    status: data.status || "planning",
-    budget: data.budget,
-    actual_cost: data.actual_cost,
-    actual_expenses: data.actual_expenses,
-    estimated_expenses: data.estimated_expenses,
-    on_budget: data.on_budget,
-    days_to_go: data.days_to_go,
-    month: data.month,
-    photo_banner: data.photo_banner,
-    img_ai: data.img_ai,
-    website_url: data.website_url,
-    notes: data.notes,
+    airtable_id: str(data.airtable_id),
+    name: str(data.name) || "",
+    date: str(data.date) || "",
+    start_date: str(data.start_date),
+    end_date: str(data.end_date),
+    start_time: str(data.start_time),
+    end_time: str(data.end_time),
+    location: str(data.location),
+    venue_name: str(data.venue_name),
+    venue_location: str(data.venue_location),
+    venue_address: str(data.venue_address),
+    venue_map_link: str(data.venue_map_link),
+    description: str(data.description),
+    agenda_overview: str(data.agenda_overview),
+    status: (str(data.status) || "planning") as PMEvent["status"],
+    budget: num(data.budget),
+    actual_cost: num(data.actual_cost),
+    actual_expenses: num(data.actual_expenses),
+    estimated_expenses: num(data.estimated_expenses),
+    on_budget: str(data.on_budget),
+    days_to_go: str(data.days_to_go),
+    month: str(data.month),
+    photo_banner: str(data.photo_banner),
+    img_ai: str(data.img_ai),
+    website_url: str(data.website_url),
+    notes: str(data.notes),
+    // links + client_contacts are structured arrays — passed through as-is;
+    // their inner string fields are unwrapped at the consumer if needed
     links: data.links || [],
     client_contacts: data.client_contacts || [],
-    vendor_ids: data.vendor_ids,
-    speaker_ids: data.speaker_ids,
+    vendor_ids: strArray(data.vendor_ids),
+    speaker_ids: strArray(data.speaker_ids),
     created_at: data.created_at instanceof Timestamp
       ? data.created_at.toDate().toISOString()
       : data.created_at,
@@ -214,28 +247,29 @@ function mapFirestoreToVendor(doc: admin.firestore.DocumentSnapshot): Vendor {
 
   return {
     id: doc.id,
-    airtable_id: data.airtable_id,
-    name: data.name || "",
-    company: data.company,
-    email: data.email,
-    phone: data.phone,
-    category: data.category || "Other",
-    specialty: data.specialty,
-    website: data.website,
-    link_url: data.link_url,
-    address: data.address,
-    city: data.city,
-    state: data.state,
-    zip: data.zip,
-    photo: data.photo,
-    social_media: data.social_media,
-    research: data.research,
-    rate: data.rate,
-    rate_type: data.rate_type,
-    contract_status: data.contract_status,
-    notes: data.notes,
-    rating: data.rating,
-    event_ids: data.event_ids,
+    airtable_id: str(data.airtable_id),
+    name: str(data.name) || "",
+    company: str(data.company),
+    email: str(data.email),
+    phone: str(data.phone),
+    category: str(data.category) || "Other",
+    specialty: str(data.specialty),
+    website: str(data.website),
+    link_url: str(data.link_url),
+    address: str(data.address),
+    city: str(data.city),
+    state: str(data.state),
+    zip: str(data.zip),
+    photo: str(data.photo),
+    social_media: str(data.social_media),
+    research: str(data.research),
+    rate: num(data.rate),
+    rate_type: str(data.rate_type) as Vendor["rate_type"],
+    contract_status: str(data.contract_status) as Vendor["contract_status"],
+    notes: str(data.notes),
+    rating: num(data.rating),
+    event_ids: strArray(data.event_ids),
+    // attachments is a structured array — passed through as-is
     attachments: data.attachments,
     created_at: data.created_at instanceof Timestamp
       ? data.created_at.toDate().toISOString()
@@ -361,24 +395,30 @@ function mapFirestoreToSpeaker(doc: admin.firestore.DocumentSnapshot): Speaker {
 
   return {
     id: doc.id,
-    airtable_id: data.airtable_id,
-    name: data.name || "",
-    title: data.title,
-    company: data.company,
-    bio: data.bio,
-    email: data.email,
-    phone: data.phone,
-    website: data.website,
-    linkedin: data.linkedin,
-    twitter: data.twitter,
-    instagram: data.instagram,
-    headshot: data.headshot,
-    topics: data.topics,
-    speaking_fee: data.speaking_fee,
-    travel_requirements: data.travel_requirements,
-    availability: data.availability,
-    notes: data.notes,
-    event_ids: data.event_ids,
+    airtable_id: str(data.airtable_id),
+    name: str(data.name) || "",
+    title: str(data.title),
+    company: str(data.company),
+    bio: str(data.bio),
+    introduction: str(data.introduction),
+    email: str(data.email),
+    phone: str(data.phone),
+    website: str(data.website),
+    linkedin: str(data.linkedin),
+    linkedin_url: str(data.linkedin_url),
+    linkedin_summary: str(data.linkedin_summary),
+    twitter: str(data.twitter),
+    instagram: str(data.instagram),
+    headshot: str(data.headshot),
+    photo: str(data.photo),
+    topics: strArray(data.topics),
+    session_topics: strArray(data.session_topics),
+    session_topic_ids: strArray(data.session_topic_ids),
+    speaking_fee: num(data.speaking_fee),
+    travel_requirements: str(data.travel_requirements),
+    availability: str(data.availability),
+    notes: str(data.notes),
+    event_ids: strArray(data.event_ids),
     created_at: data.created_at instanceof Timestamp
       ? data.created_at.toDate().toISOString()
       : data.created_at,
@@ -503,21 +543,22 @@ function mapFirestoreToSOP(doc: admin.firestore.DocumentSnapshot): SOP {
 
   return {
     id: doc.id,
-    airtable_id: data.airtable_id,
-    title: data.title || "",
-    category: data.category || "Other",
-    department: data.department,
-    description: data.description,
-    content: data.content || "",
-    version: data.version || "1.0",
-    status: data.status || "draft",
-    owner: data.owner,
-    reviewers: data.reviewers,
-    last_reviewed: data.last_reviewed,
-    next_review: data.next_review,
-    related_sops: data.related_sops,
+    airtable_id: str(data.airtable_id),
+    title: str(data.title) || "",
+    category: str(data.category) || "Other",
+    department: str(data.department),
+    description: str(data.description),
+    content: str(data.content) || "",
+    version: str(data.version) || "1.0",
+    status: (str(data.status) || "draft") as SOP["status"],
+    owner: str(data.owner),
+    reviewers: strArray(data.reviewers),
+    last_reviewed: str(data.last_reviewed),
+    next_review: str(data.next_review),
+    related_sops: strArray(data.related_sops),
+    // attachments is a structured array — passed through as-is
     attachments: data.attachments,
-    tags: data.tags,
+    tags: strArray(data.tags),
     created_at: data.created_at instanceof Timestamp
       ? data.created_at.toDate().toISOString()
       : data.created_at,

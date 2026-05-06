@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -23,10 +23,13 @@ import {
   Phone,
   DollarSign,
   ChevronDown,
+  Cloud,
 } from "lucide-react"
 import type { PMEvent, EventLink, EventClientContact, Vendor } from "@/types/project-management-types"
 import { PM_EVENT_STATUSES, VENDOR_CATEGORIES } from "@/types/project-management-types"
 import { ImageUpload } from "@/components/ImageUpload"
+import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
+import { EventPrePublishChecklist } from "@/components/admin/EventPrePublishChecklist"
 
 interface EventFormProps {
   event?: PMEvent | null
@@ -39,6 +42,14 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
   const router = useRouter()
   const isNew = !event
   const [isSaving, setIsSaving] = useState(false)
+
+  // Autosave state — fires every 30s while editing an existing event. Mirrors
+  // feed-form / blog patterns. New events skip autosave (need to be saved
+  // explicitly the first time before a backend id exists to PATCH against).
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const lastSavedFormData = useRef<string>("")
   const [form, setForm] = useState<Partial<PMEvent>>(
     event || {
       name: "",
@@ -172,6 +183,86 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
   const activeCategories = [...new Set(vendors.map((v) => v.category).filter(Boolean))].sort()
 
   // ============================================
+  // Track unsaved changes — set whenever form drifts from the last saved snapshot
+  useEffect(() => {
+    if (isNew) return
+    const currentFormString = JSON.stringify(form)
+    if (lastSavedFormData.current && currentFormString !== lastSavedFormData.current) {
+      setHasUnsavedChanges(true)
+    }
+  }, [form, isNew])
+
+  // Initialize lastSavedFormData on mount for existing events
+  useEffect(() => {
+    if (!isNew) {
+      lastSavedFormData.current = JSON.stringify(form)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew])
+
+  // Autosave handler — PATCHes the existing event without leaving the page.
+  // Skipped if no name (required field) or no unsaved changes.
+  const autoSaveToBackend = useCallback(async () => {
+    if (isNew) return
+    if (!form.name?.trim()) return
+    if (!hasUnsavedChanges) return
+
+    const currentFormString = JSON.stringify(form)
+    if (currentFormString === lastSavedFormData.current) return
+
+    setIsAutoSaving(true)
+    try {
+      const eventData = { ...form }
+      if (eventData.start_date && !eventData.date) eventData.date = eventData.start_date
+      if (eventData.links) {
+        eventData.links = eventData.links.filter((l) => l.label.trim() || l.url.trim())
+      }
+      if (eventData.client_contacts) {
+        eventData.client_contacts = eventData.client_contacts.filter((c) => c.name.trim())
+      }
+      await onSave(eventData, false)
+      setLastSavedAt(new Date())
+      setHasUnsavedChanges(false)
+      lastSavedFormData.current = currentFormString
+    } catch (err) {
+      console.error("Autosave failed:", err)
+    } finally {
+      setIsAutoSaving(false)
+    }
+  }, [form, isNew, hasUnsavedChanges, onSave])
+
+  // Run autosave every 30s while editing an existing event
+  useEffect(() => {
+    if (isNew) return
+    if (!form.name?.trim()) return
+    const interval = setInterval(() => autoSaveToBackend(), 30000)
+    return () => clearInterval(interval)
+  }, [isNew, form.name, autoSaveToBackend])
+
+  // beforeunload — flush + warn when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && form.name?.trim() && !isNew) {
+        autoSaveToBackend()
+        e.preventDefault()
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?"
+        return e.returnValue
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedChanges, form.name, isNew, autoSaveToBackend])
+
+  // Editor keyboard shortcuts: ⌘S save, Esc cancel back to events list
+  useFeedFormShortcuts({
+    enabled: true,
+    onSave: () => {
+      if (isSaving) return
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+    },
+    onCancel: () => router.push("/admin/project-management"),
+  })
+
   // Submit
   // ============================================
   const handleSubmit = async (e: React.FormEvent) => {
@@ -210,34 +301,65 @@ export default function EventForm({ event, vendors = [], onSave, showToast }: Ev
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-neutral-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-3 h-16 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
               <Link
                 href="/admin/project-management"
-                className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+                title="Back to events"
+                aria-label="Back to events"
               >
-                <ChevronLeft className="w-5 h-5" />
-                <span className="text-sm font-medium tracking-wide">Back to Events</span>
+                <ChevronLeft className="w-4 h-4" />
               </Link>
-              <div className="h-6 w-px bg-neutral-200" />
-              <h1 className="text-lg font-bold tracking-tight text-neutral-900">
-                {isNew ? "New Event" : `Edit: ${event?.name}`}
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight text-neutral-900 truncate">
+                {isNew ? "New event" : `Edit · ${event?.name}`}
               </h1>
+
+              {/* Autosave indicator — only renders for existing events */}
+              {!isNew && form.name?.trim() && (
+                <div className="hidden sm:flex items-center gap-1.5 ml-2 text-[11px]">
+                  {isAutoSaving ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 tabular-nums">
+                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse" aria-hidden="true" />
+                      <Cloud className="h-3 w-3" />
+                      Saving
+                    </span>
+                  ) : lastSavedAt ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 tabular-nums">
+                      <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                      Saved {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  ) : hasUnsavedChanges ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200">
+                      <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                      Unsaved
+                    </span>
+                  ) : null}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
+              <EventPrePublishChecklist formData={form} />
               <Link
                 href="/admin/project-management"
-                className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                title="Cancel (Esc)"
               >
                 Cancel
               </Link>
               <button
                 onClick={handleSubmit}
                 disabled={isSaving}
-                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                title={`Save (${MOD_KEY_LABEL}S)`}
               >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {isNew ? "Create Event" : "Save Changes"}
+                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {isSaving ? "Saving…" : isNew ? "Create event" : "Update"}
+                {!isSaving && (
+                  <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
+                    {MOD_KEY_LABEL}S
+                  </kbd>
+                )}
               </button>
             </div>
           </div>

@@ -1,18 +1,22 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { motion, AnimatePresence } from "motion/react"
-import { X, Loader2, Trash2, Paperclip, Upload } from "lucide-react"
+import { Loader2, Trash2, Paperclip, Upload } from "lucide-react"
 import { upload } from "@vercel/blob/client"
 import type { Vendor, VendorAttachment } from "@/types/project-management-types"
 import { VENDOR_CATEGORIES } from "@/types/project-management-types"
 import { ImageUpload } from "@/components/ImageUpload"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
 
 interface VendorFormModalProps {
   isOpen: boolean
   vendor: Vendor | null // null = create mode
   onClose: () => void
   onSave: (data: Partial<Vendor>) => Promise<void>
+  /** Existing specialties across the vendor list — drives autocomplete on the
+   *  Specialty field so editors don't recreate "Photography" / "photographer". */
+  specialtySuggestions?: string[]
 }
 
 const RATE_TYPES = ["hourly", "daily", "project", "flat"] as const
@@ -41,7 +45,7 @@ const emptyForm = {
   rating: "",
 }
 
-export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: VendorFormModalProps) {
+export default function VendorFormModal({ isOpen, vendor, onClose, onSave, specialtySuggestions = [] }: VendorFormModalProps) {
   const [form, setForm] = useState(emptyForm)
   const [attachments, setAttachments] = useState<VendorAttachment[]>([])
   const [saving, setSaving] = useState(false)
@@ -93,6 +97,17 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
     return Object.keys(errs).length === 0
   }
 
+  // ⌘S to save, Esc to close. Esc handler is built into DetailDrawer; we
+  // route the keyboard hook through the drawer's onClose for symmetry.
+  useFeedFormShortcuts({
+    enabled: isOpen,
+    onSave: () => {
+      if (saving) return
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+    },
+    onCancel: onClose,
+  })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
@@ -143,11 +158,18 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
   }
 
   const inputClass = (field: string) =>
-    `w-full px-3 py-2.5 text-sm bg-white border rounded-lg text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-400 transition-colors ${
-      errors[field] ? "border-red-300 focus:ring-red-100 focus:border-red-400" : "border-neutral-200"
+    `w-full h-10 px-3 text-sm bg-white ring-1 rounded-md text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+      errors[field] ? "ring-red-300 focus:ring-red-500" : "ring-neutral-200 focus:ring-neutral-900"
+    }`
+
+  const textareaClass = (field: string) =>
+    `w-full px-3 py-2 text-sm bg-white ring-1 rounded-md text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+      errors[field] ? "ring-red-300 focus:ring-red-500" : "ring-neutral-200 focus:ring-neutral-900"
     }`
 
   const labelClass = "block text-sm font-medium text-neutral-700 mb-1.5"
+  const sectionEyebrow =
+    "flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-3"
 
   const handleAttachmentUpload = useCallback(
     async (file: File) => {
@@ -184,45 +206,56 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+    <DetailDrawer
+      open={isOpen}
+      onClose={onClose}
+      title={isEditing ? vendor?.name || "Edit vendor" : "New vendor"}
+      subtitle={
+        isEditing ? (
+          <span className="text-xs text-neutral-500">
+            {vendor?.category}
+            {vendor?.contract_status && (
+              <>
+                <span className="text-neutral-300"> · </span>
+                <span className="capitalize">{vendor.contract_status}</span>
+              </>
+            )}
+          </span>
+        ) : (
+          <span className="text-xs text-neutral-500">Fill in vendor details below</span>
+        )
+      }
+      width="xl"
+      closeOnEscape
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+            title="Cancel (Esc)"
           >
-            {/* Header */}
-            <div className="sticky top-0 z-10 bg-white border-b border-neutral-200 px-6 py-5 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="w-8 h-1 bg-yellow-400 mb-2" />
-                  <h2 className="text-xl font-bold text-neutral-900">
-                    {isEditing ? "Edit Vendor" : "Add New Vendor"}
-                  </h2>
-                  <p className="text-sm text-neutral-500 mt-0.5">
-                    {isEditing ? `Editing ${vendor?.name}` : "Fill in vendor details below"}
-                  </p>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-8">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+            title={`Save (${MOD_KEY_LABEL}S)`}
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {saving ? "Saving…" : isEditing ? "Save changes" : "Create vendor"}
+            {!saving && (
+              <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
+                {MOD_KEY_LABEL}S
+              </kbd>
+            )}
+          </button>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 space-y-7">
               {/* Vendor Photo */}
               <ImageUpload
                 value={form.photo}
@@ -234,7 +267,8 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Basic Info */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                <legend className={sectionEyebrow}>
+                  <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
                   Basic Information
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -264,21 +298,35 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>Specialty</label>
+                    <label className={labelClass}>
+                      Specialty
+                      {specialtySuggestions.length > 0 && (
+                        <span className="ml-1.5 text-[11px] font-normal text-neutral-400 tabular-nums">
+                          · {specialtySuggestions.length} known
+                        </span>
+                      )}
+                    </label>
                     <input
                       type="text"
                       value={form.specialty}
                       onChange={(e) => updateField("specialty", e.target.value)}
                       placeholder="e.g. Wedding photography"
+                      list="vendor-specialty-suggestions"
                       className={inputClass("specialty")}
                     />
+                    <datalist id="vendor-specialty-suggestions">
+                      {specialtySuggestions.map((s) => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
               </fieldset>
 
               {/* Contact */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                <legend className={sectionEyebrow}>
+                  <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
                   Contact Information
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -338,7 +386,8 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Location */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                <legend className={sectionEyebrow}>
+                  <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
                   Location
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -389,7 +438,8 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Rate & Status */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                <legend className={sectionEyebrow}>
+                  <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
                   Rate & Status
                 </legend>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -447,7 +497,8 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Research & Notes */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                <legend className={sectionEyebrow}>
+                  <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
                   Additional Details
                 </legend>
                 <div className="space-y-4">
@@ -458,7 +509,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                       onChange={(e) => updateField("research", e.target.value)}
                       placeholder="Research notes, background info, references..."
                       rows={3}
-                      className={inputClass("research") + " resize-none"}
+                      className={textareaClass("research") + " resize-y"}
                     />
                   </div>
                   <div>
@@ -468,7 +519,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                       onChange={(e) => updateField("notes", e.target.value)}
                       placeholder="Internal notes about this vendor..."
                       rows={3}
-                      className={inputClass("notes") + " resize-none"}
+                      className={textareaClass("notes") + " resize-y"}
                     />
                   </div>
                 </div>
@@ -476,7 +527,8 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
 
               {/* Attachments */}
               <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-4">
+                <legend className={sectionEyebrow}>
+                  <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
                   Attachments
                 </legend>
                 <div className="space-y-3">
@@ -485,7 +537,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                       {attachments.map((att, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-200 rounded-lg group"
+                          className="flex items-center gap-3 p-3 bg-white rounded-md ring-1 ring-neutral-200/70 group"
                         >
                           <Paperclip className="w-4 h-4 text-neutral-400 shrink-0" />
                           <div className="flex-1 min-w-0">
@@ -527,7 +579,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                     type="button"
                     disabled={uploadingAttachment}
                     onClick={() => attachmentInputRef.current?.click()}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-neutral-600 bg-white border-2 border-dashed border-neutral-300 rounded-lg hover:border-neutral-400 hover:bg-neutral-50 transition-colors w-full justify-center"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-neutral-700 bg-white ring-1 ring-neutral-200 rounded-md hover:ring-neutral-300 hover:bg-neutral-50 transition-colors w-full justify-center"
                   >
                     {uploadingAttachment ? (
                       <>
@@ -545,28 +597,7 @@ export default function VendorFormModal({ isOpen, vendor, onClose, onSave }: Ven
                 </div>
               </fieldset>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-6 border-t border-neutral-200">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-2.5 text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 shadow-sm"
-                >
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isEditing ? "Save Changes" : "Create Vendor"}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      </form>
+    </DetailDrawer>
   )
 }

@@ -18,6 +18,7 @@ import {
   Mic2,
   Trash2,
   Edit2,
+  Copy,
   Eye,
   X,
   Loader2,
@@ -26,11 +27,16 @@ import {
   Star,
 } from "lucide-react"
 import type { Speaker } from "@/types/project-management-types"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { TaxonomyChipInput } from "@/components/feed/TaxonomyChipInput"
+import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
+import { formatRelative } from "@/components/admin/FeedCardStatusMenu"
 
 interface SpeakersSectionProps {
   speakers: Speaker[]
   onDelete: (id: string) => void
   onSave: (speaker: Partial<Speaker>, isNew: boolean) => Promise<void>
+  onDuplicate?: (speaker: Speaker) => void
   showToast: (message: string, type: "success" | "error" | "warning") => void
 }
 
@@ -38,8 +44,10 @@ type SortField = "name" | "company" | "title" | "speaking_fee"
 type SortDir = "asc" | "desc"
 type ViewLayout = "table" | "grid"
 
-export default function SpeakersSection({ speakers, onDelete, onSave, showToast }: SpeakersSectionProps) {
-  const [layout, setLayout] = useState<ViewLayout>("table")
+export default function SpeakersSection({ speakers, onDelete, onSave, onDuplicate, showToast }: SpeakersSectionProps) {
+  // Smart default: grid for small lists (headshots + recognition wins),
+  // table once you cross 12 speakers. User toggle is honored.
+  const [layout, setLayout] = useState<ViewLayout>(() => (speakers.length > 12 ? "table" : "grid"))
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
@@ -83,6 +91,14 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
   const totalPages = Math.ceil(processedData.length / pageSize)
   const paginatedData = processedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
+  // Topic taxonomy — deduped existing topics across all speakers. Powers the
+  // chip input's autocomplete so editors don't recreate "AI" / "Ai" / "ai".
+  const topicSuggestions = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of speakers) for (const t of s.topics ?? []) if (t) set.add(t)
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [speakers])
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc")
     else { setSortField(field); setSortDir("asc") }
@@ -96,52 +112,74 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
   return (
     <>
       {/* Toolbar */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           <div className="relative flex-1 max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search speakers by name, company, topic..."
+              placeholder="Search speakers by name, company, topic…"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-100"
+              className="w-full h-9 pl-9 pr-9 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-neutral-400 hover:text-neutral-600">
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-6 w-6 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
+                aria-label="Clear search"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="flex items-center bg-white border border-neutral-200 rounded-lg overflow-hidden">
-              <button onClick={() => setLayout("table")} className={`p-2.5 transition-colors ${layout === "table" ? "bg-neutral-900 text-white" : "text-neutral-400 hover:text-neutral-700"}`} title="Table view">
-                <LayoutList className="w-4 h-4" />
+            <div className="inline-flex h-9 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
+              <button
+                onClick={() => setLayout("table")}
+                className={`inline-flex items-center justify-center w-9 transition-colors ${
+                  layout === "table"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
+                }`}
+                title="Table view"
+                aria-label="Table view"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => setLayout("grid")} className={`p-2.5 transition-colors ${layout === "grid" ? "bg-neutral-900 text-white" : "text-neutral-400 hover:text-neutral-700"}`} title="Grid view">
-                <LayoutGrid className="w-4 h-4" />
+              <button
+                onClick={() => setLayout("grid")}
+                className={`inline-flex items-center justify-center w-9 transition-colors ${
+                  layout === "grid"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
+                }`}
+                title="Grid view"
+                aria-label="Grid view"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
               </button>
             </div>
             <button
               onClick={() => { setEditingSpeaker(null); setFormOpen(true) }}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Add Speaker
+              <Plus className="w-3.5 h-3.5" />
+              New speaker
             </button>
           </div>
         </div>
 
-        <div className="text-sm text-neutral-500">
-          Showing <strong className="text-neutral-900">{paginatedData.length}</strong> of{" "}
-          <strong className="text-neutral-900">{processedData.length}</strong> speakers
+        <div className="text-xs text-neutral-500 tabular-nums">
+          Showing <span className="font-medium text-neutral-900">{paginatedData.length}</span> of{" "}
+          <span className="font-medium text-neutral-900">{processedData.length}</span> speakers
         </div>
       </div>
 
       {/* Table View */}
       {layout === "table" ? (
-        <div className="mt-4 bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="mt-4 bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -213,6 +251,9 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => setDetailSpeaker(speaker)} className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors" title="View"><Eye className="w-4 h-4" /></button>
                           <button onClick={() => { setEditingSpeaker(speaker); setFormOpen(true) }} className="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit"><Edit2 className="w-4 h-4" /></button>
+                          {onDuplicate && (
+                            <button onClick={() => onDuplicate(speaker)} className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors" title="Duplicate"><Copy className="w-4 h-4" /></button>
+                          )}
                           <button onClick={() => onDelete(speaker.id)} className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
@@ -268,12 +309,24 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
                       <div className="flex-1" />
                       {speaker.speaking_fee && <span className="text-sm font-semibold text-emerald-600">${speaker.speaking_fee.toLocaleString()}</span>}
                     </div>
+
+                    {speaker.updated_at && (
+                      <p
+                        className="text-[11px] text-neutral-400 tabular-nums mt-2"
+                        title={`Updated ${speaker.updated_at}`}
+                      >
+                        Updated {formatRelative(speaker.updated_at)}
+                      </p>
+                    )}
                   </div>
 
                   {/* Hover actions */}
                   <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => { setEditingSpeaker(speaker); setFormOpen(true) }} className="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 bg-white/80 backdrop-blur rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => onDelete(speaker.id)} className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 bg-white/80 backdrop-blur rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => { setEditingSpeaker(speaker); setFormOpen(true) }} className="p-1.5 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 bg-white/80 backdrop-blur rounded-lg transition-colors" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
+                    {onDuplicate && (
+                      <button onClick={() => onDuplicate(speaker)} className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 bg-white/80 backdrop-blur rounded-lg transition-colors" title="Duplicate"><Copy className="w-3.5 h-3.5" /></button>
+                    )}
+                    <button onClick={() => onDelete(speaker.id)} className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 bg-white/80 backdrop-blur rounded-lg transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
               ))}
@@ -309,6 +362,7 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
 
       {/* Speaker Form Modal */}
       <SpeakerFormModal
+        topicSuggestions={topicSuggestions}
         isOpen={formOpen}
         speaker={editingSpeaker}
         onClose={() => { setFormOpen(false); setEditingSpeaker(null) }}
@@ -331,19 +385,20 @@ export default function SpeakersSection({ speakers, onDelete, onSave, showToast 
 }
 
 // ============================================
-// Speaker Form Modal (inline)
+// Speaker Form Drawer (inline)
 // ============================================
-function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
+function SpeakerFormModal({ isOpen, speaker, onClose, onSave, topicSuggestions = [] }: {
   isOpen: boolean
   speaker: Speaker | null
   onClose: () => void
   onSave: (data: Partial<Speaker>) => Promise<void>
+  topicSuggestions?: string[]
 }) {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     name: "", title: "", company: "", bio: "", email: "", phone: "",
     website: "", linkedin: "", twitter: "", instagram: "",
-    headshot: "", topics: "", speaking_fee: "", travel_requirements: "",
+    headshot: "", topics: [] as string[], speaking_fee: "", travel_requirements: "",
     availability: "", notes: "",
   })
 
@@ -357,7 +412,7 @@ function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
         website: speaker.website || "", linkedin: speaker.linkedin || speaker.linkedin_url || "",
         twitter: speaker.twitter || "", instagram: speaker.instagram || "",
         headshot: speaker.headshot || speaker.photo || "",
-        topics: speaker.topics?.join(", ") || "", speaking_fee: speaker.speaking_fee?.toString() || "",
+        topics: speaker.topics || [], speaking_fee: speaker.speaking_fee?.toString() || "",
         travel_requirements: speaker.travel_requirements || "", availability: speaker.availability || "",
         notes: speaker.notes || "",
       })
@@ -365,7 +420,7 @@ function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
       setForm({
         name: "", title: "", company: "", bio: "", email: "", phone: "",
         website: "", linkedin: "", twitter: "", instagram: "",
-        headshot: "", topics: "", speaking_fee: "", travel_requirements: "",
+        headshot: "", topics: [], speaking_fee: "", travel_requirements: "",
         availability: "", notes: "",
       })
     }
@@ -382,7 +437,7 @@ function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
         website: speaker.website || "", linkedin: speaker.linkedin || speaker.linkedin_url || "",
         twitter: speaker.twitter || "", instagram: speaker.instagram || "",
         headshot: speaker.headshot || speaker.photo || "",
-        topics: speaker.topics?.join(", ") || "", speaking_fee: speaker.speaking_fee?.toString() || "",
+        topics: speaker.topics || [], speaking_fee: speaker.speaking_fee?.toString() || "",
         travel_requirements: speaker.travel_requirements || "", availability: speaker.availability || "",
         notes: speaker.notes || "",
       })
@@ -390,11 +445,21 @@ function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
       setForm({
         name: "", title: "", company: "", bio: "", email: "", phone: "",
         website: "", linkedin: "", twitter: "", instagram: "",
-        headshot: "", topics: "", speaking_fee: "", travel_requirements: "",
+        headshot: "", topics: [], speaking_fee: "", travel_requirements: "",
         availability: "", notes: "",
       })
     }
   }
+
+  // ⌘S to save, Esc to close
+  useFeedFormShortcuts({
+    enabled: isOpen,
+    onSave: () => {
+      if (saving) return
+      handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+    },
+    onCancel: onClose,
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -414,7 +479,7 @@ function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
         twitter: form.twitter.trim() || undefined,
         instagram: form.instagram.trim() || undefined,
         headshot: form.headshot.trim() || undefined,
-        topics: form.topics ? form.topics.split(",").map(t => t.trim()).filter(Boolean) : undefined,
+        topics: form.topics.length > 0 ? form.topics : undefined,
         speaking_fee: form.speaking_fee ? Number(form.speaking_fee) : undefined,
         travel_requirements: form.travel_requirements.trim() || undefined,
         availability: form.availability.trim() || undefined,
@@ -426,87 +491,146 @@ function SpeakerFormModal({ isOpen, speaker, onClose, onSave }: {
     }
   }
 
-  const inputClass = "w-full px-3 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-200 focus:border-neutral-400"
+  const inputClass =
+    "w-full h-10 px-3 text-sm bg-white ring-1 ring-neutral-200 rounded-md text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+  const eyebrow =
+    "flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-3"
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-200">
-              <div>
-                <div className="w-8 h-1 bg-yellow-400 mb-2" />
-                <h2 className="text-xl font-bold text-neutral-900">{isEditing ? "Edit Speaker" : "Add New Speaker"}</h2>
-              </div>
-              <button onClick={onClose} className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+    <DetailDrawer
+      open={isOpen}
+      onClose={onClose}
+      title={isEditing ? speaker?.name || "Edit speaker" : "New speaker"}
+      subtitle={
+        isEditing && speaker ? (
+          <span className="text-xs text-neutral-500 truncate">
+            {[speaker.title, speaker.company].filter(Boolean).join(" · ")}
+          </span>
+        ) : (
+          <span className="text-xs text-neutral-500">Fill in speaker details below</span>
+        )
+      }
+      width="lg"
+      closeOnEscape
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+            title="Cancel (Esc)"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+            title={`Save (${MOD_KEY_LABEL}S)`}
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {saving ? "Saving…" : isEditing ? "Save changes" : "Create speaker"}
+            {!saving && (
+              <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
+                {MOD_KEY_LABEL}S
+              </kbd>
+            )}
+          </button>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 space-y-7">
+        <fieldset>
+          <legend className={eyebrow}>
+            <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+            Basic information
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                Name <span className="text-red-500">*</span>
+              </label>
+              <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Speaker name" className={inputClass} />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Title</label>
+              <input type="text" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Job title" className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Company</label>
+              <input type="text" value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} placeholder="Company" className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Speaking fee ($)</label>
+              <input type="text" value={form.speaking_fee} onChange={(e) => setForm((f) => ({ ...f, speaking_fee: e.target.value }))} placeholder="0.00" className={inputClass} />
+            </div>
+          </div>
+        </fieldset>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Basic Information</legend>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Speaker name" className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Title</label>
-                    <input type="text" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Job title" className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Company</label>
-                    <input type="text" value={form.company} onChange={(e) => setForm(f => ({ ...f, company: e.target.value }))} placeholder="Company" className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Speaking Fee ($)</label>
-                    <input type="text" value={form.speaking_fee} onChange={(e) => setForm(f => ({ ...f, speaking_fee: e.target.value }))} placeholder="0.00" className={inputClass} />
-                  </div>
-                </div>
-              </fieldset>
+        <fieldset>
+          <legend className={eyebrow}>
+            <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+            Contact
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Email</label><input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Phone</label><input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Website</label><input type="url" value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">LinkedIn</label><input type="text" value={form.linkedin} onChange={(e) => setForm((f) => ({ ...f, linkedin: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Twitter</label><input type="text" value={form.twitter} onChange={(e) => setForm((f) => ({ ...f, twitter: e.target.value }))} className={inputClass} /></div>
+            <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Instagram</label><input type="text" value={form.instagram} onChange={(e) => setForm((f) => ({ ...f, instagram: e.target.value }))} className={inputClass} /></div>
+          </div>
+        </fieldset>
 
-              <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Contact</legend>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Email</label><input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Phone</label><input type="tel" value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Website</label><input type="url" value={form.website} onChange={(e) => setForm(f => ({ ...f, website: e.target.value }))} className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">LinkedIn</label><input type="text" value={form.linkedin} onChange={(e) => setForm(f => ({ ...f, linkedin: e.target.value }))} className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Twitter</label><input type="text" value={form.twitter} onChange={(e) => setForm(f => ({ ...f, twitter: e.target.value }))} className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Instagram</label><input type="text" value={form.instagram} onChange={(e) => setForm(f => ({ ...f, instagram: e.target.value }))} className={inputClass} /></div>
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Details</legend>
-                <div className="space-y-4">
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Topics <span className="text-neutral-400">(comma-separated)</span></label><input type="text" value={form.topics} onChange={(e) => setForm(f => ({ ...f, topics: e.target.value }))} placeholder="AI, Marketing, Leadership" className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Bio</label><textarea value={form.bio} onChange={(e) => setForm(f => ({ ...f, bio: e.target.value }))} rows={3} className={inputClass + " resize-none"} /></div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Headshot URL</label><input type="url" value={form.headshot} onChange={(e) => setForm(f => ({ ...f, headshot: e.target.value }))} className={inputClass} /></div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className="block text-sm font-medium text-neutral-700 mb-1">Travel Requirements</label><input type="text" value={form.travel_requirements} onChange={(e) => setForm(f => ({ ...f, travel_requirements: e.target.value }))} className={inputClass} /></div>
-                    <div><label className="block text-sm font-medium text-neutral-700 mb-1">Availability</label><input type="text" value={form.availability} onChange={(e) => setForm(f => ({ ...f, availability: e.target.value }))} className={inputClass} /></div>
-                  </div>
-                  <div><label className="block text-sm font-medium text-neutral-700 mb-1">Notes</label><textarea value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className={inputClass + " resize-none"} /></div>
-                </div>
-              </fieldset>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
-                <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isEditing ? "Save Changes" : "Create Speaker"}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        <fieldset>
+          <legend className={eyebrow}>
+            <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+            Details
+          </legend>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                Topics
+                {topicSuggestions.length > 0 && (
+                  <span className="ml-1.5 text-[11px] font-normal text-neutral-400 tabular-nums">
+                    · {topicSuggestions.length} known
+                  </span>
+                )}
+              </label>
+              <TaxonomyChipInput
+                values={form.topics}
+                onChange={(next) => setForm((f) => ({ ...f, topics: next }))}
+                suggestions={topicSuggestions}
+                placeholder="Type to search or add"
+                ariaLabel="Topics"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Bio</label>
+              <textarea value={form.bio} onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} rows={3} className={inputClass.replace("h-10", "") + " py-2 resize-y"} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Headshot URL</label>
+              <input type="url" value={form.headshot} onChange={(e) => setForm((f) => ({ ...f, headshot: e.target.value }))} className={inputClass} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Travel requirements</label><input type="text" value={form.travel_requirements} onChange={(e) => setForm((f) => ({ ...f, travel_requirements: e.target.value }))} className={inputClass} /></div>
+              <div><label className="block text-sm font-medium text-neutral-700 mb-1.5">Availability</label><input type="text" value={form.availability} onChange={(e) => setForm((f) => ({ ...f, availability: e.target.value }))} className={inputClass} /></div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">Notes</label>
+              <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} className={inputClass.replace("h-10", "") + " py-2 resize-y"} />
+            </div>
+          </div>
+        </fieldset>
+      </form>
+    </DetailDrawer>
   )
 }
 
 // ============================================
-// Speaker Detail Slideout (inline)
+// Speaker Detail Slideout — DetailDrawer
 // ============================================
 function SpeakerDetailSlideout({ speaker, onClose, onEdit, onDelete }: {
   speaker: Speaker | null
@@ -515,120 +639,190 @@ function SpeakerDetailSlideout({ speaker, onClose, onEdit, onDelete }: {
   onDelete: (id: string) => void
 }) {
   return (
-    <AnimatePresence>
+    <DetailDrawer
+      open={!!speaker}
+      onClose={onClose}
+      title={speaker?.name}
+      subtitle={
+        speaker ? (
+          <span className="text-xs text-neutral-500 truncate">
+            {[speaker.title, speaker.company].filter(Boolean).join(" · ")}
+          </span>
+        ) : null
+      }
+      width="md"
+      closeOnEscape
+      footer={
+        speaker ? (
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => onDelete(speaker.id)}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-400 hover:bg-red-50 hover:text-red-600 hover:ring-red-200 transition-colors"
+              title="Delete speaker"
+              aria-label="Delete speaker"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onEdit(speaker)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+              Edit speaker
+            </button>
+          </div>
+        ) : null
+      }
+    >
       {speaker && (
-        <>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-          <motion.div
-            initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl overflow-y-auto"
-          >
-            {/* Header */}
-            <div className="relative">
-              {(speaker.photo || speaker.headshot) ? (
-                <div className="relative h-48 bg-neutral-100 overflow-hidden">
-                  <img src={speaker.photo || speaker.headshot} alt={speaker.name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
-                </div>
-              ) : (
-                <div className="h-32 bg-linear-to-br from-blue-50 to-sky-50 flex items-center justify-center">
-                  <span className="text-5xl font-bold text-neutral-300">{speaker.name?.charAt(0)}</span>
-                </div>
-              )}
-              <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm text-neutral-700 hover:bg-white rounded-lg transition-colors shadow-sm">
-                <X className="w-5 h-5" />
-              </button>
+        <div className="space-y-5">
+          {/* Photo */}
+          {(speaker.photo || speaker.headshot) ? (
+            <figure className="rounded-md overflow-hidden ring-1 ring-neutral-200/70 bg-neutral-100">
+              <img
+                src={speaker.photo || speaker.headshot}
+                alt={speaker.name}
+                className="w-full h-44 object-cover"
+              />
+            </figure>
+          ) : (
+            <div className="grid h-32 place-items-center rounded-md ring-1 ring-neutral-200/70 bg-neutral-50">
+              <span className="text-4xl font-semibold text-neutral-300">{speaker.name.charAt(0)}</span>
             </div>
+          )}
 
-            <div className="p-6 space-y-6">
-              <div>
-                <div className="w-10 h-1 bg-yellow-400 mb-3" />
-                <h2 className="text-2xl font-bold text-neutral-900">{speaker.name}</h2>
-                {speaker.title && <p className="text-base text-neutral-600 font-medium mt-1">{speaker.title}</p>}
-                {speaker.company && <p className="text-sm text-neutral-400 mt-0.5">{speaker.company}</p>}
-              </div>
-
-              {speaker.speaking_fee && (
-                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-emerald-600" />
-                    <span className="text-2xl font-bold text-emerald-700">${speaker.speaking_fee.toLocaleString()}</span>
-                    <span className="text-sm text-emerald-600">speaking fee</span>
-                  </div>
-                </div>
-              )}
-
-              {speaker.topics && speaker.topics.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">Topics</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {speaker.topics.map((t, i) => (
-                      <span key={i} className="px-2.5 py-1 text-xs font-medium text-neutral-700 bg-neutral-100 rounded-lg">{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {speaker.bio && (
-                <div>
-                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">Bio</h4>
-                  <p className="text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">{speaker.bio}</p>
-                </div>
-              )}
-
-              {/* Contact */}
-              <div>
-                <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Contact</h4>
-                <div className="space-y-3">
-                  {speaker.email && (
-                    <a href={`mailto:${speaker.email}`} className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group">
-                      <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center group-hover:bg-neutral-200 transition-colors"><Mail className="w-4 h-4 text-neutral-500" /></div>
-                      <span>{speaker.email}</span>
-                    </a>
-                  )}
-                  {speaker.phone && (
-                    <a href={`tel:${speaker.phone}`} className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group">
-                      <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center group-hover:bg-neutral-200 transition-colors"><Phone className="w-4 h-4 text-neutral-500" /></div>
-                      <span>{speaker.phone}</span>
-                    </a>
-                  )}
-                  {(speaker.linkedin_url || speaker.linkedin) && (
-                    <a href={speaker.linkedin_url || speaker.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group">
-                      <div className="w-9 h-9 rounded-lg bg-neutral-100 flex items-center justify-center group-hover:bg-neutral-200 transition-colors"><ExternalLink className="w-4 h-4 text-neutral-500" /></div>
-                      <span>LinkedIn</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              {(speaker.travel_requirements || speaker.availability) && (
-                <div>
-                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">Logistics</h4>
-                  {speaker.travel_requirements && <p className="text-sm text-neutral-600 mb-1"><strong>Travel:</strong> {speaker.travel_requirements}</p>}
-                  {speaker.availability && <p className="text-sm text-neutral-600"><strong>Availability:</strong> {speaker.availability}</p>}
-                </div>
-              )}
-
-              {speaker.notes && (
-                <div>
-                  <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">Notes</h4>
-                  <p className="text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap p-4 bg-neutral-50 rounded-xl border border-neutral-100">{speaker.notes}</p>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 pt-4 border-t border-neutral-200">
-                <button onClick={() => onEdit(speaker)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors">
-                  <Edit2 className="w-4 h-4" /> Edit Speaker
-                </button>
-                <button onClick={() => onDelete(speaker.id)} className="px-4 py-2.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+          {/* Speaking fee */}
+          {speaker.speaking_fee && (
+            <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-1">
+                <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                Speaking fee
+              </p>
+              <div className="flex items-baseline gap-1">
+                <DollarSign className="w-4 h-4 text-neutral-400 self-center" />
+                <span className="text-2xl font-semibold tabular-nums text-neutral-900">
+                  ${speaker.speaking_fee.toLocaleString()}
+                </span>
               </div>
             </div>
-          </motion.div>
-        </>
+          )}
+
+          {/* Topics */}
+          {speaker.topics && speaker.topics.length > 0 && (
+            <div>
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+                Topics
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {speaker.topics.map((t, i) => {
+                  const label = t
+                  if (!label) return null
+                  return (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-xs"
+                    >
+                      {label}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Bio */}
+          {speaker.bio && (
+            <div>
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+                Bio
+              </p>
+              <p className="text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">{speaker.bio}</p>
+            </div>
+          )}
+
+          {/* Contact */}
+          {(speaker.email || speaker.phone || speaker.linkedin_url || speaker.linkedin) && (
+            <div>
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-3">
+                <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+                Contact
+              </p>
+              <div className="space-y-2">
+                {speaker.email && (
+                  <a
+                    href={`mailto:${speaker.email}`}
+                    className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group"
+                  >
+                    <div className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200 transition-colors">
+                      <Mail className="w-3.5 h-3.5" />
+                    </div>
+                    <span>{speaker.email}</span>
+                  </a>
+                )}
+                {speaker.phone && (
+                  <a
+                    href={`tel:${speaker.phone}`}
+                    className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group"
+                  >
+                    <div className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200 transition-colors">
+                      <Phone className="w-3.5 h-3.5" />
+                    </div>
+                    <span>{speaker.phone}</span>
+                  </a>
+                )}
+                {(speaker.linkedin_url || speaker.linkedin) && (
+                  <a
+                    href={speaker.linkedin_url || speaker.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 text-sm text-neutral-700 hover:text-neutral-900 transition-colors group"
+                  >
+                    <div className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200 transition-colors">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </div>
+                    <span>LinkedIn</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Logistics */}
+          {(speaker.travel_requirements || speaker.availability) && (
+            <div>
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+                Logistics
+              </p>
+              {speaker.travel_requirements && (
+                <p className="text-sm text-neutral-600 mb-1">
+                  <span className="font-medium text-neutral-700">Travel:</span> {speaker.travel_requirements}
+                </p>
+              )}
+              {speaker.availability && (
+                <p className="text-sm text-neutral-600">
+                  <span className="font-medium text-neutral-700">Availability:</span> {speaker.availability}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          {speaker.notes && (
+            <div>
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
+                <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
+                Notes
+              </p>
+              <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4 text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">
+                {speaker.notes}
+              </div>
+            </div>
+          )}
+        </div>
       )}
-    </AnimatePresence>
+    </DetailDrawer>
   )
 }
