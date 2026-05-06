@@ -14,7 +14,6 @@ import {
   Loader2,
   FileText,
   Calendar,
-  Tag,
   User,
   CheckCircle2,
   AlertCircle,
@@ -25,8 +24,11 @@ import { RichTextEditor } from "@/components/RichTextEditor"
 import { ImageUpload } from "@/components/ImageUpload"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { TaxonomyChipInput } from "@/components/feed/TaxonomyChipInput"
+import { formatRelative } from "@/components/admin/FeedCardStatusMenu"
 import { useFeedFormShortcuts, MOD_KEY_LABEL } from "@/components/admin/useFeedFormShortcuts"
 import { BlogPrePublishChecklist } from "@/components/admin/BlogPrePublishChecklist"
+import { BlogFormBody } from "@/components/admin/BlogFormBody"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import type { BlogPost } from "@/types/blog-types"
 
 // Blog categories
@@ -63,6 +65,9 @@ export default function BlogAdminPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<"updated_desc" | "created_desc" | "created_asc" | "title_asc">(
+    "updated_desc",
+  )
   
   // Form state
   const [formData, setFormData] = useState({
@@ -87,6 +92,32 @@ export default function BlogAdminPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const lastSavedFormData = useRef<string>("")
+
+  // Team-member-backed author picker — fetched once on mount; deduped with
+  // historical authors-from-posts so the editor sees both staffers and any
+  // legacy author strings. Falls back gracefully if the API is unreachable.
+  const [teamMemberNames, setTeamMemberNames] = useState<string[]>([])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/admin/team-members")
+        if (!res.ok) return
+        const data = await res.json()
+        const names: string[] = (data.data ?? data.members ?? [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((m: any) => m?.isActive !== false && typeof m?.name === "string")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((m: any) => m.name as string)
+        if (!cancelled) setTeamMemberNames(names)
+      } catch {
+        // silent — picker just falls back to historical post authors
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Load posts on mount
   useEffect(() => {
@@ -132,14 +163,6 @@ export default function BlogAdminPage() {
     setSelectedPost(null)
   }
 
-  // Auto-generate slug from title (URL-safe, lowercase, hyphenated)
-  const generateSlug = (title: string): string =>
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9 -]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim()
 
 
   const handleCreateNew = () => {
@@ -161,7 +184,13 @@ export default function BlogAdminPage() {
       status: post.status,
       author: post.author
     })
+    // Edit-mode renders inside a drawer overlay — keep the list visible behind it.
     setView("edit")
+  }
+
+  const handleCloseDrawer = () => {
+    setView("list")
+    resetForm()
   }
 
   const handleSave = async () => {
@@ -366,14 +395,34 @@ export default function BlogAdminPage() {
     },
   })
 
-  // Filter posts
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.content.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || post.status === statusFilter
-    const matchesCategory = categoryFilter === "all" || post.category === categoryFilter
-    return matchesSearch && matchesStatus && matchesCategory
-  })
+  // Filter + sort posts
+  const filteredPosts = posts
+    .filter((post) => {
+      const q = searchQuery.toLowerCase()
+      const matchesSearch =
+        !q ||
+        post.title.toLowerCase().includes(q) ||
+        post.content.toLowerCase().includes(q) ||
+        post.excerpt?.toLowerCase().includes(q) ||
+        post.author?.toLowerCase().includes(q) ||
+        post.tags?.some((t) => t.toLowerCase().includes(q))
+      const matchesStatus = statusFilter === "all" || post.status === statusFilter
+      const matchesCategory = categoryFilter === "all" || post.category === categoryFilter
+      return matchesSearch && matchesStatus && matchesCategory
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "title_asc":
+          return a.title.localeCompare(b.title)
+        case "created_asc":
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        case "created_desc":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        case "updated_desc":
+        default:
+          return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
+      }
+    })
 
   // Compute stat counts for the header subtitle
   const draftCount = posts.filter((p) => p.status === "draft").length
@@ -417,8 +466,8 @@ export default function BlogAdminPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-300 pointer-events-none" />
           <input
             type="text"
@@ -428,16 +477,25 @@ export default function BlogAdminPage() {
             className="w-full h-9 pl-9 pr-3 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="h-9 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-700 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-          aria-label="Status filter"
-        >
-          <option value="all">All status</option>
-          <option value="published">Published</option>
-          <option value="draft">Draft</option>
-        </select>
+
+        {/* Status segmented control */}
+        <div className="inline-flex h-9 rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
+          {(["all", "published", "draft"] as const).map((status) => {
+            const isActive = statusFilter === status
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`inline-flex items-center px-3 text-xs font-medium whitespace-nowrap transition-colors ${
+                  isActive ? "bg-neutral-900 text-white" : "bg-white text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
+              </button>
+            )
+          })}
+        </div>
+
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
@@ -448,6 +506,18 @@ export default function BlogAdminPage() {
           {CATEGORIES.map((cat) => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
+        </select>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          className="h-9 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-700 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+          aria-label="Sort"
+        >
+          <option value="updated_desc">Recently edited</option>
+          <option value="created_desc">Newest first</option>
+          <option value="created_asc">Oldest first</option>
+          <option value="title_asc">Title A–Z</option>
         </select>
       </div>
 
@@ -487,109 +557,126 @@ export default function BlogAdminPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filteredPosts.map((post) => {
             const statusDot = post.status === "published" ? "bg-emerald-500" : "bg-amber-500"
+            const lastEdited = formatRelative(post.updated_at)
             return (
               <motion.div
                 key={post.id}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-md ring-1 ring-neutral-200/70 hover:ring-neutral-300 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-[box-shadow,outline-color] p-3"
+                className="bg-white rounded-md ring-1 ring-neutral-200/70 hover:ring-neutral-300 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-[box-shadow,outline-color] flex flex-col overflow-hidden"
               >
-                <div className="flex items-start gap-3">
-                  {/* Thumbnail */}
-                  <div className="w-16 h-16 rounded-md bg-neutral-100 shrink-0 overflow-hidden ring-1 ring-neutral-200/70">
-                    {post.featured_image ? (
-                      <img
-                        src={post.featured_image}
-                        alt={post.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-neutral-300" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-medium text-neutral-900 truncate">{post.title}</h3>
-                        <p className="text-xs text-neutral-500 line-clamp-1 mt-0.5">
-                          {post.excerpt || post.content.substring(0, 120)}…
-                        </p>
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[10px] font-medium uppercase tracking-[0.16em] shrink-0">
-                        <span className={`inline-block h-1 w-1 rounded-full ${statusDot}`} aria-hidden="true" />
-                        {post.status}
-                      </span>
+                {/* Thumbnail */}
+                <div className="aspect-video bg-neutral-100 overflow-hidden relative">
+                  {post.featured_image ? (
+                    <img
+                      src={post.featured_image}
+                      alt={post.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <FileText className="h-8 w-8 text-neutral-300" />
                     </div>
+                  )}
+                  <span
+                    className={`absolute top-2 right-2 inline-block h-1.5 w-1.5 rounded-full ${statusDot}`}
+                    title={post.status}
+                    aria-hidden="true"
+                  />
+                </div>
 
-                    <div className="flex items-center gap-3 mt-2 text-[11px] text-neutral-500 tabular-nums">
-                      <span className="inline-flex items-center gap-1">
-                        <Tag className="h-3 w-3 text-neutral-400" />
-                        {post.category}
+                {/* Content */}
+                <div className="p-3 flex-1 flex flex-col">
+                  <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500 mb-1.5">
+                    <span className={`inline-block h-1 w-1 rounded-full ${statusDot}`} aria-hidden="true" />
+                    {post.status}
+                    <span className="text-neutral-300">·</span>
+                    <span className="normal-case tracking-normal text-neutral-400">{post.category}</span>
+                  </p>
+
+                  <h3 className="text-sm font-medium text-neutral-900 leading-snug line-clamp-2 mb-1.5">
+                    {post.title}
+                  </h3>
+
+                  <p className="text-xs text-neutral-500 line-clamp-2 mb-2">
+                    {post.excerpt || post.content.substring(0, 140)}…
+                  </p>
+
+                  {/* Meta row */}
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-neutral-500 tabular-nums mt-auto pt-2">
+                    <span className="inline-flex items-center gap-1 truncate">
+                      <User className="h-3 w-3 text-neutral-400" />
+                      <span className="truncate">{post.author}</span>
+                    </span>
+                    {lastEdited ? (
+                      <span className="text-neutral-400" title={`Updated ${post.updated_at}`}>
+                        Updated {lastEdited}
                       </span>
-                      <span className="inline-flex items-center gap-1">
-                        <User className="h-3 w-3 text-neutral-400" />
-                        {post.author}
-                      </span>
+                    ) : (
                       <span className="inline-flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-neutral-400" />
                         {new Date(post.created_at).toLocaleDateString()}
                       </span>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  {/* Action buttons */}
+                  <div className="flex gap-1 mt-3">
+                    <button
+                      onClick={() => handleEdit(post)}
+                      className="flex-1 h-7 px-2 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-200 bg-white hover:bg-neutral-50 rounded-md transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <a
+                      href={`/admin/blog/preview/${post.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center h-7 w-7 ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 rounded-md transition-colors"
+                      title="Preview"
+                      aria-label="Preview"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </a>
                     {post.status === "published" && (
                       <a
                         href={`/blog/${post.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
-                        title="View post"
-                        aria-label="View post"
+                        className="inline-flex items-center justify-center h-7 w-7 ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 rounded-md transition-colors"
+                        title="View live"
+                        aria-label="View live"
                       >
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
-                    <button
-                      onClick={() => handleEdit(post)}
-                      className="inline-flex items-center justify-center h-7 w-7 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
-                      title="Edit post"
-                      aria-label="Edit post"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </button>
                     {deleteConfirmId === post.id ? (
-                      <div className="flex items-center gap-1">
+                      <>
                         <button
                           onClick={() => handleDelete(post.id)}
                           disabled={isDeleting}
-                          className="inline-flex items-center justify-center h-7 w-7 rounded-md ring-1 ring-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center justify-center h-7 w-7 ring-1 ring-red-200 bg-red-50 text-red-600 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50"
                           aria-label="Confirm delete"
                         >
                           {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(null)}
-                          className="inline-flex items-center justify-center h-7 w-7 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+                          className="inline-flex items-center justify-center h-7 w-7 ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 rounded-md transition-colors"
                           aria-label="Cancel delete"
                         >
                           <X className="h-3 w-3" />
                         </button>
-                      </div>
+                      </>
                     ) : (
                       <button
                         onClick={() => setDeleteConfirmId(post.id)}
-                        className="inline-flex items-center justify-center h-7 w-7 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-400 hover:bg-red-50 hover:text-red-600 hover:ring-red-200 transition-colors"
-                        title="Delete post"
-                        aria-label="Delete post"
+                        className="inline-flex items-center justify-center h-7 w-7 ring-1 ring-neutral-200 bg-white text-neutral-400 hover:bg-red-50 hover:text-red-600 hover:ring-red-200 rounded-md transition-colors"
+                        title="Delete"
+                        aria-label="Delete"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -603,6 +690,14 @@ export default function BlogAdminPage() {
       )}
     </div>
   )
+
+  // Author suggestions — team members + historical authors from existing posts.
+  const authorSuggestions = (() => {
+    const set = new Set<string>()
+    for (const n of teamMemberNames) if (n) set.add(n)
+    for (const p of posts) if (p.author) set.add(p.author)
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  })()
 
   // Tag taxonomy — deduped existing tags across all posts. Powers the chip
   // input's autocomplete so editors don't recreate "tutorial" / "Tutorial" /
@@ -716,231 +811,14 @@ export default function BlogAdminPage() {
         </div>
       </div>
 
-      {/* Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => {
-                const next = e.target.value
-                setFormData((prev) => ({
-                  ...prev,
-                  title: next,
-                  // Auto-generate slug only if it's empty (don't clobber a custom one)
-                  slug: prev.slug ? prev.slug : generateSlug(next),
-                }))
-              }}
-              placeholder="Enter post title"
-              className="w-full h-10 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-base text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-            />
-          </div>
-
-          {/* Slug */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Slug
-              <span className="ml-1.5 text-[11px] font-normal text-neutral-400">· auto-generated from title</span>
-            </label>
-            <input
-              type="text"
-              value={formData.slug}
-              onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
-              placeholder="auto-generated-from-title"
-              className={`w-full h-10 px-3 ring-1 rounded-md focus:ring-2 focus:outline-none font-mono text-sm bg-white ${
-                slugCollision
-                  ? "ring-amber-300 focus:ring-amber-500"
-                  : "ring-neutral-200 focus:ring-neutral-900"
-              }`}
-            />
-            {formData.slug.trim() && (
-              <p
-                className={`mt-1.5 text-[11px] flex items-center gap-1.5 ${
-                  slugCollision ? "text-amber-700" : "text-emerald-700"
-                }`}
-              >
-                <span
-                  className={`inline-block h-1 w-1 rounded-full ${
-                    slugCollision ? "bg-amber-500" : "bg-emerald-500"
-                  }`}
-                  aria-hidden="true"
-                />
-                {slugCollision ? (
-                  <>
-                    Used by{" "}
-                    <span className="font-medium text-neutral-700">"{slugCollision.title}"</span>{" "}
-                    — pick a different slug
-                  </>
-                ) : (
-                  <>
-                    <span className="font-medium">Available</span>
-                    <span className="text-neutral-400">· /blog/{formData.slug}</span>
-                  </>
-                )}
-              </p>
-            )}
-          </div>
-
-          {/* Content */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Content <span className="text-red-500">*</span>
-            </label>
-            <RichTextEditor
-              value={formData.content}
-              onChange={(value) => setFormData((prev) => ({ ...prev, content: value }))}
-              placeholder="Write your blog post content here..."
-              minRows={12}
-            />
-          </div>
-
-          {/* Excerpt */}
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
-              Excerpt
-              <span className="ml-1.5 text-[11px] font-normal text-neutral-400">· brief summary used in previews</span>
-            </label>
-            <textarea
-              value={formData.excerpt}
-              onChange={(e) => setFormData((prev) => ({ ...prev, excerpt: e.target.value }))}
-              placeholder="A brief summary of the post"
-              rows={3}
-              className="w-full px-3 py-2 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-y"
-            />
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Status */}
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-              <span
-                className={`inline-block h-1 w-1 rounded-full ${
-                  formData.status === "published" ? "bg-emerald-500" : "bg-amber-500"
-                }`}
-                aria-hidden="true"
-              />
-              Status
-            </p>
-            <div className="inline-flex h-8 w-full rounded-md ring-1 ring-neutral-200 divide-x divide-neutral-200 overflow-hidden bg-white">
-              <button
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, status: "draft" }))}
-                className={`flex-1 inline-flex items-center justify-center px-3 text-xs font-medium transition-colors ${
-                  formData.status === "draft"
-                    ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-700 hover:bg-neutral-50"
-                }`}
-              >
-                Draft
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData((prev) => ({ ...prev, status: "published" }))}
-                className={`flex-1 inline-flex items-center justify-center px-3 text-xs font-medium transition-colors ${
-                  formData.status === "published"
-                    ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-700 hover:bg-neutral-50"
-                }`}
-              >
-                Published
-              </button>
-            </div>
-          </div>
-
-          {/* Featured Image */}
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-              <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
-              Featured image
-            </p>
-            <ImageUpload
-              value={formData.featured_image}
-              onChange={(url) => setFormData((prev) => ({ ...prev, featured_image: url }))}
-              label="Cover image"
-            />
-          </div>
-
-          {/* Category */}
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-              <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
-              Category
-            </p>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
-              className="w-full h-9 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-              aria-label="Category"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tags */}
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-              <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
-              Tags
-              {tagSuggestions.length > 0 && (
-                <span className="text-[11px] font-normal text-neutral-400 normal-case tracking-normal tabular-nums">
-                  · {tagSuggestions.length} known
-                </span>
-              )}
-            </p>
-            <TaxonomyChipInput
-              values={formData.tags}
-              onChange={(next) => setFormData((prev) => ({ ...prev, tags: next }))}
-              suggestions={tagSuggestions}
-              placeholder="Type to search or add"
-              ariaLabel="Tags"
-            />
-          </div>
-
-          {/* Author */}
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-              <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
-              Author
-            </p>
-            <input
-              type="text"
-              value={formData.author}
-              onChange={(e) => setFormData((prev) => ({ ...prev, author: e.target.value }))}
-              placeholder="Author name"
-              className="w-full h-9 px-3 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-            />
-          </div>
-
-          {/* Meta Description */}
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">
-              <span className="inline-block h-1 w-1 rounded-full bg-neutral-400" aria-hidden="true" />
-              SEO description
-            </p>
-            <textarea
-              value={formData.meta_description}
-              onChange={(e) => setFormData((prev) => ({ ...prev, meta_description: e.target.value }))}
-              placeholder="Description for search engines"
-              rows={3}
-              maxLength={160}
-              className="w-full px-3 py-2 ring-1 ring-neutral-200 rounded-md bg-white text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-y"
-            />
-            <p className="text-[11px] text-neutral-400 mt-1 text-right tabular-nums">
-              {formData.meta_description.length}/160
-            </p>
-          </div>
-        </div>
-      </div>
+      <BlogFormBody
+        formData={formData}
+        setFormData={setFormData}
+        slugCollision={slugCollision}
+        tagSuggestions={tagSuggestions}
+        authorSuggestions={authorSuggestions}
+        variant="page"
+      />
     </div>
   )
 
@@ -972,9 +850,127 @@ export default function BlogAdminPage() {
           )}
         </AnimatePresence>
 
-        {/* Content */}
-        {view === "list" ? renderListView() : renderEditorView()}
+        {/* Content — list is always rendered for edit-mode (drawer overlays it).
+            For new-post creation, the inline full-page editor replaces the list. */}
+        {view === "create" ? renderEditorView() : renderListView()}
       </div>
+
+      {/* Edit drawer — opens whenever an existing post is being edited. List
+          stays visible behind it. Form renders without the inline header
+          (drawer provides one) and without the inline action bar (drawer
+          footer provides Save/Cancel). */}
+      <DetailDrawer
+        open={view === "edit" && !!selectedPost}
+        onClose={handleCloseDrawer}
+        title={formData.title || "Edit post"}
+        subtitle={
+          (() => {
+            const lastEdited = formatRelative(selectedPost?.updated_at)
+            return (
+              <span className="text-xs text-neutral-500 flex items-center gap-2 flex-wrap">
+                <span className="capitalize">{formData.status}</span>
+                <span className="text-neutral-300">·</span>
+                <span>{formData.category}</span>
+                {lastEdited && (
+                  <>
+                    <span className="text-neutral-300">·</span>
+                    <span title={selectedPost?.updated_at}>Updated {lastEdited}</span>
+                  </>
+                )}
+              </span>
+            )
+          })()
+        }
+        width="xl"
+        closeOnEscape
+        footer={
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              {selectedPost?.id && (
+                <a
+                  href={`/admin/blog/preview/${selectedPost.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                  title={`Preview (${MOD_KEY_LABEL}P)`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Preview
+                </a>
+              )}
+              {/* Autosave indicator inline in drawer footer */}
+              {formData.title?.trim() && formData.content?.trim() && (
+                <>
+                  {isAutoSaving ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[11px] tabular-nums">
+                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900 animate-pulse" aria-hidden="true" />
+                      Saving
+                    </span>
+                  ) : lastSavedAt ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[11px] tabular-nums">
+                      <span className="inline-block h-1 w-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                      Saved {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  ) : hasUnsavedChanges ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[11px]">
+                      <span className="inline-block h-1 w-1 rounded-full bg-amber-500" aria-hidden="true" />
+                      Unsaved
+                    </span>
+                  ) : null}
+                </>
+              )}
+              <BlogPrePublishChecklist
+                formData={formData}
+                posts={posts}
+                editingId={selectedPost?.id ?? null}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCloseDrawer}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                title={`Update (${MOD_KEY_LABEL}S)`}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating…
+                  </>
+                ) : (
+                  <>
+                    Update
+                    <kbd className="ml-1 px-1 rounded bg-white/15 font-mono text-[10px] tabular-nums">
+                      {MOD_KEY_LABEL}S
+                    </kbd>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        }
+      >
+        {view === "edit" && selectedPost && (
+          <div className="px-4 sm:px-6 py-5">
+            <BlogFormBody
+              formData={formData}
+              setFormData={setFormData}
+              slugCollision={slugCollision}
+              tagSuggestions={tagSuggestions}
+              authorSuggestions={authorSuggestions}
+              variant="drawer"
+            />
+          </div>
+        )}
+      </DetailDrawer>
     </div>
     </AdminRoleGuard>
   )
