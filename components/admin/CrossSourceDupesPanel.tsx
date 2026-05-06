@@ -61,10 +61,22 @@ interface ConvertResult {
   failed: number
 }
 
-const SOURCE_META: Record<SourceKey, { label: string; icon: typeof Mail; tabSlug: string }> = {
-  email_signups: { label: "Newsletter", icon: Mail, tabSlug: "emails" },
-  contact_forms: { label: "Contact Form", icon: MessageSquare, tabSlug: "contact-forms" },
-  event_registrations: { label: "Event", icon: Ticket, tabSlug: "events" },
+const SOURCE_META: Record<SourceKey, { label: string; icon: typeof Mail; searchPath: string }> = {
+  email_signups: {
+    label: "Newsletter",
+    icon: Mail,
+    searchPath: "/admin/audiences?sub=newsletter&search=",
+  },
+  contact_forms: {
+    label: "Contact Form",
+    icon: MessageSquare,
+    searchPath: "/admin/inbox?search=",
+  },
+  event_registrations: {
+    label: "Event",
+    icon: Ticket,
+    searchPath: "/admin/audiences?sub=events&search=",
+  },
 }
 
 function formatDate(iso: string): string {
@@ -282,7 +294,7 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
                             return (
                               <Link
                                 key={src}
-                                href={`/admin/submissions?tab=${Meta.tabSlug}&search=${encodeURIComponent(g.email)}`}
+                                href={`${Meta.searchPath}${encodeURIComponent(g.email)}`}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-neutral-100 hover:bg-neutral-200 transition-colors text-[10px] font-medium text-neutral-700"
                                 title={`Filter ${Meta.label} tab to this email`}
                               >
