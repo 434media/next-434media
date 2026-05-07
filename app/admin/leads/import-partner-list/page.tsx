@@ -10,7 +10,7 @@ import {
   AlertCircle,
   Loader2,
   Layers,
-  Sparkles,
+  Building2,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 
@@ -546,7 +546,7 @@ function ImportFlow() {
         </header>
 
         {/* Step 1 — Partner identity */}
-        <Section title="1. Partner" icon={Sparkles}>
+        <Section title="1. Partner" icon={Building2}>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">

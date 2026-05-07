@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Send,
   UserMinus,
-  Sparkles,
+  UserPlus,
 } from "lucide-react"
 
 interface AudienceProfile {
@@ -246,7 +246,7 @@ export function MailchimpRecordPanel({ email, firstName, lastName }: MailchimpRe
         {!isLoading && data && !found && (
           <div className="text-center py-6">
             <div className="grid h-10 w-10 place-items-center rounded-md bg-neutral-100 text-neutral-700 mx-auto mb-3">
-              <Sparkles className="w-5 h-5" />
+              <UserPlus className="w-5 h-5" />
             </div>
             <p className="text-sm font-medium text-neutral-900 mb-1">Not in any Mailchimp audience</p>
             <p className="text-xs text-neutral-500 max-w-sm mx-auto">

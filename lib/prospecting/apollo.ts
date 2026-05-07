@@ -1,3 +1,6 @@
+import { checkBudget } from "./budget"
+import { logCreditUsage } from "./credit-log"
+
 /**
  * Apollo API wrapper — Stage 1 foundation for the prospecting feature.
  *
@@ -166,12 +169,13 @@ export interface ApolloSearchResult {
 // ─── Error class ────────────────────────────────────────────────────────
 
 export type ApolloErrorCode =
-  | "auth"          // 401 — bad / missing API key
-  | "plan-blocked"  // 403 — endpoint not available on current plan
-  | "rate-limited"  // 429 — slow down
-  | "bad-request"   // 400 — invalid filters / payload
-  | "validation"    // 422 — unprocessable entity (deprecated endpoint, schema violation)
-  | "server-error"  // 500-range — Apollo's problem
+  | "auth"            // 401 — bad / missing API key
+  | "plan-blocked"    // 403 — endpoint not available on current plan
+  | "rate-limited"    // 429 — slow down
+  | "bad-request"     // 400 — invalid filters / payload
+  | "validation"      // 422 — unprocessable entity (deprecated endpoint, schema violation)
+  | "server-error"    // 500-range — Apollo's problem
+  | "budget-exceeded" // local — daily/monthly budget cap would be exceeded
   | "unknown"
 
 export class ApolloError extends Error {
@@ -268,6 +272,18 @@ async function callApollo<T>(
 // ─── Public API ─────────────────────────────────────────────────────────
 
 /**
+ * Caller context for credit accounting. Required for production calls so
+ * usage gets logged to the persistent audit trail and budget caps can be
+ * enforced. Internal/test calls can omit (no logging, no cap check).
+ */
+export interface ApolloCallContext {
+  /** Identifies the user for per-user budget caps + audit attribution */
+  userEmail: string
+  /** Original NL prompt — search calls only; logged for cost-spike debugging */
+  prompt?: string
+}
+
+/**
  * People Search — the prospecting workhorse. Returns candidates matching the
  * given ICP filters. Caller is responsible for scoring + dedup.
  *
@@ -284,10 +300,29 @@ async function callApollo<T>(
  * Apply filters to narrow before paginating.
  *
  * Credit cost: 1 per record returned.
+ *
+ * Budget enforcement: when `context` is provided, runs a pre-flight budget
+ * check before the call (rejects with `code: "budget-exceeded"` when daily
+ * or monthly cap would be exceeded) and writes a persistent log entry
+ * after the call.
  */
 export async function searchByFilters(
   filters: ApolloSearchFilters,
+  context?: ApolloCallContext,
 ): Promise<ApolloSearchResult> {
+  // Pre-flight budget check (production calls only — context required).
+  if (context) {
+    const expectedCredits = filters.per_page ?? 25
+    const budget = await checkBudget(context.userEmail, expectedCredits)
+    if (!budget.ok) {
+      throw new ApolloError(
+        budget.reason ?? "Apollo budget exceeded",
+        0,
+        "budget-exceeded",
+      )
+    }
+  }
+
   const body: Record<string, unknown> = {
     page: filters.page ?? 1,
     per_page: filters.per_page ?? 25,
@@ -344,6 +379,20 @@ export async function searchByFilters(
   const people = data.people ?? []
   _creditsUsedThisProcess += people.length
 
+  // Persistent log (production calls only). Fire-and-forget — log failures
+  // shouldn't break the user flow since the Apollo call already succeeded.
+  if (context && people.length > 0) {
+    logCreditUsage({
+      userEmail: context.userEmail,
+      endpoint: "search",
+      creditsUsed: people.length,
+      prompt: context.prompt,
+      candidateCount: people.length,
+    }).catch((err) => {
+      console.error("[searchByFilters] credit log write failed:", err)
+    })
+  }
+
   return {
     people,
     page: data.pagination?.page ?? (body.page as number),
@@ -360,10 +409,28 @@ export async function searchByFilters(
  *
  * Endpoint: /v1/people/match
  * Credit cost: 1 per matched person.
+ *
+ * Budget enforcement: same context contract as searchByFilters — when
+ * provided, pre-flight cap check + post-call persistent log.
  */
-export async function enrichByEmail(email: string): Promise<ApolloPerson | null> {
+export async function enrichByEmail(
+  email: string,
+  context?: ApolloCallContext,
+): Promise<ApolloPerson | null> {
   const trimmed = email.trim().toLowerCase()
   if (!trimmed) return null
+
+  // Pre-flight budget check.
+  if (context) {
+    const budget = await checkBudget(context.userEmail, 1)
+    if (!budget.ok) {
+      throw new ApolloError(
+        budget.reason ?? "Apollo budget exceeded",
+        0,
+        "budget-exceeded",
+      )
+    }
+  }
 
   interface RawMatchResponse {
     person?: ApolloPerson
@@ -376,5 +443,17 @@ export async function enrichByEmail(email: string): Promise<ApolloPerson | null>
 
   if (!data.person) return null
   _creditsUsedThisProcess += 1
+
+  if (context) {
+    logCreditUsage({
+      userEmail: context.userEmail,
+      endpoint: "enrich",
+      creditsUsed: 1,
+      candidateCount: 1,
+    }).catch((err) => {
+      console.error("[enrichByEmail] credit log write failed:", err)
+    })
+  }
+
   return data.person
 }

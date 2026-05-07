@@ -88,10 +88,16 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2. Search Apollo ──
+  // Pass context so the wrapper runs the budget check + writes the
+  // persistent credit log entry. userEmail is the per-user cap key; prompt
+  // is logged for cost-spike debugging.
   const filters = { ...translation.filters, per_page: perPage, page: 1 }
   let searchResult
   try {
-    searchResult = await searchByFilters(filters)
+    searchResult = await searchByFilters(filters, {
+      userEmail: auth.session.email,
+      prompt,
+    })
   } catch (err) {
     return surfaceError(err, "apollo")
   }

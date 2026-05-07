@@ -14,7 +14,7 @@ import {
   Inbox,
   AlertCircle,
   Clock,
-  Sparkles,
+  Target,
 } from "lucide-react"
 import type { Lead, LeadPriority, LeadStatus } from "@/types/crm-types"
 
@@ -188,7 +188,7 @@ export function LeadsView({
             href="/admin/leads/prospect"
             className="flex items-center gap-1.5 px-3 py-2 text-neutral-700 bg-white border border-neutral-200 text-[13px] font-medium rounded-lg hover:border-neutral-300 hover:bg-neutral-50 transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Target className="w-3.5 h-3.5" />
             Find prospects
           </Link>
           <button

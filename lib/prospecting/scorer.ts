@@ -55,6 +55,64 @@ const NEGATIVE_ORG_PATTERNS: RegExp[] = [
   /\bad agency\b/i,
 ]
 
+/**
+ * Jurisdictions where 434media does NOT pursue cold outbound. Per the ICP
+ * doc, EU member states (incl. UK + EEA + Switzerland) and Canada are
+ * hard-excluded due to strict consent laws (GDPR / CASL).
+ *
+ * Lowercased for case-insensitive matching against Apollo's country fields.
+ *
+ * Exported so the approval endpoint can apply a defense-in-depth check
+ * (single source of truth for the jurisdiction list).
+ *
+ * Limitation: on Apollo Free plan, country is obfuscated (`has_country: true`
+ * only — actual value hidden). The scorer can't enforce this on Free-plan
+ * responses; production usage on Basic+ exposes the country field and the
+ * exclusion fires cleanly. The translator's geography filter is the
+ * complementary defense — restrict `organization_locations` to US/Mexico
+ * so EU/CA candidates don't appear in Free-plan results in the first place.
+ */
+export const EXCLUDED_COUNTRIES: Set<string> = new Set([
+  // EU member states
+  "austria", "belgium", "bulgaria", "croatia", "cyprus",
+  "czech republic", "czechia",
+  "denmark", "estonia", "finland", "france", "germany",
+  "greece", "hungary", "ireland", "italy", "latvia",
+  "lithuania", "luxembourg", "malta", "netherlands",
+  "poland", "portugal", "romania", "slovakia", "slovenia",
+  "spain", "sweden",
+  // EEA non-EU
+  "iceland", "liechtenstein", "norway",
+  // Switzerland (Swiss-equivalent of GDPR)
+  "switzerland",
+  // UK + post-Brexit variants (retains GDPR-equivalent law)
+  "united kingdom", "uk", "great britain", "britain",
+  "england", "scotland", "wales", "northern ireland",
+  // Canada (CASL)
+  "canada",
+])
+
+/**
+ * Returns whether a candidate is in an excluded jurisdiction. Checks both
+ * the person's country and their organization's country — Apollo populates
+ * one or the other depending on the data source.
+ */
+export function isExcludedJurisdiction(person: ApolloPerson): {
+  excluded: boolean
+  country?: string
+} {
+  const personCountry = (person.country || "").trim().toLowerCase()
+  const orgCountry = (person.organization?.country || "").trim().toLowerCase()
+
+  if (personCountry && EXCLUDED_COUNTRIES.has(personCountry)) {
+    return { excluded: true, country: person.country }
+  }
+  if (orgCountry && EXCLUDED_COUNTRIES.has(orgCountry)) {
+    return { excluded: true, country: person.organization?.country }
+  }
+  return { excluded: false }
+}
+
 // ─── Geography scoring (max 25) ─────────────────────────────────────────
 
 const SOUTH_TEXAS_CITIES = [
@@ -480,7 +538,7 @@ export function scoreCandidate(
 ): ScoredPerson {
   const orgName = person.organization?.name ?? ""
 
-  // Hard exclusion — competitor agencies / PR firms.
+  // Hard exclusion 1 — competitor agencies / PR firms.
   for (const pattern of NEGATIVE_ORG_PATTERNS) {
     if (pattern.test(orgName)) {
       return {
@@ -492,6 +550,21 @@ export function scoreCandidate(
           `Excluded: organization "${orgName}" matches a negative ICP pattern (agency / PR / marketing firm).`,
         ],
       }
+    }
+  }
+
+  // Hard exclusion 2 — EU/CA jurisdictions (strict cold-outreach consent
+  // laws; per the ICP doc, 434media does not pursue these regardless of fit).
+  const jurisdiction = isExcludedJurisdiction(person)
+  if (jurisdiction.excluded) {
+    return {
+      person,
+      score: -1,
+      breakdown: { geography: 0, industry: 0, title: 0, companySize: 0 },
+      excluded: `Outside reachable geography: ${jurisdiction.country}. 434media does not pursue cold outbound to EU/Canadian contacts due to strict consent laws (GDPR / CASL).`,
+      reasons: [
+        `Excluded: contact in ${jurisdiction.country} — 434media does not reach out to EU/Canadian contacts (GDPR / CASL).`,
+      ],
     }
   }
 

@@ -638,6 +638,12 @@ export type LeadSource =
   // The specific platform should be inferred from `platform`, UTM params on
   // the originating page_url, or by tagging the lead directly.
   | "social"
+  // Outbound prospected via natural-language ICP search (Apollo + LLM).
+  // Distinct from "partner" (wholesale list) and "social" (inbound signal)
+  // because there's no prior intent — the rep went out and found them. The
+  // prompted search prompt + fit score get tagged for traceability so we
+  // can audit which prompts produce conversion-worthy leads over time.
+  | "prospected"
 
 export type LeadPriority = "high" | "medium" | "low"
 

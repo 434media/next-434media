@@ -105,6 +105,8 @@ Priority order:
 
 Not a priority unless there's a Texas or Hispanic angle: California, New York, generic East Coast B2B.
 
+**Hard exclusion — EU member states (incl. UK + EEA + Switzerland) and Canada.** 434media does not pursue cold outbound to these jurisdictions due to strict consent laws (GDPR / CASL). Even a fit candidate in these regions is non-approvable. Enforced in `lib/prospecting/scorer.ts` (score = -1) and double-checked at the approval endpoint.
+
 ---
 
 ## Industries (positive signals)
@@ -163,6 +165,7 @@ Score-lifters when surfaced alongside fit. These are the moments when buying con
 ## Negative filters (always exclude)
 
 - **Marketing agencies, PR firms, advertising firms** — competitors, not customers
+- **EU and Canadian contacts** — 434media does not pursue cold outbound there (GDPR / CASL). Hard-excluded regardless of fit; see Geography section above.
 - **Pure D2C** without a Texas or Hispanic angle
 - **Enterprise IT / SaaS** without a community or ecosystem dimension
 - **Generic "brand awareness" buyers** — we sell activation, not impressions

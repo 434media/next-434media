@@ -524,6 +524,109 @@ export async function captureLeadFromPartnerList(
   }
 }
 
+interface ProspectingCapture {
+  email: string
+  firstName: string
+  lastName?: string
+  title?: string
+  company: string
+  linkedin?: string
+  /** Optional location parts — combined into the lead's `location` field if present. */
+  city?: string
+  state?: string
+  industry?: string
+  /** The prompt that produced this candidate. Tagged for traceability. */
+  prompt: string
+  /** Apollo's person ID — useful for re-enrichment later. */
+  apolloPersonId?: string
+  /** The fit score the candidate received at approval time. */
+  fitScore: number
+  /**
+   * Email of the rep who approved the candidate (becomes assigned_to).
+   * The rep who approves owns the outreach.
+   */
+  approvedBy: string
+}
+
+/**
+ * Fan an approved prospecting candidate into the `leads` collection.
+ *
+ * Source = "prospected" (no implied inbound intent — the rep went out and
+ * found them via NL ICP search). Tags include `source:prospected` and
+ * `apollo:<id>` for traceability + future re-enrichment. The original
+ * prompt and fit score get a note line so we can audit which prompts
+ * produce conversion-worthy leads over time.
+ *
+ * Idempotent: if the email already exists in `leads`, we backfill missing
+ * fields (title/company/linkedin/location/industry) and append the prompt
+ * trace to the notes — same history-preserving rule as PartnerList capture.
+ *
+ * Same fail-safe shape as the other captureLeadFrom* helpers: returns
+ * `{ leadId: null, created: false }` on internal errors so a bulk approval
+ * can keep going row-by-row.
+ */
+export async function captureLeadFromProspecting(
+  input: ProspectingCapture,
+): Promise<{ leadId: string | null; created: boolean }> {
+  try {
+    const email = input.email.trim().toLowerCase()
+    if (!email) return { leadId: null, created: false }
+
+    const fullName =
+      `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim() || email
+    const location =
+      [input.city, input.state].filter(Boolean).join(", ") || undefined
+    const stamp = new Date().toISOString().split("T")[0]
+    const noteLine = `[${stamp}] Prospected via ICP search: "${input.prompt}". Fit score ${input.fitScore}.`
+
+    const captureTags = ["source:prospected"]
+    if (input.apolloPersonId) {
+      captureTags.push(makeTag("client", `apollo-${input.apolloPersonId}`))
+    }
+
+    const existing = await findLeadByEmail(email)
+
+    if (existing) {
+      const tags = Array.from(
+        new Set([...normalizeLegacyTags(existing.tags), ...captureTags]),
+      )
+      // Backfill-only — never overwrite existing field values, only fill
+      // blanks. Same rule as PartnerList + EventRegistration captures.
+      const patch: Parameters<typeof updateLead>[1] = {
+        tags,
+        notes: [existing.notes, noteLine].filter(Boolean).join("\n\n"),
+      }
+      if (!existing.title && input.title) patch.title = input.title
+      if (!existing.company && input.company) patch.company = input.company
+      if (!existing.linkedin && input.linkedin) patch.linkedin = input.linkedin
+      if (!existing.location && location) patch.location = location
+      if (!existing.industry && input.industry) patch.industry = input.industry
+      // Don't touch assigned_to — original assignment wins.
+      await updateLead(existing.id, patch)
+      return { leadId: existing.id, created: false }
+    }
+
+    const lead = await createLead({
+      name: fullName,
+      company: input.company || "",
+      title: input.title,
+      email,
+      linkedin: input.linkedin,
+      industry: input.industry,
+      location,
+      source: "prospected",
+      assigned_to: input.approvedBy,
+      tags: captureTags,
+      notes: noteLine,
+      created_by: input.approvedBy,
+    })
+    return { leadId: lead.id, created: true }
+  } catch (err) {
+    console.error("[captureLeadFromProspecting] swallowed error:", err)
+    return { leadId: null, created: false }
+  }
+}
+
 /**
  * Increment engagement counters from Resend webhook. Re-scores via updateLead
  * so the engagement bonus kicks in once thresholds are crossed.

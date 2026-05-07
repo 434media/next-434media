@@ -71,7 +71,13 @@ export async function POST(req: NextRequest) {
   try {
     if (body.mode === "search") {
       const filters = body.filters ?? {}
-      const result = await searchByFilters(filters)
+      // Pass context — even though this is a test endpoint, real Apollo
+      // calls still consume credits and should count toward the per-user
+      // budget. Tagged with a synthetic prompt for traceability.
+      const result = await searchByFilters(filters, {
+        userEmail: auth.session.email,
+        prompt: "[test endpoint] " + JSON.stringify(filters).slice(0, 200),
+      })
       return NextResponse.json({
         success: true,
         result: {
@@ -91,7 +97,9 @@ export async function POST(req: NextRequest) {
       if (!email) {
         return NextResponse.json({ error: "email is required" }, { status: 400 })
       }
-      const person = await enrichByEmail(email)
+      const person = await enrichByEmail(email, {
+        userEmail: auth.session.email,
+      })
       return NextResponse.json({
         success: true,
         matched: person !== null,

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, Mail, X, Check, AlertCircle, Tag as TagIcon, Send, Sparkles } from "lucide-react"
+import { Loader2, Mail, X, Check, AlertCircle, Tag as TagIcon, Send, Lightbulb } from "lucide-react"
 import { aggregateMailchimpSuggestions } from "@/lib/tag-taxonomy"
 
 export interface PushMember {
@@ -339,7 +339,7 @@ export function MailchimpPushModal({
                 {sourceSuggestions.length > 0 && (
                   <div className="mt-2 p-2 rounded-md bg-indigo-50/60 border border-indigo-100">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Sparkles className="w-3 h-3 text-indigo-500" />
+                      <Lightbulb className="w-3 h-3 text-indigo-500" />
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
                         From source data
                       </span>

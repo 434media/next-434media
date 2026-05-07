@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  Sparkles,
+  Target,
   Search,
   Loader2,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Ban,
   CheckCircle2,
+  UserPlus,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import type { ScoredPerson } from "@/lib/prospecting/scorer"
@@ -49,6 +50,38 @@ interface SearchError {
   code?: string
 }
 
+interface ApprovalResponse {
+  success: true
+  submitted: number
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+  results: Array<{
+    apolloPersonId: string
+    email: string | null
+    leadId: string | null
+    status: "created" | "updated" | "skipped" | "failed"
+    reason?: string
+  }>
+}
+
+interface ApprovalToast {
+  message: string
+  type: "success" | "error"
+}
+
+interface BudgetStatus {
+  today: number
+  thisMonth: number
+  thisMonthTeamWide: number
+  dailyCap: number
+  monthlyCap: number
+  dailyRemaining: number
+  monthlyRemaining: number
+  remaining: number
+}
+
 const EXAMPLE_PROMPTS = [
   "Biotech founders in Texas with $20M+ revenue",
   "VPs of Marketing at mid-size CPG brands targeting Hispanic audiences",
@@ -61,6 +94,38 @@ export default function ProspectPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [result, setResult] = useState<SearchSuccess | null>(null)
   const [error, setError] = useState<SearchError | null>(null)
+  // Stage 5 — selection + approval state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isApproving, setIsApproving] = useState(false)
+  const [approvalToast, setApprovalToast] = useState<ApprovalToast | null>(null)
+  // Stage 7 — persistent Apollo budget. Loaded on mount; refreshed after
+  // each search call (post-search the count goes up by people.length).
+  const [budget, setBudget] = useState<BudgetStatus | null>(null)
+
+  const loadBudget = async () => {
+    try {
+      const res = await fetch("/api/admin/prospecting/budget", { cache: "no-store" })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data?.success) {
+        setBudget(data as BudgetStatus)
+      }
+    } catch {
+      // Non-fatal — the page works without budget visibility, just less informed.
+    }
+  }
+
+  useEffect(() => {
+    loadBudget()
+  }, [])
+
+  // Auto-dismiss toast — same 4s window the rest of the admin uses for
+  // multi-line operational messages.
+  useEffect(() => {
+    if (!approvalToast) return
+    const t = setTimeout(() => setApprovalToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [approvalToast])
 
   const handleSearch = async () => {
     const trimmed = prompt.trim()
@@ -68,6 +133,8 @@ export default function ProspectPage() {
     setIsSearching(true)
     setError(null)
     setResult(null)
+    setSelectedIds(new Set())
+    setApprovalToast(null)
     try {
       const res = await fetch("/api/admin/prospecting/search", {
         method: "POST",
@@ -86,6 +153,8 @@ export default function ProspectPage() {
       })
     } finally {
       setIsSearching(false)
+      // Refresh the persistent budget — credits were just consumed.
+      void loadBudget()
     }
   }
 
@@ -93,11 +162,78 @@ export default function ProspectPage() {
     setPrompt(example)
   }
 
+  const toggleSelected = (personId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(personId)) next.delete(personId)
+      else next.add(personId)
+      return next
+    })
+  }
+
+  const handleApprove = async () => {
+    if (!result || isApproving) return
+    const toApprove = (result.candidates ?? []).filter(
+      (c) => selectedIds.has(c.person.id) && c.score >= 0,
+    )
+    if (toApprove.length === 0) return
+    const ok = confirm(
+      `Approve ${toApprove.length} prospect${toApprove.length === 1 ? "" : "s"} as leads? They'll appear in /admin/leads with source "prospected". Existing leads (matched by email) are updated, not duplicated.`,
+    )
+    if (!ok) return
+
+    setIsApproving(true)
+    setApprovalToast(null)
+    try {
+      const res = await fetch("/api/admin/prospecting/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: result.prompt, candidates: toApprove }),
+      })
+      const data = (await res.json()) as ApprovalResponse | { error: string }
+      if (!res.ok || !("success" in data)) {
+        setApprovalToast({
+          message:
+            ("error" in data && data.error) || "Approval failed — see console",
+          type: "error",
+        })
+        return
+      }
+      const { created, updated, skipped, failed } = data
+      const parts: string[] = []
+      if (created > 0) parts.push(`${created} new lead${created === 1 ? "" : "s"}`)
+      if (updated > 0) parts.push(`${updated} updated`)
+      if (skipped > 0) parts.push(`${skipped} skipped`)
+      if (failed > 0) parts.push(`${failed} failed`)
+      setApprovalToast({
+        message: `Approved: ${parts.join(", ") || "no changes"}.`,
+        type: failed > 0 ? "error" : "success",
+      })
+      // Clear selection on success so the rep can iterate without
+      // re-deselecting the rows they just approved.
+      if (created + updated > 0) setSelectedIds(new Set())
+    } catch (err) {
+      setApprovalToast({
+        message: err instanceof Error ? err.message : "Network error",
+        type: "error",
+      })
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
   const candidates = result?.candidates ?? []
   const threshold = result?.threshold ?? 60
   const aboveThreshold = candidates.filter((c) => c.score >= threshold)
   const belowThreshold = candidates.filter((c) => c.score >= 0 && c.score < threshold)
   const excluded = candidates.filter((c) => c.score === -1)
+  // Selection bookkeeping — only candidates with email + non-excluded score
+  // are approvable. Free-plan obfuscation hides email so most candidates
+  // there are non-approvable.
+  const selectableCount = candidates.filter(
+    (c) => c.score >= 0 && !!c.person.email,
+  ).length
+  const selectedCount = selectedIds.size
 
   return (
     <AdminRoleGuard allowedRoles={["full_admin"]}>
@@ -114,7 +250,7 @@ export default function ProspectPage() {
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </Link>
-                <Sparkles className="w-4 h-4 text-neutral-600" />
+                <Target className="w-4 h-4 text-neutral-600" />
                 <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
                   PROSPECT
                 </h1>
@@ -122,11 +258,7 @@ export default function ProspectPage() {
                   natural-language ICP search
                 </span>
               </div>
-              {result?.creditsUsedThisProcess !== undefined && (
-                <span className="text-[11px] text-neutral-500 tabular-nums">
-                  {result.creditsUsedThisProcess} Apollo credits this session
-                </span>
-              )}
+              {budget && <BudgetIndicator budget={budget} />}
             </div>
           </div>
         </header>
@@ -164,7 +296,16 @@ export default function ProspectPage() {
               </span>
               <button
                 onClick={handleSearch}
-                disabled={!prompt.trim() || isSearching}
+                disabled={
+                  !prompt.trim() ||
+                  isSearching ||
+                  (budget !== null && budget.remaining <= 0)
+                }
+                title={
+                  budget !== null && budget.remaining <= 0
+                    ? "Apollo budget reached — wait for reset or upgrade your plan"
+                    : undefined
+                }
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSearching ? (
@@ -238,6 +379,15 @@ export default function ProspectPage() {
                       .
                     </p>
                   )}
+                  {error.code === "budget-exceeded" && (
+                    <p className="text-[12px] text-red-700 mt-2 leading-relaxed">
+                      Hit the local budget cap configured in
+                      {" "}<code className="bg-red-100 px-1 rounded">APOLLO_DAILY_CAP</code>
+                      {" / "}
+                      <code className="bg-red-100 px-1 rounded">APOLLO_MONTHLY_CAP</code>.
+                      Wait for reset, raise the cap in env, or upgrade your Apollo plan.
+                    </p>
+                  )}
                 </div>
               </div>
             </section>
@@ -284,16 +434,88 @@ export default function ProspectPage() {
 
               {/* Results tray */}
               <section>
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <h2 className="text-[15px] font-semibold text-neutral-900">
-                    {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
-                  </h2>
-                  <div className="text-[11px] text-neutral-500 tabular-nums">
-                    {aboveThreshold.length} above threshold ({threshold}+) ·{" "}
-                    {belowThreshold.length} below ·{" "}
-                    {excluded.length} excluded
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <div>
+                    <h2 className="text-[15px] font-semibold text-neutral-900">
+                      {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
+                    </h2>
+                    <p className="text-[11px] text-neutral-500 tabular-nums mt-0.5">
+                      {aboveThreshold.length} above threshold ({threshold}+) ·{" "}
+                      {belowThreshold.length} below ·{" "}
+                      {excluded.length} excluded
+                    </p>
                   </div>
+                  {/* Approval action — only renders when selection is non-empty.
+                      Disabled state during the approve call mirrors the search
+                      button's loading pattern. */}
+                  {selectedCount > 0 && (
+                    <button
+                      onClick={handleApprove}
+                      disabled={isApproving}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isApproving ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="w-3.5 h-3.5" />
+                      )}
+                      {isApproving
+                        ? "Approving…"
+                        : `Approve ${selectedCount} as lead${selectedCount === 1 ? "" : "s"}`}
+                    </button>
+                  )}
                 </div>
+
+                {/* Approval result toast (inline since this page doesn't
+                    share the admin-shell toast surface). Auto-dismisses
+                    after 4 seconds via useEffect. */}
+                {approvalToast && (
+                  <div
+                    role="status"
+                    className={`mb-3 flex items-start gap-2 px-3 py-2 rounded-md text-[12px] font-medium ${
+                      approvalToast.type === "success"
+                        ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                        : "bg-red-50 border border-red-200 text-red-700"
+                    }`}
+                  >
+                    {approvalToast.type === "success" ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    )}
+                    <span className="flex-1 leading-relaxed">{approvalToast.message}</span>
+                    {approvalToast.type === "success" && (
+                      <Link
+                        href="/admin/leads"
+                        className="text-[11px] font-medium underline shrink-0"
+                      >
+                        View leads
+                      </Link>
+                    )}
+                  </div>
+                )}
+
+                {/* Free-plan banner — when nothing is approvable because
+                    every candidate's email is masked, surface it explicitly
+                    so reps don't try to figure out why selection is broken. */}
+                {candidates.length > 0 && selectableCount === 0 && (
+                  <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-md bg-amber-50/60 border border-amber-200/70 text-[12px] text-amber-800 leading-relaxed">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
+                    <span>
+                      None of these candidates can be approved — emails are
+                      masked on the Apollo Free plan. Upgrade to Basic at{" "}
+                      <a
+                        href="https://app.apollo.io/#/settings/plans"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-medium"
+                      >
+                        Apollo plan settings
+                      </a>{" "}
+                      to enable approval.
+                    </span>
+                  </div>
+                )}
 
                 {candidates.length === 0 ? (
                   <div className="bg-white rounded-xl border border-neutral-200 p-12 text-center">
@@ -312,16 +534,13 @@ export default function ProspectPage() {
                         key={c.person.id || i}
                         candidate={c}
                         threshold={threshold}
+                        selected={selectedIds.has(c.person.id)}
+                        onToggleSelect={() => toggleSelected(c.person.id)}
                       />
                     ))}
                   </div>
                 )}
               </section>
-
-              {/* Stage 5 will add the approval action bar here */}
-              <p className="text-[11px] text-neutral-400 text-center pt-2">
-                Approval flow (selected → leads queue) lands in Stage 5.
-              </p>
             </>
           )}
         </main>
@@ -331,6 +550,35 @@ export default function ProspectPage() {
 }
 
 // ─── sub-components ───
+
+function BudgetIndicator({ budget }: { budget: BudgetStatus }) {
+  // Tone shifts on monthly remaining: green > 25%, amber 5–25%, red ≤ 5%.
+  const monthlyPct =
+    budget.monthlyCap > 0 ? budget.monthlyRemaining / budget.monthlyCap : 0
+  const tone =
+    monthlyPct <= 0.05
+      ? "text-red-600"
+      : monthlyPct <= 0.25
+        ? "text-amber-600"
+        : "text-neutral-500"
+  return (
+    <div className="flex items-center gap-2 text-[11px] tabular-nums">
+      <span className={tone}>
+        <strong className="font-semibold">{budget.thisMonth}</strong>
+        <span className="text-neutral-400">{" / "}</span>
+        {budget.monthlyCap}
+        <span className="text-neutral-400">{" credits this month"}</span>
+      </span>
+      <span className="text-neutral-300">·</span>
+      <span className="text-neutral-500">
+        <strong className="font-semibold">{budget.today}</strong>
+        <span className="text-neutral-400">{" / "}</span>
+        {budget.dailyCap}
+        <span className="text-neutral-400">{" today"}</span>
+      </span>
+    </div>
+  )
+}
 
 function FilterChips({ filters }: { filters: ApolloSearchFilters }) {
   // Build a flat list of human-readable filter chips. Skip pagination fields.
@@ -383,13 +631,26 @@ function FilterChips({ filters }: { filters: ApolloSearchFilters }) {
 function CandidateRow({
   candidate,
   threshold,
+  selected,
+  onToggleSelect,
 }: {
   candidate: ScoredPerson
   threshold: number
+  selected: boolean
+  onToggleSelect: () => void
 }) {
   const { person, score, breakdown, reasons, excluded } = candidate
   const isExcluded = score === -1
   const aboveThreshold = !isExcluded && score >= threshold
+  // Approvability — excluded candidates can never be approved; candidates
+  // without an email can't either (Free-plan obfuscation makes dedup
+  // impossible). Both states disable the checkbox with an explanation.
+  const isApprovable = !isExcluded && !!person.email
+  const checkboxDisabledReason = isExcluded
+    ? "Excluded by ICP filter — not approvable"
+    : !person.email
+      ? "Email masked on Apollo Free plan — upgrade to enable approval"
+      : undefined
 
   // Score badge tint: green for above threshold, amber for below, red for excluded
   const scoreTint = isExcluded
@@ -407,6 +668,17 @@ function CandidateRow({
   return (
     <div className={`px-4 py-3.5 hover:bg-neutral-50/50 transition-colors ${rowOpacity}`}>
       <div className="flex items-start gap-3">
+        {/* Approval checkbox — disabled (with explanatory tooltip) for
+            excluded candidates and Free-plan obfuscated rows. */}
+        <input
+          type="checkbox"
+          checked={selected}
+          disabled={!isApprovable}
+          onChange={onToggleSelect}
+          className="rounded border-neutral-300 mt-4 shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+          title={checkboxDisabledReason ?? "Select for approval"}
+          aria-label={`Select ${displayName} for approval`}
+        />
         {/* Score badge */}
         <div
           className={`shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-md border tabular-nums ${scoreTint}`}
