@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import {
   Plus,
   Search,
@@ -13,6 +14,7 @@ import {
   Inbox,
   AlertCircle,
   Clock,
+  Sparkles,
 } from "lucide-react"
 import type { Lead, LeadPriority, LeadStatus } from "@/types/crm-types"
 
@@ -178,6 +180,17 @@ export function LeadsView({
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
+          {/* Stage 4 — discovery entry point for the prospecting feature.
+              Routes to /admin/leads/prospect where reps can run NL ICP queries
+              against Apollo. Approval lands those candidates back into this
+              queue with source="prospected" (Stage 5). */}
+          <Link
+            href="/admin/leads/prospect"
+            className="flex items-center gap-1.5 px-3 py-2 text-neutral-700 bg-white border border-neutral-200 text-[13px] font-medium rounded-lg hover:border-neutral-300 hover:bg-neutral-50 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Find prospects
+          </Link>
           <button
             onClick={onCreateLead}
             className="flex items-center gap-1.5 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800"
