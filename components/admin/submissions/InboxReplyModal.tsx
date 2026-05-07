@@ -52,6 +52,44 @@ function defaultBody(submission: ContactFormSubmissionLite | null): string {
   return `Hi ${first},\n\n\n\n`
 }
 
+// Stage 5c — starter templates for the three most common reply patterns.
+// The rep can pick one, then edit; signature is intentionally generic since
+// most reps have their own. Calendar links use a `[add link]` placeholder
+// so the rep is forced to drop in their actual scheduler URL.
+//
+// Templates are versioned with the codebase. If reps want to edit them
+// without deploys, move to Firestore later.
+interface ReplyTemplate {
+  key: string
+  label: string
+  build: (firstName: string) => string
+}
+
+const REPLY_TEMPLATES: ReplyTemplate[] = [
+  {
+    key: "acknowledge",
+    label: "Acknowledge",
+    build: (first) =>
+      `Hi ${first || "there"},\n\nThanks for reaching out — got your message. ` +
+      `I'll follow up properly within 24 hours.\n\nBest,\n`,
+  },
+  {
+    key: "qualify",
+    label: "Qualify",
+    build: (first) =>
+      `Hi ${first || "there"},\n\nThanks for reaching out. To make sure we point you to the right ` +
+      `person on our team, could you share a bit more about timing, scope, and what kind of ` +
+      `partnership you're imagining?\n\nBest,\n`,
+  },
+  {
+    key: "schedule",
+    label: "Schedule a call",
+    build: (first) =>
+      `Hi ${first || "there"},\n\nThanks for reaching out — would love to find time to talk.\n\n` +
+      `Here's my calendar: [add link]\n\nBest,\n`,
+  },
+]
+
 export function InboxReplyModal({
   open,
   submission,
@@ -210,12 +248,43 @@ export function InboxReplyModal({
 
           {/* Body */}
           <div>
-            <label
-              htmlFor="reply-body"
-              className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1"
-            >
-              Message
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label
+                htmlFor="reply-body"
+                className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider"
+              >
+                Message
+              </label>
+              {/* Stage 5c — template chips. Picking one swaps the body
+                  wholesale (no append) — the rep can edit afterward. The
+                  rep can also clear back to the empty greeting via the
+                  Clear chip. */}
+              <div className="flex items-center gap-1">
+                {REPLY_TEMPLATES.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() =>
+                      setBody(t.build(submission.firstName ?? ""))
+                    }
+                    disabled={isSending}
+                    className="px-2 py-0.5 text-[10px] font-medium text-neutral-600 bg-white border border-neutral-200 rounded hover:bg-neutral-50 hover:text-neutral-900 transition-colors disabled:opacity-50"
+                    title={`Use the ${t.label.toLowerCase()} template`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setBody(defaultBody(submission))}
+                  disabled={isSending}
+                  className="px-2 py-0.5 text-[10px] font-medium text-neutral-400 hover:text-neutral-700 transition-colors disabled:opacity-50"
+                  title="Clear and start from blank greeting"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
             <textarea
               id="reply-body"
               value={body}

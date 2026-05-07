@@ -27,6 +27,7 @@ import {
   Mail as MailIcon,
   UserPlus as UserPlusIcon,
   Ban as BanIcon,
+  Send as SendIcon,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
 import {
@@ -299,6 +300,65 @@ export function ContactFormsTab({
       clearSelected()
     } catch {
       setToast({ message: "Bulk update failed", type: "error" })
+    }
+  }
+
+  // Stage 5d — bulk acknowledge. Sends a fixed templated "got your message,
+  // real reply within 24h" to every selected inquiry, then auto-flips each
+  // to "replied". Confirmation is a `confirm()` dialog rather than a custom
+  // modal — keeps the bar lightweight; reps who want to customize per-recipient
+  // use the per-row Reply button instead.
+  const runBulkAcknowledge = async () => {
+    if (selected.size === 0) return
+    const recipients = submissions
+      .filter((s) => selected.has(s.id) && s.email)
+      .map((s) => ({
+        submissionId: s.id,
+        email: s.email,
+        firstName: s.firstName,
+      }))
+    if (recipients.length === 0) return
+    const ok = confirm(
+      `Send acknowledgment to ${recipients.length} inquir${recipients.length === 1 ? "y" : "ies"}? ` +
+        `Each recipient gets a personalized "got your message, will follow up within 24 hours" reply, ` +
+        `and the inquiries are marked as replied.`,
+    )
+    if (!ok) return
+    try {
+      const res = await fetch("/api/admin/contact-forms/bulk-acknowledge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipients }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success) {
+        setToast({ message: data?.error || "Bulk acknowledge failed", type: "error" })
+        return
+      }
+      const { sent, sendFailed, stateFailed, invalid } = data as {
+        sent: number
+        sendFailed: number
+        stateFailed: number
+        invalid: number
+      }
+      // Optimistically mark fully-sent recipients as replied locally — same
+      // pattern as per-row Reply. Per-recipient state-failures stay un-marked
+      // so the rep sees they need manual flipping.
+      const sentResults = (data.results as Array<{ submissionId: string; status: string }>).filter(
+        (r) => r.status === "sent",
+      )
+      setLocalBulk(sentResults.map((r) => ({ id: r.submissionId, state: "replied" })))
+      const parts = [`${sent} sent`]
+      if (sendFailed > 0) parts.push(`${sendFailed} failed`)
+      if (stateFailed > 0) parts.push(`${stateFailed} sent but status didn't save`)
+      if (invalid > 0) parts.push(`${invalid} invalid`)
+      setToast({
+        message: `Acknowledgments: ${parts.join(", ")}`,
+        type: sendFailed === 0 && stateFailed === 0 && invalid === 0 ? "success" : "error",
+      })
+      if (sent > 0) clearSelected()
+    } catch {
+      setToast({ message: "Bulk acknowledge failed", type: "error" })
     }
   }
 
@@ -923,6 +983,7 @@ export function ContactFormsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
+          { key: "acknowledge", label: "Send acknowledgment", icon: SendIcon, run: runBulkAcknowledge },
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
           { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },

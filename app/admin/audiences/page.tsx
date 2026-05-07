@@ -47,8 +47,7 @@ export default function AudiencesPage() {
     setActiveSub(next)
     const params = new URLSearchParams(searchParams?.toString() ?? "")
     params.set("sub", next)
-    // Drop search/event when switching to keep URLs clean — same UX as the
-    // old switchTab in /admin/submissions.
+    // Drop search/event when switching to keep URLs clean.
     params.delete("search")
     params.delete("event")
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
@@ -183,8 +182,7 @@ export default function AudiencesPage() {
               active tile mirrors the sub-tab nav state. */}
           <AudiencesHeaderStrip activeSub={activeSub} onSelectSub={switchSub} />
 
-          {/* Cross-source dedupe panel — moved from /admin/submissions to live
-              here per the Stage 3 plan. Surfaces emails appearing across the
+          {/* Cross-source dedupe panel — surfaces emails appearing across the
               three audience sources (and Inbox) so dupes can be merged into a
               single Lead in one click. Hidden when there are no dupes. */}
           <CrossSourceDupesPanel
