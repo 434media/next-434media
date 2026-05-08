@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
-import { captureLeadFromPartnerList } from "@/lib/firestore-leads"
+import { capturePartnerListMember } from "@/lib/firestore-partner-list-members"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -9,12 +9,19 @@ export const maxDuration = 300
  * POST /api/admin/leads/import-partner-list
  *
  * One-shot import of a partner-shared roster (e.g. Alamo Angels members) into
- * the `leads` collection. Each row maps to one Lead via captureLeadFromPartnerList,
- * which dedupes by email — re-importing an updated list refreshes tags / notes
- * / blank fields without creating duplicates.
+ * the audience-side `partner_list_members` collection. Members live there as
+ * audience cohorts until explicitly promoted into the `leads` pipeline (via
+ * the future /api/admin/leads/promote-from-audience endpoint).
+ *
+ * Each row maps to one PartnerListMember via capturePartnerListMember, which
+ * dedupes by email — re-importing an updated list refreshes tags / notes /
+ * blank fields without creating duplicates.
  *
  * The CSV parsing + column mapping happens client-side: this endpoint accepts
  * already-normalized rows so the user can preview the mapping before commit.
+ *
+ * URL kept under /admin/leads/ for backwards compatibility with the existing
+ * importer UI; the data target is now audience-side.
  *
  * Body:
  *   {
@@ -61,7 +68,7 @@ interface ImportResult {
   outcomes: Array<{
     email: string
     status: "created" | "updated" | "skipped" | "failed"
-    leadId?: string
+    memberId?: string
     error?: string
   }>
 }
@@ -155,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const outcome = await captureLeadFromPartnerList({
+      const outcome = await capturePartnerListMember({
         email,
         firstName: row.firstName?.trim() || undefined,
         lastName: row.lastName?.trim() || undefined,
@@ -172,16 +179,12 @@ export async function POST(request: NextRequest) {
         noteSuffix: row.noteSuffix?.trim() || undefined,
       })
 
-      if (!outcome.leadId) {
-        result.failed++
-        result.errors.push({ email, error: "Capture returned no leadId" })
-        result.outcomes.push({ email, status: "failed", error: "internal" })
-      } else if (outcome.created) {
+      if (outcome.created) {
         result.created++
-        result.outcomes.push({ email, status: "created", leadId: outcome.leadId })
+        result.outcomes.push({ email, status: "created", memberId: outcome.id })
       } else {
         result.updated++
-        result.outcomes.push({ email, status: "updated", leadId: outcome.leadId })
+        result.outcomes.push({ email, status: "updated", memberId: outcome.id })
       }
     } catch (err) {
       result.failed++

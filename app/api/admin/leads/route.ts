@@ -5,7 +5,16 @@ import type { LeadCreateInput, LeadSource } from "@/types/crm-types"
 
 export const runtime = "nodejs"
 
-const VALID_SOURCES: LeadSource[] = ["event", "web", "manual", "newsletter", "referral", "partner"]
+const VALID_SOURCES: LeadSource[] = [
+  "event",
+  "web",
+  "manual",
+  "newsletter",
+  "referral",
+  "partner",
+  "social",
+  "prospected",
+]
 
 async function requireAdmin() {
   const session = await getSession()

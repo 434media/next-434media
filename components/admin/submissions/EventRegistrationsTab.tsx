@@ -23,8 +23,8 @@ import {
   MessageSquare as MsgIcon,
   Archive as ArchiveIcon,
   Mail as MailIcon,
-  UserPlus as UserPlusIcon,
   Ban as BanIcon,
+  ArrowRight,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
 import {
@@ -53,6 +53,9 @@ import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { BackfillField } from "@/components/admin/BackfillField"
 import { ExportMenu, DetailRow } from "./shared"
 import type { Toast } from "./types"
+import { usePromoteToLeads } from "./usePromoteToLeads"
+import { PromoteOverridesDrawer } from "./PromoteOverridesDrawer"
+import { ArrowRightCircle } from "lucide-react"
 
 interface EventRegistration {
   id: string
@@ -72,6 +75,9 @@ interface EventRegistration {
   // Provenance — set by `updateEventRegistration` server-side after a backfill.
   enrichedAt?: string
   enrichedBy?: string
+  // Set when this registrant has been promoted into the leads pipeline.
+  promotedLeadId?: string
+  promotedAt?: string
 }
 
 export function EventRegistrationsTab({
@@ -151,6 +157,40 @@ export function EventRegistrationsTab({
     fetchCounts()
     fetchRegistrations()
   }, [fetchCounts, fetchRegistrations])
+
+  // Audience → Leads promotion (sets bidirectional backlinks: registration's
+  // promotedLeadId + Lead's origin_ref). Replaces the old runConvert flow,
+  // which created Leads but didn't track the backlink.
+  const { promote: promoteRegistrations } = usePromoteToLeads({
+    collection: "event_registrations",
+    setToast,
+    onSuccess: () => fetchRegistrations(),
+    onClearSelection: clearSelected,
+  })
+
+  const [promoteDrawerIds, setPromoteDrawerIds] = useState<string[]>([])
+  const [isBulkPromoting, setIsBulkPromoting] = useState(false)
+
+  const handleOpenPromoteDrawer = () => {
+    const ids = registrations
+      .filter((r) => r.id && selected.has(r.id) && !r.promotedLeadId)
+      .map((r) => r.id)
+    if (ids.length === 0) {
+      setToast({ message: "No unpromoted registrations in selection", type: "error" })
+      return
+    }
+    setPromoteDrawerIds(ids)
+  }
+
+  const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteRegistrations>[1]) => {
+    setIsBulkPromoting(true)
+    try {
+      await promoteRegistrations(promoteDrawerIds, overrides)
+      setPromoteDrawerIds([])
+    } finally {
+      setIsBulkPromoting(false)
+    }
+  }
 
   const handleFilterByEvent = (eventName: string) => {
     setSelectedEvent(eventName)
@@ -397,43 +437,6 @@ export function EventRegistrationsTab({
       clearSelected()
     } catch {
       setToast({ message: "Bulk update failed", type: "error" })
-    }
-  }
-
-  const runConvert = async () => {
-    if (selected.size === 0) return
-    const items = registrations
-      .filter((r) => r.id && selected.has(r.id) && r.email)
-      .map((r) => ({
-        id: r.id,
-        email: r.email,
-        firstName: r.firstName,
-        lastName: r.lastName,
-        company: r.company || undefined,
-        sourceSite: r.event,
-        eventName: r.eventName,
-        eventDate: r.eventDate,
-      }))
-    if (items.length === 0) return
-    try {
-      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.ok) {
-        setToast({ message: data?.error || "Convert failed", type: "error" })
-        return
-      }
-      const r = data.result as { created: number; updated: number; failed: number }
-      setToast({
-        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
-        type: r.failed === 0 ? "success" : "error",
-      })
-      if (r.failed === 0) clearSelected()
-    } catch {
-      setToast({ message: "Convert failed", type: "error" })
     }
   }
 
@@ -791,40 +794,33 @@ export function EventRegistrationsTab({
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
                 </button>
-                <div className="flex items-center gap-1.5">
-                  {existingLeadId ? (
-                    <a
-                      href={`/admin/leads?openLead=${encodeURIComponent(existingLeadId)}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
-                      title="Open this contact in the CRM"
-                    >
-                      <UserPlusIcon className="w-3.5 h-3.5" />
-                      Open in CRM
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await runConvertAll([selectedRegistration])
-                        // Refresh the lead map so the next open shows
-                        // "Open in CRM" instead of "Convert to lead". The
-                        // hook caches for 30s, so we just nudge the user
-                        // on success — they can hit it again in 30s.
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
-                      title="Create a CRM lead for this person"
-                    >
-                      <UserPlusIcon className="w-3.5 h-3.5" />
-                      Convert to lead
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setSelectedRegistration(null)}
-                    className="px-3 py-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded transition-colors"
+                {selectedRegistration.promotedLeadId || existingLeadId ? (
+                  // Already promoted — render as a navigation link rather than
+                  // an action button so its visual weight matches "FYI, the
+                  // workflow continues over there" instead of "do this now".
+                  <a
+                    href={`/admin/leads?openLead=${encodeURIComponent(selectedRegistration.promotedLeadId || existingLeadId!)}`}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-sm transition-colors"
+                    title="Open this contact in the CRM"
                   >
-                    Close
+                    Open in CRM
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selectedRegistration.id) return
+                      await promoteRegistrations([selectedRegistration.id])
+                      setSelectedRegistration(null)
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
+                    title="Promote this registrant to the leads pipeline"
+                  >
+                    <ArrowRightCircle className="w-3.5 h-3.5" />
+                    Promote to lead
                   </button>
-                </div>
+                )}
               </div>
             )
           })() : null
@@ -987,8 +983,8 @@ export function EventRegistrationsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
+          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, run: handleOpenPromoteDrawer },
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
@@ -1015,6 +1011,16 @@ export function EventRegistrationsTab({
           })
           if (result.errors.length === 0) clearSelected()
         }}
+      />
+
+      <PromoteOverridesDrawer
+        open={promoteDrawerIds.length > 0}
+        onClose={() => setPromoteDrawerIds([])}
+        count={promoteDrawerIds.length}
+        collection="event_registrations"
+        defaultSource="event"
+        isPromoting={isBulkPromoting}
+        onConfirm={handleConfirmBulkPromote}
       />
     </div>
   )

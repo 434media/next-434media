@@ -21,7 +21,7 @@ import {
   MessageSquare as MsgIcon,
   Archive as ArchiveIcon,
   Mail as MailIcon,
-  UserPlus as UserPlusIcon,
+  ArrowRight,
   Ban as BanIcon,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
@@ -55,6 +55,9 @@ import { TagList } from "@/components/admin/Tag"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { ExportMenu, DatePresetChips, DetailRow } from "./shared"
 import type { Toast } from "./types"
+import { usePromoteToLeads } from "./usePromoteToLeads"
+import { PromoteOverridesDrawer } from "./PromoteOverridesDrawer"
+import { ArrowRightCircle } from "lucide-react"
 
 interface EmailSignup {
   id: string
@@ -64,6 +67,9 @@ interface EmailSignup {
   // Optional — set on rows that have been pushed to Mailchimp. Surfaced in
   // the drawer with the same TagList overflow component used in Events.
   mailchimp_tags?: string[]
+  // Set when this subscriber has been promoted into the leads pipeline.
+  promotedLeadId?: string
+  promotedAt?: string
 }
 
 export function EmailListsTab({
@@ -433,37 +439,36 @@ export function EmailListsTab({
     }
   }
 
-  // Convert selected signups into CRM leads. Existing leads (matched by email)
-  // get a tag/note refresh — counted as "updated" rather than "created".
-  const runConvert = async () => {
-    if (selected.size === 0) return
-    const items = signups
-      .filter((s) => selected.has(s.id) && s.email)
-      .map((s) => ({
-        id: s.id,
-        email: s.email,
-        sourceSite: s.source,
-      }))
-    if (items.length === 0) return
+  // Audience → Leads promotion (sets bidirectional backlinks). Replaces the
+  // old runConvert flow, which created Leads but didn't track the backlink.
+  const { promote: promoteSignups } = usePromoteToLeads({
+    collection: "email_signups",
+    setToast,
+    onSuccess: fetchSignups,
+    onClearSelection: clearSelected,
+  })
+
+  const [promoteDrawerIds, setPromoteDrawerIds] = useState<string[]>([])
+  const [isBulkPromoting, setIsBulkPromoting] = useState(false)
+
+  const handleOpenPromoteDrawer = () => {
+    const ids = signups
+      .filter((s) => s.id && selected.has(s.id) && !s.promotedLeadId)
+      .map((s) => s.id)
+    if (ids.length === 0) {
+      setToast({ message: "No unpromoted signups in selection", type: "error" })
+      return
+    }
+    setPromoteDrawerIds(ids)
+  }
+
+  const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteSignups>[1]) => {
+    setIsBulkPromoting(true)
     try {
-      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.ok) {
-        setToast({ message: data?.error || "Convert failed", type: "error" })
-        return
-      }
-      const r = data.result as { created: number; updated: number; failed: number }
-      setToast({
-        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
-        type: r.failed === 0 ? "success" : "error",
-      })
-      if (r.failed === 0) clearSelected()
-    } catch {
-      setToast({ message: "Convert failed", type: "error" })
+      await promoteSignups(promoteDrawerIds, overrides)
+      setPromoteDrawerIds([])
+    } finally {
+      setIsBulkPromoting(false)
     }
   }
 
@@ -872,7 +877,7 @@ export function EmailListsTab({
         onClear={clearSelected}
         actions={[
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
+          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, run: handleOpenPromoteDrawer },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
@@ -952,41 +957,38 @@ export function EmailListsTab({
                     <button
                       type="button"
                       onClick={() => setSinglePushTarget(selectedSignup.email)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded hover:bg-neutral-50 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded hover:bg-neutral-50 transition-colors"
                       title="Push this email to Mailchimp"
                     >
                       <Send className="w-3.5 h-3.5" />
                       Push to Mailchimp
                     </button>
                   )}
-                  {existingLeadId ? (
+                  {selectedSignup.promotedLeadId || existingLeadId ? (
+                    // Already promoted — link rather than action button.
                     <a
-                      href={`/admin/leads?openLead=${encodeURIComponent(existingLeadId)}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
+                      href={`/admin/leads?openLead=${encodeURIComponent(selectedSignup.promotedLeadId || existingLeadId!)}`}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors"
                       title="Open this contact in the CRM"
                     >
-                      <UserPlusIcon className="w-3.5 h-3.5" />
                       Open in CRM
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </a>
                   ) : (
                     <button
                       type="button"
                       onClick={async () => {
-                        await runConvertAllSignups([selectedSignup])
+                        if (!selectedSignup.id) return
+                        await promoteSignups([selectedSignup.id])
+                        setSelectedSignup(null)
                       }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded hover:bg-neutral-800 transition-colors"
-                      title="Create a CRM lead for this person"
+                      title="Promote this subscriber to the leads pipeline"
                     >
-                      <UserPlusIcon className="w-3.5 h-3.5" />
-                      Convert to lead
+                      <ArrowRightCircle className="w-3.5 h-3.5" />
+                      Promote to lead
                     </button>
                   )}
-                  <button
-                    onClick={() => setSelectedSignup(null)}
-                    className="px-3 py-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded transition-colors"
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
             )
@@ -1099,6 +1101,16 @@ export function EmailListsTab({
           </div>
         )}
       </DetailDrawer>
+
+      <PromoteOverridesDrawer
+        open={promoteDrawerIds.length > 0}
+        onClose={() => setPromoteDrawerIds([])}
+        count={promoteDrawerIds.length}
+        collection="email_signups"
+        defaultSource="newsletter"
+        isPromoting={isBulkPromoting}
+        onConfirm={handleConfirmBulkPromote}
+      />
     </div>
   )
 }

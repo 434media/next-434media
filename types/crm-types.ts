@@ -709,6 +709,22 @@ export interface Lead extends BaseRecord {
   // Conversion link (set when promoted to crm_clients)
   converted_to_client_id?: string
   converted_at?: string
+
+  // Origin link — set when this Lead was created via promotion from an
+  // audience-side record (partner_list_members, event_registrations,
+  // email_signups, contact_forms) or sourced directly from Apollo. Lets the
+  // CRM show "from Alamo Angels list, promoted 2026-04-15" provenance and
+  // gives the audience-side surface a backlink to the active Lead.
+  origin_ref?: {
+    collection:
+      | "partner_list_members"
+      | "event_registrations"
+      | "email_signups"
+      | "contact_forms"
+      | "apollo"
+    id: string
+    promoted_at: string
+  }
 }
 
 /**

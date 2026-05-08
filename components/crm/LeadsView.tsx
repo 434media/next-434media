@@ -75,23 +75,10 @@ export function LeadsView({
   onCreateLead,
 }: LeadsViewProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
-  // Stage 6 — partner-source leads (Alamo Angels et al.) are managed
-  // primarily as campaign cohorts under /admin/audiences > Lists, not as
-  // hot leads to work. Hide them from Priority by default; toggle to bring
-  // them back if a rep wants the full picture. The All view is unaffected.
-  const [includePartnerImports, setIncludePartnerImports] = useState(false)
-
-  // Count of partner-source leads currently HIDDEN from the Priority view.
-  // Surfaced in the toggle label so the rep sees what's being filtered out.
-  const hiddenPartnerCount = useMemo(() => {
-    if (view !== "priority" || includePartnerImports) return 0
-    return leads.filter(
-      (l) =>
-        l.priority === "high" &&
-        (l.status === "new" || l.status === "ready") &&
-        l.source === "partner",
-    ).length
-  }, [leads, view, includePartnerImports])
+  // Partner-shared rosters live in `partner_list_members` (audience-side) and
+  // never appear in the leads collection by default. Promotion to lead is an
+  // explicit step from /admin/audiences > Lists, at which point a Lead record
+  // is created. No filtering needed here — leads are always active work.
 
   // Counts for chip badges (computed from full set so they're stable across views)
   const counts = useMemo(() => {
@@ -114,9 +101,6 @@ export function LeadsView({
     if (view === "priority") {
       pool = leads
         .filter((l) => l.priority === "high" && (l.status === "new" || l.status === "ready"))
-        // Stage 6 — partner imports filtered out of Priority by default.
-        // Toggle in the summary line lets the rep include them.
-        .filter((l) => includePartnerImports || l.source !== "partner")
         .sort((a, b) => b.score - a.score)
     } else if (view === "followup") {
       pool = leads
@@ -145,7 +129,7 @@ export function LeadsView({
       )
     }
     return pool
-  }, [leads, view, searchQuery, includePartnerImports])
+  }, [leads, view, searchQuery])
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
@@ -254,25 +238,6 @@ export function LeadsView({
             </span>
           )}
         </div>
-        {/* Stage 6 — partner-imports toggle. Only shown in Priority view,
-            and only when there's something to surface (either hidden
-            partner leads, or the toggle is on so the rep can flip it off). */}
-        {view === "priority" && (hiddenPartnerCount > 0 || includePartnerImports) && (
-          <label className="inline-flex items-center gap-1.5 text-[12px] text-neutral-500 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={includePartnerImports}
-              onChange={(e) => setIncludePartnerImports(e.target.checked)}
-              className="rounded border-neutral-300"
-            />
-            <span>
-              Include partner imports
-              {hiddenPartnerCount > 0 && !includePartnerImports && (
-                <span className="text-neutral-400 ml-1">({hiddenPartnerCount})</span>
-              )}
-            </span>
-          </label>
-        )}
       </div>
 
       {/* Empty state */}

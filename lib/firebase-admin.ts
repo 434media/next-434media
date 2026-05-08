@@ -234,6 +234,11 @@ export const COLLECTIONS = {
   CONTACT_FORMS: "contact_forms",
   EMAIL_SIGNUPS: "email_signups",
   EVENT_REGISTRATIONS: "event_registrations",
+  // Audience-side records imported from a partner-shared roster (e.g.
+  // Alamo Angels). These live as audience members until explicitly promoted
+  // into a Lead — at which point a Lead record is created and the
+  // promoted_lead_id backlink is set on this row.
+  PARTNER_LIST_MEMBERS: "partner_list_members",
 } as const
 
 // Map table names to Firestore collections

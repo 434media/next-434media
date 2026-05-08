@@ -12,6 +12,9 @@ export interface FirestoreEmailSignup {
   user_agent?: string
   page_url?: string
   _dbSource?: string // Track which database this came from
+  // Set when this subscriber has been promoted into the leads pipeline.
+  promotedLeadId?: string
+  promotedAt?: string
 }
 
 const COLLECTION_NAME = "email_signups"
@@ -40,6 +43,8 @@ async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<Fi
         mailchimp_synced: data.mailchimp_synced || false,
         mailchimp_tags: data.tags || data.mailchimp_tags || [],
         page_url: data.pageUrl || data.page_url || "",
+        promotedLeadId: data.promotedLeadId || undefined,
+        promotedAt: data.promotedAt || undefined,
         _dbSource: "aimsatx",
       }
     })
@@ -262,6 +267,60 @@ export function emailSignupsToCSV(signups: FirestoreEmailSignup[]): string {
         .join(",")
     ),
   ].join("\n")
-  
+
   return csvContent
+}
+
+/**
+ * Mark an email signup as promoted to the leads pipeline. Routes the write
+ * to the right database based on the id prefix (aimsatx: / default).
+ */
+export async function markEmailSignupPromoted(
+  id: string,
+  leadId: string,
+): Promise<void> {
+  const update = {
+    promotedLeadId: leadId,
+    promotedAt: new Date().toISOString(),
+  }
+
+  if (id.startsWith("aimsatx:")) {
+    const realId = id.replace("aimsatx:", "")
+    const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+    await aimsDb.collection("email_signups").doc(realId).update(update)
+    return
+  }
+  const db = getDb()
+  await db.collection(COLLECTION_NAME).doc(id).update(update)
+}
+
+/**
+ * Look up a single email signup by its prefixed id. Returns null when not found.
+ */
+export async function getEmailSignupById(
+  id: string,
+): Promise<FirestoreEmailSignup | null> {
+  if (id.startsWith("aimsatx:")) {
+    const realId = id.replace("aimsatx:", "")
+    const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+    const doc = await aimsDb.collection("email_signups").doc(realId).get()
+    if (!doc.exists) return null
+    const data = doc.data()!
+    return {
+      id: `aimsatx:${realId}`,
+      email: data.email || "",
+      source: "AIM",
+      created_at: data.created_at || "",
+      mailchimp_synced: data.mailchimp_synced || false,
+      mailchimp_tags: data.tags || data.mailchimp_tags || [],
+      page_url: data.pageUrl || data.page_url || "",
+      promotedLeadId: data.promotedLeadId || undefined,
+      promotedAt: data.promotedAt || undefined,
+      _dbSource: "aimsatx",
+    }
+  }
+  const db = getDb()
+  const doc = await db.collection(COLLECTION_NAME).doc(id).get()
+  if (!doc.exists) return null
+  return { id: doc.id, ...doc.data(), _dbSource: "default" } as FirestoreEmailSignup
 }

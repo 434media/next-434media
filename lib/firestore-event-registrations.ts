@@ -26,6 +26,10 @@ export interface EventRegistration {
   enrichedBy?: string
   enrichmentSource?: "manual" | "csv" | "api"
   _dbSource?: string // Track which database this came from
+  // Set when this registrant has been promoted into the leads pipeline.
+  // The Lead record's `origin_ref` carries the reverse pointer.
+  promotedLeadId?: string
+  promotedAt?: string
 }
 
 const COLLECTION = COLLECTIONS.EVENT_REGISTRATIONS
@@ -80,6 +84,8 @@ function mapDefaultDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     enrichedAt: data.enrichedAt ? toISOString(data.enrichedAt) : undefined,
     enrichedBy: data.enrichedBy || undefined,
     enrichmentSource: data.enrichmentSource || undefined,
+    promotedLeadId: data.promotedLeadId || undefined,
+    promotedAt: data.promotedAt ? toISOString(data.promotedAt) : undefined,
     _dbSource: "default",
   }
 }
@@ -145,6 +151,8 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     pageUrl: "https://www.sanantoniotechday.com",
     checkedIn: data.checkedIn || false,
     checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
+    promotedLeadId: data.promotedLeadId || undefined,
+    promotedAt: data.promotedAt ? toISOString(data.promotedAt) : undefined,
     _dbSource: "techday",
   }
 }
@@ -553,4 +561,60 @@ export function eventRegistrationsToCSV(registrations: EventRegistration[]): str
   }
 
   return [headers.join(","), ...rows.map((row) => row.map(escape).join(","))].join("\n")
+}
+
+/**
+ * Mark an event registration as promoted to the leads pipeline. Routes the
+ * write to the right database based on the id prefix (techday: / dc: / default).
+ * Called by /api/admin/leads/promote-from-audience.
+ */
+export async function markEventRegistrationPromoted(
+  id: string,
+  leadId: string,
+): Promise<void> {
+  const update = {
+    promotedLeadId: leadId,
+    promotedAt: new Date().toISOString(),
+  }
+
+  if (id.startsWith("techday:")) {
+    const realId = id.replace("techday:", "")
+    const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+    await tdDb.collection("registrations").doc(realId).update(update)
+    return
+  }
+  if (id.startsWith("dc:")) {
+    const realId = id.replace("dc:", "")
+    const dcDb = getDigitalCanvasDb()
+    await dcDb.collection("event-registrations").doc(realId).update(update)
+    return
+  }
+  const db = getDb()
+  await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).doc(id).update(update)
+}
+
+/**
+ * Look up a single event registration across all known DBs by its prefixed id.
+ * Used by the promote endpoint to read the contact details before creating a Lead.
+ */
+export async function getEventRegistrationById(
+  id: string,
+): Promise<EventRegistration | null> {
+  if (id.startsWith("techday:")) {
+    const realId = id.replace("techday:", "")
+    const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
+    const doc = await tdDb.collection("registrations").doc(realId).get()
+    if (!doc.exists) return null
+    return mapTechdayDoc(doc)
+  }
+  if (id.startsWith("dc:")) {
+    // Digital Canvas mapping isn't a single doc fetch — the existing code
+    // pulls them in bulk via a different path. Defer dc: promotion until the
+    // dc-specific mapper is wired here.
+    return null
+  }
+  const db = getDb()
+  const doc = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).doc(id).get()
+  if (!doc.exists) return null
+  return mapDefaultDoc(doc)
 }

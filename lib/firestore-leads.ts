@@ -67,6 +67,10 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     enriched_at: toIsoString(raw.enriched_at) || undefined,
     converted_to_client_id: raw.converted_to_client_id || undefined,
     converted_at: toIsoString(raw.converted_at) || undefined,
+    origin_ref:
+      raw.origin_ref && typeof raw.origin_ref === "object"
+        ? (raw.origin_ref as Lead["origin_ref"])
+        : undefined,
     created_at: toIsoString(raw.created_at),
     updated_at: toIsoString(raw.updated_at),
   }
@@ -153,6 +157,10 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     enriched_at: now,
     converted_to_client_id: null,
     converted_at: null,
+    // Provenance backlink — set when this lead was promoted from an
+    // audience-side record (partner_list_members, event_registrations, etc.).
+    // Null for direct creates (Apollo prospect, manual entry, web form).
+    origin_ref: input.origin_ref ?? null,
     created_at: now,
     updated_at: now,
   }

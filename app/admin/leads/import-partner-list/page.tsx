@@ -830,10 +830,10 @@ function ImportFlow() {
             {importResult && importResult.created + importResult.updated > 0 && !isImporting && (
               <div className="mt-3 text-[12px]">
                 <Link
-                  href={`/admin/leads?search=partner%3A${encodeURIComponent(partnerSlug)}`}
+                  href={`/admin/audiences?tab=lists&search=${encodeURIComponent(partnerSlug)}`}
                   className="text-neutral-700 hover:text-black underline"
                 >
-                  View imported leads in CRM →
+                  View imported list in Audiences →
                 </Link>
               </div>
             )}

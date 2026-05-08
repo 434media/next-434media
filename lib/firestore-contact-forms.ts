@@ -12,6 +12,9 @@ export interface ContactFormSubmission {
   source: string // "434Media" | "AIM" | "VemosVamos" | "DigitalCanvas" | "SATechDay"
   created_at: string
   _dbSource?: string // Track which database this came from
+  // Set when this submission has been promoted into the leads pipeline.
+  promotedLeadId?: string
+  promotedAt?: string
 }
 
 /**
@@ -124,6 +127,8 @@ async function getAimsatxContactSubmissions(filters?: { source?: string }): Prom
         message: data.message || "",
         source: "AIM",
         created_at: data.created_at || "",
+        promotedLeadId: data.promotedLeadId || undefined,
+        promotedAt: data.promotedAt || undefined,
         _dbSource: "aimsatx",
       }
     })
@@ -286,5 +291,75 @@ export function contactFormsToCSV(submissions: ContactFormSubmission[]): string 
   ].join("\n")
 
   return csvContent
+}
+
+/**
+ * Mark a contact form submission as promoted to the leads pipeline. Routes
+ * the write to the right database based on the id prefix (aimsatx: / default).
+ */
+export async function markContactFormPromoted(
+  id: string,
+  leadId: string,
+): Promise<void> {
+  const update = {
+    promotedLeadId: leadId,
+    promotedAt: new Date().toISOString(),
+  }
+
+  if (id.startsWith("aimsatx:")) {
+    const realId = id.replace("aimsatx:", "")
+    const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+    await aimsDb.collection("contact_submissions").doc(realId).update(update)
+    return
+  }
+  const db = getDb()
+  await db.collection(COLLECTIONS.CONTACT_FORMS).doc(id).update(update)
+}
+
+/**
+ * Look up a single contact form submission by its prefixed id.
+ */
+export async function getContactFormById(
+  id: string,
+): Promise<ContactFormSubmission | null> {
+  if (id.startsWith("aimsatx:")) {
+    const realId = id.replace("aimsatx:", "")
+    const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
+    const doc = await aimsDb.collection("contact_submissions").doc(realId).get()
+    if (!doc.exists) return null
+    const data = doc.data()!
+    return {
+      id: `aimsatx:${realId}`,
+      firstName: data.firstName || "",
+      lastName: data.lastName || "",
+      company: data.company || "",
+      email: data.email || "",
+      phone: data.phoneNumber || data.phone || "",
+      message: data.message || "",
+      source: "AIM",
+      created_at: data.created_at || "",
+      promotedLeadId: data.promotedLeadId || undefined,
+      promotedAt: data.promotedAt || undefined,
+      _dbSource: "aimsatx",
+    }
+  }
+  const db = getDb()
+  const doc = await db.collection(COLLECTIONS.CONTACT_FORMS).doc(id).get()
+  if (!doc.exists) return null
+  const data = doc.data()!
+  return {
+    id: doc.id,
+    firstName: data.firstName || "",
+    lastName: data.lastName || "",
+    company: data.company || "",
+    email: data.email || "",
+    phone: data.phone || data.phoneNumber || "",
+    message: data.message || "",
+    source: data.source || "",
+    created_at: data.created_at || "",
+    promotedLeadId: data.promotedLeadId || undefined,
+    promotedAt: data.promotedAt || undefined,
+    _dbSource: "default",
+  }
 }
 

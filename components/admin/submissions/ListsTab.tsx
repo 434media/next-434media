@@ -7,11 +7,11 @@ import {
   Search,
   AlertCircle,
   Users2,
-  ExternalLink,
   Mail,
   Building2,
   Linkedin,
   Phone,
+  ArrowRightCircle,
 } from "lucide-react"
 import { Mail as MailIcon } from "lucide-react"
 import {
@@ -20,21 +20,22 @@ import {
 } from "@/components/admin/MailchimpSubscribedPill"
 import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
 import { BulkActionBar, useSelection } from "@/components/admin/SubmissionStateUI"
-import { parseTag } from "@/lib/tag-taxonomy"
-import type { Lead } from "@/types/crm-types"
+import type { PartnerListMember } from "@/lib/firestore-partner-list-members"
 import { ExportMenu } from "./shared"
 import type { Toast } from "./types"
+import { usePromoteToLeads } from "./usePromoteToLeads"
+import { PromoteOverridesDrawer } from "./PromoteOverridesDrawer"
 
-// Stage 2 — Partner Lists tab.
+// Audiences > Lists tab.
 //
-// Surfaces leads where source === "partner" so partner-shared rosters
-// (Alamo Angels members, future imports) have a navigational home alongside
-// Newsletter and Events. The data lives in `leads` and stays there — this is
-// purely a filtered view, not a separate collection.
+// Reads from the audience-side `partner_list_members` collection — partner-
+// shared rosters (Alamo Angels members et al.) live here as audience cohorts
+// until explicitly promoted into the leads pipeline. Mirrors the pattern used
+// by Newsletter (email_signups) and Events (event_registrations).
 //
-// Stage 3 moved this under /admin/audiences as the "Lists" sub-tab,
-// alongside Newsletter and Events. Each surface shares the same campaign-
-// cohort flow (push to Mailchimp → engagement → promote to Lead).
+// Partner members are NOT leads. Score / priority / status are Lead-only
+// concepts and don't apply here. Use this surface for cohort prep — push to
+// Mailchimp, then promote individuals into leads when you're ready to work.
 
 function unslugify(slug: string): string {
   if (!slug) return ""
@@ -44,15 +45,6 @@ function unslugify(slug: string): string {
     .join(" ")
 }
 
-function getPartnerSlug(lead: Lead): string | null {
-  if (!lead.tags) return null
-  for (const t of lead.tags) {
-    const parsed = parseTag(t)
-    if (parsed.namespace === "partner") return parsed.value
-  }
-  return null
-}
-
 function formatDate(iso: string | undefined): string {
   if (!iso) return "—"
   return new Date(iso).toLocaleDateString("en-US", {
@@ -60,12 +52,6 @@ function formatDate(iso: string | undefined): string {
     month: "short",
     day: "numeric",
   })
-}
-
-const PRIORITY_BADGE: Record<Lead["priority"], string> = {
-  high: "bg-red-500 text-white",
-  medium: "bg-amber-500 text-white",
-  low: "bg-neutral-200 text-neutral-700",
 }
 
 export function ListsTab({
@@ -78,24 +64,22 @@ export function ListsTab({
   const subscriberMap = useMailchimpSubscribers()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [leads, setLeads] = useState<Lead[]>([])
+  const [members, setMembers] = useState<PartnerListMember[]>([])
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [selectedPartner, setSelectedPartner] = useState<string>("")
   const [showPushModal, setShowPushModal] = useState(false)
   const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
 
-  const fetchLeads = useCallback(async () => {
+  const fetchMembers = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
-      const res = await fetch("/api/admin/leads", { cache: "no-store" })
+      const res = await fetch("/api/admin/audiences/partner-list-members", {
+        cache: "no-store",
+      })
       const data = await res.json()
       if (data.success) {
-        // Filter to partner-source only. The dataset is small enough to do
-        // this client-side; mirrors the same approach the leads page takes
-        // for view filtering.
-        const partnerLeads = (data.leads as Lead[]).filter((l) => l.source === "partner")
-        setLeads(partnerLeads)
+        setMembers(data.members as PartnerListMember[])
       } else {
         setError(data.error || "Failed to fetch partner lists")
       }
@@ -107,19 +91,17 @@ export function ListsTab({
   }, [])
 
   useEffect(() => {
-    fetchLeads()
-  }, [fetchLeads])
+    fetchMembers()
+  }, [fetchMembers])
 
-  // Roll up counts per partner slug. Used by the tile row at the top of the
-  // tab so the user can see roster sizes at a glance and click to filter.
+  // Roll up counts per partner slug for the tile row at the top of the tab.
   const partnerCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const lead of leads) {
-      const slug = getPartnerSlug(lead)
-      if (slug) counts.set(slug, (counts.get(slug) ?? 0) + 1)
+    for (const m of members) {
+      if (m.partnerSlug) counts.set(m.partnerSlug, (counts.get(m.partnerSlug) ?? 0) + 1)
     }
     return counts
-  }, [leads])
+  }, [members])
 
   const partnersSorted = useMemo(
     () =>
@@ -129,56 +111,53 @@ export function ListsTab({
     [partnerCounts],
   )
 
-  // Apply partner + search filter. Sort by score desc so high-priority
-  // partner-imported leads bubble to the top of the visible list.
+  // Apply partner + search filter. Sort newest-imported first so freshly added
+  // cohorts surface immediately.
   const filtered = useMemo(() => {
-    let pool = leads
+    let pool = members
     if (selectedPartner) {
-      pool = pool.filter((l) => getPartnerSlug(l) === selectedPartner)
+      pool = pool.filter((m) => m.partnerSlug === selectedPartner)
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       pool = pool.filter(
-        (l) =>
-          l.name.toLowerCase().includes(q) ||
-          l.email.toLowerCase().includes(q) ||
-          (l.company || "").toLowerCase().includes(q) ||
-          (l.title || "").toLowerCase().includes(q),
+        (m) =>
+          m.fullName.toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q) ||
+          (m.company || "").toLowerCase().includes(q),
       )
     }
-    return [...pool].sort((a, b) => b.score - a.score)
-  }, [leads, selectedPartner, searchQuery])
+    return [...pool].sort((a, b) =>
+      (b.importedAt || "").localeCompare(a.importedAt || ""),
+    )
+  }, [members, selectedPartner, searchQuery])
 
-  const totalCount = leads.length
-  const allVisibleIds = filtered.map((l) => l.id)
+  const totalCount = members.length
+  const allVisibleIds = filtered.map((m) => m.id).filter((id): id is string => !!id)
   const allVisibleSelected =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
 
-  const buildAndDownloadCSV = (rows: Lead[], filenameBase: string) => {
+  const buildAndDownloadCSV = (rows: PartnerListMember[], filenameBase: string) => {
     try {
       const headers = [
         "Name",
         "Email",
         "Company",
-        "Title",
         "Phone",
         "LinkedIn",
         "Partner",
-        "Score",
-        "Priority",
         "Imported",
+        "Promoted",
       ]
-      const csvRows = rows.map((r) => [
-        r.name,
-        r.email,
-        r.company || "",
-        r.title || "",
-        r.phone || "",
-        r.linkedin || "",
-        unslugify(getPartnerSlug(r) || ""),
-        String(r.score),
-        r.priority,
-        r.created_at ? new Date(r.created_at).toLocaleDateString() : "",
+      const csvRows = rows.map((m) => [
+        m.fullName,
+        m.email,
+        m.company || "",
+        m.phone || "",
+        m.linkedin || "",
+        m.partnerName || unslugify(m.partnerSlug),
+        m.importedAt ? new Date(m.importedAt).toLocaleDateString() : "",
+        m.promotedLeadId ? "yes" : "no",
       ])
       const escape = (val: string) => {
         const s = String(val).replace(/"/g, '""')
@@ -202,13 +181,46 @@ export function ListsTab({
 
   const stamp = new Date().toISOString().split("T")[0]
   const handleExportAll = () =>
-    buildAndDownloadCSV(leads, `partner-lists-all-${stamp}`)
+    buildAndDownloadCSV(members, `partner-lists-all-${stamp}`)
   const handleExportFiltered = () =>
     buildAndDownloadCSV(filtered, `partner-lists-filtered-${stamp}`)
   const handleExportSelected = () => {
-    const rows = leads.filter((l) => selected.has(l.id))
+    const rows = members.filter((m) => m.id && selected.has(m.id))
     if (rows.length === 0) return
     buildAndDownloadCSV(rows, `partner-lists-selected-${stamp}`)
+  }
+
+  const { promotingIds, promote: promoteMembers } = usePromoteToLeads({
+    collection: "partner_list_members",
+    setToast,
+    onSuccess: fetchMembers,
+    onClearSelection: clearSelected,
+  })
+
+  // Drawer for bulk promote — lets the user override source/tags/notes once
+  // and have it applied across the whole batch. Per-row promote stays direct.
+  const [promoteDrawerIds, setPromoteDrawerIds] = useState<string[]>([])
+  const [isBulkPromoting, setIsBulkPromoting] = useState(false)
+
+  const handleOpenPromoteDrawer = () => {
+    const ids = members
+      .filter((m) => m.id && selected.has(m.id) && !m.promotedLeadId)
+      .map((m) => m.id!)
+    if (ids.length === 0) {
+      setToast({ message: "No unpromoted contacts in selection", type: "error" })
+      return
+    }
+    setPromoteDrawerIds(ids)
+  }
+
+  const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteMembers>[1]) => {
+    setIsBulkPromoting(true)
+    try {
+      await promoteMembers(promoteDrawerIds, overrides)
+      setPromoteDrawerIds([])
+    } finally {
+      setIsBulkPromoting(false)
+    }
   }
 
   return (
@@ -220,12 +232,12 @@ export function ListsTab({
             Partner Lists
           </h2>
           <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
-            Partner-shared rosters in the leads pipeline. Push to Mailchimp campaigns or open in the CRM to work.
+            Partner-shared rosters held as audience cohorts. Push to Mailchimp campaigns, or promote individuals into the leads pipeline when you&apos;re ready to work them.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => fetchLeads()}
+            onClick={() => fetchMembers()}
             disabled={isLoading}
             className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh"
@@ -244,8 +256,8 @@ export function ListsTab({
         </div>
       </div>
 
-      {/* Partner tiles — overview surface. Click to filter to a single
-          partner roster; click "All" to clear. */}
+      {/* Partner tiles — overview surface. Click to filter to a single partner;
+          click "All" to clear. */}
       {partnerCounts.size > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-6">
           <button
@@ -289,12 +301,12 @@ export function ListsTab({
       )}
 
       {/* Search */}
-      {leads.length > 0 && (
+      {members.length > 0 && (
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search by name, email, company, or title..."
+            placeholder="Search by name, email, or company..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
@@ -308,7 +320,7 @@ export function ListsTab({
           <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700 text-sm font-medium">{error}</p>
           <button
-            onClick={() => fetchLeads()}
+            onClick={() => fetchMembers()}
             className="mt-3 px-4 py-2 bg-red-600 text-white text-[13px] font-medium rounded-lg hover:bg-red-700 transition-colors"
           >
             Retry
@@ -325,7 +337,7 @@ export function ListsTab({
       )}
 
       {/* Empty state */}
-      {!isLoading && !error && leads.length === 0 && (
+      {!isLoading && !error && members.length === 0 && (
         <div className="bg-white rounded-md border border-neutral-200/70 p-12 text-center">
           <Users2 className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
           <p className="text-sm font-medium text-neutral-500">No partner lists yet</p>
@@ -342,7 +354,7 @@ export function ListsTab({
       )}
 
       {/* Contacts table */}
-      {!isLoading && !error && leads.length > 0 && (
+      {!isLoading && !error && members.length > 0 && (
         <div className="bg-white rounded-md border border-neutral-200/70 overflow-hidden">
           {/* Select-all header */}
           {filtered.length > 0 && (
@@ -376,62 +388,68 @@ export function ListsTab({
                 )}
               </div>
             ) : (
-              filtered.map((lead) => {
-                const slug = getPartnerSlug(lead)
-                return (
-                  <div
-                    key={lead.id}
-                    className="px-4 py-3.5 hover:bg-neutral-50 transition-colors cursor-pointer active:bg-neutral-100"
-                    onClick={() => {
-                      window.location.href = `/admin/leads?openLead=${encodeURIComponent(lead.id)}`
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(lead.id)}
-                          onChange={() => toggleSelect(lead.id)}
-                          className="rounded border-neutral-300 mt-1 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
-                            {lead.name || lead.email}
-                            <MailchimpSubscribedPill email={lead.email} mapping={subscriberMap} />
-                          </p>
-                          <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
-                            {lead.email}
-                          </p>
-                          {lead.company && (
-                            <p className="text-[12px] text-neutral-400 font-normal leading-relaxed mt-0.5 truncate">
-                              {lead.company}
-                              {lead.title && <span className="text-neutral-300"> · {lead.title}</span>}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span
-                        className={`inline-flex items-center justify-center w-7 h-7 rounded-sm text-[12px] font-semibold tabular-nums shrink-0 ${
-                          PRIORITY_BADGE[lead.priority] || PRIORITY_BADGE.low
-                        }`}
-                      >
-                        {lead.score}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      {slug && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 tracking-wide whitespace-nowrap">
-                          {unslugify(slug)}
-                        </span>
+              filtered.map((member) => (
+                <div
+                  key={member.id}
+                  className="px-4 py-3.5 hover:bg-neutral-50 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={!!member.id && selected.has(member.id)}
+                      onChange={() => member.id && toggleSelect(member.id)}
+                      className="rounded border-neutral-300 mt-1 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-semibold text-neutral-900 leading-tight tracking-tight">
+                        {member.fullName || member.email}
+                        <MailchimpSubscribedPill email={member.email} mapping={subscriberMap} />
+                      </p>
+                      <p className="text-[13px] text-neutral-500 font-normal leading-relaxed mt-0.5 truncate">
+                        {member.email}
+                      </p>
+                      {member.company && (
+                        <p className="text-[12px] text-neutral-400 font-normal leading-relaxed mt-0.5 truncate">
+                          {member.company}
+                        </p>
                       )}
-                      <span className="text-[12px] text-neutral-400 font-normal">
-                        Imported {formatDate(lead.created_at)}
-                      </span>
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 tracking-wide whitespace-nowrap">
+                          {member.partnerName || unslugify(member.partnerSlug)}
+                        </span>
+                        <span className="text-[12px] text-neutral-400 font-normal">
+                          Imported {formatDate(member.importedAt)}
+                        </span>
+                        {member.promotedLeadId ? (
+                          <a
+                            href={`/admin/leads?openLead=${encodeURIComponent(member.promotedLeadId)}`}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                          >
+                            Promoted →
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              member.id && promoteMembers([member.id])
+                            }}
+                            disabled={!member.id || (!!member.id && promotingIds.has(member.id))}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-neutral-200 text-neutral-600 disabled:opacity-50 disabled:cursor-wait"
+                          >
+                            {member.id && promotingIds.has(member.id) ? (
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            ) : (
+                              <ArrowRightCircle className="w-2.5 h-2.5" />
+                            )}
+                            Promote
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )
-              })
+                </div>
+              ))
             )}
           </div>
 
@@ -442,9 +460,6 @@ export function ListsTab({
                 <tr>
                   <th className="text-left px-4 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 w-12">
                     {/* select-all header lives in the bar above */}
-                  </th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 w-16">
-                    Score
                   </th>
                   <th className="text-left px-4 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50">
                     Contact
@@ -458,15 +473,15 @@ export function ListsTab({
                   <th className="text-left px-4 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 hidden xl:table-cell">
                     Imported
                   </th>
-                  <th className="text-right px-4 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 w-20">
-                    Actions
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-widest bg-neutral-50 w-24">
+                    Status
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-neutral-400">
+                    <td colSpan={6} className="px-5 py-12 text-center text-neutral-400">
                       <Users2 className="w-8 h-8 mx-auto mb-2 text-neutral-200" />
                       <p className="text-sm font-medium text-neutral-500">No contacts match your filter</p>
                       {searchQuery && (
@@ -475,95 +490,93 @@ export function ListsTab({
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((lead) => {
-                    const slug = getPartnerSlug(lead)
-                    return (
-                      <tr
-                        key={lead.id}
-                        className="hover:bg-neutral-50 transition-colors"
-                      >
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(lead.id)}
-                            onChange={() => toggleSelect(lead.id)}
-                            className="rounded border-neutral-300"
-                            aria-label={`Select ${lead.name || lead.email}`}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center justify-center w-7 h-7 rounded-sm text-[12px] font-semibold tabular-nums ${
-                              PRIORITY_BADGE[lead.priority] || PRIORITY_BADGE.low
-                            }`}
-                          >
-                            {lead.score}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 min-w-0">
-                          <div className="font-semibold text-[13px] text-neutral-900 truncate flex items-center gap-1.5">
-                            {lead.name || lead.email}
-                            <MailchimpSubscribedPill email={lead.email} mapping={subscriberMap} />
+                  filtered.map((member) => (
+                    <tr
+                      key={member.id}
+                      className="hover:bg-neutral-50 transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={!!member.id && selected.has(member.id)}
+                          onChange={() => member.id && toggleSelect(member.id)}
+                          className="rounded border-neutral-300"
+                          aria-label={`Select ${member.fullName || member.email}`}
+                        />
+                      </td>
+                      <td className="px-4 py-3 min-w-0">
+                        <div className="font-semibold text-[13px] text-neutral-900 truncate flex items-center gap-1.5">
+                          {member.fullName || member.email}
+                          <MailchimpSubscribedPill email={member.email} mapping={subscriberMap} />
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 mt-0.5 truncate">
+                          <Mail className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{member.email}</span>
+                        </div>
+                        {(member.phone || member.linkedin) && (
+                          <div className="flex items-center gap-2 text-[11px] text-neutral-400 mt-0.5">
+                            {member.phone && (
+                              <span className="inline-flex items-center gap-1 shrink-0">
+                                <Phone className="w-3 h-3" />
+                                {member.phone}
+                              </span>
+                            )}
+                            {member.linkedin && (
+                              <a
+                                href={member.linkedin}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 shrink-0 text-blue-500 hover:text-blue-700"
+                              >
+                                <Linkedin className="w-3 h-3" />
+                                LinkedIn
+                              </a>
+                            )}
                           </div>
-                          <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 mt-0.5 truncate">
-                            <Mail className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{lead.email}</span>
-                          </div>
-                          {(lead.title || lead.phone || lead.linkedin) && (
-                            <div className="flex items-center gap-2 text-[11px] text-neutral-400 mt-0.5">
-                              {lead.title && <span className="truncate">{lead.title}</span>}
-                              {lead.phone && (
-                                <span className="inline-flex items-center gap-1 shrink-0">
-                                  <Phone className="w-3 h-3" />
-                                  {lead.phone}
-                                </span>
-                              )}
-                              {lead.linkedin && (
-                                <a
-                                  href={lead.linkedin}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1 shrink-0 text-blue-500 hover:text-blue-700"
-                                >
-                                  <Linkedin className="w-3 h-3" />
-                                  LinkedIn
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 hidden lg:table-cell">
-                          <div className="flex items-center gap-1.5 text-[12px] text-neutral-700 truncate">
-                            <Building2 className="w-3 h-3 text-neutral-400 shrink-0" />
-                            <span className="truncate">{lead.company || "—"}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {slug ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 tracking-wide whitespace-nowrap">
-                              {unslugify(slug)}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-neutral-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 hidden xl:table-cell text-[12px] text-neutral-400 whitespace-nowrap">
-                          {formatDate(lead.created_at)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="flex items-center gap-1.5 text-[12px] text-neutral-700 truncate">
+                          <Building2 className="w-3 h-3 text-neutral-400 shrink-0" />
+                          <span className="truncate">{member.company || "—"}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 tracking-wide whitespace-nowrap">
+                          {member.partnerName || unslugify(member.partnerSlug)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-[12px] text-neutral-400 whitespace-nowrap">
+                        {formatDate(member.importedAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {member.promotedLeadId ? (
                           <a
-                            href={`/admin/leads?openLead=${encodeURIComponent(lead.id)}`}
-                            aria-label={`Open ${lead.email} in CRM`}
+                            href={`/admin/leads?openLead=${encodeURIComponent(member.promotedLeadId)}`}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
                             title="Open in CRM"
-                            className="inline-flex items-center justify-center p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" />
+                            Promoted →
                           </a>
-                        </td>
-                      </tr>
-                    )
-                  })
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => member.id && promoteMembers([member.id])}
+                            disabled={!member.id || (!!member.id && promotingIds.has(member.id))}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-neutral-200 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-wait transition-colors"
+                            title="Promote to leads"
+                          >
+                            {member.id && promotingIds.has(member.id) ? (
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            ) : (
+                              <ArrowRightCircle className="w-2.5 h-2.5" />
+                            )}
+                            Promote
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -586,37 +599,38 @@ export function ListsTab({
         </div>
       )}
 
-      {/* Bulk action bar — slimmer than the other tabs since partner lists
-          don't have submission states. Push-to-Mailchimp is the headline
-          campaign-prep action; export is a fallback for offline workflows. */}
+      {/* Bulk action bar — Promote turns audience members into active Leads;
+          Push to Mailchimp adds them to a Mailchimp campaign segment. */}
       <BulkActionBar
         count={selected.size}
         onClear={clearSelected}
         actions={[
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
+          {
+            key: "promote",
+            label: "Promote to leads",
+            icon: ArrowRightCircle,
+            run: handleOpenPromoteDrawer,
+          },
+          {
+            key: "push-mc",
+            label: "Push to Mailchimp",
+            icon: MailIcon,
+            run: () => { setShowPushModal(true) },
+          },
         ]}
       />
 
       <MailchimpPushModal
         open={showPushModal}
         onClose={() => setShowPushModal(false)}
-        members={leads
-          .filter((l) => selected.has(l.id) && l.email)
-          .map<PushMember>((l) => {
-            const slug = getPartnerSlug(l)
-            // Split "First Last" out of the lead.name (best-effort) so the
-            // push gets first/last name fields populated. Single-token names
-            // become firstName only.
-            const nameParts = l.name.trim().split(/\s+/)
-            const firstName = nameParts[0] || undefined
-            const lastName = nameParts.slice(1).join(" ") || undefined
-            return {
-              email: l.email,
-              firstName,
-              lastName,
-              sourceTags: slug ? [`partner:${slug}`] : undefined,
-            }
-          })}
+        members={members
+          .filter((m) => m.id && selected.has(m.id) && m.email)
+          .map<PushMember>((m) => ({
+            email: m.email,
+            firstName: m.firstName ?? m.preferredName ?? m.fullName.split(/\s+/)[0],
+            lastName: m.lastName ?? m.fullName.split(/\s+/).slice(1).join(" ") || undefined,
+            sourceTags: m.partnerSlug ? [`partner:${m.partnerSlug}`] : undefined,
+          }))}
         defaultTag={
           selectedPartner
             ? `partner-${selectedPartner}`
@@ -629,6 +643,16 @@ export function ListsTab({
           })
           if (result.errors.length === 0) clearSelected()
         }}
+      />
+
+      <PromoteOverridesDrawer
+        open={promoteDrawerIds.length > 0}
+        onClose={() => setPromoteDrawerIds([])}
+        count={promoteDrawerIds.length}
+        collection="partner_list_members"
+        defaultSource="partner"
+        isPromoting={isBulkPromoting}
+        onConfirm={handleConfirmBulkPromote}
       />
     </div>
   )

@@ -25,7 +25,6 @@ import {
   MessageSquare as MsgIcon,
   Archive as ArchiveIcon,
   Mail as MailIcon,
-  UserPlus as UserPlusIcon,
   Ban as BanIcon,
   Send as SendIcon,
 } from "lucide-react"
@@ -49,6 +48,9 @@ import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { InboxReplyModal } from "./InboxReplyModal"
 import { DetailRow, FieldInput } from "./shared"
 import type { Toast } from "./types"
+import { usePromoteToLeads } from "./usePromoteToLeads"
+import { PromoteOverridesDrawer } from "./PromoteOverridesDrawer"
+import { ArrowRightCircle, ArrowRight } from "lucide-react"
 
 interface ContactFormSubmission {
   id: string
@@ -60,6 +62,9 @@ interface ContactFormSubmission {
   message?: string
   source: string
   created_at: string
+  // Set when this submission has been promoted into the leads pipeline.
+  promotedLeadId?: string
+  promotedAt?: string
 }
 
 export function ContactFormsTab({
@@ -362,40 +367,37 @@ export function ContactFormsTab({
     }
   }
 
-  const runConvert = async () => {
-    if (selected.size === 0) return
-    const items = submissions
-      .filter((s) => selected.has(s.id) && s.email)
-      .map((s) => ({
-        id: s.id,
-        email: s.email,
-        firstName: s.firstName,
-        lastName: s.lastName,
-        company: s.company,
-        phone: s.phone,
-        message: s.message,
-        sourceSite: s.source,
-      }))
-    if (items.length === 0) return
+  // Audience → Leads promotion (sets bidirectional backlinks). Replaces the
+  // old runConvert flow; the contact-form's message body flows into the new
+  // Lead's notes so the rep has the original inquiry context.
+  const { promote: promoteSubmissions } = usePromoteToLeads({
+    collection: "contact_forms",
+    setToast,
+    onSuccess: () => fetchSubmissions(selectedSource || undefined),
+    onClearSelection: clearSelected,
+  })
+
+  const [promoteDrawerIds, setPromoteDrawerIds] = useState<string[]>([])
+  const [isBulkPromoting, setIsBulkPromoting] = useState(false)
+
+  const handleOpenPromoteDrawer = () => {
+    const ids = submissions
+      .filter((s) => s.id && selected.has(s.id) && !s.promotedLeadId)
+      .map((s) => s.id)
+    if (ids.length === 0) {
+      setToast({ message: "No unpromoted submissions in selection", type: "error" })
+      return
+    }
+    setPromoteDrawerIds(ids)
+  }
+
+  const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteSubmissions>[1]) => {
+    setIsBulkPromoting(true)
     try {
-      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.ok) {
-        setToast({ message: data?.error || "Convert failed", type: "error" })
-        return
-      }
-      const r = data.result as { created: number; updated: number; failed: number }
-      setToast({
-        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
-        type: r.failed === 0 ? "success" : "error",
-      })
-      if (r.failed === 0) clearSelected()
-    } catch {
-      setToast({ message: "Convert failed", type: "error" })
+      await promoteSubmissions(promoteDrawerIds, overrides)
+      setPromoteDrawerIds([])
+    } finally {
+      setIsBulkPromoting(false)
     }
   }
 
@@ -833,7 +835,7 @@ export function ContactFormsTab({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <button
                   onClick={() => {
                     handleDelete(selectedSubmission.id, selectedSubmission.email)
@@ -844,26 +846,55 @@ export function ContactFormsTab({
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
                 </button>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                  {/* Tier 1 (lightest) — meta action: Edit. Text-only ghost. */}
                   <button
                     onClick={startEditing}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded-sm transition-colors"
+                    className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-sm transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Edit
                   </button>
+                  {/* Tier 2 — pipeline action: Promote / Open in CRM. Promote
+                      is an outline button (visible but secondary). When already
+                      promoted, drops to a text link with → so it reads as
+                      "FYI, the workflow continues over there" not another action. */}
+                  {(() => {
+                    const linkedLeadId =
+                      selectedSubmission.promotedLeadId ||
+                      leadsByEmail.get(selectedSubmission.email.toLowerCase())
+                    return linkedLeadId ? (
+                      <a
+                        href={`/admin/leads?openLead=${encodeURIComponent(linkedLeadId)}`}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-sm transition-colors"
+                        title="Open this contact in the CRM"
+                      >
+                        Open in CRM
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!selectedSubmission.id) return
+                          await promoteSubmissions([selectedSubmission.id])
+                          setSelectedSubmission(null)
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50 rounded-sm transition-colors"
+                        title="Promote this submission to the leads pipeline"
+                      >
+                        <ArrowRightCircle className="w-3.5 h-3.5" />
+                        Promote
+                      </button>
+                    )
+                  })()}
+                  {/* Tier 3 — primary action: Reply. Solid black bg. */}
                   <button
                     onClick={() => setReplyTarget(selectedSubmission)}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-white bg-neutral-900 rounded-sm hover:bg-neutral-800 transition-colors"
                   >
                     <Reply className="w-3.5 h-3.5" />
                     Reply
-                  </button>
-                  <button
-                    onClick={() => setSelectedSubmission(null)}
-                    className="px-3 py-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded-sm transition-colors"
-                  >
-                    Close
                   </button>
                 </div>
               </div>
@@ -985,7 +1016,7 @@ export function ContactFormsTab({
         actions={[
           { key: "acknowledge", label: "Send acknowledgment", icon: SendIcon, run: runBulkAcknowledge },
           { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "convert-crm", label: "Convert to Leads", icon: UserPlusIcon, run: runConvert },
+          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, run: handleOpenPromoteDrawer },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
@@ -1042,6 +1073,16 @@ export function ContactFormsTab({
         onError={(message) => {
           setToast({ message, type: "error" })
         }}
+      />
+
+      <PromoteOverridesDrawer
+        open={promoteDrawerIds.length > 0}
+        onClose={() => setPromoteDrawerIds([])}
+        count={promoteDrawerIds.length}
+        collection="contact_forms"
+        defaultSource="web"
+        isPromoting={isBulkPromoting}
+        onConfirm={handleConfirmBulkPromote}
       />
     </div>
   )
