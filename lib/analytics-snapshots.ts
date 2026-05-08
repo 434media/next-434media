@@ -96,6 +96,52 @@ async function latestForKey<T>(
   }
 }
 
+// Latest snapshot at or before a given date — used for period-over-period
+// comparisons (e.g. "the snapshot from 30 days ago" for a 30d range delta).
+// snapshotDate is stored as `YYYY-MM-DD`, which sorts correctly as a string.
+async function latestForKeyAsOf<T>(
+  collection: string,
+  field: string,
+  value: string,
+  asOfDate: string,
+): Promise<T | null> {
+  try {
+    const db = getDb()
+    try {
+      const snap = await db
+        .collection(collection)
+        .where(field, "==", value)
+        .where("snapshotDate", "<=", asOfDate)
+        .orderBy("snapshotDate", "desc")
+        .limit(1)
+        .get()
+      if (snap.empty) return null
+      return snap.docs[0].data() as T
+    } catch (queryErr) {
+      const message = queryErr instanceof Error ? queryErr.message : String(queryErr)
+      if (message.includes("index") || message.includes("FAILED_PRECONDITION")) {
+        console.warn(
+          `[analytics-snapshots] Composite index missing on ${collection} for as-of query; falling back to client-side filter+sort.`,
+        )
+        const snap = await db.collection(collection).where(field, "==", value).get()
+        if (snap.empty) return null
+        const docs = snap.docs
+          .map((d) => d.data() as T & { snapshotDate?: string })
+          .filter((d) => (d.snapshotDate ?? "") <= asOfDate)
+        docs.sort((a, b) => ((a.snapshotDate ?? "") < (b.snapshotDate ?? "") ? 1 : -1))
+        return (docs[0] ?? null) as T | null
+      }
+      throw queryErr
+    }
+  } catch (error) {
+    console.error(
+      `[analytics-snapshots] Failed to read ${collection} for ${field}=${value} as-of ${asOfDate}:`,
+      error,
+    )
+    return null
+  }
+}
+
 export async function getLatestGA4Snapshot(propertyId: string): Promise<GA4Snapshot | null> {
   return latestForKey<GA4Snapshot>(GA4_SNAPSHOTS_COLLECTION, "propertyId", propertyId)
 }
@@ -112,4 +158,16 @@ export async function getLatestMailchimpSnapshotByAudienceId(
 
 export async function getLatestInstagramSnapshot(account: string): Promise<InstagramSnapshot | null> {
   return latestForKey<InstagramSnapshot>(INSTAGRAM_SNAPSHOTS_COLLECTION, "account", account)
+}
+
+export async function getInstagramSnapshotAsOf(
+  account: string,
+  asOfDate: string,
+): Promise<InstagramSnapshot | null> {
+  return latestForKeyAsOf<InstagramSnapshot>(
+    INSTAGRAM_SNAPSHOTS_COLLECTION,
+    "account",
+    account,
+    asOfDate,
+  )
 }

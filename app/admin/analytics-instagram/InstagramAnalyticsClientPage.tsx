@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { InstagramAnalyticsHeader } from "@/components/instagram/InstagramAnalyticsHeader"
 import { InstagramKeyMetrics, InstagramMarketingFunnel } from "@/components/instagram/InstagramKeyMetrics"
 import { InstagramTopPostsTable } from "@/components/instagram/InstagramTopPostsTable"
@@ -436,11 +437,24 @@ function downloadInstagramPNG(
   document.body.removeChild(link)
 }
 
+// Valid Instagram account keys — kept in sync with the cron at
+// /api/cron/instagram-snapshot and the snapshot route's VALID_ACCOUNTS.
+const VALID_IG_ACCOUNTS = new Set(["txmx", "vemos", "milcity", "ampd"])
+
 export default function InstagramAnalyticsClientPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<InstagramTimeRange>("30d")
-  const [selectedAccount, setSelectedAccount] = useState("txmx")
+  // Initial account comes from `?account=` so the Portfolio rollup can deep-link
+  // into a specific brand. Falls back to txmx for invalid or missing values.
+  const [selectedAccount, setSelectedAccount] = useState(() => {
+    const fromUrl = searchParams?.get("account")
+    return fromUrl && VALID_IG_ACCOUNTS.has(fromUrl) ? fromUrl : "txmx"
+  })
 
   // Data states
   const [insightsData, setInsightsData] = useState<InstagramInsightsData | null>(null)
@@ -474,9 +488,13 @@ export default function InstagramAnalyticsClientPage() {
     loadInstagramData()
   }, [dateRange, selectedAccount, dataSource])
 
-  // Handle account change
+  // Handle account change — also update the URL so the selection survives
+  // refresh and is shareable. Keeps the existing `?tab=` (and any other) params.
   const handleAccountChange = (accountId: string) => {
     setSelectedAccount(accountId)
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    params.set("account", accountId)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   // Get the API route for the selected account
