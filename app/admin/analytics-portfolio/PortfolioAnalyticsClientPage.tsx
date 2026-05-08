@@ -15,12 +15,14 @@ import {
   TrendingUp,
   ChevronRight,
   Award,
+  Download,
 } from "lucide-react"
 import { dateRangeFromUrl, rangeKeyFromDateRange, type RangeKey } from "@/lib/analytics-url-state"
 import { buildAnalyticsUrl } from "@/lib/analytics-url"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
 import { BrandPeekDrawerWeb } from "@/components/analytics/BrandPeekDrawerWeb"
 import { BrandPeekDrawerInstagram } from "@/components/analytics/BrandPeekDrawerInstagram"
+import { downloadPortfolioCSV, downloadPortfolioPNG } from "@/lib/portfolio-export"
 import type { DateRange } from "@/types/analytics"
 import type {
   InstagramPortfolioSummary,
@@ -214,7 +216,7 @@ export default function PortfolioAnalyticsClientPage() {
       {/* Header */}
       <div className="bg-white border-b border-neutral-200">
         <div className="px-4 sm:px-5 lg:px-6 py-4 sm:py-5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <div className="p-2 sm:p-2.5 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
               <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600" />
             </div>
@@ -241,6 +243,32 @@ export default function PortfolioAnalyticsClientPage() {
                   "Aggregating across GA4 properties and Instagram accounts…"
                 )}
               </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-1.5">
+              <ExportButton
+                label="CSV"
+                disabled={!data && !igData}
+                onClick={() =>
+                  downloadPortfolioCSV(
+                    data,
+                    igData,
+                    selectedDateRange.label,
+                    rangeKeyFromDateRange(selectedDateRange),
+                  )
+                }
+              />
+              <ExportButton
+                label="PNG"
+                disabled={!data && !igData}
+                onClick={() =>
+                  downloadPortfolioPNG(
+                    data,
+                    igData,
+                    selectedDateRange.label,
+                    rangeKeyFromDateRange(selectedDateRange),
+                  )
+                }
+              />
             </div>
           </div>
         </div>
@@ -282,13 +310,28 @@ export default function PortfolioAnalyticsClientPage() {
 
       {/* Body */}
       <div className="px-4 sm:px-5 lg:px-6 py-6 space-y-8">
-        <WebPortfolioSection
-          summary={data}
-          isLoading={isLoading}
-          error={error}
-          dateRange={selectedDateRange}
-        />
-        <SocialPortfolioSection summary={igData} isLoading={igIsLoading} error={igError} />
+        {!isLoading &&
+        !igIsLoading &&
+        data &&
+        igData &&
+        data.configuredCount === 0 &&
+        igData.configuredCount === 0 ? (
+          <PortfolioEmptyState />
+        ) : (
+          <>
+            <WebPortfolioSection
+              summary={data}
+              isLoading={isLoading}
+              error={error}
+              dateRange={selectedDateRange}
+            />
+            <SocialPortfolioSection
+              summary={igData}
+              isLoading={igIsLoading}
+              error={igError}
+            />
+          </>
+        )}
       </div>
     </div>
   )
@@ -333,6 +376,7 @@ function BrandRow({
   brand: PortfolioBrandRow
   onPeek: (brand: PortfolioBrandRow) => void
 }) {
+  const router = useRouter()
   if (brand.unavailable) {
     return (
       <tr className="opacity-60">
@@ -356,7 +400,7 @@ function BrandRow({
       className="group hover:bg-neutral-50 transition-colors cursor-pointer"
       onClick={(e) => {
         if (e.shiftKey) {
-          window.location.href = drillUrl
+          router.push(drillUrl)
         } else {
           onPeek(brand)
         }
@@ -802,6 +846,7 @@ function InstagramBrandRow({
   brand: InstagramPortfolioSummary["brands"][number]
   onPeek: (brand: InstagramPortfolioSummary["brands"][number]) => void
 }) {
+  const router = useRouter()
   if (brand.unavailable) {
     return (
       <tr className="opacity-60">
@@ -834,7 +879,7 @@ function InstagramBrandRow({
       className="group hover:bg-neutral-50 transition-colors cursor-pointer"
       onClick={(e) => {
         if (e.shiftKey) {
-          window.location.href = drillUrl
+          router.push(drillUrl)
         } else {
           onPeek(brand)
         }
@@ -898,5 +943,78 @@ function InstagramBrandRow({
         </div>
       </td>
     </tr>
+  )
+}
+
+// ============================================================
+// Empty state — both sources unconfigured
+// ============================================================
+
+function PortfolioEmptyState() {
+  return (
+    <div className="bg-white border border-neutral-200 rounded-xl p-8 sm:p-12 max-w-2xl mx-auto">
+      <div className="text-center">
+        <div className="inline-flex p-3 bg-neutral-100 rounded-xl mb-4">
+          <Layers className="w-6 h-6 text-neutral-400" />
+        </div>
+        <h2 className="text-lg font-bold text-neutral-900">No analytics sources configured</h2>
+        <p className="text-sm text-neutral-500 mt-2 max-w-md mx-auto">
+          Connect a GA4 property or set up the Instagram snapshot cron, then refresh this page.
+          The rollup populates automatically as data arrives.
+        </p>
+      </div>
+      <div className="mt-6 grid sm:grid-cols-2 gap-3">
+        <div className="border border-neutral-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Globe className="w-4 h-4 text-emerald-500" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+              Google Analytics
+            </span>
+          </div>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            Set <code className="text-[11px] bg-neutral-100 px-1 py-0.5 rounded">ANALYTICS_PROPERTY_ID_*</code>{" "}
+            env vars and grant the service account viewer access on each GA4 property.
+          </p>
+        </div>
+        <div className="border border-neutral-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Instagram className="w-4 h-4 text-pink-500" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+              Instagram
+            </span>
+          </div>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            Configure <code className="text-[11px] bg-neutral-100 px-1 py-0.5 rounded">INSTAGRAM_ACCESS_TOKEN_*</code>{" "}
+            and <code className="text-[11px] bg-neutral-100 px-1 py-0.5 rounded">FACEBOOK_PAGE_ID_*</code> env vars,
+            then wait for the daily snapshot cron.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// Export button — small icon button used in the header
+// ============================================================
+
+interface ExportButtonProps {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+}
+
+function ExportButton({ label, disabled, onClick }: ExportButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={`Download ${label}`}
+      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-md border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    >
+      <Download className="w-3 h-3" />
+      {label}
+    </button>
   )
 }

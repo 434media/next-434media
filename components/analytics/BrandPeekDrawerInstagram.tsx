@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Instagram, ExternalLink, Heart, MessageCircle } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import type { InstagramPortfolioSummary } from "@/lib/instagram-portfolio"
@@ -89,13 +90,14 @@ export function BrandPeekDrawerInstagram({
           >
             Close
           </button>
-          <a
+          <Link
             href={fullDashboardUrl}
+            onClick={onClose}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold rounded-md bg-neutral-900 text-white hover:bg-neutral-700 transition-colors"
           >
             Open full dashboard
             <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          </Link>
         </div>
       }
     >

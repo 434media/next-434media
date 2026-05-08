@@ -53,19 +53,24 @@ const tabs: TabConfig[] = [
   { key: "instagram", label: "Instagram", short: "Instagram", icon: InstagramIcon, color: "text-pink-500" },
 ]
 
+const VALID_TABS = new Set<TabKey>(["portfolio", "ga4", "instagram"])
+
 export default function UnifiedAnalyticsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const initialTab = (searchParams?.get("tab") as TabKey) || ("portfolio" as TabKey)
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  // Derive activeTab from URL rather than holding it in state — that way
+  // `router.push("?tab=instagram")` from a child (e.g. portfolio drawer drill)
+  // actually triggers a tab switch via re-render, instead of leaving state stale.
+  const tabParam = searchParams?.get("tab") as TabKey | null
+  const activeTab: TabKey = tabParam && VALID_TABS.has(tabParam) ? tabParam : "portfolio"
+
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
 
   const setTab = useCallback(
     (tab: TabKey) => {
-      setActiveTab(tab)
       router.replace(`?tab=${tab}`, { scroll: false })
     },
     [router],
