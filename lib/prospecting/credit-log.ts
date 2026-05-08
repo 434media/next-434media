@@ -71,10 +71,20 @@ export interface CreditUsageSummary {
 }
 
 /**
- * Roll up credit usage for a user over the standard windows. Two queries
- * for per-user (today + month) and one team-wide. Each query needs a
- * Firestore composite index on (userEmail, timestamp) — Firestore will
- * surface the index-build link in the console on first query.
+ * Roll up credit usage for a user over the standard windows.
+ *
+ * Strategy: one Firestore query for everything since the start of the
+ * current month, then filter in memory. This trades a tiny in-memory
+ * scan for avoiding a composite (userEmail, timestamp) index entirely —
+ * the equality + inequality combo would otherwise require Firestore
+ * console setup on every deployment, and the data volume is small
+ * enough that in-memory filtering is genuinely faster.
+ *
+ * Scale: at Apollo Free plan (~75 credits/mo team-wide → ~75 log
+ * entries) this returns at most 75 docs. At Professional (~4K/mo)
+ * still under 5K docs — Firestore handles tens of thousands per query
+ * in single-digit milliseconds. Revisit only if multiple teams share
+ * one deployment with tens of thousands of credits/month each.
  */
 export async function getCreditUsage(userEmail: string): Promise<CreditUsageSummary> {
   const db = getDb()
@@ -84,37 +94,35 @@ export async function getCreditUsage(userEmail: string): Promise<CreditUsageSumm
   startOfDay.setHours(0, 0, 0, 0)
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  const startOfDayIso = startOfDay.toISOString()
+  const startOfDayMs = startOfDay.getTime()
   const startOfMonthIso = startOfMonth.toISOString()
 
-  const sumCredits = (snap: FirebaseFirestore.QuerySnapshot) =>
-    snap.docs.reduce((sum, d) => {
-      const v = d.data().creditsUsed
-      return sum + (typeof v === "number" ? v : 0)
-    }, 0)
-
-  // Per-user today
-  const todaySnap = await db
-    .collection(COLLECTION)
-    .where("userEmail", "==", userEmail)
-    .where("timestamp", ">=", startOfDayIso)
-    .get()
-  const today = sumCredits(todaySnap)
-
-  // Per-user this month
+  // Single-field range query on `timestamp` — uses Firestore's auto
+  // index, no composite required.
   const monthSnap = await db
     .collection(COLLECTION)
-    .where("userEmail", "==", userEmail)
     .where("timestamp", ">=", startOfMonthIso)
     .get()
-  const thisMonth = sumCredits(monthSnap)
 
-  // Team-wide this month (no user filter)
-  const teamSnap = await db
-    .collection(COLLECTION)
-    .where("timestamp", ">=", startOfMonthIso)
-    .get()
-  const thisMonthTeamWide = sumCredits(teamSnap)
+  let today = 0
+  let thisMonth = 0
+  let thisMonthTeamWide = 0
+
+  for (const doc of monthSnap.docs) {
+    const data = doc.data()
+    const credits = typeof data.creditsUsed === "number" ? data.creditsUsed : 0
+    if (credits <= 0) continue
+
+    thisMonthTeamWide += credits
+
+    if (data.userEmail === userEmail) {
+      thisMonth += credits
+      const tsMs = data.timestamp ? new Date(data.timestamp).getTime() : NaN
+      if (Number.isFinite(tsMs) && tsMs >= startOfDayMs) {
+        today += credits
+      }
+    }
+  }
 
   return { today, thisMonth, thisMonthTeamWide }
 }

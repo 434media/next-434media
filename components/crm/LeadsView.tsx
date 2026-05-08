@@ -328,7 +328,7 @@ function ViewChip({
       <Icon className="w-3.5 h-3.5" />
       {label}
       <span
-        className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-semibold rounded-full ${
+        className={`inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[11px] font-semibold rounded-full ${
           active
             ? "bg-white/20 text-white"
             : urgent
