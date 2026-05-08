@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Instagram, ExternalLink, Heart, MessageCircle } from "lucide-react"
+import { ExternalLink, Heart, MessageCircle } from "lucide-react"
+import { InstagramIcon } from "@/components/icons/InstagramIcon"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import type { InstagramPortfolioSummary } from "@/lib/instagram-portfolio"
 
@@ -76,7 +77,7 @@ export function BrandPeekDrawerInstagram({
       width="lg"
       title={
         <span className="flex items-center gap-2">
-          <Instagram className="w-4 h-4 text-pink-500 shrink-0" />
+          <InstagramIcon className="w-4 h-4 text-pink-500 shrink-0" />
           <span className="truncate">{brand?.name ?? "Account"}</span>
         </span>
       }

@@ -11,12 +11,12 @@ import {
   ArrowDownRight,
   Globe,
   CalendarDays,
-  Instagram,
   TrendingUp,
   ChevronRight,
   Award,
   Download,
 } from "lucide-react"
+import { InstagramIcon } from "@/components/icons/InstagramIcon"
 import { dateRangeFromUrl, rangeKeyFromDateRange, type RangeKey } from "@/lib/analytics-url-state"
 import { buildAnalyticsUrl } from "@/lib/analytics-url"
 import { InfoTooltip } from "@/components/analytics/InfoTooltip"
@@ -217,7 +217,7 @@ export default function PortfolioAnalyticsClientPage() {
       <div className="bg-white border-b border-neutral-200">
         <div className="px-4 sm:px-5 lg:px-6 py-4 sm:py-5">
           <div className="flex items-start gap-3">
-            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
+            <div className="p-2 sm:p-2.5 bg-linear-to-br from-teal-500/20 to-emerald-500/20 rounded-lg sm:rounded-xl border border-neutral-200 shrink-0">
               <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600" />
             </div>
             <div className="min-w-0 flex-1">
@@ -232,7 +232,7 @@ export default function PortfolioAnalyticsClientPage() {
                       {data ? `${data.configuredCount}/${data.totalCount}` : "—/—"} GA4
                     </span>
                     <span className="text-neutral-300">·</span>
-                    <Instagram className="w-3 h-3 text-pink-500 shrink-0" />
+                    <InstagramIcon className="w-3 h-3 text-pink-500 shrink-0" />
                     <span className="tabular-nums">
                       {igData ? `${igData.configuredCount}/${igData.totalCount}` : "—/—"} Instagram
                     </span>
@@ -446,7 +446,7 @@ function BrandRow({
       <td className="px-5 py-3 text-right">
         <div className="inline-flex items-center gap-3 justify-end">
           {/* Inline share-of-portfolio bar — visual at-a-glance for who dominates */}
-          <div className="inline-flex flex-col items-end gap-0.5 min-w-[80px]">
+          <div className="inline-flex flex-col items-end gap-0.5 min-w-20">
             <span className="text-[11px] text-neutral-500 tabular-nums">
               {(brand.sessionShare * 100).toFixed(1)}%
             </span>
@@ -695,13 +695,13 @@ function SocialPortfolioSection({ summary, isLoading, error }: SocialPortfolioSe
 
   return (
     <section>
-      <SectionHeader icon={Instagram} iconColor="text-pink-500" label="Social — Instagram" />
+      <SectionHeader icon={InstagramIcon} iconColor="text-pink-500" label="Social — Instagram" />
       {error && <SectionError message={error} />}
       {isLoading || !summary ? (
         <SectionSkeleton />
       ) : summary.configuredCount === 0 ? (
         <div className="bg-white border border-neutral-200 rounded-xl p-8 text-center">
-          <Instagram className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
+          <InstagramIcon className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
           <p className="text-sm font-medium text-neutral-700">
             No Instagram snapshots yet
           </p>
@@ -724,7 +724,7 @@ function SocialPortfolioSection({ summary, isLoading, error }: SocialPortfolioSe
                 }`}
               />
               <div className="flex items-center gap-2 mb-1">
-                <Instagram className="w-4 h-4 text-neutral-400" />
+                <InstagramIcon className="w-4 h-4 text-neutral-400" />
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                   Total portfolio followers
                 </span>
@@ -928,7 +928,7 @@ function InstagramBrandRow({
       </td>
       <td className="px-5 py-3 text-right">
         <div className="inline-flex items-center gap-3 justify-end">
-          <div className="inline-flex flex-col items-end gap-0.5 min-w-[80px]">
+          <div className="inline-flex flex-col items-end gap-0.5 min-w-20">
             <span className="text-[11px] text-neutral-500 tabular-nums">
               {(brand.followerShare * 100).toFixed(1)}%
             </span>
@@ -978,7 +978,7 @@ function PortfolioEmptyState() {
         </div>
         <div className="border border-neutral-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Instagram className="w-4 h-4 text-pink-500" />
+            <InstagramIcon className="w-4 h-4 text-pink-500" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-700">
               Instagram
             </span>

@@ -77,11 +77,12 @@ function dateStamp(): string {
 export function downloadPortfolioCSV(
   webData: WebPortfolioPayload | null,
   igData: InstagramPortfolioSummary | null,
-  rangeLabel: string,
+  rangeLabel: string | undefined,
   rangeKey: string,
 ) {
+  const safeLabel = rangeLabel || "Custom range"
   let csv = `434 Media Portfolio Rollup\n`
-  csv += `Range,${csvEscape(rangeLabel)}\n`
+  csv += `Range,${csvEscape(safeLabel)}\n`
   csv += `Generated,${csvEscape(new Date().toLocaleString())}\n\n`
 
   if (webData) {
@@ -191,9 +192,10 @@ function fmtCount(n: number): string {
 export function downloadPortfolioPNG(
   webData: WebPortfolioPayload | null,
   igData: InstagramPortfolioSummary | null,
-  rangeLabel: string,
+  rangeLabel: string | undefined,
   rangeKey: string,
 ) {
+  const safeLabel = rangeLabel || "Custom range"
   const canvas = document.createElement("canvas")
   const ctx = canvas.getContext("2d")
   if (!ctx) {
@@ -236,7 +238,7 @@ export function downloadPortfolioPNG(
 
   ctx.fillStyle = PNG_COLORS.muted
   ctx.font = "14px system-ui, -apple-system, sans-serif"
-  ctx.fillText(`${rangeLabel} · Generated ${new Date().toLocaleString()}`, PADDING, 88)
+  ctx.fillText(`${safeLabel} · Generated ${new Date().toLocaleString()}`, PADDING, 88)
 
   // Divider
   ctx.strokeStyle = PNG_COLORS.border

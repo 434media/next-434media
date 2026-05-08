@@ -100,7 +100,12 @@ interface MediaItem {
 
 export async function GET(request: NextRequest) {
   return runCronJob("instagram-snapshot", request, async () => {
-    const configured = ACCOUNTS.filter((a) => !!a.accessToken && !!a.pageId)
+    // An account is snapshottable when it has an access token AND either a
+    // Facebook page id (we'll resolve the IG business id via Graph) OR a
+    // pre-known IG business id override (we use it directly, no page lookup).
+    const configured = ACCOUNTS.filter(
+      (a) => !!a.accessToken && (!!a.pageId || looksIGUserId(a.businessAccountIdOverride)),
+    )
     if (configured.length === 0) {
       return { message: "No Instagram accounts configured", detail: { accounts: 0 } }
     }

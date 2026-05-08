@@ -2,14 +2,14 @@
 
 import {
   RefreshCw,
-  LogOut, 
-  Loader2, 
+  LogOut,
+  Loader2,
   Calendar,
   FileText,
   Image,
-  Instagram,
   ChevronDown
 } from "lucide-react"
+import { InstagramIcon } from "@/components/icons/InstagramIcon"
 import type { InstagramTimeRange, InstagramAccount } from "../../types/instagram-insights"
 
 // Instagram accounts available for selection
@@ -76,7 +76,7 @@ export function InstagramAnalyticsHeader({
             <div className="flex items-center gap-3 min-w-0">
               {/* Mono icon tile — pink reserved for the brand-color SVG fill on the icon */}
               <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 shrink-0">
-                <Instagram className="h-5 w-5 text-pink-600" />
+                <InstagramIcon className="h-5 w-5 text-pink-600" />
               </div>
               <div className="min-w-0">
                 <h1 className="text-base sm:text-lg font-medium text-neutral-900 truncate">
