@@ -785,9 +785,7 @@ export default function WorkClient() {
             >
               Brand Stories
               <br />
-              <span className="bg-linear-to-br from-neutral-950 via-neutral-700 to-neutral-400 bg-clip-text text-transparent">
-                Aren&apos;t Accidental
-              </span>
+              Aren&apos;t Accidental
             </motion.h1>
 
             <motion.p
@@ -825,28 +823,6 @@ export default function WorkClient() {
                 </span>
               </a>
             </motion.div>
-
-            <motion.dl
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-16 grid max-w-3xl grid-cols-3 gap-x-8 border-t border-neutral-200/70 pt-8"
-            >
-              {[
-                { v: workItems.length, l: "Projects shipped" },
-                { v: CATEGORIES.length, l: "Practice areas" },
-                { v: "SATX", l: "Built in" },
-              ].map((s) => (
-                <div key={s.l}>
-                  <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
-                    {s.l}
-                  </dt>
-                  <dd className="mt-1 font-ggx88 text-3xl font-black tracking-tight tabular-nums text-neutral-950 md:text-4xl">
-                    {s.v}
-                  </dd>
-                </div>
-              ))}
-            </motion.dl>
           </motion.div>
         </section>
 
