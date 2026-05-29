@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
+import { notifyNewContactForm } from "@/lib/contact-form-notification"
 import { requireHumanRequest } from "@/lib/botid-guard"
 
 export async function POST(request: Request) {
@@ -14,7 +15,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    await saveContactForm({
+    const createdAt = new Date().toISOString()
+    const result = await saveContactForm({
       firstName,
       lastName,
       company,
@@ -22,8 +24,23 @@ export async function POST(request: Request) {
       phone: phoneNumber || "",
       message: message || "",
       source: "434Media",
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
     })
+
+    // Best-effort admin notification — never blocks or fails the submission.
+    if (result.success) {
+      await notifyNewContactForm({
+        id: result.id,
+        firstName,
+        lastName,
+        company,
+        email,
+        phone: phoneNumber || "",
+        message: message || "",
+        source: "434Media",
+        created_at: createdAt,
+      })
+    }
 
     return NextResponse.json({ message: "Contact form submission successful" }, { status: 200 })
   } catch (error) {

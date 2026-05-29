@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { saveContactForm } from "@/lib/firestore-contact-forms"
 import { captureLeadFromContactForm } from "@/lib/firestore-leads"
+import { notifyNewContactForm } from "@/lib/contact-form-notification"
 import { requireHumanRequest } from "@/lib/botid-guard"
 import { headers } from "next/headers"
 
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
     }
 
     // Save to Firestore
+    const createdAt = new Date().toISOString()
     const result = await saveContactForm({
       firstName: firstName?.trim() || "",
       lastName: lastName?.trim() || "",
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
       phone: phone?.trim() || "",
       message: message?.trim() || "",
       source,
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
     })
 
     if (!result.success) {
@@ -143,6 +145,19 @@ export async function POST(request: Request) {
       phone: phone?.trim() || "",
       message: message?.trim() || "",
       source,
+    })
+
+    // Best-effort admin notification — never blocks or fails the submission.
+    await notifyNewContactForm({
+      id: result.id,
+      firstName: firstName?.trim() || "",
+      lastName: lastName?.trim() || "",
+      company: company?.trim() || "",
+      email: email.toLowerCase().trim(),
+      phone: phone?.trim() || "",
+      message: message?.trim() || "",
+      source,
+      created_at: createdAt,
     })
 
     return NextResponse.json({
