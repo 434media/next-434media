@@ -19,6 +19,7 @@ import {
   Home,
   Settings,
   Globe,
+  LayoutDashboard,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -44,6 +45,9 @@ interface SidebarItemBase {
 interface SidebarLink extends SidebarItemBase {
   href: string
   matchPrefix?: string
+  /** Highlight only on an exact path match (not prefix). Used by Overview so
+   *  "/admin" doesn't stay active on every "/admin/*" sub-route. */
+  exact?: boolean
   children?: never
 }
 
@@ -55,73 +59,111 @@ interface SidebarGroup extends SidebarItemBase {
 
 type SidebarEntry = SidebarLink | SidebarGroup
 
-const SIDEBAR_ITEMS: SidebarEntry[] = [
+interface SidebarSection {
+  id: string
+  title: string
+  items: SidebarEntry[]
+}
+
+// Pinned above the sections — the shared home for every role.
+const OVERVIEW_ITEM: SidebarLink = {
+  id: "overview",
+  label: "Overview",
+  icon: LayoutDashboard,
+  href: "/admin",
+  matchPrefix: "/admin",
+  exact: true,
+  roles: ["crm_super_admin", "full_admin", "crm_only"],
+}
+
+// Sections mirror the lifecycle: "Pipeline" runs in funnel order
+// (Audiences → Inbox → Leads → CRM) so the sidebar reads entry-point → outcome
+// top-to-bottom. Insights and Workspace hold the supporting surfaces.
+const SIDEBAR_SECTIONS: SidebarSection[] = [
   {
-    id: "crm",
-    label: "CRM",
-    icon: Rocket,
-    href: "/admin/crm",
-    matchPrefix: "/admin/crm",
-    roles: ["full_admin", "crm_only"],
-  },
-  {
-    id: "analytics",
-    label: "Analytics",
-    icon: BarChart3,
-    href: "/admin/analytics",
-    matchPrefix: "/admin/analytics",
-    roles: ["full_admin"],
-  },
-  {
-    id: "leads",
-    label: "Leads",
-    icon: Flag,
-    href: "/admin/leads",
-    matchPrefix: "/admin/leads",
-    roles: ["full_admin", "crm_only"],
-  },
-  {
-    id: "inbox",
-    label: "Inbox",
-    icon: Inbox,
-    href: "/admin/inbox",
-    matchPrefix: "/admin/inbox",
-    roles: ["full_admin"],
-  },
-  {
-    id: "audiences",
-    label: "Audiences",
-    icon: Megaphone,
-    href: "/admin/audiences",
-    matchPrefix: "/admin/audiences",
-    roles: ["full_admin"],
-  },
-  {
-    id: "content",
-    label: "Content",
-    icon: Layers,
-    matchPrefix: "/admin/feed-form|/admin/blog",
-    roles: ["full_admin"],
-    children: [
-      { id: "feed", label: "Feed", href: "/admin/feed-form", matchPrefix: "/admin/feed-form" },
-      { id: "blog", label: "Blog", href: "/admin/blog", matchPrefix: "/admin/blog" },
+    id: "pipeline",
+    title: "Pipeline",
+    items: [
+      {
+        id: "audiences",
+        label: "Audiences",
+        icon: Megaphone,
+        href: "/admin/audiences",
+        matchPrefix: "/admin/audiences",
+        roles: ["full_admin"],
+      },
+      {
+        id: "inbox",
+        label: "Inbox",
+        icon: Inbox,
+        href: "/admin/inbox",
+        matchPrefix: "/admin/inbox",
+        roles: ["full_admin"],
+      },
+      {
+        id: "leads",
+        label: "Leads",
+        icon: Flag,
+        href: "/admin/leads",
+        matchPrefix: "/admin/leads",
+        roles: ["full_admin", "crm_only"],
+      },
+      {
+        id: "crm",
+        label: "CRM",
+        icon: Rocket,
+        href: "/admin/crm",
+        matchPrefix: "/admin/crm",
+        roles: ["full_admin", "crm_only"],
+      },
     ],
   },
   {
-    id: "projects",
-    label: "Projects",
-    icon: ClipboardList,
-    href: "/admin/project-management",
-    matchPrefix: "/admin/project-management",
-    roles: ["full_admin"],
+    id: "insights",
+    title: "Insights",
+    items: [
+      {
+        id: "analytics",
+        label: "Analytics",
+        icon: BarChart3,
+        href: "/admin/analytics",
+        matchPrefix: "/admin/analytics",
+        roles: ["full_admin"],
+      },
+    ],
   },
   {
-    id: "sops",
-    label: "SOPs",
-    icon: FileText,
-    href: "/admin/sops",
-    matchPrefix: "/admin/sops",
-    roles: ["full_admin"],
+    id: "workspace",
+    title: "Workspace",
+    items: [
+      {
+        id: "content",
+        label: "Content",
+        icon: Layers,
+        matchPrefix: "/admin/feed-form|/admin/blog",
+        roles: ["full_admin"],
+        children: [
+          { id: "feed", label: "Feed", href: "/admin/feed-form", matchPrefix: "/admin/feed-form" },
+          { id: "blog", label: "Blog", href: "/admin/blog", matchPrefix: "/admin/blog" },
+        ],
+      },
+      {
+        id: "projects",
+        label: "Projects",
+        icon: ClipboardList,
+        href: "/admin/project-management",
+        matchPrefix: "/admin/project-management",
+        roles: ["full_admin"],
+      },
+      {
+        id: "sops",
+        label: "SOPs",
+        icon: FileText,
+        href: "/admin/sops",
+        matchPrefix: "/admin/sops",
+        roles: ["full_admin"],
+      },
+    ],
   },
 ]
 
@@ -138,8 +180,10 @@ const FOOTER_ITEMS: SidebarLink[] = [
   },
 ]
 
-function isActive(pathname: string, matchPrefix: string): boolean {
-  return matchPrefix.split("|").some((p) => pathname === p || pathname.startsWith(`${p}/`))
+function isActive(pathname: string, matchPrefix: string, exact = false): boolean {
+  return matchPrefix
+    .split("|")
+    .some((p) => (exact ? pathname === p : pathname === p || pathname.startsWith(`${p}/`)))
 }
 
 interface AdminSidebarProps {
@@ -168,20 +212,114 @@ export function AdminSidebar({
   // Super-admins see everything full_admins see, plus super-admin-only items.
   const grantedRoles: AdminRole[] =
     role === "crm_super_admin" ? ["crm_super_admin", "full_admin", "crm_only"] : [role]
-  const items = SIDEBAR_ITEMS.filter((i) => i.roles.some((r) => grantedRoles.includes(r)))
-  const footerItems = FOOTER_ITEMS.filter((i) => i.roles.some((r) => grantedRoles.includes(r)))
+  const canSee = (entry: SidebarItemBase) => entry.roles.some((r) => grantedRoles.includes(r))
+
+  const overviewVisible = canSee(OVERVIEW_ITEM)
+  // Filter each section's items by role, then drop any section left empty.
+  const sections = SIDEBAR_SECTIONS.map((s) => ({
+    ...s,
+    items: s.items.filter(canSee),
+  })).filter((s) => s.items.length > 0)
+  const footerItems = FOOTER_ITEMS.filter(canSee)
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const out: Record<string, boolean> = {}
-    for (const item of items) {
-      if ("children" in item && item.children) {
-        out[item.id] = isActive(pathname, item.matchPrefix)
+    for (const section of SIDEBAR_SECTIONS) {
+      for (const item of section.items) {
+        if ("children" in item && item.children) {
+          out[item.id] = isActive(pathname, item.matchPrefix)
+        }
       }
     }
     return out
   })
 
   const showLabels = isMobile || !collapsed
+
+  // Renders a single sidebar entry (link or expandable group). Extracted so the
+  // pinned Overview item and every section share identical markup/behavior.
+  const renderEntry = (item: SidebarEntry) => {
+    const Icon = item.icon
+    const matchPrefix =
+      "matchPrefix" in item && item.matchPrefix ? item.matchPrefix : item.href ?? ""
+    const exact = "exact" in item ? item.exact ?? false : false
+    const active = isActive(pathname, matchPrefix, exact)
+
+    if ("children" in item && item.children) {
+      const isOpen = openGroups[item.id] ?? active
+      return (
+        <div key={item.id}>
+          <button
+            type="button"
+            onClick={() => {
+              if (collapsed && !isMobile) {
+                onToggleCollapsed()
+                setOpenGroups((s) => ({ ...s, [item.id]: true }))
+                return
+              }
+              setOpenGroups((s) => ({ ...s, [item.id]: !isOpen }))
+            }}
+            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+              active
+                ? "bg-neutral-100 text-neutral-900"
+                : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
+            }`}
+            title={!showLabels ? item.label : undefined}
+          >
+            <Icon className="w-4 h-4 shrink-0" />
+            {showLabels && (
+              <>
+                <span className="flex-1 text-left truncate">{item.label}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-neutral-400 transition-transform ${
+                    isOpen ? "rotate-0" : "-rotate-90"
+                  }`}
+                />
+              </>
+            )}
+          </button>
+          {showLabels && isOpen && (
+            <div className="ml-6 mt-0.5 space-y-0.5">
+              {item.children.map((child) => {
+                const childActive = isActive(pathname, child.matchPrefix ?? child.href)
+                return (
+                  <Link
+                    key={child.id}
+                    href={child.href}
+                    onClick={onNavigate}
+                    className={`flex items-center px-2 py-1 rounded-md text-[12px] transition-colors ${
+                      childActive
+                        ? "bg-neutral-100 text-neutral-900 font-semibold"
+                        : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50"
+                    }`}
+                  >
+                    {child.label}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <Link
+        key={item.id}
+        href={item.href}
+        onClick={onNavigate}
+        title={!showLabels ? item.label : undefined}
+        className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+          active
+            ? "bg-neutral-900 text-white"
+            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+        }`}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        {showLabels && <span className="truncate">{item.label}</span>}
+      </Link>
+    )
+  }
 
   return (
     <aside
@@ -214,87 +352,22 @@ export function AdminSidebar({
       </div>
 
       {/* Items */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-        {items.map((item) => {
-          const Icon = item.icon
-          const matchPrefix = "matchPrefix" in item && item.matchPrefix ? item.matchPrefix : item.href ?? ""
-          const active = isActive(pathname, matchPrefix)
+      <nav className="flex-1 overflow-y-auto py-2 px-2">
+        {overviewVisible && <div className="space-y-0.5">{renderEntry(OVERVIEW_ITEM)}</div>}
 
-          if ("children" in item && item.children) {
-            const isOpen = openGroups[item.id] ?? active
-            return (
-              <div key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (collapsed && !isMobile) {
-                      onToggleCollapsed()
-                      setOpenGroups((s) => ({ ...s, [item.id]: true }))
-                      return
-                    }
-                    setOpenGroups((s) => ({ ...s, [item.id]: !isOpen }))
-                  }}
-                  className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
-                    active
-                      ? "bg-neutral-100 text-neutral-900"
-                      : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
-                  }`}
-                  title={!showLabels ? item.label : undefined}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {showLabels && (
-                    <>
-                      <span className="flex-1 text-left truncate">{item.label}</span>
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 text-neutral-400 transition-transform ${
-                          isOpen ? "rotate-0" : "-rotate-90"
-                        }`}
-                      />
-                    </>
-                  )}
-                </button>
-                {showLabels && isOpen && (
-                  <div className="ml-6 mt-0.5 space-y-0.5">
-                    {item.children.map((child) => {
-                      const childActive = isActive(pathname, child.matchPrefix ?? child.href)
-                      return (
-                        <Link
-                          key={child.id}
-                          href={child.href}
-                          onClick={onNavigate}
-                          className={`flex items-center px-2 py-1 rounded-md text-[12px] transition-colors ${
-                            childActive
-                              ? "bg-neutral-100 text-neutral-900 font-semibold"
-                              : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50"
-                          }`}
-                        >
-                          {child.label}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          }
-
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              onClick={onNavigate}
-              title={!showLabels ? item.label : undefined}
-              className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
-                active
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
-              }`}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              {showLabels && <span className="truncate">{item.label}</span>}
-            </Link>
-          )
-        })}
+        {sections.map((section) => (
+          <div key={section.id} className={overviewVisible ? "mt-1" : ""}>
+            {showLabels ? (
+              <p className="px-2 pt-3 pb-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400">
+                {section.title}
+              </p>
+            ) : (
+              // Collapsed rail: a thin divider stands in for the section header.
+              <div className="my-1.5 mx-2 border-t border-neutral-200" aria-hidden />
+            )}
+            <div className="space-y-0.5">{section.items.map(renderEntry)}</div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer-pinned items (configuration surfaces) */}

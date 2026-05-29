@@ -2,14 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
-import {
-  Megaphone,
-  Mail,
-  Ticket,
-  Users2,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react"
+import { Megaphone, CheckCircle2, AlertCircle } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { CrossSourceDupesPanel } from "@/components/admin/CrossSourceDupesPanel"
 import { AudiencesHeaderStrip } from "@/components/admin/submissions/AudiencesHeaderStrip"
@@ -114,72 +107,16 @@ export default function AudiencesPage() {
                 </span>
               </div>
             </div>
-
-            {/* Sub-tab navigation */}
-            <nav
-              className="flex gap-0 -mb-px overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              aria-label="Audience sources"
-            >
-              <button
-                onClick={() => switchSub("newsletter")}
-                aria-current={activeSub === "newsletter" ? "page" : undefined}
-                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
-                  activeSub === "newsletter"
-                    ? "text-neutral-900"
-                    : "text-neutral-400 hover:text-neutral-600"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5" />
-                  Newsletter
-                </span>
-                {activeSub === "newsletter" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
-                )}
-              </button>
-              <button
-                onClick={() => switchSub("events")}
-                aria-current={activeSub === "events" ? "page" : undefined}
-                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
-                  activeSub === "events"
-                    ? "text-neutral-900"
-                    : "text-neutral-400 hover:text-neutral-600"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Ticket className="w-3.5 h-3.5" />
-                  Events
-                </span>
-                {activeSub === "events" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
-                )}
-              </button>
-              <button
-                onClick={() => switchSub("lists")}
-                aria-current={activeSub === "lists" ? "page" : undefined}
-                className={`relative shrink-0 px-3 sm:px-4 py-3 text-[13px] font-semibold tracking-wide whitespace-nowrap transition-colors ${
-                  activeSub === "lists"
-                    ? "text-neutral-900"
-                    : "text-neutral-400 hover:text-neutral-600"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Users2 className="w-3.5 h-3.5" />
-                  Lists
-                </span>
-                {activeSub === "lists" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 rounded-full" />
-                )}
-              </button>
-            </nav>
+            {/* Source switcher lives in the AudiencesHeaderStrip below (segmented
+                control with per-source counts) — no separate tab row here. */}
           </div>
         </header>
 
         {/* Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          {/* Stage 4 — Audiences-level rollup tiles. Total / +N in 7d /
-              % in Mailchimp per source. Tiles are also a nav surface — the
-              active tile mirrors the sub-tab nav state. */}
+          {/* Source switcher — segmented control with per-source totals, plus
+              the active source's secondary KPIs (+this week / % in Mailchimp).
+              This is the page's only nav for Newsletter / Events / Lists. */}
           <AudiencesHeaderStrip activeSub={activeSub} onSelectSub={switchSub} />
 
           {/* Cross-source dedupe panel — surfaces emails appearing across the

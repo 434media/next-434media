@@ -1,22 +1,22 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Mail, Ticket, Users2, ArrowRight, Loader2 } from "lucide-react"
+import { Mail, Ticket, Users2, Loader2 } from "lucide-react"
 import { useMailchimpSubscribers } from "@/components/admin/MailchimpSubscribedPill"
 import type { Lead } from "@/types/crm-types"
 
-// Stage 4 — Audiences-level rollup strip. Renders three per-source tiles
-// (Newsletter / Events / Lists) at the top of /admin/audiences with three
-// numbers each:
-//   - Total (count of contacts in that source)
-//   - +N in 7d (recent intake; quick "is this source still alive?" check)
+// Stage 4 — Audiences source nav + KPIs, fused into one control.
+//
+// This is the page's ONLY source switcher (it replaced the separate text
+// sub-tab row that used to sit in the sticky header — that was a second,
+// redundant three-way nav for the same Newsletter / Events / Lists). Each
+// segment carries its source's total so all three counts stay visible at a
+// glance, and the secondary stats for the *active* source render just below:
+//   - +N this week (recent intake; "is this source still alive?")
 //   - % in Mailchimp (campaign reachability today)
 //
-// The strip is also a navigation surface — clicking a tile switches the
-// active sub-tab. Duplicates the sub-tab nav at the top of the page, but
-// the duplication is intentional: a marketing operator scanning numbers can
-// click straight from the data they're looking at instead of jumping back
-// up to the nav. Active tile mirrors the dark filled state of the nav.
+// Per-source detail sits next to the data you're viewing instead of stacking
+// all three sources' KPIs above the table.
 
 type SubTab = "newsletter" | "events" | "lists"
 
@@ -112,105 +112,91 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscriberMap])
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-      <SourceTile
-        label="Newsletter"
-        icon={Mail}
-        active={activeSub === "newsletter"}
-        stats={newsletter}
-        loading={isLoading}
-        onClick={() => onSelectSub("newsletter")}
-      />
-      <SourceTile
-        label="Events"
-        icon={Ticket}
-        active={activeSub === "events"}
-        stats={events}
-        loading={isLoading}
-        onClick={() => onSelectSub("events")}
-      />
-      <SourceTile
-        label="Lists"
-        icon={Users2}
-        active={activeSub === "lists"}
-        stats={lists}
-        loading={isLoading}
-        onClick={() => onSelectSub("lists")}
-      />
-    </div>
-  )
-}
-
-interface SourceTileProps {
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  active: boolean
-  stats: SourceStats | null
-  loading: boolean
-  onClick: () => void
-}
-
-function SourceTile({ label, icon: Icon, active, stats, loading, onClick }: SourceTileProps) {
+  const sources = [
+    { id: "newsletter" as const, label: "Newsletter", icon: Mail, stats: newsletter },
+    { id: "events" as const, label: "Events", icon: Ticket, stats: events },
+    { id: "lists" as const, label: "Lists", icon: Users2, stats: lists },
+  ]
+  const active = sources.find((s) => s.id === activeSub) ?? sources[0]
+  const activeStats = active.stats
   const mcPct =
-    stats && stats.total > 0 ? Math.round((stats.inMailchimp / stats.total) * 100) : 0
+    activeStats && activeStats.total > 0
+      ? Math.round((activeStats.inMailchimp / activeStats.total) * 100)
+      : 0
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      aria-label={`Switch to ${label} sub-tab`}
-      className={`group p-4 rounded-xl border transition-all text-left ${
-        active
-          ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-          : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-      }`}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <Icon className="w-3.5 h-3.5 opacity-70" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider">
-            {label}
-          </span>
-        </div>
-        <ArrowRight
-          className={`w-3.5 h-3.5 transition-opacity ${
-            active ? "opacity-50" : "opacity-30 group-hover:opacity-70"
-          }`}
-        />
+    <div className="mb-4">
+      {/* Segmented control — the single source switcher, with each source's
+          total baked in so all three counts stay visible while you navigate. */}
+      <div
+        role="tablist"
+        aria-label="Audience sources"
+        className="grid grid-cols-3 gap-1 rounded-xl border border-neutral-200 bg-white p-1"
+      >
+        {sources.map((s) => {
+          const Icon = s.icon
+          const isActive = s.id === activeSub
+          return (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onSelectSub(s.id)}
+              className={`flex flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                isActive
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-600 hover:bg-neutral-50"
+              }`}
+            >
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                <Icon className="w-3.5 h-3.5 opacity-70" />
+                {s.label}
+              </span>
+              {isLoading ? (
+                <span
+                  className={`h-6 w-12 rounded animate-pulse ${
+                    isActive ? "bg-white/20" : "bg-neutral-100"
+                  }`}
+                />
+              ) : (
+                <span className="text-xl sm:text-2xl font-bold leading-none tabular-nums">
+                  {(s.stats?.total ?? 0).toLocaleString()}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
-      {loading ? (
-        <div className="flex items-center gap-2 text-[12px] opacity-60 h-12">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          Loading…
-        </div>
-      ) : stats ? (
-        <>
-          <div className="text-2xl font-bold leading-tight tabular-nums mb-1">
-            {stats.total.toLocaleString()}
-          </div>
-          <div
-            className={`text-[11px] flex items-center gap-3 ${
-              active ? "opacity-80" : "text-neutral-500"
-            }`}
-          >
+      {/* Secondary KPIs for the active source only. */}
+      <div className="mt-2 flex items-center gap-3 px-1 text-[12px] text-neutral-500">
+        {isLoading ? (
+          <span className="flex items-center gap-2 opacity-60">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Loading…
+          </span>
+        ) : activeStats ? (
+          <>
+            <span className="font-medium text-neutral-700">{active.label}</span>
+            <span className="text-neutral-300">·</span>
             <span className="tabular-nums">
-              <strong className="font-semibold">+{stats.last7Days.toLocaleString()}</strong> in 7d
+              <strong className="font-semibold text-neutral-700">
+                +{activeStats.last7Days.toLocaleString()}
+              </strong>{" "}
+              this week
             </span>
-            <span className={active ? "opacity-40" : "text-neutral-300"}>·</span>
+            <span className="text-neutral-300">·</span>
             <span className="tabular-nums">
-              <strong className="font-semibold">{mcPct}%</strong> in Mailchimp
+              <strong className="font-semibold text-neutral-700">{mcPct}%</strong> in Mailchimp
             </span>
-          </div>
-        </>
-      ) : (
-        <div className="text-[12px] opacity-60 h-12">No data</div>
-      )}
-    </button>
+          </>
+        ) : (
+          <span className="opacity-60">No data</span>
+        )}
+      </div>
+    </div>
   )
 }

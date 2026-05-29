@@ -34,6 +34,41 @@ export interface EventRegistration {
 
 const COLLECTION = COLLECTIONS.EVENT_REGISTRATIONS
 
+// ── In-memory read cache (mirrors lib/firestore-crm.ts / firestore-events.ts) ──
+// getEventRegistrations fans out to three Firestore backends: the default DB,
+// the techday named DB, and the Digital Canvas project (a *separate* GCP
+// project — the slow leg at ~2–3s per call). Nothing here was cached, so every
+// admin surface that lists registrations (Audiences, the /admin overview, the
+// header strips) paid that cross-project round-trip in full on each load. A
+// short TTL collapses repeat reads; writes invalidate eagerly so an edit is
+// reflected on the next fetch.
+interface RegCacheEntry<T> {
+  data: T
+  timestamp: number
+}
+const regCache = new Map<string, RegCacheEntry<unknown>>()
+const REG_CACHE_TTL = 30 * 1000 // 30 seconds
+
+function getRegCache<T>(key: string): T | null {
+  const entry = regCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.timestamp > REG_CACHE_TTL) {
+    regCache.delete(key)
+    return null
+  }
+  return entry.data as T
+}
+
+function setRegCache<T>(key: string, data: T): void {
+  regCache.set(key, { data, timestamp: Date.now() })
+}
+
+// Cleared wholesale on any write — the cross-backend dedup/merge makes targeted
+// per-key invalidation error-prone, and writes are rare relative to reads.
+export function invalidateRegistrationsCache(): void {
+  regCache.clear()
+}
+
 /**
  * Convert a Firestore Timestamp or date value to ISO string
  */
@@ -267,6 +302,10 @@ export async function getEventRegistrations(filters?: {
   event?: string
   source?: string
 }): Promise<EventRegistration[]> {
+  const cacheKey = `registrations:${filters?.event ?? "*"}:${filters?.source ?? "*"}`
+  const cached = getRegCache<EventRegistration[]>(cacheKey)
+  if (cached) return cached
+
   try {
     // Fetch from default DB
     const db = getDb()
@@ -296,6 +335,7 @@ export async function getEventRegistrations(filters?: {
       filters.source !== "SATechDay" &&
       filters.source !== "web-digitalcanvas"
     ) {
+      setRegCache(cacheKey, defaultRegs)
       return defaultRegs
     }
 
@@ -305,6 +345,7 @@ export async function getEventRegistrations(filters?: {
       ...techdayRegs,
       ...dcRegs,
     ])
+    setRegCache(cacheKey, allRegs)
     return allRegs
   } catch (error) {
     console.error("Error fetching event registrations:", error)
@@ -397,12 +438,14 @@ export async function updateEventRegistration(
       const realId = id.replace("techday:", "")
       const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
       await tdDb.collection("registrations").doc(realId).update(fields)
+      invalidateRegistrationsCache()
       return { success: true }
     }
     if (id.startsWith("dc:")) {
       const realId = id.replace("dc:", "")
       const dcDb = getDigitalCanvasDb()
       await dcDb.collection("event-registrations").doc(realId).update(fields)
+      invalidateRegistrationsCache()
       return { success: true }
     }
 
@@ -417,7 +460,7 @@ export async function updateEventRegistration(
       BACKFILL_FIELDS.includes(k as BackfillField),
     ) as BackfillField[]
 
-    let willStampProvenance = backfillKeys.length > 0
+    const willStampProvenance = backfillKeys.length > 0
 
     if (backfillKeys.length > 0) {
       const snapshot = await docRef.get()
@@ -448,6 +491,7 @@ export async function updateEventRegistration(
     }
 
     await docRef.update(writeFields)
+    invalidateRegistrationsCache()
     return { success: true }
   } catch (error) {
     console.error("Error updating event registration:", error)
@@ -492,6 +536,7 @@ export async function addEventRegistration(
       const mergedTags = Array.from(new Set([...existingTags, ...newTags]))
 
       await matchingDoc.ref.update({ tags: mergedTags })
+      invalidateRegistrationsCache()
       return { success: true, id: matchingDoc.id, merged: true }
     }
 
@@ -500,6 +545,7 @@ export async function addEventRegistration(
       ...registration,
       registeredAt: registration.registeredAt || new Date().toISOString(),
     })
+    invalidateRegistrationsCache()
     return { success: true, id: docRef.id }
   } catch (error) {
     console.error("Error adding event registration:", error)
@@ -518,6 +564,7 @@ export async function deleteEventRegistration(id: string): Promise<{ success: bo
       const realId = id.replace("techday:", "")
       const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
       await tdDb.collection("registrations").doc(realId).delete()
+      invalidateRegistrationsCache()
       return { success: true }
     }
 
@@ -526,11 +573,13 @@ export async function deleteEventRegistration(id: string): Promise<{ success: bo
       const realId = id.replace("dc:", "")
       const dcDb = getDigitalCanvasDb()
       await dcDb.collection("event-registrations").doc(realId).delete()
+      invalidateRegistrationsCache()
       return { success: true }
     }
 
     const db = getDb()
     await db.collection(COLLECTION).doc(id).delete()
+    invalidateRegistrationsCache()
     return { success: true }
   } catch (error) {
     console.error("Error deleting event registration:", error)
@@ -581,16 +630,19 @@ export async function markEventRegistrationPromoted(
     const realId = id.replace("techday:", "")
     const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
     await tdDb.collection("registrations").doc(realId).update(update)
+    invalidateRegistrationsCache()
     return
   }
   if (id.startsWith("dc:")) {
     const realId = id.replace("dc:", "")
     const dcDb = getDigitalCanvasDb()
     await dcDb.collection("event-registrations").doc(realId).update(update)
+    invalidateRegistrationsCache()
     return
   }
   const db = getDb()
   await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).doc(id).update(update)
+  invalidateRegistrationsCache()
 }
 
 /**
