@@ -7,10 +7,7 @@ import type {
   Brand,
   Disposition,
   DOC,
-  ViewMode,
   Toast as ToastType,
-  CurrentUser,
-  ContentPost,
 } from "../components/crm/types"
 
 // Contact form shape (shared by client and opportunity forms)
@@ -148,30 +145,18 @@ interface UseClientHandlersProps {
   setEditingClient: Dispatch<SetStateAction<Client | null>>
   clientForm: ClientFormData
   setClientForm: Dispatch<SetStateAction<ClientFormData>>
-  showClientForm: boolean
   setShowClientForm: Dispatch<SetStateAction<boolean>>
   // Opportunity form state
   opportunityForm: OpportunityFormData
   setOpportunityForm: Dispatch<SetStateAction<OpportunityFormData>>
   isEditingOpportunity: boolean
   setIsEditingOpportunity: Dispatch<SetStateAction<boolean>>
-  showOpportunityForm: boolean
   setShowOpportunityForm: Dispatch<SetStateAction<boolean>>
-  // Content post state
-  contentPosts: ContentPost[]
-  setContentPosts: Dispatch<SetStateAction<ContentPost[]>>
-  editingContentPost: ContentPost | null
-  setEditingContentPost: Dispatch<SetStateAction<ContentPost | null>>
-  showContentPostForm: boolean
-  setShowContentPostForm: Dispatch<SetStateAction<boolean>>
   // Linked panel
   setCurrentOpportunityForLinked: Dispatch<SetStateAction<Client | null>>
   setLinkedTasks: Dispatch<SetStateAction<Task[]>>
   setLinkedClientForPanel: Dispatch<SetStateAction<Client | null>>
   setShowLinkedTasksPanel: Dispatch<SetStateAction<boolean>>
-  // Current user & view
-  currentUser: CurrentUser | null
-  setViewMode: Dispatch<SetStateAction<ViewMode>>
 }
 
 export function useClientHandlers({
@@ -184,30 +169,19 @@ export function useClientHandlers({
   setEditingClient,
   clientForm,
   setClientForm,
-  showClientForm,
   setShowClientForm,
   opportunityForm,
   setOpportunityForm,
   isEditingOpportunity,
   setIsEditingOpportunity,
-  showOpportunityForm,
   setShowOpportunityForm,
-  contentPosts,
-  setContentPosts,
-  editingContentPost,
-  setEditingContentPost,
-  showContentPostForm,
-  setShowContentPostForm,
   setCurrentOpportunityForLinked,
   setLinkedTasks,
   setLinkedClientForPanel,
   setShowLinkedTasksPanel,
-  currentUser,
-  setViewMode,
 }: UseClientHandlersProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingOpportunity, setIsSavingOpportunity] = useState(false)
-  const [isSavingContentPost, setIsSavingContentPost] = useState(false)
 
   // Save client
   const handleSaveClient = async () => {
@@ -609,118 +583,9 @@ export function useClientHandlers({
     }
   }
 
-  // Content Post Handlers
-  const handleAddContentPost = () => {
-    setEditingContentPost(null)
-    setShowContentPostForm(true)
-  }
-
-  const handleOpenContentPost = (post: ContentPost) => {
-    setEditingContentPost(post)
-    setShowContentPostForm(true)
-  }
-
-  const handleOpenContentPostFromNotification = async (postId: string) => {
-    let posts = contentPosts
-    if (posts.length === 0) {
-      try {
-        const response = await fetch("/api/admin/crm/content-posts")
-        if (response.ok) {
-          const data = await response.json()
-          posts = data.posts || []
-          setContentPosts(posts)
-        }
-      } catch { /* ignore */ }
-    }
-
-    let post = posts.find(p => p.id === postId)
-    if (!post) {
-      try {
-        const response = await fetch("/api/admin/crm/content-posts")
-        if (response.ok) {
-          const data = await response.json()
-          posts = data.posts || []
-          setContentPosts(posts)
-          post = posts.find(p => p.id === postId)
-        }
-      } catch { /* ignore */ }
-    }
-
-    if (post) {
-      setViewMode("social-calendar")
-      setEditingContentPost(post)
-      setShowContentPostForm(true)
-    } else {
-      setViewMode("social-calendar")
-      setToast({ message: "Could not find the content post", type: "error" })
-    }
-  }
-
-  const handleSaveContentPost = async (postData: Partial<ContentPost>) => {
-    setIsSavingContentPost(true)
-    try {
-      if (editingContentPost) {
-        const response = await fetch(`/api/admin/crm/content-posts?id=${editingContentPost.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(postData),
-        })
-        if (!response.ok) throw new Error("Failed to update content post")
-        const data = await response.json()
-        setContentPosts(prev => prev.map(p => p.id === editingContentPost.id ? data.post : p))
-        setToast({ message: "Content post updated successfully", type: "success" })
-      } else {
-        const response = await fetch("/api/admin/crm/content-posts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user: postData.user || "",
-            date_created: new Date().toISOString(),
-            platform: postData.platform,
-            status: postData.status || "to_do",
-            title: postData.title || "",
-            date_to_post: postData.date_to_post,
-            notes: postData.notes,
-            thumbnail: postData.thumbnail,
-            social_copy: postData.social_copy,
-            links: postData.links || [],
-            assets: postData.assets || [],
-            tags: postData.tags,
-            social_platforms: postData.social_platforms || [],
-            comments: postData.comments || [],
-          }),
-        })
-        if (!response.ok) throw new Error("Failed to create content post")
-        const data = await response.json()
-        setContentPosts(prev => [...prev, data.post])
-        setToast({ message: "Content post created successfully", type: "success" })
-      }
-      setShowContentPostForm(false)
-      setEditingContentPost(null)
-    } catch {
-      setToast({ message: `Failed to ${editingContentPost ? "update" : "create"} content post`, type: "error" })
-    } finally {
-      setIsSavingContentPost(false)
-    }
-  }
-
-  const handleDeleteContentPost = async (postId: string) => {
-    try {
-      const response = await fetch(`/api/admin/crm/content-posts?id=${postId}`, { method: "DELETE" })
-      if (!response.ok) throw new Error("Failed to delete content post")
-      setContentPosts(prev => prev.filter(p => p.id !== postId))
-      setShowContentPostForm(false)
-      setEditingContentPost(null)
-      setToast({ message: "Content post deleted successfully", type: "success" })
-    } catch {
-      setToast({ message: "Failed to delete content post", type: "error" })
-    }
-  }
-
   return {
     isSaving,
     isSavingOpportunity,
-    isSavingContentPost,
     handleSaveClient,
     handleSaveOpportunity,
     handleDeleteClient,
@@ -730,10 +595,5 @@ export function useClientHandlers({
     handleEditClient,
     handleEditOpportunity,
     handleStackedItemsClick,
-    handleAddContentPost,
-    handleOpenContentPost,
-    handleOpenContentPostFromNotification,
-    handleSaveContentPost,
-    handleDeleteContentPost,
   }
 }

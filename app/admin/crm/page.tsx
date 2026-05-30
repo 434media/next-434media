@@ -8,7 +8,6 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
-  Calendar,
 } from "lucide-react"
 
 // Import CRM components
@@ -19,11 +18,9 @@ import {
   OpportunitiesKanbanView,
   ClientsView,
   TasksView,
-  SocialCalendarView,
   ClientDetailDrawer,
   OpportunityDetailDrawer,
   TaskDetailDrawer,
-  ContentDetailDrawer,
   LinkedTasksPanel,
 } from "@/components/crm"
 
@@ -37,7 +34,6 @@ import type {
   CurrentUser,
   TaskAttachment,
   CRMTag,
-  ContentPost,
 } from "@/components/crm/types"
 
 import { useTaskHandlers, EMPTY_TASK_FORM } from "@/hooks/useTaskHandlers"
@@ -153,12 +149,6 @@ export default function SalesCRMPage() {
   const [pipeline, setPipeline] = useState<PipelineColumn[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
-  const [contentPosts, setContentPosts] = useState<ContentPost[]>([])
-  
-  // Content Post Modal state
-  const [showContentPostForm, setShowContentPostForm] = useState(false)
-  const [editingContentPost, setEditingContentPost] = useState<ContentPost | null>(null)
-
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard")
   const [searchQuery, setSearchQuery] = useState("")
@@ -329,17 +319,6 @@ export default function SalesCRMPage() {
     }
   }
 
-  const loadContentPosts = async () => {
-    try {
-      const response = await fetch("/api/admin/crm/content-posts")
-      if (!response.ok) throw new Error("Failed to fetch content posts")
-      const data = await response.json()
-      setContentPosts(data.posts || [])
-    } catch (err) {
-      setToast({ message: "Failed to load content posts", type: "error" })
-    }
-  }
-
   const loadTags = async () => {
     setIsLoadingTags(true)
     try {
@@ -467,7 +446,6 @@ export default function SalesCRMPage() {
   const {
     isSaving,
     isSavingOpportunity,
-    isSavingContentPost,
     handleSaveClient,
     handleSaveOpportunity,
     handleDeleteClient,
@@ -477,11 +455,6 @@ export default function SalesCRMPage() {
     handleEditClient,
     handleEditOpportunity,
     handleStackedItemsClick,
-    handleAddContentPost,
-    handleOpenContentPost,
-    handleOpenContentPostFromNotification,
-    handleSaveContentPost,
-    handleDeleteContentPost,
   } = useClientHandlers({
     clients,
     setClients,
@@ -492,26 +465,16 @@ export default function SalesCRMPage() {
     setEditingClient,
     clientForm,
     setClientForm,
-    showClientForm,
     setShowClientForm,
     opportunityForm,
     setOpportunityForm,
     isEditingOpportunity,
     setIsEditingOpportunity,
-    showOpportunityForm,
     setShowOpportunityForm,
-    contentPosts,
-    setContentPosts,
-    editingContentPost,
-    setEditingContentPost,
-    showContentPostForm,
-    setShowContentPostForm,
     setCurrentOpportunityForLinked,
     setLinkedTasks,
     setLinkedClientForPanel,
     setShowLinkedTasksPanel,
-    currentUser,
-    setViewMode,
   })
 
   // ======== useEffects ========
@@ -546,11 +509,6 @@ export default function SalesCRMPage() {
       if (storedTaskId) {
         sessionStorage.removeItem("openTaskId")
         handleOpenTaskFromNotification(storedTaskId)
-      }
-      const storedContentPostId = sessionStorage.getItem("openContentPostId")
-      if (storedContentPostId) {
-        sessionStorage.removeItem("openContentPostId")
-        handleOpenContentPostFromNotification(storedContentPostId)
       }
     }
   }, [isLoading, tasks])
@@ -606,7 +564,19 @@ export default function SalesCRMPage() {
   const tabParam = searchParams?.get("tab") ?? null
   useEffect(() => {
     if (!tabParam) return
-    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks", "social-calendar"]
+    // Legacy redirect — the Social Calendar moved to its own /admin/content
+    // route. Old links (?tab=social-calendar, optionally ?openContent=) forward
+    // there so bookmarks and notifications keep working.
+    if (tabParam === "social-calendar") {
+      const openContent = searchParams?.get("openContent")
+      router.replace(
+        openContent
+          ? `/admin/content?openContent=${encodeURIComponent(openContent)}`
+          : "/admin/content",
+      )
+      return
+    }
+    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks"]
     if (allowed.includes(tabParam as ViewMode) && tabParam !== viewMode) {
       setViewMode(tabParam as ViewMode)
     }
@@ -657,8 +627,6 @@ export default function SalesCRMPage() {
       setShowOpportunityForm(true)
     } else if (newParam === "task") {
       handleAddTask()
-    } else if (newParam === "content") {
-      handleAddContentPost()
     }
     const params = new URLSearchParams(searchParams?.toString() ?? "")
     params.delete("new")
@@ -750,46 +718,6 @@ export default function SalesCRMPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTaskModal, selectedTask?.id])
 
-  // ?openContent=<id> — same pattern, against the contentPosts[] array.
-  // Note contentPosts only loads when viewMode === "social-calendar", so the
-  // ?tab= sync above must run first to populate the array.
-  const openContentId = searchParams?.get("openContent") ?? null
-  useEffect(() => {
-    if (!openContentId) {
-      if (showContentPostForm) {
-        setShowContentPostForm(false)
-        setEditingContentPost(null)
-      }
-      return
-    }
-    if (contentPosts.length === 0) return
-    const target = contentPosts.find((p) => p.id === openContentId)
-    if (!target) return
-    if (editingContentPost?.id === openContentId && showContentPostForm) return
-    handleOpenContentPost(target)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openContentId, contentPosts])
-
-  const closeContentDrawer = () => {
-    setShowContentPostForm(false)
-    setEditingContentPost(null)
-    if (searchParams?.get("openContent")) {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete("openContent")
-      const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-    }
-  }
-
-  useEffect(() => {
-    if (!showContentPostForm || !editingContentPost?.id) return
-    if (searchParams?.get("openContent") === editingContentPost.id) return
-    const params = new URLSearchParams(searchParams?.toString() ?? "")
-    params.set("openContent", editingContentPost.id)
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showContentPostForm, editingContentPost?.id])
-
   // Set default assignee filter based on logged-in user
   useEffect(() => {
     if (currentUser?.email && Object.keys(teamMembersMap).length > 0) {
@@ -820,8 +748,6 @@ export default function SalesCRMPage() {
       loadPipeline()
       loadClients()
       loadTasks()
-    } else if (viewMode === "social-calendar") {
-      loadContentPosts()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode])
@@ -863,7 +789,6 @@ export default function SalesCRMPage() {
               { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
               { id: "clients", label: "Clients", icon: Users, badge: null },
               { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
-              { id: "social-calendar", label: "Social Calendar", icon: Calendar, badge: null },
             ].map(({ id, label, icon: Icon, badge }) => (
               <button
                 key={id}
@@ -1002,27 +927,7 @@ export default function SalesCRMPage() {
           />
         )}
 
-        {/* Social Calendar View */}
-        {viewMode === "social-calendar" && (
-          <SocialCalendarView
-            contentPosts={contentPosts}
-            onOpenPost={handleOpenContentPost}
-            onAddPost={handleAddContentPost}
-          />
-        )}
-
       </div>
-
-      {/* Content Post Detail Drawer */}
-      <ContentDetailDrawer
-        open={showContentPostForm}
-        post={editingContentPost}
-        isSaving={isSavingContentPost}
-        currentUser={currentUser}
-        onSave={handleSaveContentPost}
-        onDelete={editingContentPost ? handleDeleteContentPost : undefined}
-        onClose={closeContentDrawer}
-      />
 
       {/* Client Detail Drawer */}
       <ClientDetailDrawer

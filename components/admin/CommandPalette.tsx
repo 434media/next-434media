@@ -76,7 +76,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Calendar,
     section: "Quick actions",
     search: "create new content post social",
-    run: (router) => router.push("/admin/crm?tab=social-calendar&new=content"),
+    run: (router) => router.push("/admin/content?new=content"),
   },
   {
     id: "create-lead",
@@ -227,6 +227,15 @@ const STATIC_ITEMS: CommandItem[] = [
     section: "Navigate",
     search: "analytics linkedin social",
     run: (router) => router.push("/admin/analytics-linkedin"),
+  },
+  {
+    id: "nav-content-calendar",
+    label: "Content — Calendar",
+    hint: "Social content calendar & approvals",
+    icon: Calendar,
+    section: "Navigate",
+    search: "content calendar social posts schedule approve reject",
+    run: (router) => router.push("/admin/content"),
   },
   {
     id: "nav-feed",

@@ -27,6 +27,7 @@ const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
   { match: "/admin/analytics-instagram", label: "Analytics · Instagram" },
   { match: "/admin/analytics-linkedin", label: "Analytics · LinkedIn" },
   { match: "/admin/analytics", label: "Analytics" },
+  { match: "/admin/content", label: "Content · Calendar" },
   { match: "/admin/feed-form", label: "Content · Feed" },
   { match: "/admin/blog", label: "Content · Blog" },
   { match: "/admin/project-management", label: "Project Management" },

@@ -12,6 +12,8 @@ import {
   FileText,
   Flag,
   Megaphone,
+  Calendar,
+  Newspaper,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -133,20 +135,42 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     ],
   },
   {
+    id: "content",
+    title: "Content",
+    items: [
+      // Social Calendar — graduated from the CRM tab into its own surface, ahead
+      // of the approve/reject + posting pipeline. crm_only can reach it (same as
+      // the page guard); Feed/Blog stay full_admin.
+      {
+        id: "content-calendar",
+        label: "Calendar",
+        icon: Calendar,
+        href: "/admin/content",
+        matchPrefix: "/admin/content",
+        roles: ["full_admin", "crm_only"],
+      },
+      {
+        id: "feed",
+        label: "Feed",
+        icon: Layers,
+        href: "/admin/feed-form",
+        matchPrefix: "/admin/feed-form",
+        roles: ["full_admin"],
+      },
+      {
+        id: "blog",
+        label: "Blog",
+        icon: Newspaper,
+        href: "/admin/blog",
+        matchPrefix: "/admin/blog",
+        roles: ["full_admin"],
+      },
+    ],
+  },
+  {
     id: "workspace",
     title: "Workspace",
     items: [
-      {
-        id: "content",
-        label: "Content",
-        icon: Layers,
-        matchPrefix: "/admin/feed-form|/admin/blog",
-        roles: ["full_admin"],
-        children: [
-          { id: "feed", label: "Feed", href: "/admin/feed-form", matchPrefix: "/admin/feed-form" },
-          { id: "blog", label: "Blog", href: "/admin/blog", matchPrefix: "/admin/blog" },
-        ],
-      },
       {
         id: "projects",
         label: "Projects",
