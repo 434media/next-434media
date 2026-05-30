@@ -8,6 +8,10 @@ import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useContentPostHandlers } from "@/hooks/useContentPostHandlers"
 
+// Same fallback list as lib/auth.ts CRM_SUPER_ADMIN_FALLBACK — lets the review
+// action bar render before a session role lookup, for the two known super-admins.
+const SUPER_ADMIN_EMAILS = ["marcos@434media.com", "jesse@434media.com"]
+
 // /admin/content — the Social Calendar lifted out of the CRM tab into its own
 // route, ahead of the approve/reject + posting pipeline. Data still lives in
 // crm_content_posts; this is purely the surface relocation. Mirrors the
@@ -19,6 +23,9 @@ export default function ContentPage() {
   const pathname = usePathname()
 
   const [toast, setToast] = useState<ToastType | null>(null)
+  // Whether the current user can approve/reject (super-admin only). The decision
+  // API enforces this server-side; this just gates the UI affordance.
+  const [canReview, setCanReview] = useState(false)
 
   const {
     contentPosts,
@@ -39,6 +46,26 @@ export default function ContentPage() {
   useEffect(() => {
     loadContentPosts()
   }, [loadContentPosts])
+
+  // Resolve whether the current user may approve/reject (super-admin only).
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/auth/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.authenticated || !data.user) return
+        const email = (data.user.email || "").toLowerCase()
+        const isSuper =
+          SUPER_ADMIN_EMAILS.includes(email) || data.user.role === "crm_super_admin"
+        setCanReview(isSuper)
+      })
+      .catch(() => {
+        /* non-fatal — defaults to no review actions */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -131,6 +158,11 @@ export default function ContentPage() {
           onClose={closeContentDrawer}
           onSave={handleSaveContentPost}
           onDelete={editingContentPost ? handleDeleteContentPost : undefined}
+          canReview={canReview}
+          onDecided={() => {
+            closeContentDrawer()
+            loadContentPosts()
+          }}
         />
       </div>
     </AdminRoleGuard>

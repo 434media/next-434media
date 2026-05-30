@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Calendar,
   CalendarDays,
   CalendarRange,
@@ -67,11 +68,13 @@ function toDateString(date: Date): string {
 // Mono dot map per status — replaces the legacy bg/border/text saturated triples.
 // Pill chrome stays mono everywhere; the dot color carries semantic meaning.
 const STATUS_DOT: Record<ContentPostStatus, string> = {
+  ai_drafted: "bg-violet-500",
   to_do: "bg-neutral-400",
   planning: "bg-neutral-400",
   in_progress: "bg-neutral-500",
-  needs_approval: "bg-red-500",
+  needs_approval: "bg-amber-500",
   approved: "bg-blue-500",
+  rejected: "bg-red-500",
   scheduled: "bg-amber-500",
   posted: "bg-emerald-500",
 }
@@ -186,13 +189,21 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
 }
 
 export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: SocialCalendarViewProps) {
+  // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
+  // in-review work live), "calendar" is the date grid (scheduled/posted only).
+  // The pipeline belongs on the board, not as a filter over a date grid — a
+  // calendar can't show work that has no date yet.
+  const [view, setView] = useState<"board" | "calendar">("board")
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
   const [hoveredDay, setHoveredDay] = useState<string | null>(null)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set())
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  // Filters popover holds the User + Platform slicers. Status isn't a filter
+  // here — it's the Board's columns (and the Calendar shows dated posts only).
+  const [showFilters, setShowFilters] = useState(false)
+  const filtersRef = useRef<HTMLDivElement>(null)
 
   const fetchTeamMembers = useCallback(async () => {
     try {
@@ -212,20 +223,50 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
 
   useEffect(() => { fetchTeamMembers() }, [fetchTeamMembers])
 
+  // Close the Filters popover on outside-click / Escape.
+  useEffect(() => {
+    if (!showFilters) return
+    function onClick(e: MouseEvent) {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) setShowFilters(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowFilters(false)
+    }
+    document.addEventListener("mousedown", onClick)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("mousedown", onClick)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [showFilters])
+
   const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
   const togglePlatform = (platform: string) => { setSelectedPlatforms(prev => { const next = new Set(prev); next.has(platform) ? next.delete(platform) : next.add(platform); return next }) }
-  const toggleStatus = (status: string) => { setSelectedStatuses(prev => { const next = new Set(prev); next.has(status) ? next.delete(status) : next.add(status); return next }) }
-  const clearAllFilters = () => { setSelectedUsers(new Set()); setSelectedPlatforms(new Set()); setSelectedStatuses(new Set()) }
-  const hasActiveFilters = selectedUsers.size > 0 || selectedPlatforms.size > 0 || selectedStatuses.size > 0
+  // Count of the secondary (popover) slicers only — drives the Filters badge.
+  const secondaryFilterCount = selectedUsers.size + selectedPlatforms.size
+
+  // Workflow phases — group the status enum into the four Board columns.
+  const PIPELINE_GROUPS: { label: string; statuses: ContentPostStatus[] }[] = [
+    { label: "Produce", statuses: ["ai_drafted", "to_do", "planning", "in_progress"] },
+    { label: "Review", statuses: ["needs_approval", "rejected"] },
+    { label: "Schedule", statuses: ["approved", "scheduled"] },
+    { label: "Live", statuses: ["posted"] },
+  ]
 
   const filteredPosts = useMemo(() => {
     return contentPosts.filter(post => {
       if (selectedUsers.size > 0 && !selectedUsers.has(post.user)) return false
       if (selectedPlatforms.size > 0 && post.platform && !selectedPlatforms.has(post.platform)) return false
-      if (selectedStatuses.size > 0 && !selectedStatuses.has(post.status)) return false
       return true
     })
-  }, [contentPosts, selectedUsers, selectedPlatforms, selectedStatuses])
+  }, [contentPosts, selectedUsers, selectedPlatforms])
+
+  // Posts that the Calendar can't show because they have no scheduled date —
+  // surfaced as an indicator so they're never silently dropped.
+  const unscheduledCount = useMemo(
+    () => filteredPosts.filter(p => !p.date_to_post).length,
+    [filteredPosts],
+  )
 
   const postsByDate = useMemo(() => {
     const grouped: Record<string, ContentPost[]> = {}
@@ -276,14 +317,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     return currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
   }
 
-  const platformStats = useMemo(() => {
-    const stats: Record<SocialPlatform, number> = { instagram: 0, youtube: 0, tiktok: 0, linkedin: 0, facebook: 0 }
-    filteredPosts.forEach(post => { post.social_platforms?.forEach(platform => { stats[platform]++ }) })
-    return stats
-  }, [filteredPosts])
-
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-  const statusOptions = CONTENT_POST_STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label, color: s.color }))
   const brandOptions = BRANDS.map(b => ({ value: b, label: b }))
 
   // Filter out specific users from the calendar filter list
@@ -295,23 +329,126 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
   return (
     <div className="space-y-4">
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-medium text-neutral-900">Content Calendar</h2>
-          <span className="text-sm tabular-nums text-neutral-500">{filteredPosts.length} post{filteredPosts.length !== 1 ? "s" : ""}</span>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-medium text-neutral-900">Content</h2>
+          <p className="text-[13px] text-neutral-500 mt-0.5">
+            Produce, review, and schedule social content for your brands.
+          </p>
         </div>
         <button
           onClick={onAddPost}
-          className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium shrink-0"
         >
           <Plus className="w-4 h-4" />
           Add post
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-3 space-y-3">
-          {/* Toolbar — uniform h-9 segmented controls */}
+      {/* View switcher (Board / Calendar) + Filters — one calm toolbar row.
+          Board is the pipeline; Calendar is the dated grid. */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="inline-flex items-center h-9 rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
+          {[
+            { value: "board" as const, label: "Board", icon: LayoutGrid },
+            { value: "calendar" as const, label: "Calendar", icon: Calendar },
+          ].map(({ value, label, icon: Icon }) => {
+            const active = view === value
+            return (
+              <button
+                key={value}
+                onClick={() => setView(value)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-1.5 h-9 px-3.5 text-sm font-medium transition-colors ${
+                  active ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Filters popover — User + Platform slicers. Status lives in the board
+            columns (Board view) / is implicit (Calendar = scheduled only). */}
+        <div className="relative self-start sm:self-auto" ref={filtersRef}>
+          <button
+            type="button"
+            onClick={() => setShowFilters(v => !v)}
+            aria-expanded={showFilters}
+            className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 text-sm font-medium transition-colors ${
+              secondaryFilterCount > 0
+                ? "ring-neutral-900 bg-neutral-900 text-white"
+                : "ring-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {secondaryFilterCount > 0 && (
+              <span className="ml-0.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-white/20 text-[10px] tabular-nums">
+                {secondaryFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showFilters ? "rotate-180" : ""}`} />
+          </button>
+          {showFilters && (
+            <div className="absolute right-0 z-20 mt-1 w-72 rounded-md bg-white ring-1 ring-neutral-200 shadow-lg">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-neutral-100">
+                <h3 className="text-sm font-medium text-neutral-900">Filters</h3>
+                {secondaryFilterCount > 0 && (
+                  <button
+                    onClick={() => { setSelectedUsers(new Set()); setSelectedPlatforms(new Set()) }}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="p-3 space-y-4 max-h-[60vh] overflow-y-auto">
+                <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
+                <FilterSection title="Platform" options={brandOptions} selectedValues={selectedPlatforms} onToggle={togglePlatform} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Board view — the pipeline kanban. Columns are the workflow phases;
+          each holds the posts in its statuses, including the date-less drafts a
+          calendar can't show. This is where Produce/Review work actually lives. */}
+      {view === "board" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {PIPELINE_GROUPS.map(group => {
+            const columnPosts = filteredPosts.filter(p => group.statuses.includes(p.status))
+            return (
+              <div key={group.label} className="rounded-md ring-1 ring-neutral-200/70 bg-neutral-50/60 flex flex-col min-h-40">
+                <div className="flex items-center justify-between px-3 py-2.5 border-b border-neutral-200/70">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                    {group.label}
+                  </span>
+                  <span className="text-xs tabular-nums text-neutral-400">{columnPosts.length}</span>
+                </div>
+                <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[calc(100dvh-340px)] scrollbar-thin scrollbar-thumb-neutral-200 scrollbar-track-transparent">
+                  {columnPosts.length === 0 ? (
+                    <p className="px-2 py-6 text-center text-xs text-neutral-400">Nothing here</p>
+                  ) : (
+                    <AnimatePresence mode="popLayout">
+                      {columnPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} />)}
+                    </AnimatePresence>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Calendar view — dated content only (Scheduled / Posted). */}
+      {view === "calendar" && (
+        <div className="space-y-3">
+          {/* Calendar nav toolbar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {/* Prev / Today / Next segmented group */}
@@ -340,28 +477,43 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
               <h3 className="text-base font-medium text-neutral-900">{getHeaderText()}</h3>
             </div>
 
-            {/* View toggle — Day / Week / Month, uniform h-9 segmented */}
-            <div className="inline-flex items-center h-9 rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
-              {[
-                { value: "day" as const, label: "Day", icon: CalendarDays },
-                { value: "week" as const, label: "Week", icon: CalendarRange },
-                { value: "month" as const, label: "Month", icon: LayoutGrid },
-              ].map(({ value, label, icon: Icon }) => {
-                const active = viewMode === value
-                return (
-                  <button
-                    key={value}
-                    onClick={() => setViewMode(value)}
-                    aria-pressed={active}
-                    className={`inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium transition-colors ${
-                      active ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
-                  </button>
-                )
-              })}
+            <div className="flex items-center gap-2">
+              {/* Unscheduled indicator — the bug fix: posts the calendar can't
+                  show (no date) are surfaced, not silently dropped. Clicking
+                  jumps to the Board where they're workable. */}
+              {unscheduledCount > 0 && (
+                <button
+                  onClick={() => setView("board")}
+                  title="These posts have no scheduled date — view them on the Board"
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-amber-200 bg-amber-50 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors"
+                >
+                  {unscheduledCount} unscheduled
+                </button>
+              )}
+
+              {/* Day / Week / Month */}
+              <div className="inline-flex items-center h-9 rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
+                {[
+                  { value: "day" as const, label: "Day", icon: CalendarDays },
+                  { value: "week" as const, label: "Week", icon: CalendarRange },
+                  { value: "month" as const, label: "Month", icon: LayoutGrid },
+                ].map(({ value, label, icon: Icon }) => {
+                  const active = viewMode === value
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setViewMode(value)}
+                      aria-pressed={active}
+                      className={`inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium transition-colors ${
+                        active ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-50"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
@@ -525,87 +677,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
             </div>
           )}
         </div>
-
-        {/* Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden sticky top-4">
-            <div className="px-3 py-2.5 border-b border-neutral-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-neutral-500" />
-                  <h3 className="text-sm font-medium text-neutral-900">Filters</h3>
-                </div>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearAllFilters}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="p-3 space-y-4 max-h-[calc(100dvh-400px)] overflow-y-auto">
-              <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
-              <FilterSection title="Platform" options={brandOptions} selectedValues={selectedPlatforms} onToggle={togglePlatform} />
-              <FilterSection
-                title="Status"
-                options={statusOptions}
-                selectedValues={selectedStatuses}
-                onToggle={toggleStatus}
-                renderOption={(option, isSelected) => {
-                  const dotColor = STATUS_DOT[option.value as ContentPostStatus] ?? "bg-neutral-400"
-                  return (
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
-                        isSelected
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
-                      }`}
-                    >
-                      <span className={`inline-block h-1 w-1 rounded-full ${dotColor}`} aria-hidden="true" />
-                      {option.label}
-                    </span>
-                  )
-                }}
-              />
-            </div>
-            <div className="p-3 border-t border-neutral-100">
-              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">Status legend</p>
-              <div className="space-y-1.5">
-                {CONTENT_POST_STATUS_OPTIONS.map(status => (
-                  <div key={status.value} className="flex items-center gap-2 text-xs">
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[status.value as ContentPostStatus] ?? "bg-neutral-400"}`}
-                      aria-hidden="true"
-                    />
-                    <span className="text-neutral-700">{status.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="p-3 border-t border-neutral-100">
-              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-500 mb-2">Platform breakdown</p>
-              <div className="flex flex-wrap gap-2">
-                {SOCIAL_PLATFORM_OPTIONS.map(platform => {
-                  const count = platformStats[platform.value]
-                  if (count === 0) return null
-                  return (
-                    <div key={platform.value} className="inline-flex items-center gap-1 text-xs tabular-nums">
-                      <PlatformBadge platform={platform.value} size="sm" />
-                      <span className="text-neutral-700">{count}</span>
-                    </div>
-                  )
-                })}
-                {Object.values(platformStats).every(v => v === 0) && (
-                  <span className="text-xs text-neutral-400">No posts yet</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

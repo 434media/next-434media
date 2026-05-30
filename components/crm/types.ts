@@ -271,20 +271,61 @@ export type ViewMode = "dashboard" | "pipeline" | "clients" | "tasks" | "social-
 // Social Media Platform type
 export type SocialPlatform = "instagram" | "youtube" | "tiktok" | "linkedin" | "facebook"
 
+// ─── Content asset model ──────────────────────────────────────────────────────
+// A content post's publishable media. Replaces the old flat `assets: string[]`.
+// Legacy string URLs are normalized to Asset objects at read time (see
+// firestore-crm.ts), so existing posts keep working without a data migration.
+
+export type MediaKind = "image" | "video"
+
+// Snapped to the nearest known social aspect ratio; "other" when it matches none.
+// 9:16 = Reels/Shorts/TikTok, 1:1 = IG feed square, 4:5 = IG portrait,
+// 16:9 = landscape video, 1.91:1 = LinkedIn/FB link.
+export type AspectRatio = "9:16" | "1:1" | "4:5" | "16:9" | "1.91:1" | "other"
+
+// How the asset entered the system — drives the provenance trail in review.
+export type AssetSource = "upload" | "higgsfield"
+
+export interface Asset {
+  url: string
+  kind: MediaKind
+  // Auto-measured at upload (client-side). Optional so legacy/normalized assets
+  // without metadata remain valid.
+  width?: number
+  height?: number
+  aspectRatio?: AspectRatio
+  durationSec?: number // video only
+  // Which platforms this specific cut is meant for. Empty = applies to all the
+  // post's target platforms (the common single-asset case).
+  platforms?: SocialPlatform[]
+  // Provenance.
+  source?: AssetSource
+  higgsfieldJobId?: string
+  prompt?: string
+  model?: string
+}
+
 // Calendar view mode for social calendar
 export type CalendarViewMode = "day" | "week" | "month"
 
 // Content Post Status type (for Social Calendar)
-export type ContentPostStatus = "to_do" | "planning" | "in_progress" | "needs_approval" | "approved" | "scheduled" | "posted"
+// ai_drafted: Higgsfield/AI output awaiting human triage (first state for
+//   generated content; human-authored posts still start at to_do).
+// rejected: a reviewer sent it back from needs_approval — distinct from the
+//   working states so it's visibly flagged for rework.
+export type ContentPostStatus = "ai_drafted" | "to_do" | "planning" | "in_progress" | "needs_approval" | "approved" | "rejected" | "scheduled" | "posted"
 
 // Content Post Status options with colors for UI
-// planning/in_progress: no color (neutral), needs_approval: light red, approved: blue, scheduled: yellow, posted: green
+// ai_drafted: purple (AI), planning/in_progress: neutral, needs_approval: amber,
+// approved: blue, rejected: red, scheduled: yellow, posted: green
 export const CONTENT_POST_STATUS_OPTIONS: { value: ContentPostStatus; label: string; color: string; bgColor: string; borderColor: string }[] = [
+  { value: "ai_drafted", label: "AI Draft", color: "#7c3aed", bgColor: "bg-violet-50", borderColor: "border-violet-200" },
   { value: "to_do", label: "To Do", color: "#6b7280", bgColor: "bg-gray-50", borderColor: "border-gray-200" },
   { value: "planning", label: "Planning", color: "#6b7280", bgColor: "bg-gray-50", borderColor: "border-gray-200" },
   { value: "in_progress", label: "In Progress", color: "#6b7280", bgColor: "bg-gray-50", borderColor: "border-gray-200" },
-  { value: "needs_approval", label: "Needs Approval", color: "#dc2626", bgColor: "bg-red-50", borderColor: "border-red-200" },
+  { value: "needs_approval", label: "Needs Approval", color: "#d97706", bgColor: "bg-amber-50", borderColor: "border-amber-200" },
   { value: "approved", label: "Approved", color: "#2563eb", bgColor: "bg-blue-50", borderColor: "border-blue-200" },
+  { value: "rejected", label: "Rejected", color: "#dc2626", bgColor: "bg-red-50", borderColor: "border-red-200" },
   { value: "scheduled", label: "Scheduled", color: "#ca8a04", bgColor: "bg-yellow-50", borderColor: "border-yellow-200" },
   { value: "posted", label: "Posted", color: "#16a34a", bgColor: "bg-green-50", borderColor: "border-green-200" },
 ]
@@ -302,12 +343,37 @@ export interface ContentPost {
   thumbnail?: string  // Uploaded thumbnail URL
   social_copy?: string  // The actual social media copy/text
   links: string[]  // Array of links
-  assets: string[]  // Array of asset URLs
+  assets: Asset[]  // Publishable media (image/video). Legacy string[] is
+                   // normalized to Asset[] at read time — see firestore-crm.ts.
   tags?: string  // Text field for tags
   social_platforms: SocialPlatform[]  // Which social platforms (IG, TikTok, etc.)
   comments?: TaskComment[]  // Comments with tagging/notifications
+  // Approve/reject audit trail — appended when a reviewer makes a decision.
+  approvals?: ContentApproval[]
+  // Posting record — set when an admin marks the post live (manual-assisted v1;
+  // real per-platform publishing comes later). published_url is the live
+  // permalink (IG/TikTok/etc.); posted_at is when it went out.
+  published_url?: string
+  posted_at?: string
+  // AI generation tracking — set when a post is created via "Generate with AI".
+  // generation_status mirrors the Higgsfield job; generation_request_id lets the
+  // webhook/poll match the completed asset back to this post.
+  generation_status?: "pending" | "completed" | "failed"
+  generation_request_id?: string
+  generation_model?: string
+  generation_prompt?: string
   created_at: string
   updated_at: string
+}
+
+// One reviewer decision on a content post. The latest entry reflects the
+// current approve/reject state; the array preserves the full history.
+export interface ContentApproval {
+  decision: "approved" | "rejected"
+  by_name: string
+  by_email: string
+  note?: string  // required on reject, optional on approve
+  at: string
 }
 
 // Social platform options with colors for UI

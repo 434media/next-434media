@@ -1220,6 +1220,35 @@ export async function getPipelineView(): Promise<PipelineColumn[]> {
 // ============================================
 import type { ContentPost } from "../components/crm/types"
 
+// Infer media kind from a URL's file extension. Conservative: only flags
+// known video extensions as video, everything else (incl. unknown) as image —
+// matches the legacy assumption that all assets were images.
+function inferKindFromUrl(url: string): "image" | "video" {
+  const clean = url.split("?")[0].toLowerCase()
+  return /\.(mp4|mov|webm|m4v|avi|mkv)$/.test(clean) ? "video" : "image"
+}
+
+// Normalize a stored assets value to Asset[]. Existing posts persist assets as
+// string[] (bare URLs); newer posts persist Asset[] objects. Reading both keeps
+// old data working without a migration. Anything unrecognized is dropped.
+function normalizeAssets(raw: unknown): import("../components/crm/types").Asset[] {
+  if (!Array.isArray(raw)) return []
+  const out: import("../components/crm/types").Asset[] = []
+  for (const item of raw) {
+    if (typeof item === "string") {
+      out.push({ url: item, kind: inferKindFromUrl(item), source: "upload" })
+    } else if (item && typeof item === "object" && typeof (item as { url?: unknown }).url === "string") {
+      const a = item as Record<string, unknown>
+      out.push({
+        ...(a as object),
+        url: a.url as string,
+        kind: (a.kind as "image" | "video") || inferKindFromUrl(a.url as string),
+      } as import("../components/crm/types").Asset)
+    }
+  }
+  return out
+}
+
 export async function getContentPosts(): Promise<ContentPost[]> {
   const cacheKey = "collection:crm_content_posts"
   const cached = getCached<ContentPost[]>(cacheKey)
@@ -1236,11 +1265,12 @@ export async function getContentPosts(): Promise<ContentPost[]> {
       return {
         ...data,
         id: doc.id,
+        assets: normalizeAssets(data.assets),
         created_at: convertTimestamp(data.created_at),
         updated_at: convertTimestamp(data.updated_at),
       } as ContentPost
     })
-    
+
     setCache(cacheKey, results)
     console.log("[Firestore] Fetched", results.length, "content posts")
     return results
@@ -1259,6 +1289,7 @@ export async function getContentPostById(id: string): Promise<ContentPost | null
     return {
       ...data,
       id: doc.id,
+      assets: normalizeAssets(data.assets),
       created_at: convertTimestamp(data.created_at),
       updated_at: convertTimestamp(data.updated_at),
     } as ContentPost
@@ -1333,6 +1364,34 @@ export async function deleteContentPost(id: string): Promise<void> {
   } catch (error) {
     console.error("Error deleting content post:", id, error)
     throw new Error("Failed to delete content post")
+  }
+}
+
+// Look up a content post by its in-flight Higgsfield generation request id.
+// Used by the generation webhook to match a completed job back to its post.
+export async function getContentPostByGenerationRequestId(
+  requestId: string,
+): Promise<ContentPost | null> {
+  try {
+    const db = getDb()
+    const snap = await db
+      .collection(CRM_COLLECTIONS.CONTENT_POSTS)
+      .where("generation_request_id", "==", requestId)
+      .limit(1)
+      .get()
+    if (snap.empty) return null
+    const doc = snap.docs[0]
+    const data = doc.data()
+    return {
+      ...data,
+      id: doc.id,
+      assets: normalizeAssets(data.assets),
+      created_at: convertTimestamp(data.created_at),
+      updated_at: convertTimestamp(data.updated_at),
+    } as ContentPost
+  } catch (error) {
+    console.error("Error fetching content post by generation request id:", error)
+    return null
   }
 }
 

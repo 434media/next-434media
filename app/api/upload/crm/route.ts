@@ -14,6 +14,10 @@ export const fetchCache = 'force-no-store'
 
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp",
+  // Video — content posts carry reels/clips, not just images. Streamed to Blob
+  // like everything else; the ~4.5MB inbound-body limit still applies to this
+  // direct-upload path, so large clips should use the ingest-from-URL route.
+  "video/mp4", "video/quicktime", "video/webm",
   "application/pdf",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

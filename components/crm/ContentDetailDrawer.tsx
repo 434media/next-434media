@@ -12,12 +12,13 @@ import {
   Check,
   ChevronDown,
   Calendar,
-  Image as ImageIcon,
   MessageSquare,
   Send,
   Pencil,
   ExternalLink,
-  GripVertical
+  GripVertical,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react"
 import { 
   BRANDS, 
@@ -25,7 +26,8 @@ import {
   SOCIAL_PLATFORM_OPTIONS,
   CONTENT_POST_STATUS_OPTIONS,
 } from "./types"
-import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser } from "./types"
+import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser, Asset } from "./types"
+import { GENERATABLE_MODELS } from "@/lib/higgsfield-models"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 
 interface ContentDetailDrawerProps {
@@ -39,6 +41,10 @@ interface ContentDetailDrawerProps {
   onAddComment?: (comment: TaskComment) => void
   onDeleteComment?: (commentId: string) => void
   onEditComment?: (commentId: string, newContent: string) => void
+  // Approve/reject — only super-admins get the action bar (server enforces too).
+  canReview?: boolean
+  // Called after a decision is recorded so the parent can reload + close.
+  onDecided?: () => void
 }
 
 const getDefaultFormData = () => ({
@@ -48,11 +54,9 @@ const getDefaultFormData = () => ({
   title: "",
   date_to_post: "",
   notes: "",
-  thumbnail: "",
   social_copy: "",
   links: [] as string[],
-  assets: [] as string[],
-  tags: "",
+  assets: [] as Asset[],
   social_platforms: [] as SocialPlatform[],
   comments: [] as TaskComment[],
 })
@@ -101,6 +105,8 @@ export function ContentDetailDrawer({
   onAddComment,
   onDeleteComment,
   onEditComment,
+  canReview,
+  onDecided,
 }: ContentDetailDrawerProps) {
   const [formData, setFormData] = useState(getDefaultFormData())
   const [isUploadingFile, setIsUploadingFile] = useState(false)
@@ -111,6 +117,27 @@ export function ContentDetailDrawer({
   const [newComment, setNewComment] = useState("")
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentContent, setEditCommentContent] = useState("")
+  // Approve/reject local state
+  const [isDeciding, setIsDeciding] = useState(false)
+  const [showRejectNote, setShowRejectNote] = useState(false)
+  const [rejectNote, setRejectNote] = useState("")
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  // Mark-as-posted local state
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [showPublishForm, setShowPublishForm] = useState(false)
+  const [publishUrl, setPublishUrl] = useState("")
+  const [publishError, setPublishError] = useState<string | null>(null)
+  // Ingest-asset-from-URL local state (Higgsfield outputs / large video)
+  const [ingestUrl, setIngestUrl] = useState("")
+  const [isIngesting, setIsIngesting] = useState(false)
+  const [ingestError, setIngestError] = useState<string | null>(null)
+  // Generate-with-AI local state (create mode only)
+  const [genModelId, setGenModelId] = useState(GENERATABLE_MODELS[0]?.id ?? "")
+  const [genPrompt, setGenPrompt] = useState("")
+  const [genImageUrl, setGenImageUrl] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+  const [genOutOfCredits, setGenOutOfCredits] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -122,7 +149,6 @@ export function ContentDetailDrawer({
           title: post.title || "",
           date_to_post: post.date_to_post || "",
           notes: post.notes || "",
-          thumbnail: post.thumbnail || "",
           social_copy: post.social_copy || "",
           links: (post.links || []).filter((link: string) => {
             try {
@@ -133,7 +159,6 @@ export function ContentDetailDrawer({
             }
           }),
           assets: post.assets || [],
-          tags: post.tags || "",
           social_platforms: post.social_platforms || [],
           comments: post.comments || [],
         })
@@ -142,6 +167,22 @@ export function ContentDetailDrawer({
       }
       setNewComment("")
       setEditingCommentId(null)
+      setEditCommentContent("")
+      setShowRejectNote(false)
+      setRejectNote("")
+      setDecisionError(null)
+      setShowPublishForm(false)
+      setPublishUrl("")
+      setPublishError(null)
+      setIngestUrl("")
+      setIsIngesting(false)
+      setIngestError(null)
+      setGenModelId(GENERATABLE_MODELS[0]?.id ?? "")
+      setGenPrompt("")
+      setGenImageUrl("")
+      setIsGenerating(false)
+      setGenError(null)
+      setGenOutOfCredits(false)
     }
   }, [open, post])
 
@@ -202,28 +243,28 @@ export function ContentDetailDrawer({
     }
   }, [open, fetchTeamMembers])
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldType: "thumbnail" | "asset") => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    
+
     setIsUploadingFile(true)
     try {
       const formDataUpload = new FormData()
       formDataUpload.append("file", file)
       formDataUpload.append("folder", "content-posts")
-      
+
       const response = await fetch("/api/upload/crm", {
         method: "POST",
         body: formDataUpload,
       })
-      
+
       if (response.ok) {
         const { url } = await response.json()
-        if (fieldType === "thumbnail") {
-          setFormData(prev => ({ ...prev, thumbnail: url }))
-        } else {
-          setFormData(prev => ({ ...prev, assets: [...prev.assets, url] }))
-        }
+        // Capture media kind from the uploaded file's MIME type so tiles/cards
+        // render video vs image correctly.
+        const kind: Asset["kind"] = file.type.startsWith("video/") ? "video" : "image"
+        const newAsset: Asset = { url, kind, source: "upload" }
+        setFormData(prev => ({ ...prev, assets: [...prev.assets, newAsset] }))
       } else {
         const errorData = await response.json()
         console.error("Upload failed:", errorData.error)
@@ -262,6 +303,34 @@ export function ContentDetailDrawer({
 
   const handleRemoveAsset = (index: number) => {
     setFormData(prev => ({ ...prev, assets: prev.assets.filter((_, i) => i !== index) }))
+  }
+
+  // Ingest an asset from a URL (e.g. a Higgsfield generation output). The server
+  // fetches + streams it into Blob and returns a structured Asset — this is the
+  // path for video and large files that can't go through the direct-upload body.
+  const handleIngestAssetUrl = async () => {
+    const url = ingestUrl.trim()
+    if (!url) return
+    setIsIngesting(true)
+    setIngestError(null)
+    try {
+      const res = await fetch("/api/admin/crm/content-posts/ingest-asset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url, source: "higgsfield" }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.asset) {
+        throw new Error(data.error || "Failed to ingest asset")
+      }
+      setFormData(prev => ({ ...prev, assets: [...prev.assets, data.asset as Asset] }))
+      setIngestUrl("")
+    } catch (err) {
+      setIngestError(err instanceof Error ? err.message : "Failed to ingest asset")
+    } finally {
+      setIsIngesting(false)
+    }
   }
 
   const handleLocalAddComment = async () => {
@@ -340,17 +409,126 @@ export function ContentDetailDrawer({
       title: formData.title,
       date_to_post: formData.date_to_post || undefined,
       notes: formData.notes || undefined,
-      thumbnail: formData.thumbnail || undefined,
       social_copy: formData.social_copy || undefined,
       links: formData.links,
       assets: formData.assets,
-      tags: formData.tags || undefined,
       social_platforms: formData.social_platforms,
       comments: formData.comments,
     })
   }
 
+  // Approve / request-changes. Posts to the decision route (server enforces
+  // super-admin), then asks the parent to reload + close so the new status,
+  // audit entry, and decision comment are reflected.
+  const handleDecision = async (decision: "approved" | "rejected") => {
+    if (!post?.id) return
+    if (decision === "rejected" && !rejectNote.trim()) {
+      setShowRejectNote(true)
+      setDecisionError("A note is required so the assignee knows what to change.")
+      return
+    }
+    setIsDeciding(true)
+    setDecisionError(null)
+    try {
+      const res = await fetch(`/api/admin/crm/content-posts/${post.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          decision,
+          note: decision === "rejected" ? rejectNote.trim() : undefined,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to record decision")
+      }
+      onDecided?.()
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "Failed to record decision")
+    } finally {
+      setIsDeciding(false)
+    }
+  }
+
+  // Mark-as-posted. Records the live URL (optional) and flips status → posted
+  // via the publish route, then reloads + closes.
+  const handlePublish = async () => {
+    if (!post?.id) return
+    setIsPublishing(true)
+    setPublishError(null)
+    try {
+      const res = await fetch(`/api/admin/crm/content-posts/${post.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ published_url: publishUrl.trim() || undefined }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Failed to mark posted")
+      }
+      onDecided?.()
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Failed to mark posted")
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  // Generate with AI — kicks off a Higgsfield generation that creates its own
+  // ai_drafted post (server-side), then reloads + closes so it appears on the
+  // Board. Only shown in create mode.
+  const selectedGenModel = GENERATABLE_MODELS.find(m => m.id === genModelId)
+  const handleGenerate = async () => {
+    if (!genPrompt.trim()) {
+      setGenError("A prompt is required.")
+      return
+    }
+    if (selectedGenModel?.kind === "video" && !genImageUrl.trim()) {
+      setGenError("This model animates an image — provide an image URL.")
+      return
+    }
+    setIsGenerating(true)
+    setGenError(null)
+    try {
+      const res = await fetch("/api/admin/crm/content-posts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          modelId: genModelId,
+          prompt: genPrompt.trim(),
+          platform: formData.platform || undefined,
+          title: formData.title.trim() || undefined,
+          image_url: selectedGenModel?.kind === "video" ? genImageUrl.trim() : undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // Out-of-credits is a distinct, expected state — surface it as a calm
+        // notice rather than a transient error.
+        if (data.code === "out_of_credits") {
+          setGenOutOfCredits(true)
+          return
+        }
+        throw new Error(data.error || "Generation failed")
+      }
+      onDecided?.()
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Generation failed")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   if (!open) return null
+
+  // Latest reviewer decision, if any (the audit history is newest-last).
+  const latestApproval =
+    post?.approvals && post.approvals.length > 0
+      ? post.approvals[post.approvals.length - 1]
+      : null
 
   const drawerTitle = post ? formData.title || "Content Post" : "New Content Post"
 
@@ -574,53 +752,11 @@ export function ContentDetailDrawer({
                 </div>
               </div>
 
-              {/* Tags */}
+              {/* Reference links — internal context (briefs, source footage,
+                  reference reels). Not published; the live post URL is captured
+                  by mark-as-posted (published_url). */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tags</label>
-                <input
-                  type="text"
-                  value={formData.tags}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-                  placeholder="Enter tags (comma separated)..."
-                  className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                />
-              </div>
-
-              {/* Thumbnail */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Thumbnail</label>
-                {formData.thumbnail ? (
-                  <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-200">
-                    <img src={sanitizeUrl(formData.thumbnail)} alt="Thumbnail" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, thumbnail: "" }))}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center gap-2 px-4 py-3 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50/30">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, "thumbnail")}
-                      className="hidden"
-                    />
-                    {isUploadingFile ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                    ) : (
-                      <ImageIcon className="w-5 h-5 text-gray-400" />
-                    )}
-                    <span className="text-sm text-gray-500">Upload thumbnail image</span>
-                  </label>
-                )}
-              </div>
-
-              {/* Links - Clickable */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Links</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Reference links</label>
                 <div className="space-y-2">
                   {formData.links.map((link, index) => (
                     <div key={index} className="flex items-center gap-2 group">
@@ -671,11 +807,25 @@ export function ContentDetailDrawer({
                   {formData.assets.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {formData.assets.map((asset, index) => (
-                        <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
-                          <img src={sanitizeUrl(asset)} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveAsset(index)} 
+                        <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group bg-neutral-900">
+                          {asset.kind === "video" ? (
+                            <video
+                              src={sanitizeUrl(asset.url)}
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <img src={sanitizeUrl(asset.url)} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
+                          )}
+                          {asset.kind === "video" && (
+                            <span className="absolute bottom-0.5 left-0.5 px-1 py-0.5 text-[9px] font-medium text-white bg-black/60 rounded">
+                              video
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAsset(index)}
                             className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-3 h-3" />
@@ -685,12 +835,233 @@ export function ContentDetailDrawer({
                     </div>
                   )}
                   <label className="flex items-center gap-2 px-4 py-3 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50/30">
-                    <input type="file" accept="image/*,video/*" onChange={(e) => handleFileUpload(e, "asset")} className="hidden" />
+                    <input type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
                     {isUploadingFile ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : <Upload className="w-5 h-5 text-gray-400" />}
                     <span className="text-sm text-gray-500">Upload asset</span>
                   </label>
+
+                  {/* Add from URL — ingests a Higgsfield output (or any media
+                      URL) server-side into Blob. Handles video / large files the
+                      direct upload can't. */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={ingestUrl}
+                      onChange={(e) => setIngestUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleIngestAssetUrl())}
+                      placeholder="…or paste a Higgsfield / media URL"
+                      className="flex-1 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleIngestAssetUrl}
+                      disabled={isIngesting || !ingestUrl.trim()}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors text-sm font-medium"
+                    >
+                      {isIngesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      Add
+                    </button>
+                  </div>
+                  {ingestError && <p className="text-xs text-red-600">{ingestError}</p>}
+
+                  {/* Generate with Higgsfield — create mode only. Produces an
+                      ai_drafted post with the generated asset attached. Sits
+                      with the other "add media" methods (upload / paste URL).
+                      Models limited to the verified API roster; everything else
+                      (Nano Banana, Veo, …) is generated locally + pasted above. */}
+                  {!post && GENERATABLE_MODELS.length > 0 && (
+                    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
+                      <div>
+                        <h4 className="text-sm font-medium text-neutral-900">Generate with Higgsfield</h4>
+                        <p className="text-[11px] text-neutral-500">Uses your Higgsfield account credits.</p>
+                      </div>
+                      {genOutOfCredits && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          <span className="font-medium">Generation unavailable</span> — the Higgsfield account is out of credits.
+                          Add credits in the Higgsfield dashboard, or generate locally and paste the URL above.
+                        </div>
+                      )}
+                      <select
+                        value={genModelId}
+                        onChange={(e) => setGenModelId(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
+                      >
+                        {GENERATABLE_MODELS.map(m => (
+                          <option key={m.id} value={m.id}>{m.label} · {m.kind === "video" ? "Video" : "Image"}</option>
+                        ))}
+                      </select>
+                      {selectedGenModel?.kind === "video" && (
+                        <input
+                          type="text"
+                          value={genImageUrl}
+                          onChange={(e) => setGenImageUrl(e.target.value)}
+                          placeholder="Source image URL (this model animates an image)"
+                          className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
+                        />
+                      )}
+                      <textarea
+                        value={genPrompt}
+                        onChange={(e) => setGenPrompt(e.target.value)}
+                        placeholder="Describe what to generate…"
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
+                      />
+                      {genError && <p className="text-xs text-red-600">{genError}</p>}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] text-neutral-500 leading-snug">
+                          Other models (Nano Banana, Veo, Seedance…) — generate locally and paste the URL above.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleGenerate}
+                          disabled={isGenerating || !genPrompt.trim()}
+                          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                          Generate
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Approval — decision banner (everyone) + action bar (reviewers) */}
+              {post && (
+                <div className="pt-4 border-t border-gray-200 space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Approval
+                  </label>
+
+                  {/* Latest decision banner */}
+                  {latestApproval && (
+                    <div
+                      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${
+                        latestApproval.decision === "approved"
+                          ? "border-blue-200 bg-blue-50"
+                          : "border-red-200 bg-red-50"
+                      }`}
+                    >
+                      {latestApproval.decision === "approved" ? (
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                      )}
+                      <div className="min-w-0 text-sm">
+                        <p className={latestApproval.decision === "approved" ? "text-blue-800" : "text-red-800"}>
+                          <span className="font-medium">
+                            {latestApproval.decision === "approved" ? "Approved" : "Changes requested"}
+                          </span>{" "}
+                          by {latestApproval.by_name} · {formatDate(latestApproval.at)}
+                        </p>
+                        {latestApproval.note && (
+                          <p className="mt-0.5 text-neutral-600 wrap-break-word">{latestApproval.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reviewer action bar — only super-admins, only when awaiting approval */}
+                  {canReview && post.status === "needs_approval" && (
+                    <div className="space-y-2">
+                      {showRejectNote && (
+                        <textarea
+                          value={rejectNote}
+                          onChange={(e) => setRejectNote(e.target.value)}
+                          placeholder="What needs to change? (required to request changes)"
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-red-400"
+                        />
+                      )}
+                      {decisionError && (
+                        <p className="text-xs text-red-600">{decisionError}</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDecision("approved")}
+                          disabled={isDeciding}
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {isDeciding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!showRejectNote) {
+                              setShowRejectNote(true)
+                              setDecisionError(null)
+                            } else {
+                              handleDecision("rejected")
+                            }
+                          }}
+                          disabled={isDeciding}
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Request changes
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Posted banner — shown once the post is live */}
+                  {post.status === "posted" && (
+                    <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
+                      <Send className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                      <div className="min-w-0 text-sm">
+                        <p className="text-green-800">
+                          <span className="font-medium">Posted</span>
+                          {post.posted_at && <> · {formatDate(post.posted_at)}</>}
+                        </p>
+                        {post.published_url && (
+                          <a
+                            href={sanitizeUrl(post.published_url) || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 inline-flex items-center gap-1 text-green-700 hover:text-green-800 wrap-break-word"
+                          >
+                            View live post
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mark-as-posted action — any admin, once approved/scheduled */}
+                  {(post.status === "approved" || post.status === "scheduled") && (
+                    <div className="space-y-2">
+                      {showPublishForm && (
+                        <input
+                          type="text"
+                          value={publishUrl}
+                          onChange={(e) => setPublishUrl(e.target.value)}
+                          placeholder="Live post URL (optional) — https://…"
+                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-green-400"
+                        />
+                      )}
+                      {publishError && <p className="text-xs text-red-600">{publishError}</p>}
+                      <button
+                        onClick={() => {
+                          if (!showPublishForm) {
+                            setShowPublishForm(true)
+                            setPublishError(null)
+                          } else {
+                            handlePublish()
+                          }
+                        }}
+                        disabled={isPublishing}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {showPublishForm ? "Confirm posted" : "Mark as posted"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Comments Section */}
               <div className="pt-4 border-t border-gray-200">
