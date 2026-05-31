@@ -12,7 +12,14 @@
 // `generateImage`/`generateText` are stable AI SDK v6 exports; video remains
 // experimental. Field names (uint8Array / mediaType) verified against a live call.
 
-import { generateImage, generateText, experimental_generateVideo as generateVideo } from "ai"
+import {
+  generateImage,
+  generateText,
+  experimental_generateVideo as generateVideo,
+  NoImageGeneratedError,
+  NoVideoGeneratedError,
+  APICallError,
+} from "ai"
 import { put } from "@vercel/blob"
 import crypto from "crypto"
 import type { Asset } from "@/components/crm/types"
@@ -34,18 +41,30 @@ export interface GenerateError {
 }
 export type GenerateOutcome = GenerateResult | GenerateError
 
+// The AI SDK types aspectRatio as the template-literal `${number}:${number}`.
+type AspectRatio = `${number}:${number}`
+
 export interface GenerateParams {
   modelId: string
   prompt: string
   sourceImageUrl?: string
   /** Image + video: "{w}:{h}", e.g. "16:9". Ignored by the language-image path. */
-  aspectRatio?: string
+  aspectRatio?: AspectRatio
   /** Video only: clip length in seconds. */
   duration?: number
 }
 
 function blobName(ext: string): string {
   return `content-posts/${crypto.randomUUID()}.${ext}`
+}
+
+// Providers don't error on unsupported params (e.g. an aspectRatio/duration a
+// model doesn't honor) — they silently drop them and report via `warnings`.
+// Surface those in logs so dropped settings are debuggable instead of invisible.
+function logWarnings(modelId: string, warnings: unknown): void {
+  if (Array.isArray(warnings) && warnings.length > 0) {
+    console.warn(`[ai-generate] ${modelId} warnings:`, JSON.stringify(warnings))
+  }
 }
 
 function extFromMediaType(mediaType: string, fallback: string): string {
@@ -75,7 +94,7 @@ async function storeImage(
 async function runImage(
   modelId: string,
   prompt: string,
-  aspectRatio?: string,
+  aspectRatio?: AspectRatio,
 ): Promise<GenerateOutcome> {
   const result = await generateImage({
     model: modelId,
@@ -83,6 +102,7 @@ async function runImage(
     n: 1,
     ...(aspectRatio ? { aspectRatio } : {}),
   })
+  logWarnings(modelId, result.warnings)
   const img = result.images?.[0]
   if (!img?.uint8Array) {
     return { ok: false, status: 502, error: "No image returned by the model" }
@@ -97,6 +117,7 @@ async function runLanguageImage(
   prompt: string,
 ): Promise<GenerateOutcome> {
   const result = await generateText({ model: modelId, prompt })
+  logWarnings(modelId, result.warnings)
   const file = result.files?.find((f) => f.mediaType?.startsWith("image/"))
   if (!file?.uint8Array) {
     return { ok: false, status: 502, error: "No image returned by the model" }
@@ -109,7 +130,7 @@ async function runVideo(
   modelId: string,
   prompt: string,
   sourceImageUrl?: string,
-  aspectRatio?: string,
+  aspectRatio?: AspectRatio,
   duration?: number,
 ): Promise<GenerateOutcome> {
   // Provider key for pollTimeoutMs = the model id's creator prefix (e.g. "google").
@@ -124,6 +145,7 @@ async function runVideo(
     abortSignal: AbortSignal.timeout(VIDEO_TIMEOUT_MS),
     providerOptions: { [provider]: { pollTimeoutMs: VIDEO_TIMEOUT_MS } },
   })
+  logWarnings(modelId, result.warnings)
   const vid = result.videos?.[0]
   if (!vid?.uint8Array) {
     return { ok: false, status: 502, error: "No video returned by the model" }
@@ -154,12 +176,40 @@ export async function generateAsset(opts: GenerateParams): Promise<GenerateOutco
       ? await runLanguageImage(opts.modelId, opts.prompt)
       : await runImage(opts.modelId, opts.prompt, opts.aspectRatio)
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Generation failed"
-    // Surface insufficient-credit / billing as a distinct status so the UI can
-    // show a clean "generation unavailable" state.
-    if (/credit|quota|insufficient|payment|billing/i.test(message)) {
-      return { ok: false, status: 402, error: message }
-    }
-    return { ok: false, status: 502, error: message }
+    return classifyGenerationError(err)
   }
+}
+
+// Map a generation error to a typed outcome. Uses the AI SDK's typed error
+// classes (more reliable than string matching) and falls back to a message
+// regex only when no class matches.
+function classifyGenerationError(err: unknown): GenerateError {
+  // Provider/HTTP error — carries a real status code (402 = billing, 429 =
+  // rate/quota). Prefer this over guessing from the message.
+  if (APICallError.isInstance(err)) {
+    const status = err.statusCode
+    if (status === 402 || status === 429) {
+      return { ok: false, status: 402, error: err.message }
+    }
+    return { ok: false, status: status && status >= 400 ? status : 502, error: err.message }
+  }
+
+  // Model ran but produced nothing usable. `cause` carries the underlying
+  // reason for logging/debugging. (Checked separately so TS keeps each error's
+  // type — an `||` would narrow the shared binding to `never`.)
+  if (NoImageGeneratedError.isInstance(err)) {
+    console.error("[ai-generate] no image generated:", err.cause ?? err.message)
+    return { ok: false, status: 502, error: "The model didn't return any media. Try again or pick another model." }
+  }
+  if (NoVideoGeneratedError.isInstance(err)) {
+    console.error("[ai-generate] no video generated:", err.cause ?? err.message)
+    return { ok: false, status: 502, error: "The model didn't return any media. Try again or pick another model." }
+  }
+
+  // Fallback: classify billing/quota from the message text.
+  const message = err instanceof Error ? err.message : "Generation failed"
+  if (/credit|quota|insufficient|payment|billing/i.test(message)) {
+    return { ok: false, status: 402, error: message }
+  }
+  return { ok: false, status: 502, error: message }
 }

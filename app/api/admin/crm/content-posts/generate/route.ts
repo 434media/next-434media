@@ -59,7 +59,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "A prompt is required" }, { status: 400 })
   }
   const sourceImageUrl = body.image_url?.trim() || undefined
-  const aspectRatio = body.aspect_ratio?.trim() || undefined
+  // Validate against the offered set; ignore anything else so a bad value can't
+  // reach the model. Typed as the AI SDK's `${number}:${number}` literal.
+  const ALLOWED_ASPECTS = ["1:1", "16:9", "9:16", "4:3", "3:4"] as const
+  const aspectRatio = ALLOWED_ASPECTS.includes(body.aspect_ratio?.trim() as (typeof ALLOWED_ASPECTS)[number])
+    ? (body.aspect_ratio!.trim() as (typeof ALLOWED_ASPECTS)[number])
+    : undefined
   const duration = typeof body.duration === "number" && body.duration > 0 ? body.duration : undefined
 
   // Create the ai_drafted post immediately so it appears on the Board.
