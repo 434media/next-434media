@@ -146,6 +146,8 @@ export function ContentDetailDrawer({
   const [genModelId, setGenModelId] = useState("")
   const [genPrompt, setGenPrompt] = useState("")
   const [genImageUrl, setGenImageUrl] = useState("")
+  const [genAspectRatio, setGenAspectRatio] = useState("1:1")
+  const [genDuration, setGenDuration] = useState(5)
   const [isGenerating, setIsGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [genOutOfCredits, setGenOutOfCredits] = useState(false)
@@ -191,6 +193,8 @@ export function ContentDetailDrawer({
       setGenKind("image")
       setGenPrompt("")
       setGenImageUrl("")
+      setGenAspectRatio("1:1")
+      setGenDuration(5)
       setIsGenerating(false)
       setGenError(null)
       setGenOutOfCredits(false)
@@ -538,6 +542,8 @@ export function ContentDetailDrawer({
           platform: formData.platform || undefined,
           title: formData.title.trim() || undefined,
           image_url: genKind === "video" && genImageUrl.trim() ? genImageUrl.trim() : undefined,
+          aspect_ratio: genAspectRatio,
+          duration: genKind === "video" ? genDuration : undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -971,6 +977,36 @@ export function ContentDetailDrawer({
                         rows={2}
                         className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
                       />
+
+                      {/* Aspect ratio (both) + duration (video) */}
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+                          Aspect
+                          <select
+                            value={genAspectRatio}
+                            onChange={(e) => setGenAspectRatio(e.target.value)}
+                            className="px-2 py-1 rounded-md bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-400"
+                          >
+                            {["1:1", "16:9", "9:16", "4:3", "3:4"].map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </label>
+                        {genKind === "video" && (
+                          <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+                            Duration
+                            <select
+                              value={genDuration}
+                              onChange={(e) => setGenDuration(Number(e.target.value))}
+                              className="px-2 py-1 rounded-md bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-400"
+                            >
+                              {[5, 8, 10].map((d) => (
+                                <option key={d} value={d}>{d}s</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                      </div>
 
                       {genKind === "video" && (
                         <p className="text-[11px] text-neutral-500 leading-snug">

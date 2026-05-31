@@ -2,37 +2,26 @@
 // the Vercel AI Gateway (one key, many providers), writes the returned bytes
 // straight into Vercel Blob, and returns a structured Asset.
 //
-// Replaces the Higgsfield REST client. Unlike Higgsfield (submit → poll → fetch
-// URL), the Gateway returns raw bytes inline:
-//   - image: experimental_generateImage → result.images[0].{uint8ArrayData, mediaType}
-//   - video: experimental_generateVideo → result.videos[0].{uint8Array}  (mp4)
+// Three generation paths:
+//   - image (dedicated):  generateImage → result.images[0].{uint8Array, mediaType}
+//   - image (language):   generateText  → result.files[] (Nano Banana family;
+//                         Gateway types these as `language`, image is a file output)
+//   - video:              experimental_generateVideo → result.videos[0].uint8Array (mp4)
 // Bytes go directly to Blob — no fetch-from-URL hop, no SSRF surface.
 //
-// Field names verified against a live Imagen 4 call (AI SDK v6): images use
-// `uint8ArrayData`/`mediaType`; videos use `uint8Array` (per Gateway video docs).
+// `generateImage`/`generateText` are stable AI SDK v6 exports; video remains
+// experimental. Field names (uint8Array / mediaType) verified against a live call.
 
-import { experimental_generateImage as generateImage, experimental_generateVideo as generateVideo } from "ai"
-import { createGateway } from "@ai-sdk/gateway"
+import { generateImage, generateText, experimental_generateVideo as generateVideo } from "ai"
 import { put } from "@vercel/blob"
-import { Agent } from "undici"
 import crypto from "crypto"
 import type { Asset } from "@/components/crm/types"
-import { curatedKind } from "@/lib/ai-gateway-models"
+import { curatedModel } from "@/lib/ai-gateway-models"
 
-// Video generation can take several minutes; the default Undici fetch enforces
-// a 5-minute timeout. A custom gateway instance with a longer agent timeout
-// avoids premature aborts. Used only for video.
-const videoGateway = createGateway({
-  fetch: (url, init) =>
-    fetch(url, {
-      ...init,
-      // dispatcher is an undici extension to RequestInit, not in DOM lib types
-      dispatcher: new Agent({
-        headersTimeout: 15 * 60 * 1000,
-        bodyTimeout: 15 * 60 * 1000,
-      }),
-    } as RequestInit),
-})
+// Video generation can take minutes. We pass an abortSignal timeout and, per the
+// AI SDK docs, a provider-keyed pollTimeoutMs (default polling is ~5 min). The
+// route runs video in an after() callback, so this never blocks the response.
+const VIDEO_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
 export interface GenerateResult {
   ok: true
@@ -45,6 +34,16 @@ export interface GenerateError {
 }
 export type GenerateOutcome = GenerateResult | GenerateError
 
+export interface GenerateParams {
+  modelId: string
+  prompt: string
+  sourceImageUrl?: string
+  /** Image + video: "{w}:{h}", e.g. "16:9". Ignored by the language-image path. */
+  aspectRatio?: string
+  /** Video only: clip length in seconds. */
+  duration?: number
+}
+
 function blobName(ext: string): string {
   return `content-posts/${crypto.randomUUID()}.${ext}`
 }
@@ -55,18 +54,13 @@ function extFromMediaType(mediaType: string, fallback: string): string {
   return sub.replace("quicktime", "mov").replace("jpeg", "jpg")
 }
 
-// Generate an image and store it. modelId must be a curated image model.
-async function runImage(
+async function storeImage(
+  bytes: Uint8Array,
+  mediaType: string,
   modelId: string,
   prompt: string,
-): Promise<GenerateOutcome> {
-  const result = await generateImage({ model: modelId, prompt, n: 1 })
-  const img = result.images?.[0]
-  if (!img?.uint8Array) {
-    return { ok: false, status: 502, error: "No image returned by the model" }
-  }
-  const mediaType = img.mediaType || "image/png"
-  const blob = await put(blobName(extFromMediaType(mediaType, "png")), Buffer.from(img.uint8Array), {
+): Promise<GenerateResult> {
+  const blob = await put(blobName(extFromMediaType(mediaType, "png")), Buffer.from(bytes), {
     access: "public",
     addRandomSuffix: false,
     contentType: mediaType,
@@ -77,16 +71,58 @@ async function runImage(
   }
 }
 
-// Generate a video and store it. For image-to-video, pass sourceImageUrl.
+// Dedicated image model (Flux, Imagen): generateImage.
+async function runImage(
+  modelId: string,
+  prompt: string,
+  aspectRatio?: string,
+): Promise<GenerateOutcome> {
+  const result = await generateImage({
+    model: modelId,
+    prompt,
+    n: 1,
+    ...(aspectRatio ? { aspectRatio } : {}),
+  })
+  const img = result.images?.[0]
+  if (!img?.uint8Array) {
+    return { ok: false, status: 502, error: "No image returned by the model" }
+  }
+  return storeImage(img.uint8Array, img.mediaType || "image/png", modelId, prompt)
+}
+
+// Multimodal language model that outputs an image (Nano Banana): generateText,
+// then pull the first image file from result.files.
+async function runLanguageImage(
+  modelId: string,
+  prompt: string,
+): Promise<GenerateOutcome> {
+  const result = await generateText({ model: modelId, prompt })
+  const file = result.files?.find((f) => f.mediaType?.startsWith("image/"))
+  if (!file?.uint8Array) {
+    return { ok: false, status: 502, error: "No image returned by the model" }
+  }
+  return storeImage(file.uint8Array, file.mediaType || "image/png", modelId, prompt)
+}
+
+// Video model. For image-to-video, pass sourceImageUrl.
 async function runVideo(
   modelId: string,
   prompt: string,
   sourceImageUrl?: string,
+  aspectRatio?: string,
+  duration?: number,
 ): Promise<GenerateOutcome> {
+  // Provider key for pollTimeoutMs = the model id's creator prefix (e.g. "google").
+  const provider = modelId.split("/")[0]
   const result = await generateVideo({
-    model: videoGateway.video(modelId),
+    // Plain string model id routes through the default AI Gateway provider.
+    model: modelId,
     // image-to-video uses the { image, text } prompt form; text-to-video a string
     prompt: sourceImageUrl ? { image: sourceImageUrl, text: prompt } : prompt,
+    ...(aspectRatio ? { aspectRatio } : {}),
+    ...(duration ? { duration } : {}),
+    abortSignal: AbortSignal.timeout(VIDEO_TIMEOUT_MS),
+    providerOptions: { [provider]: { pollTimeoutMs: VIDEO_TIMEOUT_MS } },
   })
   const vid = result.videos?.[0]
   if (!vid?.uint8Array) {
@@ -103,21 +139,20 @@ async function runVideo(
   }
 }
 
-// Public entry — routes to image or video based on the curated model's kind.
-// Never throws; returns a typed outcome so the route can map errors cleanly.
-export async function generateAsset(opts: {
-  modelId: string
-  prompt: string
-  sourceImageUrl?: string
-}): Promise<GenerateOutcome> {
-  const kind = curatedKind(opts.modelId)
-  if (!kind) {
+// Public entry — routes to the right path based on the curated model. Never
+// throws; returns a typed outcome so the route can map errors cleanly.
+export async function generateAsset(opts: GenerateParams): Promise<GenerateOutcome> {
+  const model = curatedModel(opts.modelId)
+  if (!model) {
     return { ok: false, status: 400, error: "Unknown or unsupported model" }
   }
   try {
-    return kind === "image"
-      ? await runImage(opts.modelId, opts.prompt)
-      : await runVideo(opts.modelId, opts.prompt, opts.sourceImageUrl)
+    if (model.kind === "video") {
+      return await runVideo(opts.modelId, opts.prompt, opts.sourceImageUrl, opts.aspectRatio, opts.duration)
+    }
+    return model.viaLanguage
+      ? await runLanguageImage(opts.modelId, opts.prompt)
+      : await runImage(opts.modelId, opts.prompt, opts.aspectRatio)
   } catch (err) {
     const message = err instanceof Error ? err.message : "Generation failed"
     // Surface insufficient-credit / billing as a distinct status so the UI can

@@ -28,6 +28,8 @@ interface GenerateBody {
   title?: string
   platform?: Brand | ""
   image_url?: string // optional source image for image-to-video models
+  aspect_ratio?: string // "{w}:{h}" — image + video
+  duration?: number // seconds — video only
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -57,6 +59,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "A prompt is required" }, { status: 400 })
   }
   const sourceImageUrl = body.image_url?.trim() || undefined
+  const aspectRatio = body.aspect_ratio?.trim() || undefined
+  const duration = typeof body.duration === "number" && body.duration > 0 ? body.duration : undefined
 
   // Create the ai_drafted post immediately so it appears on the Board.
   const title = (body.title ?? "").trim() || `AI draft — ${prompt.slice(0, 48)}`
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // ── Image: synchronous — attach before responding. ──
   if (kind === "image") {
-    const result = await generateAsset({ modelId, prompt, sourceImageUrl })
+    const result = await generateAsset({ modelId, prompt, sourceImageUrl, aspectRatio })
     if (!result.ok) {
       await updateContentPost(post.id, { generation_status: "failed" }).catch(() => {})
       const code = result.status === 402 ? "out_of_credits" : undefined
@@ -99,7 +103,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── Video: run after the response (can take minutes). ──
   after(async () => {
     try {
-      const result = await generateAsset({ modelId, prompt, sourceImageUrl })
+      const result = await generateAsset({ modelId, prompt, sourceImageUrl, aspectRatio, duration })
       if (!result.ok) {
         await updateContentPost(post.id, { generation_status: "failed" })
         return
