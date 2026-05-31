@@ -1,37 +1,33 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import type { NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { createContentPost, updateContentPost } from "@/lib/firestore-crm"
-import { submitGeneration, getGenerationStatus, resultAssetUrl, isOutOfCreditsError, type HiggsfieldResult } from "@/lib/higgsfield"
-import { findHiggsfieldModel } from "@/lib/higgsfield-models"
-import { ingestAssetFromUrl } from "@/lib/asset-ingest"
+import { generateAsset } from "@/lib/ai-generate"
+import { isCuratedModel, curatedKind } from "@/lib/ai-gateway-models"
 import type { Brand, ContentPost } from "@/components/crm/types"
 
 // POST /api/admin/crm/content-posts/generate
-// Body: { modelId, prompt, title?, platform?, image_url?, aspect_ratio?, resolution?, duration? }
+// Body: { modelId, prompt, title?, platform?, image_url? }
 //
-// "Generate with AI" — creates an ai_drafted content post and kicks off a
-// Higgsfield generation. The post appears on the Board immediately (status
-// ai_drafted, generation_status pending). Completion is handled two ways,
-// whichever lands first (both idempotent): the Higgsfield webhook
-// (/api/webhooks/higgsfield) OR a short inline poll here for quick image jobs.
+// "Generate with AI" via Vercel AI Gateway. Creates an ai_drafted post and
+// attaches the generated asset.
+//   - Image: synchronous — generate + attach before responding (seconds).
+//   - Video: can take minutes, so the post is created immediately (pending) and
+//     the generation runs in an after() callback that attaches the asset and
+//     flips generation_status. The Board shows the pending draft right away.
 //
-// Only models in the verified registry are accepted — never an arbitrary
-// client-supplied model_id.
+// Only curated registry models are accepted — never an arbitrary client id.
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+// Generous ceiling so the after() video work has room (bounded by plan limit).
+export const maxDuration = 300
 
 interface GenerateBody {
   modelId?: string
   prompt?: string
   title?: string
   platform?: Brand | ""
-  // model-specific knobs
-  image_url?: string
-  aspect_ratio?: string
-  resolution?: string
-  duration?: number
+  image_url?: string // optional source image for image-to-video models
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -48,8 +44,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const model = body.modelId ? findHiggsfieldModel(body.modelId) : undefined
-  if (!model || !model.verified) {
+  const modelId = body.modelId ?? ""
+  const kind = curatedKind(modelId)
+  if (!isCuratedModel(modelId) || !kind) {
     return NextResponse.json(
       { error: "Unknown or unsupported model. Pick one from the list." },
       { status: 400 },
@@ -59,51 +56,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!prompt) {
     return NextResponse.json({ error: "A prompt is required" }, { status: 400 })
   }
-  // Image-to-video models need a source image.
-  if (model.kind === "video" && !body.image_url?.trim()) {
-    return NextResponse.json(
-      { error: "This model animates an image — provide an image URL" },
-      { status: 400 },
-    )
-  }
+  const sourceImageUrl = body.image_url?.trim() || undefined
 
-  // Build the model-specific request body per the Higgsfield API contract.
-  const params: Record<string, unknown> =
-    model.kind === "image"
-      ? {
-          prompt,
-          aspect_ratio: body.aspect_ratio || "1:1",
-          resolution: body.resolution || "1080p",
-        }
-      : {
-          image_url: body.image_url!.trim(),
-          prompt,
-          duration: body.duration || 5,
-        }
-
-  // Webhook target so Higgsfield can notify us on completion (production path).
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://434media.com"
-  const webhookUrl = `${baseUrl}/api/webhooks/higgsfield`
-
-  // 1) Submit the generation.
-  let submission
-  try {
-    submission = await submitGeneration(`${model.id}?hf_webhook=${encodeURIComponent(webhookUrl)}`, params)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Generation request failed"
-    console.error("[content generate] submit failed:", message)
-    // Out-of-credits is an expected operational state, not a bug — flag it so
-    // the UI can show a clean "generation unavailable" message + how to fix.
-    if (isOutOfCreditsError(message)) {
-      return NextResponse.json(
-        { error: "Higgsfield account is out of credits — add credits to generate in-app.", code: "out_of_credits" },
-        { status: 402 },
-      )
-    }
-    return NextResponse.json({ error: message }, { status: 502 })
-  }
-
-  // 2) Create the ai_drafted post immediately so it shows on the Board.
+  // Create the ai_drafted post immediately so it appears on the Board.
   const title = (body.title ?? "").trim() || `AI draft — ${prompt.slice(0, 48)}`
   let post: ContentPost
   try {
@@ -118,8 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       assets: [],
       social_platforms: [],
       generation_status: "pending",
-      generation_request_id: submission.request_id,
-      generation_model: model.id,
+      generation_model: modelId,
       generation_prompt: prompt,
     })
   } catch (err) {
@@ -127,60 +81,38 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to create draft post" }, { status: 500 })
   }
 
-  // 3) Best-effort short inline poll — quick image jobs often finish in seconds,
-  //    so the asset is ready by the time the drawer reloads. The webhook is the
-  //    fallback for slower jobs. Both attach the asset idempotently (the post is
-  //    only finalized while generation_status is still "pending").
-  if (submission.status === "completed") {
-    await finalizeFromResult(post.id, submission, model.id, prompt)
-  } else {
-    // Poll up to ~5 times with backoff, staying within maxDuration.
-    for (let i = 0; i < 5; i++) {
-      await new Promise((r) => setTimeout(r, 2500))
-      try {
-        const status = await getGenerationStatus(submission.request_id)
-        if (status.status === "completed") {
-          await finalizeFromResult(post.id, status, model.id, prompt)
-          break
-        }
-        if (status.status === "failed" || status.status === "nsfw") {
-          await updateContentPost(post.id, { generation_status: "failed" })
-          break
-        }
-      } catch {
-        // transient — let the webhook handle completion
-        break
-      }
+  // ── Image: synchronous — attach before responding. ──
+  if (kind === "image") {
+    const result = await generateAsset({ modelId, prompt, sourceImageUrl })
+    if (!result.ok) {
+      await updateContentPost(post.id, { generation_status: "failed" }).catch(() => {})
+      const code = result.status === 402 ? "out_of_credits" : undefined
+      return NextResponse.json({ error: result.error, code, id: post.id }, { status: result.status })
     }
+    await updateContentPost(post.id, {
+      generation_status: "completed",
+      assets: [result.asset],
+    })
+    return NextResponse.json({ success: true, id: post.id, status: "completed" })
   }
 
-  return NextResponse.json({ success: true, id: post.id, request_id: submission.request_id })
-}
+  // ── Video: run after the response (can take minutes). ──
+  after(async () => {
+    try {
+      const result = await generateAsset({ modelId, prompt, sourceImageUrl })
+      if (!result.ok) {
+        await updateContentPost(post.id, { generation_status: "failed" })
+        return
+      }
+      await updateContentPost(post.id, {
+        generation_status: "completed",
+        assets: [result.asset],
+      })
+    } catch (err) {
+      console.error(`[content generate] video after() failed for ${post.id}:`, err)
+      await updateContentPost(post.id, { generation_status: "failed" }).catch(() => {})
+    }
+  })
 
-// Ingest the completed output and attach it to the post. Exported-style helper
-// kept local; mirrored by the webhook receiver.
-async function finalizeFromResult(
-  postId: string,
-  result: HiggsfieldResult,
-  modelId: string,
-  prompt: string,
-): Promise<void> {
-  const url = resultAssetUrl(result)
-  if (!url) {
-    await updateContentPost(postId, { generation_status: "failed" })
-    return
-  }
-  const ingest = await ingestAssetFromUrl(url, {
-    source: "higgsfield",
-    prompt,
-    model: modelId,
-  })
-  if (!ingest.ok) {
-    await updateContentPost(postId, { generation_status: "failed" })
-    return
-  }
-  await updateContentPost(postId, {
-    generation_status: "completed",
-    assets: [ingest.asset],
-  })
+  return NextResponse.json({ success: true, id: post.id, status: "pending" })
 }

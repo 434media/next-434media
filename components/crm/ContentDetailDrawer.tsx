@@ -27,8 +27,16 @@ import {
   CONTENT_POST_STATUS_OPTIONS,
 } from "./types"
 import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser, Asset } from "./types"
-import { GENERATABLE_MODELS } from "@/lib/higgsfield-models"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+
+// Shape returned by /api/admin/crm/content-posts/models (AI Gateway registry).
+interface GenModel {
+  id: string
+  label: string
+  kind: "image" | "video"
+  priceLabel: string | null
+  available: boolean
+}
 
 interface ContentDetailDrawerProps {
   open: boolean
@@ -127,12 +135,15 @@ export function ContentDetailDrawer({
   const [showPublishForm, setShowPublishForm] = useState(false)
   const [publishUrl, setPublishUrl] = useState("")
   const [publishError, setPublishError] = useState<string | null>(null)
-  // Ingest-asset-from-URL local state (Higgsfield outputs / large video)
+  // Ingest-asset-from-URL local state (locally-generated media / large video)
   const [ingestUrl, setIngestUrl] = useState("")
   const [isIngesting, setIsIngesting] = useState(false)
   const [ingestError, setIngestError] = useState<string | null>(null)
-  // Generate-with-AI local state (create mode only)
-  const [genModelId, setGenModelId] = useState(GENERATABLE_MODELS[0]?.id ?? "")
+  // Generate-with-AI local state (create mode only). genKind is the segmented
+  // Image/Video toggle that drives which models are shown + which fields render.
+  const [genModels, setGenModels] = useState<GenModel[]>([])
+  const [genKind, setGenKind] = useState<"image" | "video">("image")
+  const [genModelId, setGenModelId] = useState("")
   const [genPrompt, setGenPrompt] = useState("")
   const [genImageUrl, setGenImageUrl] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -177,7 +188,7 @@ export function ContentDetailDrawer({
       setIngestUrl("")
       setIsIngesting(false)
       setIngestError(null)
-      setGenModelId(GENERATABLE_MODELS[0]?.id ?? "")
+      setGenKind("image")
       setGenPrompt("")
       setGenImageUrl("")
       setIsGenerating(false)
@@ -185,6 +196,36 @@ export function ContentDetailDrawer({
       setGenOutOfCredits(false)
     }
   }, [open, post])
+
+  // Load the AI Gateway model roster when opening a NEW post (generate is
+  // create-mode only). Fetched server-side so pricing/availability stay live.
+  useEffect(() => {
+    if (!open || post) return
+    let cancelled = false
+    fetch("/api/admin/crm/content-posts/models", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled || !data?.models) return
+        setGenModels(data.models as GenModel[])
+      })
+      .catch(() => {
+        /* leave roster empty — panel hides itself when there are no models */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, post])
+
+  // Keep the selected model valid for the active modality: when the Image/Video
+  // toggle changes (or models load), default to the first model of that kind.
+  const genModelsForKind = genModels.filter((m) => m.kind === genKind)
+  useEffect(() => {
+    if (genModelsForKind.length === 0) return
+    if (!genModelsForKind.some((m) => m.id === genModelId)) {
+      setGenModelId(genModelsForKind[0].id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genKind, genModels])
 
   const fetchTeamMembers = useCallback(async () => {
     setIsLoadingMembers(true)
@@ -305,7 +346,7 @@ export function ContentDetailDrawer({
     setFormData(prev => ({ ...prev, assets: prev.assets.filter((_, i) => i !== index) }))
   }
 
-  // Ingest an asset from a URL (e.g. a Higgsfield generation output). The server
+  // Ingest an asset from a URL (e.g. a locally-generated media output). The server
   // fetches + streams it into Blob and returns a structured Asset — this is the
   // path for video and large files that can't go through the direct-upload body.
   const handleIngestAssetUrl = async () => {
@@ -318,7 +359,7 @@ export function ContentDetailDrawer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url, source: "higgsfield" }),
+        body: JSON.stringify({ url, source: "upload" }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.asset) {
@@ -476,17 +517,12 @@ export function ContentDetailDrawer({
     }
   }
 
-  // Generate with AI — kicks off a Higgsfield generation that creates its own
+  // Generate with AI — kicks off an AI Gateway generation that creates its own
   // ai_drafted post (server-side), then reloads + closes so it appears on the
   // Board. Only shown in create mode.
-  const selectedGenModel = GENERATABLE_MODELS.find(m => m.id === genModelId)
   const handleGenerate = async () => {
     if (!genPrompt.trim()) {
       setGenError("A prompt is required.")
-      return
-    }
-    if (selectedGenModel?.kind === "video" && !genImageUrl.trim()) {
-      setGenError("This model animates an image — provide an image URL.")
       return
     }
     setIsGenerating(true)
@@ -501,7 +537,7 @@ export function ContentDetailDrawer({
           prompt: genPrompt.trim(),
           platform: formData.platform || undefined,
           title: formData.title.trim() || undefined,
-          image_url: selectedGenModel?.kind === "video" ? genImageUrl.trim() : undefined,
+          image_url: genKind === "video" && genImageUrl.trim() ? genImageUrl.trim() : undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -840,16 +876,15 @@ export function ContentDetailDrawer({
                     <span className="text-sm text-gray-500">Upload asset</span>
                   </label>
 
-                  {/* Add from URL — ingests a Higgsfield output (or any media
-                      URL) server-side into Blob. Handles video / large files the
-                      direct upload can't. */}
+                  {/* Add from URL — ingests a media URL server-side into Blob.
+                      Handles video / large files the direct upload can't. */}
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
                       value={ingestUrl}
                       onChange={(e) => setIngestUrl(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleIngestAssetUrl())}
-                      placeholder="…or paste a Higgsfield / media URL"
+                      placeholder="…or paste a media URL"
                       className="flex-1 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:border-blue-500"
                     />
                     <button
@@ -864,61 +899,94 @@ export function ContentDetailDrawer({
                   </div>
                   {ingestError && <p className="text-xs text-red-600">{ingestError}</p>}
 
-                  {/* Generate with Higgsfield — create mode only. Produces an
-                      ai_drafted post with the generated asset attached. Sits
-                      with the other "add media" methods (upload / paste URL).
-                      Models limited to the verified API roster; everything else
-                      (Nano Banana, Veo, …) is generated locally + pasted above. */}
-                  {!post && GENERATABLE_MODELS.length > 0 && (
+                  {/* Generate with AI — create mode only. Produces an ai_drafted
+                      post with the generated asset attached, via the Vercel AI
+                      Gateway (one key, many providers). Sits with the other "add
+                      media" methods. Models not on the Gateway are generated
+                      locally and brought in via the paste-URL field above.
+                      Video runs in the background; the draft appears immediately. */}
+                  {!post && genModels.length > 0 && (
                     <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
                       <div>
-                        <h4 className="text-sm font-medium text-neutral-900">Generate with Higgsfield</h4>
-                        <p className="text-[11px] text-neutral-500">Uses your Higgsfield account credits.</p>
+                        <h4 className="text-sm font-medium text-neutral-900">Generate with AI</h4>
+                        <p className="text-[11px] text-neutral-500">Via Vercel AI Gateway · billed to your Vercel account.</p>
                       </div>
+
+                      {/* Modality toggle — pick the task first, then the form is
+                          purpose-built for it (no field shuffling). */}
+                      <div className="inline-flex w-full rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
+                        {(["image", "video"] as const).map((k) => {
+                          const active = genKind === k
+                          const has = genModels.some((m) => m.kind === k)
+                          return (
+                            <button
+                              key={k}
+                              type="button"
+                              disabled={!has}
+                              onClick={() => setGenKind(k)}
+                              aria-pressed={active}
+                              className={`flex-1 h-8 text-xs font-medium capitalize transition-colors ${
+                                active ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"
+                              } disabled:opacity-40 disabled:cursor-not-allowed`}
+                            >
+                              {k}
+                            </button>
+                          )
+                        })}
+                      </div>
+
                       {genOutOfCredits && (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                          <span className="font-medium">Generation unavailable</span> — the Higgsfield account is out of credits.
-                          Add credits in the Higgsfield dashboard, or generate locally and paste the URL above.
+                          <span className="font-medium">Generation unavailable</span> — the AI Gateway account is out of credits.
+                          Add credits in the Vercel dashboard, or generate locally and paste the URL above.
                         </div>
                       )}
+
                       <select
                         value={genModelId}
                         onChange={(e) => setGenModelId(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                       >
-                        {GENERATABLE_MODELS.map(m => (
-                          <option key={m.id} value={m.id}>{m.label} · {m.kind === "video" ? "Video" : "Image"}</option>
+                        {genModelsForKind.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.label}{m.priceLabel ? ` · ${m.priceLabel}` : ""}
+                          </option>
                         ))}
                       </select>
-                      {selectedGenModel?.kind === "video" && (
+
+                      {genKind === "video" && (
                         <input
                           type="text"
                           value={genImageUrl}
                           onChange={(e) => setGenImageUrl(e.target.value)}
-                          placeholder="Source image URL (this model animates an image)"
+                          placeholder="Source image URL (optional — to animate an image)"
                           className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
                         />
                       )}
+
                       <textarea
                         value={genPrompt}
                         onChange={(e) => setGenPrompt(e.target.value)}
-                        placeholder="Describe what to generate…"
+                        placeholder={genKind === "video" ? "Describe the motion / scene…" : "Describe the image…"}
                         rows={2}
                         className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
                       />
-                      {genError && <p className="text-xs text-red-600">{genError}</p>}
-                      <div className="flex items-center justify-between gap-2">
+
+                      {genKind === "video" && (
                         <p className="text-[11px] text-neutral-500 leading-snug">
-                          Other models (Nano Banana, Veo, Seedance…) — generate locally and paste the URL above.
+                          Video can take a few minutes — the draft appears now and the clip attaches when it&apos;s ready.
                         </p>
+                      )}
+                      {genError && <p className="text-xs text-red-600">{genError}</p>}
+                      <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={handleGenerate}
-                          disabled={isGenerating || !genPrompt.trim()}
+                          disabled={isGenerating || !genPrompt.trim() || !genModelId}
                           className="shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
                         >
                           {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                          Generate
+                          Generate {genKind === "video" ? "video" : "image"}
                         </button>
                       </div>
                     </div>

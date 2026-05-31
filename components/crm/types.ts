@@ -284,7 +284,7 @@ export type MediaKind = "image" | "video"
 export type AspectRatio = "9:16" | "1:1" | "4:5" | "16:9" | "1.91:1" | "other"
 
 // How the asset entered the system — drives the provenance trail in review.
-export type AssetSource = "upload" | "higgsfield"
+export type AssetSource = "upload" | "higgsfield" | "ai_gateway"
 
 export interface Asset {
   url: string
