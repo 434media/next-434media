@@ -47,7 +47,9 @@ type AspectRatio = `${number}:${number}`
 export interface GenerateParams {
   modelId: string
   prompt: string
-  sourceImageUrl?: string
+  /** Reference/input images for edit + remix (image models) or as the source
+   *  for image-to-video (video models use the first one). */
+  sourceImageUrls?: string[]
   /** Image + video: "{w}:{h}", e.g. "16:9". Ignored by the language-image path. */
   aspectRatio?: AspectRatio
   /** Video only: clip length in seconds. */
@@ -90,15 +92,18 @@ async function storeImage(
   }
 }
 
-// Dedicated image model (Flux, Imagen): generateImage.
+// Dedicated image model (GPT Image, Flux, Grok, Imagen): generateImage. When
+// reference images are supplied, use the object prompt form so the model edits/
+// remixes them instead of generating from scratch.
 async function runImage(
   modelId: string,
   prompt: string,
   aspectRatio?: AspectRatio,
+  images?: string[],
 ): Promise<GenerateOutcome> {
   const result = await generateImage({
     model: modelId,
-    prompt,
+    prompt: images && images.length > 0 ? { text: prompt, images } : prompt,
     n: 1,
     ...(aspectRatio ? { aspectRatio } : {}),
   })
@@ -111,12 +116,27 @@ async function runImage(
 }
 
 // Multimodal language model that outputs an image (Nano Banana): generateText,
-// then pull the first image file from result.files.
+// then pull the first image file from result.files. Reference images are passed
+// as image content parts on the user message (edit / remix).
 async function runLanguageImage(
   modelId: string,
   prompt: string,
+  images?: string[],
 ): Promise<GenerateOutcome> {
-  const result = await generateText({ model: modelId, prompt })
+  const result = images && images.length > 0
+    ? await generateText({
+        model: modelId,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...images.map((image) => ({ type: "image" as const, image })),
+            ],
+          },
+        ],
+      })
+    : await generateText({ model: modelId, prompt })
   logWarnings(modelId, result.warnings)
   const file = result.files?.find((f) => f.mediaType?.startsWith("image/"))
   if (!file?.uint8Array) {
@@ -169,12 +189,14 @@ export async function generateAsset(opts: GenerateParams): Promise<GenerateOutco
     return { ok: false, status: 400, error: "Unknown or unsupported model" }
   }
   try {
+    const images = opts.sourceImageUrls?.filter(Boolean)
     if (model.kind === "video") {
-      return await runVideo(opts.modelId, opts.prompt, opts.sourceImageUrl, opts.aspectRatio, opts.duration)
+      // Video models take a single source image (image-to-video).
+      return await runVideo(opts.modelId, opts.prompt, images?.[0], opts.aspectRatio, opts.duration)
     }
     return model.viaLanguage
-      ? await runLanguageImage(opts.modelId, opts.prompt)
-      : await runImage(opts.modelId, opts.prompt, opts.aspectRatio)
+      ? await runLanguageImage(opts.modelId, opts.prompt, images)
+      : await runImage(opts.modelId, opts.prompt, opts.aspectRatio, images)
   } catch (err) {
     return classifyGenerationError(err)
   }

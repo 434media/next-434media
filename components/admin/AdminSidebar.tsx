@@ -13,6 +13,7 @@ import {
   Flag,
   Megaphone,
   Calendar,
+  Clapperboard,
   Newspaper,
   ChevronLeft,
   ChevronRight,
@@ -147,6 +148,16 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Calendar,
         href: "/admin/content",
         matchPrefix: "/admin/content",
+        // Exact so it doesn't stay highlighted on the /admin/content/studio sibling.
+        exact: true,
+        roles: ["full_admin", "crm_only"],
+      },
+      {
+        id: "content-studio",
+        label: "AI Studio",
+        icon: Clapperboard,
+        href: "/admin/content/studio",
+        matchPrefix: "/admin/content/studio",
         roles: ["full_admin", "crm_only"],
       },
       {

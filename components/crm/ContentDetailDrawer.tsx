@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "motion/react"
 import { 
   X, 
   Loader2, 
@@ -19,6 +18,7 @@ import {
   GripVertical,
   CheckCircle2,
   XCircle,
+  Images,
 } from "lucide-react"
 import { 
   BRANDS, 
@@ -26,17 +26,10 @@ import {
   SOCIAL_PLATFORM_OPTIONS,
   CONTENT_POST_STATUS_OPTIONS,
 } from "./types"
-import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser, Asset } from "./types"
+import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser, Asset, StoredAsset } from "./types"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
-
-// Shape returned by /api/admin/crm/content-posts/models (AI Gateway registry).
-interface GenModel {
-  id: string
-  label: string
-  kind: "image" | "video"
-  priceLabel: string | null
-  available: boolean
-}
+import { GeneratePanel } from "./GeneratePanel"
+import { AssetLibraryPicker } from "./AssetLibraryPicker"
 
 interface ContentDetailDrawerProps {
   open: boolean
@@ -139,18 +132,9 @@ export function ContentDetailDrawer({
   const [ingestUrl, setIngestUrl] = useState("")
   const [isIngesting, setIsIngesting] = useState(false)
   const [ingestError, setIngestError] = useState<string | null>(null)
-  // Generate-with-AI local state (create mode only). genKind is the segmented
-  // Image/Video toggle that drives which models are shown + which fields render.
-  const [genModels, setGenModels] = useState<GenModel[]>([])
-  const [genKind, setGenKind] = useState<"image" | "video">("image")
-  const [genModelId, setGenModelId] = useState("")
-  const [genPrompt, setGenPrompt] = useState("")
-  const [genImageUrl, setGenImageUrl] = useState("")
-  const [genAspectRatio, setGenAspectRatio] = useState("1:1")
-  const [genDuration, setGenDuration] = useState(5)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [genError, setGenError] = useState<string | null>(null)
-  const [genOutOfCredits, setGenOutOfCredits] = useState(false)
+  // Pick an existing asset from the reusable library.
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false)
+  // Generation is handled by the shared <GeneratePanel> (rendered in create mode).
 
   useEffect(() => {
     if (open) {
@@ -190,46 +174,8 @@ export function ContentDetailDrawer({
       setIngestUrl("")
       setIsIngesting(false)
       setIngestError(null)
-      setGenKind("image")
-      setGenPrompt("")
-      setGenImageUrl("")
-      setGenAspectRatio("1:1")
-      setGenDuration(5)
-      setIsGenerating(false)
-      setGenError(null)
-      setGenOutOfCredits(false)
     }
   }, [open, post])
-
-  // Load the AI Gateway model roster when opening a NEW post (generate is
-  // create-mode only). Fetched server-side so pricing/availability stay live.
-  useEffect(() => {
-    if (!open || post) return
-    let cancelled = false
-    fetch("/api/admin/crm/content-posts/models", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled || !data?.models) return
-        setGenModels(data.models as GenModel[])
-      })
-      .catch(() => {
-        /* leave roster empty — panel hides itself when there are no models */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [open, post])
-
-  // Keep the selected model valid for the active modality: when the Image/Video
-  // toggle changes (or models load), default to the first model of that kind.
-  const genModelsForKind = genModels.filter((m) => m.kind === genKind)
-  useEffect(() => {
-    if (genModelsForKind.length === 0) return
-    if (!genModelsForKind.some((m) => m.id === genModelId)) {
-      setGenModelId(genModelsForKind[0].id)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genKind, genModels])
 
   const fetchTeamMembers = useCallback(async () => {
     setIsLoadingMembers(true)
@@ -344,6 +290,22 @@ export function ContentDetailDrawer({
 
   const handleRemoveLink = (index: number) => {
     setFormData(prev => ({ ...prev, links: prev.links.filter((_, i) => i !== index) }))
+  }
+
+  // Append a picked library asset to the post. Build a minimal Asset (no
+  // undefined fields — Firestore rejects them) carrying provenance forward.
+  const addLibraryAsset = (picked: StoredAsset) => {
+    const asset: Asset = { url: picked.url, kind: picked.kind }
+    if (picked.width !== undefined) asset.width = picked.width
+    if (picked.height !== undefined) asset.height = picked.height
+    if (picked.aspectRatio !== undefined) asset.aspectRatio = picked.aspectRatio
+    if (picked.durationSec !== undefined) asset.durationSec = picked.durationSec
+    if (picked.platforms !== undefined) asset.platforms = picked.platforms
+    if (picked.source !== undefined) asset.source = picked.source
+    if (picked.prompt !== undefined) asset.prompt = picked.prompt
+    if (picked.model !== undefined) asset.model = picked.model
+    setFormData((prev) => ({ ...prev, assets: [...prev.assets, asset] }))
+    setShowLibraryPicker(false)
   }
 
   const handleRemoveAsset = (index: number) => {
@@ -518,49 +480,6 @@ export function ContentDetailDrawer({
       setPublishError(err instanceof Error ? err.message : "Failed to mark posted")
     } finally {
       setIsPublishing(false)
-    }
-  }
-
-  // Generate with AI — kicks off an AI Gateway generation that creates its own
-  // ai_drafted post (server-side), then reloads + closes so it appears on the
-  // Board. Only shown in create mode.
-  const handleGenerate = async () => {
-    if (!genPrompt.trim()) {
-      setGenError("A prompt is required.")
-      return
-    }
-    setIsGenerating(true)
-    setGenError(null)
-    try {
-      const res = await fetch("/api/admin/crm/content-posts/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          modelId: genModelId,
-          prompt: genPrompt.trim(),
-          platform: formData.platform || undefined,
-          title: formData.title.trim() || undefined,
-          image_url: genKind === "video" && genImageUrl.trim() ? genImageUrl.trim() : undefined,
-          aspect_ratio: genAspectRatio,
-          duration: genKind === "video" ? genDuration : undefined,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        // Out-of-credits is a distinct, expected state — surface it as a calm
-        // notice rather than a transient error.
-        if (data.code === "out_of_credits") {
-          setGenOutOfCredits(true)
-          return
-        }
-        throw new Error(data.error || "Generation failed")
-      }
-      onDecided?.()
-    } catch (err) {
-      setGenError(err instanceof Error ? err.message : "Generation failed")
-    } finally {
-      setIsGenerating(false)
     }
   }
 
@@ -882,6 +801,23 @@ export function ContentDetailDrawer({
                     <span className="text-sm text-gray-500">Upload asset</span>
                   </label>
 
+                  {/* Add from the reusable asset library (Studio-generated
+                      + previously added). Available in create and edit. */}
+                  <button
+                    type="button"
+                    onClick={() => setShowLibraryPicker(true)}
+                    className="flex items-center gap-2 px-4 py-3 rounded-lg border border-dashed border-gray-300 hover:border-blue-400 cursor-pointer transition-colors bg-gray-50 hover:bg-blue-50/30 w-full text-left"
+                  >
+                    <Images className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-500">Add from library</span>
+                  </button>
+                  <AssetLibraryPicker
+                    open={showLibraryPicker}
+                    onClose={() => setShowLibraryPicker(false)}
+                    onSelect={addLibraryAsset}
+                    title="Add from library"
+                  />
+
                   {/* Add from URL — ingests a media URL server-side into Blob.
                       Handles video / large files the direct upload can't. */}
                   <div className="flex items-center gap-2">
@@ -905,127 +841,18 @@ export function ContentDetailDrawer({
                   </div>
                   {ingestError && <p className="text-xs text-red-600">{ingestError}</p>}
 
-                  {/* Generate with AI — create mode only. Produces an ai_drafted
-                      post with the generated asset attached, via the Vercel AI
-                      Gateway (one key, many providers). Sits with the other "add
-                      media" methods. Models not on the Gateway are generated
-                      locally and brought in via the paste-URL field above.
-                      Video runs in the background; the draft appears immediately. */}
-                  {!post && genModels.length > 0 && (
-                    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2.5">
-                      <div>
-                        <h4 className="text-sm font-medium text-neutral-900">Generate with AI</h4>
-                        <p className="text-[11px] text-neutral-500">Via Vercel AI Gateway · billed to your Vercel account.</p>
-                      </div>
-
-                      {/* Modality toggle — pick the task first, then the form is
-                          purpose-built for it (no field shuffling). */}
-                      <div className="inline-flex w-full rounded-md ring-1 ring-neutral-200 bg-white overflow-hidden divide-x divide-neutral-200">
-                        {(["image", "video"] as const).map((k) => {
-                          const active = genKind === k
-                          const has = genModels.some((m) => m.kind === k)
-                          return (
-                            <button
-                              key={k}
-                              type="button"
-                              disabled={!has}
-                              onClick={() => setGenKind(k)}
-                              aria-pressed={active}
-                              className={`flex-1 h-8 text-xs font-medium capitalize transition-colors ${
-                                active ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-50"
-                              } disabled:opacity-40 disabled:cursor-not-allowed`}
-                            >
-                              {k}
-                            </button>
-                          )
-                        })}
-                      </div>
-
-                      {genOutOfCredits && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                          <span className="font-medium">Generation unavailable</span> — the AI Gateway account is out of credits.
-                          Add credits in the Vercel dashboard, or generate locally and paste the URL above.
-                        </div>
-                      )}
-
-                      <select
-                        value={genModelId}
-                        onChange={(e) => setGenModelId(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
-                      >
-                        {genModelsForKind.map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.label}{m.priceLabel ? ` · ${m.priceLabel}` : ""}
-                          </option>
-                        ))}
-                      </select>
-
-                      {genKind === "video" && (
-                        <input
-                          type="text"
-                          value={genImageUrl}
-                          onChange={(e) => setGenImageUrl(e.target.value)}
-                          placeholder="Source image URL (optional — to animate an image)"
-                          className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
-                        />
-                      )}
-
-                      <textarea
-                        value={genPrompt}
-                        onChange={(e) => setGenPrompt(e.target.value)}
-                        placeholder={genKind === "video" ? "Describe the motion / scene…" : "Describe the image…"}
-                        rows={2}
-                        className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
-                      />
-
-                      {/* Aspect ratio (both) + duration (video) */}
-                      <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-                          Aspect
-                          <select
-                            value={genAspectRatio}
-                            onChange={(e) => setGenAspectRatio(e.target.value)}
-                            className="px-2 py-1 rounded-md bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-400"
-                          >
-                            {["1:1", "16:9", "9:16", "4:3", "3:4"].map((r) => (
-                              <option key={r} value={r}>{r}</option>
-                            ))}
-                          </select>
-                        </label>
-                        {genKind === "video" && (
-                          <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-                            Duration
-                            <select
-                              value={genDuration}
-                              onChange={(e) => setGenDuration(Number(e.target.value))}
-                              className="px-2 py-1 rounded-md bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-400"
-                            >
-                              {[5, 8, 10].map((d) => (
-                                <option key={d} value={d}>{d}s</option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                      </div>
-
-                      {genKind === "video" && (
-                        <p className="text-[11px] text-neutral-500 leading-snug">
-                          Video can take a few minutes — the draft appears now and the clip attaches when it&apos;s ready.
-                        </p>
-                      )}
-                      {genError && <p className="text-xs text-red-600">{genError}</p>}
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={handleGenerate}
-                          disabled={isGenerating || !genPrompt.trim() || !genModelId}
-                          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                          Generate {genKind === "video" ? "video" : "image"}
-                        </button>
-                      </div>
-                    </div>
+                  {/* Generate with AI — create mode only. Shared GeneratePanel;
+                      generated assets are added to this post (and auto-saved to the
+                      library). Models not on the Gateway are generated locally and
+                      brought in via the paste-URL field above. */}
+                  {!post && (
+                    <GeneratePanel
+                      open={open}
+                      addLabel="Add to post"
+                      onAdd={(asset) =>
+                        setFormData((prev) => ({ ...prev, assets: [...prev.assets, asset] }))
+                      }
+                    />
                   )}
                 </div>
               </div>

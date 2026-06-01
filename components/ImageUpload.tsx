@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { upload } from "@vercel/blob/client"
-import { Upload, X, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react"
+import { Upload, X, Link as LinkIcon, Loader2, Image as ImageIcon, Images } from "lucide-react"
+import { AssetLibraryPicker } from "@/components/crm/AssetLibraryPicker"
+import type { StoredAsset } from "@/components/crm/types"
 
 interface ImageUploadProps {
   value: string
@@ -28,6 +30,7 @@ export function ImageUpload({
   const [uploadMethod, setUploadMethod] = useState<"url" | "file">("file")
   const [preview, setPreview] = useState<string>(value)
   const [isDragging, setIsDragging] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
 
@@ -196,6 +199,14 @@ export function ImageUpload({
           <LinkIcon className="h-3.5 w-3.5" />
           Paste URL
         </button>
+        <button
+          type="button"
+          onClick={() => setShowLibrary(true)}
+          className="inline-flex items-center gap-1.5 px-3 text-xs font-medium whitespace-nowrap bg-white text-neutral-700 hover:bg-neutral-50 transition-colors"
+        >
+          <Images className="h-3.5 w-3.5" />
+          Library
+        </button>
       </div>
 
       {/* URL Input */}
@@ -336,6 +347,19 @@ export function ImageUpload({
           <p className="text-[11px] text-neutral-500 mt-0.5">Paste an image URL in the field above</p>
         </div>
       )}
+
+      {/* Pick an existing image from the reusable asset library (image-only;
+          these fields hold a single image URL). */}
+      <AssetLibraryPicker
+        open={showLibrary}
+        kind="image"
+        onClose={() => setShowLibrary(false)}
+        onSelect={(asset: StoredAsset) => {
+          onChange(asset.url)
+          setShowLibrary(false)
+        }}
+        title="Choose an image"
+      />
     </div>
   )
 }

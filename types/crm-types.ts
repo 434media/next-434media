@@ -607,6 +607,10 @@ export const CRM_COLLECTIONS = {
   BARB_PIE_CHART: "crm_barb_pie_chart",
   PIE_SLICES: "crm_pie_slices",
   CONTENT_POSTS: "crm_content_posts",
+  GENERATION_JOBS: "crm_generation_jobs",
+  // Reusable media library — generated (and later uploaded) assets persisted
+  // independently of any content post, browsable + reusable in the Studio.
+  ASSETS: "crm_assets",
   LEADS: "leads",
 } as const
 

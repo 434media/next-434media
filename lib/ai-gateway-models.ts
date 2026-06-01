@@ -15,44 +15,58 @@ interface CuratedModel {
   id: string
   label: string
   kind: GenModelKind
+  /** Creator prefix — drives the provider logo + grouping. */
+  provider: string
   // Some image models (e.g. Google "Nano Banana" gemini-*-image) are typed as
   // `language` on the Gateway and produce images via generateText → result.files,
   // not generateImage. The client switches paths on this flag.
   viaLanguage?: boolean
+  // True when the model accepts reference/input images (edit, remix, style). For
+  // image kind this enables the "Reference images" path; video models always
+  // accept a single source image (image-to-video) regardless of this flag.
+  supportsImageInput?: boolean
 }
 
 // Curated roster. Add verified ids here to grow it — confirm a new id exists via
-// /v1/models before adding.
+// /v1/models before adding. Order = display order (first of each kind = default).
 const CURATED: CuratedModel[] = [
-  // Image (dedicated image models)
-  { id: "bfl/flux-2-flex", label: "Flux 2 Flex", kind: "image" },
-  { id: "google/imagen-4.0-generate-001", label: "Imagen 4", kind: "image" },
-  // Image via multimodal language models ("Nano Banana" family)
-  { id: "google/gemini-2.5-flash-image", label: "Nano Banana", kind: "image", viaLanguage: true },
-  { id: "google/gemini-3-pro-image", label: "Nano Banana Pro", kind: "image", viaLanguage: true },
+  // Image
+  { id: "openai/gpt-image-2", label: "GPT Image 2", kind: "image", provider: "openai", supportsImageInput: true },
+  { id: "google/gemini-3-pro-image", label: "Nano Banana Pro", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true },
+  { id: "google/gemini-2.5-flash-image", label: "Nano Banana", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true },
+  { id: "bfl/flux-2-flex", label: "Flux 2 Flex", kind: "image", provider: "bfl", supportsImageInput: true },
+  { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true },
+  { id: "google/imagen-4.0-generate-001", label: "Imagen 4", kind: "image", provider: "google" },
   // Video (text-to-video; image-to-video handled per-model in the client)
-  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video" },
-  { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video" },
-  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video" },
+  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google" },
+  { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai" },
+  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance" },
+  { id: "xai/grok-imagine-video", label: "Grok Imagine", kind: "video", provider: "xai" },
 ]
 
 export interface GatewayModel {
   id: string
   label: string
   kind: GenModelKind
+  provider: string
   viaLanguage: boolean
-  /** Human-readable price hint for the dropdown, e.g. "$0.04 / image". Null when
-   *  the list endpoint doesn't expose a simple flat unit price — common for
-   *  video and language-image models. */
+  supportsImageInput: boolean
+  /** Human-readable price hint for the picker, e.g. "$0.04 / image" or
+   *  "from $0.10 / sec". Null when the list endpoint exposes only token-based
+   *  pricing (e.g. GPT Image) that has no clean per-asset unit price. */
   priceLabel: string | null
   /** False when the curated model isn't currently offered by the Gateway. */
   available: boolean
 }
 
+// The Gateway exposes several pricing shapes depending on the model. We read the
+// ones that map to a clean per-asset price and ignore token-only pricing.
 interface GatewayPricing {
   image?: string
   video?: string
   request?: string
+  image_dimension_quality_pricing?: Array<{ size?: string; cost?: string }>
+  video_duration_pricing?: Array<{ cost_per_second?: string }>
 }
 interface GatewayListEntry {
   id: string
@@ -65,12 +79,36 @@ const TTL_MS = 5 * 60 * 1000
 
 let cache: { at: number; data: GatewayModel[] } | null = null
 
+// Trim a string-encoded dollar amount to a tidy display value.
+function fmtUsd(value: string): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return value
+  const fixed = n < 0.01 ? n.toFixed(4) : n.toFixed(2)
+  // Drop trailing zeros (0.040 → 0.04, 0.10 → 0.1) but keep at least one decimal.
+  return fixed.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")
+}
+
 function priceLabelFor(entry: GatewayListEntry | undefined, kind: GenModelKind): string | null {
   const p = entry?.pricing
   if (!p) return null
-  if (kind === "image" && p.image) return `$${p.image} / image`
-  if (kind === "video" && p.video) return `$${p.video} / video`
-  if (p.request) return `$${p.request} / request`
+
+  if (kind === "image") {
+    if (p.image) return `$${fmtUsd(p.image)} / image`
+    const dim = p.image_dimension_quality_pricing
+    if (dim && dim.length > 0) {
+      const def = dim.find((d) => d.size === "default") ?? dim[0]
+      if (def?.cost) return `$${fmtUsd(def.cost)} / image`
+    }
+    return null // token-based (e.g. GPT Image) — no clean per-image unit price
+  }
+
+  if (p.video) return `$${fmtUsd(p.video)} / video`
+  const dur = p.video_duration_pricing
+  if (dur && dur.length > 0) {
+    const costs = dur.map((d) => Number(d.cost_per_second)).filter((n) => Number.isFinite(n))
+    if (costs.length > 0) return `from $${fmtUsd(String(Math.min(...costs)))} / sec`
+  }
+  if (p.request) return `$${fmtUsd(p.request)} / request`
   return null
 }
 
@@ -98,7 +136,9 @@ export async function getGatewayModels(): Promise<GatewayModel[]> {
       id: c.id,
       label: c.label,
       kind: c.kind,
+      provider: c.provider,
       viaLanguage: !!c.viaLanguage,
+      supportsImageInput: !!c.supportsImageInput,
       priceLabel: priceLabelFor(entry, c.kind),
       available: live ? live.has(c.id) : true,
     }
@@ -118,8 +158,8 @@ export function curatedKind(id: string): GenModelKind | null {
   return CURATED.find((c) => c.id === id)?.kind ?? null
 }
 
-// Full curated entry (kind + viaLanguage) — used by the generation client to
-// pick the right SDK path.
+// Full curated entry (kind + viaLanguage + capabilities) — used by the
+// generation client to pick the right SDK path.
 export function curatedModel(id: string): Readonly<CuratedModel> | null {
   return CURATED.find((c) => c.id === id) ?? null
 }

@@ -286,6 +286,34 @@ export type AspectRatio = "9:16" | "1:1" | "4:5" | "16:9" | "1.91:1" | "other"
 // How the asset entered the system — drives the provenance trail in review.
 export type AssetSource = "upload" | "higgsfield" | "ai_gateway"
 
+// A generated/stored media asset persisted in the reusable library (crm_assets),
+// independent of any content post. Extends Asset with library metadata so it can
+// be browsed, downloaded, and reused across content posts / blog / feed.
+export interface StoredAsset extends Asset {
+  id: string
+  title?: string
+  created_by: string
+  created_at: string
+}
+
+// Async generation job — the holder for a decoupled AI generation (currently
+// video, which runs for minutes). The client polls it until status is terminal.
+// Image generation is synchronous and returns an Asset directly (no job).
+export type GenerationJobStatus = "pending" | "completed" | "failed"
+
+export interface GenerationJob {
+  id: string
+  status: GenerationJobStatus
+  kind: MediaKind
+  model: string
+  prompt: string
+  asset?: Asset // set when completed
+  error?: string // set when failed
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Asset {
   url: string
   kind: MediaKind
