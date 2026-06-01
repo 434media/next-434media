@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server"
 import type { NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { generateAsset } from "@/lib/ai-generate"
-import { isCuratedModel, curatedKind } from "@/lib/ai-gateway-models"
+import { isCuratedModel, curatedKind, videoConstraints } from "@/lib/ai-gateway-models"
 import {
   createGenerationJob,
   getGenerationJob,
@@ -22,7 +22,9 @@ import { createAsset } from "@/lib/firestore-assets"
 export const runtime = "nodejs"
 export const maxDuration = 300
 
-const ALLOWED_ASPECTS = ["1:1", "4:5", "16:9", "9:16", "4:3", "3:4"] as const
+// Superset of every aspect any curated model accepts (used to validate the
+// incoming value before per-model coercion). 21:9 is Seedance-only.
+const ALLOWED_ASPECTS = ["1:1", "4:5", "16:9", "9:16", "4:3", "3:4", "21:9"] as const
 type AllowedAspect = (typeof ALLOWED_ASPECTS)[number]
 
 interface GenerateBody {
@@ -93,10 +95,35 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .map((u) => (typeof u === "string" ? u.trim() : ""))
     .filter(Boolean)
     .slice(0, 4)
-  const aspectRatio = ALLOWED_ASPECTS.includes(body.aspect_ratio?.trim() as AllowedAspect)
+  let aspectRatio = ALLOWED_ASPECTS.includes(body.aspect_ratio?.trim() as AllowedAspect)
     ? (body.aspect_ratio!.trim() as AllowedAspect)
     : undefined
-  const duration = typeof body.duration === "number" && body.duration > 0 ? body.duration : undefined
+  let duration = typeof body.duration === "number" && body.duration > 0 ? body.duration : undefined
+
+  // Backstop: a video model with curated constraints must only ever receive an
+  // aspect/duration it supports. Coerce out-of-range values to the model's
+  // default (rather than failing) so a stale client can't send Veo "1:1 / 10s"
+  // and trip an opaque upstream rejection. The picker prevents this in the UI;
+  // this guarantees it server-side too.
+  const vc = kind === "video" ? videoConstraints(modelId) : null
+  if (vc) {
+    if (!aspectRatio || !vc.aspectRatios.includes(aspectRatio)) {
+      if (aspectRatio) console.warn(`[generate-asset] ${modelId}: aspect "${aspectRatio}" unsupported → ${vc.aspectRatios[0]}`)
+      aspectRatio = vc.aspectRatios[0] as AllowedAspect
+    }
+    if (vc.durations && vc.durations.length > 0) {
+      if (!duration || !vc.durations.includes(duration)) {
+        if (duration) console.warn(`[generate-asset] ${modelId}: duration "${duration}" unsupported → ${vc.durations[0]}`)
+        duration = vc.durations[0]
+      }
+    } else if (vc.durationRange) {
+      const { min, max, default: def } = vc.durationRange
+      if (!duration || duration < min || duration > max) {
+        if (duration) console.warn(`[generate-asset] ${modelId}: duration "${duration}" out of ${min}–${max}s → ${def}`)
+        duration = def
+      }
+    }
+  }
 
   const createdBy = auth.session.name || auth.session.email
 

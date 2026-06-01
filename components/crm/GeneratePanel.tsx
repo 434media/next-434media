@@ -22,7 +22,19 @@ export interface GenModel {
   blurb: string | null
   priceLabel: string | null
   available: boolean
+  /** Video models: accepted aspect ratios + durations (null = use global options).
+   *  durations = fixed set (first = default); durationRange = continuous range. */
+  video: {
+    aspectRatios: string[]
+    durations?: number[]
+    durationRange?: { min: number; max: number; default: number }
+  } | null
 }
+
+// Fallback option sets — used for image models and for video models whose
+// per-model constraints haven't been curated yet (see lib/ai-gateway-models.ts).
+const ASPECTS = ["1:1", "4:5", "16:9", "9:16", "4:3", "3:4"]
+const DURATIONS = [5, 8, 10]
 
 interface GeneratePanelProps {
   /** Shown only when open. Lets the host gate mounting without unmounting state. */
@@ -113,6 +125,31 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   // Reference images: image models that accept input images (edit/remix), or any
   // video model (the first image is the i2v source).
   const showRefs = genKind === "video" || !!selectedModel?.supportsImageInput
+
+  // Aspect/duration options come from the selected video model when its
+  // constraints are curated; otherwise the global fallback. Image models always
+  // use the global aspect set (and have no duration control).
+  const videoCaps = genKind === "video" ? selectedModel?.video ?? null : null
+  const aspectOptions = videoCaps?.aspectRatios ?? ASPECTS
+  // Duration is either a fixed set (dropdown/label) or a continuous range
+  // (number input). Unconstrained models use the global preset list.
+  const durRange = videoCaps?.durationRange ?? null
+  const durList = durRange ? null : videoCaps?.durations ?? DURATIONS
+
+  // Snap the aspect/duration to a valid value whenever the model (or kind)
+  // changes, so a stale selection (e.g. 1:1 / 10s) can't ride into a model that
+  // rejects it — the core fix for unsupported-combo failures like Veo.
+  useEffect(() => {
+    if (!aspectOptions.includes(genAspectRatio)) setGenAspectRatio(aspectOptions[0])
+    if (genKind === "video") {
+      if (durRange) {
+        if (genDuration < durRange.min || genDuration > durRange.max) setGenDuration(durRange.default)
+      } else if (durList && !durList.includes(genDuration)) {
+        setGenDuration(durList[0])
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel?.id, genKind])
 
   const addRef = (url: string) => {
     const clean = sanitizeUrl(url)
@@ -408,31 +445,56 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
             </div>
           )}
 
-          {/* Aspect (both) + duration (video) pills */}
+          {/* Aspect (both) + duration (video). Options are derived from the
+              selected model; a single fixed value renders as a label, not a
+              dropdown with invalid choices. */}
           <label className="inline-flex items-center gap-1 h-8 px-2 rounded-lg ring-1 ring-neutral-200 text-[11px] font-medium text-neutral-600">
             Aspect
-            <select
-              value={genAspectRatio}
-              onChange={(e) => setGenAspectRatio(e.target.value)}
-              className="bg-transparent text-xs text-neutral-900 focus:outline-none"
-            >
-              {["1:1", "4:5", "16:9", "9:16", "4:3", "3:4"].map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            {aspectOptions.length === 1 ? (
+              <span className="text-xs text-neutral-900">{aspectOptions[0]}</span>
+            ) : (
+              <select
+                value={genAspectRatio}
+                onChange={(e) => setGenAspectRatio(e.target.value)}
+                className="bg-transparent text-xs text-neutral-900 focus:outline-none"
+              >
+                {aspectOptions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            )}
           </label>
           {genKind === "video" && (
             <label className="inline-flex items-center gap-1 h-8 px-2 rounded-lg ring-1 ring-neutral-200 text-[11px] font-medium text-neutral-600">
               Duration
-              <select
-                value={genDuration}
-                onChange={(e) => setGenDuration(Number(e.target.value))}
-                className="bg-transparent text-xs text-neutral-900 focus:outline-none"
-              >
-                {[5, 8, 10].map((d) => (
-                  <option key={d} value={d}>{d}s</option>
-                ))}
-              </select>
+              {durRange ? (
+                <span className="inline-flex items-center gap-0.5">
+                  <input
+                    type="number"
+                    min={durRange.min}
+                    max={durRange.max}
+                    value={genDuration}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      if (Number.isFinite(n)) setGenDuration(Math.min(durRange.max, Math.max(durRange.min, n)))
+                    }}
+                    className="w-9 bg-transparent text-xs text-neutral-900 focus:outline-none"
+                  />
+                  <span className="text-xs text-neutral-900">s</span>
+                </span>
+              ) : durList && durList.length === 1 ? (
+                <span className="text-xs text-neutral-900">{durList[0]}s</span>
+              ) : (
+                <select
+                  value={genDuration}
+                  onChange={(e) => setGenDuration(Number(e.target.value))}
+                  className="bg-transparent text-xs text-neutral-900 focus:outline-none"
+                >
+                  {(durList ?? DURATIONS).map((d) => (
+                    <option key={d} value={d}>{d}s</option>
+                  ))}
+                </select>
+              )}
             </label>
           )}
 
@@ -449,6 +511,11 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
         </div>
       </div>
 
+      {videoCaps && (
+        <p className="text-[11px] text-neutral-400 leading-snug">
+          {selectedModel?.label} · {durRange ? `${durRange.min}–${durRange.max}s` : (durList ?? DURATIONS).map((d) => `${d}s`).join(", ")} · {aspectOptions.join(", ")}
+        </p>
+      )}
       {genKind === "video" && genStatus !== "ready" && (
         <p className="text-[11px] text-neutral-500 leading-snug">
           Video can take a few minutes — keep this open while it generates.

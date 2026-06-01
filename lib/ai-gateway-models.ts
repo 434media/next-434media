@@ -11,6 +11,19 @@
 
 export type GenModelKind = "image" | "video"
 
+// Per-model video requirements. The Gateway's /v1/models metadata does NOT
+// expose valid aspect ratios or durations (only resolution price tiers), so
+// these are curated from each provider's docs. The first entry of each list is
+// the default the picker snaps to. Omit the block for a model whose constraints
+// haven't been verified — the UI then falls back to the global option set.
+export interface VideoConstraints {
+  aspectRatios: string[]
+  /** Enumerated allowed durations (first = default). For fixed-set models (Veo). */
+  durations?: number[]
+  /** Continuous duration range in seconds, inclusive. For range models (Seedance). */
+  durationRange?: { min: number; max: number; default: number }
+}
+
 interface CuratedModel {
   id: string
   label: string
@@ -28,6 +41,9 @@ interface CuratedModel {
   /** One-line "good for…" hint shown on the picker card to help a first-time
    *  admin choose between unfamiliar models. */
   blurb?: string
+  /** Video models only: the aspect ratios + durations this model accepts.
+   *  Omitted when unverified → the picker uses the global fallback options. */
+  video?: VideoConstraints
 }
 
 // Curated roster. Add verified ids here to grow it — confirm a new id exists via
@@ -41,9 +57,11 @@ const CURATED: CuratedModel[] = [
   { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true, blurb: "Quick, budget-friendly images" },
   { id: "google/imagen-4.0-generate-001", label: "Imagen 4", kind: "image", provider: "google", blurb: "Photoreal, true-to-life images" },
   // Video (text-to-video; image-to-video handled per-model in the client)
-  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google", blurb: "Top-quality video with audio" },
+  // Veo 3.1: Gateway desc = fixed 8-second clips; Google docs = 16:9 / 9:16 only.
+  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google", blurb: "Top-quality video with audio", video: { aspectRatios: ["16:9", "9:16"], durations: [8] } },
   { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai", blurb: "Smooth, cinematic motion" },
-  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance", blurb: "Dynamic action & camera moves" },
+  // Seedance 2.0: 4–15s output, six aspect ratios incl. 21:9 ultrawide.
+  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance", blurb: "Dynamic action & camera moves", video: { aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], durationRange: { min: 4, max: 15, default: 5 } } },
   { id: "xai/grok-imagine-video", label: "Grok Imagine", kind: "video", provider: "xai", blurb: "Fast, budget-friendly clips" },
 ]
 
@@ -62,6 +80,8 @@ export interface GatewayModel {
   priceLabel: string | null
   /** False when the curated model isn't currently offered by the Gateway. */
   available: boolean
+  /** Video models: accepted aspect ratios + durations (null = use global options). */
+  video: VideoConstraints | null
 }
 
 // The Gateway exposes several pricing shapes depending on the model. We read the
@@ -147,6 +167,7 @@ export async function getGatewayModels(): Promise<GatewayModel[]> {
       blurb: c.blurb ?? null,
       priceLabel: priceLabelFor(entry, c.kind),
       available: live ? live.has(c.id) : true,
+      video: c.video ?? null,
     }
   })
 
@@ -168,4 +189,10 @@ export function curatedKind(id: string): GenModelKind | null {
 // generation client to pick the right SDK path.
 export function curatedModel(id: string): Readonly<CuratedModel> | null {
   return CURATED.find((c) => c.id === id) ?? null
+}
+
+// Video aspect/duration constraints for a model, or null if unconstrained.
+// Single source of truth shared by the picker (UI) and the route (backstop).
+export function videoConstraints(id: string): VideoConstraints | null {
+  return curatedModel(id)?.video ?? null
 }

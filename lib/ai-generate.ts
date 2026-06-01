@@ -21,6 +21,13 @@ import {
   APICallError,
   RetryError,
 } from "ai"
+import {
+  GatewayError,
+  GatewayResponseError,
+  GatewayRateLimitError,
+  GatewayAuthenticationError,
+  GatewayModelNotFoundError,
+} from "@ai-sdk/gateway"
 import { put } from "@vercel/blob"
 import crypto from "crypto"
 import type { Asset } from "@/components/crm/types"
@@ -216,6 +223,59 @@ function classifyGenerationError(err: unknown): GenerateError {
   // "Failed after N attempts…", which buries the actual provider error.
   if (RetryError.isInstance(err)) {
     return classifyGenerationError(err.lastError)
+  }
+
+  // AI Gateway errors are their own class tree (they extend Error, NOT
+  // APICallError), so without this branch they fall through to the opaque
+  // message fallback. Handle them first — and crucially UNMASK
+  // GatewayResponseError: the gateway emits a generic "Invalid error response
+  // format: Gateway request failed" whenever it can't fit the upstream
+  // provider's error body into its own schema, hiding the real cause on
+  // .response / .validationError. Log those so the actual failure is visible.
+  if (GatewayError.isInstance(err)) {
+    const status = err.statusCode || 0
+    if (GatewayResponseError.isInstance(err)) {
+      console.error("[ai-generate] gateway could not parse the provider's response:", {
+        statusCode: err.statusCode,
+        response: err.response,
+        validationError: err.validationError?.message,
+      })
+    } else {
+      console.error("[ai-generate] gateway error:", err.name, err.statusCode, err.message)
+    }
+
+    if (GatewayAuthenticationError.isInstance(err)) {
+      return { ok: false, status: 401, error: "AI Gateway authentication failed — check AI_GATEWAY_API_KEY." }
+    }
+    if (GatewayRateLimitError.isInstance(err) || status === 429) {
+      return {
+        ok: false,
+        status: 429,
+        error: "Rate limit reached — the Gateway allows 1 video per minute on this plan. Wait a minute and try again, or add credits to raise the limit.",
+      }
+    }
+    if (GatewayModelNotFoundError.isInstance(err)) {
+      return { ok: false, status: 404, error: "This model isn't available on the AI Gateway right now. Pick another model." }
+    }
+    if (status === 402) {
+      return { ok: false, status: 402, error: "The AI Gateway account is out of credits. Add credits in the Vercel dashboard." }
+    }
+    if (GatewayResponseError.isInstance(err)) {
+      // Surface whatever the provider actually returned, if it's human-readable.
+      const raw =
+        typeof err.response === "string"
+          ? err.response
+          : err.response
+            ? JSON.stringify(err.response)
+            : ""
+      const detail = raw && raw !== "{}" ? ` (provider said: ${raw.slice(0, 300)})` : ""
+      return {
+        ok: false,
+        status: status >= 400 ? status : 502,
+        error: `The video provider returned a response the Gateway couldn't read${detail}. This usually means the generation timed out or the request was rejected — try again, shorten the clip, or pick another video model.`,
+      }
+    }
+    return { ok: false, status: status >= 400 ? status : 502, error: err.message }
   }
 
   // Provider/HTTP error — carries a real status code. Distinguish a temporary
