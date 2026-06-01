@@ -5,6 +5,7 @@ import { Loader2, Download, Trash2, Film, RefreshCw, X } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { GeneratePanel } from "@/components/crm/GeneratePanel"
 import { ProviderLogo } from "@/components/crm/ProviderLogo"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { StoredAsset } from "@/components/crm/types"
 import { sanitizeAssetUrl as sanitizeUrl, toDownloadUrl } from "@/lib/asset-url"
 
@@ -13,9 +14,6 @@ import { sanitizeAssetUrl as sanitizeUrl, toDownloadUrl } from "@/lib/asset-url"
 // content post from any asset. Sibling of the content Calendar; not the default.
 
 type KindFilter = "all" | "image" | "video"
-
-// localStorage key for dismissing the "How it works" intro.
-const INTRO_KEY = "aiStudioIntroDismissed"
 
 // Starter prompts for the empty library — one click to try, so a first-time
 // admin isn't staring at a blank box. Kept generic/brand-neutral.
@@ -66,8 +64,6 @@ export default function StudioPage() {
   const [detail, setDetail] = useState<StoredAsset | null>(null)
   // Example prompt pushed into the generator (bump nonce to re-fire same text).
   const [seedPrompt, setSeedPrompt] = useState<{ text: string; nonce: number } | null>(null)
-  // "How it works" intro — dismissible, remembered per browser.
-  const [showIntro, setShowIntro] = useState(true)
 
   const loadFirst = useCallback(async () => {
     setIsLoading(true)
@@ -131,24 +127,6 @@ export default function StudioPage() {
     return () => window.removeEventListener("keydown", onKey)
   }, [detail])
 
-  // Restore the intro's dismissed state from this browser.
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(INTRO_KEY) === "1") setShowIntro(false)
-    } catch {
-      /* ignore */
-    }
-  }, [])
-
-  const dismissIntro = () => {
-    setShowIntro(false)
-    try {
-      localStorage.setItem(INTRO_KEY, "1")
-    } catch {
-      /* ignore */
-    }
-  }
-
   // Fill the generator with an example prompt and scroll to it.
   const applyExamplePrompt = (text: string) => {
     setSeedPrompt({ text, nonce: Date.now() })
@@ -175,35 +153,14 @@ export default function StudioPage() {
           </div>
 
           {/* How it works — dismissible first-run intro */}
-          {showIntro && (
-            <div className="relative rounded-xl border border-neutral-200 bg-white px-4 py-3 pr-9">
-              <button
-                type="button"
-                onClick={dismissIntro}
-                aria-label="Dismiss"
-                className="absolute top-2.5 right-2.5 grid place-items-center h-6 w-6 rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {[
-                  { n: "1", t: "Pick a model", d: "Each has a “good for…” hint — try one you haven't used." },
-                  { n: "2", t: "Describe or upload", d: "Write a prompt, or attach a reference image to edit & remix." },
-                  { n: "3", t: "Generate & reuse", d: "Every result is saved to your library for social, blog, and campaigns." },
-                ].map((s) => (
-                  <div key={s.n} className="flex items-start gap-2.5">
-                    <span className="grid place-items-center h-5 w-5 shrink-0 rounded-full bg-neutral-900 text-white text-[11px] font-medium">
-                      {s.n}
-                    </span>
-                    <div>
-                      <p className="text-[13px] font-medium text-neutral-900 leading-tight">{s.t}</p>
-                      <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">{s.d}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <HowItWorks
+            storageKey="aiStudioIntroDismissed"
+            steps={[
+              { title: "Pick a model", detail: "Each has a “good for…” hint — try one you haven't used." },
+              { title: "Describe or upload", detail: "Write a prompt, or attach a reference image to edit & remix." },
+              { title: "Generate & reuse", detail: "Every result is saved to your library for social, blog, and campaigns." },
+            ]}
+          />
 
           {/* Generate */}
           <GeneratePanel open seed={seed} seedPrompt={seedPrompt} onGenerated={() => loadFirst()} />

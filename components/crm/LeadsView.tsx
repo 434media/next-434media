@@ -17,6 +17,8 @@ import {
   Target,
 } from "lucide-react"
 import type { Lead, LeadPriority, LeadStatus } from "@/types/crm-types"
+import { HowItWorks } from "@/components/admin/HowItWorks"
+import { LegendPopover } from "@/components/admin/LegendPopover"
 
 type LeadView = "priority" | "all" | "followup"
 
@@ -185,6 +187,18 @@ export function LeadsView({
         </div>
       </div>
 
+      {/* How it works — dismissible first-run intro; connects to the sibling
+          pipeline surfaces leads arrive from. */}
+      <HowItWorks
+        className="mb-4"
+        storageKey="leadsIntroDismissed"
+        steps={[
+          { title: "Leads arrive here", detail: "From Audiences (promoted), the Inbox (converted), and prospecting." },
+          { title: "Scored & prioritized", detail: "A 0–100 fit score ranks each lead — work the Priority queue first." },
+          { title: "Convert to a Client", detail: "Once qualified, convert the lead into a client in the CRM." },
+        ]}
+      />
+
       {/* Sub-view chips */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <ViewChip
@@ -233,11 +247,26 @@ export function LeadsView({
             {filtered.length === 1 ? "lead" : "leads"}
           </span>
           {filtered.length > 0 && (
-            <span>
+            <span
+              title="Fit score (0–100): how well a lead matches the ideal-customer profile. Higher = stronger fit. The colored badge shows priority — red = high, amber = medium."
+              className="cursor-help underline decoration-dotted decoration-neutral-300 underline-offset-2"
+            >
               avg score <strong className="text-neutral-900 font-semibold tabular-nums">{avgScore}</strong>
             </span>
           )}
         </div>
+        {/* Status legend — maps the row status dots to their meaning. */}
+        <LegendPopover
+          title="Lead statuses"
+          items={[
+            { dotClass: STATUS_DOT.new, label: "New" },
+            { dotClass: STATUS_DOT.ready, label: "Ready" },
+            { dotClass: STATUS_DOT.contacted, label: "Contacted" },
+            { dotClass: STATUS_DOT.engaged, label: "Engaged" },
+            { dotClass: STATUS_DOT.converted, label: "Converted" },
+            { dotClass: STATUS_DOT.archived, label: "Archived" },
+          ]}
+        />
       </div>
 
       {/* Empty state */}
@@ -246,7 +275,12 @@ export function LeadsView({
       ) : (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
           <div className="hidden md:grid grid-cols-[80px_1fr_140px_140px_120px_80px] gap-3 px-4 py-2 bg-neutral-50 border-b border-neutral-200 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-            <div>Score</div>
+            <div
+              title="Fit score (0–100): how well a lead matches the ideal-customer profile. Higher = stronger fit. Badge color = priority (red high, amber medium)."
+              className="cursor-help"
+            >
+              Score
+            </div>
             <div>Lead</div>
             <div>Status</div>
             <div>Source / Platform</div>

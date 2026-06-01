@@ -6,6 +6,8 @@ import { Inbox, CheckCircle2, AlertCircle } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { ContactFormsTab } from "@/components/admin/submissions/ContactFormsTab"
 import { InboxResponseStrip } from "@/components/admin/submissions/InboxResponseStrip"
+import { HowItWorks } from "@/components/admin/HowItWorks"
+import { LegendPopover } from "@/components/admin/LegendPopover"
 import type { Toast } from "@/components/admin/submissions/types"
 
 // Stage 3 — /admin/inbox is the response queue for direct contact-form
@@ -76,11 +78,37 @@ export default function InboxPage() {
 
         {/* Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          {/* How it works — dismissible first-run intro; the inbox's place in
+              the pipeline (inquiry → reply → lead). */}
+          <HowItWorks
+            className="mb-4"
+            storageKey="inboxIntroDismissed"
+            steps={[
+              { title: "Direct inquiries land here", detail: "Messages from the site's contact form, newest first." },
+              { title: "Reply within hours", detail: "Watch “Oldest waiting” — it turns red once an inquiry sits over a day." },
+              { title: "Convert to a Lead", detail: "When an inquiry is real pipeline, promote it into Leads." },
+            ]}
+          />
+
           {/* Stage 5 — response-queue identity. Awaiting reply / oldest
               waiting / replied today / avg response time across the contact
               forms surface. Tone shifts (amber → red) when oldest waiting
               crosses 24h. */}
           <InboxResponseStrip />
+
+          {/* Status legend — maps the inbox state dots to their meaning. */}
+          <div className="flex justify-end mb-3">
+            <LegendPopover
+              title="Inbox states"
+              items={[
+                { dotClass: "bg-blue-500", label: "New" },
+                { dotClass: "bg-amber-500", label: "Triaged" },
+                { dotClass: "bg-emerald-500", label: "Replied" },
+                { dotClass: "bg-neutral-400", label: "Archived" },
+                { dotClass: "bg-rose-500", label: "Spam" },
+              ]}
+            />
+          </div>
 
           <ContactFormsTab setToast={setToast} initialSearch={initialSearch} />
         </main>

@@ -115,9 +115,9 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
   }, [subscriberMap])
 
   const sources = [
-    { id: "newsletter" as const, label: "Newsletter", icon: Mail, stats: newsletter },
-    { id: "events" as const, label: "Events", icon: Ticket, stats: events },
-    { id: "lists" as const, label: "Lists", icon: Users2, stats: lists },
+    { id: "newsletter" as const, label: "Newsletter", icon: Mail, stats: newsletter, blurb: "People who signed up for email updates." },
+    { id: "events" as const, label: "Events", icon: Ticket, stats: events, blurb: "People who registered for an event." },
+    { id: "lists" as const, label: "Lists", icon: Users2, stats: lists, blurb: "Contacts shared by partners, imported in bulk." },
   ]
   const active = sources.find((s) => s.id === activeSub) ?? sources[0]
   const activeStats = active.stats
@@ -125,6 +125,9 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
     activeStats && activeStats.total > 0
       ? Math.round((activeStats.inMailchimp / activeStats.total) * 100)
       : 0
+  // Contacts in this source not yet synced to Mailchimp — the actionable gap
+  // behind the "% in Mailchimp" stat.
+  const notInMc = activeStats ? Math.max(0, activeStats.total - activeStats.inMailchimp) : 0
 
   return (
     <div className="mb-4">
@@ -180,7 +183,7 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
           </span>
         ) : activeStats ? (
           <>
-            <span className="font-medium text-neutral-700">{active.label}</span>
+            <span className="text-neutral-500">{active.blurb}</span>
             <span className="text-neutral-300">·</span>
             <span className="tabular-nums">
               <strong className="font-semibold text-neutral-700">
@@ -189,9 +192,16 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
               this week
             </span>
             <span className="text-neutral-300">·</span>
-            <span className="tabular-nums">
-              <strong className="font-semibold text-neutral-700">{mcPct}%</strong> in Mailchimp
-            </span>
+            {/* Reachability framed as the remaining action, not an inert %. */}
+            {notInMc > 0 ? (
+              <span className="tabular-nums">
+                <strong className="font-semibold text-amber-600">{notInMc.toLocaleString()}</strong> not yet in Mailchimp
+              </span>
+            ) : (
+              <span className="tabular-nums text-emerald-600 font-medium">All in Mailchimp</span>
+            )}
+            <span className="text-neutral-300 hidden sm:inline">·</span>
+            <span className="tabular-nums hidden sm:inline text-neutral-400">{mcPct}% synced</span>
           </>
         ) : (
           <span className="opacity-60">No data</span>

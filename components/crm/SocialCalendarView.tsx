@@ -14,12 +14,13 @@ import {
   Plus,
   Filter,
   X,
-  Info,
   Clapperboard,
   ArrowUpRight,
 } from "lucide-react"
 import type { ContentPost, SocialPlatform, ContentPostStatus, TeamMember } from "./types"
 import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS, TEAM_MEMBERS } from "./types"
+import { HowItWorks } from "@/components/admin/HowItWorks"
+import { LegendPopover } from "@/components/admin/LegendPopover"
 
 interface SocialCalendarViewProps {
   contentPosts: ContentPost[]
@@ -28,9 +29,6 @@ interface SocialCalendarViewProps {
 }
 
 type CalendarViewMode = "day" | "week" | "month"
-
-// localStorage key for dismissing the "How it works" intro.
-const INTRO_KEY = "contentCalendarIntroDismissed"
 
 function getDaysInMonth(year: number, month: number): Date[] {
   const firstDay = new Date(year, month, 1)
@@ -245,31 +243,9 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
   // here — it's the Board's columns (and the Calendar shows dated posts only).
   const [showFilters, setShowFilters] = useState(false)
   const filtersRef = useRef<HTMLDivElement>(null)
-  // Status legend popover — maps the dot colors to their meaning.
-  const [showLegend, setShowLegend] = useState(false)
-  const legendRef = useRef<HTMLDivElement>(null)
   // Board column to briefly highlight (e.g. jumped-to from the approval chip).
   const [highlightColumn, setHighlightColumn] = useState<string | null>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
-  // "How it works" intro — dismissible, remembered per browser.
-  const [showIntro, setShowIntro] = useState(true)
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(INTRO_KEY) === "1") setShowIntro(false)
-    } catch {
-      /* ignore */
-    }
-  }, [])
-
-  const dismissIntro = () => {
-    setShowIntro(false)
-    try {
-      localStorage.setItem(INTRO_KEY, "1")
-    } catch {
-      /* ignore */
-    }
-  }
 
   // Jump to a Board column and pulse it — the reviewer's "show me what needs
   // approval" shortcut from the header summary.
@@ -322,22 +298,6 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     }
   }, [showFilters])
 
-  // Close the Legend popover on outside-click / Escape.
-  useEffect(() => {
-    if (!showLegend) return
-    function onClick(e: MouseEvent) {
-      if (legendRef.current && !legendRef.current.contains(e.target as Node)) setShowLegend(false)
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setShowLegend(false)
-    }
-    document.addEventListener("mousedown", onClick)
-    document.addEventListener("keydown", onKey)
-    return () => {
-      document.removeEventListener("mousedown", onClick)
-      document.removeEventListener("keydown", onKey)
-    }
-  }, [showLegend])
 
   const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
   const toggleBrand = (brand: string) => { setSelectedBrands(prev => { const next = new Set(prev); next.has(brand) ? next.delete(brand) : next.add(brand); return next }) }
@@ -493,35 +453,14 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
       </div>
 
       {/* How it works — dismissible first-run intro */}
-      {showIntro && (
-        <div className="relative rounded-xl border border-neutral-200 bg-white px-4 py-3 pr-9">
-          <button
-            type="button"
-            onClick={dismissIntro}
-            aria-label="Dismiss"
-            className="absolute top-2.5 right-2.5 grid place-items-center h-6 w-6 rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {[
-              { n: "1", t: "Board", d: "Your pipeline — drafts and in-progress work live here, even before they have a date." },
-              { n: "2", t: "Calendar", d: "Scheduled & posted content on a date grid (Day, Week, or Month)." },
-              { n: "3", t: "Review & schedule", d: "Approved posts move to Schedule, then go Live once published." },
-            ].map((s) => (
-              <div key={s.n} className="flex items-start gap-2.5">
-                <span className="grid place-items-center h-5 w-5 shrink-0 rounded-full bg-neutral-900 text-white text-[11px] font-medium">
-                  {s.n}
-                </span>
-                <div>
-                  <p className="text-[13px] font-medium text-neutral-900 leading-tight">{s.t}</p>
-                  <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">{s.d}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <HowItWorks
+        storageKey="contentCalendarIntroDismissed"
+        steps={[
+          { title: "Board", detail: "Your pipeline — drafts and in-progress work live here, even before they have a date." },
+          { title: "Calendar", detail: "Scheduled & posted content on a date grid (Day, Week, or Month)." },
+          { title: "Review & schedule", detail: "Approved posts move to Schedule, then go Live once published." },
+        ]}
+      />
 
       {/* View switcher (Board / Calendar) + Filters — one calm toolbar row.
           Board is the pipeline; Calendar is the dated grid. */}
@@ -550,32 +489,9 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
         {/* Status legend — maps the dot colors used on cards to their meaning. */}
-        <div className="relative" ref={legendRef}>
-          <button
-            type="button"
-            onClick={() => setShowLegend(v => !v)}
-            aria-expanded={showLegend}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-          >
-            <Info className="w-4 h-4" />
-            Legend
-          </button>
-          {showLegend && (
-            <div className="absolute right-0 z-20 mt-1 w-56 rounded-md bg-white ring-1 ring-neutral-200 shadow-lg">
-              <div className="px-3 py-2.5 border-b border-neutral-100">
-                <h3 className="text-sm font-medium text-neutral-900">Status legend</h3>
-              </div>
-              <div className="p-3 grid grid-cols-1 gap-1.5">
-                {CONTENT_POST_STATUS_OPTIONS.map((s) => (
-                  <div key={s.value} className="flex items-center gap-2">
-                    <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${getStatusDot(s.value)}`} aria-hidden="true" />
-                    <span className="text-xs text-neutral-700">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <LegendPopover
+          items={CONTENT_POST_STATUS_OPTIONS.map((s) => ({ dotClass: getStatusDot(s.value), label: s.label }))}
+        />
 
         {/* Filters popover — User + Platform slicers. Status lives in the board
             columns (Board view) / is implicit (Calendar = scheduled only). */}

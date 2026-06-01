@@ -9,6 +9,7 @@ import { AudiencesHeaderStrip } from "@/components/admin/submissions/AudiencesHe
 import { EmailListsTab } from "@/components/admin/submissions/EmailListsTab"
 import { EventRegistrationsTab } from "@/components/admin/submissions/EventRegistrationsTab"
 import { ListsTab } from "@/components/admin/submissions/ListsTab"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { Toast } from "@/components/admin/submissions/types"
 
 // Stage 3 — /admin/audiences groups the three campaign-feeder surfaces
@@ -103,7 +104,7 @@ export default function AudiencesPage() {
                   AUDIENCES
                 </h1>
                 <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-2 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-                  campaign cohorts — push to Mailchimp
+                  contacts to email — sync to Mailchimp, promote to leads
                 </span>
               </div>
             </div>
@@ -114,6 +115,18 @@ export default function AudiencesPage() {
 
         {/* Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          {/* How it works — dismissible first-run intro; narrates this page's
+              place in the pipeline (contacts → Mailchimp → leads). */}
+          <HowItWorks
+            className="mb-4"
+            storageKey="audiencesIntroDismissed"
+            steps={[
+              { title: "Three sources", detail: "Newsletter signups, event registrants, and partner-shared lists — all in one place." },
+              { title: "Sync to Mailchimp", detail: "Keep contacts reachable so they can receive your campaigns." },
+              { title: "Promote to Leads", detail: "Turn an engaged contact into worked sales pipeline." },
+            ]}
+          />
+
           {/* Source switcher — segmented control with per-source totals, plus
               the active source's secondary KPIs (+this week / % in Mailchimp).
               This is the page's only nav for Newsletter / Events / Lists. */}
