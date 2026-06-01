@@ -25,6 +25,8 @@ Welcome to the 434 Media codebase. This document serves as a Standard Operating 
 - **Marketing Website** - Public-facing pages with i18n support (English/Spanish)
 - **Blog Engine** - Content managed via Firestore with markdown support
 - **Admin Dashboard** - Protected area for analytics, CRM, blog management, event management, and email lists
+- **Sales Pipeline** - Audiences → Inbox → Leads → CRM funnel, with AI-assisted prospecting, outreach drafting, and web-grounded lead research
+- **Content & AI Studio** - Social content calendar/board with an approve→schedule→post pipeline, plus in-app image/video generation
 - **Multi-site Email Collection** - Centralized email signup system for multiple brand websites
 - **Social Analytics** - Web, Instagram, LinkedIn, and Mailchimp analytics dashboards
 
@@ -56,6 +58,9 @@ This application manages data for multiple websites:
 | **Email Marketing** | Mailchimp | 
 | **Bot Protection** | BotID (Vercel) |
 | **Analytics** | Google Analytics, Meta Pixel |
+| **AI** | Vercel AI Gateway (AI SDK v6) — one key across Anthropic, OpenAI, Google, etc. |
+| **Prospecting** | Apollo (contact discovery + enrichment) |
+| **Transactional Email** | Resend (lead outreach + inbox replies) |
 | **Deployment** | Vercel |
 
 ---
@@ -242,15 +247,62 @@ Firestore-based blog with markdown support:
 | `blog/[slug]/` | Public blog post pages |
 | `components/blog/` | Blog UI components |
 
-### CRM System
+### Sales Pipeline (Audiences → Inbox → Leads → CRM)
 
-Contact and lead management:
+The admin "Pipeline" section is a funnel of connected surfaces. Each page opens
+with a dismissible "How it works" strip (`components/admin/HowItWorks.tsx`) that
+explains where it sits in the funnel, and status indicators share a single
+legend popover (`components/admin/LegendPopover.tsx`).
+
+| Surface | File | Purpose |
+|---------|------|---------|
+| **Audiences** | `admin/audiences/` | Newsletter / Events / Lists cohorts → sync to Mailchimp → promote to leads |
+| **Inbox** | `admin/inbox/` | Contact-form inquiries with a response-time queue (awaiting / oldest waiting / replied today) |
+| **Leads** | `admin/leads/`, `components/crm/LeadsView.tsx` | Scored lead queue — priority/follow-up/all views, bulk actions, owner filter + sort, activity timeline |
+| **Prospecting** | `admin/leads/prospect/` | NL-prompt outbound prospecting (Apollo + LLM ICP scoring), credit-budgeted |
+| **CRM** | `admin/crm/`, `lib/firestore-crm.ts` | Clients, opportunities, tasks |
+
+**Lead lifecycle:** capture (inbound form, audience promotion, or prospecting) →
+fit score (`lib/score-lead.ts`) → AI outreach draft → send via Resend →
+follow-up → convert to client. Every step appends to the lead's activity
+timeline (`lib/firestore-leads.ts` `appendLeadActivity`).
+
+**AI-assisted lead tooling** (all via the AI Gateway — see Tech Stack):
+- **Outreach drafting** — `api/admin/leads/[id]/generate-draft` builds a tailored
+  email from lead signals (engagement, tags, provenance) via `lib/lead-prompt.ts`.
+- **Research & qualify** — `api/admin/leads/[id]/research` runs a web-grounded
+  search model to produce a cited company summary + ICP-fit rationale. Stored as
+  a **review-only** `lead.research` field; nothing is auto-applied to canonical
+  fields, and a suggested HQ country is applied only on explicit click
+  (the EU/UK/CA outreach-compliance gate is never driven by model output).
+- **Prospecting translator** — `lib/prospecting/translator.ts` turns a free-form
+  query into Apollo filters via forced tool-use.
+
+> **Compliance:** 434media does not cold-outreach EU/UK/EEA/Switzerland/Canada
+> (GDPR/CASL). The single source of truth is `EXCLUDED_COUNTRIES` in
+> `lib/prospecting/scorer.ts`, enforced in the translator, scorer, and approval
+> boundary.
+
+### Content & AI Studio
+
+| Surface | File | Purpose |
+|---------|------|---------|
+| **Content Calendar** | `admin/content/`, `components/crm/SocialCalendarView.tsx` | Board + calendar views of social posts; approve→schedule→mark-posted pipeline |
+| **AI Studio** | `admin/content/studio/` | Generate images/video, reusable asset library, remix/upload references |
+| **Generate panel** | `components/crm/GeneratePanel.tsx` | Shared generator (model picker with provider logos + pricing) used by Studio + the post drawer |
+| **Generation backend** | `lib/ai-generate.ts`, `lib/ai-gateway-models.ts` | Image (sync) + video (async via `after()` + job polling) through the AI Gateway |
+
+Image/video models (GPT Image, Nano Banana, Flux, Imagen, Veo, Kling, Seedance,
+Grok) are exposed through a curated registry that live-enriches pricing and
+availability from the Gateway's `/v1/models` endpoint. Generated assets are
+saved to a reusable library (`lib/firestore-assets.ts`) and can be attached to
+content posts, blog, or feed via a shared asset picker.
+
+### Contact Form
 
 | File | Purpose |
 |------|---------|
-| `lib/firestore-crm.ts` | CRM data operations |
-| `admin/crm/` | CRM dashboard |
-| `api/contact-form/` | Contact form handler |
+| `api/contact-form/` | Public contact form handler (feeds the admin Inbox) |
 
 ### Analytics
 
@@ -300,7 +352,26 @@ META_ACCESS_TOKEN=xxxxxxxxxxxxx
 
 # API SECURITY
 EMAIL_SIGNUP_API_KEY=your-secure-random-key
+
+# AI GATEWAY (image/video generation, lead drafting + research)
+AI_GATEWAY_API_KEY=your-vercel-ai-gateway-key
+BLOB_READ_WRITE_TOKEN=your-vercel-blob-token   # stores generated assets
+# Optional model overrides (default to curated gateway slugs):
+# ANTHROPIC_MODEL=anthropic/claude-opus-4.8     # outreach drafts
+# TRANSLATOR_MODEL=anthropic/claude-sonnet-4.6  # prospecting query → filters
+# RESEARCH_MODEL=openai/gpt-4o-mini-search-preview  # web-grounded lead research
+
+# PROSPECTING (Apollo)
+APOLLO_API_KEY=your-apollo-key
+# APOLLO_DAILY_CAP / APOLLO_MONTHLY_CAP — credit guards (optional)
+
+# TRANSACTIONAL EMAIL (Resend — lead outreach + inbox replies)
+RESEND_API_KEY=your-resend-key
 ```
+
+> **Note:** lead-outreach drafting and prospecting now route through the AI
+> Gateway. `ANTHROPIC_API_KEY` is no longer required by the pipeline (the
+> deprecated `lib/anthropic.ts` is unused and kept only as a revert path).
 
 ---
 

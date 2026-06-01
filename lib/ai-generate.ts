@@ -19,6 +19,7 @@ import {
   NoImageGeneratedError,
   NoVideoGeneratedError,
   APICallError,
+  RetryError,
 } from "ai"
 import { put } from "@vercel/blob"
 import crypto from "crypto"
@@ -162,6 +163,11 @@ async function runVideo(
     prompt: sourceImageUrl ? { image: sourceImageUrl, text: prompt } : prompt,
     ...(aspectRatio ? { aspectRatio } : {}),
     ...(duration ? { duration } : {}),
+    // No SDK retries. The Gateway rate-limits video to 1 request/minute on
+    // balances under $100, so an immediate retry always re-hits the same wall —
+    // it just wastes ~minutes and buries the real cause in a RetryError. We
+    // surface the quota error cleanly instead (see classifyGenerationError).
+    maxRetries: 0,
     abortSignal: AbortSignal.timeout(VIDEO_TIMEOUT_MS),
     providerOptions: { [provider]: { pollTimeoutMs: VIDEO_TIMEOUT_MS } },
   })
@@ -206,12 +212,34 @@ export async function generateAsset(opts: GenerateParams): Promise<GenerateOutco
 // classes (more reliable than string matching) and falls back to a message
 // regex only when no class matches.
 function classifyGenerationError(err: unknown): GenerateError {
-  // Provider/HTTP error — carries a real status code (402 = billing, 429 =
-  // rate/quota). Prefer this over guessing from the message.
+  // Unwrap RetryError → the real last cause. The SDK wraps retried failures as
+  // "Failed after N attempts…", which buries the actual provider error.
+  if (RetryError.isInstance(err)) {
+    return classifyGenerationError(err.lastError)
+  }
+
+  // Provider/HTTP error — carries a real status code. Distinguish a temporary
+  // rate-limit (429, or a quota message) from true credit exhaustion (402):
+  // they need different user guidance ("wait a minute" vs "add credits").
   if (APICallError.isInstance(err)) {
     const status = err.statusCode
-    if (status === 402 || status === 429) {
-      return { ok: false, status: 402, error: err.message }
+    const msg = err.message || ""
+    // Gateway video quota = 1/min under $100; it reports as a rate-limit but the
+    // message also mentions credits, so match on the per-minute/quota wording.
+    const isRateLimit = status === 429 || /per minute|rate limit|quota of \d+ request/i.test(msg)
+    if (isRateLimit) {
+      return {
+        ok: false,
+        status: 429,
+        error: "Rate limit reached — the Gateway allows 1 video per minute on this plan. Wait a minute and try again, or add credits to raise the limit.",
+      }
+    }
+    if (status === 402 || /insufficient|add credits|top up|balance/i.test(msg)) {
+      return {
+        ok: false,
+        status: 402,
+        error: "The AI Gateway account is out of credits. Add credits in the Vercel dashboard.",
+      }
     }
     return { ok: false, status: status && status >= 400 ? status : 502, error: err.message }
   }
@@ -228,10 +256,17 @@ function classifyGenerationError(err: unknown): GenerateError {
     return { ok: false, status: 502, error: "The model didn't return any media. Try again or pick another model." }
   }
 
-  // Fallback: classify billing/quota from the message text.
+  // Fallback: classify from the message text when no typed class matched.
   const message = err instanceof Error ? err.message : "Generation failed"
-  if (/credit|quota|insufficient|payment|billing/i.test(message)) {
-    return { ok: false, status: 402, error: message }
+  if (/per minute|rate limit|quota of \d+ request/i.test(message)) {
+    return {
+      ok: false,
+      status: 429,
+      error: "Rate limit reached — the Gateway allows 1 video per minute on this plan. Wait a minute and try again, or add credits to raise the limit.",
+    }
+  }
+  if (/credit|insufficient|payment|billing|top up|balance/i.test(message)) {
+    return { ok: false, status: 402, error: "The AI Gateway account is out of credits. Add credits in the Vercel dashboard." }
   }
   return { ok: false, status: 502, error: message }
 }

@@ -104,7 +104,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (kind === "image") {
     const result = await generateAsset({ modelId, prompt, sourceImageUrls, aspectRatio })
     if (!result.ok) {
-      const code = result.status === 402 ? "out_of_credits" : undefined
+      const code =
+        result.status === 402 ? "out_of_credits" : result.status === 429 ? "rate_limited" : undefined
       return NextResponse.json({ error: result.error, code }, { status: result.status })
     }
     // Library persistence is best-effort — never fail the generation over it.
