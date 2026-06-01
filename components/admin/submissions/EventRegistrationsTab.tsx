@@ -21,9 +21,7 @@ import { Lock as LockIcon } from "lucide-react"
 import {
   Eye as EyeIcon,
   MessageSquare as MsgIcon,
-  Archive as ArchiveIcon,
   Mail as MailIcon,
-  Ban as BanIcon,
   ArrowRight,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
@@ -438,6 +436,44 @@ export function EventRegistrationsTab({
     } catch {
       setToast({ message: "Bulk update failed", type: "error" })
     }
+  }
+
+  // Bulk delete — the single "go away" action. Hard-deletes each selected
+  // registration through the existing per-id DELETE, chunked so a large
+  // selection doesn't fan out all at once.
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    if (!confirm(`Delete ${ids.length} registration${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return
+    const CHUNK = 10
+    const deletedIds: string[] = []
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK)
+      const results = await Promise.allSettled(
+        chunk.map((id) =>
+          fetch("/api/admin/event-registrations", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          }).then((r) => {
+            if (!r.ok) throw new Error("failed")
+            return id
+          }),
+        ),
+      )
+      results.forEach((r) => { if (r.status === "fulfilled") deletedIds.push(r.value) })
+    }
+    const deletedSet = new Set(deletedIds)
+    if (deletedSet.size > 0) {
+      setRegistrations((prev) => prev.filter((r) => !r.id || !deletedSet.has(r.id)))
+    }
+    const failed = ids.length - deletedSet.size
+    setToast({
+      message: failed === 0 ? `Deleted ${deletedSet.size} registration${deletedSet.size === 1 ? "" : "s"}` : `Deleted ${deletedSet.size}, failed ${failed}`,
+      type: failed === 0 ? "success" : "error",
+    })
+    clearSelected()
+    await fetchCounts()
   }
 
   // "Convert all" — converts every CURRENTLY VISIBLE registration into a lead,
@@ -983,12 +1019,11 @@ export function EventRegistrationsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
-          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, run: handleOpenPromoteDrawer },
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
+          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, group: "primary", run: handleOpenPromoteDrawer },
+          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, group: "primary", run: () => { setShowPushModal(true) } },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
-          { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
-          { key: "spam", label: "Mark spam", icon: BanIcon, destructive: true, run: () => runBulk("spam") },
+          { key: "delete", label: "Delete", icon: Trash2, destructive: true, run: handleBulkDelete },
         ]}
       />
 

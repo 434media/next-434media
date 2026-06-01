@@ -19,10 +19,8 @@ import { Lock as LockIcon } from "lucide-react"
 import {
   Eye as EyeIcon,
   MessageSquare as MsgIcon,
-  Archive as ArchiveIcon,
   Mail as MailIcon,
   ArrowRight,
-  Ban as BanIcon,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
 import {
@@ -437,6 +435,39 @@ export function EmailListsTab({
     } catch {
       setToast({ message: "Bulk update failed", type: "error" })
     }
+  }
+
+  // Bulk delete — the single "go away" action. Hard-deletes each selected signup
+  // through the existing per-id DELETE (handles aimsatx: named-DB routing),
+  // chunked so a large selection doesn't fan out all at once.
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    if (!confirm(`Delete ${ids.length} signup${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return
+    const CHUNK = 10
+    let deleted = 0
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const results = await Promise.allSettled(
+        ids.slice(i, i + CHUNK).map((id) =>
+          fetch("/api/admin/email-lists-firestore", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          }).then((r) => {
+            if (!r.ok) throw new Error("failed")
+          }),
+        ),
+      )
+      deleted += results.filter((r) => r.status === "fulfilled").length
+    }
+    const failed = ids.length - deleted
+    setToast({
+      message: failed === 0 ? `Deleted ${deleted} signup${deleted === 1 ? "" : "s"}` : `Deleted ${deleted}, failed ${failed}`,
+      type: failed === 0 ? "success" : "error",
+    })
+    clearSelected()
+    await fetchSourcesAndCounts()
+    await fetchSignups()
   }
 
   // Audience → Leads promotion (sets bidirectional backlinks). Replaces the
@@ -876,12 +907,11 @@ export function EmailListsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, run: handleOpenPromoteDrawer },
+          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, group: "primary", run: () => { setShowPushModal(true) } },
+          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, group: "primary", run: handleOpenPromoteDrawer },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
-          { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
-          { key: "spam", label: "Mark spam", icon: BanIcon, destructive: true, run: () => runBulk("spam") },
+          { key: "delete", label: "Delete", icon: Trash2, destructive: true, run: handleBulkDelete },
         ]}
       />
 

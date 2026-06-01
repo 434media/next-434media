@@ -16,6 +16,9 @@ import {
   X,
   Clapperboard,
   ArrowUpRight,
+  CheckSquare,
+  Check,
+  Trash2,
 } from "lucide-react"
 import type { ContentPost, SocialPlatform, ContentPostStatus, TeamMember } from "./types"
 import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS, TEAM_MEMBERS } from "./types"
@@ -26,6 +29,10 @@ interface SocialCalendarViewProps {
   contentPosts: ContentPost[]
   onOpenPost: (post: ContentPost) => void
   onAddPost: () => void
+  // Drag-and-drop status move on the Board (Produce ↔ Review only).
+  onMovePost?: (postId: string, newStatus: ContentPostStatus) => void
+  // Bulk delete from the Board's select mode.
+  onBulkDelete?: (ids: string[]) => void | Promise<void>
 }
 
 type CalendarViewMode = "day" | "week" | "month"
@@ -146,16 +153,48 @@ function PlatformBadge({ platform, size = "sm" }: { platform: SocialPlatform; si
   return <PlatformIcon platform={platform} className={`${sizeClasses[size]} shrink-0`} style={{ color: platformConfig.color }} />
 }
 
-function PostCard({ post, onClick, compact = false }: { post: ContentPost; onClick: () => void; compact?: boolean }) {
+function PostCard({
+  post,
+  onClick,
+  compact = false,
+  draggable = false,
+  onDragStart,
+  selectMode = false,
+  selected = false,
+}: {
+  post: ContentPost
+  onClick: () => void
+  compact?: boolean
+  draggable?: boolean
+  onDragStart?: (e: React.DragEvent) => void
+  selectMode?: boolean
+  selected?: boolean
+}) {
   const dotColor = getStatusDot(post.status)
+  // Native HTML5 drag lives on a plain wrapper — motion.div types onDragStart as
+  // its own pan-gesture handler, which clashes with React.DragEvent. The wrapper
+  // keeps the card's entrance animation while owning the drag affordance.
   return (
+    <div draggable={draggable} onDragStart={onDragStart} className={draggable && !selectMode ? "cursor-grab active:cursor-grabbing" : undefined}>
     <motion.div
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={(e) => { e.stopPropagation(); onClick() }}
-      className={`group cursor-pointer rounded bg-white ring-1 ring-neutral-200/70 hover:ring-neutral-300 transition-[box-shadow,outline-color] ${compact ? "px-1.5 py-1" : "px-2 py-1.5"}`}
+      className={`group rounded bg-white transition-[box-shadow,outline-color] ${compact ? "px-1.5 py-1" : "px-2 py-1.5"} ${
+        selected ? "ring-2 ring-neutral-900" : "ring-1 ring-neutral-200/70 hover:ring-neutral-300"
+      } ${draggable && !selectMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
     >
       <div className="flex items-center gap-1.5">
+        {selectMode && (
+          <span
+            className={`grid place-items-center h-3.5 w-3.5 shrink-0 rounded-[3px] border ${
+              selected ? "bg-neutral-900 border-neutral-900 text-white" : "bg-white border-neutral-300"
+            }`}
+            aria-hidden="true"
+          >
+            {selected && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+          </span>
+        )}
         <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`} aria-hidden="true" />
         <div className="flex items-center gap-0.5 shrink-0">
           {post.social_platforms?.slice(0, compact ? 2 : 3).map(platform => (
@@ -186,6 +225,7 @@ function PostCard({ post, onClick, compact = false }: { post: ContentPost; onCli
         </div>
       )}
     </motion.div>
+    </div>
   )
 }
 
@@ -224,7 +264,7 @@ function FilterSection({ title, options, selectedValues, onToggle, renderOption 
   )
 }
 
-export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: SocialCalendarViewProps) {
+export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMovePost, onBulkDelete }: SocialCalendarViewProps) {
   // Top-level surface: "board" is the pipeline kanban (where date-less drafts &
   // in-review work live), "calendar" is the date grid (scheduled/posted only).
   // The pipeline belongs on the board, not as a filter over a date grid — a
@@ -246,6 +286,14 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
   // Board column to briefly highlight (e.g. jumped-to from the approval chip).
   const [highlightColumn, setHighlightColumn] = useState<string | null>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
+  // Drag-and-drop (Board): the card being dragged + the column it came from, and
+  // the column currently hovered as a drop target (for the ring highlight).
+  const draggedRef = useRef<{ id: string; fromGroup: string } | null>(null)
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null)
+  // Bulk-select (Board): toggle + the set of selected post ids.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   // Jump to a Board column and pulse it — the reviewer's "show me what needs
   // approval" shortcut from the header summary.
@@ -299,9 +347,9 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
   }, [showFilters])
 
 
-  const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
-  const toggleBrand = (brand: string) => { setSelectedBrands(prev => { const next = new Set(prev); next.has(brand) ? next.delete(brand) : next.add(brand); return next }) }
-  const toggleSocial = (platform: string) => { setSelectedSocials(prev => { const next = new Set(prev); next.has(platform) ? next.delete(platform) : next.add(platform); return next }) }
+  const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); if (next.has(user)) next.delete(user); else next.add(user); return next }) }
+  const toggleBrand = (brand: string) => { setSelectedBrands(prev => { const next = new Set(prev); if (next.has(brand)) next.delete(brand); else next.add(brand); return next }) }
+  const toggleSocial = (platform: string) => { setSelectedSocials(prev => { const next = new Set(prev); if (next.has(platform)) next.delete(platform); else next.add(platform); return next }) }
   // Count of the secondary (popover) slicers only — drives the Filters badge.
   const secondaryFilterCount = selectedUsers.size + selectedBrands.size + selectedSocials.size
 
@@ -313,6 +361,51 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     { label: "Schedule", sublabel: "Approved & scheduled", statuses: ["approved", "scheduled"] },
     { label: "Live", sublabel: "Published", statuses: ["posted"] },
   ]
+
+  // Only Produce ↔ Review are drag-movable — Schedule (approve) and Live
+  // (mark posted) stay gated server actions in the drawer. Everything else is a
+  // no-op drop. The target status is the entry status of the destination phase.
+  const DRAGGABLE_GROUPS = new Set(["Produce", "Review"])
+  const moveStatusFor = (fromGroup: string, toGroup: string): ContentPostStatus | null => {
+    if (fromGroup === toGroup) return null
+    if (toGroup === "Review" && fromGroup === "Produce") return "needs_approval"
+    if (toGroup === "Produce" && fromGroup === "Review") return "in_progress"
+    return null
+  }
+
+  const handleDropOnGroup = (toGroup: string) => {
+    const dragged = draggedRef.current
+    draggedRef.current = null
+    setDragOverGroup(null)
+    if (!dragged || !onMovePost) return
+    const next = moveStatusFor(dragged.fromGroup, toGroup)
+    if (!next) return
+    onMovePost(dragged.id, next)
+  }
+
+  // Bulk-select helpers.
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || !onBulkDelete) return
+    if (!window.confirm(`Delete ${selectedIds.size} selected post${selectedIds.size === 1 ? "" : "s"}? This can't be undone.`)) return
+    setIsBulkDeleting(true)
+    try {
+      await onBulkDelete([...selectedIds])
+      exitSelectMode()
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
 
   const filteredPosts = useMemo(() => {
     return contentPosts.filter(post => {
@@ -488,6 +581,22 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Select mode — board-only bulk actions (e.g. clearing test data). */}
+        {view === "board" && (
+          <button
+            type="button"
+            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            aria-pressed={selectMode}
+            className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 text-sm font-medium transition-colors ${
+              selectMode
+                ? "ring-neutral-900 bg-neutral-900 text-white"
+                : "ring-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            <CheckSquare className="w-4 h-4" />
+            {selectMode ? "Done" : "Select"}
+          </button>
+        )}
         {/* Status legend — maps the dot colors used on cards to their meaning. */}
         <LegendPopover
           items={CONTENT_POST_STATUS_OPTIONS.map((s) => ({ dotClass: getStatusDot(s.value), label: s.label }))}
@@ -576,12 +685,35 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
           {PIPELINE_GROUPS.map(group => {
             const columnPosts = filteredPosts.filter(p => group.statuses.includes(p.status))
             const isHighlighted = highlightColumn === group.label
+            const canDrag = !selectMode && !!onMovePost && DRAGGABLE_GROUPS.has(group.label)
+            const isDropTarget = !selectMode && !!onMovePost && DRAGGABLE_GROUPS.has(group.label)
+            const isDragOver = dragOverGroup === group.label
             return (
               <div
                 key={group.label}
                 ref={isHighlighted ? highlightRef : undefined}
+                onDragOver={isDropTarget ? (e) => {
+                  // Allow the drop only when the in-flight card can legally move here.
+                  const dragged = draggedRef.current
+                  if (dragged && moveStatusFor(dragged.fromGroup, group.label)) {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = "move"
+                    if (dragOverGroup !== group.label) setDragOverGroup(group.label)
+                  }
+                } : undefined}
+                onDragLeave={isDropTarget ? (e) => {
+                  // Ignore leaves that bubble from children still inside the column.
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDragOverGroup(prev => (prev === group.label ? null : prev))
+                  }
+                } : undefined}
+                onDrop={isDropTarget ? (e) => { e.preventDefault(); handleDropOnGroup(group.label) } : undefined}
                 className={`rounded-md ring-1 bg-neutral-50/60 flex flex-col min-h-40 transition-shadow ${
-                  isHighlighted ? "ring-2 ring-amber-400" : "ring-neutral-200/70"
+                  isDragOver
+                    ? "ring-2 ring-neutral-900 bg-neutral-100/60"
+                    : isHighlighted
+                      ? "ring-2 ring-amber-400"
+                      : "ring-neutral-200/70"
                 }`}
               >
                 <div className="flex items-start justify-between px-3 py-2.5 border-b border-neutral-200/70">
@@ -595,10 +727,26 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                 </div>
                 <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[calc(100dvh-340px)] scrollbar-thin scrollbar-thumb-neutral-200 scrollbar-track-transparent">
                   {columnPosts.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-xs text-neutral-400">Nothing here</p>
+                    <p className="px-2 py-6 text-center text-xs text-neutral-400">
+                      {isDragOver ? "Drop to move here" : "Nothing here"}
+                    </p>
                   ) : (
                     <AnimatePresence mode="popLayout">
-                      {columnPosts.map(post => <PostCard key={post.id} post={post} onClick={() => onOpenPost(post)} />)}
+                      {columnPosts.map(post => (
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          draggable={canDrag}
+                          onDragStart={canDrag ? (e) => {
+                            draggedRef.current = { id: post.id, fromGroup: group.label }
+                            e.dataTransfer.effectAllowed = "move"
+                            e.dataTransfer.setData("text/plain", post.id)
+                          } : undefined}
+                          selectMode={selectMode}
+                          selected={selectedIds.has(post.id)}
+                          onClick={() => (selectMode ? toggleSelect(post.id) : onOpenPost(post))}
+                        />
+                      ))}
                     </AnimatePresence>
                   )}
                 </div>
@@ -839,6 +987,33 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Bulk-select action bar — floats while selecting on the Board. */}
+      {selectMode && (
+        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-neutral-900 text-white shadow-lg ring-1 ring-black/10 pl-4 pr-2 py-2">
+            <span className="text-sm font-medium tabular-nums">
+              {selectedIds.size} selected
+            </span>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0 || isBulkDeleting || !onBulkDelete}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {isBulkDeleting ? "Deleting…" : "Delete"}
+            </button>
+            <button
+              type="button"
+              onClick={exitSelectMode}
+              className="inline-flex items-center justify-center h-8 px-3 rounded-full hover:bg-white/10 text-sm font-medium text-neutral-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>

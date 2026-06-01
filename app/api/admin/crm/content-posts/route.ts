@@ -7,6 +7,7 @@ import {
   updateContentPost,
   deleteContentPost,
 } from "@/lib/firestore-crm"
+import { notifyContentNeedsApproval } from "@/lib/content-approval-notification"
 
 // Check admin access
 async function requireAdmin() {
@@ -101,6 +102,11 @@ export async function POST(request: NextRequest) {
 
     const post = await createContentPost(postData)
 
+    // Created straight into Review → alert the reviewers (best-effort).
+    if (post.status === "needs_approval") {
+      await notifyContentNeedsApproval(post)
+    }
+
     return NextResponse.json({ success: true, post }, { status: 201 })
   } catch (error) {
     console.error("Error creating content post:", error)
@@ -134,6 +140,11 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
 
+    // Capture the prior status so we can tell when a post *enters* Review (vs.
+    // an edit to one already there) — the email should fire only on entry.
+    const existing = await getContentPostById(id)
+    const prevStatus = existing?.status
+
     const updates = {
       user: body.user,
       platform: body.platform,
@@ -158,6 +169,13 @@ export async function PUT(request: NextRequest) {
     })
 
     const post = await updateContentPost(id, updates)
+
+    // Entered Review (from any other status) → alert the reviewers. Covers the
+    // drawer status dropdown, the Board drag-to-Review, and re-submission after
+    // a rejection. Best-effort; never fails the save.
+    if (post.status === "needs_approval" && prevStatus !== "needs_approval") {
+      await notifyContentNeedsApproval(post)
+    }
 
     return NextResponse.json({ success: true, post })
   } catch (error) {

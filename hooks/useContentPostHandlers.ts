@@ -15,9 +15,13 @@ import type { ContentPost, Toast as ToastType } from "../components/crm/types"
 
 interface UseContentPostHandlersProps {
   setToast: Dispatch<SetStateAction<ToastType | null>>
+  // Called after a content post is successfully created or updated. The page
+  // uses this to clear the ?openContent= deep-link param and re-sync the list
+  // so the Calendar reflects the saved date.
+  onSaved?: () => void
 }
 
-export function useContentPostHandlers({ setToast }: UseContentPostHandlersProps) {
+export function useContentPostHandlers({ setToast, onSaved }: UseContentPostHandlersProps) {
   const [contentPosts, setContentPosts] = useState<ContentPost[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [editingContentPost, setEditingContentPost] = useState<ContentPost | null>(null)
@@ -123,6 +127,7 @@ export function useContentPostHandlers({ setToast }: UseContentPostHandlersProps
         }
         setShowContentPostForm(false)
         setEditingContentPost(null)
+        onSaved?.()
       } catch {
         setToast({
           message: `Failed to ${editingContentPost ? "update" : "create"} content post`,
@@ -132,7 +137,80 @@ export function useContentPostHandlers({ setToast }: UseContentPostHandlersProps
         setIsSavingContentPost(false)
       }
     },
-    [editingContentPost, setToast],
+    [editingContentPost, setToast, onSaved],
+  )
+
+  // Lightweight status move for the Board's drag-and-drop. Optimistically flips
+  // the card's status locally, then persists just { status } via the same PUT
+  // route the drawer uses (so the server-side "entered Review" email fires).
+  // Reverts on failure.
+  const handleMoveContentPost = useCallback(
+    async (postId: string, newStatus: ContentPost["status"]) => {
+      let previous: ContentPost | undefined
+      setContentPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId) {
+            previous = p
+            return { ...p, status: newStatus }
+          }
+          return p
+        }),
+      )
+      if (previous && previous.status === newStatus) return
+      try {
+        const response = await fetch(`/api/admin/crm/content-posts?id=${postId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        })
+        if (!response.ok) throw new Error("Failed to move content post")
+        const data = await response.json()
+        setContentPosts((prev) => prev.map((p) => (p.id === postId ? data.post : p)))
+      } catch {
+        // Revert the optimistic change.
+        if (previous) {
+          const reverted = previous
+          setContentPosts((prev) => prev.map((p) => (p.id === postId ? reverted : p)))
+        }
+        setToast({ message: "Failed to move content post", type: "error" })
+      }
+    },
+    [setToast],
+  )
+
+  // Delete several posts at once (the clean-slate / housekeeping action). Best
+  // effort per id against the existing single DELETE route; drops the
+  // successfully-deleted ids from local state and reports the count.
+  const handleBulkDeleteContentPosts = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`/api/admin/crm/content-posts?id=${id}`, { method: "DELETE" }).then((r) => {
+            if (!r.ok) throw new Error(`Failed to delete ${id}`)
+            return id
+          }),
+        ),
+      )
+      const deleted = new Set(
+        results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+          .map((r) => r.value),
+      )
+      if (deleted.size > 0) {
+        setContentPosts((prev) => prev.filter((p) => !deleted.has(p.id)))
+      }
+      const failed = ids.length - deleted.size
+      if (failed === 0) {
+        setToast({ message: `Deleted ${deleted.size} post${deleted.size === 1 ? "" : "s"}`, type: "success" })
+      } else {
+        setToast({
+          message: `Deleted ${deleted.size}, failed ${failed}. Try again.`,
+          type: "error",
+        })
+      }
+    },
+    [setToast],
   )
 
   const handleDeleteContentPost = useCallback(
@@ -168,5 +246,7 @@ export function useContentPostHandlers({ setToast }: UseContentPostHandlersProps
     handleOpenContentPostFromNotification,
     handleSaveContentPost,
     handleDeleteContentPost,
+    handleMoveContentPost,
+    handleBulkDeleteContentPosts,
   }
 }

@@ -1,13 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, Check, ChevronDown, X, Inbox, Eye, MessageSquare, Archive, Ban } from "lucide-react"
+import { Loader2, Check, ChevronDown, X, Inbox, Eye, MessageSquare, Archive, Ban, MoreHorizontal } from "lucide-react"
 import type { DotColor } from "./StatusDot"
 
 export type SubmissionSource = "email_signups" | "contact_forms" | "event_registrations"
+// The union keeps "archived"/"spam" for backward-compat: legacy rows may still
+// carry them and the bulk-state endpoint still validates against the full set.
+// They're no longer *selectable* in the UI — see SELECTABLE_STATES.
 export type SubmissionState = "new" | "triaged" | "replied" | "archived" | "spam"
 
-const ALL_STATES: SubmissionState[] = ["new", "triaged", "replied", "archived", "spam"]
+// The triage workflow we actually offer. Archived/Spam were dropped — Delete is
+// the single "go away" action now (see the tabs' bulk bars). STATE_META still
+// carries all five so any legacy archived/spam row renders a sensible badge.
+const SELECTABLE_STATES: SubmissionState[] = ["new", "triaged", "replied"]
 
 const STATE_META: Record<SubmissionState, { label: string; dot: DotColor; icon: React.ComponentType<{ className?: string }> }> = {
   new: { label: "New", dot: "blue", icon: Inbox },
@@ -182,7 +188,7 @@ export function StateBadge({ source, id, state, onChange }: StateBadgeProps) {
           {/* Click-outside catcher */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full mt-1 z-50 min-w-[120px] bg-white border border-neutral-200 rounded-lg shadow-lg py-1">
-            {ALL_STATES.map((s) => {
+            {SELECTABLE_STATES.map((s) => {
               const m = STATE_META[s]
               const SIcon = m.icon
               const isCurrent = s === state
@@ -226,8 +232,6 @@ export function StateFilterChips({ active, onChange, counts }: StateFilterChipsP
     { key: "new", label: "New" },
     { key: "triaged", label: "Triaged" },
     { key: "replied", label: "Replied" },
-    { key: "archived", label: "Archived" },
-    { key: "spam", label: "Spam" },
   ]
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -274,7 +278,9 @@ export interface BulkAction {
   key: string
   label: string
   icon?: React.ComponentType<{ className?: string }>
-  /** Style hint — destructive ones get red treatment. */
+  /** Visible inline when "primary"; otherwise tucked into the "More" overflow. */
+  group?: "primary"
+  /** Style hint — destructive ones get red treatment and a separated slot. */
   destructive?: boolean
   /** Async handler. Should resolve when the bulk op completes. */
   run: () => Promise<void> | void
@@ -286,17 +292,51 @@ interface BulkActionBarProps {
   onClear: () => void
 }
 
+// Focused, Vercel-style layout: the high-frequency handoffs sit inline (primary),
+// the rest live behind a "More" overflow, and the destructive Delete is pulled
+// out, reddened, and separated so it's never a careless click next to benign ones.
 export function BulkActionBar({ count, actions, onClear }: BulkActionBarProps) {
   const [isWorking, setIsWorking] = useState<string | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
   if (count === 0) return null
 
+  const primary = actions.filter((a) => a.group === "primary" && !a.destructive)
+  const overflow = actions.filter((a) => a.group !== "primary" && !a.destructive)
+  const destructive = actions.filter((a) => a.destructive)
+
   const handleAction = async (action: BulkAction) => {
+    setMoreOpen(false)
     setIsWorking(action.key)
     try {
       await action.run()
     } finally {
       setIsWorking(null)
     }
+  }
+
+  const actionButton = (action: BulkAction) => {
+    const ActionIcon = action.icon
+    const isThisOneWorking = isWorking === action.key
+    return (
+      <button
+        key={action.key}
+        type="button"
+        onClick={() => handleAction(action)}
+        disabled={!!isWorking}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors disabled:opacity-50 ${
+          action.destructive
+            ? "text-red-300 hover:text-white hover:bg-red-600"
+            : "text-neutral-100 hover:text-white hover:bg-neutral-700"
+        }`}
+      >
+        {isThisOneWorking ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          ActionIcon && <ActionIcon className="w-3.5 h-3.5" />
+        )}
+        {action.label}
+      </button>
+    )
   }
 
   return (
@@ -308,30 +348,60 @@ export function BulkActionBar({ count, actions, onClear }: BulkActionBarProps) {
         selected
       </span>
       <div className="h-4 w-px bg-neutral-700 mx-0.5" />
-      {actions.map((action) => {
-        const ActionIcon = action.icon
-        const isThisOneWorking = isWorking === action.key
-        return (
+
+      {primary.map(actionButton)}
+
+      {overflow.length > 0 && (
+        <span className="relative inline-block">
           <button
-            key={action.key}
             type="button"
-            onClick={() => handleAction(action)}
+            onClick={() => setMoreOpen((o) => !o)}
             disabled={!!isWorking}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors disabled:opacity-50 ${
-              action.destructive
-                ? "text-red-300 hover:text-white hover:bg-red-600"
-                : "text-neutral-100 hover:text-white hover:bg-neutral-700"
-            }`}
+            aria-expanded={moreOpen}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-neutral-100 hover:text-white hover:bg-neutral-700 transition-colors disabled:opacity-50"
           >
-            {isThisOneWorking ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              ActionIcon && <ActionIcon className="w-3.5 h-3.5" />
-            )}
-            {action.label}
+            <MoreHorizontal className="w-3.5 h-3.5" />
+            More
+            <ChevronDown className="w-3 h-3 text-neutral-400" />
           </button>
-        )
-      })}
+          {moreOpen && (
+            <>
+              {/* Click-outside catcher */}
+              <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
+              <div className="absolute right-0 bottom-full mb-1 z-50 min-w-[180px] bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl py-1">
+                {overflow.map((action) => {
+                  const ActionIcon = action.icon
+                  const isThisOneWorking = isWorking === action.key
+                  return (
+                    <button
+                      key={action.key}
+                      type="button"
+                      onClick={() => handleAction(action)}
+                      disabled={!!isWorking}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left text-neutral-100 hover:bg-neutral-700 disabled:opacity-50"
+                    >
+                      {isThisOneWorking ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        ActionIcon && <ActionIcon className="w-3.5 h-3.5 text-neutral-400" />
+                      )}
+                      {action.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </span>
+      )}
+
+      {destructive.length > 0 && (
+        <>
+          <div className="h-4 w-px bg-neutral-700 mx-0.5" />
+          {destructive.map(actionButton)}
+        </>
+      )}
+
       <div className="h-4 w-px bg-neutral-700 mx-0.5" />
       <button
         type="button"

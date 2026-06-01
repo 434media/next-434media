@@ -23,9 +23,7 @@ import {
 import {
   Eye as EyeIcon,
   MessageSquare as MsgIcon,
-  Archive as ArchiveIcon,
   Mail as MailIcon,
-  Ban as BanIcon,
   Send as SendIcon,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
@@ -306,6 +304,39 @@ export function ContactFormsTab({
     } catch {
       setToast({ message: "Bulk update failed", type: "error" })
     }
+  }
+
+  // Bulk delete — the single "go away" action. Hard-deletes each selected
+  // submission through the existing per-id DELETE (which handles the aimsatx:
+  // named-DB routing), chunked so a large selection doesn't fan out all at once.
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    if (!confirm(`Delete ${ids.length} submission${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return
+    const CHUNK = 10
+    let deleted = 0
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const results = await Promise.allSettled(
+        ids.slice(i, i + CHUNK).map((id) =>
+          fetch("/api/admin/contact-forms", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          }).then((r) => {
+            if (!r.ok) throw new Error("failed")
+          }),
+        ),
+      )
+      deleted += results.filter((r) => r.status === "fulfilled").length
+    }
+    const failed = ids.length - deleted
+    setToast({
+      message: failed === 0 ? `Deleted ${deleted} submission${deleted === 1 ? "" : "s"}` : `Deleted ${deleted}, failed ${failed}`,
+      type: failed === 0 ? "success" : "error",
+    })
+    clearSelected()
+    await fetchSourcesAndCounts()
+    await fetchSubmissions(selectedSource || undefined)
   }
 
   // Stage 5d — bulk acknowledge. Sends a fixed templated "got your message,
@@ -1014,13 +1045,12 @@ export function ContactFormsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
+          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, group: "primary", run: () => { setShowPushModal(true) } },
+          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, group: "primary", run: handleOpenPromoteDrawer },
           { key: "acknowledge", label: "Send acknowledgment", icon: SendIcon, run: runBulkAcknowledge },
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, run: () => { setShowPushModal(true) } },
-          { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, run: handleOpenPromoteDrawer },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
-          { key: "archive", label: "Archive", icon: ArchiveIcon, destructive: true, run: () => runBulk("archived") },
-          { key: "spam", label: "Mark spam", icon: BanIcon, destructive: true, run: () => runBulk("spam") },
+          { key: "delete", label: "Delete", icon: Trash2, destructive: true, run: handleBulkDelete },
         ]}
       />
 

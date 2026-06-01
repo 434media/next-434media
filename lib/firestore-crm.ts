@@ -1316,6 +1316,7 @@ export async function createContentPost(postData: Omit<ContentPost, "id" | "crea
     return {
       ...data,
       id: createdDoc.id,
+      assets: normalizeAssets(data.assets),
       created_at: convertTimestamp(data.created_at),
       updated_at: convertTimestamp(data.updated_at),
     } as ContentPost
@@ -1346,6 +1347,7 @@ export async function updateContentPost(id: string, updates: Partial<ContentPost
     return {
       ...data,
       id: updatedDoc.id,
+      assets: normalizeAssets(data.assets),
       created_at: convertTimestamp(data.created_at),
       updated_at: convertTimestamp(data.updated_at),
     } as ContentPost

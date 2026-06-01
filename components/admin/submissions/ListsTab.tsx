@@ -12,6 +12,7 @@ import {
   Linkedin,
   Phone,
   ArrowRightCircle,
+  Trash2,
 } from "lucide-react"
 import { Mail as MailIcon } from "lucide-react"
 import {
@@ -221,6 +222,52 @@ export function ListsTab({
     } finally {
       setIsBulkPromoting(false)
     }
+  }
+
+  // Delete — the single "go away" action for partner contacts. Hard-deletes
+  // via the per-id route, then drops the row from local state.
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete ${name}? This cannot be undone.`)) return
+    try {
+      setDeletingId(id)
+      const res = await fetch(`/api/admin/audiences/partner-list-members/${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("failed")
+      setMembers((prev) => prev.filter((m) => m.id !== id))
+      setToast({ message: `Deleted ${name}`, type: "success" })
+    } catch {
+      setToast({ message: "Failed to delete contact", type: "error" })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // Bulk delete — chunked so a large selection doesn't fan out all at once.
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    if (!confirm(`Delete ${ids.length} contact${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return
+    const CHUNK = 10
+    const deletedIds: string[] = []
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const results = await Promise.allSettled(
+        ids.slice(i, i + CHUNK).map((id) =>
+          fetch(`/api/admin/audiences/partner-list-members/${id}`, { method: "DELETE" }).then((r) => {
+            if (!r.ok) throw new Error("failed")
+            return id
+          }),
+        ),
+      )
+      results.forEach((r) => { if (r.status === "fulfilled") deletedIds.push(r.value) })
+    }
+    const deletedSet = new Set(deletedIds)
+    if (deletedSet.size > 0) setMembers((prev) => prev.filter((m) => !m.id || !deletedSet.has(m.id)))
+    const failed = ids.length - deletedSet.size
+    setToast({
+      message: failed === 0 ? `Deleted ${deletedSet.size} contact${deletedSet.size === 1 ? "" : "s"}` : `Deleted ${deletedSet.size}, failed ${failed}`,
+      type: failed === 0 ? "success" : "error",
+    })
+    clearSelected()
   }
 
   return (
@@ -445,6 +492,22 @@ export function ListsTab({
                             Promote
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (member.id) handleDelete(member.id, member.fullName || member.email)
+                          }}
+                          disabled={!member.id || deletingId === member.id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                          title="Delete contact"
+                        >
+                          {deletingId === member.id ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-2.5 h-2.5" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -550,30 +613,45 @@ export function ListsTab({
                         {formatDate(member.importedAt)}
                       </td>
                       <td className="px-4 py-3">
-                        {member.promotedLeadId ? (
-                          <a
-                            href={`/admin/leads?openLead=${encodeURIComponent(member.promotedLeadId)}`}
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                            title="Open in CRM"
-                          >
-                            Promoted →
-                          </a>
-                        ) : (
+                        <div className="flex items-center gap-1.5">
+                          {member.promotedLeadId ? (
+                            <a
+                              href={`/admin/leads?openLead=${encodeURIComponent(member.promotedLeadId)}`}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                              title="Open in CRM"
+                            >
+                              Promoted →
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => member.id && promoteMembers([member.id])}
+                              disabled={!member.id || (!!member.id && promotingIds.has(member.id))}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-neutral-200 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-wait transition-colors"
+                              title="Promote to leads"
+                            >
+                              {member.id && promotingIds.has(member.id) ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : (
+                                <ArrowRightCircle className="w-2.5 h-2.5" />
+                              )}
+                              Promote
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => member.id && promoteMembers([member.id])}
-                            disabled={!member.id || (!!member.id && promotingIds.has(member.id))}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-neutral-200 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-wait transition-colors"
-                            title="Promote to leads"
+                            onClick={() => member.id && handleDelete(member.id, member.fullName || member.email)}
+                            disabled={!member.id || deletingId === member.id}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                            title="Delete contact"
                           >
-                            {member.id && promotingIds.has(member.id) ? (
-                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            {deletingId === member.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
                             ) : (
-                              <ArrowRightCircle className="w-2.5 h-2.5" />
+                              <Trash2 className="w-3 h-3" />
                             )}
-                            Promote
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -609,13 +687,22 @@ export function ListsTab({
             key: "promote",
             label: "Promote to leads",
             icon: ArrowRightCircle,
+            group: "primary",
             run: handleOpenPromoteDrawer,
           },
           {
             key: "push-mc",
             label: "Push to Mailchimp",
             icon: MailIcon,
+            group: "primary",
             run: () => { setShowPushModal(true) },
+          },
+          {
+            key: "delete",
+            label: "Delete",
+            icon: Trash2,
+            destructive: true,
+            run: handleBulkDelete,
           },
         ]}
       />

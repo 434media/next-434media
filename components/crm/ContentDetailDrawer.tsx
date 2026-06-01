@@ -144,7 +144,10 @@ export function ContentDetailDrawer({
           platform: post.platform || "",
           status: post.status || "to_do",
           title: post.title || "",
-          date_to_post: post.date_to_post || "",
+          // <input type="date"> only renders YYYY-MM-DD; posts stored with a
+          // full ISO date_to_post would otherwise show the field blank (looking
+          // like the date never saved). Truncate to the date part on load.
+          date_to_post: post.date_to_post ? post.date_to_post.split("T")[0] : "",
           notes: post.notes || "",
           social_copy: post.social_copy || "",
           links: (post.links || []).filter((link: string) => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm"
@@ -26,6 +26,30 @@ export default function ContentPage() {
   // API enforces this server-side; this just gates the UI affordance.
   const [canReview, setCanReview] = useState(false)
 
+  // Holds the latest loadContentPosts so the stable onSaved callback can re-sync
+  // without depending on the hook's return (which is defined below).
+  const loadRef = useRef<() => void>(() => {})
+  // Set right before a save resolves so the deep-link reopen effect doesn't
+  // bounce the drawer back open when the post list state updates.
+  const suppressReopenRef = useRef(false)
+
+  // After a successful save: suppress the reopen race, drop the ?openContent=
+  // param so the drawer stays closed, and re-sync the list so the Calendar
+  // reflects the saved date.
+  const handleSaved = useCallback(() => {
+    const sp = searchParams
+    if (sp?.get("openContent")) {
+      // Editing an open post: arm the guard and drop the deep-link param so the
+      // post-save list update doesn't bounce the drawer back open.
+      suppressReopenRef.current = true
+      const params = new URLSearchParams(sp.toString())
+      params.delete("openContent")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+    loadRef.current()
+  }, [searchParams, router, pathname])
+
   const {
     contentPosts,
     isLoading,
@@ -39,7 +63,14 @@ export default function ContentPage() {
     handleOpenContentPost,
     handleSaveContentPost,
     handleDeleteContentPost,
-  } = useContentPostHandlers({ setToast })
+    handleMoveContentPost,
+    handleBulkDeleteContentPosts,
+  } = useContentPostHandlers({ setToast, onSaved: handleSaved })
+
+  // Keep the ref pointed at the current loader for handleSaved.
+  useEffect(() => {
+    loadRef.current = loadContentPosts
+  }, [loadContentPosts])
 
   // Initial load
   useEffect(() => {
@@ -97,6 +128,12 @@ export default function ContentPage() {
         setShowContentPostForm(false)
         setEditingContentPost(null)
       }
+      return
+    }
+    // A just-completed save updates contentPosts; don't let that re-open the
+    // drawer we just closed (the ?openContent= param is being cleared too).
+    if (suppressReopenRef.current) {
+      suppressReopenRef.current = false
       return
     }
     if (contentPosts.length === 0) return
@@ -163,6 +200,8 @@ export default function ContentPage() {
               contentPosts={contentPosts}
               onOpenPost={handleOpenContentPost}
               onAddPost={handleAddContentPost}
+              onMovePost={handleMoveContentPost}
+              onBulkDelete={handleBulkDeleteContentPosts}
             />
           )}
         </div>
