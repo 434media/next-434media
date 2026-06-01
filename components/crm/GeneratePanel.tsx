@@ -19,6 +19,7 @@ export interface GenModel {
   kind: "image" | "video"
   provider: string
   supportsImageInput: boolean
+  blurb: string | null
   priceLabel: string | null
   available: boolean
 }
@@ -46,6 +47,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   const [refs, setRefs] = useState<string[]>([]) // reference/input images for edit + remix
   const [isUploadingRef, setIsUploadingRef] = useState(false)
   const [showRefPicker, setShowRefPicker] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false) // "+" attach menu in the composer toolbar
   const [genAspectRatio, setGenAspectRatio] = useState("1:1")
   const [genDuration, setGenDuration] = useState(5)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -232,8 +234,8 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3.5">
       <div>
-        <h4 className="text-sm font-medium text-neutral-900 leading-tight">Generate with AI Models</h4>
-        <p className="text-[11px] text-neutral-500">Powered by the  Vercel AI Gateway</p>
+        <h4 className="text-sm font-medium text-neutral-900 leading-tight">Create something new</h4>
+        <p className="text-[11px] text-neutral-500">Pick a model, describe what you want, and it&apos;s saved to your library.</p>
       </div>
 
       {genOutOfCredits && (
@@ -277,16 +279,19 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
                 type="button"
                 onClick={() => setGenModelId(m.id)}
                 aria-pressed={active}
-                className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
                   active
                     ? "border-neutral-900 ring-1 ring-neutral-900 bg-neutral-50"
                     : "border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
                 }`}
               >
-                <ProviderLogo provider={m.provider} size={20} />
+                <ProviderLogo provider={m.provider} size={20} className="mt-0.5" />
                 <span className="min-w-0">
                   <span className="block text-xs font-medium text-neutral-900 truncate" title={m.id}>{m.id}</span>
-                  <span className="block text-[10px] text-neutral-500 truncate">
+                  {m.blurb && (
+                    <span className="block text-[10px] text-neutral-600 leading-snug line-clamp-2">{m.blurb}</span>
+                  )}
+                  <span className="block text-[10px] text-neutral-400 truncate mt-0.5">
                     {m.priceLabel ?? "usage-based"}
                   </span>
                 </span>
@@ -296,92 +301,140 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
         </div>
       </div>
 
-      {/* Reference images (edit / remix / animate) */}
-      {showRefs && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-medium text-neutral-500">{refLabel}</p>
-            <div className="flex items-center gap-1.5">
-              <label className="inline-flex items-center gap-1 px-2 py-1 rounded-md ring-1 ring-neutral-200 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 cursor-pointer transition-colors">
-                <input type="file" accept="image/*" onChange={handleUploadRef} className="hidden" disabled={isUploadingRef} />
-                {isUploadingRef ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                Upload
-              </label>
+      {/* Composer — prompt with inline reference attachments + controls, in the
+          modern AI input-bar pattern. The "+" menu attaches reference images
+          (upload / library); aspect + duration live as pills in the toolbar. */}
+      <div className="rounded-xl border border-neutral-200 bg-white focus-within:border-neutral-400 transition-colors">
+        {/* Reference thumbnails (edit / remix source) */}
+        {showRefs && refs.length > 0 && (
+          <div className="flex flex-wrap gap-2 p-2 pb-0">
+            {refs.map((url) => (
+              <div key={url} className="relative w-14 h-14 rounded-md overflow-hidden ring-1 ring-neutral-200 bg-neutral-100 group/ref">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="Reference" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeRef(url)}
+                  className="absolute top-0.5 right-0.5 grid place-items-center h-4 w-4 rounded-full bg-black/60 text-white opacity-0 group-hover/ref:opacity-100 transition-opacity"
+                  aria-label="Remove reference"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <textarea
+          value={genPrompt}
+          onChange={(e) => setGenPrompt(e.target.value)}
+          placeholder={
+            genKind === "video"
+              ? "Describe the motion / scene…"
+              : refs.length > 0
+              ? "Describe the edit — what to change or add…"
+              : "Describe the image…"
+          }
+          rows={3}
+          className="w-full px-3 py-2.5 bg-transparent text-sm resize-none focus:outline-none"
+        />
+
+        {/* Empty-state hint — keeps the "+" discoverable for new users */}
+        {showRefs && refs.length === 0 && (
+          <p className="px-3 -mt-1 pb-1 text-[11px] text-neutral-400">{refHint}</p>
+        )}
+
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 px-2 pb-2">
+          {/* "+" attach menu — reference images (upload / library) */}
+          {showRefs && (
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowRefPicker(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md ring-1 ring-neutral-200 text-[11px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                title={refLabel}
+                className="grid place-items-center h-8 w-8 rounded-lg ring-1 ring-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
               >
-                <Images className="w-3 h-3" />
-                Library
+                {isUploadingRef ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               </button>
-            </div>
-          </div>
-          {refs.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {refs.map((url) => (
-                <div key={url} className="relative w-14 h-14 rounded-md overflow-hidden ring-1 ring-neutral-200 bg-neutral-100 group/ref">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="Reference" className="w-full h-full object-cover" />
+              {menuOpen && (
+                <>
+                  {/* click-away backdrop */}
                   <button
                     type="button"
-                    onClick={() => removeRef(url)}
-                    className="absolute top-0.5 right-0.5 grid place-items-center h-4 w-4 rounded-full bg-black/60 text-white opacity-0 group-hover/ref:opacity-100 transition-opacity"
-                    aria-label="Remove reference"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ))}
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    onClick={() => setMenuOpen(false)}
+                    className="fixed inset-0 z-10 cursor-default"
+                  />
+                  <div role="menu" className="absolute bottom-full left-0 mb-1.5 z-20 w-52 rounded-lg border border-neutral-200 bg-white shadow-lg p-1">
+                    <label className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium text-neutral-700 hover:bg-neutral-50 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => { setMenuOpen(false); handleUploadRef(e) }}
+                        className="hidden"
+                        disabled={isUploadingRef}
+                      />
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload from computer
+                    </label>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setMenuOpen(false); setShowRefPicker(true) }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                    >
+                      <Images className="w-3.5 h-3.5" />
+                      Choose from library
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-          ) : (
-            <p className="text-[11px] text-neutral-400">{refHint}</p>
           )}
-        </div>
-      )}
 
-      <textarea
-        value={genPrompt}
-        onChange={(e) => setGenPrompt(e.target.value)}
-        placeholder={
-          genKind === "video"
-            ? "Describe the motion / scene…"
-            : refs.length > 0
-            ? "Describe the edit — what to change or add…"
-            : "Describe the image…"
-        }
-        rows={3}
-        className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-200 text-sm focus:outline-none focus:border-neutral-400"
-      />
-
-      {/* Aspect ratio (both) + duration (video) */}
-      <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-          Aspect
-          <select
-            value={genAspectRatio}
-            onChange={(e) => setGenAspectRatio(e.target.value)}
-            className="px-2 py-1 rounded-md bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-400"
-          >
-            {["1:1", "4:5", "16:9", "9:16", "4:3", "3:4"].map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </label>
-        {genKind === "video" && (
-          <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-            Duration
+          {/* Aspect (both) + duration (video) pills */}
+          <label className="inline-flex items-center gap-1 h-8 px-2 rounded-lg ring-1 ring-neutral-200 text-[11px] font-medium text-neutral-600">
+            Aspect
             <select
-              value={genDuration}
-              onChange={(e) => setGenDuration(Number(e.target.value))}
-              className="px-2 py-1 rounded-md bg-white border border-neutral-200 text-xs text-neutral-900 focus:outline-none focus:border-neutral-400"
+              value={genAspectRatio}
+              onChange={(e) => setGenAspectRatio(e.target.value)}
+              className="bg-transparent text-xs text-neutral-900 focus:outline-none"
             >
-              {[5, 8, 10].map((d) => (
-                <option key={d} value={d}>{d}s</option>
+              {["1:1", "4:5", "16:9", "9:16", "4:3", "3:4"].map((r) => (
+                <option key={r} value={r}>{r}</option>
               ))}
             </select>
           </label>
-        )}
+          {genKind === "video" && (
+            <label className="inline-flex items-center gap-1 h-8 px-2 rounded-lg ring-1 ring-neutral-200 text-[11px] font-medium text-neutral-600">
+              Duration
+              <select
+                value={genDuration}
+                onChange={(e) => setGenDuration(Number(e.target.value))}
+                className="bg-transparent text-xs text-neutral-900 focus:outline-none"
+              >
+                {[5, 8, 10].map((d) => (
+                  <option key={d} value={d}>{d}s</option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {/* Generate / Remix — lives at the right edge of the composer */}
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={isGenerating || !genPrompt.trim() || !genModelId}
+            className="ml-auto shrink-0 inline-flex items-center gap-2 px-4 h-8 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {refs.length > 0 && genKind === "image" ? "Remix" : "Generate"}
+          </button>
+        </div>
       </div>
 
       {genKind === "video" && genStatus !== "ready" && (
@@ -451,21 +504,6 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
               {onAdd ? "Discard" : "Generate another"}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Generate button — hidden once a preview is ready */}
-      {genStatus !== "ready" && (
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isGenerating || !genPrompt.trim() || !genModelId}
-            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {refs.length > 0 && genKind === "image" ? "Remix image" : `Generate ${genKind === "video" ? "video" : "image"}`}
-          </button>
         </div>
       )}
 

@@ -25,23 +25,26 @@ interface CuratedModel {
   // image kind this enables the "Reference images" path; video models always
   // accept a single source image (image-to-video) regardless of this flag.
   supportsImageInput?: boolean
+  /** One-line "good for…" hint shown on the picker card to help a first-time
+   *  admin choose between unfamiliar models. */
+  blurb?: string
 }
 
 // Curated roster. Add verified ids here to grow it — confirm a new id exists via
 // /v1/models before adding. Order = display order (first of each kind = default).
 const CURATED: CuratedModel[] = [
   // Image
-  { id: "openai/gpt-image-2", label: "GPT Image 2", kind: "image", provider: "openai", supportsImageInput: true },
-  { id: "google/gemini-3-pro-image", label: "Nano Banana Pro", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true },
-  { id: "google/gemini-2.5-flash-image", label: "Nano Banana", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true },
-  { id: "bfl/flux-2-flex", label: "Flux 2 Flex", kind: "image", provider: "bfl", supportsImageInput: true },
-  { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true },
-  { id: "google/imagen-4.0-generate-001", label: "Imagen 4", kind: "image", provider: "google" },
+  { id: "openai/gpt-image-2", label: "GPT Image 2", kind: "image", provider: "openai", supportsImageInput: true, blurb: "Versatile all-rounder, great with text in images" },
+  { id: "google/gemini-3-pro-image", label: "Nano Banana Pro", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true, blurb: "Highest quality edits & precise remixes" },
+  { id: "google/gemini-2.5-flash-image", label: "Nano Banana", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true, blurb: "Fast, low-cost edits & remixes" },
+  { id: "bfl/flux-2-flex", label: "Flux 2 Flex", kind: "image", provider: "bfl", supportsImageInput: true, blurb: "Artistic, stylized visuals" },
+  { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true, blurb: "Quick, budget-friendly images" },
+  { id: "google/imagen-4.0-generate-001", label: "Imagen 4", kind: "image", provider: "google", blurb: "Photoreal, true-to-life images" },
   // Video (text-to-video; image-to-video handled per-model in the client)
-  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google" },
-  { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai" },
-  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance" },
-  { id: "xai/grok-imagine-video", label: "Grok Imagine", kind: "video", provider: "xai" },
+  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google", blurb: "Top-quality video with audio" },
+  { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai", blurb: "Smooth, cinematic motion" },
+  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance", blurb: "Dynamic action & camera moves" },
+  { id: "xai/grok-imagine-video", label: "Grok Imagine", kind: "video", provider: "xai", blurb: "Fast, budget-friendly clips" },
 ]
 
 export interface GatewayModel {
@@ -51,6 +54,8 @@ export interface GatewayModel {
   provider: string
   viaLanguage: boolean
   supportsImageInput: boolean
+  /** One-line "good for…" hint for the picker card. */
+  blurb: string | null
   /** Human-readable price hint for the picker, e.g. "$0.04 / image" or
    *  "from $0.10 / sec". Null when the list endpoint exposes only token-based
    *  pricing (e.g. GPT Image) that has no clean per-asset unit price. */
@@ -139,6 +144,7 @@ export async function getGatewayModels(): Promise<GatewayModel[]> {
       provider: c.provider,
       viaLanguage: !!c.viaLanguage,
       supportsImageInput: !!c.supportsImageInput,
+      blurb: c.blurb ?? null,
       priceLabel: priceLabelFor(entry, c.kind),
       available: live ? live.has(c.id) : true,
     }
