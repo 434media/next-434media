@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
-import { getLeadById, updateLead } from "@/lib/firestore-leads"
+import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 import { createClient } from "@/lib/firestore-crm"
 import { trackLeadConverted } from "@/lib/ga4-events"
 import type { ClientContact, ClientRecord, ClientStatus } from "@/types/crm-types"
@@ -119,6 +119,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       converted_to_client_id: createdClient.id,
       converted_at: new Date().toISOString(),
     })
+    await appendLeadActivity(id, {
+      type: "converted",
+      actor: auth.session.email,
+      detail: `Converted to client ${createdClient.name || createdClient.id}`,
+    }).catch(() => {})
   } catch (err) {
     console.error(
       `[POST /api/admin/leads/${id}/convert] updateLead failed (client ${createdClient.id} created but lead not stamped):`,

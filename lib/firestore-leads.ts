@@ -6,10 +6,13 @@ import { makeTag, normalizeLegacyTags } from "./tag-taxonomy"
 import {
   CRM_COLLECTIONS,
   type Lead,
+  type LeadActivityEvent,
+  type LeadActivityType,
   type LeadCreateInput,
   type LeadStatus,
   type LeadUpdateInput,
 } from "../types/crm-types"
+import crypto from "crypto"
 
 const COLLECTION = CRM_COLLECTIONS.LEADS
 
@@ -63,6 +66,8 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     email_clicks: typeof raw.email_clicks === "number" ? raw.email_clicks : 0,
     tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : undefined,
     notes: raw.notes || undefined,
+    activity: Array.isArray(raw.activity) ? (raw.activity as Lead["activity"]) : undefined,
+    research: raw.research && typeof raw.research === "object" ? (raw.research as Lead["research"]) : undefined,
     created_by: raw.created_by || undefined,
     enriched_at: toIsoString(raw.enriched_at) || undefined,
     converted_to_client_id: raw.converted_to_client_id || undefined,
@@ -153,6 +158,17 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     email_clicks: 0,
     tags: input.tags ?? [],
     notes: input.notes ?? null,
+    // Seed the activity log with the creation event so the timeline always has
+    // an origin entry (source tells the rep where it came from).
+    activity: [
+      {
+        id: crypto.randomUUID(),
+        type: "created" as const,
+        at: now,
+        ...(input.created_by ? { actor: input.created_by } : {}),
+        detail: `Lead created · source: ${input.source}`,
+      },
+    ],
     created_by: input.created_by ?? null,
     enriched_at: now,
     converted_to_client_id: null,
@@ -220,6 +236,26 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
 
   await ref.update(update)
   invalidate()
+
+  // Log a status-change event when the patch actually flips status. Done inline
+  // (not via appendLeadActivity) so it's part of the same read-after-write — the
+  // returned lead includes the new event. Best-effort: a log failure shouldn't
+  // fail the update.
+  if (typeof patch.status === "string" && patch.status !== current.status) {
+    try {
+      await ref.update({
+        activity: FieldValue.arrayUnion({
+          id: crypto.randomUUID(),
+          type: "status_changed",
+          at: new Date().toISOString(),
+          detail: `${current.status} → ${patch.status}`,
+        }),
+      })
+    } catch {
+      /* non-fatal — the status change itself already persisted */
+    }
+  }
+
   const after = await ref.get()
   const updatedLead = normalize(id, after.data() ?? {})
 
@@ -238,6 +274,28 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
   }
 
   return updatedLead
+}
+
+// Append an activity event to a lead's log (atomic arrayUnion). Best-effort by
+// design — callers wrap in catch so a logging failure never blocks the real
+// action (sending an email, converting, etc.). Does NOT re-score or bump
+// updated_at — it's a side-channel append, not a lead edit.
+export async function appendLeadActivity(
+  id: string,
+  event: { type: LeadActivityType; actor?: string; detail?: string },
+): Promise<void> {
+  const db = getDb()
+  const entry: LeadActivityEvent = {
+    id: crypto.randomUUID(),
+    type: event.type,
+    at: new Date().toISOString(),
+    ...(event.actor ? { actor: event.actor } : {}),
+    ...(event.detail ? { detail: event.detail } : {}),
+  }
+  await db.collection(COLLECTION).doc(id).update({
+    activity: FieldValue.arrayUnion(entry),
+  })
+  invalidate()
 }
 
 export async function deleteLead(id: string): Promise<void> {

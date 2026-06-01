@@ -31,6 +31,8 @@ export default function LeadsPage() {
   const [leadView, setLeadView] = useState<LeadView>(initialView)
   const [leadSearch, setLeadSearch] = useState(initialSearch)
   const [isSavingLead, setIsSavingLead] = useState(false)
+  // Current admin's display name — powers the "Assigned to me" filter.
+  const [currentUserName, setCurrentUserName] = useState<string>("")
 
   const {
     loadLeads,
@@ -42,6 +44,8 @@ export default function LeadsPage() {
     generateDraft,
     sendOutreach,
     convertToClient,
+    bulkUpdate,
+    researchLead,
   } = useLeadHandlers({
     leads,
     setLeads,
@@ -69,6 +73,23 @@ export default function LeadsPage() {
       return () => clearTimeout(timer)
     }
   }, [toast])
+
+  // Resolve the current admin's name once (for the "Assigned to me" filter).
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/auth/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.user) return
+        setCurrentUserName(data.user.name || "")
+      })
+      .catch(() => {
+        /* non-fatal — filter just won't offer "mine" */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Sync ?view= → leadView (back/forward nav)
   useEffect(() => {
@@ -162,6 +183,8 @@ export default function LeadsPage() {
               onRefresh={loadLeads}
               onOpenLead={openLead}
               onCreateLead={openNewLeadForm}
+              onBulkUpdate={bulkUpdate}
+              currentUserName={currentUserName}
             />
           )}
         </div>
@@ -184,6 +207,7 @@ export default function LeadsPage() {
           onGenerateDraft={generateDraft}
           onSendOutreach={sendOutreach}
           onConvertToClient={convertToClient}
+          onResearch={researchLead}
         />
       </div>
     </AdminRoleGuard>

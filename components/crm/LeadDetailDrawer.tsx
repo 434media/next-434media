@@ -11,17 +11,24 @@ import {
   Tag as TagIcon,
   CheckCircle2,
   AlertCircle,
-  Wand2,
+  PenLine,
   Send,
   ArrowRight,
   Trash2,
   Loader2,
+  CircleDot,
+  CalendarClock,
+  MousePointerClick,
+  MailOpen,
+  Globe,
+  ExternalLink,
 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { Tag } from "@/components/admin/Tag"
 import { MailchimpRecordPanel } from "@/components/crm/MailchimpRecordPanel"
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
-import type { Lead, LeadStatus, LeadPlatform, LeadSource } from "@/types/crm-types"
+import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch } from "@/types/crm-types"
+import { TEAM_MEMBERS } from "@/components/crm/types"
 
 interface LeadDetailDrawerProps {
   open: boolean
@@ -35,6 +42,8 @@ interface LeadDetailDrawerProps {
   onGenerateDraft?: (id: string) => Promise<void> | void
   onSendOutreach?: (id: string, subject: string, body?: string) => Promise<boolean> | boolean
   onConvertToClient?: (id: string) => Promise<void> | void
+  /** Web-grounded "Research & qualify" — writes a review-only research record. */
+  onResearch?: (id: string) => Promise<boolean> | boolean
 }
 
 const STATUS_OPTIONS: { value: LeadStatus; label: string; dot: string }[] = [
@@ -46,7 +55,7 @@ const STATUS_OPTIONS: { value: LeadStatus; label: string; dot: string }[] = [
   { value: "archived", label: "Archived", dot: "bg-neutral-400" },
 ]
 
-const SOURCE_OPTIONS: LeadSource[] = ["event", "web", "social", "manual", "newsletter", "referral"]
+const SOURCE_OPTIONS: LeadSource[] = ["event", "web", "social", "manual", "newsletter", "referral", "partner", "prospected"]
 const PLATFORM_OPTIONS: LeadPlatform[] = ["434 Media", "TXMX", "VemosVamos", "DevSA", "MilCity"]
 
 const PRIORITY_BADGE: Record<string, { bg: string; label: string }> = {
@@ -73,6 +82,23 @@ function formatDate(iso?: string) {
 function formatDateOnly(iso?: string) {
   if (!iso) return ""
   return iso.split("T")[0]
+}
+
+// Today as YYYY-MM-DD in local time (matches the date input's value format).
+function todayLocalIso(): string {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+// N days from today as YYYY-MM-DD (local) — for the quick-reschedule chips.
+function addDaysIso(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${m}-${day}`
 }
 
 interface FormState {
@@ -146,11 +172,13 @@ export function LeadDetailDrawer({
   onGenerateDraft,
   onSendOutreach,
   onConvertToClient,
+  onResearch,
 }: LeadDetailDrawerProps) {
   const [form, setForm] = useState<FormState>(fromLead(lead))
   const [tagInput, setTagInput] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [isResearching, setIsResearching] = useState(false)
   // Subject is per-send, not persisted on the lead. Reset when drawer reopens.
   const [subject, setSubject] = useState("")
 
@@ -190,6 +218,16 @@ export function LeadDetailDrawer({
       if (ok) setSubject("")
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const handleResearch = async () => {
+    if (!lead?.id || !onResearch) return
+    setIsResearching(true)
+    try {
+      await onResearch(lead.id)
+    } finally {
+      setIsResearching(false)
     }
   }
 
@@ -373,6 +411,18 @@ export function LeadDetailDrawer({
           </div>
         )}
 
+        {/* AI research & qualify — web-grounded company context. Review-only:
+            nothing here is written to the lead's canonical fields. */}
+        {isEditing && onResearch && (
+          <ResearchCard
+            research={lead.research}
+            busy={isResearching}
+            onRun={handleResearch}
+            currentLocation={form.location}
+            onApplyLocation={(country) => update("location", country)}
+          />
+        )}
+
         {/* Contact section */}
         <Section title="Contact" icon={Building2}>
           <Field label="Full name *" value={form.name} onChange={(v) => update("name", v)} />
@@ -475,11 +525,18 @@ export function LeadDetailDrawer({
               ))}
             </div>
           </div>
-          <Field
+          <Select
             label="Assigned to"
             value={form.assigned_to}
             onChange={(v) => update("assigned_to", v)}
-            placeholder="Sales rep name"
+            options={[
+              { value: "", label: "Unassigned" },
+              ...TEAM_MEMBERS.map((m) => ({ value: m.name, label: m.name })),
+              // Preserve a legacy/free-text owner not in the current roster.
+              ...(form.assigned_to && !TEAM_MEMBERS.some((m) => m.name === form.assigned_to)
+                ? [{ value: form.assigned_to, label: `${form.assigned_to} (legacy)` }]
+                : []),
+            ]}
           />
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1.5">Next follow-up</label>
@@ -489,11 +546,42 @@ export function LeadDetailDrawer({
               onChange={(e) => update("next_followup_date", e.target.value)}
               className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
             />
+            {/* Quick reschedule + done — adjusts the date in the form; persists
+                on Save. "Followed up" clears the date so it leaves the due queue. */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {[
+                { label: "+3d", days: 3 },
+                { label: "+1w", days: 7 },
+                { label: "+2w", days: 14 },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => update("next_followup_date", addDaysIso(opt.days))}
+                  className="px-2 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200 rounded-md hover:bg-neutral-50"
+                >
+                  {opt.label}
+                </button>
+              ))}
+              {form.next_followup_date && (
+                <button
+                  type="button"
+                  onClick={() => update("next_followup_date", "")}
+                  className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200 rounded-md hover:bg-neutral-50"
+                >
+                  <CheckCircle2 className="w-3 h-3" />
+                  Followed up
+                </button>
+              )}
+            </div>
+            {isEditing && form.next_followup_date && form.next_followup_date < todayLocalIso() && (
+              <p className="mt-1 text-[11px] text-red-600 font-medium">Overdue</p>
+            )}
           </div>
         </Section>
 
         {/* Outreach section */}
-        <Section title="Outreach" icon={Wand2}>
+        <Section title="Outreach" icon={PenLine}>
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium text-neutral-600">Draft email</label>
@@ -513,7 +601,7 @@ export function LeadDetailDrawer({
                       </>
                     ) : (
                       <>
-                        <Wand2 className="w-3 h-3" />
+                        <PenLine className="w-3 h-3" />
                         {form.outreach_draft ? "Regenerate" : "Generate"}
                       </>
                     )}
@@ -603,9 +691,16 @@ export function LeadDetailDrawer({
           />
         )}
 
-        {/* Activity (read-only) */}
+        {/* Timeline — chronological log of what's happened on this lead */}
         {isEditing && (
-          <Section title="Activity" icon={CheckCircle2}>
+          <Section title="Timeline" icon={CheckCircle2}>
+            <ActivityTimeline lead={lead} />
+          </Section>
+        )}
+
+        {/* Details (read-only counters + ids) */}
+        {isEditing && (
+          <Section title="Details" icon={AlertCircle}>
             <ActivityRow label="Email opens" value={String(lead.email_opens ?? 0)} />
             <ActivityRow label="Email clicks" value={String(lead.email_clicks ?? 0)} />
             <ActivityRow label="Last contacted" value={formatDate(lead.last_contacted_at)} />
@@ -701,6 +796,166 @@ function Select({
         ))}
       </select>
     </div>
+  )
+}
+
+// AI research card — runs web-grounded research and shows the cited result as a
+// review surface. The suggested HQ country can be applied to the lead's location
+// field by an explicit click; it is NEVER auto-applied (compliance depends on it).
+function ResearchCard({
+  research,
+  busy,
+  onRun,
+  currentLocation,
+  onApplyLocation,
+}: {
+  research?: LeadResearch
+  busy: boolean
+  onRun: () => void
+  currentLocation: string
+  onApplyLocation: (country: string) => void
+}) {
+  const suggested = research?.suggestedCountry?.trim()
+  const alreadyMatches = !!suggested && currentLocation.toLowerCase().includes(suggested.toLowerCase())
+
+  return (
+    <div className="border border-neutral-200 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-neutral-50 border-b border-neutral-200">
+        <div className="flex items-center gap-2">
+          <Globe className="w-3.5 h-3.5 text-neutral-400" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">AI research</h3>
+        </div>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-300 rounded-md hover:bg-white disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+          {busy ? "Researching…" : research ? "Refresh" : "Research & qualify"}
+        </button>
+      </div>
+
+      <div className="p-4">
+        {busy && !research && (
+          <p className="text-xs text-neutral-500">Searching the web and assessing fit — this takes a few seconds.</p>
+        )}
+        {!busy && !research && (
+          <p className="text-xs text-neutral-500">
+            Pull a web-grounded company summary + fit rationale. Results are for review — nothing is saved to the lead automatically.
+          </p>
+        )}
+        {research && (
+          <div className="space-y-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Summary</p>
+              <p className="text-[13px] text-neutral-700 leading-relaxed">{research.summary}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Fit rationale</p>
+              <p className="text-[13px] text-neutral-700 leading-relaxed">{research.fitRationale}</p>
+            </div>
+
+            {/* Suggested country — a suggestion, applied only on explicit click. */}
+            {suggested && (
+              <div className="flex items-center gap-2 flex-wrap text-[12px]">
+                <span className="text-neutral-500">Suggested HQ country:</span>
+                <span className="font-medium text-neutral-800">{suggested}</span>
+                {alreadyMatches ? (
+                  <span className="text-[11px] text-emerald-600">✓ matches location</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onApplyLocation(suggested)}
+                    className="px-2 py-0.5 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-300 rounded-md hover:bg-neutral-50"
+                  >
+                    Apply to location
+                  </button>
+                )}
+              </div>
+            )}
+
+            {research.sources.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                  Sources ({research.sources.length})
+                </p>
+                <ul className="space-y-1">
+                  {research.sources.map((s) => (
+                    <li key={s.url}>
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline break-all"
+                      >
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                        {s.title || s.url}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="text-[10px] text-neutral-400">
+              {research.generatedBy ? `${research.generatedBy} · ` : ""}
+              {formatDate(research.generatedAt)} · web-grounded, verify before acting
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Per-event icon + label for the timeline. Brand-grounded icons (no Sparkle/Wand).
+const ACTIVITY_META: Record<LeadActivityType, { icon: React.ComponentType<{ className?: string }>; label: string }> = {
+  created: { icon: CircleDot, label: "Created" },
+  status_changed: { icon: ArrowRight, label: "Status changed" },
+  draft_generated: { icon: PenLine, label: "Draft generated" },
+  outreach_sent: { icon: Send, label: "Outreach sent" },
+  followup_set: { icon: CalendarClock, label: "Follow-up set" },
+  converted: { icon: CheckCircle2, label: "Converted" },
+  researched: { icon: Globe, label: "AI research" },
+  email_opened: { icon: MailOpen, label: "Email opened" },
+  email_clicked: { icon: MousePointerClick, label: "Email clicked" },
+  note: { icon: AlertCircle, label: "Note" },
+}
+
+function ActivityTimeline({ lead }: { lead: Lead }) {
+  // Newest first. Events accrue from feature rollout forward, so older leads
+  // may have none — show a clear empty state rather than implying nothing happened.
+  const events = [...(lead.activity ?? [])].sort((a, b) => b.at.localeCompare(a.at))
+  if (events.length === 0) {
+    return (
+      <p className="text-xs text-neutral-500">
+        No activity recorded yet. New events (drafts, sends, status changes) will appear here.
+      </p>
+    )
+  }
+  return (
+    <ol className="relative space-y-3">
+      {events.map((e) => {
+        const meta = ACTIVITY_META[e.type] ?? { icon: CircleDot, label: e.type }
+        const Icon = meta.icon
+        return (
+          <li key={e.id} className="flex items-start gap-2.5">
+            <span className="grid place-items-center h-5 w-5 shrink-0 rounded-full bg-neutral-100 text-neutral-500 mt-0.5">
+              <Icon className="w-3 h-3" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[12px] font-medium text-neutral-800">{meta.label}</span>
+                <span className="text-[10px] text-neutral-400 shrink-0 tabular-nums">{formatDate(e.at)}</span>
+              </div>
+              {e.detail && <p className="text-[11px] text-neutral-500 leading-snug">{e.detail}</p>}
+              {e.actor && <p className="text-[10px] text-neutral-400 mt-0.5">{e.actor}</p>}
+            </div>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 

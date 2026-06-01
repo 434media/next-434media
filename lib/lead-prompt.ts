@@ -7,7 +7,7 @@ import type { Lead } from "@/types/crm-types"
  * Edit when the audience/portfolio shifts. This is the single source of truth
  * for what Claude knows about who we are.
  */
-const BRAND_CONTEXT = `434 Media is a San Antonio-based media company that owns niche, engaged audiences across several sub-brands:
+export const BRAND_CONTEXT = `434 Media is a San Antonio-based media company that owns niche, engaged audiences across several sub-brands:
 
 - TXMX Boxing — boxing, combat sports, Latino fight culture
 - VemosVamos — bicultural lifestyle, Texas/LATAM crossover
@@ -61,6 +61,24 @@ export function buildLeadOutreachPrompt({ lead, repName }: BuildPromptOptions): 
   const tagsLine = lead.tags && lead.tags.length > 0 ? lead.tags.join(", ") : "(none)"
   const repLine = repName ? `Sender: ${repName} at 434 Media` : ""
 
+  // Engagement signal — whether this contact has already shown interest via our
+  // email (Mailchimp opens/clicks). A warm contact gets a different opener than
+  // a cold one, so we surface it to the writer.
+  const opens = lead.email_opens ?? 0
+  const clicks = lead.email_clicks ?? 0
+  const engagementLine =
+    opens > 0 || clicks > 0
+      ? `Prior email engagement: ${opens} open(s), ${clicks} click(s)${
+          lead.last_contacted_at ? ` (last contacted ${lead.last_contacted_at.split("T")[0]})` : ""
+        } — this is a WARM contact who already engaged with us.`
+      : "Prior email engagement: none yet — treat as a cold first-touch."
+
+  // Provenance — how the lead entered our world (promoted from a partner list,
+  // an event registration, etc.). Gives the writer a legitimate reason for reaching out.
+  const originLine = lead.origin_ref
+    ? `How we got them: promoted from ${lead.origin_ref.collection.replace(/_/g, " ")} on ${lead.origin_ref.promoted_at?.split("T")[0] ?? "(unknown date)"}.`
+    : ""
+
   const system = `You are a senior business development writer for 434 Media. You write outbound prospecting emails that read like a real person reached out, not a marketing template. You know the 434 portfolio cold and you tailor every send to which sub-brand actually fits the prospect's world.
 
 ${BRAND_CONTEXT}
@@ -80,11 +98,14 @@ Capture source: ${lead.source}
 Suggested platform fit: ${lead.platform || "(none yet — pick the best from the portfolio)"}
 Tags: ${tagsLine}
 Lead-scoring signals that fired: ${scoreSignals || "(none — be cautious about assuming fit)"}
+${engagementLine}
+${originLine}
 ${repLine}
 
 Rules for this draft:
 - Lead with the audience or sub-brand most relevant to their industry. If multiple fit, pick the strongest one and commit to it.
 - Be specific to their world — reference their industry or location, not generic phrases.
+- If this is a WARM contact (prior engagement), acknowledge it naturally — don't open as if it's a first introduction. If cold, a clean first-touch opener.
 - Make one concrete value claim. Don't list capabilities.
 - End with a low-friction CTA: a 15-minute call, or just a one-line reply.
 - Output the email body only. No subject line. No preamble. No signature.`

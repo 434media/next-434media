@@ -232,6 +232,84 @@ export function useLeadHandlers({
     [selectedLead, setLeads, setSelectedLead, setToast],
   )
 
+  // Bulk patch N leads with the same partial update (status, assigned_to, or
+  // append tags). Applies each through the per-lead PATCH so server re-scoring +
+  // activity logging stay consistent. Optimistic; reloads on any failure to
+  // resync. Returns the count that succeeded.
+  const bulkUpdate = useCallback(
+    async (ids: string[], patch: { status?: LeadStatus; assigned_to?: string; addTags?: string[] }): Promise<number> => {
+      if (ids.length === 0) return 0
+      let ok = 0
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          const lead = leads.find((l) => l.id === id)
+          const body: Record<string, unknown> = {}
+          if (patch.status) body.status = patch.status
+          if (patch.assigned_to !== undefined) body.assigned_to = patch.assigned_to
+          if (patch.addTags?.length) {
+            const existing = lead?.tags ?? []
+            body.tags = Array.from(new Set([...existing, ...patch.addTags]))
+          }
+          const res = await fetch(`/api/admin/leads/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+          if (!res.ok) throw new Error("patch failed")
+          const data = await res.json()
+          return data.lead as Lead
+        }),
+      )
+      const updatedById = new Map<string, Lead>()
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value?.id) {
+          updatedById.set(r.value.id, r.value)
+          ok++
+        }
+      }
+      if (updatedById.size > 0) {
+        setLeads((curr) => curr.map((l) => updatedById.get(l.id) ?? l))
+      }
+      const failed = ids.length - ok
+      setToast({
+        message: failed === 0 ? `Updated ${ok} lead${ok === 1 ? "" : "s"}` : `Updated ${ok}, ${failed} failed`,
+        type: failed === 0 ? "success" : "error",
+      })
+      if (failed > 0) loadLeads()
+      return ok
+    },
+    [leads, setLeads, setToast, loadLeads],
+  )
+
+  // Web-grounded "Research & qualify" — calls the gateway search model and
+  // writes a review-only research record to the lead. Server returns the
+  // updated lead; we swap it in so the drawer shows the new card.
+  const researchLead = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/admin/leads/${id}/research`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(data.error || "Research failed")
+        }
+        if (data.lead) {
+          setLeads((curr) => curr.map((l) => (l.id === id ? data.lead : l)))
+          if (selectedLead?.id === id) setSelectedLead(data.lead)
+        }
+        setToast({ message: "Research added", type: "success" })
+        return true
+      } catch (err) {
+        setToast({ message: err instanceof Error ? err.message : "Research failed", type: "error" })
+        return false
+      }
+    },
+    [selectedLead, setLeads, setSelectedLead, setToast],
+  )
+
   // Hard delete (admin-only destructive action)
   const deleteLead = useCallback(
     async (id: string) => {
@@ -261,5 +339,7 @@ export function useLeadHandlers({
     generateDraft,
     sendOutreach,
     convertToClient,
+    bulkUpdate,
+    researchLead,
   }
 }

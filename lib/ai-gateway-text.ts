@@ -8,8 +8,9 @@
 // use case is kept identical to the previous direct-Anthropic setup so output
 // quality is unchanged; env overrides still win.
 
-import { generateText, APICallError } from "ai"
+import { generateText, APICallError, Output } from "ai"
 import type { Tool } from "ai"
+import { z } from "zod"
 
 // Curated model slugs for pipeline text generation. Confirmed present on
 // https://ai-gateway.vercel.sh/v1/models. Env overrides preserve the prior
@@ -20,6 +21,10 @@ export const GATEWAY_TEXT_MODELS = {
   // Prospecting prompt→filters — Sonnet, a structured extraction task that
   // doesn't need Opus (was claude-sonnet-4-6).
   translator: process.env.TRANSLATOR_MODEL || "anthropic/claude-sonnet-4.6",
+  // Lead research — OpenAI's web-search-grounded model. Returns live cited
+  // company context. Verified to support structured Output + a `sources[]`
+  // array through the gateway. `web_search` priced per call — guard usage.
+  research: process.env.RESEARCH_MODEL || "openai/gpt-4o-mini-search-preview",
 } as const
 
 export interface GatewayTextParams {
@@ -75,6 +80,61 @@ export async function generateGatewayToolCall<TInput = unknown>(
     )
   }
   return call.input as TInput
+}
+
+// ── Lead research (web-grounded) ───────────────────────────────────────────
+
+export interface GatewayResearchResult {
+  summary: string
+  fitRationale: string
+  suggestedCountry?: string
+  sources: { url: string; title?: string }[]
+}
+
+// The structured shape the research model returns. Web-grounded, so values are
+// drawn from live sources — but the caller MUST treat this as review-only
+// (never auto-apply suggestedCountry to a lead; compliance depends on it).
+const researchSchema = z.object({
+  summary: z
+    .string()
+    .describe("3–4 sentence factual overview of the company: what they do, size/scale, and one recent development."),
+  fitRationale: z
+    .string()
+    .describe("2–3 sentences on why this company might (or might not) fit a Texas/LATAM-focused media company's audiences. Be honest if it's a weak fit."),
+  suggestedCountry: z
+    .string()
+    .optional()
+    .describe("Best-guess HQ country name from the research (e.g. 'United States'). A suggestion only."),
+})
+
+// Run web-grounded research on a real company/person already in our system.
+// Returns a structured result + the cited sources the model used. Throws on
+// failure (route maps to 502). NOT for discovery — only enriching known leads.
+export async function generateGatewayResearch(params: {
+  system: string
+  prompt: string
+}): Promise<GatewayResearchResult> {
+  const result = await generateText({
+    model: GATEWAY_TEXT_MODELS.research,
+    system: params.system,
+    prompt: params.prompt,
+    experimental_output: Output.object({ schema: researchSchema }),
+  })
+
+  const out = result.experimental_output
+  const sources = (result.sources ?? [])
+    .filter((s): s is Extract<typeof s, { url: string }> => "url" in s && typeof s.url === "string")
+    .map((s) => ({ url: s.url, title: "title" in s && typeof s.title === "string" ? s.title : undefined }))
+    // De-dupe by url; cap to keep the stored record lean.
+    .filter((s, i, arr) => arr.findIndex((x) => x.url === s.url) === i)
+    .slice(0, 8)
+
+  return {
+    summary: out.summary,
+    fitRationale: out.fitRationale,
+    suggestedCountry: out.suggestedCountry?.trim() || undefined,
+    sources,
+  }
 }
 
 // Re-exported so callers can classify gateway/provider HTTP errors (e.g. 402

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { generateGatewayText, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
 import { buildLeadOutreachPrompt } from "@/lib/lead-prompt"
-import { getLeadById, updateLead } from "@/lib/firestore-leads"
+import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -72,6 +72,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       draft_generated_at: new Date().toISOString(),
       status: lead.status === "new" ? "ready" : lead.status,
     })
+    await appendLeadActivity(id, {
+      type: "draft_generated",
+      actor: auth.session.email,
+      detail: lead.outreach_draft ? "Regenerated outreach draft" : "Generated outreach draft",
+    }).catch(() => {})
     return NextResponse.json({ success: true, lead: updated, draft })
   } catch (err) {
     console.error(`[POST /api/admin/leads/${id}/generate-draft] persist error:`, err)

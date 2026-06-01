@@ -651,12 +651,57 @@ export type LeadSource =
 
 export type LeadPriority = "high" | "medium" | "low"
 
+// Append-only activity log entry on a Lead — powers the drawer timeline so a
+// rep can see what's happened (drafted, sent, status changes, engagement)
+// rather than just the current state. Events accrue from rollout forward.
+export type LeadActivityType =
+  | "created"
+  | "status_changed"
+  | "draft_generated"
+  | "outreach_sent"
+  | "followup_set"
+  | "converted"
+  | "researched"
+  | "email_opened"
+  | "email_clicked"
+  | "note"
+
+export interface LeadActivityEvent {
+  id: string
+  type: LeadActivityType
+  at: string // ISO timestamp
+  actor?: string // who/what triggered it (rep email, "system")
+  detail?: string // short human-readable detail, e.g. "new → contacted"
+}
+
 export type LeadPlatform =
   | "434 Media"
   | "TXMX"
   | "VemosVamos"
   | "DevSA"
   | "MilCity"
+
+// AI research attached to a lead — web-grounded company context + ICP-fit
+// rationale produced by the gateway search model. REVIEW-ONLY: stored in its
+// own field and shown as a card; it never overwrites canonical lead fields.
+// `suggestedCountry` in particular is a *suggestion* a human confirms — it is
+// never auto-applied, because the EU/UK/CA compliance gate depends on accurate
+// country data (see project_434media_compliance).
+export interface LeadResearchSource {
+  url: string
+  title?: string
+}
+
+export interface LeadResearch {
+  summary: string
+  fitRationale: string
+  /** Model's read of the HQ country — a suggestion for the rep, NOT applied. */
+  suggestedCountry?: string
+  sources: LeadResearchSource[]
+  generatedAt: string
+  model: string
+  generatedBy?: string
+}
 
 export interface LeadScoreBreakdown {
   geography?: number
@@ -705,6 +750,13 @@ export interface Lead extends BaseRecord {
   // Classification
   tags?: string[]
   notes?: string
+
+  // Append-only activity log (newest events pushed last). Optional — leads
+  // created before this feature simply have none.
+  activity?: LeadActivityEvent[]
+
+  // AI research (web-grounded). Review-only; see LeadResearch.
+  research?: LeadResearch
 
   // Provenance
   created_by?: string

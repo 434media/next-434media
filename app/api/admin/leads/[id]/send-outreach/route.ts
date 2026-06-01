@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
-import { getLeadById, updateLead } from "@/lib/firestore-leads"
+import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -119,6 +119,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       next_followup_date: followUpDate,
       resend_email_id: emailId,
     })
+    // Timeline event — more meaningful than the auto status_changed log.
+    // Best-effort; the send + update already succeeded.
+    await appendLeadActivity(id, {
+      type: "outreach_sent",
+      actor: auth.session.email,
+      detail: `Sent “${subject}” · follow-up ${followUpDate}`,
+    }).catch(() => {})
     return NextResponse.json({ success: true, lead: updated, emailId })
   } catch (err) {
     console.error(`[POST /api/admin/leads/${id}/send-outreach] persist error:`, err)
