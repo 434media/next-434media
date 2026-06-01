@@ -42,6 +42,8 @@ interface SidebarItemBase {
   id: string
   label: string
   icon: LucideIcon
+  /** Optional hover tooltip explaining what the item is / how it relates. */
+  description?: string
   roles: AdminRole[]
 }
 
@@ -139,9 +141,19 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     id: "content",
     title: "Content",
     items: [
-      // Social Calendar — graduated from the CRM tab into its own surface, ahead
-      // of the approve/reject + posting pipeline. crm_only can reach it (same as
-      // the page guard); Feed/Blog stay full_admin.
+      // Ordered as the content lifecycle: create (AI Studio) → plan & schedule
+      // (Calendar) → publish (Feed, Blog). AI Studio leads since it's where
+      // assets are made and feeds the rest. crm_only can reach Studio + Calendar
+      // (same as the page guards); Feed/Blog stay full_admin.
+      {
+        id: "content-studio",
+        label: "AI Studio",
+        icon: Clapperboard,
+        href: "/admin/content/studio",
+        matchPrefix: "/admin/content/studio",
+        description: "Generate images & video with AI — saved to your library",
+        roles: ["full_admin", "crm_only"],
+      },
       {
         id: "content-calendar",
         label: "Calendar",
@@ -150,14 +162,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         matchPrefix: "/admin/content",
         // Exact so it doesn't stay highlighted on the /admin/content/studio sibling.
         exact: true,
-        roles: ["full_admin", "crm_only"],
-      },
-      {
-        id: "content-studio",
-        label: "AI Studio",
-        icon: Clapperboard,
-        href: "/admin/content/studio",
-        matchPrefix: "/admin/content/studio",
+        description: "Plan, review & schedule social posts",
         roles: ["full_admin", "crm_only"],
       },
       {
@@ -166,6 +171,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Layers,
         href: "/admin/feed-form",
         matchPrefix: "/admin/feed-form",
+        description: "Publish to the site feed",
         roles: ["full_admin"],
       },
       {
@@ -174,6 +180,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Newspaper,
         href: "/admin/blog",
         matchPrefix: "/admin/blog",
+        description: "Write & publish blog posts",
         roles: ["full_admin"],
       },
     ],
@@ -343,7 +350,7 @@ export function AdminSidebar({
         key={item.id}
         href={item.href}
         onClick={onNavigate}
-        title={!showLabels ? item.label : undefined}
+        title={!showLabels ? item.label : item.description}
         className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
           active
             ? "bg-neutral-900 text-white"

@@ -14,6 +14,17 @@ import { sanitizeAssetUrl as sanitizeUrl, toDownloadUrl } from "@/lib/asset-url"
 
 type KindFilter = "all" | "image" | "video"
 
+// localStorage key for dismissing the "How it works" intro.
+const INTRO_KEY = "aiStudioIntroDismissed"
+
+// Starter prompts for the empty library — one click to try, so a first-time
+// admin isn't staring at a blank box. Kept generic/brand-neutral.
+const EXAMPLE_PROMPTS = [
+  "A minimalist product shot on a clean studio background, soft lighting",
+  "A bold, colorful social graphic announcing a community event",
+  "A cinematic 16:9 hero image of a city skyline at golden hour",
+]
+
 // model id is "creator/model-name" (e.g. "openai/gpt-image-2"). Split for the
 // provider logo and a short display name.
 function providerOf(modelId?: string): string {
@@ -53,6 +64,10 @@ export default function StudioPage() {
   const [seed, setSeed] = useState<{ url: string; nonce: number } | null>(null)
   // Asset opened in the detail lightbox (full-size + prompt/model metadata).
   const [detail, setDetail] = useState<StoredAsset | null>(null)
+  // Example prompt pushed into the generator (bump nonce to re-fire same text).
+  const [seedPrompt, setSeedPrompt] = useState<{ text: string; nonce: number } | null>(null)
+  // "How it works" intro — dismissible, remembered per browser.
+  const [showIntro, setShowIntro] = useState(true)
 
   const loadFirst = useCallback(async () => {
     setIsLoading(true)
@@ -116,6 +131,30 @@ export default function StudioPage() {
     return () => window.removeEventListener("keydown", onKey)
   }, [detail])
 
+  // Restore the intro's dismissed state from this browser.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(INTRO_KEY) === "1") setShowIntro(false)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const dismissIntro = () => {
+    setShowIntro(false)
+    try {
+      localStorage.setItem(INTRO_KEY, "1")
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Fill the generator with an example prompt and scroll to it.
+  const applyExamplePrompt = (text: string) => {
+    setSeedPrompt({ text, nonce: Date.now() })
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
   const shown = filter === "all" ? assets : assets.filter((a) => a.kind === filter)
 
   return (
@@ -135,8 +174,39 @@ export default function StudioPage() {
             </p>
           </div>
 
+          {/* How it works — dismissible first-run intro */}
+          {showIntro && (
+            <div className="relative rounded-xl border border-neutral-200 bg-white px-4 py-3 pr-9">
+              <button
+                type="button"
+                onClick={dismissIntro}
+                aria-label="Dismiss"
+                className="absolute top-2.5 right-2.5 grid place-items-center h-6 w-6 rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {[
+                  { n: "1", t: "Pick a model", d: "Each has a “good for…” hint — try one you haven't used." },
+                  { n: "2", t: "Describe or upload", d: "Write a prompt, or attach a reference image to edit & remix." },
+                  { n: "3", t: "Generate & reuse", d: "Every result is saved to your library for social, blog, and campaigns." },
+                ].map((s) => (
+                  <div key={s.n} className="flex items-start gap-2.5">
+                    <span className="grid place-items-center h-5 w-5 shrink-0 rounded-full bg-neutral-900 text-white text-[11px] font-medium">
+                      {s.n}
+                    </span>
+                    <div>
+                      <p className="text-[13px] font-medium text-neutral-900 leading-tight">{s.t}</p>
+                      <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">{s.d}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Generate */}
-          <GeneratePanel open seed={seed} onGenerated={() => loadFirst()} />
+          <GeneratePanel open seed={seed} seedPrompt={seedPrompt} onGenerated={() => loadFirst()} />
 
           {/* Library */}
           <div className="space-y-3">
@@ -165,8 +235,20 @@ export default function StudioPage() {
                 Loading library…
               </div>
             ) : shown.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-neutral-300 bg-white py-12 text-center text-sm text-neutral-500">
-                No assets yet — generate one above to start your library.
+              <div className="rounded-lg border border-dashed border-neutral-300 bg-white py-10 px-6 text-center">
+                <p className="text-sm text-neutral-500">No assets yet — try one of these to get started:</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {EXAMPLE_PROMPTS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => applyExamplePrompt(p)}
+                      className="text-left max-w-xs px-3 py-1.5 rounded-full ring-1 ring-neutral-200 text-xs text-neutral-700 hover:bg-neutral-50 hover:ring-neutral-300 transition-colors"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <>
@@ -289,7 +371,7 @@ export default function StudioPage() {
             key signal, so the prompt + model are front and center. */}
         {detail && (
           <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
             onClick={() => setDetail(null)}
             role="dialog"
             aria-modal="true"

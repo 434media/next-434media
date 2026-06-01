@@ -35,11 +35,14 @@ interface GeneratePanelProps {
   /** Push a reference image in (e.g. "Remix" from the library). Bump `nonce` to
    *  re-trigger with the same url. */
   seed?: { url: string; nonce: number } | null
+  /** Prefill the prompt box (e.g. an example prompt from the empty library).
+   *  Bump `nonce` to re-trigger with the same text. */
+  seedPrompt?: { text: string; nonce: number } | null
 }
 
 const MAX_REFS = 4
 
-export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed }: GeneratePanelProps) {
+export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed, seedPrompt }: GeneratePanelProps) {
   const [genModels, setGenModels] = useState<GenModel[]>([])
   const [genKind, setGenKind] = useState<"image" | "video">("image")
   const [genModelId, setGenModelId] = useState("")
@@ -96,6 +99,15 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
     setRefs((cur) => (cur.includes(seed.url) ? cur : [...cur, seed.url].slice(0, MAX_REFS)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed?.nonce])
+
+  // Prompt seed from the host (example prompts in the empty library).
+  useEffect(() => {
+    if (!seedPrompt?.text) return
+    setGenPreview(null)
+    setGenStatus("idle")
+    setGenPrompt(seedPrompt.text)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedPrompt?.nonce])
 
   const selectedModel = genModelsForKind.find((m) => m.id === genModelId) ?? null
   // Reference images: image models that accept input images (edit/remix), or any
