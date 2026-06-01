@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
 import { motion, AnimatePresence } from "motion/react"
 import {
   ChevronLeft,
@@ -13,6 +14,9 @@ import {
   Plus,
   Filter,
   X,
+  Info,
+  Clapperboard,
+  ArrowUpRight,
 } from "lucide-react"
 import type { ContentPost, SocialPlatform, ContentPostStatus, TeamMember } from "./types"
 import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS, TEAM_MEMBERS } from "./types"
@@ -24,6 +28,9 @@ interface SocialCalendarViewProps {
 }
 
 type CalendarViewMode = "day" | "week" | "month"
+
+// localStorage key for dismissing the "How it works" intro.
+const INTRO_KEY = "contentCalendarIntroDismissed"
 
 function getDaysInMonth(year: number, month: number): Date[] {
   const firstDay = new Date(year, month, 1)
@@ -81,6 +88,19 @@ const STATUS_DOT: Record<ContentPostStatus, string> = {
 
 function getStatusDot(status: ContentPostStatus): string {
   return STATUS_DOT[status] ?? "bg-neutral-400"
+}
+
+// "Mar 5" style short date from a YYYY-MM-DD (or ISO) post date.
+function shortDate(value?: string): string {
+  if (!value) return ""
+  const d = new Date(`${value.split("T")[0]}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+// First initial of an assignee name, for the card avatar chip.
+function initialOf(name?: string): string {
+  return name?.trim()?.charAt(0).toUpperCase() ?? ""
 }
 
 const PlatformIcon = ({ platform, className = "w-4 h-4", style }: { platform: SocialPlatform; className?: string; style?: React.CSSProperties }) => {
@@ -149,6 +169,24 @@ function PostCard({ post, onClick, compact = false }: { post: ContentPost; onCli
         </div>
         <span className={`truncate leading-tight font-medium text-neutral-900 ${compact ? "text-[11px]" : "text-xs"}`}>{post.title}</span>
       </div>
+
+      {/* Meta row — board cards only (compact calendar cells stay minimal).
+          Shows the scheduled date + assignee so cards are scannable unopened. */}
+      {!compact && (post.date_to_post || post.user) && (
+        <div className="flex items-center gap-1.5 mt-1 pl-3">
+          {post.date_to_post && (
+            <span className="text-[10px] tabular-nums text-neutral-400">{shortDate(post.date_to_post)}</span>
+          )}
+          {post.user && (
+            <span
+              title={post.user}
+              className="ml-auto grid place-items-center h-4 w-4 shrink-0 rounded-full bg-neutral-200 text-neutral-700 text-[9px] font-semibold"
+            >
+              {initialOf(post.user)}
+            </span>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -198,12 +236,56 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month")
   const [hoveredDay, setHoveredDay] = useState<string | null>(null)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set())
+  // Brand slicer (post.platform is the brand dropdown, typed Brand | "").
+  const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set())
+  // Social-platform slicer (post.social_platforms: IG / TikTok / …).
+  const [selectedSocials, setSelectedSocials] = useState<Set<string>>(new Set())
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   // Filters popover holds the User + Platform slicers. Status isn't a filter
   // here — it's the Board's columns (and the Calendar shows dated posts only).
   const [showFilters, setShowFilters] = useState(false)
   const filtersRef = useRef<HTMLDivElement>(null)
+  // Status legend popover — maps the dot colors to their meaning.
+  const [showLegend, setShowLegend] = useState(false)
+  const legendRef = useRef<HTMLDivElement>(null)
+  // Board column to briefly highlight (e.g. jumped-to from the approval chip).
+  const [highlightColumn, setHighlightColumn] = useState<string | null>(null)
+  const highlightRef = useRef<HTMLDivElement>(null)
+  // "How it works" intro — dismissible, remembered per browser.
+  const [showIntro, setShowIntro] = useState(true)
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(INTRO_KEY) === "1") setShowIntro(false)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const dismissIntro = () => {
+    setShowIntro(false)
+    try {
+      localStorage.setItem(INTRO_KEY, "1")
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Jump to a Board column and pulse it — the reviewer's "show me what needs
+  // approval" shortcut from the header summary.
+  const jumpToColumn = (label: string) => {
+    setView("board")
+    setHighlightColumn(label)
+  }
+
+  // Once the highlighted column renders, scroll it into view, then fade the
+  // pulse after a moment.
+  useEffect(() => {
+    if (!highlightColumn) return
+    highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    const t = setTimeout(() => setHighlightColumn(null), 1600)
+    return () => clearTimeout(t)
+  }, [highlightColumn])
 
   const fetchTeamMembers = useCallback(async () => {
     try {
@@ -240,26 +322,47 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     }
   }, [showFilters])
 
-  const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
-  const togglePlatform = (platform: string) => { setSelectedPlatforms(prev => { const next = new Set(prev); next.has(platform) ? next.delete(platform) : next.add(platform); return next }) }
-  // Count of the secondary (popover) slicers only — drives the Filters badge.
-  const secondaryFilterCount = selectedUsers.size + selectedPlatforms.size
+  // Close the Legend popover on outside-click / Escape.
+  useEffect(() => {
+    if (!showLegend) return
+    function onClick(e: MouseEvent) {
+      if (legendRef.current && !legendRef.current.contains(e.target as Node)) setShowLegend(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowLegend(false)
+    }
+    document.addEventListener("mousedown", onClick)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("mousedown", onClick)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [showLegend])
 
-  // Workflow phases — group the status enum into the four Board columns.
-  const PIPELINE_GROUPS: { label: string; statuses: ContentPostStatus[] }[] = [
-    { label: "Produce", statuses: ["ai_drafted", "to_do", "planning", "in_progress"] },
-    { label: "Review", statuses: ["needs_approval", "rejected"] },
-    { label: "Schedule", statuses: ["approved", "scheduled"] },
-    { label: "Live", statuses: ["posted"] },
+  const toggleUser = (user: string) => { setSelectedUsers(prev => { const next = new Set(prev); next.has(user) ? next.delete(user) : next.add(user); return next }) }
+  const toggleBrand = (brand: string) => { setSelectedBrands(prev => { const next = new Set(prev); next.has(brand) ? next.delete(brand) : next.add(brand); return next }) }
+  const toggleSocial = (platform: string) => { setSelectedSocials(prev => { const next = new Set(prev); next.has(platform) ? next.delete(platform) : next.add(platform); return next }) }
+  // Count of the secondary (popover) slicers only — drives the Filters badge.
+  const secondaryFilterCount = selectedUsers.size + selectedBrands.size + selectedSocials.size
+
+  // Workflow phases — group the status enum into the four Board columns. The
+  // sublabel documents the phase so the kanban reads as a workflow, not just tags.
+  const PIPELINE_GROUPS: { label: string; sublabel: string; statuses: ContentPostStatus[] }[] = [
+    { label: "Produce", sublabel: "Drafts & in progress", statuses: ["ai_drafted", "to_do", "planning", "in_progress"] },
+    { label: "Review", sublabel: "Awaiting approval", statuses: ["needs_approval", "rejected"] },
+    { label: "Schedule", sublabel: "Approved & scheduled", statuses: ["approved", "scheduled"] },
+    { label: "Live", sublabel: "Published", statuses: ["posted"] },
   ]
 
   const filteredPosts = useMemo(() => {
     return contentPosts.filter(post => {
       if (selectedUsers.size > 0 && !selectedUsers.has(post.user)) return false
-      if (selectedPlatforms.size > 0 && post.platform && !selectedPlatforms.has(post.platform)) return false
+      if (selectedBrands.size > 0 && (!post.platform || !selectedBrands.has(post.platform))) return false
+      // Social filter: keep posts targeting at least one of the selected platforms.
+      if (selectedSocials.size > 0 && !(post.social_platforms ?? []).some(p => selectedSocials.has(p))) return false
       return true
     })
-  }, [contentPosts, selectedUsers, selectedPlatforms])
+  }, [contentPosts, selectedUsers, selectedBrands, selectedSocials])
 
   // Posts that the Calendar can't show because they have no scheduled date —
   // surfaced as an indicator so they're never silently dropped.
@@ -267,6 +370,20 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
     () => filteredPosts.filter(p => !p.date_to_post).length,
     [filteredPosts],
   )
+
+  // At-a-glance pipeline state for the header summary. "In progress" is the
+  // Produce phase; the rest map to single statuses that matter for the workflow.
+  const statusSummary = useMemo(() => {
+    const has = (s: ContentPostStatus) => filteredPosts.filter(p => p.status === s).length
+    return {
+      inProgress: filteredPosts.filter(p =>
+        ["ai_drafted", "to_do", "planning", "in_progress"].includes(p.status),
+      ).length,
+      needsApproval: has("needs_approval"),
+      scheduled: has("scheduled") + has("approved"),
+      posted: has("posted"),
+    }
+  }, [filteredPosts])
 
   const postsByDate = useMemo(() => {
     const grouped: Record<string, ContentPost[]> = {}
@@ -319,6 +436,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
   const brandOptions = BRANDS.map(b => ({ value: b, label: b }))
+  const socialOptions = SOCIAL_PLATFORM_OPTIONS.map(p => ({ value: p.value, label: p.label }))
 
   // Filter out specific users from the calendar filter list
   const EXCLUDED_USERS = ["barbara carreon", "elon john", "guna", "nichole snow", "testing"]
@@ -331,10 +449,39 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-medium text-neutral-900">Content</h2>
+          <h2 className="text-lg font-medium text-neutral-900">Content Calendar</h2>
           <p className="text-[13px] text-neutral-500 mt-0.5">
-            Produce, review, and schedule social content for your brands.
+            Produce, review, and schedule social content for your brands.{" "}
+            <Link
+              href="/admin/content/studio"
+              className="inline-flex items-center gap-0.5 font-medium text-neutral-700 hover:text-neutral-900 underline-offset-2 hover:underline"
+            >
+              <Clapperboard className="w-3.5 h-3.5" />
+              Generate assets in AI Studio
+              <ArrowUpRight className="w-3 h-3" />
+            </Link>
           </p>
+          {/* At-a-glance pipeline state */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[12px] text-neutral-500 tabular-nums">
+            <span><span className="font-medium text-neutral-700">{statusSummary.inProgress}</span> in progress</span>
+            <span className="text-neutral-300">·</span>
+            {statusSummary.needsApproval > 0 ? (
+              <button
+                type="button"
+                onClick={() => jumpToColumn("Review")}
+                title="Review these on the Board"
+                className="inline-flex items-center gap-1 rounded-full bg-amber-50 ring-1 ring-amber-200 px-2 py-0.5 text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                <span className="font-medium">{statusSummary.needsApproval}</span> need approval
+              </button>
+            ) : (
+              <span><span className="font-medium text-neutral-700">0</span> need approval</span>
+            )}
+            <span className="text-neutral-300">·</span>
+            <span><span className="font-medium text-neutral-700">{statusSummary.scheduled}</span> scheduled</span>
+            <span className="text-neutral-300">·</span>
+            <span><span className="font-medium text-neutral-700">{statusSummary.posted}</span> posted</span>
+          </div>
         </div>
         <button
           onClick={onAddPost}
@@ -344,6 +491,37 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
           Add post
         </button>
       </div>
+
+      {/* How it works — dismissible first-run intro */}
+      {showIntro && (
+        <div className="relative rounded-xl border border-neutral-200 bg-white px-4 py-3 pr-9">
+          <button
+            type="button"
+            onClick={dismissIntro}
+            aria-label="Dismiss"
+            className="absolute top-2.5 right-2.5 grid place-items-center h-6 w-6 rounded-md text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { n: "1", t: "Board", d: "Your pipeline — drafts and in-progress work live here, even before they have a date." },
+              { n: "2", t: "Calendar", d: "Scheduled & posted content on a date grid (Day, Week, or Month)." },
+              { n: "3", t: "Review & schedule", d: "Approved posts move to Schedule, then go Live once published." },
+            ].map((s) => (
+              <div key={s.n} className="flex items-start gap-2.5">
+                <span className="grid place-items-center h-5 w-5 shrink-0 rounded-full bg-neutral-900 text-white text-[11px] font-medium">
+                  {s.n}
+                </span>
+                <div>
+                  <p className="text-[13px] font-medium text-neutral-900 leading-tight">{s.t}</p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5 leading-snug">{s.d}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* View switcher (Board / Calendar) + Filters — one calm toolbar row.
           Board is the pipeline; Calendar is the dated grid. */}
@@ -370,9 +548,38 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
           })}
         </div>
 
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Status legend — maps the dot colors used on cards to their meaning. */}
+        <div className="relative" ref={legendRef}>
+          <button
+            type="button"
+            onClick={() => setShowLegend(v => !v)}
+            aria-expanded={showLegend}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+          >
+            <Info className="w-4 h-4" />
+            Legend
+          </button>
+          {showLegend && (
+            <div className="absolute right-0 z-20 mt-1 w-56 rounded-md bg-white ring-1 ring-neutral-200 shadow-lg">
+              <div className="px-3 py-2.5 border-b border-neutral-100">
+                <h3 className="text-sm font-medium text-neutral-900">Status legend</h3>
+              </div>
+              <div className="p-3 grid grid-cols-1 gap-1.5">
+                {CONTENT_POST_STATUS_OPTIONS.map((s) => (
+                  <div key={s.value} className="flex items-center gap-2">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${getStatusDot(s.value)}`} aria-hidden="true" />
+                    <span className="text-xs text-neutral-700">{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Filters popover — User + Platform slicers. Status lives in the board
             columns (Board view) / is implicit (Calendar = scheduled only). */}
-        <div className="relative self-start sm:self-auto" ref={filtersRef}>
+        <div className="relative" ref={filtersRef}>
           <button
             type="button"
             onClick={() => setShowFilters(v => !v)}
@@ -398,7 +605,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
                 <h3 className="text-sm font-medium text-neutral-900">Filters</h3>
                 {secondaryFilterCount > 0 && (
                   <button
-                    onClick={() => { setSelectedUsers(new Set()); setSelectedPlatforms(new Set()) }}
+                    onClick={() => { setSelectedUsers(new Set()); setSelectedBrands(new Set()); setSelectedSocials(new Set()) }}
                     className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
                   >
                     <X className="w-3 h-3" />
@@ -408,27 +615,67 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost }: Soci
               </div>
               <div className="p-3 space-y-4 max-h-[60vh] overflow-y-auto">
                 <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
-                <FilterSection title="Platform" options={brandOptions} selectedValues={selectedPlatforms} onToggle={togglePlatform} />
+                <FilterSection title="Brand" options={brandOptions} selectedValues={selectedBrands} onToggle={toggleBrand} />
+                <FilterSection title="Platform" options={socialOptions} selectedValues={selectedSocials} onToggle={toggleSocial} />
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
 
       {/* ── Board view — the pipeline kanban. Columns are the workflow phases;
           each holds the posts in its statuses, including the date-less drafts a
           calendar can't show. This is where Produce/Review work actually lives. */}
-      {view === "board" && (
+      {view === "board" && filteredPosts.length === 0 && (
+        <div className="rounded-xl border border-dashed border-neutral-300 bg-white py-12 px-6 text-center">
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-neutral-100 text-neutral-600 mx-auto mb-3">
+            <LayoutGrid className="w-5 h-5" />
+          </div>
+          <p className="text-sm font-medium text-neutral-900">No content yet</p>
+          <p className="text-[13px] text-neutral-500 mt-1 max-w-sm mx-auto">
+            Add a post to start the pipeline, or generate images and video in AI Studio first.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button
+              onClick={onAddPost}
+              className="inline-flex items-center gap-2 h-9 px-4 bg-neutral-900 text-white rounded-md hover:bg-neutral-800 transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Add post
+            </button>
+            <Link
+              href="/admin/content/studio"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md ring-1 ring-neutral-300 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+            >
+              <Clapperboard className="w-4 h-4" />
+              Open AI Studio
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {view === "board" && filteredPosts.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {PIPELINE_GROUPS.map(group => {
             const columnPosts = filteredPosts.filter(p => group.statuses.includes(p.status))
+            const isHighlighted = highlightColumn === group.label
             return (
-              <div key={group.label} className="rounded-md ring-1 ring-neutral-200/70 bg-neutral-50/60 flex flex-col min-h-40">
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-neutral-200/70">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
-                    {group.label}
-                  </span>
-                  <span className="text-xs tabular-nums text-neutral-400">{columnPosts.length}</span>
+              <div
+                key={group.label}
+                ref={isHighlighted ? highlightRef : undefined}
+                className={`rounded-md ring-1 bg-neutral-50/60 flex flex-col min-h-40 transition-shadow ${
+                  isHighlighted ? "ring-2 ring-amber-400" : "ring-neutral-200/70"
+                }`}
+              >
+                <div className="flex items-start justify-between px-3 py-2.5 border-b border-neutral-200/70">
+                  <div className="min-w-0">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-600">
+                      {group.label}
+                    </span>
+                    <span className="block text-[10px] text-neutral-400 leading-tight mt-0.5">{group.sublabel}</span>
+                  </div>
+                  <span className="text-xs tabular-nums text-neutral-400 mt-0.5">{columnPosts.length}</span>
                 </div>
                 <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[calc(100dvh-340px)] scrollbar-thin scrollbar-thumb-neutral-200 scrollbar-track-transparent">
                   {columnPosts.length === 0 ? (

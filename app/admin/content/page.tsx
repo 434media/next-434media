@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
-import { Loader2 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, SocialCalendarView, ContentDetailDrawer } from "@/components/crm"
 import type { Toast as ToastType } from "@/components/crm/types"
@@ -136,10 +135,27 @@ export default function ContentPage() {
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex items-center gap-3 text-neutral-500">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="font-medium">Loading content…</span>
+            // Board-shaped skeleton — matches the default Board layout so there's
+            // no layout shift when content loads.
+            <div className="space-y-4 animate-pulse">
+              <div className="space-y-2">
+                <div className="h-5 w-44 rounded bg-neutral-200" />
+                <div className="h-3 w-72 rounded bg-neutral-100" />
+              </div>
+              <div className="h-9 w-56 rounded-md bg-neutral-100" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                {Array.from({ length: 4 }).map((_, col) => (
+                  <div key={col} className="rounded-md ring-1 ring-neutral-200/70 bg-neutral-50/60 min-h-40">
+                    <div className="px-3 py-2.5 border-b border-neutral-200/70">
+                      <div className="h-3 w-20 rounded bg-neutral-200" />
+                    </div>
+                    <div className="p-2 space-y-2">
+                      {Array.from({ length: 3 - (col % 2) }).map((_, i) => (
+                        <div key={i} className="h-9 rounded bg-white ring-1 ring-neutral-200/70" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
