@@ -1,6 +1,8 @@
 import { promises as fs } from "fs"
 import path from "path"
-import { getAnthropic } from "@/lib/anthropic"
+import { tool } from "ai"
+import { z } from "zod"
+import { generateGatewayToolCall, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
 import type {
   ApolloSearchFilters,
   ApolloSeniority,
@@ -23,10 +25,6 @@ import type {
  * No Apollo credits consumed here — this stage is pure LLM. Apollo only
  * gets called downstream once the rep approves a query.
  */
-
-// Sonnet is correct for structured extraction. Override via TRANSLATOR_MODEL
-// env var if a future eval shows Opus produces better filter mapping.
-const TRANSLATOR_MODEL = process.env.TRANSLATOR_MODEL || "claude-sonnet-4-6"
 
 const ICP_PATH = path.join(process.cwd(), "lib/prospecting/icp.md")
 
@@ -61,74 +59,82 @@ const SENIORITY_VALUES: ApolloSeniority[] = [
   "intern",
 ]
 
-const FILTERS_TOOL = {
-  name: "submit_search_filters",
+const FILTERS_TOOL_NAME = "submit_search_filters"
+
+// Zod schema mirroring the previous Anthropic input_schema field-for-field —
+// the descriptions ARE the behavioral contract that steers the model, so they
+// are preserved verbatim. `reasoning` is the only required field (matches the
+// prior `required: ["reasoning"]`); everything else is optional.
+const filtersSchema = z.object({
+  organization_locations: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Geographic locations of the company HQ. Use 'Texas, US' style strings. Default to Texas / Mexico / US Hispanic markets unless the user specifies otherwise.",
+    ),
+  person_titles: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Specific job titles to match (e.g. 'CEO', 'VP Marketing', 'Head of Partnerships'). Use this for named roles. For broader categories use person_seniorities instead.",
+    ),
+  include_similar_titles: z
+    .boolean()
+    .optional()
+    .describe(
+      "If true, expand exact-title matches with similar titles. Default true unless the user explicitly wants exact matches only.",
+    ),
+  person_seniorities: z
+    .array(z.enum(SENIORITY_VALUES as [ApolloSeniority, ...ApolloSeniority[]]))
+    .optional()
+    .describe(
+      "Seniority tiers for broad decision-maker queries. E.g. 'decision-makers' → ['c_suite','founder','vp','director']. Don't combine with person_titles unless the user wants a union.",
+    ),
+  num_employees_ranges: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Employee count ranges as 'min,max' strings. E.g. ['10,50','51,200']. Map size adjectives: 'small' → ['10,50'], 'mid' → ['51,500'], 'large' → ['501,5000']. Don't filter at all if the user didn't specify size.",
+    ),
+  revenue_range_min: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Minimum annual revenue in USD integers. '$20M' → 20000000. '$1B' → 1000000000. Set only if the user specified a revenue floor.",
+    ),
+  revenue_range_max: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Maximum annual revenue in USD integers. Set only if the user specified a revenue ceiling.",
+    ),
+  q_keywords: z
+    .string()
+    .optional()
+    .describe(
+      "Loose keyword search across the candidate profile. Use sparingly — Apollo's keyword search is fuzzy. Better to use specific filters when possible. Useful for industry verticals that don't map cleanly to other filters (e.g. 'cannabis', 'fight gear').",
+    ),
+  reasoning: z
+    .string()
+    .describe(
+      "Brief 1–2 sentence explanation of how you mapped the user's prompt to filters. Mention any ICP defaults you applied (e.g. 'defaulted to Texas geography per ICP').",
+    ),
+  ambiguity_note: z
+    .string()
+    .optional()
+    .describe(
+      "ONLY include if the prompt is genuinely ambiguous (e.g. 'CBG' could be Cannabis or Consumer Brand Goods). Describe the ambiguity and what the user should clarify. Do NOT fabricate ambiguity to avoid making decisions.",
+    ),
+})
+
+const filtersTool = tool({
   description:
     "Submit Apollo search filters derived from the user's prospecting query. Always call this tool — never respond in text. Map the user's intent onto the filter fields below using 434 Media's ICP as guidance. Set ambiguity_note ONLY when the query is genuinely ambiguous (e.g. an acronym with multiple plausible interpretations).",
-  input_schema: {
-    type: "object",
-    properties: {
-      organization_locations: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Geographic locations of the company HQ. Use 'Texas, US' style strings. Default to Texas / Mexico / US Hispanic markets unless the user specifies otherwise.",
-      },
-      person_titles: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Specific job titles to match (e.g. 'CEO', 'VP Marketing', 'Head of Partnerships'). Use this for named roles. For broader categories use person_seniorities instead.",
-      },
-      include_similar_titles: {
-        type: "boolean",
-        description:
-          "If true, expand exact-title matches with similar titles. Default true unless the user explicitly wants exact matches only.",
-      },
-      person_seniorities: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: SENIORITY_VALUES,
-        },
-        description:
-          "Seniority tiers for broad decision-maker queries. E.g. 'decision-makers' → ['c_suite','founder','vp','director']. Don't combine with person_titles unless the user wants a union.",
-      },
-      num_employees_ranges: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Employee count ranges as 'min,max' strings. E.g. ['10,50','51,200']. Map size adjectives: 'small' → ['10,50'], 'mid' → ['51,500'], 'large' → ['501,5000']. Don't filter at all if the user didn't specify size.",
-      },
-      revenue_range_min: {
-        type: "integer",
-        description:
-          "Minimum annual revenue in USD integers. '$20M' → 20000000. '$1B' → 1000000000. Set only if the user specified a revenue floor.",
-      },
-      revenue_range_max: {
-        type: "integer",
-        description:
-          "Maximum annual revenue in USD integers. Set only if the user specified a revenue ceiling.",
-      },
-      q_keywords: {
-        type: "string",
-        description:
-          "Loose keyword search across the candidate profile. Use sparingly — Apollo's keyword search is fuzzy. Better to use specific filters when possible. Useful for industry verticals that don't map cleanly to other filters (e.g. 'cannabis', 'fight gear').",
-      },
-      reasoning: {
-        type: "string",
-        description:
-          "Brief 1–2 sentence explanation of how you mapped the user's prompt to filters. Mention any ICP defaults you applied (e.g. 'defaulted to Texas geography per ICP').",
-      },
-      ambiguity_note: {
-        type: "string",
-        description:
-          "ONLY include if the prompt is genuinely ambiguous (e.g. 'CBG' could be Cannabis or Consumer Brand Goods). Describe the ambiguity and what the user should clarify. Do NOT fabricate ambiguity to avoid making decisions.",
-      },
-    },
-    required: ["reasoning"],
-  },
-} as const
+  inputSchema: filtersSchema,
+  // No execute — we only want the validated tool input, not a tool result.
+})
 
 // ─── Public API ─────────────────────────────────────────────────────────
 
@@ -202,25 +208,18 @@ export async function translatePromptToFilters(
   }
 
   const icp = await getIcpContext()
-  const anthropic = getAnthropic()
 
-  const response = await anthropic.messages.create({
-    model: TRANSLATOR_MODEL,
-    max_tokens: 1024,
+  // Forced single-tool extraction through the AI Gateway — equivalent to the
+  // prior Anthropic `tool_choice: { type: "tool" }`. Returns the validated
+  // tool input (schema-checked against filtersSchema).
+  const raw = await generateGatewayToolCall<RawTranslatedFilters>({
+    model: GATEWAY_TEXT_MODELS.translator,
+    maxTokens: 1024,
     system: buildSystemPrompt(icp),
-    tools: [FILTERS_TOOL],
-    tool_choice: { type: "tool", name: FILTERS_TOOL.name },
-    messages: [{ role: "user", content: trimmed }],
+    prompt: trimmed,
+    toolName: FILTERS_TOOL_NAME,
+    tool: filtersTool,
   })
-
-  const toolUseBlock = response.content.find((b) => b.type === "tool_use")
-  if (!toolUseBlock || toolUseBlock.type !== "tool_use") {
-    throw new Error(
-      "Translator: model did not produce a tool call (this should not happen with tool_choice forced)",
-    )
-  }
-
-  const raw = toolUseBlock.input as RawTranslatedFilters
 
   // Map LLM output to the strict ApolloSearchFilters shape. The LLM emits
   // a flat shape; we lift revenue_range into a nested object and drop empty

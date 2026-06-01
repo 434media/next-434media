@@ -1,6 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk"
 
 /**
+ * @deprecated Pipeline LLM calls now route through the Vercel AI Gateway via
+ * `lib/ai-gateway-text.ts` (unified billing/observability with the content
+ * section). This direct-Anthropic client has no remaining callers as of the
+ * gateway consolidation — kept for one cycle as a quick revert path. Once the
+ * gateway path is proven in production, delete this file and drop the
+ * `@anthropic-ai/sdk` dependency.
+ */
+
+/**
  * Default model for outbound prospecting drafts.
  * Opus is overkill for short templated emails but produces noticeably better
  * lead-specific copy than Sonnet — the per-call cost is small relative to

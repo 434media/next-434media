@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
-import { getAnthropic, getModel } from "@/lib/anthropic"
+import { generateGatewayText, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
 import { buildLeadOutreachPrompt } from "@/lib/lead-prompt"
 import { getLeadById, updateLead } from "@/lib/firestore-leads"
 
@@ -47,19 +47,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   let draft: string
   try {
-    const message = await getAnthropic().messages.create({
-      model: getModel(),
-      max_tokens: 600,
+    draft = await generateGatewayText({
+      model: GATEWAY_TEXT_MODELS.outreachDraft,
+      maxTokens: 600,
       system,
-      messages: [{ role: "user", content: prompt }],
+      prompt,
     })
-    const block = message.content[0]
-    draft = block && block.type === "text" ? block.text.trim() : ""
     if (!draft) {
-      throw new Error("Claude returned an empty draft")
+      throw new Error("Model returned an empty draft")
     }
   } catch (err) {
-    console.error(`[POST /api/admin/leads/${id}/generate-draft] Claude error:`, err)
+    console.error(`[POST /api/admin/leads/${id}/generate-draft] gateway error:`, err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to generate draft" },
       { status: 502 },
