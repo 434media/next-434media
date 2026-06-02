@@ -6,16 +6,18 @@ export const runtime = "nodejs"
 export const maxDuration = 120
 
 // Firestore → Mailchimp auto-sync (Phase 2 of the alignment plan). The mirror of
-// the daily Mailchimp → Firestore `mailchimp-sync` cron; intended to run hourly.
+// the daily Mailchimp → Firestore `mailchimp-sync` cron; runs hourly.
 //
-// PHASE 1: DRY-RUN ONLY. This computes and logs exactly who *would* sync but
-// writes nothing to Mailchimp. Flip `dryRun` to false (Phase 2) only after the
-// dry-run output has been reviewed.
-const DRY_RUN = true
-
+// LIVE. Each run upserts consent-bearing contacts with canonical tags. Safe to
+// repeat: pushMembersToMailchimp uses update_existing + status_if_new, so existing
+// members never have their status changed (no resurrection of opt-outs) — only
+// brand-new emails get `subscribed`, and tags refresh harmlessly.
+//
+// Preview without writing: hit this route with `?secret=<CRON_SECRET>&dryRun=1`.
 export async function GET(request: NextRequest) {
   return runCronJob("mailchimp-push", request, async () => {
-    const result = await runAutoSync({ dryRun: DRY_RUN })
+    const dryRun = request.nextUrl.searchParams.get("dryRun") === "1"
+    const result = await runAutoSync({ dryRun })
     const verb = result.dryRun ? "would sync" : "synced"
     return {
       message:
