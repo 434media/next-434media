@@ -29,14 +29,14 @@
 
 # Phase 2 — Firestore → Mailchimp auto-sync engine (planned)
 
-> Status: **Phase 1 built (dry-run only).** Decisions locked 2026-06-02: keep inline push +
-> engine as safety net; hourly cron; stateless v1. Files: `lib/mailchimp-intent.ts`,
-> `lib/mailchimp-autosync.ts` (`runAutoSync({dryRun})`), `app/api/cron/mailchimp-push/route.ts`
-> (hardcoded `DRY_RUN = true`). Dry-run verified 2026-06-02: 554 unique contacts would sync
-> across 14 canonical tag-groups; 2,387 event regs correctly skipped ("did not opt in") — the
-> consent gate works. Cron scheduled hourly in vercel.json (`0 * * * *`) but still DRY_RUN —
-> it logs "would sync N…" each hour, writes nothing, until DRY_RUN→false. Activates on next
-> Vercel deploy. NOT YET: flip DRY_RUN→false to go live (Phase 2).
+> Status: **LIVE (Phase 2) — pushed to main 2026-06-02 (commit 3ecf951c).** The hourly
+> `mailchimp-push` cron (`0 * * * *` in vercel.json) now upserts consent-bearing contacts
+> live. Files: `lib/mailchimp-intent.ts`, `lib/mailchimp-autosync.ts`,
+> `app/api/cron/mailchimp-push/route.ts`. Idempotent (update_existing + status_if_new — no
+> opt-out resurrection). Preview without writing: GET `?secret=<CRON_SECRET>&dryRun=1`.
+> Dry-run baseline (2026-06-02): ~554 unique contacts, 14 tag-groups, 2,387 event regs skipped
+> (no opt-in). First live run = mostly tag updates on existing newsletter contacts + ~48 new
+> opted-in event registrants created as subscribed. Activates on next Vercel deploy.
 
 **Principle:** one engine, one direction, consent is the only gate. Tags are deterministic, so
 the engine decides *inclusion* (is there consent?), never tagging. Non-consented contacts are
