@@ -21,13 +21,13 @@ import { Lock as LockIcon } from "lucide-react"
 import {
   Eye as EyeIcon,
   MessageSquare as MsgIcon,
-  Mail as MailIcon,
   ArrowRight,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
 import {
   MailchimpSubscribedPill,
   useMailchimpSubscribers,
+  isMarketable,
 } from "@/components/admin/MailchimpSubscribedPill"
 import { EventInsights, type AudienceFilter } from "@/components/admin/EventInsights"
 import {
@@ -45,7 +45,6 @@ import {
   type SubmissionState,
   type SubmissionSource,
 } from "@/components/admin/SubmissionStateUI"
-import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
 import { TagList } from "@/components/admin/Tag"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { BackfillField } from "@/components/admin/BackfillField"
@@ -96,7 +95,6 @@ export function EventRegistrationsTab({
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [stateFilter, setStateFilter] = useState<"all" | SubmissionState>("all")
   const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
-  const [showPushModal, setShowPushModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<string>(initialEvent)
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -104,7 +102,8 @@ export function EventRegistrationsTab({
   const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null)
   // Audience filter — driven by the four stat tiles on the event detail page.
   // "all" = no filter, "in-crm" = registrations whose email exists in `leadsByEmail`,
-  // "in-mailchimp" = registrations whose email exists in `subscriberMap`,
+  // "in-mailchimp" = registrations SUBSCRIBED (marketable) in Mailchimp — consent,
+  // not mere presence, to match the consent-aware header strip,
   // "untapped" = registrations NOT in CRM (the conversion opportunity bucket).
   const [audienceFilter, setAudienceFilter] = useState<AudienceFilter>("all")
   // Default sort: most recent registrations first. Click any column header to
@@ -375,7 +374,7 @@ export function EventRegistrationsTab({
     if (audienceFilter !== "all") {
       const email = r.email.toLowerCase()
       const inCrm = leadsByEmail.has(email)
-      const inMc = subscriberMap.has(email)
+      const inMc = isMarketable(subscriberMap.get(email))
       if (audienceFilter === "in-crm" && !inCrm) return false
       if (audienceFilter === "in-mailchimp" && !inMc) return false
       if (audienceFilter === "untapped" && inCrm) return false
@@ -563,9 +562,7 @@ export function EventRegistrationsTab({
         audienceFilter={audienceFilter}
         onAudienceFilterChange={setAudienceFilter}
         onConvertAll={() => runConvertAll(filteredRegistrations)}
-        onPushToMailchimp={() => setShowPushModal(true)}
         convertAllDisabled={filteredRegistrations.length === 0}
-        pushToMailchimpDisabled={filteredRegistrations.length === 0}
         // Timestamps from the FULL event set (not filtered) so the sparkline
         // shows the true history regardless of audience/state filters.
         drilldownTimestamps={
@@ -1020,32 +1017,10 @@ export function EventRegistrationsTab({
         onClear={clearSelected}
         actions={[
           { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, group: "primary", run: handleOpenPromoteDrawer },
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, group: "primary", run: () => { setShowPushModal(true) } },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "delete", label: "Delete", icon: Trash2, destructive: true, run: handleBulkDelete },
         ]}
-      />
-
-      <MailchimpPushModal
-        open={showPushModal}
-        onClose={() => setShowPushModal(false)}
-        members={registrations
-          .filter((r) => r.id && selected.has(r.id) && r.email)
-          .map<PushMember>((r) => ({
-            email: r.email,
-            firstName: r.firstName || undefined,
-            lastName: r.lastName || undefined,
-            sourceTags: r.tags && r.tags.length > 0 ? r.tags : undefined,
-          }))}
-        defaultTag="source:event"
-        onComplete={(result) => {
-          setToast({
-            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
-            type: result.errors.length === 0 ? "success" : "error",
-          })
-          if (result.errors.length === 0) clearSelected()
-        }}
       />
 
       <PromoteOverridesDrawer

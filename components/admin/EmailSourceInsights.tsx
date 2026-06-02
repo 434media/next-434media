@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { useLeadsByEmail } from "@/components/admin/LeadCrossLink"
-import { useMailchimpSubscribers } from "@/components/admin/MailchimpSubscribedPill"
+import { useMailchimpSubscribers, isMarketable } from "@/components/admin/MailchimpSubscribedPill"
 import { RegistrationSparkline } from "@/components/admin/RegistrationSparkline"
 
 // ── Types ──
@@ -122,7 +122,9 @@ export function EmailSourceInsights({
       if (!e) continue
       b.uniqueEmails.add(e)
       if (leadsByEmail.has(e)) b.inCrm.add(e)
-      if (subscriberMap.has(e)) b.inMc.add(e)
+      // Subscribed (marketable) only — matches the "subscribed" tile label and
+      // the consent-aware header strip, not mere presence.
+      if (isMarketable(subscriberMap.get(e))) b.inMc.add(e)
     }
 
     // Make sure every source from the canonical counts has a row, even if

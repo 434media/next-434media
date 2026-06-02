@@ -14,9 +14,10 @@ import type { Toast } from "@/components/admin/submissions/types"
 
 // Stage 3 — /admin/audiences groups the three campaign-feeder surfaces
 // (Newsletter, Events, Lists) under one route with sub-tab navigation.
-// These three share an operational flow: import → push to Mailchimp →
-// engagement signals → promote to Lead. The Inbox surface lives separately
-// at /admin/inbox because contact forms have a different response cadence.
+// These three share an operational flow: collect → opt-ins auto-sync to
+// Mailchimp (cold/partner lists don't) → promote to Lead. The Inbox surface
+// lives separately at /admin/inbox because contact forms have a different
+// response cadence.
 //
 // Sub-tabs are driven by `?sub=newsletter|events|lists`; default is
 // `newsletter` since it has the highest volume.
@@ -104,7 +105,7 @@ export default function AudiencesPage() {
                   AUDIENCES
                 </h1>
                 <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-2 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-                  contacts to email — sync to Mailchimp, promote to leads
+                  where audiences collect — opt-ins auto-sync to Mailchimp, promote the rest to leads
                 </span>
               </div>
             </div>
@@ -116,20 +117,20 @@ export default function AudiencesPage() {
         {/* Content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           {/* How it works — dismissible first-run intro; narrates this page's
-              place in the pipeline (contacts → Mailchimp → leads). */}
+              place in the pipeline (collect → opt-ins auto-sync → leads). */}
           <HowItWorks
             className="mb-4"
             storageKey="audiencesIntroDismissed"
             steps={[
-              { title: "Three sources", detail: "Newsletter signups, event registrants, and partner-shared lists — all in one place." },
-              { title: "Sync to Mailchimp", detail: "Keep contacts reachable so they can receive your campaigns." },
-              { title: "Promote to Leads", detail: "Turn an engaged contact into worked sales pipeline." },
+              { title: "Three sources", detail: "Newsletter signups, event registrants, and partner lists — all in one place." },
+              { title: "Opt-ins auto-sync", detail: "Anyone who consented flows to Mailchimp automatically, tagged and ready for campaigns. No manual step." },
+              { title: "Promote to Leads", detail: "Work a contact 1:1 in the sales pipeline — and how cold/partner lists get reached, since they're not emailed via Mailchimp." },
             ]}
           />
 
           {/* Source switcher — segmented control with per-source totals, plus
-              the active source's secondary KPIs (+this week / % in Mailchimp).
-              This is the page's only nav for Newsletter / Events / Lists. */}
+              the active source's secondary KPIs (+this week / subscribed /
+              to-push). This is the page's only nav for Newsletter / Events / Lists. */}
           <AudiencesHeaderStrip activeSub={activeSub} onSelectSub={switchSub} />
 
           {/* Cross-source dedupe panel — surfaces emails appearing across the

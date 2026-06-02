@@ -11,7 +11,6 @@ import {
   Trash2,
   Globe,
   Layers,
-  Send,
   Clock,
   Eye,
 } from "lucide-react"
@@ -19,7 +18,6 @@ import { Lock as LockIcon } from "lucide-react"
 import {
   Eye as EyeIcon,
   MessageSquare as MsgIcon,
-  Mail as MailIcon,
   ArrowRight,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
@@ -46,7 +44,6 @@ import {
   type SubmissionState,
   type SubmissionSource,
 } from "@/components/admin/SubmissionStateUI"
-import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
 import { PermissionStateRibbon } from "@/components/admin/PermissionStateRibbon"
 import { CampaignAttributionStrip } from "@/components/admin/CampaignAttributionStrip"
 import { TagList } from "@/components/admin/Tag"
@@ -94,8 +91,6 @@ export function EmailListsTab({
   const [stateFilter, setStateFilter] = useState<"all" | SubmissionState>("all")
   // PR 4 — bulk select
   const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
-  // PR 5 — Mailchimp push modal
-  const [showPushModal, setShowPushModal] = useState(false)
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [datePreset, setDatePreset] = useState("")
@@ -108,9 +103,6 @@ export function EmailListsTab({
     direction: "desc",
   })
   const [selectedSignup, setSelectedSignup] = useState<EmailSignup | null>(null)
-  // Single-row Mailchimp push — opens the existing modal preloaded with one
-  // member instead of forcing select-then-bulk-act for a one-off push.
-  const [singlePushTarget, setSinglePushTarget] = useState<string | null>(null)
   // Sprint D — cross-collection signal map. Built from /cross-source-dupes
   // so the drawer can answer "this email is also a contact form / event
   // registrant" without a per-row fetch. Counts of OTHER collections only.
@@ -673,9 +665,7 @@ export function EmailListsTab({
         onRefresh={() => { fetchSourcesAndCounts(); fetchSignups() }}
         isLoading={isLoading}
         onConvertAll={() => runConvertAllSignups(filteredSignupsBeforeState)}
-        onPushToMailchimp={() => setShowPushModal(true)}
         convertAllDisabled={filteredSignupsBeforeState.length === 0}
-        pushToMailchimpDisabled={filteredSignupsBeforeState.length === 0}
         // Timestamps from the FULL source set (no audience/state/date
         // filter) so the sparkline shows true history regardless of the
         // user's current view.
@@ -697,7 +687,6 @@ export function EmailListsTab({
           <PermissionStateRibbon
             emails={filteredSignupsBeforeState.map((s) => s.email).filter(Boolean)}
             subscriberMap={subscriberMap}
-            onPushNotInMc={() => setShowPushModal(true)}
           />
         </div>
       )}
@@ -881,7 +870,6 @@ export function EmailListsTab({
             crossCollectionMap={crossCollectionMap}
             onSelectRow={setSelectedSignup}
             onDelete={handleDeleteEmail}
-            onPushOne={(email) => setSinglePushTarget(email)}
             isDeleting={isDeleting}
             searchQuery={searchQuery}
           />
@@ -907,46 +895,11 @@ export function EmailListsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, group: "primary", run: () => { setShowPushModal(true) } },
           { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, group: "primary", run: handleOpenPromoteDrawer },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "delete", label: "Delete", icon: Trash2, destructive: true, run: handleBulkDelete },
         ]}
-      />
-
-      <MailchimpPushModal
-        open={showPushModal}
-        onClose={() => setShowPushModal(false)}
-        members={signups
-          .filter((s) => selected.has(s.id) && s.email)
-          .map<PushMember>((s) => ({ email: s.email }))}
-        defaultTag="source:newsletter"
-        onComplete={(result) => {
-          setToast({
-            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
-            type: result.errors.length === 0 ? "success" : "error",
-          })
-          if (result.errors.length === 0) clearSelected()
-        }}
-      />
-
-      {/* Single-row push modal — opens when the user clicks the per-row
-          Mailchimp action on an unsubscribed email. Reuses the same modal
-          component, scoped to one member, so the user gets the same tag
-          chooser and confirmation flow as bulk push. */}
-      <MailchimpPushModal
-        open={!!singlePushTarget}
-        onClose={() => setSinglePushTarget(null)}
-        members={singlePushTarget ? [{ email: singlePushTarget }] : []}
-        defaultTag="source:newsletter"
-        onComplete={(result) => {
-          setToast({
-            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
-            type: result.errors.length === 0 ? "success" : "error",
-          })
-          setSinglePushTarget(null)
-        }}
       />
 
       {/* Email signup detail drawer — opens on row click. Slim version of
@@ -969,7 +922,6 @@ export function EmailListsTab({
             const existingLeadId = leadsByEmail.get(
               selectedSignup.email.toLowerCase(),
             )
-            const isSubscribed = subscriberMap.has(selectedSignup.email.toLowerCase())
             return (
               <div className="flex items-center justify-between gap-2">
                 <button
@@ -983,17 +935,6 @@ export function EmailListsTab({
                   Delete
                 </button>
                 <div className="flex items-center gap-1.5">
-                  {!isSubscribed && (
-                    <button
-                      type="button"
-                      onClick={() => setSinglePushTarget(selectedSignup.email)}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 text-[12px] font-medium text-neutral-700 bg-white border border-neutral-200 rounded hover:bg-neutral-50 transition-colors"
-                      title="Push this email to Mailchimp"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      Push to Mailchimp
-                    </button>
-                  )}
                   {selectedSignup.promotedLeadId || existingLeadId ? (
                     // Already promoted — link rather than action button.
                     <a

@@ -55,10 +55,16 @@ export async function GET() {
       if (l.email) leadEmails.add(l.email.toLowerCase())
     }
 
+    // "In Mailchimp" = SUBSCRIBED (marketable) in at least one audience — consent,
+    // not mere presence — so this matches the consent-aware Audiences header strip
+    // and pill (transactional/unsubscribed contacts are present but not counted).
     const mcEmails = new Set<string>()
     if (mailchimpMap?.byEmail) {
-      for (const email of Object.keys(mailchimpMap.byEmail)) {
-        mcEmails.add(email.toLowerCase())
+      for (const [email, entry] of Object.entries(mailchimpMap.byEmail)) {
+        const memberships = (entry as { memberships?: Array<{ status?: string }> }).memberships ?? []
+        if (memberships.some((m) => m.status === "subscribed")) {
+          mcEmails.add(email.toLowerCase())
+        }
       }
     }
 

@@ -14,12 +14,10 @@ import {
   ArrowRightCircle,
   Trash2,
 } from "lucide-react"
-import { Mail as MailIcon } from "lucide-react"
 import {
   MailchimpSubscribedPill,
   useMailchimpSubscribers,
 } from "@/components/admin/MailchimpSubscribedPill"
-import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
 import { BulkActionBar, useSelection } from "@/components/admin/SubmissionStateUI"
 import type { PartnerListMember } from "@/lib/firestore-partner-list-members"
 import { ExportMenu } from "./shared"
@@ -68,7 +66,6 @@ export function ListsTab({
   const [members, setMembers] = useState<PartnerListMember[]>([])
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [selectedPartner, setSelectedPartner] = useState<string>("")
-  const [showPushModal, setShowPushModal] = useState(false)
   const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
 
   const fetchMembers = useCallback(async () => {
@@ -279,7 +276,7 @@ export function ListsTab({
             Partner Lists
           </h2>
           <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
-            Partner-shared rosters held as audience cohorts. Push to Mailchimp campaigns, or promote individuals into the leads pipeline when you&apos;re ready to work them.
+            Partner-shared rosters held as audience cohorts. These are cold contacts (no opt-in), so they aren&apos;t emailed via Mailchimp campaigns — promote individuals into the leads pipeline to work them 1:1.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -677,8 +674,9 @@ export function ListsTab({
         </div>
       )}
 
-      {/* Bulk action bar — Promote turns audience members into active Leads;
-          Push to Mailchimp adds them to a Mailchimp campaign segment. */}
+      {/* Bulk action bar — Promote turns audience members into active Leads.
+          Partner/cold rosters are NOT bulk-pushed to Mailchimp (no opt-in
+          consent); they reach contacts 1:1 through the leads pipeline. */}
       <BulkActionBar
         count={selected.size}
         onClear={clearSelected}
@@ -691,13 +689,6 @@ export function ListsTab({
             run: handleOpenPromoteDrawer,
           },
           {
-            key: "push-mc",
-            label: "Push to Mailchimp",
-            icon: MailIcon,
-            group: "primary",
-            run: () => { setShowPushModal(true) },
-          },
-          {
             key: "delete",
             label: "Delete",
             icon: Trash2,
@@ -705,31 +696,6 @@ export function ListsTab({
             run: handleBulkDelete,
           },
         ]}
-      />
-
-      <MailchimpPushModal
-        open={showPushModal}
-        onClose={() => setShowPushModal(false)}
-        members={members
-          .filter((m) => m.id && selected.has(m.id) && m.email)
-          .map<PushMember>((m) => ({
-            email: m.email,
-            firstName: m.firstName ?? m.preferredName ?? m.fullName.split(/\s+/)[0],
-            lastName: m.lastName ?? m.fullName.split(/\s+/).slice(1).join(" ") || undefined,
-            sourceTags: m.partnerSlug ? [`partner:${m.partnerSlug}`] : undefined,
-          }))}
-        defaultTag={
-          selectedPartner
-            ? `partner-${selectedPartner}`
-            : `from-partner-list-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`
-        }
-        onComplete={(result) => {
-          setToast({
-            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
-            type: result.errors.length === 0 ? "success" : "error",
-          })
-          if (result.errors.length === 0) clearSelected()
-        }}
       />
 
       <PromoteOverridesDrawer
