@@ -921,7 +921,7 @@ export function EmailListsTab({
         members={signups
           .filter((s) => selected.has(s.id) && s.email)
           .map<PushMember>((s) => ({ email: s.email }))}
-        defaultTag={`from-newsletter-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+        defaultTag="source:newsletter"
         onComplete={(result) => {
           setToast({
             message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
@@ -939,7 +939,7 @@ export function EmailListsTab({
         open={!!singlePushTarget}
         onClose={() => setSinglePushTarget(null)}
         members={singlePushTarget ? [{ email: singlePushTarget }] : []}
-        defaultTag={`from-newsletter-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+        defaultTag="source:newsletter"
         onComplete={(result) => {
           setToast({
             message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,

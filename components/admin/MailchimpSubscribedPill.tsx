@@ -2,19 +2,28 @@
 
 import { useEffect, useState } from "react"
 
-interface AudienceMembership {
+export interface AudienceMembership {
   audienceId: string
   audienceName: string
   tags: string[]
   status: string
 }
 
-interface SubscriberEntry {
+export interface SubscriberEntry {
   email: string
   memberships: AudienceMembership[]
 }
 
-type SubscriberMap = Map<string, SubscriberEntry>
+export type SubscriberMap = Map<string, SubscriberEntry>
+
+/**
+ * True when the contact is `subscribed` (marketable) in at least one audience.
+ * Present-but-not-subscribed (transactional / unsubscribed / cleaned / pending)
+ * returns false — they exist in Mailchimp but can't receive a campaign today.
+ */
+export function isMarketable(entry: SubscriberEntry | undefined): boolean {
+  return !!entry?.memberships.some((m) => m.status === "subscribed")
+}
 
 let cachedMap: { map: SubscriberMap; ts: number } | null = null
 const CACHE_TTL = 60 * 1000 // 60s — Mailchimp data changes slowly
@@ -71,23 +80,30 @@ export function MailchimpSubscribedPill({ email, mapping }: MailchimpSubscribedP
   const entry = mapping.get(email.toLowerCase())
   if (!entry || entry.memberships.length === 0) return null
 
+  const marketable = isMarketable(entry)
+
   const audienceLabel =
     entry.memberships.length === 1
       ? entry.memberships[0].audienceName
       : `${entry.memberships.length} audiences`
 
-  // Tooltip text: full audience names + tags
+  // Tooltip text: full audience names + status + tags
   const tooltipLines = entry.memberships.map((m) => {
     const tagSuffix = m.tags.length > 0 ? ` · tags: ${m.tags.join(", ")}` : ""
-    return `${m.audienceName}${tagSuffix}`
+    return `${m.audienceName} (${m.status})${tagSuffix}`
   })
 
+  // Green dot = subscribed/marketable. Amber = present in Mailchimp but not
+  // subscribed (transactional/unsubscribed/cleaned) — can't be emailed today.
   return (
     <span
       title={tooltipLines.join("\n")}
       className="inline-flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-neutral-700 bg-neutral-100"
     >
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${marketable ? "bg-emerald-500" : "bg-amber-500"}`}
+        aria-hidden="true"
+      />
       MC
       <span className="text-neutral-400">·</span>
       <span className="truncate max-w-[10ch]">{audienceLabel}</span>

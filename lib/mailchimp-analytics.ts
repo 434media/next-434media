@@ -30,10 +30,11 @@ interface MailchimpPropertyConfig {
 // Initialize Mailchimp client
 let mailchimpClient: any = null
 
-// Property configurations for the two actual Mailchimp audiences
+// Property configuration for the single live Mailchimp audience. (The former
+// TXMX audience was removed — its id 404s; TXMX now lives as brand:txmx tags
+// within the 434 Media list. See docs/audiences-mailchimp-alignment.md.)
 const MAILCHIMP_PROPERTIES_CONFIG: MailchimpPropertyConfig[] = [
   { id: "434media", name: "434 Media", key: "MAILCHIMP_AUDIENCE_ID_434MEDIA" },
-  { id: "txmx", name: "TXMX Founders Tee", key: "MAILCHIMP_AUDIENCE_ID_TXMX" },
 ]
 
 function getMailchimpClient() {
@@ -75,12 +76,10 @@ function getAudienceId(audienceId?: string): string {
     return audienceId
   }
 
-  // Use default audience ID (434 Media preferred, TXMX as fallback)
+  // Use the single configured 434 Media audience.
   const defaultAudienceId = getDefaultAudienceId()
   if (!defaultAudienceId) {
-    throw new Error(
-      "No Mailchimp audience ID configured. Please set MAILCHIMP_AUDIENCE_ID_434MEDIA or MAILCHIMP_AUDIENCE_ID_TXMX",
-    )
+    throw new Error("No Mailchimp audience ID configured. Please set MAILCHIMP_AUDIENCE_ID_434MEDIA")
   }
 
   console.log("[Mailchimp] Using default audienceId:", defaultAudienceId)
@@ -810,7 +809,7 @@ export async function createMailchimpTag(name: string, audienceId?: string): Pro
     console.log("[Mailchimp] Tag created successfully:", segmentData)
     
     return {
-      id: String(segmentData.id),
+      id: segmentData.id,
       name: segmentData.name,
       member_count: segmentData.member_count || 0,
       type: segmentData.type || "static",

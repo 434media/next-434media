@@ -5,6 +5,7 @@ import {
   type MailchimpPushMember,
   type MailchimpMemberStatus,
 } from "@/lib/mailchimp-analytics"
+import { normalizeTags } from "@/lib/mailchimp-tags"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -50,7 +51,13 @@ export async function POST(request: NextRequest) {
 
   const audienceId = typeof body.audienceId === "string" ? body.audienceId.trim() : ""
   const statusRaw = (body.status as MailchimpMemberStatus) || "subscribed"
-  const tags = Array.isArray(body.tags) ? body.tags : []
+  // Enforce the canonical taxonomy at the write boundary: legacy/free-form tags
+  // are remapped (e.g. "web-434media" → brand:434media + source:newsletter) and
+  // anything unmappable is dropped — so the admin push can never reintroduce
+  // drift into the Mailchimp audience. droppedTags is surfaced to the UI.
+  const { canonical: tags, dropped: droppedTags } = normalizeTags(
+    Array.isArray(body.tags) ? body.tags : [],
+  )
   const members = Array.isArray(body.members) ? body.members : []
 
   if (!audienceId) {
@@ -100,7 +107,7 @@ export async function POST(request: NextRequest) {
         failed: result.errors.length,
       }),
     )
-    return NextResponse.json({ success: true, result })
+    return NextResponse.json({ success: true, result, appliedTags: tags, droppedTags })
   } catch (err) {
     console.error("[POST /push-members]", err)
     return NextResponse.json(

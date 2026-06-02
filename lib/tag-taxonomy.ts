@@ -13,6 +13,8 @@
  * `normalizeLegacyTag()`. New writes always emit namespaced form.
  */
 
+import { type Brand, brandTag, sourceTag, eventTag, isCanonicalTag } from "./mailchimp-tags"
+
 export type TagNamespace =
   | "source"
   | "site"
@@ -280,15 +282,76 @@ export function tagToMailchimpLabel(rawTag: string): string | null {
 }
 
 /**
- * Aggregate Mailchimp tag suggestions from a list of source tags.
- * Used by the push modal to derive segmentation labels from selected
- * leads' namespaced tags.
+ * @deprecated Produces human-readable labels ("SA Tech Day 2026"). The push
+ * modal now uses {@link mailchimpTagsFromInternal} to emit canonical machine
+ * tags instead. Kept for any out-of-band callers.
  */
 export function aggregateMailchimpSuggestions(allSourceTags: string[]): string[] {
   const out = new Set<string>()
   for (const t of allSourceTags) {
     const label = tagToMailchimpLabel(t)
     if (label) out.add(label)
+  }
+  return Array.from(out).sort()
+}
+
+// ── Internal CRM tags → canonical Mailchimp tags (the "lean" bridge) ──────────
+//
+// Step 4b of the alignment plan. Internal CRM tags (this file's namespaces) and
+// canonical Mailchimp tags (lib/mailchimp-tags.ts) are separate systems; this is
+// the one-way bridge applied when an admin pushes a lead/registrant to Mailchimp.
+//
+// Lean policy (chosen 2026-06-02): only provenance crosses over —
+//   site:<brand>  → brand:<brand>     (canonical brands only; vemos→vemosvamos)
+//   source:newsletter|event|partner   → source:<same>
+//   partner:<slug>                    → source:partner   (came via a partner list)
+//   event:<slug>                      → event:<slug> + source:event (event implies provenance)
+// Everything else (role/intent/feed/client/geo/industry/quality, source:form,
+// and site values with no canonical brand like techday/milcity/devsa) is DROPPED.
+// Correctness doesn't depend on this being exhaustive — the push route also
+// normalizes — this just pre-seeds good suggestions in the modal.
+
+const SITE_TO_BRAND: Record<string, Brand> = {
+  "434media": "434media",
+  txmx: "txmx",
+  aim: "aim",
+  sdoh: "sdoh",
+  salute: "salute",
+  ampd: "ampd",
+  digitalcanvas: "digitalcanvas",
+  vemos: "vemosvamos",
+  vemosvamos: "vemosvamos",
+}
+
+/** Map a set of internal CRM tags to canonical Mailchimp tags (deduped, sorted). */
+export function mailchimpTagsFromInternal(internalTags: string[]): string[] {
+  const out = new Set<string>()
+  for (const raw of internalTags) {
+    const { namespace, value } = parseTag(raw)
+    if (!namespace) continue
+    const v = value.toLowerCase()
+    switch (namespace) {
+      case "site": {
+        const brand = SITE_TO_BRAND[v]
+        if (brand) out.add(brandTag(brand))
+        break
+      }
+      case "source":
+        if (v === "newsletter" || v === "event" || v === "partner") out.add(sourceTag(v))
+        break
+      case "partner":
+        out.add(sourceTag("partner"))
+        break
+      case "event": {
+        const t = eventTag(v)
+        if (isCanonicalTag(t)) {
+          out.add(t)
+          out.add(sourceTag("event")) // an event tag implies event provenance
+        }
+        break
+      }
+      // role / intent / feed / client / geo / industry / quality → internal-only
+    }
   }
   return Array.from(out).sort()
 }

@@ -2,7 +2,28 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, Mail, X, Check, AlertCircle, Tag as TagIcon, Send, Lightbulb } from "lucide-react"
-import { aggregateMailchimpSuggestions } from "@/lib/tag-taxonomy"
+import { mailchimpTagsFromInternal } from "@/lib/tag-taxonomy"
+import {
+  BRANDS,
+  SOURCES,
+  STATUSES,
+  EVENTS,
+  brandTag,
+  sourceTag,
+  statusTag,
+  eventTag,
+  normalizeTags,
+} from "@/lib/mailchimp-tags"
+
+// Canonical tag groups for the multiselect. Built once from the taxonomy so the
+// modal can only ever offer canonical tags — free-form input was removed in
+// Step 4b so the admin push can't reintroduce drift.
+const TAG_GROUPS: Array<{ label: string; tags: string[] }> = [
+  { label: "Brand", tags: BRANDS.map(brandTag) },
+  { label: "Source", tags: SOURCES.map(sourceTag) },
+  { label: "Event", tags: EVENTS.map(eventTag) },
+  { label: "Status", tags: STATUSES.map(statusTag) },
+]
 
 export interface PushMember {
   email: string
@@ -18,11 +39,6 @@ export interface PushMember {
 
 interface MailchimpAudience {
   id: string
-  name: string
-}
-
-interface MailchimpTag {
-  id: string | number
   name: string
 }
 
@@ -53,17 +69,18 @@ export function MailchimpPushModal({
   onComplete,
 }: MailchimpPushModalProps) {
   const [audiences, setAudiences] = useState<MailchimpAudience[]>([])
-  const [existingTags, setExistingTags] = useState<MailchimpTag[]>([])
   const [audienceId, setAudienceId] = useState("")
-  const [tags, setTags] = useState<string[]>(defaultTag ? [defaultTag] : [])
-  const [tagInput, setTagInput] = useState("")
+  // Selected canonical tags. Seed from defaultTag only if it's canonical
+  // (legacy free-form defaults are ignored — the admin picks from the groups).
+  const [tags, setTags] = useState<string[]>(defaultTag ? normalizeTags([defaultTag]).canonical : [])
   const [status, setStatus] = useState<Status>("subscribed")
   const [isLoading, setIsLoading] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<PushResult | null>(null)
 
-  // Load audiences + existing tags when modal opens
+  // Load audiences when modal opens. (Tags are no longer fetched — the canonical
+  // vocabulary is the source of truth, rendered from TAG_GROUPS below.)
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -72,24 +89,15 @@ export function MailchimpPushModal({
       setError(null)
       setResult(null)
       try {
-        const [audRes, tagsRes] = await Promise.all([
-          fetch("/api/mailchimp?endpoint=properties"),
-          fetch("/api/mailchimp?endpoint=tags"),
-        ])
-        if (!cancelled) {
-          if (audRes.ok) {
-            const data = await audRes.json()
-            // Route wraps in { success, data, timestamp } — handle both wrapped
-            // and unwrapped shapes for backward compatibility.
-            const list = (data?.data?.properties ?? data?.properties ?? data ?? []) as MailchimpAudience[]
-            setAudiences(list)
-            // Default to first audience if none picked
-            if (list.length > 0 && !audienceId) setAudienceId(list[0].id)
-          }
-          if (tagsRes.ok) {
-            const data = await tagsRes.json()
-            setExistingTags((data?.data?.tags ?? data?.tags ?? []) as MailchimpTag[])
-          }
+        const audRes = await fetch("/api/mailchimp?endpoint=properties")
+        if (!cancelled && audRes.ok) {
+          const data = await audRes.json()
+          // Route wraps in { success, data, timestamp } — handle both wrapped
+          // and unwrapped shapes for backward compatibility.
+          const list = (data?.data?.properties ?? data?.properties ?? data ?? []) as MailchimpAudience[]
+          setAudiences(list)
+          // Default to first audience if none picked
+          if (list.length > 0 && !audienceId) setAudienceId(list[0].id)
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -102,15 +110,10 @@ export function MailchimpPushModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const addTag = (raw: string) => {
-    const t = raw.trim()
-    if (!t) return
-    if (tags.includes(t)) return
-    setTags([...tags, t])
-    setTagInput("")
-  }
+  const toggleTag = (t: string) =>
+    setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
 
-  const removeTag = (t: string) => setTags(tags.filter((x) => x !== t))
+  const removeTag = (t: string) => setTags((prev) => prev.filter((x) => x !== t))
 
   const handlePush = async () => {
     if (!audienceId) {
@@ -149,28 +152,24 @@ export function MailchimpPushModal({
     onClose()
   }
 
-  if (!open) return null
-
-  // Quick-pick suggestions: top 8 most-used existing tags by member count
-  const tagSuggestions = existingTags
-    .filter((t) => !tags.includes(t.name))
-    .slice(0, 8)
-
-  // Source-derived suggestions: aggregate namespaced tags across all
-  // selected members and convert to Mailchimp-friendly labels. Empty when
-  // nothing in the selection has source tags.
+  // Source-derived suggestions: bridge each selected member's internal CRM tags
+  // to canonical Mailchimp tags (the lean bridge). Empty when nothing in the
+  // selection carries source tags. Computed before the early return so hook
+  // order stays stable across renders.
   const sourceSuggestions = useMemo(() => {
     const all: string[] = []
     for (const m of members) {
       if (m.sourceTags) all.push(...m.sourceTags)
     }
-    return aggregateMailchimpSuggestions(all).filter((s) => !tags.includes(s))
+    return mailchimpTagsFromInternal(all).filter((s) => !tags.includes(s))
   }, [members, tags])
 
   const addAllSourceSuggestions = () => {
     if (sourceSuggestions.length === 0) return
-    setTags(Array.from(new Set([...tags, ...sourceSuggestions])))
+    setTags((prev) => Array.from(new Set([...prev, ...sourceSuggestions])))
   }
+
+  if (!open) return null
 
   return (
     <div
@@ -284,60 +283,39 @@ export function MailchimpPushModal({
                 )}
               </div>
 
-              {/* Tags */}
+              {/* Tags — canonical multiselect. Free-form input was removed so the
+                  push can only ever apply canonical tags. */}
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-neutral-500 mb-1.5">
                   Tags
                 </label>
-                <div className="flex flex-wrap items-center gap-1.5 p-2 border border-neutral-200 rounded-lg bg-white min-h-[40px]">
-                  {tags.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-100 text-[11px] text-neutral-700"
-                    >
-                      <TagIcon className="w-3 h-3 text-neutral-400" />
-                      {t}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(t)}
-                        className="text-neutral-400 hover:text-neutral-700"
+
+                {/* Selected */}
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    {tags.map((t) => (
+                      <span
+                        key={t}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-[11px] text-emerald-800 border border-emerald-200"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === ",") {
-                        e.preventDefault()
-                        addTag(tagInput)
-                      }
-                    }}
-                    onBlur={() => addTag(tagInput)}
-                    placeholder={tags.length === 0 ? "Add tag…" : ""}
-                    className="flex-1 min-w-[80px] text-[12px] bg-transparent focus:outline-none"
-                  />
-                </div>
-                {tagSuggestions.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    <span className="text-[10px] text-neutral-400 mr-1">Suggested:</span>
-                    {tagSuggestions.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => addTag(t.name)}
-                        className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
-                      >
-                        + {t.name}
-                      </button>
+                        <TagIcon className="w-3 h-3 text-emerald-500" />
+                        {t}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(t)}
+                          aria-label={`Remove ${t}`}
+                          className="text-emerald-500 hover:text-emerald-800"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
                     ))}
                   </div>
                 )}
+
+                {/* Source-derived suggestions (bridged to canonical tags) */}
                 {sourceSuggestions.length > 0 && (
-                  <div className="mt-2 p-2 rounded-md bg-indigo-50/60 border border-indigo-100">
+                  <div className="mb-2 p-2 rounded-md bg-indigo-50/60 border border-indigo-100">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Lightbulb className="w-3 h-3 text-indigo-500" />
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
@@ -356,7 +334,7 @@ export function MailchimpPushModal({
                         <button
                           key={s}
                           type="button"
-                          onClick={() => addTag(s)}
+                          onClick={() => toggleTag(s)}
                           className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium text-indigo-700 bg-white hover:bg-indigo-100 border border-indigo-200"
                         >
                           + {s}
@@ -365,6 +343,40 @@ export function MailchimpPushModal({
                     </div>
                   </div>
                 )}
+
+                {/* Canonical groups */}
+                <div className="space-y-2">
+                  {TAG_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                        {group.label}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {group.tags.map((t) => {
+                          const active = tags.includes(t)
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => toggleTag(t)}
+                              aria-pressed={active}
+                              className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] border transition-colors ${
+                                active
+                                  ? "bg-emerald-600 text-white border-emerald-600"
+                                  : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[10px] text-neutral-400">
+                  Only canonical tags can be applied — this keeps Mailchimp aligned with the app.
+                </p>
               </div>
 
               {/* Status */}

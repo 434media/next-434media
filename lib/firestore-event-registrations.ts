@@ -264,6 +264,81 @@ async function getDigitalCanvasRegistrations(filters?: { event?: string }): Prom
 }
 
 /**
+ * Fetch registrations from the `digitalcanvas` NAMED database (434 Media
+ * project) — Digital Canvas workshops such as "Lead with Ops. Layer in AI."
+ *
+ * Distinct from getDigitalCanvasRegistrations() above, which reads the separate
+ * media-analytics-proxy GCP project (MHTH). Two quirks of this DB: tags are
+ * stored as a JSON-encoded *string* (not an array), and the newsletter signal
+ * is the `optInForUpdates` flag on the registration form (there's no separate
+ * email-signups collection — opted-in registrants are the newsletter contacts).
+ * Records carry the `dcw:` id prefix so writes route back here, not to `dc:`.
+ */
+function mapDcWorkshopDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistration {
+  const data = doc.data()!
+
+  // `tags` is stored JSON-encoded here; parse defensively (array or string).
+  let incomingTags: string[] = []
+  if (Array.isArray(data.tags)) {
+    incomingTags = data.tags as string[]
+  } else if (typeof data.tags === "string") {
+    try {
+      const parsed = JSON.parse(data.tags)
+      if (Array.isArray(parsed)) incomingTags = parsed
+    } catch {
+      /* leave empty if not valid JSON */
+    }
+  }
+
+  // Canonical namespaced internal tags (mirrors the techday/MHTH pattern).
+  // site:digitalcanvas → brand:digitalcanvas via the lean Mailchimp bridge.
+  const tags = Array.from(
+    new Set<string>([
+      "site:digitalcanvas",
+      "event:lead-with-ops-2026-06-18",
+      "role:workshop-attendee",
+      ...incomingTags,
+    ]),
+  )
+
+  return {
+    id: `dcw:${doc.id}`,
+    email: data.email || "",
+    firstName: data.firstName || "",
+    lastName: data.lastName || "",
+    fullName: data.fullName || "",
+    company: data.company || null,
+    // The workshop form's "keep me updated" opt-in — the newsletter signal.
+    subscribeToFeed: data.optInForUpdates === true || data.optInForUpdates === "true",
+    event: data.event || "LeadWithOpsLayerInAI-2026-06-18",
+    eventName: data.eventName || "Lead with Ops. Layer in AI.",
+    eventDate: toISOString(data.eventDate || ""),
+    registeredAt: toISOString(data.registeredAt || data.createdAt || ""),
+    source: data.source || "web-digitalcanvas",
+    tags,
+    pageUrl: data.pageUrl || "",
+    checkedIn: data.checkedIn || false,
+    checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
+    _dbSource: "digitalcanvas-workshops",
+  }
+}
+
+async function getDigitalCanvasWorkshopRegistrations(filters?: {
+  event?: string
+}): Promise<EventRegistration[]> {
+  try {
+    if (filters?.event && filters.event !== "LeadWithOpsLayerInAI-2026-06-18") return []
+
+    const dcDb = getNamedDb(NAMED_DATABASES.DIGITALCANVAS)
+    const snapshot = await dcDb.collection("event-registrations").get()
+    return snapshot.docs.map(mapDcWorkshopDoc)
+  } catch (error) {
+    console.error("Error fetching Digital Canvas workshop registrations:", error)
+    return []
+  }
+}
+
+/**
  * Deduplicate registrations across databases by email+event+name
  * Default DB registrations take priority (they may have been enriched).
  * Tags are merged across duplicates so speaker/spotlight tags are never lost.
@@ -318,10 +393,11 @@ export async function getEventRegistrations(filters?: {
       query = query.where("source", "==", filters.source)
     }
 
-    const [defaultSnapshot, techdayRegs, dcRegs] = await Promise.all([
+    const [defaultSnapshot, techdayRegs, dcRegs, dcWorkshopRegs] = await Promise.all([
       query.get(),
       getTechdayRegistrations(filters),
       getDigitalCanvasRegistrations(filters),
+      getDigitalCanvasWorkshopRegistrations(filters),
     ])
 
     const defaultRegs = defaultSnapshot.docs.map(mapDefaultDoc)
@@ -329,6 +405,7 @@ export async function getEventRegistrations(filters?: {
     // If filtering by source and it's not one of the named-DB sources, only
     // return default. Accept both new ("techday") and legacy ("SATechDay")
     // labels for techday so existing bookmarks/links keep working.
+    // ("web-digitalcanvas" covers both the MHTH project and the workshops DB.)
     if (
       filters?.source &&
       filters.source !== "techday" &&
@@ -344,6 +421,7 @@ export async function getEventRegistrations(filters?: {
       ...defaultRegs,
       ...techdayRegs,
       ...dcRegs,
+      ...dcWorkshopRegs,
     ])
     setRegCache(cacheKey, allRegs)
     return allRegs
@@ -445,6 +523,13 @@ export async function updateEventRegistration(
       const realId = id.replace("dc:", "")
       const dcDb = getDigitalCanvasDb()
       await dcDb.collection("event-registrations").doc(realId).update(fields)
+      invalidateRegistrationsCache()
+      return { success: true }
+    }
+    if (id.startsWith("dcw:")) {
+      const realId = id.replace("dcw:", "")
+      const dcwDb = getNamedDb(NAMED_DATABASES.DIGITALCANVAS)
+      await dcwDb.collection("event-registrations").doc(realId).update(fields)
       invalidateRegistrationsCache()
       return { success: true }
     }
@@ -568,11 +653,20 @@ export async function deleteEventRegistration(id: string): Promise<{ success: bo
       return { success: true }
     }
 
-    // Check if this is a digitalcanvas-prefixed ID
+    // Check if this is a digitalcanvas-prefixed ID (external MHTH project)
     if (id.startsWith("dc:")) {
       const realId = id.replace("dc:", "")
       const dcDb = getDigitalCanvasDb()
       await dcDb.collection("event-registrations").doc(realId).delete()
+      invalidateRegistrationsCache()
+      return { success: true }
+    }
+
+    // Digital Canvas workshops named DB (434 Media project)
+    if (id.startsWith("dcw:")) {
+      const realId = id.replace("dcw:", "")
+      const dcwDb = getNamedDb(NAMED_DATABASES.DIGITALCANVAS)
+      await dcwDb.collection("event-registrations").doc(realId).delete()
       invalidateRegistrationsCache()
       return { success: true }
     }
@@ -640,6 +734,13 @@ export async function markEventRegistrationPromoted(
     invalidateRegistrationsCache()
     return
   }
+  if (id.startsWith("dcw:")) {
+    const realId = id.replace("dcw:", "")
+    const dcwDb = getNamedDb(NAMED_DATABASES.DIGITALCANVAS)
+    await dcwDb.collection("event-registrations").doc(realId).update(update)
+    invalidateRegistrationsCache()
+    return
+  }
   const db = getDb()
   await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).doc(id).update(update)
   invalidateRegistrationsCache()
@@ -664,6 +765,13 @@ export async function getEventRegistrationById(
     // pulls them in bulk via a different path. Defer dc: promotion until the
     // dc-specific mapper is wired here.
     return null
+  }
+  if (id.startsWith("dcw:")) {
+    const realId = id.replace("dcw:", "")
+    const dcwDb = getNamedDb(NAMED_DATABASES.DIGITALCANVAS)
+    const doc = await dcwDb.collection("event-registrations").doc(realId).get()
+    if (!doc.exists) return null
+    return mapDcWorkshopDoc(doc)
   }
   const db = getDb()
   const doc = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).doc(id).get()

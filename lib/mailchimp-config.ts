@@ -6,21 +6,14 @@ export interface MailchimpConfig {
   defaultListId?: string
 }
 
-// Property configurations for the two actual Mailchimp audiences
+// Property configuration for the single live Mailchimp audience. (The former
+// TXMX audience was removed — its id 404s; TXMX now lives as brand:txmx tags
+// within the 434 Media list. See docs/audiences-mailchimp-alignment.md.)
 const MAILCHIMP_PROPERTIES: MailchimpProperty[] = [
   {
     id: "434media",
     name: "434 Media",
     key: "MAILCHIMP_AUDIENCE_ID_434MEDIA",
-    list_id: "",
-    member_count: 0,
-    campaign_count: 0,
-    created_date: null,
-  },
-  {
-    id: "txmx",
-    name: "TXMX Founders Tee",
-    key: "MAILCHIMP_AUDIENCE_ID_TXMX",
     list_id: "",
     member_count: 0,
     campaign_count: 0,
@@ -45,18 +38,10 @@ export function getMailchimpConfig(): MailchimpConfig | null {
   }
 }
 
-// Get default audience ID with fallback logic
+// Get the single 434 Media audience ID. Falls back to the legacy bare
+// MAILCHIMP_AUDIENCE_ID alias (same list) so older env setups keep working.
 export function getDefaultAudienceId(): string | undefined {
-  // Prefer 434 Media, fallback to TXMX
-  const primary = process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA
-  const fallback = process.env.MAILCHIMP_AUDIENCE_ID_TXMX
-
-  console.log("[Mailchimp Config] Checking audience IDs:", {
-    primary: primary ? "configured" : "missing",
-    fallback: fallback ? "configured" : "missing",
-  })
-
-  return primary || fallback
+  return process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA || process.env.MAILCHIMP_AUDIENCE_ID
 }
 
 // Get all available properties with configuration status
@@ -74,11 +59,9 @@ export function getPropertyById(id: string): MailchimpProperty | undefined {
 
 // Get property name by audience ID
 export function getPropertyNameByAudienceId(audienceId: string): string {
-  const property434 = process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA
-  const propertyTXMX = process.env.MAILCHIMP_AUDIENCE_ID_TXMX
+  const property434 = process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA || process.env.MAILCHIMP_AUDIENCE_ID
 
   if (audienceId === property434) return "434 Media"
-  if (audienceId === propertyTXMX) return "TXMX Founders Tee"
 
   return "Unknown Audience"
 }
@@ -103,9 +86,9 @@ export function validateMailchimpConfig(): MailchimpConnectionStatus {
     }
   }
 
-  // Need at least one audience configured
+  // Need the 434 Media audience configured
   if (configuredProperties.length === 0) {
-    missingVariables.push("At least one audience ID (MAILCHIMP_AUDIENCE_ID_434MEDIA or MAILCHIMP_AUDIENCE_ID_TXMX)")
+    missingVariables.push("MAILCHIMP_AUDIENCE_ID_434MEDIA")
   }
 
   const isValid = missingVariables.length === 0
@@ -128,7 +111,7 @@ export function validateMailchimpConfig(): MailchimpConnectionStatus {
 // Check if Mailchimp is configured
 export function isMailchimpConfigured(): boolean {
   const hasApiKey = !!process.env.MAILCHIMP_API_KEY
-  const hasAudienceId = !!(process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA || process.env.MAILCHIMP_AUDIENCE_ID_TXMX)
+  const hasAudienceId = !!(process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA || process.env.MAILCHIMP_AUDIENCE_ID)
 
   console.log("[Mailchimp Config] Configuration status:", {
     hasApiKey,

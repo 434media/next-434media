@@ -14,7 +14,7 @@ export async function GET() {
         hasApiKey: !!process.env.MAILCHIMP_API_KEY,
         hasServerPrefix: !!process.env.MAILCHIMP_API_KEY?.split("-")[1],
         hasAudienceIds: !!(
-          process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA || process.env.MAILCHIMP_AUDIENCE_ID_TXMX
+          process.env.MAILCHIMP_AUDIENCE_ID_434MEDIA || process.env.MAILCHIMP_AUDIENCE_ID
         ),
         missingVariables: validationResult.validation?.missingVariables || [],
         configuredProperties:

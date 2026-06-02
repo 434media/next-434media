@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Mail, Ticket, Users2, Loader2 } from "lucide-react"
-import { useMailchimpSubscribers } from "@/components/admin/MailchimpSubscribedPill"
+import { useMailchimpSubscribers, isMarketable, type SubscriberMap } from "@/components/admin/MailchimpSubscribedPill"
 import type { Lead } from "@/types/crm-types"
 
 // Stage 4 — Audiences source nav + KPIs, fused into one control.
@@ -13,7 +13,8 @@ import type { Lead } from "@/types/crm-types"
 // segment carries its source's total so all three counts stay visible at a
 // glance, and the secondary stats for the *active* source render just below:
 //   - +N this week (recent intake; "is this source still alive?")
-//   - % in Mailchimp (campaign reachability today)
+//   - N subscribed (marketable today) + the to-push and not-subscribed gaps,
+//     split by Mailchimp consent status rather than mere presence
 //
 // Per-source detail sits next to the data you're viewing instead of stacking
 // all three sources' KPIs above the table.
@@ -23,7 +24,10 @@ type SubTab = "newsletter" | "events" | "lists"
 interface SourceStats {
   total: number
   last7Days: number
-  inMailchimp: number
+  /** Email exists in Mailchimp in any status. */
+  present: number
+  /** Email is `subscribed` in Mailchimp — i.e. actually emailable today. */
+  subscribed: number
 }
 
 interface AudiencesHeaderStripProps {
@@ -49,17 +53,22 @@ interface RowSig {
   created_at: string
 }
 
-function statsFromRows(rows: RowSig[], subscriberMap: Map<string, unknown>): SourceStats {
+function statsFromRows(rows: RowSig[], subscriberMap: SubscriberMap): SourceStats {
   const timestamps = rows.map((r) => r.created_at).filter(Boolean)
-  let inMc = 0
+  let present = 0
+  let subscribed = 0
   for (const r of rows) {
     if (!r.email) continue
-    if (subscriberMap.has(r.email.toLowerCase())) inMc++
+    const entry = subscriberMap.get(r.email.toLowerCase())
+    if (!entry) continue
+    present++
+    if (isMarketable(entry)) subscribed++
   }
   return {
     total: rows.length,
     last7Days: countRecent(timestamps, ONE_WEEK_MS),
-    inMailchimp: inMc,
+    present,
+    subscribed,
   }
 }
 
@@ -85,7 +94,7 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
         const rows = (nlRes.value.signups || []) as Array<{ email: string; created_at: string }>
         setNewsletter(statsFromRows(rows, subscriberMap))
       } else {
-        setNewsletter({ total: 0, last7Days: 0, inMailchimp: 0 })
+        setNewsletter({ total: 0, last7Days: 0, present: 0, subscribed: 0 })
       }
 
       if (evRes.status === "fulfilled" && evRes.value?.success) {
@@ -94,7 +103,7 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
         const normalized: RowSig[] = rows.map((r) => ({ email: r.email, created_at: r.registeredAt }))
         setEvents(statsFromRows(normalized, subscriberMap))
       } else {
-        setEvents({ total: 0, last7Days: 0, inMailchimp: 0 })
+        setEvents({ total: 0, last7Days: 0, present: 0, subscribed: 0 })
       }
 
       if (ldRes.status === "fulfilled" && ldRes.value?.success) {
@@ -103,7 +112,7 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
         const normalized: RowSig[] = partner.map((l) => ({ email: l.email, created_at: l.created_at }))
         setLists(statsFromRows(normalized, subscriberMap))
       } else {
-        setLists({ total: 0, last7Days: 0, inMailchimp: 0 })
+        setLists({ total: 0, last7Days: 0, present: 0, subscribed: 0 })
       }
 
       setIsLoading(false)
@@ -121,13 +130,17 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
   ]
   const active = sources.find((s) => s.id === activeSub) ?? sources[0]
   const activeStats = active.stats
-  const mcPct =
+  // Reachability split by consent (Mailchimp status is the source of truth):
+  //   subscribedPct — share of this source that's actually emailable today
+  //   notInMc       — not in Mailchimp at all → the push action
+  //   notSubscribed — in Mailchimp but transactional/unsubscribed → the consent
+  //                   gray zone (present but can't receive a campaign)
+  const subscribedPct =
     activeStats && activeStats.total > 0
-      ? Math.round((activeStats.inMailchimp / activeStats.total) * 100)
+      ? Math.round((activeStats.subscribed / activeStats.total) * 100)
       : 0
-  // Contacts in this source not yet synced to Mailchimp — the actionable gap
-  // behind the "% in Mailchimp" stat.
-  const notInMc = activeStats ? Math.max(0, activeStats.total - activeStats.inMailchimp) : 0
+  const notInMc = activeStats ? Math.max(0, activeStats.total - activeStats.present) : 0
+  const notSubscribed = activeStats ? Math.max(0, activeStats.present - activeStats.subscribed) : 0
 
   return (
     <div className="mb-4">
@@ -192,16 +205,34 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
               this week
             </span>
             <span className="text-neutral-300">·</span>
-            {/* Reachability framed as the remaining action, not an inert %. */}
-            {notInMc > 0 ? (
-              <span className="tabular-nums">
-                <strong className="font-semibold text-amber-600">{notInMc.toLocaleString()}</strong> not yet in Mailchimp
-              </span>
-            ) : (
-              <span className="tabular-nums text-emerald-600 font-medium">All in Mailchimp</span>
+            {/* Marketable = subscribed in Mailchimp (emailable today). */}
+            <span className="tabular-nums">
+              <strong className="font-semibold text-emerald-600">
+                {(activeStats.subscribed ?? 0).toLocaleString()}
+              </strong>{" "}
+              subscribed{activeStats.total > 0 ? ` (${subscribedPct}%)` : ""}
+            </span>
+            {/* Actionable: not in Mailchimp at all → push them. */}
+            {notInMc > 0 && (
+              <>
+                <span className="text-neutral-300">·</span>
+                <span className="tabular-nums">
+                  <strong className="font-semibold text-amber-600">{notInMc.toLocaleString()}</strong> to push
+                </span>
+              </>
             )}
-            <span className="text-neutral-300 hidden sm:inline">·</span>
-            <span className="tabular-nums hidden sm:inline text-neutral-400">{mcPct}% synced</span>
+            {/* Consent gray zone: present but transactional/unsubscribed. */}
+            {notSubscribed > 0 && (
+              <>
+                <span className="text-neutral-300 hidden sm:inline">·</span>
+                <span
+                  className="tabular-nums hidden sm:inline text-neutral-400"
+                  title="In Mailchimp but not subscribed (transactional / unsubscribed) — can't receive a campaign"
+                >
+                  {notSubscribed.toLocaleString()} not subscribed
+                </span>
+              </>
+            )}
           </>
         ) : (
           <span className="opacity-60">No data</span>

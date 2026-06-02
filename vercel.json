@@ -9,6 +9,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/mailchimp-push",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/instagram-snapshot",
       "schedule": "0 10 * * *"
     },

@@ -1038,7 +1038,7 @@ export function EventRegistrationsTab({
             lastName: r.lastName || undefined,
             sourceTags: r.tags && r.tags.length > 0 ? r.tags : undefined,
           }))}
-        defaultTag={selectedEvent ? `event-${selectedEvent.toLowerCase().replace(/\s+/g, "-")}` : undefined}
+        defaultTag="source:event"
         onComplete={(result) => {
           setToast({
             message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
