@@ -173,7 +173,10 @@ function mapTechdayDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistrati
     lastName: data.lastName || "",
     fullName: `${data.firstName || ""} ${data.lastName || ""}`.trim(),
     company: data.company || null,
-    subscribeToFeed: false,
+    // SA Tech Day registration includes opt-in to Techbloc + 434 Media network
+    // communications (confirmed by the Tech Day team 2026-06-02), so every
+    // registrant is a consented contact — eligible for broadcasts + Mailchimp sync.
+    subscribeToFeed: true,
     event: "SATechDay2026",
     eventName: "SA Tech Day 2026",
     eventDate: "2026-04-10",

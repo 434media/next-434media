@@ -321,6 +321,9 @@ const SITE_TO_BRAND: Record<string, Brand> = {
   digitalcanvas: "digitalcanvas",
   vemos: "vemosvamos",
   vemosvamos: "vemosvamos",
+  // SA Tech Day is a Techbloc / 434 Media network property — its registrants
+  // opted into 434 Media comms, so they sync to Mailchimp under brand:434media.
+  techday: "434media",
 }
 
 /** Map a set of internal CRM tags to canonical Mailchimp tags (deduped, sorted). */
