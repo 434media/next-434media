@@ -16,7 +16,9 @@ const BATCH_SIZE = 100 // Resend batch cap
 const DELAY_MS = 1100 // between batches — keeps us under Resend's rate limit
 
 function baseUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || "https://434media.com"
+  // Canonical www host so unsubscribe links don't bounce through a redirect
+  // (which can drop the one-click POST).
+  return process.env.NEXT_PUBLIC_APP_URL || "https://www.434media.com"
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))

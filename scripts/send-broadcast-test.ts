@@ -7,14 +7,16 @@
  */
 import { getResend, RESEND_DOMAIN, assertVerifiedSender } from "../lib/resend"
 import { inviteEmailHtml } from "../lib/email-templates/lead-with-ops"
+import { unsubscribeUrl } from "../lib/unsubscribe-token"
 
 const TO = "jesse@434media.com"
 const FROM = `Digital Canvas | 434 Media <vip@${RESEND_DOMAIN}>`
 const REPLY_TO = "VIP@434media.com"
 const REGISTRATION_URL = "https://www.digitalcanvas.community/workshops/lead-with-ops"
-// Placeholder for the test only — the real broadcast generates a signed,
-// per-recipient unsubscribe URL.
-const UNSUBSCRIBE_URL = "https://434media.com/unsubscribe?test=1"
+const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://www.434media.com"
+// Real signed unsubscribe URL (same as the live broadcast) so the test
+// validates the full click-through. NOTE: clicking it actually unsubscribes TO.
+const UNSUBSCRIBE_URL = unsubscribeUrl(BASE, TO)
 
 async function main() {
   assertVerifiedSender(FROM)
