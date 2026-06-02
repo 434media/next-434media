@@ -130,17 +130,17 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
   ]
   const active = sources.find((s) => s.id === activeSub) ?? sources[0]
   const activeStats = active.stats
-  // Reachability split by consent (Mailchimp status is the source of truth):
+  // Reachability by consent (Mailchimp status is the source of truth):
   //   subscribedPct — share of this source that's actually emailable today
-  //   notInMc       — not in Mailchimp at all → the push action
-  //   notSubscribed — in Mailchimp but transactional/unsubscribed → the consent
-  //                   gray zone (present but can't receive a campaign)
+  //   notReachable  — everyone not subscribed (no marketing consent yet). This
+  //                   is NOT a task: the hourly sync only adds opted-in
+  //                   contacts, and non-consented contacts are never pushed —
+  //                   so "to push" would overstate actionable work ~50x.
   const subscribedPct =
     activeStats && activeStats.total > 0
       ? Math.round((activeStats.subscribed / activeStats.total) * 100)
       : 0
-  const notInMc = activeStats ? Math.max(0, activeStats.total - activeStats.present) : 0
-  const notSubscribed = activeStats ? Math.max(0, activeStats.present - activeStats.subscribed) : 0
+  const notReachable = activeStats ? Math.max(0, activeStats.total - activeStats.subscribed) : 0
 
   return (
     <div className="mb-4">
@@ -205,31 +205,24 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
               this week
             </span>
             <span className="text-neutral-300">·</span>
-            {/* Marketable = subscribed in Mailchimp (emailable today). */}
+            {/* Reachable = subscribed in Mailchimp (emailable today). */}
             <span className="tabular-nums">
               <strong className="font-semibold text-emerald-600">
                 {(activeStats.subscribed ?? 0).toLocaleString()}
               </strong>{" "}
-              subscribed{activeStats.total > 0 ? ` (${subscribedPct}%)` : ""}
+              subscribed{activeStats.total > 0 ? ` · ${subscribedPct}% reachable` : ""}
             </span>
-            {/* Actionable: not in Mailchimp at all → push them. */}
-            {notInMc > 0 && (
-              <>
-                <span className="text-neutral-300">·</span>
-                <span className="tabular-nums">
-                  <strong className="font-semibold text-amber-600">{notInMc.toLocaleString()}</strong> to push
-                </span>
-              </>
-            )}
-            {/* Consent gray zone: present but transactional/unsubscribed. */}
-            {notSubscribed > 0 && (
+            {/* Not opted in — informational consent gap, not a task. The hourly
+                sync only adds opted-in contacts; the rest stay out of Mailchimp
+                until they consent. */}
+            {notReachable > 0 && (
               <>
                 <span className="text-neutral-300 hidden sm:inline">·</span>
                 <span
                   className="tabular-nums hidden sm:inline text-neutral-400"
-                  title="In Mailchimp but not subscribed (transactional / unsubscribed) — can't receive a campaign"
+                  title="No marketing consent — these stay out of Mailchimp until they opt in. The hourly sync only adds opted-in contacts."
                 >
-                  {notSubscribed.toLocaleString()} not subscribed
+                  {notReachable.toLocaleString()} not opted in
                 </span>
               </>
             )}

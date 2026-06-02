@@ -261,9 +261,9 @@ export function EventInsights({
             />
             <FilterTile
               icon={TrendingUp}
-              label="Untapped"
+              label="Not a lead yet"
               value={untapped.toLocaleString()}
-              hint="not yet leads"
+              hint="conversion opportunity"
               valueClass={untapped > 0 ? "text-amber-700" : "text-neutral-400"}
               active={audienceFilter === "untapped"}
               onClick={() => onAudienceFilterChange?.("untapped")}
@@ -608,7 +608,7 @@ function EventCard({
             <span className="text-neutral-300">·</span>
             <span className="inline-flex items-center gap-1">
               <Mail className="w-2.5 h-2.5 text-neutral-400" />
-              {event.inMailchimp} MC
+              {event.inMailchimp} reachable
             </span>
           </>
         )}
@@ -616,7 +616,7 @@ function EventCard({
           <>
             <span className="text-neutral-300">·</span>
             <span className="inline-flex items-center gap-1 text-amber-700">
-              {untapped} untapped
+              {untapped} not a lead
             </span>
           </>
         )}
