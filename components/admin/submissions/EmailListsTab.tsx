@@ -47,7 +47,6 @@ import {
   type SubmissionSource,
 } from "@/components/admin/SubmissionStateUI"
 import { PermissionStateRibbon } from "@/components/admin/PermissionStateRibbon"
-import { LastBroadcastStrip } from "@/components/admin/LastBroadcastStrip"
 import { TagList } from "@/components/admin/Tag"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { ExportMenu, DatePresetChips, DetailRow } from "./shared"
@@ -645,15 +644,6 @@ export function EmailListsTab({
             onExportSelected={handleDownloadSelectedCSV}
           />
         </div>
-      </div>
-
-      {/* Last broadcast — surfaces the most recent Resend broadcast (the
-          occasional branded sends) so the operator can correlate signup spikes
-          with send activity. Hidden when none exist — no stale campaign data. */}
-      <div className="mb-3">
-        <LastBroadcastStrip
-          signupTimestamps={filteredSignupsBeforeState.map((s) => s.created_at).filter(Boolean) as string[]}
-        />
       </div>
 
       {/* Source insights — overview grid (no source selected) or drilldown
