@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, Download, ChevronDown } from "lucide-react"
+import { Loader2, Download, ChevronDown, Calendar, Check } from "lucide-react"
 
 // =====================================================================
 // Sprint B — export menu. Single button + dropdown collapses the three
@@ -120,13 +120,12 @@ function ExportMenuItem({
 }
 
 // =====================================================================
-// Sprint B — date preset chips. Replaces the date-range dropdown with a
-// row of clickable chips: Today · 7d · 30d · This month · Custom. Active
-// preset gets a filled neutral-900 chip; idle chips are ghosts. "Custom"
-// reveals two date inputs inline + a Clear button.
+// Date range dropdown — one trigger (Vercel-style) instead of a row of
+// preset chips. The button shows the active range ("Last 30 days" / "All
+// time" / "Custom"); the menu holds the presets + a custom from/to range.
 // =====================================================================
 
-export interface DatePresetChipsProps {
+export interface DateRangeDropdownProps {
   preset: string
   startDate: string
   endDate: string
@@ -138,90 +137,132 @@ export interface DatePresetChipsProps {
 const DATE_CHIPS: { value: string; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
-  { value: "last7days", label: "7d" },
-  { value: "last30days", label: "30d" },
+  { value: "last7days", label: "Last 7 days" },
+  { value: "last30days", label: "Last 30 days" },
   { value: "thisMonth", label: "This month" },
   { value: "lastMonth", label: "Last month" },
   { value: "thisYear", label: "This year" },
 ]
 
-export function DatePresetChips({
+export function DateRangeDropdown({
   preset,
   startDate,
   endDate,
   onPresetChange,
   onCustomChange,
   onClear,
-}: DatePresetChipsProps) {
+}: DateRangeDropdownProps) {
+  const [open, setOpen] = useState(false)
   const customActive = preset === "custom" || (preset === "" && (!!startDate || !!endDate))
   const anyActive = !!preset || !!startDate || !!endDate
+  const activeChip = DATE_CHIPS.find((c) => c.value === preset)
+  const label = activeChip ? activeChip.label : customActive ? "Custom" : "All time"
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {DATE_CHIPS.map((chip) => {
-          const active = preset === chip.value
-          return (
-            <button
-              key={chip.value}
-              type="button"
-              onClick={() => onPresetChange(active ? "" : chip.value)}
-              className={`px-2.5 py-1 text-[12px] font-medium rounded transition-colors ${
-                active
-                  ? "bg-neutral-900 text-white"
-                  : "bg-white text-neutral-600 border border-neutral-200/70 hover:bg-neutral-50 hover:text-neutral-900"
-              }`}
-            >
-              {chip.label}
-            </button>
-          )
-        })}
-        <button
-          type="button"
-          onClick={() => {
-            // Toggle custom mode. When activating, leave dates blank — user
-            // picks them. When deactivating, clear everything.
-            if (customActive) onClear()
-            else onPresetChange("custom")
-          }}
-          className={`px-2.5 py-1 text-[12px] font-medium rounded transition-colors ${
-            customActive
-              ? "bg-neutral-900 text-white"
-              : "bg-white text-neutral-600 border border-neutral-200/70 hover:bg-neutral-50 hover:text-neutral-900"
-          }`}
-        >
-          Custom
-        </button>
-        {anyActive && (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium rounded transition-colors ${
+          anyActive
+            ? "bg-neutral-900 text-white"
+            : "bg-white text-neutral-600 border border-neutral-200/70 hover:bg-neutral-50 hover:text-neutral-900"
+        }`}
+      >
+        <Calendar className={`w-3.5 h-3.5 ${anyActive ? "opacity-80" : "text-neutral-400"}`} />
+        {label}
+        <ChevronDown className={`w-3 h-3 ${anyActive ? "opacity-70" : "text-neutral-400"}`} />
+      </button>
+
+      {open && (
+        <>
+          {/* Click-away backdrop — keeps the custom date inputs focusable
+              (an onBlur-close would fire the moment you click into one). */}
           <button
             type="button"
-            onClick={onClear}
-            className="px-2 py-1 text-[12px] font-medium text-neutral-400 hover:text-neutral-700 transition-colors"
+            aria-hidden="true"
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+          <div
+            role="menu"
+            className="absolute right-0 top-full mt-1 z-20 w-56 py-1 rounded-md border border-neutral-200 bg-white shadow-md"
           >
-            Clear
-          </button>
-        )}
-      </div>
+            {DATE_CHIPS.map((chip) => {
+              const active = preset === chip.value
+              return (
+                <button
+                  key={chip.value}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onPresetChange(active ? "" : chip.value)
+                    setOpen(false)
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-[12px] hover:bg-neutral-50 transition-colors ${
+                    active ? "text-neutral-900 font-medium" : "text-neutral-600"
+                  }`}
+                >
+                  {chip.label}
+                  {active && <Check className="w-3.5 h-3.5 text-neutral-900" />}
+                </button>
+              )
+            })}
 
-      {/* Custom range inputs — only render when "Custom" is active. */}
-      {customActive && (
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => onCustomChange(e.target.value, endDate)}
-            className="flex-1 min-w-[10rem] px-2.5 py-2 sm:py-1 text-[13px] sm:text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
-            aria-label="Start date"
-          />
-          <span className="text-[12px] text-neutral-400">to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => onCustomChange(startDate, e.target.value)}
-            className="flex-1 min-w-[10rem] px-2.5 py-2 sm:py-1 text-[13px] sm:text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
-            aria-label="End date"
-          />
-        </div>
+            <div className="my-1 border-t border-neutral-100" />
+
+            {/* Custom range — reveals two date inputs inline in the menu. */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => onPresetChange("custom")}
+              className={`w-full flex items-center justify-between px-3 py-1.5 text-[12px] hover:bg-neutral-50 transition-colors ${
+                customActive ? "text-neutral-900 font-medium" : "text-neutral-600"
+              }`}
+            >
+              Custom range
+              {customActive && <Check className="w-3.5 h-3.5 text-neutral-900" />}
+            </button>
+            {customActive && (
+              <div className="px-3 py-2 space-y-1.5">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => onCustomChange(e.target.value, endDate)}
+                  className="w-full px-2.5 py-1 text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
+                  aria-label="Start date"
+                />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => onCustomChange(startDate, e.target.value)}
+                  className="w-full px-2.5 py-1 text-[12px] font-normal text-neutral-700 bg-white border border-neutral-200/70 rounded focus:outline-none focus:border-neutral-400"
+                  aria-label="End date"
+                />
+              </div>
+            )}
+
+            {anyActive && (
+              <>
+                <div className="my-1 border-t border-neutral-100" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onClear()
+                    setOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 transition-colors"
+                >
+                  Clear · All time
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   )

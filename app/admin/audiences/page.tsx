@@ -104,9 +104,8 @@ export default function AudiencesPage() {
                 <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
                   AUDIENCES
                 </h1>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-2 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-                  where audiences collect — opt-ins auto-sync to Mailchimp, promote the rest to leads
-                </span>
+                {/* Pipeline explainer lives in the dismissible "How it works"
+                    panel below — no need to also restate it here. */}
               </div>
             </div>
             {/* Source switcher lives in the AudiencesHeaderStrip below (segmented

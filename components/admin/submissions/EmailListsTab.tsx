@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   Loader2,
   Mail,
-  RefreshCw,
   Search,
   AlertCircle,
   Calendar,
@@ -49,7 +48,7 @@ import {
 import { PermissionStateRibbon } from "@/components/admin/PermissionStateRibbon"
 import { TagList } from "@/components/admin/Tag"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
-import { ExportMenu, DatePresetChips, DetailRow } from "./shared"
+import { ExportMenu, DateRangeDropdown, DetailRow } from "./shared"
 import type { Toast } from "./types"
 import { usePromoteToLeads } from "./usePromoteToLeads"
 import { PromoteOverridesDrawer } from "./PromoteOverridesDrawer"
@@ -498,36 +497,6 @@ export function EmailListsTab({
     }
   }
 
-  // Convert ALL currently-visible signups (filtered set, not just selected) —
-  // wired to the drilldown header's "Convert all to leads" button. Backend
-  // is idempotent: existing leads get tag refreshes, not duplicates.
-  const runConvertAllSignups = async (rows: EmailSignup[]) => {
-    const items = rows
-      .filter((s) => s.email)
-      .map((s) => ({ id: s.id, email: s.email, sourceSite: s.source }))
-    if (items.length === 0) return
-    if (!confirm(`Convert ${items.length} signup${items.length === 1 ? "" : "s"} to leads? Existing leads will be updated, not duplicated.`)) return
-    try {
-      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.ok) {
-        setToast({ message: data?.error || "Convert failed", type: "error" })
-        return
-      }
-      const r = data.result as { created: number; updated: number; failed: number }
-      setToast({
-        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
-        type: r.failed === 0 ? "success" : "error",
-      })
-    } catch {
-      setToast({ message: "Convert failed", type: "error" })
-    }
-  }
-
   const allVisibleIds = filteredSignups.map((s) => s.id)
   const allVisibleSelected =
     allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
@@ -612,27 +581,33 @@ export function EmailListsTab({
     ? counts[selectedSource] || 0
     : Object.values(counts).reduce((a, b) => a + b, 0)
 
+  // The permission ribbon only earns its place once the list is narrowed —
+  // otherwise it just restates the source-level consent stats already shown in
+  // the Audiences header strip. Any of these filters counts as "narrowed".
+  const isFiltered =
+    !!selectedSource ||
+    searchQuery.trim() !== "" ||
+    datePreset !== "" ||
+    startDate !== "" ||
+    endDate !== "" ||
+    stateFilter !== "all" ||
+    audienceFilter !== "all"
+
   return (
     <div>
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
-            Email Lists
-          </h2>
-          <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
-            Manage and export email signups from all 434 MEDIA websites
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchSignups()}
-            disabled={isLoading}
-            className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
+      {/* No tab header — the Audiences segmented control already labels this
+          section ("Newsletter"). The source pill row below is the only chrome,
+          with Export tucked into its right edge via the `actions` slot. */}
+      <EmailSourceInsights
+        sourceCounts={counts}
+        allSignups={signups}
+        selectedSource={selectedSource}
+        onSelectSource={setSelectedSource}
+        audienceFilter={audienceFilter}
+        onAudienceFilterChange={setAudienceFilter}
+        onRefresh={() => { fetchSourcesAndCounts(); fetchSignups() }}
+        isLoading={isLoading}
+        actions={
           <ExportMenu
             disabled={isDownloading || totalCount === 0}
             isDownloading={isDownloading}
@@ -643,75 +618,46 @@ export function EmailListsTab({
             onExportFiltered={handleDownloadFilteredCSV}
             onExportSelected={handleDownloadSelectedCSV}
           />
-        </div>
-      </div>
-
-      {/* Source insights — overview grid (no source selected) or drilldown
-          stats strip (source selected). Mirrors EventInsights so the two
-          tabs feel like siblings. */}
-      <EmailSourceInsights
-        sourceCounts={counts}
-        allSignups={signups}
-        selectedSource={selectedSource}
-        onSelectSource={setSelectedSource}
-        audienceFilter={audienceFilter}
-        onAudienceFilterChange={setAudienceFilter}
-        onRefresh={() => { fetchSourcesAndCounts(); fetchSignups() }}
-        isLoading={isLoading}
-        onConvertAll={() => runConvertAllSignups(filteredSignupsBeforeState)}
-        convertAllDisabled={filteredSignupsBeforeState.length === 0}
-        // Timestamps from the FULL source set (no audience/state/date
-        // filter) so the sparkline shows true history regardless of the
-        // user's current view.
-        drilldownTimestamps={
-          selectedSource
-            ? signups
-                .filter((s) => s.source === selectedSource)
-                .map((s) => s.created_at)
-                .filter(Boolean)
-            : undefined
         }
       />
 
-      {/* Search — flush, no card chrome (matches Events surface). */}
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search emails..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
-        />
-      </div>
-
-      {/* Date preset chips — replaces the dropdown. "Custom" reveals from/to
-          inputs inline. Active preset / custom range gets a filled neutral-900
-          chip; idle chips are bordered ghosts. */}
-      <DatePresetChips
-        preset={datePreset}
-        startDate={startDate}
-        endDate={endDate}
-        onPresetChange={handleDatePreset}
-        onCustomChange={(s, e) => {
-          setStartDate(s)
-          setEndDate(e)
-          setDatePreset(s || e ? "custom" : "")
-        }}
-        onClear={() => {
-          setStartDate("")
-          setEndDate("")
-          setDatePreset("")
-        }}
-      />
-
-
-      {/* PR 3 — state filter chips */}
-      {!isLoading && !error && (
-        <div className="mb-3">
-          <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+      {/* Filter toolbar — search + a single Date dropdown + state chips on
+          one quiet row (wraps on narrow widths). Date/state filters only
+          appear once the list has loaded. */}
+      <div className="flex items-center gap-2.5 flex-wrap mb-3">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search emails..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-1.5 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
+          />
         </div>
-      )}
+        {!isLoading && !error && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <DateRangeDropdown
+              preset={datePreset}
+              startDate={startDate}
+              endDate={endDate}
+              onPresetChange={handleDatePreset}
+              onCustomChange={(s, e) => {
+                setStartDate(s)
+                setEndDate(e)
+                setDatePreset(s || e ? "custom" : "")
+              }}
+              onClear={() => {
+                setStartDate("")
+                setEndDate("")
+                setDatePreset("")
+              }}
+            />
+            <span className="h-5 w-px bg-neutral-200 shrink-0" aria-hidden="true" />
+            <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+          </div>
+        )}
+      </div>
 
       {/* Error */}
       {error && (
@@ -735,10 +681,11 @@ export function EmailListsTab({
         </div>
       )}
 
-      {/* Permission state — reachability of the rows currently shown, placed
-          right above the table so the numbers match exactly what you're viewing
-          (subscribed / pending / opted out / not opted in). */}
-      {!isLoading && !error && filteredSignups.length > 0 && (
+      {/* Permission state — reachability of the *filtered* slice, right above
+          the table so the numbers match what you're viewing. Only shown when a
+          filter is active; unfiltered, the Audiences header strip already
+          carries the source-level consent breakdown. */}
+      {!isLoading && !error && isFiltered && filteredSignups.length > 0 && (
         <div className="mb-3">
           <PermissionStateRibbon
             emails={filteredSignups.map((s) => s.email).filter(Boolean)}
@@ -773,9 +720,9 @@ export function EmailListsTab({
                   aria-label="Select all visible"
                 />
                 <span className="text-[11px] text-neutral-500">
-                  {selected.size > 0
-                    ? `${selected.size} selected`
-                    : `${filteredSignups.length} visible`}
+                  {/* Selection-only — the visible/total row count lives once, in
+                      the table footer, so it isn't repeated at top and bottom. */}
+                  {selected.size > 0 ? `${selected.size} selected` : "Select all"}
                   {hiddenSelected > 0 && (
                     <span className="ml-2 text-neutral-400">
                       ({hiddenSelected} hidden by filter)
