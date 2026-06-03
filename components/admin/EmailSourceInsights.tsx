@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import {
   Globe,
   ArrowLeft,
@@ -103,6 +103,22 @@ export function EmailSourceInsights({
   const subscriberMap = useMailchimpSubscribers()
   const [sortKey, setSortKey] = useState<SortKey>("volume")
   const [overviewQuery, setOverviewQuery] = useState("")
+  // Collapse the source grid to bring the table up. Default expanded so a
+  // first-time admin sees the sources; remembered per browser once toggled.
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    setCollapsed(localStorage.getItem("emailSourcesCollapsed") === "1")
+  }, [])
+  const toggleCollapsed = () =>
+    setCollapsed((v) => {
+      const next = !v
+      try {
+        localStorage.setItem("emailSourcesCollapsed", next ? "1" : "0")
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
 
   // Build per-source rollups joining signups against CRM + Mailchimp.
   // Rollups are derived from `allSignups` rather than `sourceCounts` so the
@@ -334,7 +350,16 @@ export function EmailSourceInsights({
     <div className="mb-6">
       {/* Header row */}
       <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          className="flex items-center gap-2 min-w-0 text-left"
+          title={collapsed ? "Show sources" : "Hide sources"}
+        >
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-neutral-400 shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+          />
           <Globe className="w-4 h-4 text-neutral-400 shrink-0" />
           <h3 className="text-[12px] font-semibold uppercase tracking-wider text-neutral-500">
             Sources
@@ -343,7 +368,7 @@ export function EmailSourceInsights({
             {totals.sources} {totals.sources === 1 ? "source" : "sources"} ·{" "}
             {totals.registrations.toLocaleString()} signups
           </span>
-        </div>
+        </button>
         <div className="flex items-center gap-1.5 shrink-0">
           <SortDropdown value={sortKey} onChange={setSortKey} />
           <button
@@ -358,6 +383,8 @@ export function EmailSourceInsights({
         </div>
       </div>
 
+      {!collapsed && (
+        <>
       {/* Search — progressive */}
       {showSearch && (
         <div className="relative mb-3">
@@ -422,6 +449,8 @@ export function EmailSourceInsights({
             />
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   )

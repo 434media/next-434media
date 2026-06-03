@@ -673,18 +673,6 @@ export function EmailListsTab({
         }
       />
 
-      {/* Permission state ribbon — segmented bar over the currently filtered
-          signup set: subscribed (can email today) / pending (double-opt-in) /
-          unmailable (unsub/cleaned) / not in MC (push opportunity). */}
-      {filteredSignupsBeforeState.length > 0 && (
-        <div className="mb-3">
-          <PermissionStateRibbon
-            emails={filteredSignupsBeforeState.map((s) => s.email).filter(Boolean)}
-            subscriberMap={subscriberMap}
-          />
-        </div>
-      )}
-
       {/* Search — flush, no card chrome (matches Events surface). */}
       <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
@@ -744,6 +732,18 @@ export function EmailListsTab({
         <div className="bg-white rounded-md border border-neutral-200/70 p-12 text-center">
           <Loader2 className="w-6 h-6 animate-spin text-neutral-300 mx-auto mb-3" />
           <p className="text-neutral-400 text-[13px] font-normal">Loading email signups...</p>
+        </div>
+      )}
+
+      {/* Permission state — reachability of the rows currently shown, placed
+          right above the table so the numbers match exactly what you're viewing
+          (subscribed / pending / opted out / not opted in). */}
+      {!isLoading && !error && filteredSignups.length > 0 && (
+        <div className="mb-3">
+          <PermissionStateRibbon
+            emails={filteredSignups.map((s) => s.email).filter(Boolean)}
+            subscriberMap={subscriberMap}
+          />
         </div>
       )}
 
