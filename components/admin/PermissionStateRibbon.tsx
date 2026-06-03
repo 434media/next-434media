@@ -17,11 +17,9 @@ interface PermissionStateRibbonProps {
   emails: string[]
   /** subscriberMap from useMailchimpSubscribers (all-status). */
   subscriberMap: Map<string, SubscriberEntry>
-  /** Optional: open the push-to-Mailchimp modal when the user clicks "Push not-in-MC". */
-  onPushNotInMc?: () => void
 }
 
-type Bucket = "subscribed" | "pending" | "unmailable" | "not_in_mc"
+type Bucket = "subscribed" | "pending" | "opted_out" | "not_opted_in"
 
 const BUCKET_META: Record<
   Bucket,
@@ -35,53 +33,50 @@ const BUCKET_META: Record<
     hint: "Subscribed in at least one audience",
   },
   pending: {
-    label: "Pending",
+    label: "Pending opt-in",
     dot: "bg-amber-500",
     bar: "bg-amber-500",
     icon: Clock,
     hint: "Awaiting double opt-in confirmation",
   },
-  unmailable: {
-    label: "Cannot email",
-    dot: "bg-neutral-500",
-    bar: "bg-neutral-500",
+  opted_out: {
+    label: "Opted out",
+    dot: "bg-rose-500",
+    bar: "bg-rose-500",
     icon: Ban,
-    hint: "Unsubscribed, cleaned, or hard-bounced",
+    hint: "Unsubscribed or hard-bounced (cleaned)",
   },
-  not_in_mc: {
-    label: "Not in Mailchimp",
+  not_opted_in: {
+    label: "Not opted in",
     dot: "bg-neutral-300",
     bar: "bg-neutral-300",
     icon: UserPlus,
-    hint: "Not yet pushed to any audience",
+    hint: "Never subscribed — consented contacts sync to Mailchimp automatically",
   },
 }
 
 /**
- * Bucket priority — when a person sits in multiple audiences with mixed
- * statuses, we use the most permissive bucket. Subscribed in audience A
- * trumps unsubscribed in audience B for "can I email this person today?"
+ * Bucket priority. "Can I email this person today?" — subscribed in any audience
+ * wins. Then pending. Opted out (unsubscribed/cleaned) is called out distinctly
+ * from "not opted in" (transactional / never synced) so an active opt-out reads
+ * differently from someone who simply hasn't consented.
  */
 function pickBucket(memberships: SubscriberMembership[]): Bucket {
   if (memberships.some((m) => m.status === "subscribed")) return "subscribed"
   if (memberships.some((m) => m.status === "pending")) return "pending"
-  if (
-    memberships.some(
-      (m) => m.status === "unsubscribed" || m.status === "cleaned" || m.status === "transactional" || m.status === "archived",
-    )
-  ) {
-    return "unmailable"
+  if (memberships.some((m) => m.status === "unsubscribed" || m.status === "cleaned")) {
+    return "opted_out"
   }
-  return "not_in_mc"
+  return "not_opted_in" // transactional / archived / never synced
 }
 
-export function PermissionStateRibbon({ emails, subscriberMap, onPushNotInMc }: PermissionStateRibbonProps) {
+export function PermissionStateRibbon({ emails, subscriberMap }: PermissionStateRibbonProps) {
   const counts = useMemo(() => {
-    const acc: Record<Bucket, number> = { subscribed: 0, pending: 0, unmailable: 0, not_in_mc: 0 }
+    const acc: Record<Bucket, number> = { subscribed: 0, pending: 0, opted_out: 0, not_opted_in: 0 }
     for (const e of emails) {
       const entry = subscriberMap.get(e.toLowerCase())
       if (!entry || entry.memberships.length === 0) {
-        acc.not_in_mc += 1
+        acc.not_opted_in += 1
         continue
       }
       acc[pickBucket(entry.memberships)] += 1
@@ -93,7 +88,7 @@ export function PermissionStateRibbon({ emails, subscriberMap, onPushNotInMc }: 
   if (total === 0) return null
 
   const segments: Array<{ key: Bucket; count: number; pct: number }> = (
-    ["subscribed", "pending", "unmailable", "not_in_mc"] as Bucket[]
+    ["subscribed", "pending", "opted_out", "not_opted_in"] as Bucket[]
   ).map((key) => ({
     key,
     count: counts[key],
@@ -101,7 +96,6 @@ export function PermissionStateRibbon({ emails, subscriberMap, onPushNotInMc }: 
   }))
 
   const subscribedCount = counts.subscribed
-  const notInMcCount = counts.not_in_mc
 
   return (
     <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
@@ -121,16 +115,6 @@ export function PermissionStateRibbon({ emails, subscriberMap, onPushNotInMc }: 
             </p>
           </div>
         </div>
-
-        {notInMcCount > 0 && onPushNotInMc && (
-          <button
-            onClick={onPushNotInMc}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors"
-          >
-            <UserPlus className="w-3 h-3" />
-            Push {notInMcCount.toLocaleString()} to Mailchimp
-          </button>
-        )}
       </div>
 
       {/* Stacked bar */}
