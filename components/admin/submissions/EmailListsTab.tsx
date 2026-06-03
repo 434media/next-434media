@@ -24,6 +24,8 @@ import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink
 import {
   MailchimpSubscribedPill,
   useMailchimpSubscribers,
+  isMarketable,
+  isOptedOut,
 } from "@/components/admin/MailchimpSubscribedPill"
 import {
   EmailSourceInsights,
@@ -366,10 +368,12 @@ export function EmailListsTab({
       if (audienceFilter !== "all") {
         const email = signup.email.toLowerCase()
         const inCrm = leadsByEmail.has(email)
-        const inMc = subscriberMap.has(email)
+        // "In Mailchimp" = subscribed (marketable), matching the tile — not mere presence.
+        const inMc = isMarketable(subscriberMap.get(email))
         if (audienceFilter === "in-crm" && !inCrm) return false
         if (audienceFilter === "in-mailchimp" && !inMc) return false
         if (audienceFilter === "untapped" && inCrm) return false
+        if (audienceFilter === "opted-out" && !isOptedOut(subscriberMap.get(email))) return false
       }
       return true
     })

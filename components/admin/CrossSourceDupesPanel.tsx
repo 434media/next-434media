@@ -204,15 +204,15 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
         >
           <Combine className="w-4 h-4 text-neutral-400 shrink-0" />
           <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 shrink-0">
-            Cross-source duplicates
+            Multi-touch contacts
           </span>
           <span className="text-[10px] text-neutral-400 truncate">
             {isLoading ? (
               "scanning…"
             ) : stats ? (
               <>
-                {stats.duplicateEmails} {stats.duplicateEmails === 1 ? "person" : "people"} in 2+ tabs ·{" "}
-                {stats.totalRows} total submissions
+                {stats.duplicateEmails} {stats.duplicateEmails === 1 ? "person" : "people"} across 2+ sources ·{" "}
+                {stats.totalRows} total touchpoints
                 {stats.duplicateEmails > 0 ? (
                   <>
                     {" "}
@@ -354,8 +354,8 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
             </ul>
           )}
           <div className="px-4 py-2 border-t border-neutral-100 bg-neutral-50 text-[11px] text-neutral-400">
-            One person, multiple touchpoints. Merging captures every source as a tag on a single CRM lead so
-            scoring and follow-up stay aligned.
+            Your warmest contacts — they showed up across more than one source. Merging captures every source
+            as a tag on a single CRM lead, so scoring and follow-up stay aligned.
           </div>
         </div>
       )}

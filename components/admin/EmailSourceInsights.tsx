@@ -10,14 +10,15 @@ import {
   ChevronDown,
   UserPlus,
   RefreshCw,
+  BellOff,
 } from "lucide-react"
 import { useLeadsByEmail } from "@/components/admin/LeadCrossLink"
-import { useMailchimpSubscribers, isMarketable } from "@/components/admin/MailchimpSubscribedPill"
+import { useMailchimpSubscribers, isMarketable, isOptedOut } from "@/components/admin/MailchimpSubscribedPill"
 import { RegistrationSparkline } from "@/components/admin/RegistrationSparkline"
 
 // ── Types ──
 
-export type EmailAudienceFilter = "all" | "in-crm" | "in-mailchimp" | "untapped"
+export type EmailAudienceFilter = "all" | "in-crm" | "in-mailchimp" | "untapped" | "opted-out"
 
 export interface SignupRowMinimal {
   // Just enough shape for the rollup. The parent passes the full signups[]
@@ -31,6 +32,7 @@ interface SourceRollup {
   total: number
   inCrm: number
   inMailchimp: number
+  optedOut: number
   conversionRate: number
 }
 
@@ -108,14 +110,19 @@ export function EmailSourceInsights({
   // back to `sourceCounts[source]` so the headline is always the canonical
   // server count even if a source has zero loaded rows.
   const rollups: SourceRollup[] = useMemo(() => {
-    type Bucket = { uniqueEmails: Set<string>; inCrm: Set<string>; inMc: Set<string> }
+    type Bucket = {
+      uniqueEmails: Set<string>
+      inCrm: Set<string>
+      inMc: Set<string>
+      optedOut: Set<string>
+    }
     const buckets = new Map<string, Bucket>()
 
     for (const s of allSignups) {
       const src = s.source || "Unknown"
       let b = buckets.get(src)
       if (!b) {
-        b = { uniqueEmails: new Set(), inCrm: new Set(), inMc: new Set() }
+        b = { uniqueEmails: new Set(), inCrm: new Set(), inMc: new Set(), optedOut: new Set() }
         buckets.set(src, b)
       }
       const e = (s.email || "").toLowerCase()
@@ -125,6 +132,7 @@ export function EmailSourceInsights({
       // Subscribed (marketable) only — matches the "subscribed" tile label and
       // the consent-aware header strip, not mere presence.
       if (isMarketable(subscriberMap.get(e))) b.inMc.add(e)
+      if (isOptedOut(subscriberMap.get(e))) b.optedOut.add(e)
     }
 
     // Make sure every source from the canonical counts has a row, even if
@@ -146,6 +154,7 @@ export function EmailSourceInsights({
         total,
         inCrm,
         inMailchimp: inMc,
+        optedOut: b?.optedOut.size ?? 0,
         conversionRate: unique > 0 ? inCrm / unique : 0,
       })
     }
@@ -252,7 +261,7 @@ export function EmailSourceInsights({
 
         {/* Stats — clickable filters */}
         {current ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
             <FilterTile
               icon={Globe}
               label="Total"
@@ -287,6 +296,15 @@ export function EmailSourceInsights({
               valueClass={untapped > 0 ? "text-amber-700" : "text-neutral-400"}
               active={audienceFilter === "untapped"}
               onClick={() => onAudienceFilterChange("untapped")}
+            />
+            <FilterTile
+              icon={BellOff}
+              label="Opted out"
+              value={current.optedOut.toLocaleString()}
+              hint="unsubscribed"
+              valueClass={current.optedOut > 0 ? "text-rose-700" : "text-neutral-400"}
+              active={audienceFilter === "opted-out"}
+              onClick={() => onAudienceFilterChange("opted-out")}
             />
           </div>
         ) : (
