@@ -81,10 +81,14 @@ export function EventRegistrationsTab({
   setToast,
   initialSearch = "",
   initialEvent = "",
+  onChanged,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
   initialEvent?: string
+  /** Fired after a mutation (delete / promote) so the Audiences header strip
+   *  can re-fetch its per-source counts live. */
+  onChanged?: () => void
 }) {
   const leadsByEmail = useLeadsByEmail()
   const subscriberMap = useMailchimpSubscribers()
@@ -163,7 +167,10 @@ export function EventRegistrationsTab({
   const { promote: promoteRegistrations } = usePromoteToLeads({
     collection: "event_registrations",
     setToast,
-    onSuccess: () => fetchRegistrations(),
+    onSuccess: () => {
+      fetchRegistrations()
+      onChanged?.()
+    },
     onClearSelection: clearSelected,
   })
 
@@ -214,6 +221,7 @@ export function EventRegistrationsTab({
         setRegistrations((prev) => prev.filter((r) => r.id !== id))
         if (selectedRegistration?.id === id) setSelectedRegistration(null)
         await fetchCounts()
+        onChanged?.()
       } else {
         setToast({ message: data.error || "Failed to delete", type: "error" })
       }
@@ -476,6 +484,7 @@ export function EventRegistrationsTab({
     })
     clearSelected()
     await fetchCounts()
+    onChanged?.()
   }
 
   // "Convert all" — converts every CURRENTLY VISIBLE registration into a lead,

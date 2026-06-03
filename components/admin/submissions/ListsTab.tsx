@@ -56,9 +56,13 @@ function formatDate(iso: string | undefined): string {
 export function ListsTab({
   setToast,
   initialSearch = "",
+  onChanged,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
+  /** Fired after a mutation (delete / promote) so the Audiences header strip
+   *  can re-fetch its per-source counts live. */
+  onChanged?: () => void
 }) {
   const subscriberMap = useMailchimpSubscribers()
   const [isLoading, setIsLoading] = useState(true)
@@ -208,7 +212,10 @@ export function ListsTab({
   const { promotingIds, promote: promoteMembers } = usePromoteToLeads({
     collection: "partner_list_members",
     setToast,
-    onSuccess: fetchMembers,
+    onSuccess: () => {
+      fetchMembers()
+      onChanged?.()
+    },
     onClearSelection: clearSelected,
   })
 
@@ -249,6 +256,7 @@ export function ListsTab({
       if (!res.ok) throw new Error("failed")
       setMembers((prev) => prev.filter((m) => m.id !== id))
       setToast({ message: `Deleted ${name}`, type: "success" })
+      onChanged?.()
     } catch {
       setToast({ message: "Failed to delete contact", type: "error" })
     } finally {
@@ -282,6 +290,7 @@ export function ListsTab({
       type: failed === 0 ? "success" : "error",
     })
     clearSelected()
+    onChanged?.()
   }
 
   return (

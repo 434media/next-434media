@@ -48,7 +48,20 @@ export async function deleteContactForm(id: string): Promise<{ success: boolean;
     if (id.startsWith("aimsatx:")) {
       const realId = id.replace("aimsatx:", "")
       const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
-      await aimsDb.collection("contact_submissions").doc(realId).delete()
+      const ref = aimsDb.collection("contact_submissions").doc(realId)
+
+      // Verify-before / verify-after. Firestore .delete() is idempotent, so a
+      // delete routed to the wrong database (the binding bug this guards
+      // against) would resolve as a successful no-op and leave the doc behind.
+      const before = await ref.get()
+      if (!before.exists) {
+        return { success: false, error: "Contact form submission not found in aimsatx" }
+      }
+      await ref.delete()
+      const after = await ref.get()
+      if (after.exists) {
+        return { success: false, error: "Delete did not persist (aimsatx) — check named-database binding" }
+      }
       console.log(`[Firestore] Deleted aimsatx contact submission: ${realId}`)
       return { success: true }
     }

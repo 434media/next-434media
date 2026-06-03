@@ -24,14 +24,21 @@ interface InboxStats {
   totalSubmissions: number
 }
 
-export function InboxResponseStrip() {
+interface InboxResponseStripProps {
+  /** Increment to force a re-fetch — bumped by the page after a mutation
+   *  (delete / reply / triage / acknowledge) so the SLA numbers stay live. */
+  refreshSignal?: number
+}
+
+export function InboxResponseStrip({ refreshSignal = 0 }: InboxResponseStripProps) {
   const [stats, setStats] = useState<InboxStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    setIsLoading(true)
+    // Keep prior numbers visible on a refresh-triggered refetch (don't flash
+    // skeletons); only show the loading state on the initial load.
     setHasError(false)
     fetch(`/api/admin/contact-forms/inbox-stats?_t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
@@ -52,7 +59,7 @@ export function InboxResponseStrip() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshSignal])
 
   // Silently hide on error — the strip is supplemental; keeping the inbox
   // list visible matters more than showing an error banner for a stats fetch.

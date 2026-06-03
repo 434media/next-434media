@@ -64,12 +64,16 @@ export function AdminOverview() {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined)
   const [counts, setCounts] = useState<OverviewCounts | null>(null)
   const [loading, setLoading] = useState(true)
+  // The overview has no in-page mutator (it's just the funnel), so there's no
+  // sibling to signal. Instead it self-refreshes when you return to the tab —
+  // `refreshKey` is bumped on window focus / visibility so the counts stay live
+  // after you've been working elsewhere, without flashing skeletons.
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  // Single self-contained load that runs exactly once (empty deps): resolve the
-  // session, then fetch counts for the stages this role can see. Resolving the
-  // session inside this effect — rather than via useAdminAccess with an inline
-  // array — avoids the dependency-identity feedback loop that re-fetched on
-  // every render.
+  // Resolve the session, then fetch counts for the stages this role can see.
+  // Re-runs when refreshKey changes (focus/visibility). Resolving the session
+  // inside this effect — rather than via useAdminAccess with an inline array —
+  // avoids the dependency-identity feedback loop that re-fetched on every render.
   useEffect(() => {
     let cancelled = false
 
@@ -154,6 +158,20 @@ export function AdminOverview() {
     run()
     return () => {
       cancelled = true
+    }
+  }, [refreshKey])
+
+  // Self-refresh when the user returns to the overview (tab focus / visibility),
+  // so the counts reflect work done elsewhere without a manual page refresh.
+  useEffect(() => {
+    const bump = () => {
+      if (document.visibilityState === "visible") setRefreshKey((k) => k + 1)
+    }
+    window.addEventListener("focus", bump)
+    document.addEventListener("visibilitychange", bump)
+    return () => {
+      window.removeEventListener("focus", bump)
+      document.removeEventListener("visibilitychange", bump)
     }
   }, [])
 

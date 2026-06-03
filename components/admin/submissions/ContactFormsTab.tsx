@@ -65,9 +65,13 @@ interface ContactFormSubmission {
 export function ContactFormsTab({
   setToast,
   initialSearch = "",
+  onChanged,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
+  /** Fired after any mutation that affects the inbox SLA stats (delete, reply,
+   *  triage/replied, acknowledge) so the page can refresh the response strip. */
+  onChanged?: () => void
 }) {
   const leadsByEmail = useLeadsByEmail()
   const subscriberMap = useMailchimpSubscribers()
@@ -150,6 +154,7 @@ export function ContactFormsTab({
         setToast({ message: `Deleted submission from ${email}`, type: "success" })
         await fetchSourcesAndCounts()
         await fetchSubmissions(selectedSource || undefined)
+        onChanged?.()
       } else {
         setToast({ message: data.error || "Failed to delete", type: "error" })
       }
@@ -345,6 +350,7 @@ export function ContactFormsTab({
         type: "success",
       })
       clearSelected()
+      onChanged?.()
     } catch {
       setToast({ message: "Bulk update failed", type: "error" })
     }
@@ -381,6 +387,7 @@ export function ContactFormsTab({
     clearSelected()
     await fetchSourcesAndCounts()
     await fetchSubmissions(selectedSource || undefined)
+    onChanged?.()
   }
 
   // Stage 5d — bulk acknowledge. Sends a fixed templated "got your message,
@@ -436,7 +443,10 @@ export function ContactFormsTab({
         message: `Acknowledgments: ${parts.join(", ")}`,
         type: sendFailed === 0 && stateFailed === 0 && invalid === 0 ? "success" : "error",
       })
-      if (sent > 0) clearSelected()
+      if (sent > 0) {
+        clearSelected()
+        onChanged?.()
+      }
     } catch {
       setToast({ message: "Bulk acknowledge failed", type: "error" })
     }
@@ -1066,6 +1076,7 @@ export function ContactFormsTab({
             // change locally so the row badge updates without a refetch.
             setLocal(submissionId, "replied")
             setToast({ message: "Reply sent", type: "success" })
+            onChanged?.()
           } else {
             // Partial success: email already sent, but the sidecar state
             // write failed. Do NOT call setLocal — optimistically claiming

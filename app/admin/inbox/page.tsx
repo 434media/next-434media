@@ -18,6 +18,10 @@ export default function InboxPage() {
   const searchParams = useSearchParams()
   const initialSearch = searchParams?.get("search") ?? ""
   const [toast, setToast] = useState<Toast | null>(null)
+  // Bumped by ContactFormsTab after any stat-affecting mutation (delete, reply,
+  // triage, acknowledge) so the response-SLA strip re-fetches live instead of
+  // only on a full page refresh.
+  const [statsNonce, setStatsNonce] = useState(0)
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -93,9 +97,13 @@ export default function InboxPage() {
               waiting / replied today / avg response time across the contact
               forms surface. Tone shifts (amber → red) when oldest waiting
               crosses 24h. */}
-          <InboxResponseStrip />
+          <InboxResponseStrip refreshSignal={statsNonce} />
 
-          <ContactFormsTab setToast={setToast} initialSearch={initialSearch} />
+          <ContactFormsTab
+            setToast={setToast}
+            initialSearch={initialSearch}
+            onChanged={() => setStatsNonce((n) => n + 1)}
+          />
         </main>
       </div>
     </AdminRoleGuard>

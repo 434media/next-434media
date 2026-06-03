@@ -70,9 +70,13 @@ interface EmailSignup {
 export function EmailListsTab({
   setToast,
   initialSearch = "",
+  onChanged,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
+  /** Fired after a mutation (delete / promote) so the Audiences header strip
+   *  can re-fetch its per-source counts live. */
+  onChanged?: () => void
 }) {
   const leadsByEmail = useLeadsByEmail()
   const subscriberMap = useMailchimpSubscribers()
@@ -209,6 +213,7 @@ export function EmailListsTab({
         setToast({ message: `Deleted ${email}`, type: "success" })
         await fetchSourcesAndCounts()
         await fetchSignups()
+        onChanged?.()
       } else {
         setToast({ message: data.error || "Failed to delete", type: "error" })
       }
@@ -462,6 +467,7 @@ export function EmailListsTab({
     clearSelected()
     await fetchSourcesAndCounts()
     await fetchSignups()
+    onChanged?.()
   }
 
   // Audience → Leads promotion (sets bidirectional backlinks). Replaces the
@@ -469,7 +475,10 @@ export function EmailListsTab({
   const { promote: promoteSignups } = usePromoteToLeads({
     collection: "email_signups",
     setToast,
-    onSuccess: fetchSignups,
+    onSuccess: () => {
+      fetchSignups()
+      onChanged?.()
+    },
     onClearSelection: clearSelected,
   })
 

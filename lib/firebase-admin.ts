@@ -1,4 +1,5 @@
 import admin from "firebase-admin"
+import { getFirestore } from "firebase-admin/firestore"
 
 // Initialize Firebase Admin SDK
 let app: admin.app.App | undefined
@@ -101,36 +102,34 @@ const namedDbs: Record<string, admin.firestore.Firestore> = {}
 /**
  * Get a Firestore instance for a named database (e.g., "techday", "aimsatx")
  * These are separate databases within the same GCP project.
+ *
+ * Binds the database at construction via `getFirestore(app, databaseId)` — the
+ * supported multi-database API. The previous approach created a per-database
+ * app and retargeted it with `.settings({ databaseId })`, a one-shot that can
+ * only run before the instance's first operation; when it threw (e.g. after a
+ * dev HMR reset, where the app persists but the instance was already used) the
+ * error was swallowed and the instance silently stayed on the `(default)`
+ * database. Reads happened to bind correctly while WRITES landed on `(default)`
+ * — so deletes/updates/promotions against aimsatx/techday/digitalcanvas
+ * succeeded as idempotent no-ops and never persisted.
  */
 export function getNamedDb(databaseId: string): admin.firestore.Firestore {
   if (namedDbs[databaseId]) return namedDbs[databaseId]
 
-  const appName = `named-db-${databaseId}`
-  let namedApp: admin.app.App
+  // One app for the whole project; getFirestore(app, databaseId) gives a
+  // distinct, correctly-bound instance per database — no settings() hack.
+  const namedFirestore = getFirestore(
+    getFirebaseApp(),
+    databaseId,
+  ) as unknown as admin.firestore.Firestore
 
-  // Check if this named app already exists
-  const existing = admin.apps.find((a) => a?.name === appName)
-  if (existing) {
-    namedApp = existing
-  } else {
-    const credentials = getCredentials()
-    namedApp = admin.initializeApp(
-      {
-        credential: admin.credential.cert({
-          projectId: credentials.project_id,
-          clientEmail: credentials.client_email,
-          privateKey: credentials.private_key,
-        }),
-      },
-      appName
-    )
-  }
-
-  const namedFirestore = namedApp.firestore()
+  // Match the default instance's write behavior. Unlike the old code, the
+  // databaseId is already bound by getFirestore — if this throws (instance
+  // already used) the binding is unaffected, so the swallow is harmless now.
   try {
-    namedFirestore.settings({ databaseId, ignoreUndefinedProperties: true })
+    namedFirestore.settings({ ignoreUndefinedProperties: true })
   } catch {
-    // Settings already applied
+    // Settings already applied on this instance — fine.
   }
 
   namedDbs[databaseId] = namedFirestore

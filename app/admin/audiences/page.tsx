@@ -37,6 +37,10 @@ export default function AudiencesPage() {
 
   const [activeSub, setActiveSub] = useState<SubTab>(initialSub)
   const [toast, setToast] = useState<Toast | null>(null)
+  // Bumped by the active sub-tab after a mutation (delete / promote) so the
+  // header strip's per-source counts re-fetch live instead of only on refresh.
+  const [stripNonce, setStripNonce] = useState(0)
+  const bumpStrip = () => setStripNonce((n) => n + 1)
 
   const switchSub = (next: SubTab) => {
     setActiveSub(next)
@@ -130,7 +134,7 @@ export default function AudiencesPage() {
           {/* Source switcher — segmented control with per-source totals, plus
               the active source's secondary KPIs (+this week / subscribed /
               to-push). This is the page's only nav for Newsletter / Events / Lists. */}
-          <AudiencesHeaderStrip activeSub={activeSub} onSelectSub={switchSub} />
+          <AudiencesHeaderStrip activeSub={activeSub} onSelectSub={switchSub} refreshSignal={stripNonce} />
 
           {/* Cross-source dedupe panel — surfaces emails appearing across the
               three audience sources (and Inbox) so dupes can be merged into a
@@ -140,15 +144,16 @@ export default function AudiencesPage() {
           />
 
           {activeSub === "newsletter" ? (
-            <EmailListsTab setToast={setToast} initialSearch={initialSearch} />
+            <EmailListsTab setToast={setToast} initialSearch={initialSearch} onChanged={bumpStrip} />
           ) : activeSub === "events" ? (
             <EventRegistrationsTab
               setToast={setToast}
               initialSearch={initialSearch}
               initialEvent={initialEvent}
+              onChanged={bumpStrip}
             />
           ) : (
-            <ListsTab setToast={setToast} initialSearch={initialSearch} />
+            <ListsTab setToast={setToast} initialSearch={initialSearch} onChanged={bumpStrip} />
           )}
         </main>
       </div>

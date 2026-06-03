@@ -36,6 +36,9 @@ interface SourceStats {
 interface AudiencesHeaderStripProps {
   activeSub: SubTab
   onSelectSub: (sub: SubTab) => void
+  /** Increment to force a re-fetch of the per-source counts — bumped by the
+   *  active sub-tab after a mutation (delete / promote) so totals stay live. */
+  refreshSignal?: number
 }
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -99,7 +102,7 @@ function statsFromMembers(members: MemberSig[]): SourceStats {
   }
 }
 
-export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeaderStripProps) {
+export function AudiencesHeaderStrip({ activeSub, onSelectSub, refreshSignal = 0 }: AudiencesHeaderStripProps) {
   const subscriberMap = useMailchimpSubscribers()
   const [newsletter, setNewsletter] = useState<SourceStats | null>(null)
   const [events, setEvents] = useState<SourceStats | null>(null)
@@ -108,7 +111,9 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
 
   useEffect(() => {
     let cancelled = false
-    setIsLoading(true)
+    // No setIsLoading(true) here: on a refresh-triggered refetch we keep the
+    // prior numbers visible (no skeleton flash). The initial useState(true)
+    // covers the first load.
 
     Promise.allSettled([
       fetch(`/api/admin/email-lists-firestore?_t=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
@@ -146,7 +151,7 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
     return () => {
       cancelled = true
     }
-  }, [subscriberMap])
+  }, [subscriberMap, refreshSignal])
 
   const sources = [
     { id: "newsletter" as const, label: "Newsletter", icon: Mail, stats: newsletter, blurb: "People who signed up for email updates." },
