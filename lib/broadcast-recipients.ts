@@ -3,9 +3,11 @@ import { getEventRegistrations } from "./firestore-event-registrations"
 import {
   mailchimpIntentForEmailSignup,
   mailchimpIntentForEventRegistration,
+  type MailchimpIntent,
 } from "./mailchimp-intent"
 import { getMailchimpSubscriberMap } from "./mailchimp-analytics"
 import { getSuppressedEmails } from "./firestore-suppression"
+import { listPartnerListMembers } from "./firestore-partner-list-members"
 import { BROADCAST_AUDIENCES } from "./broadcast-audiences"
 
 // Recipient builder for a branded broadcast (Phase 2).
@@ -15,6 +17,12 @@ import { BROADCAST_AUDIENCES } from "./broadcast-audiences"
 // anyone unsubscribed/cleaned in Mailchimp or on the suppression list — so a
 // broadcast can never reach a non-consented or opted-out contact, and consent
 // stays single-sourced in Mailchimp.
+//
+// Partner-list members are COLD by default: they're tagged `partner:<slug>` and
+// only reach the matching stage if a BROADCAST_AUDIENCES selector exists for
+// that partner (added only after the partner confirms opt-in). The Mailchimp
+// opt-out + suppression exclusions still apply to them, so an unsubscribe is
+// always honored.
 
 export interface BroadcastRecipient {
   email: string
@@ -43,16 +51,32 @@ export async function gatherBroadcastRecipients(
 ): Promise<BroadcastGatherResult> {
   const selectors = BROADCAST_AUDIENCES.filter((a) => selectedIds.includes(a.id))
 
-  const [signups, regs, mcMap, suppressed] = await Promise.all([
+  const [signups, regs, members, mcMap, suppressed] = await Promise.all([
     getEmailSignups(),
     getEventRegistrations(),
+    listPartnerListMembers({}),
     getMailchimpSubscriberMap().catch(() => null),
     getSuppressedEmails(),
   ])
 
+  // Partner members → intents tagged `partner:<slug>`. Cold by default: an
+  // intent only survives audience matching if a selector exists for its
+  // partner (gated above), so this can't email a partner that hasn't opted in.
+  const memberIntents: MailchimpIntent[] = members
+    .filter((m) => m.email)
+    .map((m) => ({
+      include: true,
+      email: m.email.toLowerCase().trim(),
+      status: "subscribed",
+      tags: [`partner:${m.partnerSlug}`],
+      firstName: m.firstName || undefined,
+      reason: `partner list member (${m.partnerName || m.partnerSlug})`,
+    }))
+
   const intents = [
     ...signups.map(mailchimpIntentForEmailSignup),
     ...regs.map(mailchimpIntentForEventRegistration),
+    ...memberIntents,
   ].filter((i) => i.include && i.email)
 
   // Mailchimp opt-outs (unsubscribed / cleaned) — honored as the consent ledger.

@@ -4,8 +4,12 @@
 // auto-sync intent functions produce), so "who's in this audience" is defined
 // once and shared by the recipient builder and the /admin/broadcasts UI.
 //
-// Cold/partner lists (e.g. Alamo Angels) are intentionally NOT here — they never
-// opted in, so they're excluded from broadcasts by design and handled 1:1.
+// Partner lists are COLD by default and excluded from broadcasts — they don't
+// flow through the consent-intent functions, so they only ever become
+// broadcast-eligible when (a) the partner confirms opt-in AND (b) an explicit
+// selector is added here. The recipient builder tags partner members
+// `partner:<slug>`, so a partner with no selector below can never be emailed.
+// Alamo Angels confirmed opt-in to the 434 Media network (2026-06-03).
 
 export interface AudienceSelector {
   id: string
@@ -39,5 +43,12 @@ export const BROADCAST_AUDIENCES: AudienceSelector[] = [
     id: "rise-of-a-champion",
     label: "Rise of a Champion",
     match: (t) => t.includes("event:rise-of-a-champion-2026"),
+  },
+  {
+    id: "alamo-angels",
+    label: "Alamo Angels",
+    // Partner cohort — opted in to the 434 Media network (confirmed 2026-06-03).
+    // Members are tagged `partner:alamo-angels` by the recipient builder.
+    match: (t) => t.includes("partner:alamo-angels"),
   },
 ]
