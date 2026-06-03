@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getMailchimpSubscriberMap } from "@/lib/mailchimp-analytics"
+import { getSuppressedEmails } from "@/lib/firestore-suppression"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -26,7 +27,32 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
   try {
-    const map = await getMailchimpSubscriberMap()
+    const [map, suppressed] = await Promise.all([
+      getMailchimpSubscriberMap(),
+      getSuppressedEmails(),
+    ])
+
+    // Merge broadcast opt-outs as a synthetic "unsubscribed" membership, so the
+    // audience pill shows them as opted-out even if they never became a Mailchimp
+    // member (an unsubscribe before they synced).
+    for (const email of suppressed) {
+      const key = email.toLowerCase()
+      const optOut = {
+        audienceId: "suppression",
+        audienceName: "Broadcast opt-out",
+        tags: [],
+        status: "unsubscribed",
+      }
+      const existing = map.byEmail[key]
+      if (existing) {
+        if (!existing.memberships.some((m) => m.status === "unsubscribed" || m.status === "cleaned")) {
+          existing.memberships.push(optOut)
+        }
+      } else {
+        map.byEmail[key] = { email: key, memberships: [optOut] }
+      }
+    }
+
     return NextResponse.json({ success: true, ...map })
   } catch (err) {
     console.error("[GET /admin/mailchimp/subscriber-map]", err)

@@ -7,6 +7,7 @@ import {
   mailchimpIntentForEventRegistration,
   type MailchimpIntent,
 } from "./mailchimp-intent"
+import { getSuppressedEmails } from "./firestore-suppression"
 
 // Phase 2 of the alignment plan — the Firestore → Mailchimp auto-sync engine.
 //
@@ -31,6 +32,8 @@ export interface AutoSyncResult {
   considered: { emailSignups: number; eventRegistrations: number }
   included: number
   skipped: number
+  /** Consent-bearing contacts excluded because they're on the suppression list. */
+  excludedSuppressed: number
   /** Unique contacts after dedupe across sources. */
   uniqueContacts: number
   /** Members grouped by identical canonical tag-set (one push per group). */
@@ -52,15 +55,24 @@ export async function runAutoSync(opts: { dryRun?: boolean } = {}): Promise<Auto
   const audienceId = getDefaultAudienceId()
   if (!audienceId) throw new Error("No Mailchimp audience configured")
 
-  const [signups, regs] = await Promise.all([getEmailSignups(), getEventRegistrations()])
+  const [signups, regs, suppressed] = await Promise.all([
+    getEmailSignups(),
+    getEventRegistrations(),
+    getSuppressedEmails(),
+  ])
 
   const intents: MailchimpIntent[] = [
     ...signups.map(mailchimpIntentForEmailSignup),
     ...regs.map(mailchimpIntentForEventRegistration),
   ]
 
-  const included = intents.filter((i) => i.include && i.email)
-  const skippedCount = intents.length - included.length
+  const consentBearing = intents.filter((i) => i.include && i.email)
+  // Honor broadcast opt-outs: a suppressed email is never pushed to Mailchimp —
+  // even one that never became a member — so an unsubscribe can't be silently
+  // undone by a later sync re-adding them as subscribed.
+  const included = consentBearing.filter((i) => !suppressed.has(i.email))
+  const excludedSuppressed = consentBearing.length - included.length
+  const skippedCount = intents.length - consentBearing.length
 
   // Dedupe + merge canonical tags by email (a person in both newsletter and an
   // event gets the union of their tags, pushed once).
@@ -103,6 +115,7 @@ export async function runAutoSync(opts: { dryRun?: boolean } = {}): Promise<Auto
     considered: { emailSignups: signups.length, eventRegistrations: regs.length },
     included: included.length,
     skipped: skippedCount,
+    excludedSuppressed,
     uniqueContacts: merged.size,
     groups: [...groups.values()]
       .map((g) => ({ tags: g.tags, count: g.members.length }))
