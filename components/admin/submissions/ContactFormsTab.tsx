@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import {
   Loader2,
-  Download,
   RefreshCw,
   Globe,
   MessageSquare,
@@ -23,7 +22,6 @@ import {
 import {
   Eye as EyeIcon,
   MessageSquare as MsgIcon,
-  Mail as MailIcon,
   Send as SendIcon,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
@@ -41,10 +39,9 @@ import {
   type SubmissionState,
   type SubmissionSource,
 } from "@/components/admin/SubmissionStateUI"
-import { MailchimpPushModal, type PushMember } from "@/components/admin/MailchimpPushModal"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { InboxReplyModal } from "./InboxReplyModal"
-import { DetailRow, FieldInput } from "./shared"
+import { ExportMenu, DetailRow, FieldInput } from "./shared"
 import type { Toast } from "./types"
 import { usePromoteToLeads } from "./usePromoteToLeads"
 import { PromoteOverridesDrawer } from "./PromoteOverridesDrawer"
@@ -82,7 +79,6 @@ export function ContactFormsTab({
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [stateFilter, setStateFilter] = useState<"all" | SubmissionState>("all")
   const { selected, toggle: toggleSelect, set: setSelected, clear: clearSelected } = useSelection()
-  const [showPushModal, setShowPushModal] = useState(false)
   const [selectedSource, setSelectedSource] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
@@ -229,6 +225,54 @@ export function ContactFormsTab({
     } finally {
       setIsDownloading(false)
     }
+  }
+
+  // Client-side CSV for the Filtered / Selected export options (the "All"
+  // option uses the server route above for the canonical dataset). Mirrors the
+  // pattern in the Events/Newsletter tabs so all four surfaces export alike.
+  const buildAndDownloadCsv = (rows: ContactFormSubmission[], filenameBase: string) => {
+    try {
+      const headers = ["First Name", "Last Name", "Email", "Company", "Phone", "Message", "Source", "Submitted At"]
+      const escape = (val: string) => {
+        const s = String(val ?? "").replace(/"/g, '""')
+        return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s}"` : s
+      }
+      const csvRows = rows.map((s) => [
+        s.firstName,
+        s.lastName,
+        s.email,
+        s.company || "",
+        s.phone || "",
+        s.message || "",
+        s.source,
+        s.created_at ? new Date(s.created_at).toLocaleDateString() : "",
+      ])
+      const csv = [headers.join(","), ...csvRows.map((row) => row.map(escape).join(","))].join("\n")
+      const blob = new Blob([csv], { type: "text/csv" })
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = downloadUrl
+      a.download = `${filenameBase}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(downloadUrl)
+      setToast({ message: `Downloaded ${rows.length} submission${rows.length === 1 ? "" : "s"}`, type: "success" })
+    } catch {
+      setToast({ message: "Failed to download CSV", type: "error" })
+    }
+  }
+
+  const handleDownloadFilteredCSV = () => {
+    const stamp = new Date().toISOString().split("T")[0]
+    buildAndDownloadCsv(filteredSubmissions, `contact-forms-filtered-${stamp}`)
+  }
+
+  const handleDownloadSelectedCSV = () => {
+    const rows = submissions.filter((s) => selected.has(s.id))
+    if (rows.length === 0) return
+    const stamp = new Date().toISOString().split("T")[0]
+    buildAndDownloadCsv(rows, `contact-forms-selected-${stamp}`)
   }
 
   const formatDate = (dateString: string) => {
@@ -438,98 +482,67 @@ export function ContactFormsTab({
 
   return (
     <div>
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
-            Contact Form Submissions
-          </h2>
-          <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
-            Form data from 434 Media, AIM, and Vemos Vamos websites
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchSubmissions(selectedSource || undefined)}
-            disabled={isLoading}
-            className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={handleDownloadCSV}
-            disabled={isDownloading || totalCount === 0}
-            className="flex items-center gap-2 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isDownloading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-            <span className="hidden sm:inline">Export CSV</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Source Stats Cards */}
+      {/* No tab header — the sticky INBOX header + How-it-works already establish
+          identity. Source selector is a compact pill row with Export + Refresh
+          in its right edge; selecting a source filters the list. */}
       {Object.keys(counts).length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-6">
-          <button
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <SourcePill
+            label="All"
+            count={Object.values(counts).reduce((a, b) => a + b, 0)}
+            active={!selectedSource}
             onClick={() => setSelectedSource("")}
-            className={`p-3 rounded-xl border transition-all text-left ${
-              selectedSource === ""
-                ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-            }`}
-          >
-            <div className="flex items-center gap-1.5 mb-1">
-              <Globe className="w-3 h-3 opacity-50" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">All</span>
-            </div>
-            <div className="text-xl font-bold leading-tight">
-              {Object.values(counts).reduce((a, b) => a + b, 0).toLocaleString()}
-            </div>
-            <div className="text-[11px] opacity-50 font-normal leading-snug">submissions</div>
-          </button>
+          />
           {Object.entries(counts)
             .sort(([, a], [, b]) => b - a)
             .map(([source, count]) => (
-              <button
+              <SourcePill
                 key={source}
+                label={source}
+                count={count}
+                active={selectedSource === source}
                 onClick={() => setSelectedSource(source)}
-                className={`p-3 rounded-xl border transition-all text-left ${
-                  selectedSource === source
-                    ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                    : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <MessageSquare className="w-3 h-3 opacity-50" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider truncate">
-                    {source}
-                  </span>
-                </div>
-                <div className="text-xl font-bold leading-tight">{count.toLocaleString()}</div>
-                <div className="text-[11px] opacity-50 font-normal leading-snug">submissions</div>
-              </button>
+              />
             ))}
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <ExportMenu
+              disabled={isDownloading || totalCount === 0}
+              isDownloading={isDownloading}
+              allCount={totalCount}
+              filteredCount={filteredSubmissions.length}
+              selectedCount={selected.size}
+              onExportAll={handleDownloadCSV}
+              onExportFiltered={handleDownloadFilteredCSV}
+              onExportSelected={handleDownloadSelectedCSV}
+            />
+            <button
+              onClick={() => fetchSubmissions(selectedSource || undefined)}
+              disabled={isLoading}
+              className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Search */}
-      {submissions.length > 0 && (
-        <div className="bg-white rounded-xl border border-neutral-200 p-3 sm:p-4 mb-4 shadow-sm">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300" />
+      {/* Filter toolbar — search + state chips on one quiet row. */}
+      {submissions.length > 0 && !error && (
+        <div className="flex items-center gap-2.5 flex-wrap mb-3">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
             <input
               type="text"
               placeholder="Search by name, email, company, or message..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent text-[13px] font-normal text-neutral-700"
+              className="w-full pl-9 pr-4 py-1.5 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
             />
           </div>
+          {!isLoading && (
+            <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+          )}
         </div>
       )}
 
@@ -555,13 +568,6 @@ export function ContactFormsTab({
         </div>
       )}
 
-      {/* PR 3 — state filter chips */}
-      {!isLoading && !error && submissions.length > 0 && (
-        <div className="mb-3">
-          <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
-        </div>
-      )}
-
       {/* Submissions List */}
       {!isLoading && !error && submissions.length > 0 && (
         <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
@@ -579,9 +585,9 @@ export function ContactFormsTab({
                 aria-label="Select all visible"
               />
               <span className="text-[11px] text-neutral-500">
-                {selected.size > 0
-                  ? `${selected.size} selected`
-                  : `${filteredSubmissions.length} visible`}
+                {/* Selection-only — the visible/total count lives once, in the
+                    table footer, so it isn't repeated top and bottom. */}
+                {selected.size > 0 ? `${selected.size} selected` : "Select all"}
               </span>
             </div>
           )}
@@ -804,17 +810,10 @@ export function ContactFormsTab({
           </div>
 
           {filteredSubmissions.length > 0 && (
-            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5 flex items-center justify-between">
-              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed">
+            <div className="bg-neutral-50 border-t border-neutral-200 px-4 sm:px-5 py-2.5">
+              <span className="text-[12px] text-neutral-400 font-normal leading-relaxed tabular-nums">
                 {filteredSubmissions.length} submission{filteredSubmissions.length !== 1 ? "s" : ""}
               </span>
-              <button
-                onClick={handleDownloadCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors"
-              >
-                <Download className="w-3 h-3" />
-                CSV
-              </button>
             </div>
           )}
         </div>
@@ -1045,33 +1044,12 @@ export function ContactFormsTab({
         count={selected.size}
         onClear={clearSelected}
         actions={[
-          { key: "push-mc", label: "Push to Mailchimp", icon: MailIcon, group: "primary", run: () => { setShowPushModal(true) } },
           { key: "promote", label: "Promote to leads", icon: ArrowRightCircle, group: "primary", run: handleOpenPromoteDrawer },
           { key: "acknowledge", label: "Send acknowledgment", icon: SendIcon, run: runBulkAcknowledge },
           { key: "triage", label: "Mark triaged", icon: EyeIcon, run: () => runBulk("triaged") },
           { key: "reply", label: "Mark replied", icon: MsgIcon, run: () => runBulk("replied") },
           { key: "delete", label: "Delete", icon: Trash2, destructive: true, run: handleBulkDelete },
         ]}
-      />
-
-      <MailchimpPushModal
-        open={showPushModal}
-        onClose={() => setShowPushModal(false)}
-        members={submissions
-          .filter((s) => selected.has(s.id) && s.email)
-          .map<PushMember>((s) => ({
-            email: s.email,
-            firstName: s.firstName || undefined,
-            lastName: s.lastName || undefined,
-          }))}
-        defaultTag={`from-contact-form-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
-        onComplete={(result) => {
-          setToast({
-            message: `Pushed: ${result.newMembers} new, ${result.updatedMembers} updated${result.errors.length > 0 ? `, ${result.errors.length} failed` : ""}`,
-            type: result.errors.length === 0 ? "success" : "error",
-          })
-          if (result.errors.length === 0) clearSelected()
-        }}
       />
 
       {/* Stage 5b — Reply via Resend modal. Opens from the drawer Reply
@@ -1115,5 +1093,37 @@ export function ContactFormsTab({
         onConfirm={handleConfirmBulkPromote}
       />
     </div>
+  )
+}
+
+// ── Source pill (selector) ──
+
+function SourcePill({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors ${
+        active
+          ? "bg-neutral-900 text-white"
+          : "bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900"
+      }`}
+    >
+      <span className="truncate max-w-56">{label}</span>
+      <span className={`tabular-nums ${active ? "text-white/60" : "text-neutral-400"}`}>
+        {count.toLocaleString()}
+      </span>
+    </button>
   )
 }

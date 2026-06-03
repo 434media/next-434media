@@ -7,7 +7,6 @@ import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { ContactFormsTab } from "@/components/admin/submissions/ContactFormsTab"
 import { InboxResponseStrip } from "@/components/admin/submissions/InboxResponseStrip"
 import { HowItWorks } from "@/components/admin/HowItWorks"
-import { LegendPopover } from "@/components/admin/LegendPopover"
 import type { Toast } from "@/components/admin/submissions/types"
 
 // Stage 3 — /admin/inbox is the response queue for direct contact-form
@@ -95,20 +94,6 @@ export default function InboxPage() {
               forms surface. Tone shifts (amber → red) when oldest waiting
               crosses 24h. */}
           <InboxResponseStrip />
-
-          {/* Status legend — maps the inbox state dots to their meaning. */}
-          <div className="flex justify-end mb-3">
-            <LegendPopover
-              title="Inbox states"
-              items={[
-                { dotClass: "bg-blue-500", label: "New" },
-                { dotClass: "bg-amber-500", label: "Triaged" },
-                { dotClass: "bg-emerald-500", label: "Replied" },
-                { dotClass: "bg-neutral-400", label: "Archived" },
-                { dotClass: "bg-rose-500", label: "Spam" },
-              ]}
-            />
-          </div>
 
           <ContactFormsTab setToast={setToast} initialSearch={initialSearch} />
         </main>
