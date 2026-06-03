@@ -97,12 +97,13 @@ export function AdminOverview() {
 
       // 2) Fetch stage counts. Audience/Inbox are full-admin-only surfaces.
       const now = Date.now()
-      const [leadsR, clientsR, nlR, evR, inboxR] = await Promise.allSettled([
+      const [leadsR, clientsR, nlR, evR, inboxR, plR] = await Promise.allSettled([
         jget("/api/admin/leads", now),
         jget("/api/admin/crm/clients", now),
         isFull ? jget("/api/admin/email-lists-firestore", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/event-registrations", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/contact-forms/inbox-stats", now) : Promise.resolve(null),
+        isFull ? jget("/api/admin/audiences/partner-list-members", now) : Promise.resolve(null),
       ])
       if (cancelled) return
 
@@ -123,8 +124,11 @@ export function AdminOverview() {
 
       const inboxBody = ok<{ awaitingReply?: number; totalSubmissions?: number }>(inboxR)
 
-      // "Lists" audience source = partner-shared leads (mirrors AudiencesHeaderStrip).
-      const partnerLeads = leads.filter((l) => l.source === "partner")
+      // "Lists" audience source = the partner_list_members cohort (the same
+      // collection the Audiences page counts), NOT promoted partner leads — so
+      // the overview total matches what /admin/audiences shows.
+      const plBody = ok<{ success?: boolean; members?: Array<{ importedAt?: string }> }>(plR)
+      const members = plBody?.success ? plBody.members ?? [] : []
 
       const leadsActive = leads.filter((l) => l.status !== "archived").length
       const leadsPriority = leads.filter(
@@ -132,11 +136,11 @@ export function AdminOverview() {
       ).length
 
       setCounts({
-        audiencesTotal: signups.length + registrations.length + partnerLeads.length,
+        audiencesTotal: signups.length + registrations.length + members.length,
         audiences7d:
           countRecent(signups.map((s) => s.created_at).filter(Boolean), now) +
           countRecent(registrations.map((r) => r.registeredAt).filter(Boolean), now) +
-          countRecent(partnerLeads.map((l) => l.created_at).filter(Boolean), now),
+          countRecent(members.map((m) => m.importedAt ?? "").filter(Boolean), now),
         inboxAwaiting: inboxBody?.awaitingReply ?? 0,
         inboxTotal: inboxBody?.totalSubmissions ?? 0,
         leadsActive,
@@ -185,7 +189,7 @@ export function AdminOverview() {
         {/* Until the role resolves (~one fast session call), default to the
             full layout so full admins never flash the shorter crm_only view. */}
         {!roleResolved || isFullAdmin ? (
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-2">
             {/* 01 — Entry points (two sources feed Leads) */}
             <FunnelZone label="01 · Entry points" className="lg:flex-1">
               <StageNode
@@ -196,8 +200,8 @@ export function AdminOverview() {
                 statLabel="contacts"
                 sub={
                   counts && counts.audiences7d > 0
-                    ? `+${counts.audiences7d} new this week · push to Mailchimp`
-                    : "Newsletter · Events · Lists → Mailchimp"
+                    ? `+${counts.audiences7d} new this week · opt-ins auto-sync to Mailchimp`
+                    : "Newsletter · Events · Lists · opt-ins auto-sync to Mailchimp"
                 }
                 loading={showLoading}
               />
