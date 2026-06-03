@@ -326,6 +326,12 @@ const SITE_TO_BRAND: Record<string, Brand> = {
   techday: "434media",
 }
 
+// Partner events where 434 Media was the official media partner — attendees
+// opted into 434 Media comms, so they carry brand:434media into Mailchimp.
+const PARTNER_NETWORK_BRAND: Record<string, Brand> = {
+  "nucleate-tx": "434media",
+}
+
 /** Map a set of internal CRM tags to canonical Mailchimp tags (deduped, sorted). */
 export function mailchimpTagsFromInternal(internalTags: string[]): string[] {
   const out = new Set<string>()
@@ -342,9 +348,12 @@ export function mailchimpTagsFromInternal(internalTags: string[]): string[] {
       case "source":
         if (v === "newsletter" || v === "event" || v === "partner") out.add(sourceTag(v))
         break
-      case "partner":
+      case "partner": {
         out.add(sourceTag("partner"))
+        const partnerBrand = PARTNER_NETWORK_BRAND[v]
+        if (partnerBrand) out.add(brandTag(partnerBrand))
         break
+      }
       case "event": {
         const t = eventTag(v)
         if (isCanonicalTag(t)) {
