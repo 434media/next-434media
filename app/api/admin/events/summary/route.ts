@@ -3,6 +3,7 @@ import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getEventRegistrations } from "@/lib/firestore-event-registrations"
 import { getLeads } from "@/lib/firestore-leads"
 import { getMailchimpSubscriberMap } from "@/lib/mailchimp-analytics"
+import { getSuppressedEmails } from "@/lib/firestore-suppression"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -16,6 +17,7 @@ interface EventSummary {
   uniqueAttendees: number
   inCrm: number
   inMailchimp: number
+  optedOut: number
   conversionRate: number // unique attendees in CRM / unique attendees, 0..1
 }
 
@@ -44,10 +46,11 @@ export async function GET() {
   }
 
   try {
-    const [registrations, leads, mailchimpMap] = await Promise.all([
+    const [registrations, leads, mailchimpMap, suppressed] = await Promise.all([
       getEventRegistrations(),
       getLeads(),
       getMailchimpSubscriberMap().catch(() => null),
+      getSuppressedEmails().catch(() => new Set<string>()),
     ])
 
     const leadEmails = new Set<string>()
@@ -59,11 +62,17 @@ export async function GET() {
     // not mere presence — so this matches the consent-aware Audiences header strip
     // and pill (transactional/unsubscribed contacts are present but not counted).
     const mcEmails = new Set<string>()
+    // Opted out = unsubscribed/cleaned in Mailchimp, or on the broadcast
+    // suppression list (an unsubscribe that may never have reached Mailchimp).
+    const optedOutEmails = new Set<string>(suppressed)
     if (mailchimpMap?.byEmail) {
       for (const [email, entry] of Object.entries(mailchimpMap.byEmail)) {
         const memberships = (entry as { memberships?: Array<{ status?: string }> }).memberships ?? []
         if (memberships.some((m) => m.status === "subscribed")) {
           mcEmails.add(email.toLowerCase())
+        }
+        if (memberships.some((m) => m.status === "unsubscribed" || m.status === "cleaned")) {
+          optedOutEmails.add(email.toLowerCase())
         }
       }
     }
@@ -95,9 +104,11 @@ export async function GET() {
       const uniqueEmails = new Set(b.rows.map((row) => row.email))
       let inCrm = 0
       let inMc = 0
+      let optedOut = 0
       for (const email of uniqueEmails) {
         if (leadEmails.has(email)) inCrm++
         if (mcEmails.has(email)) inMc++
+        if (optedOutEmails.has(email)) optedOut++
       }
       const eventDateMs = b.eventDate ? new Date(b.eventDate).getTime() : NaN
       const isPast = !isNaN(eventDateMs) ? eventDateMs < now : true
@@ -111,6 +122,7 @@ export async function GET() {
         uniqueAttendees,
         inCrm,
         inMailchimp: inMc,
+        optedOut,
         conversionRate: uniqueAttendees > 0 ? inCrm / uniqueAttendees : 0,
       })
     }

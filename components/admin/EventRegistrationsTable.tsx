@@ -78,8 +78,8 @@ interface Props {
 const ROW_HEIGHT_PX = 44
 
 // Grid template — header + body share the same template so columns line up.
-// At lg: 7 columns (name, email, company, event, registered, feed, actions).
-// At md: 5 columns — company + feed are display:none, so the grid drops them.
+// At lg: 7 columns (name, email, company, event, registered, opted-in, actions).
+// At md: 5 columns — company + opted-in are display:none, so the grid drops them.
 // Using arbitrary Tailwind values rather than inline `style` so the template
 // reacts to viewport resize via media queries.
 const GRID_COLS =
@@ -166,7 +166,12 @@ export function EventRegistrationsTable({
           sort={sort}
           onSortChange={onSortChange}
         />
-        <div className="px-5 py-3 hidden lg:flex items-center justify-center">Feed</div>
+        <div
+          className="px-5 py-3 hidden lg:flex items-center justify-center"
+          title="Opted in to communications (subscribe to updates) at registration"
+        >
+          Opted in
+        </div>
         <div className="px-5 py-3 flex items-center justify-end">Actions</div>
       </div>
 
@@ -253,7 +258,7 @@ export function EventRegistrationsTable({
                 <div className="px-5 py-2.5 flex items-center text-neutral-400 text-[13px] font-normal whitespace-nowrap tabular-nums">
                   {formattedDate}
                 </div>
-                {/* Feed */}
+                {/* Opted in */}
                 <div className="px-5 py-2.5 hidden lg:flex items-center justify-center">
                   {reg.subscribeToFeed ? (
                     <Check className="w-4 h-4 text-emerald-500" />

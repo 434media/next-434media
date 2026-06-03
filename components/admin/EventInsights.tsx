@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ChevronDown,
   UserPlus,
+  BellOff,
 } from "lucide-react"
 import { RegistrationSparkline } from "@/components/admin/RegistrationSparkline"
 
@@ -24,6 +25,7 @@ interface EventSummary {
   uniqueAttendees: number
   inCrm: number
   inMailchimp: number
+  optedOut: number
   conversionRate: number
 }
 
@@ -47,7 +49,7 @@ function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`
 }
 
-export type AudienceFilter = "all" | "in-crm" | "in-mailchimp" | "untapped"
+export type AudienceFilter = "all" | "in-crm" | "in-mailchimp" | "untapped" | "opted-out"
 
 type SortKey = "date" | "registrations" | "conversion" | "untapped"
 
@@ -228,7 +230,7 @@ export function EventInsights({
 
         {/* Stats — clickable filters */}
         {current ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
             <FilterTile
               icon={Ticket}
               label="Registrations"
@@ -267,6 +269,15 @@ export function EventInsights({
               valueClass={untapped > 0 ? "text-amber-700" : "text-neutral-400"}
               active={audienceFilter === "untapped"}
               onClick={() => onAudienceFilterChange?.("untapped")}
+            />
+            <FilterTile
+              icon={BellOff}
+              label="Opted out"
+              value={current.optedOut.toLocaleString()}
+              hint="unsubscribed"
+              valueClass={current.optedOut > 0 ? "text-rose-700" : "text-neutral-400"}
+              active={audienceFilter === "opted-out"}
+              onClick={() => onAudienceFilterChange?.("opted-out")}
             />
           </div>
         ) : isLoading ? (
@@ -617,6 +628,14 @@ function EventCard({
             <span className="text-neutral-300">·</span>
             <span className="inline-flex items-center gap-1 text-amber-700">
               {untapped} not a lead
+            </span>
+          </>
+        )}
+        {event.optedOut > 0 && (
+          <>
+            <span className="text-neutral-300">·</span>
+            <span className="inline-flex items-center gap-1 text-rose-700">
+              {event.optedOut} opted out
             </span>
           </>
         )}

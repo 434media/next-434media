@@ -28,6 +28,7 @@ import {
   MailchimpSubscribedPill,
   useMailchimpSubscribers,
   isMarketable,
+  isOptedOut,
 } from "@/components/admin/MailchimpSubscribedPill"
 import { EventInsights, type AudienceFilter } from "@/components/admin/EventInsights"
 import {
@@ -100,11 +101,13 @@ export function EventRegistrationsTab({
   const [isDownloading, setIsDownloading] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null)
-  // Audience filter — driven by the four stat tiles on the event detail page.
+  // Audience filter — driven by the stat tiles on the event detail page.
   // "all" = no filter, "in-crm" = registrations whose email exists in `leadsByEmail`,
   // "in-mailchimp" = registrations SUBSCRIBED (marketable) in Mailchimp — consent,
   // not mere presence, to match the consent-aware header strip,
-  // "untapped" = registrations NOT in CRM (the conversion opportunity bucket).
+  // "untapped" = registrations NOT in CRM (the conversion opportunity bucket),
+  // "opted-out" = registrations who unsubscribed/cleaned or are on the
+  // broadcast suppression list.
   const [audienceFilter, setAudienceFilter] = useState<AudienceFilter>("all")
   // Default sort: most recent registrations first. Click any column header to
   // resort; clicking the same column toggles asc/desc.
@@ -378,6 +381,7 @@ export function EventRegistrationsTab({
       if (audienceFilter === "in-crm" && !inCrm) return false
       if (audienceFilter === "in-mailchimp" && !inMc) return false
       if (audienceFilter === "untapped" && inCrm) return false
+      if (audienceFilter === "opted-out" && !isOptedOut(subscriberMap.get(email))) return false
     }
     return true
   }).sort((a, b) => compareRows(a, b, sortState))
