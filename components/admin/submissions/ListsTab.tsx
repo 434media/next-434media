@@ -109,6 +109,23 @@ export function ListsTab({
     [partnerCounts],
   )
 
+  // Promotion rollup per partner — how much of each cohort has been worked
+  // into the leads pipeline. Drives the per-partner summary line (the Lists
+  // equivalent of a drilldown) so you can see which cohort still has unworked
+  // contacts. Consent doesn't apply to cold lists, so promotion is the metric.
+  const promotionByPartner = useMemo(() => {
+    const m = new Map<string, { total: number; promoted: number }>()
+    for (const mem of members) {
+      if (!mem.partnerSlug) continue
+      const e = m.get(mem.partnerSlug) ?? { total: 0, promoted: 0 }
+      e.total += 1
+      if (mem.promotedLeadId) e.promoted += 1
+      m.set(mem.partnerSlug, e)
+    }
+    return m
+  }, [members])
+  const selectedPromotion = selectedPartner ? promotionByPartner.get(selectedPartner) : undefined
+
   // Apply partner + search filter. Sort newest-imported first so freshly added
   // cohorts surface immediately.
   const filtered = useMemo(() => {
@@ -269,91 +286,86 @@ export function ListsTab({
 
   return (
     <div>
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
-            Partner Lists
-          </h2>
-          <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
-            Partner-shared rosters held as audience cohorts. These are cold contacts (no opt-in), so they aren&apos;t emailed via Mailchimp campaigns — promote individuals into the leads pipeline to work them 1:1.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => fetchMembers()}
-            disabled={isLoading}
-            className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
-          <ExportMenu
-            disabled={totalCount === 0}
-            allCount={totalCount}
-            filteredCount={filtered.length}
-            selectedCount={selected.size}
-            onExportAll={handleExportAll}
-            onExportFiltered={handleExportFiltered}
-            onExportSelected={handleExportSelected}
-          />
-        </div>
-      </div>
-
-      {/* Partner tiles — overview surface. Click to filter to a single partner;
-          click "All" to clear. */}
+      {/* No tab header — the Audiences segmented control already labels this
+          section ("Lists") and carries the "cold partner contacts → promote"
+          framing. The partner pill row is the only chrome, with Export tucked
+          into its right edge via the actions slot. */}
       {partnerCounts.size > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-6">
-          <button
+        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+          <PartnerPill
+            label="All"
+            count={totalCount}
+            active={!selectedPartner}
             onClick={() => setSelectedPartner("")}
-            className={`p-3 rounded-xl border transition-all text-left ${
-              selectedPartner === ""
-                ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-            }`}
-          >
-            <div className="flex items-center gap-1.5 mb-1">
-              <Users2 className="w-3 h-3 opacity-50" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">All</span>
-            </div>
-            <div className="text-xl font-bold leading-tight">
-              {totalCount.toLocaleString()}
-            </div>
-            <div className="text-[11px] opacity-50 font-normal leading-snug">contacts</div>
-          </button>
+          />
           {partnersSorted.map(([slug, count]) => (
-            <button
+            <PartnerPill
               key={slug}
+              label={unslugify(slug)}
+              count={count}
+              active={selectedPartner === slug}
               onClick={() => setSelectedPartner(slug)}
-              className={`p-3 rounded-xl border transition-all text-left ${
-                selectedPartner === slug
-                  ? "bg-neutral-900 text-white border-neutral-900 shadow-md"
-                  : "bg-white text-neutral-900 border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <Users2 className="w-3 h-3 opacity-50" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider truncate">
-                  {unslugify(slug)}
-                </span>
-              </div>
-              <div className="text-xl font-bold leading-tight">{count.toLocaleString()}</div>
-              <div className="text-[11px] opacity-50 font-normal leading-snug">contacts</div>
-            </button>
+            />
           ))}
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <ExportMenu
+              disabled={totalCount === 0}
+              allCount={totalCount}
+              filteredCount={filtered.length}
+              selectedCount={selected.size}
+              onExportAll={handleExportAll}
+              onExportFiltered={handleExportFiltered}
+              onExportSelected={handleExportSelected}
+            />
+            <button
+              onClick={() => fetchMembers()}
+              disabled={isLoading}
+              className="p-1.5 text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 rounded transition-colors disabled:opacity-50"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Search */}
+      {/* Per-partner promotion line — the Lists "drilldown". Only when a
+          partner is selected (the header strip carries the all-lists version),
+          so you see how much of this cohort is still unworked. */}
+      {selectedPromotion && (
+        <div className="mb-3 flex items-center gap-2 px-1 text-[11px] text-neutral-500 flex-wrap tabular-nums">
+          <span>
+            <strong className="font-semibold text-neutral-700">{selectedPromotion.total.toLocaleString()}</strong>{" "}
+            contacts
+          </span>
+          <span className="text-neutral-300">·</span>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+            {selectedPromotion.promoted.toLocaleString()} promoted
+          </span>
+          <span className="text-neutral-300">·</span>
+          <span className="inline-flex items-center gap-1">
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${
+                selectedPromotion.total - selectedPromotion.promoted > 0 ? "bg-amber-500" : "bg-neutral-300"
+              }`}
+              aria-hidden="true"
+            />
+            {(selectedPromotion.total - selectedPromotion.promoted).toLocaleString()} not yet promoted
+          </span>
+        </div>
+      )}
+
+      {/* Search — slim, single row (Lists has no state/date filters). */}
       {members.length > 0 && (
-        <div className="relative mb-4">
+        <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
           <input
             type="text"
             placeholder="Search by name, email, or company..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
+            className="w-full pl-9 pr-4 py-1.5 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
           />
         </div>
       )}
@@ -414,9 +426,9 @@ export function ListsTab({
                 aria-label="Select all visible"
               />
               <span className="text-[11px] text-neutral-500">
-                {selected.size > 0
-                  ? `${selected.size} selected`
-                  : `${filtered.length} visible`}
+                {/* Selection-only — the visible/total count lives once, in the
+                    table footer, so it isn't repeated top and bottom. */}
+                {selected.size > 0 ? `${selected.size} selected` : "Select all"}
               </span>
             </div>
           )}
@@ -476,7 +488,7 @@ export function ListsTab({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              member.id && promoteMembers([member.id])
+                              if (member.id) promoteMembers([member.id])
                             }}
                             disabled={!member.id || (!!member.id && promotingIds.has(member.id))}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border border-neutral-200 text-neutral-600 disabled:opacity-50 disabled:cursor-wait"
@@ -708,5 +720,37 @@ export function ListsTab({
         onConfirm={handleConfirmBulkPromote}
       />
     </div>
+  )
+}
+
+// ── Partner pill (selector) ──
+
+function PartnerPill({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors ${
+        active
+          ? "bg-neutral-900 text-white"
+          : "bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900"
+      }`}
+    >
+      <span className="truncate max-w-56">{label}</span>
+      <span className={`tabular-nums ${active ? "text-white/60" : "text-neutral-400"}`}>
+        {count.toLocaleString()}
+      </span>
+    </button>
   )
 }

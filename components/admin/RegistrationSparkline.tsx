@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useId, useMemo } from "react"
 
 interface Props {
   // ISO timestamps — one per registration. Empty/invalid entries are dropped.
@@ -9,8 +9,7 @@ interface Props {
   // see registration activity *relative* to the event (e.g. "70% registered
   // the day before"). Optional.
   eventDate?: string
-  // Optional render width. Defaults to 100% of container.
-  width?: number
+  // Optional render height. Width always fills the container.
   height?: number
   className?: string
 }
@@ -40,11 +39,12 @@ function shortLabel(ms: number): string {
 }
 
 /**
- * Per-day registration sparkline + event-day anchor. Buckets registrations
- * into UTC days, fills in zero-count days between min and max, and renders an
- * SVG bar chart sized to fill its container. The event date (if provided) is
- * drawn as a vertical dashed line so the eye can read pre-event vs day-of vs
- * post-event activity at a glance.
+ * Per-day registration trend as a filled area chart + event-day anchor.
+ * Buckets registrations into UTC days, fills zero-count days between min and
+ * max, and renders a gradient area with a crisp indigo line on top (the stroke
+ * uses non-scaling-stroke so it stays 1.5px crisp even though the SVG stretches
+ * to its container). The event date, when provided, is a dashed emerald
+ * vertical so the eye reads pre-event vs day-of vs post-event activity.
  *
  * Returns null when there's no usable data — the caller can render its own
  * empty state if needed.
@@ -55,7 +55,8 @@ export function RegistrationSparkline({
   height = 56,
   className = "",
 }: Props) {
-  const { buckets, max, eventBucketIndex, trendPoints } = useMemo(() => {
+  const gradId = useId()
+  const { buckets, max, eventBucketIndex } = useMemo(() => {
     const days = new Map<string, number>()
     let minMs = Infinity
     let maxMs = -Infinity
@@ -69,15 +70,10 @@ export function RegistrationSparkline({
       days.set(k, (days.get(k) ?? 0) + 1)
     }
     if (!Number.isFinite(minMs)) {
-      return {
-        buckets: [] as Bucket[],
-        max: 0,
-        eventBucketIndex: -1,
-        trendPoints: [] as number[],
-      }
+      return { buckets: [] as Bucket[], max: 0, eventBucketIndex: -1 }
     }
 
-    // Walk min→max in UTC-day steps so empty days appear as zero bars.
+    // Walk min→max in UTC-day steps so empty days appear as zero.
     const startMs = Date.UTC(
       new Date(minMs).getUTCFullYear(),
       new Date(minMs).getUTCMonth(),
@@ -101,7 +97,7 @@ export function RegistrationSparkline({
         const evKey = dayKey(evMs)
         evIdx = out.findIndex((b) => b.day === evKey)
         // If the event falls outside the registration range, append a marker
-        // bar with count 0 so the user still sees where it landed.
+        // day so the user still sees where it landed.
         if (evIdx < 0) {
           if (evMs < startMs) {
             out.unshift({ day: evKey, label: shortLabel(evMs), count: 0 })
@@ -115,33 +111,23 @@ export function RegistrationSparkline({
     }
 
     const m = out.reduce((acc, b) => Math.max(acc, b.count), 0)
-
-    // 7-day moving average — smooths the daily spikes into a trend line so
-    // the user sees direction (rising / steady / falling) without having
-    // to read individual bars. Only computed when the range is wide enough
-    // to make the average meaningful (>= 7 days).
-    const window = 7
-    const trend: number[] = []
-    if (out.length >= window) {
-      let sum = 0
-      for (let i = 0; i < out.length; i++) {
-        sum += out[i].count
-        if (i >= window) sum -= out[i - window].count
-        if (i >= window - 1) trend.push(sum / window)
-        else trend.push(NaN) // not enough data for the leading edge
-      }
-    }
-
-    return { buckets: out, max: m, eventBucketIndex: evIdx, trendPoints: trend }
+    return { buckets: out, max: m, eventBucketIndex: evIdx }
   }, [timestamps, eventDate])
 
   if (buckets.length === 0 || max === 0) return null
 
-  // SVG viewBox uses normalized 0..100 width / 0..1 height so the bars scale
-  // fluidly to whatever container width Tailwind hands us. Bar gap is a small
-  // pixel rhythm — too tight at high counts, too sparse below ~8 days.
-  const colW = 100 / buckets.length
-  const gap = buckets.length > 60 ? 0.15 : buckets.length > 30 ? 0.4 : 0.8
+  const n = buckets.length
+  // Top padding so the peak never clips the top edge.
+  const pad = 6
+  const usableH = height - pad
+  // x spreads points edge-to-edge; y maps count → pixels (0 at baseline).
+  const xFor = (i: number) => (n === 1 ? 50 : (i / (n - 1)) * 100)
+  const yFor = (c: number) => height - (c / max) * usableH
+
+  const pts = buckets.map((b, i) => `${xFor(i).toFixed(2)},${yFor(b.count).toFixed(2)}`)
+  const linePath = `M${pts.join(" L")}`
+  const areaPath = `M${xFor(0).toFixed(2)},${height} L${pts.join(" L")} L${xFor(n - 1).toFixed(2)},${height} Z`
+  const eventX = eventBucketIndex >= 0 ? xFor(eventBucketIndex) : null
 
   return (
     <div className={`w-full ${className}`}>
@@ -151,105 +137,71 @@ export function RegistrationSparkline({
         className="w-full"
         style={{ height }}
         role="img"
-        aria-label={`Registrations per day from ${buckets[0].label} to ${buckets[buckets.length - 1].label}, peak ${max}`}
+        aria-label={`Registrations per day from ${buckets[0].label} to ${buckets[n - 1].label}, peak ${max}`}
       >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgb(99,102,241)" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="rgb(99,102,241)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+
         {/* Baseline */}
         <line x1={0} y1={height - 0.5} x2={100} y2={height - 0.5} stroke="rgb(229,229,229)" strokeWidth={0.5} />
 
-        {/* Event-day anchor — drawn behind the bars */}
-        {eventBucketIndex >= 0 && (
+        {/* Event-day anchor — behind the series */}
+        {eventX !== null && (
           <line
-            x1={(eventBucketIndex + 0.5) * colW}
+            x1={eventX}
             y1={0}
-            x2={(eventBucketIndex + 0.5) * colW}
+            x2={eventX}
             y2={height}
             stroke="rgb(16,185,129)"
-            strokeWidth={0.6}
-            strokeDasharray="1.5 1"
-            opacity={0.55}
+            strokeWidth={1}
+            strokeDasharray="2 2"
+            vectorEffect="non-scaling-stroke"
+            opacity={0.6}
           />
         )}
 
-        {/* Bars */}
-        {buckets.map((b, i) => {
-          const h = b.count === 0 ? 0 : Math.max(1.5, (b.count / max) * (height - 4))
-          const x = i * colW + gap / 2
-          const w = Math.max(0.4, colW - gap)
-          const y = height - h
-          return (
-            <rect
-              key={b.day}
-              x={x}
-              y={y}
-              width={w}
-              height={h}
-              rx={0.4}
-              className="fill-neutral-400"
-            >
-              <title>
-                {b.label}: {b.count} registration{b.count === 1 ? "" : "s"}
-              </title>
-            </rect>
-          )
-        })}
-
-        {/* 7-day moving-average trend line — drawn on top of the bars in
-            indigo so the user sees rising / steady / falling at a glance.
-            NaN entries (leading edge) are skipped via M/L splitting. */}
-        {trendPoints.length > 0 && (() => {
-          const segments: string[] = []
-          let cursor = ""
-          for (let i = 0; i < trendPoints.length; i++) {
-            const v = trendPoints[i]
-            if (!Number.isFinite(v)) {
-              cursor = ""
-              continue
-            }
-            const cx = i * colW + colW / 2
-            const cy = height - Math.max(0, (v / max) * (height - 4)) - 0.5
-            cursor += `${cursor ? "L" : "M"}${cx.toFixed(2)} ${cy.toFixed(2)} `
-            // When the next point is NaN, flush the current path.
-            if (i === trendPoints.length - 1 || !Number.isFinite(trendPoints[i + 1])) {
-              segments.push(cursor.trim())
-              cursor = ""
-            }
-          }
-          return segments.map((d, idx) => (
+        {n === 1 ? (
+          // Single day — a centered marker so the value is still visible.
+          <rect x={47} y={yFor(buckets[0].count)} width={6} height={height - yFor(buckets[0].count)} fill="rgb(99,102,241)" opacity={0.75} />
+        ) : (
+          <>
+            <path d={areaPath} fill={`url(#${gradId})`} />
             <path
-              key={idx}
-              d={d}
+              d={linePath}
               fill="none"
               stroke="rgb(99,102,241)"
-              strokeWidth={0.7}
+              strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={0.85}
+              vectorEffect="non-scaling-stroke"
             />
-          ))
-        })()}
+          </>
+        )}
       </svg>
 
-      {/* Caption: range + peak — keeps the chart legible without axis labels */}
+      {/* Caption: range + peak + legend — keeps the chart legible without axes */}
       <div className="mt-1.5 flex items-center justify-between text-[10px] text-neutral-400 tabular-nums">
         <span>{buckets[0].label}</span>
         <span className="flex items-center gap-2">
-          <span>
-            peak <span className="text-neutral-700 font-medium">{max}</span>/day
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block w-2 h-px bg-indigo-500" />
+            per day
           </span>
-          {trendPoints.length > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-block w-2 h-px bg-indigo-500" />
-              7d avg
-            </span>
-          )}
-          {eventBucketIndex >= 0 && (
+          <span>
+            peak <span className="text-neutral-700 font-medium">{max}</span>
+          </span>
+          {eventX !== null && (
             <span className="inline-flex items-center gap-1">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
               event day
             </span>
           )}
         </span>
-        <span>{buckets[buckets.length - 1].label}</span>
+        <span>{buckets[n - 1].label}</span>
       </div>
     </div>
   )

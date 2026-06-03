@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import {
   Loader2,
-  RefreshCw,
   AlertCircle,
   Search,
   Trash2,
@@ -483,65 +482,32 @@ export function EventRegistrationsTab({
   // ignoring the selection set. Powers the action button in the event detail
   // header so the user doesn't have to select-all-then-convert. Idempotent on
   // the backend (already-existing leads get updated, not duplicated).
-  const runConvertAll = async (rows: EventRegistration[]) => {
-    const items = rows
-      .filter((r) => r.id && r.email)
-      .map((r) => ({
-        id: r.id,
-        email: r.email,
-        firstName: r.firstName,
-        lastName: r.lastName,
-        company: r.company || undefined,
-        sourceSite: r.event,
-        eventName: r.eventName,
-        eventDate: r.eventDate,
-      }))
-    if (items.length === 0) return
-    if (!confirm(`Convert ${items.length} registration${items.length === 1 ? "" : "s"} to leads? Existing leads will be updated, not duplicated.`)) return
-    try {
-      const res = await fetch("/api/admin/submissions/bulk-convert-leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: SUBMISSION_SOURCE, items }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.ok) {
-        setToast({ message: data?.error || "Convert failed", type: "error" })
-        return
-      }
-      const r = data.result as { created: number; updated: number; failed: number }
-      setToast({
-        message: `Converted: ${r.created} new lead${r.created === 1 ? "" : "s"}, ${r.updated} updated${r.failed > 0 ? `, ${r.failed} failed` : ""}`,
-        type: r.failed === 0 ? "success" : "error",
-      })
-    } catch {
-      setToast({ message: "Convert failed", type: "error" })
-    }
-  }
-
   const totalCount = Object.values(counts).reduce((a, b) => a + b, 0)
 
   return (
     <div>
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
-            Event Registrations
-          </h2>
-          <p className="text-[13px] text-neutral-400 font-normal leading-relaxed mt-1">
-            Registration data from Digital Canvas and SA Tech Day events
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { fetchCounts(); fetchRegistrations() }}
-            disabled={isLoading}
-            className="p-2 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
+      {/* No tab header — the Audiences segmented control already labels this
+          section ("Events"). The event pill rows (grouped Upcoming/Past) are
+          the only chrome, with Export tucked into their right edge via the
+          `actions` slot. Selecting an event reveals its stat-chip filters +
+          the registrations-over-time chart. */}
+      <EventInsights
+        selectedEvent={selectedEvent}
+        onSelect={handleFilterByEvent}
+        totalRegistrationsFallback={totalCount}
+        audienceFilter={audienceFilter}
+        onAudienceFilterChange={setAudienceFilter}
+        // Timestamps from the FULL event set (not filtered) so the chart shows
+        // the true history regardless of audience/state filters.
+        drilldownTimestamps={
+          selectedEvent
+            ? registrations
+                .filter((r) => r.eventName === selectedEvent)
+                .map((r) => r.registeredAt)
+                .filter(Boolean)
+            : undefined
+        }
+        actions={
           <ExportMenu
             disabled={isDownloading || totalCount === 0}
             isDownloading={isDownloading}
@@ -552,44 +518,27 @@ export function EventRegistrationsTab({
             onExportFiltered={handleDownloadFilteredRegCSV}
             onExportSelected={handleDownloadSelectedRegCSV}
           />
-        </div>
-      </div>
-
-      {/* Per-event insights — overview cards (no event selected) or stats
-          strip (event selected). Joins registrations against CRM leads and
-          Mailchimp subscribers so the card surface answers "how is this event
-          performing on conversion + activation?" not just "how many signed up". */}
-      <EventInsights
-        selectedEvent={selectedEvent}
-        onSelect={handleFilterByEvent}
-        totalRegistrationsFallback={totalCount}
-        audienceFilter={audienceFilter}
-        onAudienceFilterChange={setAudienceFilter}
-        onConvertAll={() => runConvertAll(filteredRegistrations)}
-        convertAllDisabled={filteredRegistrations.length === 0}
-        // Timestamps from the FULL event set (not filtered) so the sparkline
-        // shows the true history regardless of audience/state filters.
-        drilldownTimestamps={
-          selectedEvent
-            ? registrations
-                .filter((r) => r.eventName === selectedEvent)
-                .map((r) => r.registeredAt)
-                .filter(Boolean)
-            : undefined
         }
       />
 
-      {/* Search */}
-      {registrations.length > 0 && (
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search by name, email, company, or event..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
-          />
+      {/* Filter toolbar — search + state chips on one quiet row (wraps on
+          narrow widths). No date filter: selecting an event above *is* the
+          temporal filter. */}
+      {registrations.length > 0 && !error && (
+        <div className="flex items-center gap-2.5 flex-wrap mb-3">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by name, email, company, or event..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
+            />
+          </div>
+          {!isLoading && (
+            <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
+          )}
         </div>
       )}
 
@@ -615,12 +564,6 @@ export function EventRegistrationsTab({
         </div>
       )}
 
-      {/* PR 3 — state filter chips */}
-      {!isLoading && !error && registrations.length > 0 && (
-        <div className="mb-3">
-          <StateFilterChips active={stateFilter} onChange={setStateFilter} counts={stateCounts} />
-        </div>
-      )}
 
       {/* Registrations List */}
       {!isLoading && !error && registrations.length > 0 && (

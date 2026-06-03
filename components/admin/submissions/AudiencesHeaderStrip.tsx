@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { Mail, Ticket, Users2, Loader2 } from "lucide-react"
 import { useMailchimpSubscribers, isMarketable, type SubscriberMap } from "@/components/admin/MailchimpSubscribedPill"
-import type { Lead } from "@/types/crm-types"
 
 // Stage 4 — Audiences source nav + KPIs, fused into one control.
 //
@@ -28,6 +27,10 @@ interface SourceStats {
   present: number
   /** Email is `subscribed` in Mailchimp — i.e. actually emailable today. */
   subscribed: number
+  /** Lists only — cohort members already promoted into the leads pipeline.
+   *  Consent/reachability is N/A for cold partner lists, so promotion is the
+   *  metric that matters here. */
+  promoted?: number
 }
 
 interface AudiencesHeaderStripProps {
@@ -72,6 +75,30 @@ function statsFromRows(rows: RowSig[], subscriberMap: SubscriberMap): SourceStat
   }
 }
 
+interface MemberSig {
+  importedAt?: string
+  promotedLeadId?: string
+}
+
+/**
+ * Lists stats from partner_list_members — the SAME collection the Lists tab
+ * reads, so the segment total matches the tab (the old code counted partner
+ * *leads*, i.e. only the promoted ones, which disagreed with the tab). Consent
+ * is N/A for cold lists; we surface promotion progress instead.
+ */
+function statsFromMembers(members: MemberSig[]): SourceStats {
+  const timestamps = members.map((m) => m.importedAt ?? "").filter(Boolean)
+  let promoted = 0
+  for (const m of members) if (m.promotedLeadId) promoted++
+  return {
+    total: members.length,
+    last7Days: countRecent(timestamps, ONE_WEEK_MS),
+    present: 0,
+    subscribed: 0,
+    promoted,
+  }
+}
+
 export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeaderStripProps) {
   const subscriberMap = useMailchimpSubscribers()
   const [newsletter, setNewsletter] = useState<SourceStats | null>(null)
@@ -86,7 +113,7 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
     Promise.allSettled([
       fetch(`/api/admin/email-lists-firestore?_t=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
       fetch(`/api/admin/event-registrations?_t=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
-      fetch(`/api/admin/leads?_t=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
+      fetch(`/api/admin/audiences/partner-list-members?_t=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
     ]).then(([nlRes, evRes, ldRes]) => {
       if (cancelled) return
 
@@ -107,12 +134,10 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
       }
 
       if (ldRes.status === "fulfilled" && ldRes.value?.success) {
-        // Filter to partner-source leads only — Lists tab does the same join.
-        const partner = (ldRes.value.leads as Lead[]).filter((l) => l.source === "partner")
-        const normalized: RowSig[] = partner.map((l) => ({ email: l.email, created_at: l.created_at }))
-        setLists(statsFromRows(normalized, subscriberMap))
+        const members = (ldRes.value.members ?? []) as MemberSig[]
+        setLists(statsFromMembers(members))
       } else {
-        setLists({ total: 0, last7Days: 0, present: 0, subscribed: 0 })
+        setLists({ total: 0, last7Days: 0, present: 0, subscribed: 0, promoted: 0 })
       }
 
       setIsLoading(false)
@@ -126,10 +151,14 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
   const sources = [
     { id: "newsletter" as const, label: "Newsletter", icon: Mail, stats: newsletter, blurb: "People who signed up for email updates." },
     { id: "events" as const, label: "Events", icon: Ticket, stats: events, blurb: "People who registered for an event." },
-    { id: "lists" as const, label: "Lists", icon: Users2, stats: lists, blurb: "Contacts shared by partners, imported in bulk." },
+    { id: "lists" as const, label: "Lists", icon: Users2, stats: lists, blurb: "Cold partner contacts — promote to work as leads." },
   ]
   const active = sources.find((s) => s.id === activeSub) ?? sources[0]
   const activeStats = active.stats
+  // Lists are cold (no opt-in), so consent/reachability is N/A — the metric
+  // that matters is promotion into the leads pipeline. Other sources use the
+  // consent breakdown.
+  const isLists = active.id === "lists"
   // Reachability by consent (Mailchimp status is the source of truth):
   //   subscribedPct — share of this source that's actually emailable today
   //   notReachable  — everyone not subscribed (no marketing consent yet). This
@@ -141,6 +170,8 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
       ? Math.round((activeStats.subscribed / activeStats.total) * 100)
       : 0
   const notReachable = activeStats ? Math.max(0, activeStats.total - activeStats.subscribed) : 0
+  const promoted = activeStats?.promoted ?? 0
+  const notPromoted = activeStats ? Math.max(0, activeStats.total - promoted) : 0
 
   return (
     <div className="mb-4">
@@ -205,25 +236,49 @@ export function AudiencesHeaderStrip({ activeSub, onSelectSub }: AudiencesHeader
               this week
             </span>
             <span className="text-neutral-300">·</span>
-            {/* Reachable = subscribed in Mailchimp (emailable today). */}
-            <span className="tabular-nums">
-              <strong className="font-semibold text-emerald-600">
-                {(activeStats.subscribed ?? 0).toLocaleString()}
-              </strong>{" "}
-              subscribed{activeStats.total > 0 ? ` · ${subscribedPct}% reachable` : ""}
-            </span>
-            {/* Not opted in — informational consent gap, not a task. The hourly
-                sync only adds opted-in contacts; the rest stay out of Mailchimp
-                until they consent. */}
-            {notReachable > 0 && (
+            {isLists ? (
               <>
-                <span className="text-neutral-300 hidden sm:inline">·</span>
-                <span
-                  className="tabular-nums hidden sm:inline text-neutral-400"
-                  title="No marketing consent — these stay out of Mailchimp until they opt in. The hourly sync only adds opted-in contacts."
-                >
-                  {notReachable.toLocaleString()} not opted in
+                {/* Promotion progress — the Lists metric. Consent/reachability
+                    is N/A for cold partner contacts. */}
+                <span className="tabular-nums">
+                  <strong className="font-semibold text-emerald-600">{promoted.toLocaleString()}</strong>{" "}
+                  promoted to leads
                 </span>
+                {notPromoted > 0 && (
+                  <>
+                    <span className="text-neutral-300 hidden sm:inline">·</span>
+                    <span
+                      className="tabular-nums hidden sm:inline text-neutral-400"
+                      title="Cohort members not yet worked into the leads pipeline."
+                    >
+                      {notPromoted.toLocaleString()} not yet promoted
+                    </span>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Reachable = subscribed in Mailchimp (emailable today). */}
+                <span className="tabular-nums">
+                  <strong className="font-semibold text-emerald-600">
+                    {(activeStats.subscribed ?? 0).toLocaleString()}
+                  </strong>{" "}
+                  subscribed{activeStats.total > 0 ? ` · ${subscribedPct}% reachable` : ""}
+                </span>
+                {/* Not opted in — informational consent gap, not a task. The hourly
+                    sync only adds opted-in contacts; the rest stay out of Mailchimp
+                    until they consent. */}
+                {notReachable > 0 && (
+                  <>
+                    <span className="text-neutral-300 hidden sm:inline">·</span>
+                    <span
+                      className="tabular-nums hidden sm:inline text-neutral-400"
+                      title="No marketing consent — these stay out of Mailchimp until they opt in. The hourly sync only adds opted-in contacts."
+                    >
+                      {notReachable.toLocaleString()} not opted in
+                    </span>
+                  </>
+                )}
               </>
             )}
           </>
