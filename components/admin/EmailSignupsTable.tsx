@@ -10,11 +10,13 @@ import {
   ChevronDown,
   ChevronsUpDown,
   Mail,
-  Send,
   Layers,
 } from "lucide-react"
 import { LeadCrossLink, useLeadsByEmail } from "@/components/admin/LeadCrossLink"
-import { useMailchimpSubscribers } from "@/components/admin/MailchimpSubscribedPill"
+import {
+  useMailchimpSubscribers,
+  MailchimpSubscribedPill,
+} from "@/components/admin/MailchimpSubscribedPill"
 import {
   StateBadge,
   getStateOrNew,
@@ -53,8 +55,8 @@ interface Props {
   onLocalState: (id: string, state: SubmissionState) => void
   // CRM cross-link map (Mailchimp pill moved to drawer)
   leadsByEmail: ReturnType<typeof useLeadsByEmail>
-  // Mailchimp subscriber map — used to decide whether to show the per-row
-  // push button. Subscribed rows hide it; unsubscribed rows expose it.
+  // Mailchimp subscriber map — renders the per-row consent pill (subscribed /
+  // not opted in / opted out).
   subscriberMap: ReturnType<typeof useMailchimpSubscribers>
   // Cross-source dupes lookup — lowercased email → Set<source>. When the
   // set has 2+ entries, the row gets a small "+N sources" badge.
@@ -66,7 +68,6 @@ interface Props {
   // Row actions
   onSelectRow: (row: EmailSignupRow) => void
   onDelete: (id: string, email: string) => void
-  onPushOne: (email: string) => void
   isDeleting: string | null
   // Empty state
   searchQuery: string
@@ -74,9 +75,9 @@ interface Props {
 
 const ROW_HEIGHT_PX = 44
 
-// Grid template — 4 columns at all breakpoints (Email / Source+state / Date / Actions).
+// Grid template — 5 columns (Email / Source+state / Mailchimp status / Date / Actions).
 const GRID_COLS =
-  "grid-cols-[minmax(220px,2fr)_minmax(180px,1.5fr)_110px_80px]"
+  "grid-cols-[minmax(200px,2fr)_minmax(130px,1.2fr)_minmax(116px,1fr)_104px_72px]"
 
 export function EmailSignupsTable({
   rows,
@@ -93,7 +94,6 @@ export function EmailSignupsTable({
   crossCollectionMap,
   onSelectRow,
   onDelete,
-  onPushOne,
   isDeleting,
   searchQuery,
 }: Props) {
@@ -142,6 +142,7 @@ export function EmailSignupsTable({
       >
         <SortHeader column="email" label="Email" sort={sort} onSortChange={onSortChange} />
         <SortHeader column="source" label="Source" sort={sort} onSortChange={onSortChange} />
+        <div className="px-5 py-3 flex items-center">Status</div>
         <SortHeader
           column="created_at"
           label={
@@ -173,7 +174,6 @@ export function EmailSignupsTable({
               ? dateLookup.get(signup.created_at) ?? "—"
               : "N/A"
             const emailKey = signup.email.toLowerCase()
-            const isSubscribed = subscriberMap.has(emailKey)
             const sourceSet = sourcesByEmail.get(emailKey)
             // "+N" rolls up two signals: other email_signup sources for the
             // same email + cross-collection counts (contact forms, event
@@ -252,25 +252,21 @@ export function EmailSignupsTable({
                     onChange={(s) => onLocalState(signup.id, s)}
                   />
                 </div>
+                {/* Mailchimp status — consent pill (subscribed / not opted in /
+                    opted out), or "not synced" when not in Mailchimp yet. */}
+                <div className="px-5 py-2.5 flex items-center min-w-0">
+                  {subscriberMap.has(signup.email.toLowerCase()) ? (
+                    <MailchimpSubscribedPill email={signup.email} mapping={subscriberMap} />
+                  ) : (
+                    <span className="text-[10px] text-neutral-300">not synced</span>
+                  )}
+                </div>
                 {/* Date */}
                 <div className="px-5 py-2.5 flex items-center text-neutral-400 text-[13px] font-normal whitespace-nowrap tabular-nums">
                   {formattedDate}
                 </div>
                 {/* Actions */}
                 <div className="px-5 py-2.5 flex items-center justify-end gap-0.5">
-                  {!isSubscribed && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onPushOne(signup.email)
-                      }}
-                      className="p-1.5 text-neutral-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                      title={`Push ${signup.email} to Mailchimp`}
-                      aria-label={`Push ${signup.email} to Mailchimp`}
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
