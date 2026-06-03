@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import {
   getStatesForSubmissions,
+  getAllStatesForSource,
   setSubmissionState,
   VALID_STATES,
   type SubmissionSourceCollection,
@@ -26,8 +27,11 @@ async function requireAdmin() {
 }
 
 // GET /api/admin/submissions/states?source=email_signups&ids=a,b,c
+//   or  ?source=email_signups&all=1
 // Returns { states: { [id]: state } } — only entries that have been set.
-// Missing ids implicitly default to "new" client-side.
+// Missing ids implicitly default to "new" client-side. `all=1` returns every
+// set state for the source in a single query (preferred for large sources —
+// the sidecar is sparse, so this avoids reading every id).
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin()
   if ("error" in auth) {
@@ -35,6 +39,7 @@ export async function GET(request: NextRequest) {
   }
 
   const source = request.nextUrl.searchParams.get("source") as SubmissionSourceCollection | null
+  const all = request.nextUrl.searchParams.get("all") === "1"
   const idsParam = request.nextUrl.searchParams.get("ids") ?? ""
   const ids = idsParam.split(",").filter(Boolean)
 
@@ -44,12 +49,14 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     )
   }
-  if (ids.length === 0) {
+  if (!all && ids.length === 0) {
     return NextResponse.json({ success: true, states: {} })
   }
 
   try {
-    const map = await getStatesForSubmissions(source, ids)
+    const map = all
+      ? await getAllStatesForSource(source)
+      : await getStatesForSubmissions(source, ids)
     const states: Record<string, SubmissionState> = {}
     for (const [id, state] of map.entries()) {
       states[id] = state

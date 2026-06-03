@@ -75,6 +75,30 @@ export async function getStatesForSubmissions(
 }
 
 /**
+ * Fetch ALL set states for a source in ONE query. The sidecar is sparse (only
+ * explicitly-set states exist; a missing record means "new"), so this returns
+ * just the handful of records that exist — far cheaper than a getAll over every
+ * id when the source collection is large (thousands of event registrations).
+ * The caller defaults any id not in the returned map to "new".
+ */
+export async function getAllStatesForSource(
+  source: SubmissionSourceCollection,
+): Promise<Map<string, SubmissionState>> {
+  const result = new Map<string, SubmissionState>()
+  const db = getDb()
+  const snap = await db.collection(COLLECTION).where("source", "==", source).get()
+  for (const doc of snap.docs) {
+    const data = doc.data()
+    const sourceId = data?.sourceId as string | undefined
+    const state = data?.state as SubmissionState | undefined
+    if (sourceId && state && VALID_STATES.includes(state)) {
+      result.set(sourceId, state)
+    }
+  }
+  return result
+}
+
+/**
  * Set state for one submission. Pass state="new" to delete the record (so the
  * sidecar collection stays sparse — no entries for unmodified submissions).
  */

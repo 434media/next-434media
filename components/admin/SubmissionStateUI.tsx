@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Loader2, Check, ChevronDown, X, Inbox, Eye, MessageSquare, Archive, Ban, MoreHorizontal } from "lucide-react"
 import type { DotColor } from "./StatusDot"
 
@@ -45,53 +45,28 @@ interface UseSubmissionStatesArgs {
   ids: string[]
 }
 
-// Cap each request's ?ids= payload well under the ~8 KB URL limit that
-// browsers, proxies, and Vercel's edge enforce. With ~25 chars per encoded id,
-// 100 ids produces a query of ~2.5 KB — plenty of headroom.
-const STATES_BATCH_SIZE = 100
-
-export function useSubmissionStates({ source, ids }: UseSubmissionStatesArgs) {
-  // Stringified id key — only re-fetch when the set actually changes
-  const idsKey = useMemo(() => [...ids].sort().join(","), [ids])
+export function useSubmissionStates({ source }: UseSubmissionStatesArgs) {
   const [states, setStates] = useState<Map<string, SubmissionState>>(new Map())
 
+  // Fetch ALL set states for the source in ONE request. The sidecar is sparse
+  // (a missing record means "new"), so this returns only the handful of records
+  // that actually exist — no per-id chunking, no reads that scale with the
+  // number of submissions loaded. (`ids` is no longer needed for fetching; it's
+  // kept on the args for call-site compatibility.)
   const refresh = useCallback(async () => {
-    if (ids.length === 0) {
-      setStates(new Map())
-      return
-    }
     try {
-      // Chunk the id list so no single GET URL exceeds the proxy/browser limit.
-      // Without chunking, a list of ~2k ids produces a >50 KB URL that fails
-      // before reaching the route handler.
-      const chunks: string[][] = []
-      for (let i = 0; i < ids.length; i += STATES_BATCH_SIZE) {
-        chunks.push(ids.slice(i, i + STATES_BATCH_SIZE))
-      }
-
-      const responses = await Promise.all(
-        chunks.map((chunk) =>
-          fetch(
-            `/api/admin/submissions/states?source=${source}&ids=${encodeURIComponent(chunk.join(","))}`,
-          )
-            .then((res) => (res.ok ? (res.json() as Promise<{ states?: Record<string, SubmissionState> }>) : null))
-            .catch(() => null),
-        ),
-      )
-
+      const res = await fetch(`/api/admin/submissions/states?source=${source}&all=1`)
+      if (!res.ok) return
+      const data = (await res.json()) as { states?: Record<string, SubmissionState> }
       const next = new Map<string, SubmissionState>()
-      for (const data of responses) {
-        if (!data?.states) continue
-        for (const [id, state] of Object.entries(data.states)) {
-          next.set(id, state)
-        }
+      if (data?.states) {
+        for (const [id, state] of Object.entries(data.states)) next.set(id, state)
       }
       setStates(next)
     } catch {
       /* silent — non-critical */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, idsKey])
+  }, [source])
 
   useEffect(() => {
     refresh()
