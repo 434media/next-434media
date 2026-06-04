@@ -167,6 +167,11 @@ export function TaskDetailDrawer({
 
   if (!task) return null
 
+  // Create vs. detail mode. A brand-new task has no id; collaboration/metadata
+  // sections (comments, attachments, links, created-by) are only meaningful once
+  // the task exists, so they're hidden while creating.
+  const isNew = !task.id
+
   const dueDateStatus = getDueDateStatus(task.due_date, task.status)
 
   const drawerTitle = task.id ? formData.title || "Task" : "New Task"
@@ -263,44 +268,22 @@ export function TaskDetailDrawer({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
-                  <div className="relative">
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => onFormChange({ ...formData, description: e.target.value })}
-                      rows={4}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-25 max-h-75"
-                      placeholder="Task description..."
-                    />
-                    <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 10 10">
-                        <path d="M9 9H7v-1h1V7h1v2zm0-4H8V4h1v1zm-4 4H4V8h1v1zm4-8H8V0h1v1zM5 1H4V0h1v1zM1 9H0V7h1v2zm0-4H0V4h1v1zM1 1H0V0h1v1z" opacity="0.5"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Drag corner to resize</p>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => onFormChange({ ...formData, description: e.target.value })}
+                    rows={4}
+                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-25 max-h-75"
+                    placeholder="Task description..."
+                  />
                 </div>
 
-                {/* Created By & Date Created - Read-only reference fields */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Created by</label>
-                    <input
-                      type="text"
-                      value={task?.id ? (task.created_by || "—") : (currentUser?.name || currentUser?.email || "—")}
-                      disabled
-                      className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Date Created</label>
-                    <input
-                      type="text"
-                      value={task?.id ? formatDate(task.created_at) : formatDate(new Date().toISOString())}
-                      disabled
-                      className="w-full px-3 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
+                {/* Created-by / date — reference metadata, only meaningful once the
+                    task exists. Shown as a muted line, not disabled inputs. */}
+                {!isNew && (
+                  <p className="text-xs text-gray-400">
+                    Created by {task.created_by || "—"} · {formatDate(task.created_at)}
+                  </p>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -694,7 +677,8 @@ export function TaskDetailDrawer({
                 </div>
               </div>
 
-              {/* Web Links Section */}
+              {/* Web Links Section — detail-only (hidden while creating) */}
+              {!isNew && (
               <div className="pt-4 border-t border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   <Link2 className="w-4 h-4 inline mr-2" />
@@ -739,8 +723,10 @@ export function TaskDetailDrawer({
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* File Attachments Section */}
+              {/* File Attachments Section — detail-only */}
+              {!isNew && (
               <div className="pt-4 border-t border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   <Upload className="w-4 h-4 inline mr-2" />
@@ -840,6 +826,7 @@ export function TaskDetailDrawer({
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
               </div>
+              )}
 
               <div className="pt-4 border-t border-gray-200 space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
@@ -876,7 +863,8 @@ export function TaskDetailDrawer({
                 )}
               </div>
 
-              {/* Comments Section */}
+              {/* Comments Section — detail-only */}
+              {!isNew && (
               <div className="pt-4 border-t border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   <MessageSquare className="w-4 h-4 inline mr-2" />
@@ -1089,6 +1077,7 @@ export function TaskDetailDrawer({
                   </p>
                 )}
               </div>
+              )}
       </div>
     </DetailDrawer>
   )
