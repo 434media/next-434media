@@ -419,12 +419,43 @@ export async function getClientsByStatus(status: string): Promise<ClientRecord[]
 // ============================================
 const OPPORTUNITIES_COLLECTION = "crm_opportunities"
 
+// Opportunities live in `crm_clients` (is_opportunity=true) — that's where the
+// UI writes (the opportunity drawer POSTs to /api/admin/crm/clients) and where
+// the kanban reads. The legacy `crm_opportunities` collection is orphaned
+// (write-dead, stale "lead" seed data). Map a client-opportunity record to the
+// `Opportunity` shape so the dashboard stats, pipeline view, and command palette
+// all reflect the real data. disposition → stage: pitched→proposal, open/none→
+// lead, won/lost pass straight through (only the closed-vs-open split drives the
+// stats; the exact open stage only picks a pipeline column).
+function clientOpportunityToOpportunity(c: ClientRecord): Opportunity {
+  const stage: OpportunityStage =
+    c.disposition === "closed_won"
+      ? "closed_won"
+      : c.disposition === "closed_lost"
+        ? "closed_lost"
+        : c.disposition === "pitched"
+          ? "proposal"
+          : "lead"
+  return {
+    id: c.id,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+    name: c.title || c.company_name || c.name || "Untitled opportunity",
+    client_id: c.id,
+    client_name: c.company_name || c.name,
+    stage,
+    value: c.pitch_value ?? 0,
+  }
+}
+
 export async function getOpportunities(): Promise<Opportunity[]> {
-  return getAllFromCollection<Opportunity>(OPPORTUNITIES_COLLECTION)
+  const clients = await getClients()
+  return clients.filter((c) => c.is_opportunity).map(clientOpportunityToOpportunity)
 }
 
 export async function getOpportunityById(id: string): Promise<Opportunity | null> {
-  return getById<Opportunity>(OPPORTUNITIES_COLLECTION, id)
+  const client = await getClientById(id)
+  return client && client.is_opportunity ? clientOpportunityToOpportunity(client) : null
 }
 
 export async function createOpportunity(
@@ -445,35 +476,11 @@ export async function deleteOpportunity(id: string): Promise<void> {
 }
 
 export async function getOpportunitiesByStage(stage: OpportunityStage): Promise<Opportunity[]> {
-  try {
-    const db = getDb()
-    const snapshot = await db
-      .collection(OPPORTUNITIES_COLLECTION)
-      .where("stage", "==", stage)
-      .get()
-    return snapshot.docs
-      .map((doc) => docToData<Opportunity>(doc))
-      .filter((item): item is Opportunity => item !== null)
-  } catch (error) {
-    console.error("Error fetching opportunities by stage:", error)
-    throw error
-  }
+  return (await getOpportunities()).filter((o) => o.stage === stage)
 }
 
 export async function getOpportunitiesByClient(clientId: string): Promise<Opportunity[]> {
-  try {
-    const db = getDb()
-    const snapshot = await db
-      .collection(OPPORTUNITIES_COLLECTION)
-      .where("client_id", "==", clientId)
-      .get()
-    return snapshot.docs
-      .map((doc) => docToData<Opportunity>(doc))
-      .filter((item): item is Opportunity => item !== null)
-  } catch (error) {
-    console.error("Error fetching opportunities by client:", error)
-    throw error
-  }
+  return (await getOpportunities()).filter((o) => o.client_id === clientId)
 }
 
 // ============================================
