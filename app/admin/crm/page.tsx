@@ -561,11 +561,11 @@ export default function SalesCRMPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showClientForm, editingClient?.id])
 
-  // ?tab=<view> drives which tab renders. Lets the command palette and shared
-  // links land directly on Pipeline / Tasks / Social Calendar without a click.
+  // ?tab=<view> ⇄ viewMode. The URL is the source of truth for which section is
+  // open, so deep links, refresh, share, AND browser back/forward all land on the
+  // right tab. (A missing ?tab= means the default Dashboard.)
   const tabParam = searchParams?.get("tab") ?? null
   useEffect(() => {
-    if (!tabParam) return
     // Legacy redirect — the Social Calendar moved to its own /admin/content
     // route. Old links (?tab=social-calendar, optionally ?openContent=) forward
     // there so bookmarks and notifications keep working.
@@ -579,11 +579,24 @@ export default function SalesCRMPage() {
       return
     }
     const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks"]
-    if (allowed.includes(tabParam as ViewMode) && tabParam !== viewMode) {
-      setViewMode(tabParam as ViewMode)
-    }
+    const next: ViewMode = allowed.includes(tabParam as ViewMode) ? (tabParam as ViewMode) : "dashboard"
+    if (next !== viewMode) setViewMode(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam])
+
+  // Mirror viewMode → ?tab= so clicking a tab updates the URL. push() (not
+  // replace) gives each section its own history entry, so back returns to the
+  // previous section. Dashboard is the default and stays a clean, tab-less URL.
+  useEffect(() => {
+    const currentView = searchParams?.get("tab") ?? "dashboard"
+    if (currentView === viewMode) return
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    if (viewMode === "dashboard") params.delete("tab")
+    else params.set("tab", viewMode)
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode])
 
   // ?new=<entity> opens an empty create drawer (command palette quick actions).
   // Strip the param immediately so re-renders don't reopen it after the user closes.
