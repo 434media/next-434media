@@ -66,7 +66,7 @@ function KPICard({
   label: string
   value: string
   subLabel?: string
-  icon: React.ElementType
+  icon: React.ComponentType<{ className?: string }>
   color?: "neutral" | "emerald" | "amber" | "blue" | "sky" | "red"
   trend?: { value: number; isPositive: boolean }
 }) {
@@ -420,7 +420,7 @@ function ActiveOpportunitiesList({
         </div>
       </div>
 
-      <div className="divide-y divide-neutral-100 max-h-[60dvh] sm:max-h-[400px] overflow-y-auto">
+      <div className="divide-y divide-neutral-100 max-h-[60dvh] sm:max-h-100 overflow-y-auto">
         {activeOpportunities.length === 0 ? (
           <div className="p-6 text-center text-sm text-neutral-400">
             No active opportunities. Add clients as opportunities to track them here.
@@ -743,9 +743,10 @@ export function DashboardView({
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
   
   // Pitched at 90% DOC for Pacing calculation
-  // IMPORTANT: Only "pitched" disposition counts - closed_lost is NEVER included
+  // IMPORTANT: Only "pitched" disposition counts — closed_won/closed_lost are
+  // excluded by the disposition === "pitched" check.
   const pitched90DocValue = opportunityClients
-    .filter(c => c.disposition === "pitched" && c.disposition !== "closed_lost" && c.doc === "90")
+    .filter(c => c.disposition === "pitched" && c.doc === "90")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
   
   // Pipeline value = opportunities that are not closed (pitched or no disposition)
