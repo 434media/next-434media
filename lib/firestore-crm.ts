@@ -417,8 +417,6 @@ export async function getClientsByStatus(status: string): Promise<ClientRecord[]
 // ============================================
 // OPPORTUNITIES OPERATIONS
 // ============================================
-const OPPORTUNITIES_COLLECTION = "crm_opportunities"
-
 // Opportunities live in `crm_clients` (is_opportunity=true) — that's where the
 // UI writes (the opportunity drawer POSTs to /api/admin/crm/clients) and where
 // the kanban reads. The legacy `crm_opportunities` collection is orphaned
@@ -456,23 +454,6 @@ export async function getOpportunities(): Promise<Opportunity[]> {
 export async function getOpportunityById(id: string): Promise<Opportunity | null> {
   const client = await getClientById(id)
   return client && client.is_opportunity ? clientOpportunityToOpportunity(client) : null
-}
-
-export async function createOpportunity(
-  data: Omit<Opportunity, "id" | "created_at" | "updated_at">
-): Promise<Opportunity> {
-  return createDocument<Opportunity>(OPPORTUNITIES_COLLECTION, data)
-}
-
-export async function updateOpportunity(
-  id: string,
-  updates: Partial<Opportunity>
-): Promise<Opportunity> {
-  return updateDocument<Opportunity>(OPPORTUNITIES_COLLECTION, id, updates)
-}
-
-export async function deleteOpportunity(id: string): Promise<void> {
-  return deleteDocument(OPPORTUNITIES_COLLECTION, id)
 }
 
 export async function getOpportunitiesByStage(stage: OpportunityStage): Promise<Opportunity[]> {
