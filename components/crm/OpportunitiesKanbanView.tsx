@@ -281,7 +281,7 @@ function KanbanCard({
       }}
     >
       <div className="flex items-start gap-2">
-        <GripVertical className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+        <GripVertical className="w-4 h-4 text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           {/* Linked-client pill */}
           {isLinkedClient && isStacked && stackIndex > 0 && (
@@ -314,13 +314,13 @@ function KanbanCard({
           )}
 
           {/* Title (opportunity title) */}
-          <p className="text-sm font-medium text-gray-900 truncate leading-snug">
+          <p className="text-sm font-medium text-neutral-900 truncate leading-snug">
             {item.name}
           </p>
 
           {/* Company Name */}
           {item.companyName && (
-            <p className="text-xs text-gray-500 mt-0.5 truncate">
+            <p className="text-xs text-neutral-500 mt-0.5 truncate">
               {item.companyName}
             </p>
           )}
@@ -344,14 +344,14 @@ function KanbanCard({
 
           {/* Due date or follow-up */}
           {item.dueDate && (
-            <p className="text-xs text-gray-400 mt-1.5">
+            <p className="text-xs text-neutral-400 mt-1.5">
               Follow up: {formatDate(item.dueDate)}
             </p>
           )}
 
           {/* Assigned to */}
           {item.assignedTo && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-neutral-400 mt-1">
               {item.assignedTo}
             </p>
           )}
@@ -441,7 +441,7 @@ function StackedKanbanCard({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute bottom-1 right-1 text-[10px] text-gray-400 pointer-events-none"
+          className="absolute bottom-1 right-1 text-[10px] text-neutral-400 pointer-events-none"
         >
           Hover to view linked
         </motion.div>
@@ -530,7 +530,7 @@ function KanbanColumn({
         )}
       </div>
 
-      {/* Cards Container — drop indicator surfaces on dragOver instead of a static gray-50 card */}
+      {/* Cards Container — drop indicator surfaces on dragOver instead of a static neutral-50 card */}
       <div
         className={`flex-1 p-2 space-y-3 rounded-md min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-visible transition-colors ${
           isDragOver ? "bg-neutral-100" : "bg-neutral-50/40"

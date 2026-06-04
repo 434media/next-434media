@@ -8,6 +8,7 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
+  Rocket,
 } from "lucide-react"
 
 // Import CRM components
@@ -757,15 +758,19 @@ export default function SalesCRMPage() {
       <div className="min-h-full bg-neutral-50 text-neutral-900">
         {/* Skeleton tab strip — same shape as the live nav so the page doesn't reflow on hydration */}
         <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-neutral-200/70">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex gap-2 py-3" aria-hidden="true">
-              {[...Array(5)].map((_, i) => (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2 pt-3" aria-hidden="true">
+              <Rocket className="w-4 h-4 text-neutral-300" />
+              <div className="h-3.5 w-10 rounded bg-neutral-200/70" />
+            </div>
+            <div className="flex gap-2 pt-2 pb-3" aria-hidden="true">
+              {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-7 w-24 rounded-md bg-neutral-200/70 animate-pulse" />
               ))}
             </div>
           </div>
         </div>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <DashboardSkeleton />
         </div>
       </div>
@@ -779,9 +784,17 @@ export default function SalesCRMPage() {
 
       {/* Sticky tab nav — Linear/Vercel pattern. Stays in view as content scrolls. */}
       <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-neutral-200/70">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Brand row — matches the Audiences/Inbox header idiom. */}
+          <div className="flex items-center gap-2 pt-3">
+            <Rocket className="w-4 h-4 text-neutral-600" />
+            <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">CRM</h1>
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-1 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
+              clients &amp; won revenue — the pipeline&apos;s final stage
+            </span>
+          </div>
           <nav
-            className="flex gap-1 -mb-px overflow-x-auto py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="flex gap-1 -mb-px overflow-x-auto pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             aria-label="CRM views"
           >
             {[
@@ -813,7 +826,7 @@ export default function SalesCRMPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* Error State */}
         {error && (

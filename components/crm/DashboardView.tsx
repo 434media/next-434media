@@ -11,20 +11,15 @@ import {
   ChevronRight,
   ChevronDown,
   Calendar,
-  Building2,
   BarChart3,
-  PieChart,
   ArrowUpRight,
   ArrowDownRight,
-  Plus,
-  Search,
 } from "lucide-react"
 import {
   formatCurrency,
   formatDate,
   BRAND_GOALS,
   DISPOSITION_OPTIONS,
-  DOC_OPTIONS,
 } from "./types"
 import type {
   DashboardStats,
@@ -341,43 +336,6 @@ function PipelineConfidence({
   )
 }
 
-// Disposition Summary Pills
-function DispositionSummary({ clients }: { clients: Client[] }) {
-  const opportunityClients = clients.filter(c => c.is_opportunity)
-
-  const counts: Record<Disposition, { count: number; value: number }> = {
-    pitched: { count: 0, value: 0 },
-    closed_won: { count: 0, value: 0 },
-    closed_lost: { count: 0, value: 0 },
-  }
-
-  opportunityClients.forEach(c => {
-    const disp = c.disposition || "pitched"
-    counts[disp].count++
-    counts[disp].value += c.pitch_value || 0
-  })
-
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {DISPOSITION_OPTIONS.map(opt => (
-        <div
-          key={opt.value}
-          className="p-3 rounded-lg ring-1 ring-neutral-200/70 bg-white transition-shadow hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: opt.color }} />
-            <span className="text-xs font-medium text-neutral-600">{opt.label}</span>
-          </div>
-          <p className="text-xl font-semibold tabular-nums text-neutral-900">{counts[opt.value].count}</p>
-          {counts[opt.value].value > 0 && (
-            <p className="text-xs tabular-nums text-neutral-400">{formatCurrency(counts[opt.value].value, true)}</p>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // Active Opportunities List Component - shows client-based opportunities only
 function ActiveOpportunitiesList({
   clients,
@@ -520,126 +478,6 @@ function ActiveOpportunitiesList({
                     <p className="text-sm font-semibold tabular-nums text-neutral-900">{formatCurrency(item.value, true)}</p>
                   )}
                 </div>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Recent Clients List Component
-function RecentClientsList({
-  clients,
-  onClientClick,
-  onViewAll,
-  onAdd,
-}: {
-  clients: Client[]
-  onClientClick: (client: Client) => void
-  onViewAll: () => void
-  onAdd: () => void
-}) {
-  const [searchQuery, setSearchQuery] = useState("")
-
-  const isSearching = searchQuery.trim().length > 0
-
-  const recentClients = clients
-    // When searching, include ALL clients (including opportunities)
-    // When not searching, only show non-opportunity clients
-    .filter(c => isSearching ? true : !c.is_opportunity)
-    .filter(c => {
-      if (!isSearching) return true
-      const query = searchQuery.toLowerCase()
-      const companyName = (c.company_name || "").toLowerCase()
-      const name = (c.name || "").toLowerCase()
-      const contactName = (c.contacts?.[0]?.name || "").toLowerCase()
-      const email = (c.email || "").toLowerCase()
-      return companyName.includes(query) || name.includes(query) || contactName.includes(query) || email.includes(query)
-    })
-    .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
-    .slice(0, isSearching ? 15 : 5)
-
-  return (
-    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden">
-      <div className="p-4 border-b border-neutral-100">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-neutral-500" />
-            <h3 className="text-sm font-medium text-neutral-900">Recent Clients</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onAdd}
-              aria-label="Add client"
-              className="grid place-items-center h-8 w-8 rounded-md hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-700"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                onViewAll()
-                window.scrollTo({ top: 0, behavior: 'smooth' })
-              }}
-              className="text-xs font-medium text-neutral-600 hover:text-neutral-950 flex items-center gap-1 transition-colors"
-            >
-              View all
-              <ArrowUpRight className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Search Field */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-          <input
-            type="text"
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-          />
-        </div>
-      </div>
-
-      <div className="divide-y divide-neutral-100 max-h-[60dvh] sm:max-h-[300px] overflow-y-auto">
-        {recentClients.length === 0 ? (
-          <div className="p-6 text-center text-sm text-neutral-400">
-            {searchQuery.trim() 
-              ? `No clients matching "${searchQuery}".`
-              : "No clients yet. Add your first client to get started."
-            }
-          </div>
-        ) : (
-          recentClients.map((client) => (
-            <button
-              key={client.id}
-              onClick={() => onClientClick(client)}
-              className="w-full p-3 hover:bg-neutral-50 transition-colors text-left flex items-center gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-neutral-900 truncate">{client.company_name || client.name}</p>
-                  {client.is_opportunity && (
-                    <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700">
-                      Opportunity
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-neutral-500 truncate">
-                  {client.contacts?.[0]?.name || client.name || "No contact"}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                {client.brand && (
-                  <span className="inline-block px-2 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-600">
-                    {client.brand}
-                  </span>
-                )}
-                {client.source && (
-                  <p className="text-[10px] text-neutral-400 mt-0.5 capitalize">{client.source.replace("_", " ")}</p>
-                )}
               </div>
             </button>
           ))

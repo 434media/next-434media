@@ -2,6 +2,7 @@
 
 import { Search, Plus, Mail, Phone, Users, Calendar, Filter, AlertCircle, Clock } from "lucide-react"
 import { formatDate, normalizeAssigneeName, TEAM_MEMBERS, getDueDateStatus } from "./types"
+import { Dropdown } from "./Dropdown"
 import type { Client } from "./types"
 
 interface ClientsViewProps {
@@ -115,35 +116,30 @@ export function ClientsView({
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-wrap flex-1 gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
             <input
               type="text"
               placeholder="Search clients by name or email..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
             />
           </div>
-          {/* Assignee Filter */}
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <select
-              value={assigneeFilter}
-              onChange={(e) => onAssigneeFilterChange(e.target.value)}
-              className="pl-10 pr-8 py-2.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 shadow-sm appearance-none cursor-pointer min-w-[160px]"
-            >
-              <option value="all">All Assignees</option>
-              {allAssignees.map(assignee => (
-                <option key={assignee} value={assignee}>
-                  {assignee}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Assignee Filter — custom dropdown (matches the app idiom). */}
+          <Dropdown
+            ariaLabel="Filter by assignee"
+            icon={<Filter className="w-3.5 h-3.5 text-neutral-400" />}
+            value={assigneeFilter}
+            onChange={onAssigneeFilterChange}
+            options={[
+              { value: "all", label: "All Assignees" },
+              ...allAssignees.map((a) => ({ value: a, label: a })),
+            ]}
+          />
         </div>
         <button
           onClick={onAddClient}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Client
@@ -151,28 +147,28 @@ export function ClientsView({
       </div>
 
       {/* Clients Table - Focused on Client, Primary Contact, Follow Up */}
-      <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
+      <div className="rounded-md border border-neutral-200/70 overflow-hidden bg-white">
         <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
           <table className="w-full table-fixed">
-            <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+            <thead className="bg-neutral-50 sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="w-[25%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">
+                <th className="w-[25%] px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider bg-neutral-50">
                   Client
                 </th>
-                <th className="w-[40%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50">
+                <th className="w-[40%] px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider bg-neutral-50">
                   Primary Contact
                 </th>
-                <th className="w-[35%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell bg-gray-50">
+                <th className="w-[35%] px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell bg-neutral-50">
                   Follow Up
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {sortedClients.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={3} className="px-4 py-12 text-center text-neutral-400">
                     <div className="flex flex-col items-center gap-2">
-                      <Users className="w-8 h-8 text-gray-300" />
+                      <Users className="w-8 h-8 text-neutral-300" />
                       <p className="text-sm">{clients.length === 0 ? "No clients yet. Add your first client!" : "No clients match your search"}</p>
                     </div>
                   </td>
@@ -186,19 +182,19 @@ export function ClientsView({
                     <tr
                       key={client.id}
                       onClick={() => onEditClient(client)}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
                     >
                       {/* Client */}
                       <td className="px-4 py-3.5">
                         <div className="min-w-0">
-                          <p className="font-medium text-sm text-gray-900 truncate">{client.company_name || client.name || "Unnamed Client"}</p>
+                          <p className="font-medium text-sm text-neutral-900 truncate">{client.company_name || client.name || "Unnamed Client"}</p>
                           {client.department && (
-                            <p className="text-xs text-blue-600 mt-0.5 truncate">
+                            <p className="text-xs text-neutral-500 mt-0.5 truncate">
                               {client.department}
                             </p>
                           )}
                           {contactCount > 1 && (
-                            <p className="inline-flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                            <p className="inline-flex items-center gap-1 text-xs text-neutral-500 mt-0.5">
                               <Users className="w-3 h-3 flex-shrink-0" />
                               <span>{contactCount} contacts</span>
                             </p>
@@ -211,14 +207,14 @@ export function ClientsView({
                           {primaryContact ? (
                             <>
                               {primaryContact.fullName && (
-                                <p className="text-sm font-medium text-gray-800 truncate">{primaryContact.fullName}</p>
+                                <p className="text-sm font-medium text-neutral-800 truncate">{primaryContact.fullName}</p>
                               )}
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 {primaryContact.email && (
                                   <a
                                     href={`mailto:${primaryContact.email}`}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                                    className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
                                     <Mail className="w-3.5 h-3.5 flex-shrink-0" />
                                     <span className="truncate max-w-[180px]">{primaryContact.email}</span>
@@ -228,7 +224,7 @@ export function ClientsView({
                                   <a
                                     href={`tel:${primaryContact.phone}`}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600 transition-colors"
+                                    className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
                                     <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                                     <span className="whitespace-nowrap">{primaryContact.phone}</span>
@@ -237,7 +233,7 @@ export function ClientsView({
                               </div>
                             </>
                           ) : (
-                            <span className="text-sm text-gray-400">No contact info</span>
+                            <span className="text-sm text-neutral-400">No contact info</span>
                           )}
                         </div>
                       </td>
@@ -249,7 +245,7 @@ export function ClientsView({
                             const statusStyles = {
                               overdue: "bg-red-50 text-red-700 border-red-200",
                               approaching: "bg-amber-50 text-amber-700 border-amber-200",
-                              normal: "bg-blue-50 text-blue-700 border-blue-100",
+                              normal: "bg-neutral-50 text-neutral-600 border-neutral-200",
                             }
                             const IconComponent = followUpStatus === "overdue" ? AlertCircle : followUpStatus === "approaching" ? Clock : Calendar
                             return (
@@ -260,7 +256,7 @@ export function ClientsView({
                             )
                           })()
                         ) : (
-                          <span className="text-sm text-gray-400">—</span>
+                          <span className="text-sm text-neutral-400">—</span>
                         )}
                       </td>
                     </tr>
