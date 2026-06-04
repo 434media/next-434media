@@ -195,7 +195,7 @@ export function ClientsView({
                           )}
                           {contactCount > 1 && (
                             <p className="inline-flex items-center gap-1 text-xs text-neutral-500 mt-0.5">
-                              <Users className="w-3 h-3 flex-shrink-0" />
+                              <Users className="w-3 h-3 shrink-0" />
                               <span>{contactCount} contacts</span>
                             </p>
                           )}
@@ -216,8 +216,8 @@ export function ClientsView({
                                     onClick={(e) => e.stopPropagation()}
                                     className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
-                                    <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-                                    <span className="truncate max-w-[180px]">{primaryContact.email}</span>
+                                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate max-w-45">{primaryContact.email}</span>
                                   </a>
                                 )}
                                 {primaryContact.phone && (
@@ -226,7 +226,7 @@ export function ClientsView({
                                     onClick={(e) => e.stopPropagation()}
                                     className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
-                                    <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                                    <Phone className="w-3.5 h-3.5 shrink-0" />
                                     <span className="whitespace-nowrap">{primaryContact.phone}</span>
                                   </a>
                                 )}
@@ -250,7 +250,7 @@ export function ClientsView({
                             const IconComponent = followUpStatus === "overdue" ? AlertCircle : followUpStatus === "approaching" ? Clock : Calendar
                             return (
                               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border whitespace-nowrap ${statusStyles[followUpStatus || "normal"]}`}>
-                                <IconComponent className="w-3.5 h-3.5 flex-shrink-0" />
+                                <IconComponent className="w-3.5 h-3.5 shrink-0" />
                                 <span>{formatDate(client.next_followup_date)}</span>
                               </div>
                             )
