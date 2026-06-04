@@ -95,9 +95,6 @@ export async function POST(request: NextRequest) {
       attachments: body.attachments || [],
       comments: body.comments || [],
       tagged_users: body.tagged_users || [],
-      is_social_post: body.is_social_post || false,
-      social_post_date: body.social_post_date || "",
-      social_platforms: body.social_platforms || [],
     })
 
     return NextResponse.json({ success: true, task, id: task.id }, { status: 201 })

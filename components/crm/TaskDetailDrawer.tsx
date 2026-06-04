@@ -24,44 +24,18 @@ import {
   Target,
   Search,
   Building2,
-  ArrowLeft,
-  Calendar
+  ArrowLeft
 } from "lucide-react"
-import { 
-  BRANDS, 
-  TEAM_MEMBERS, 
-  getDueDateStatus, 
-  formatDate,
-  DISPOSITION_OPTIONS,
-  DOC_OPTIONS,
-  SOCIAL_PLATFORM_OPTIONS
+import {
+  BRANDS,
+  TEAM_MEMBERS,
+  getDueDateStatus,
+  formatDate
 } from "./types"
-import type { Task, TaskAttachment, TaskComment, CurrentUser, Brand, Disposition, DOC, SocialPlatform } from "./types"
+import type { Task, TaskAttachment, CurrentUser, Brand } from "./types"
+import type { TaskFormData } from "@/hooks/useTaskHandlers"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
-
-interface TaskFormData {
-  title: string
-  description: string
-  assigned_to: string
-  secondary_assigned_to: string[]  // Changed to array for multi-select
-  brand: Brand | ""
-  status: string
-  priority: string
-  due_date: string
-  notes: string
-  web_links: string[]
-  tagged_users: string[]
-  is_opportunity: boolean
-  opportunity_id: string
-  disposition: Disposition | ""
-  doc: DOC | ""
-  client_id: string
-  client_name: string
-  is_social_post: boolean
-  social_post_date: string
-  social_platforms: SocialPlatform[]
-}
 
 // Simplified opportunity type for selection
 interface OpportunityOption {
@@ -153,29 +127,43 @@ export function TaskDetailDrawer({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentContent, setEditCommentContent] = useState("")
 
-  // State for client dropdown
-  const [showClientDropdown, setShowClientDropdown] = useState(false)
-  const [clientSearchQuery, setClientSearchQuery] = useState("")
+  // State for the "Link to" picker (links the task to a client or opportunity)
+  const [showLinkDropdown, setShowLinkDropdown] = useState(false)
+  const [linkSearchQuery, setLinkSearchQuery] = useState("")
 
-  // Get unique client names from clients list and sort alphabetically
-  // Use case-insensitive comparison to prevent duplicates like "HEB" and "HEB "
-  const uniqueClients = clients
-    .filter(client => client.company_name || client.name)
-    .reduce((acc, client) => {
-      const name = (client.company_name || client.name || '').trim()
-      const nameLower = name.toLowerCase()
-      // Check if we already have this client (case-insensitive)
-      if (!acc.find(c => c.name.toLowerCase() === nameLower)) {
-        acc.push({ id: client.id, name, company_name: client.company_name })
-      }
-      return acc
-    }, [] as { id: string; name: string; company_name?: string }[])
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // Unified "Link to" options: opportunities (tagged) + plain clients. Both are
+  // crm_clients rows; tagging each row lets the picker set the right foreign key
+  // (opportunity_id vs client_id). Plain clients are deduped by name
+  // (case-insensitive, so "HEB" and "HEB " collapse).
+  const opportunityIdSet = new Set(opportunities.map((o) => o.id))
+  const linkOptions = [
+    ...opportunities.map((o) => ({
+      id: o.id,
+      name: (o.title || o.company_name || "Unnamed opportunity").trim(),
+      kind: "opportunity" as const,
+    })),
+    ...clients
+      .filter((c) => !opportunityIdSet.has(c.id) && (c.company_name || c.name))
+      .reduce(
+        (acc, c) => {
+          const name = (c.company_name || c.name || "").trim()
+          if (!acc.find((x) => x.name.toLowerCase() === name.toLowerCase())) {
+            acc.push({ id: c.id, name, kind: "client" as const })
+          }
+          return acc
+        },
+        [] as { id: string; name: string; kind: "client" }[],
+      ),
+  ].sort((a, b) => a.name.localeCompare(b.name))
 
-  // Filter clients based on search query
-  const filteredClients = uniqueClients.filter((client) => {
-    return client.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
-  })
+  const filteredLinkOptions = linkOptions.filter((o) =>
+    o.name.toLowerCase().includes(linkSearchQuery.toLowerCase()),
+  )
+
+  // Trigger label: the linked opportunity's name, else the linked client name.
+  const linkedLabel = formData.opportunity_id
+    ? linkOptions.find((o) => o.id === formData.opportunity_id)?.name ?? "Linked opportunity"
+    : formData.client_name || ""
 
   if (!task) return null
 
@@ -355,25 +343,25 @@ export function TaskDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Link to</label>
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => {
-                          setShowClientDropdown(!showClientDropdown)
-                          setClientSearchQuery("")
+                          setShowLinkDropdown(!showLinkDropdown)
+                          setLinkSearchQuery("")
                         }}
                         className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
                       >
-                        <span className={formData.client_id ? "text-gray-900 truncate" : "text-gray-400"}>
-                          {formData.client_name || "No client"}
+                        <span className={(formData.opportunity_id || formData.client_id) ? "text-gray-900 truncate" : "text-gray-400"}>
+                          {linkedLabel || "Nothing linked"}
                         </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showClientDropdown ? "rotate-180" : ""}`} />
+                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showLinkDropdown ? "rotate-180" : ""}`} />
                       </button>
                       
-                      {/* Client Dropdown menu */}
+                      {/* Link-to dropdown menu */}
                       <AnimatePresence>
-                        {showClientDropdown && (
+                        {showLinkDropdown && (
                           <motion.div
                             initial={{ opacity: 0, y: -8 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -386,9 +374,9 @@ export function TaskDetailDrawer({
                                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                   type="text"
-                                  value={clientSearchQuery}
-                                  onChange={(e) => setClientSearchQuery(e.target.value)}
-                                  placeholder="Search clients..."
+                                  value={linkSearchQuery}
+                                  onChange={(e) => setLinkSearchQuery(e.target.value)}
+                                  placeholder="Search clients & opportunities..."
                                   className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500 focus:bg-white"
                                   autoFocus
                                   onClick={(e) => e.stopPropagation()}
@@ -397,57 +385,69 @@ export function TaskDetailDrawer({
                             </div>
                             
                             <div className="max-h-48 overflow-y-auto">
-                              {/* No client option */}
+                              {/* Nothing-linked option */}
                               <button
                                 type="button"
                                 onClick={() => {
-                                  onFormChange({ ...formData, client_id: "", client_name: "" })
-                                  setShowClientDropdown(false)
-                                  setClientSearchQuery("")
+                                  onFormChange({ ...formData, client_id: "", client_name: "", opportunity_id: "" })
+                                  setShowLinkDropdown(false)
+                                  setLinkSearchQuery("")
                                 }}
                                 className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
                               >
-                                <span className="text-gray-500">No client</span>
-                                {!formData.client_id && <Check className="w-4 h-4 text-blue-600" />}
+                                <span className="text-gray-500">Nothing linked</span>
+                                {!formData.client_id && !formData.opportunity_id && <Check className="w-4 h-4 text-blue-600" />}
                               </button>
                               
                               <div className="border-t border-gray-100" />
                               
-                              {/* Filtered clients */}
-                              {filteredClients.length === 0 ? (
+                              {/* Filtered options (clients + opportunities) */}
+                              {filteredLinkOptions.length === 0 ? (
                                 <div className="px-3 py-4 text-center text-sm text-gray-500">
-                                  {clientSearchQuery ? "No clients found" : "No clients available"}
+                                  {linkSearchQuery ? "No matches found" : "Nothing available"}
                                 </div>
                               ) : (
                                 <>
-                                  {filteredClients.slice(0, 50).map((client) => {
-                                    const clientName = client.name || 'Unnamed Client'
+                                  {filteredLinkOptions.slice(0, 50).map((option) => {
+                                    const isOpp = option.kind === "opportunity"
+                                    const selected = isOpp
+                                      ? formData.opportunity_id === option.id
+                                      : formData.client_id === option.id
                                     return (
                                       <button
-                                        key={client.id}
+                                        key={`${option.kind}-${option.id}`}
                                         type="button"
                                         onClick={() => {
-                                          onFormChange({ 
-                                            ...formData, 
-                                            client_id: client.id,
-                                            client_name: clientName
-                                          })
-                                          setShowClientDropdown(false)
-                                          setClientSearchQuery("")
+                                          onFormChange(
+                                            isOpp
+                                              ? { ...formData, opportunity_id: option.id, client_id: "", client_name: "" }
+                                              : { ...formData, client_id: option.id, client_name: option.name, opportunity_id: "" }
+                                          )
+                                          setShowLinkDropdown(false)
+                                          setLinkSearchQuery("")
                                         }}
                                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
                                       >
                                         <div className="flex items-center gap-2 min-w-0">
-                                          <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
-                                          <span className="text-gray-900 truncate">{clientName}</span>
+                                          {isOpp ? (
+                                            <Target className="w-4 h-4 text-sky-500 shrink-0" />
+                                          ) : (
+                                            <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
+                                          )}
+                                          <span className="text-gray-900 truncate">{option.name}</span>
+                                          {isOpp && (
+                                            <span className="shrink-0 px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 text-[10px] font-medium uppercase tracking-wide">
+                                              Opp
+                                            </span>
+                                          )}
                                         </div>
-                                        {formData.client_id === client.id && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                        {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                                       </button>
                                     )
                                   })}
-                                  {uniqueClients.length > 50 && (
+                                  {linkOptions.length > 50 && (
                                     <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50">
-                                      Showing {Math.min(50, filteredClients.length)} of {uniqueClients.length} clients. Type to search for more.
+                                      Showing {Math.min(50, filteredLinkOptions.length)} of {linkOptions.length}. Type to search for more.
                                     </div>
                                   )}
                                 </>
@@ -457,12 +457,12 @@ export function TaskDetailDrawer({
                         )}
                       </AnimatePresence>
                       
-                      {showClientDropdown && (
+                      {showLinkDropdown && (
                         <div
                           className="fixed inset-0 z-20"
                           onClick={() => {
-                            setShowClientDropdown(false)
-                            setClientSearchQuery("")
+                            setShowLinkDropdown(false)
+                            setLinkSearchQuery("")
                           }}
                         />
                       )}
@@ -848,17 +848,13 @@ export function TaskDetailDrawer({
                       <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-sky-600' : 'text-gray-500'}`} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Link to Opportunity</p>
-                      <p className="text-xs text-gray-500">Associate this task with an opportunity</p>
+                      <p className="text-sm font-medium text-gray-900">Track in pipeline</p>
+                      <p className="text-xs text-gray-500">Show this task as a card in the opportunities pipeline</p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => onFormChange({ 
-                      ...formData, 
-                      is_opportunity: !formData.is_opportunity,
-                      opportunity_id: !formData.is_opportunity ? formData.opportunity_id : ""
-                    })}
+                    onClick={() => onFormChange({ ...formData, is_opportunity: !formData.is_opportunity })}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       formData.is_opportunity ? 'bg-sky-600' : 'bg-gray-300'
                     }`}
@@ -871,26 +867,12 @@ export function TaskDetailDrawer({
                   </button>
                 </div>
                 
-                {/* Opportunity Dropdown - shown when toggle is enabled */}
+                {/* Linking to a parent opportunity is done via "Link to" above;
+                    this toggle only controls pipeline visibility. */}
                 {formData.is_opportunity && (
-                  <div className="pl-12">
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Opportunity</label>
-                    <select
-                      value={formData.opportunity_id}
-                      onChange={(e) => onFormChange({ ...formData, opportunity_id: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-sky-500 focus:bg-white"
-                    >
-                      <option value="">Select an opportunity...</option>
-                      {opportunities.map((opp) => (
-                        <option key={opp.id} value={opp.id}>
-                          {opp.title || opp.company_name || 'Unnamed Opportunity'}
-                        </option>
-                      ))}
-                    </select>
-                    {opportunities.length === 0 && (
-                      <p className="text-xs text-gray-500 mt-1">No opportunities available. Create one first.</p>
-                    )}
-                  </div>
+                  <p className="pl-12 text-xs text-gray-500">
+                    Appears in the pipeline&apos;s Pitched column by default — drag it in the kanban to set its stage.
+                  </p>
                 )}
               </div>
 

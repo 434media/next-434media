@@ -12,7 +12,6 @@ import type {
   Brand,
   Disposition,
   DOC,
-  SocialPlatform,
   ViewMode,
   Toast as ToastType,
 } from "../components/crm/types"
@@ -36,9 +35,6 @@ export interface TaskFormData {
   doc: DOC | ""
   client_id: string
   client_name: string
-  is_social_post: boolean
-  social_post_date: string
-  social_platforms: SocialPlatform[]
 }
 
 export const EMPTY_TASK_FORM: TaskFormData = {
@@ -59,9 +55,6 @@ export const EMPTY_TASK_FORM: TaskFormData = {
   doc: "",
   client_id: "",
   client_name: "",
-  is_social_post: false,
-  social_post_date: "",
-  social_platforms: [],
 }
 
 interface UseTaskHandlersProps {
@@ -157,9 +150,6 @@ export function useTaskHandlers({
       doc: task.doc || "",
       client_id: task.client_id || "",
       client_name: task.client_name || "",
-      is_social_post: task.is_social_post || false,
-      social_post_date: task.social_post_date || "",
-      social_platforms: task.social_platforms || [],
     })
     setTaskAttachments(task.attachments || [])
     setShowTaskModal(true)
@@ -183,9 +173,6 @@ export function useTaskHandlers({
       is_opportunity: false,
       disposition: undefined,
       doc: undefined,
-      is_social_post: false,
-      social_post_date: "",
-      social_platforms: [],
       attachments: [],
       comments: [],
       created_at: new Date().toISOString(),
