@@ -44,11 +44,15 @@ export async function GET() {
       )
     }
 
-    // Fetch all data ONCE - no duplicate reads
-    const [clients, opportunities, salesReps, allTasks] = await Promise.all([
-      getClients().catch(() => []),
+    // Fetch all data ONCE. Read crm_clients FRESH (bypassing the 30s cache) so the
+    // dashboard reflects the latest writes immediately. The fresh read warms the
+    // cache, so getOpportunities() below — which derives from crm_clients — reuses
+    // it without a second Firestore read. Sales reps are read fresh too; tasks are
+    // uncached post-migration.
+    const clients = await getClients({ fresh: true }).catch(() => [])
+    const [opportunities, salesReps, allTasks] = await Promise.all([
       getOpportunities().catch(() => []),
-      getSalesReps().catch(() => []),
+      getSalesReps({ fresh: true }).catch(() => []),
       getAllTasks().catch(() => []),
     ])
 

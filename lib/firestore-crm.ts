@@ -84,16 +84,22 @@ function docToData<T>(doc: admin.firestore.DocumentSnapshot): T | null {
   } as T
 }
 
-// Generic get all documents from a collection (with caching)
+// Generic get all documents from a collection (with caching).
+// Pass { fresh: true } to skip the cache read (always hit Firestore) — used by
+// the dashboard stat path, where up-to-date numbers matter more than the read
+// saved. The fresh result still refreshes the cache for subsequent normal reads.
 async function getAllFromCollection<T>(
-  collectionName: string
+  collectionName: string,
+  options?: { fresh?: boolean }
 ): Promise<T[]> {
-  // Check cache first
+  // Check cache first (unless a fresh read was explicitly requested)
   const cacheKey = `collection:${collectionName}`
-  const cached = getCached<T[]>(cacheKey)
-  if (cached) {
-    console.log("[Firestore] Cache hit for collection:", collectionName)
-    return cached
+  if (!options?.fresh) {
+    const cached = getCached<T[]>(cacheKey)
+    if (cached) {
+      console.log("[Firestore] Cache hit for collection:", collectionName)
+      return cached
+    }
   }
 
   try {
@@ -363,8 +369,8 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
   }
 }
 
-export async function getClients(): Promise<ClientRecord[]> {
-  const rawClients = await getAllFromCollection<Record<string, unknown>>(CLIENTS_COLLECTION)
+export async function getClients(options?: { fresh?: boolean }): Promise<ClientRecord[]> {
+  const rawClients = await getAllFromCollection<Record<string, unknown>>(CLIENTS_COLLECTION, options)
   return rawClients.map(normalizeClientData)
 }
 
@@ -1021,8 +1027,8 @@ export async function deletePlatform(id: string): Promise<void> {
 // ============================================
 const SALES_REPS_COLLECTION = "crm_sales_reps"
 
-export async function getSalesReps(): Promise<SalesRep[]> {
-  return getAllFromCollection<SalesRep>(SALES_REPS_COLLECTION)
+export async function getSalesReps(options?: { fresh?: boolean }): Promise<SalesRep[]> {
+  return getAllFromCollection<SalesRep>(SALES_REPS_COLLECTION, options)
 }
 
 export async function getSalesRepById(id: string): Promise<SalesRep | null> {
