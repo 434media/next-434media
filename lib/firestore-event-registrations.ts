@@ -716,12 +716,13 @@ export function eventRegistrationsToCSV(registrations: EventRegistration[]): str
  */
 export async function markEventRegistrationPromoted(
   id: string,
-  leadId: string,
+  leadId: string | null,
 ): Promise<void> {
-  const update = {
-    promotedLeadId: leadId,
-    promotedAt: new Date().toISOString(),
-  }
+  // leadId null = un-promote: clear the backlink so the registration returns to
+  // a normal, re-promotable state (used when a mistaken promotion is undone).
+  const update = leadId
+    ? { promotedLeadId: leadId, promotedAt: new Date().toISOString() }
+    : { promotedLeadId: null, promotedAt: null }
 
   if (id.startsWith("techday:")) {
     const realId = id.replace("techday:", "")

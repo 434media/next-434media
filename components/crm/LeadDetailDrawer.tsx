@@ -22,10 +22,11 @@ import {
   MailOpen,
   Globe,
   ExternalLink,
+  Undo2,
 } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { Tag } from "@/components/admin/Tag"
-import { MailchimpRecordPanel } from "@/components/crm/MailchimpRecordPanel"
+import { MailchimpRecordPanel, type LeadConsent } from "@/components/crm/MailchimpRecordPanel"
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch } from "@/types/crm-types"
 import { TEAM_MEMBERS } from "@/components/crm/types"
@@ -40,7 +41,12 @@ interface LeadDetailDrawerProps {
   onDelete?: (id: string) => Promise<void> | void
   /** Stubs for PR #7 — wire when handlers ship. */
   onGenerateDraft?: (id: string) => Promise<void> | void
-  onSendOutreach?: (id: string, subject: string, body?: string) => Promise<boolean> | boolean
+  onSendOutreach?: (
+    id: string,
+    subject: string,
+    body?: string,
+    overrideOptOut?: boolean,
+  ) => Promise<boolean> | boolean
   onConvertToClient?: (id: string) => Promise<void> | void
   /** Web-grounded "Research & qualify" — writes a review-only research record. */
   onResearch?: (id: string) => Promise<boolean> | boolean
@@ -57,6 +63,18 @@ const STATUS_OPTIONS: { value: LeadStatus; label: string; dot: string }[] = [
 
 const SOURCE_OPTIONS: LeadSource[] = ["event", "web", "social", "manual", "newsletter", "referral", "partner", "prospected"]
 const PLATFORM_OPTIONS: LeadPlatform[] = ["434 Media", "TXMX", "VemosVamos", "DevSA", "MilCity"]
+
+// Where a promoted lead came from — drives the provenance block + the
+// "Return to audience" affordance. `href` deep-links back to the source
+// record (Apollo-sourced leads have no audience record, so no link).
+type OriginCollection = NonNullable<Lead["origin_ref"]>["collection"]
+const ORIGIN_META: Record<OriginCollection, { label: string; href: (email: string) => string | null }> = {
+  partner_list_members: { label: "Lists", href: (e) => `/admin/audiences?sub=lists&search=${encodeURIComponent(e)}` },
+  event_registrations: { label: "Events", href: (e) => `/admin/audiences?sub=events&search=${encodeURIComponent(e)}` },
+  email_signups: { label: "the Newsletter", href: (e) => `/admin/audiences?sub=newsletter&search=${encodeURIComponent(e)}` },
+  contact_forms: { label: "the Inbox", href: (e) => `/admin/inbox?search=${encodeURIComponent(e)}` },
+  apollo: { label: "Apollo prospecting", href: () => null },
+}
 
 const PRIORITY_BADGE: Record<string, { bg: string; label: string }> = {
   high: { bg: "bg-red-500 text-white", label: "High" },
@@ -181,11 +199,19 @@ export function LeadDetailDrawer({
   const [isResearching, setIsResearching] = useState(false)
   // Subject is per-send, not persisted on the lead. Reset when drawer reopens.
   const [subject, setSubject] = useState("")
+  // Consent verdict from the lead's Mailchimp record (reported by the panel
+  // below). Surfaced at the Send block so a marketing opt-out is visible — and
+  // gated — before a 1:1 outreach goes out.
+  const [consent, setConsent] = useState<LeadConsent | null>(null)
+  // Tabbed body (edit mode) — keeps the record from becoming one long scroll.
+  const [activeTab, setActiveTab] = useState<"details" | "outreach" | "activity">("details")
 
   useEffect(() => {
     if (open) {
       setForm(fromLead(lead))
+      setActiveTab("details")
       setSubject("")
+      setConsent(null) // re-resolved by the panel for the newly-opened lead
     }
   }, [open, lead])
 
@@ -211,10 +237,29 @@ export function LeadDetailDrawer({
   const handleSend = async () => {
     if (!lead?.id || !onSendOutreach) return
     if (!subject.trim() || !form.outreach_draft.trim()) return
-    if (!confirm(`Send outreach to ${lead.email}? This cannot be undone.`)) return
+    // Opt-out awareness: this is a 1:1 sales message (not a campaign), but a
+    // marketing opt-out should never be sent through without an explicit nod.
+    if (consent === "opted_out") {
+      if (
+        !confirm(
+          `${lead.email} opted out of marketing emails in Mailchimp.\n\nThis is a 1:1 sales message, not a campaign — send anyway?`,
+        )
+      )
+        return
+    } else if (!confirm(`Send outreach to ${lead.email}? This cannot be undone.`)) {
+      return
+    }
     setIsSending(true)
     try {
-      const ok = await onSendOutreach(lead.id, subject.trim(), form.outreach_draft)
+      // When the rep just confirmed an opt-out, authorize the server-side
+      // override so it doesn't bounce back with a 409 (the handler also
+      // backstops the suppression-only case the panel can't see).
+      const ok = await onSendOutreach(
+        lead.id,
+        subject.trim(),
+        form.outreach_draft,
+        consent === "opted_out",
+      )
       if (ok) setSubject("")
     } finally {
       setIsSending(false)
@@ -236,6 +281,14 @@ export function LeadDetailDrawer({
   const priority = lead?.priority ?? "low"
   const breakdown = lead?.score_breakdown ?? {}
   const breakdownEntries = Object.entries(breakdown).filter(([, v]) => typeof v === "number" && v > 0)
+
+  // Tab visibility. Tabs only exist in edit mode; the create form shows the
+  // Details group only. Hidden tabs stay mounted (display:none) so the
+  // Mailchimp panel keeps resolving consent for the Outreach send block.
+  const tabClass = (key: "details" | "outreach" | "activity") =>
+    !isEditing
+      ? key === "details" ? "space-y-6" : "hidden"
+      : activeTab === key ? "space-y-6" : "hidden"
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
@@ -286,9 +339,18 @@ export function LeadDetailDrawer({
     onClose()
   }
 
+  // A promoted lead (origin_ref pointing at an audience record) is "returned to
+  // audience" rather than hard-deleted: deleting the lead clears the source
+  // record's backlink server-side, restoring it as re-promotable.
+  const promotedFrom =
+    lead?.origin_ref && lead.origin_ref.collection !== "apollo" ? lead.origin_ref : null
+
   const handleDelete = async () => {
     if (!lead?.id || !onDelete) return
-    if (!confirm(`Permanently delete ${lead.name || lead.email}? This cannot be undone.`)) return
+    const msg = promotedFrom
+      ? `Remove this lead and return ${lead.email} to ${ORIGIN_META[promotedFrom.collection].label}?\n\nThe source record is restored and can be re-promoted later.`
+      : `Permanently delete ${lead.name || lead.email}? This cannot be undone.`
+    if (!confirm(msg)) return
     await onDelete(lead.id)
     onClose()
   }
@@ -325,10 +387,15 @@ export function LeadDetailDrawer({
           <button
             onClick={handleDelete}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md disabled:opacity-50"
+            title={promotedFrom ? "Remove the lead and restore the audience record" : undefined}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50 ${
+              promotedFrom
+                ? "text-neutral-700 hover:bg-neutral-100"
+                : "text-red-600 hover:bg-red-50"
+            }`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete
+            {promotedFrom ? <Undo2 className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+            {promotedFrom ? "Return to audience" : "Delete"}
           </button>
         )}
       </div>
@@ -380,10 +447,10 @@ export function LeadDetailDrawer({
       width="xl"
       footer={footer}
     >
-      <div className="p-6 space-y-6">
+      <div className="p-6">
         {/* Score panel — only when editing */}
         {isEditing && (
-          <div className="flex items-stretch gap-4 p-4 bg-gradient-to-br from-neutral-50 to-white border border-neutral-200 rounded-xl">
+          <div className="flex items-stretch gap-4 p-4 mb-4 bg-gradient-to-br from-neutral-50 to-white border border-neutral-200 rounded-xl">
             <div className="flex flex-col items-center justify-center px-4 border-r border-neutral-200">
               <div className="text-3xl font-bold text-neutral-900 tabular-nums">{score}</div>
               <div className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">Lead score</div>
@@ -411,6 +478,30 @@ export function LeadDetailDrawer({
           </div>
         )}
 
+        {/* Tabs — split the record into focused views so it doesn't become one
+            long scroll. Edit mode only; the create form shows Details alone. */}
+        {isEditing && (
+          <div className="flex items-center gap-1 p-0.5 mb-4 bg-neutral-100 rounded-lg w-fit">
+            {(["details", "outreach", "activity"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setActiveTab(t)}
+                className={`px-3 py-1 text-[12px] font-medium rounded-md capitalize transition-colors ${
+                  activeTab === t
+                    ? "bg-white text-neutral-900 shadow-sm"
+                    : "text-neutral-500 hover:text-neutral-800"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Details tab — the editable core (Contact / Qualification /
+            Workflow / Notes) plus research + provenance. ── */}
+        <div className={tabClass("details")}>
         {/* AI research & qualify — web-grounded company context. Review-only:
             nothing here is written to the lead's canonical fields. */}
         {isEditing && onResearch && (
@@ -421,6 +512,12 @@ export function LeadDetailDrawer({
             currentLocation={form.location}
             onApplyLocation={(country) => update("location", country)}
           />
+        )}
+
+        {/* Provenance — where this lead came from in the pipeline, with a link
+            back to the source audience record. */}
+        {isEditing && lead.origin_ref && (
+          <OriginBlock originRef={lead.origin_ref} email={lead.email} />
         )}
 
         {/* Contact section */}
@@ -508,21 +605,38 @@ export function LeadDetailDrawer({
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1.5">Status</label>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_OPTIONS.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => update("status", s.value)}
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-[12px] font-medium transition-colors ${
-                    form.status === s.value
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-600 hover:bg-neutral-100"
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
-                  {s.label}
-                </button>
-              ))}
+              {STATUS_OPTIONS.map((s) => {
+                // "Converted" and "archived" are terminal states reached only
+                // through their real actions (Convert to Client / Archive),
+                // which create the client record + bidirectional link. Setting
+                // them by hand would leave a converted lead with no client, so
+                // the chips show current state but aren't directly settable.
+                const terminal = s.value === "converted" || s.value === "archived"
+                const isActive = form.status === s.value
+                return (
+                  <button
+                    key={s.value}
+                    type="button"
+                    disabled={terminal}
+                    onClick={() => {
+                      if (!terminal) update("status", s.value)
+                    }}
+                    title={
+                      terminal
+                        ? `Set via the ${s.value === "converted" ? "Convert to Client" : "Archive"} action`
+                        : undefined
+                    }
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-[12px] font-medium transition-colors ${
+                      isActive
+                        ? "bg-neutral-900 text-white"
+                        : "text-neutral-600 hover:bg-neutral-100"
+                    } ${terminal ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} aria-hidden="true" />
+                    {s.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
           <Select
@@ -544,7 +658,7 @@ export function LeadDetailDrawer({
               type="date"
               value={form.next_followup_date}
               onChange={(e) => update("next_followup_date", e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400"
             />
             {/* Quick reschedule + done — adjusts the date in the form; persists
                 on Save. "Followed up" clears the date so it leaves the due queue. */}
@@ -580,6 +694,20 @@ export function LeadDetailDrawer({
           </div>
         </Section>
 
+        {/* Notes — kept with the editable record. */}
+        <Section title="Notes" icon={AlertCircle}>
+          <textarea
+            value={form.notes}
+            onChange={(e) => update("notes", e.target.value)}
+            rows={4}
+            placeholder="Internal notes, context from past conversations, etc."
+            className="w-full px-3 py-2 text-[13px] border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400"
+          />
+        </Section>
+        </div>
+
+        {/* ── Outreach tab — draft, generate, send + consent cue ── */}
+        <div className={tabClass("outreach")}>
         {/* Outreach section */}
         <Section title="Outreach" icon={PenLine}>
           <div>
@@ -620,7 +748,7 @@ export function LeadDetailDrawer({
                   : "(Available after lead is created)"
               }
               disabled={!isEditing}
-              className="w-full px-3 py-2 text-[13px] border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono leading-relaxed disabled:bg-neutral-50 disabled:text-neutral-400"
+              className="w-full px-3 py-2 text-[13px] border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400 font-mono leading-relaxed disabled:bg-neutral-50 disabled:text-neutral-400"
             />
             {lead?.draft_generated_at && (
               <p className="mt-1 text-[10px] text-neutral-400">
@@ -641,8 +769,11 @@ export function LeadDetailDrawer({
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="e.g. Quick thought on TXMX × your CPG audience"
                 disabled={isSending}
-                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900 disabled:bg-neutral-100"
+                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400 disabled:bg-neutral-100"
               />
+              {/* Consent cue — reachability from the single source (Mailchimp),
+                  shown right where the rep decides to send. */}
+              {consent && <ConsentNote consent={consent} />}
               <div className="flex items-center justify-between mt-2">
                 <p className="text-[11px] text-neutral-500">
                   Sends from <span className="font-mono">hello@send.434media.com</span>; replies route to you.
@@ -670,25 +801,15 @@ export function LeadDetailDrawer({
           )}
         </Section>
 
-        {/* Notes */}
-        <Section title="Notes" icon={AlertCircle}>
-          <textarea
-            value={form.notes}
-            onChange={(e) => update("notes", e.target.value)}
-            rows={4}
-            placeholder="Internal notes, context from past conversations, etc."
-            className="w-full px-3 py-2 text-[13px] border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
-          />
-        </Section>
+        </div>
 
+        {/* ── Activity tab — read-only history + engagement (one home for the
+            timeline, Mailchimp campaign activity, and outreach metrics). ── */}
+        <div className={tabClass("activity")}>
         {/* Mailchimp profile — subscription state, tags, and recent campaign activity
             for the lead's email. Reps can see open/click history before reaching out. */}
         {isEditing && lead.email && (
-          <MailchimpRecordPanel
-            email={lead.email}
-            firstName={(form.name || "").split(" ")[0]}
-            lastName={(form.name || "").split(" ").slice(1).join(" ")}
-          />
+          <MailchimpRecordPanel email={lead.email} onConsentResolved={setConsent} />
         )}
 
         {/* Timeline — chronological log of what's happened on this lead */}
@@ -698,9 +819,10 @@ export function LeadDetailDrawer({
           </Section>
         )}
 
-        {/* Details (read-only counters + ids) */}
+        {/* Engagement & metadata — outreach opens/clicks (distinct from the
+            Mailchimp campaign activity above) + record timestamps. */}
         {isEditing && (
-          <Section title="Details" icon={AlertCircle}>
+          <Section title="Engagement & metadata" icon={AlertCircle}>
             <ActivityRow label="Email opens" value={String(lead.email_opens ?? 0)} />
             <ActivityRow label="Email clicks" value={String(lead.email_clicks ?? 0)} />
             <ActivityRow label="Last contacted" value={formatDate(lead.last_contacted_at)} />
@@ -711,12 +833,63 @@ export function LeadDetailDrawer({
             )}
           </Section>
         )}
+        </div>
       </div>
     </DetailDrawer>
   )
 }
 
 // ─────────── small layout helpers ───────────
+
+// Compact consent cue for the Send block — reachability from the single source
+// of consent (Mailchimp). Opt-out is the one that changes behavior, so it reads
+// loudest; the rest are quiet context.
+const CONSENT_NOTE: Record<LeadConsent, { dot: string; text: string; tone: string }> = {
+  opted_out: { dot: "bg-rose-500", text: "Opted out of marketing emails in Mailchimp", tone: "text-rose-700" },
+  subscribed: { dot: "bg-emerald-500", text: "Subscribed in Mailchimp", tone: "text-neutral-500" },
+  pending: { dot: "bg-amber-500", text: "Pending opt-in confirmation", tone: "text-neutral-500" },
+  not_in_mailchimp: { dot: "bg-neutral-300", text: "Not in Mailchimp — hasn't opted in", tone: "text-neutral-500" },
+}
+
+function OriginBlock({
+  originRef,
+  email,
+}: {
+  originRef: NonNullable<Lead["origin_ref"]>
+  email: string
+}) {
+  const meta = ORIGIN_META[originRef.collection]
+  const href = email ? meta.href(email) : null
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md ring-1 ring-neutral-200/70 bg-neutral-50/70 px-3 py-2 text-[12px]">
+      <span className="text-neutral-600 min-w-0 truncate">
+        Promoted from <span className="font-medium text-neutral-900">{meta.label}</span>
+        {originRef.promoted_at && (
+          <span className="text-neutral-400"> · {formatDateOnly(originRef.promoted_at)}</span>
+        )}
+      </span>
+      {href && (
+        <a
+          href={href}
+          className="inline-flex items-center gap-1 shrink-0 text-neutral-600 hover:text-neutral-900 underline decoration-dotted underline-offset-2"
+        >
+          View source
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function ConsentNote({ consent }: { consent: LeadConsent }) {
+  const meta = CONSENT_NOTE[consent]
+  return (
+    <p className={`mt-2 inline-flex items-center gap-1.5 text-[11px] ${meta.tone}`}>
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+      {meta.text}
+    </p>
+  )
+}
 
 function Section({
   title,
@@ -763,7 +936,7 @@ function Field({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full ${iconLeft ? "pl-8" : "pl-3"} pr-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900`}
+          className={`w-full ${iconLeft ? "pl-8" : "pl-3"} pr-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400`}
         />
       </div>
     </div>
@@ -787,7 +960,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900 bg-white"
+        className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400 bg-white"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

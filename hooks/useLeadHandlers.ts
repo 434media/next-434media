@@ -166,13 +166,27 @@ export function useLeadHandlers({
   // Send outreach via Resend. Server returns the updated lead with status
   // flipped to `contacted` and follow-up scheduled. We swap it in.
   const sendOutreach = useCallback(
-    async (id: string, subject: string, body?: string) => {
+    async (id: string, subject: string, body?: string, overrideOptOut?: boolean): Promise<boolean> => {
       try {
         const res = await fetch(`/api/admin/leads/${id}/send-outreach`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subject, body }),
+          body: JSON.stringify({ subject, body, overrideOptOut }),
         })
+        if (res.status === 409) {
+          // Consent/deliverability gate. A marketing opt-out is overridable for a
+          // 1:1 message (confirm, then retry); a hard bounce never is.
+          const data = await res.json().catch(() => ({}))
+          if (data.code === "opted_out" && data.canOverride && !overrideOptOut) {
+            const ok = window.confirm(
+              `${data.error}\n\nSend this 1:1 message anyway? It'll be logged on the lead.`,
+            )
+            if (!ok) return false
+            return sendOutreach(id, subject, body, true)
+          }
+          setToast({ message: data.error || "Outreach blocked", type: "error" })
+          return false
+        }
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           throw new Error(err.error || "Failed to send outreach")

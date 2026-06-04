@@ -270,7 +270,7 @@ export default function ProspectPage() {
               htmlFor="prospect-prompt"
               className="block text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-2"
             >
-              Describe who you're looking for
+              Describe who you&apos;re looking for
             </label>
             <textarea
               id="prospect-prompt"
@@ -286,7 +286,7 @@ export default function ProspectPage() {
               disabled={isSearching}
               rows={3}
               placeholder="e.g. Biotech founders in Texas with $20M+ revenue"
-              className="w-full px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900 text-[13px] text-neutral-800 leading-relaxed resize-none disabled:opacity-50"
+              className="w-full px-3 py-2 border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] text-neutral-800 leading-relaxed resize-none disabled:opacity-50"
             />
             <div className="flex items-center justify-between gap-3 mt-3">
               <span className="text-[11px] text-neutral-400 hidden sm:block">

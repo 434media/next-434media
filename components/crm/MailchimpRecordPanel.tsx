@@ -48,11 +48,15 @@ interface MemberLookup {
   generatedAt: string
 }
 
+/** Consent verdict for the lead, derived from their Mailchimp membership. */
+export type LeadConsent = "subscribed" | "pending" | "opted_out" | "not_in_mailchimp"
+
 interface MailchimpRecordPanelProps {
   email: string | undefined
-  /** Display name passed through to the push-to-Mailchimp helper for new records. */
-  firstName?: string
-  lastName?: string
+  /** Reports the consent verdict up to the parent once the member loads, so the
+   *  outreach Send block can surface it and gate on a marketing opt-out. Pass a
+   *  stable callback (e.g. a useState setter) — it's read in an effect. */
+  onConsentResolved?: (state: LeadConsent) => void
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -105,7 +109,7 @@ function humanizeAction(action: string): string {
   return action.charAt(0).toUpperCase() + action.slice(1)
 }
 
-export function MailchimpRecordPanel({ email, firstName, lastName }: MailchimpRecordPanelProps) {
+export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpRecordPanelProps) {
   const [data, setData] = useState<MemberLookup | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -150,6 +154,20 @@ export function MailchimpRecordPanel({ email, firstName, lastName }: MailchimpRe
     load(ctl.signal)
     return () => ctl.abort()
   }, [load])
+
+  // Report the consent verdict up once the member resolves. Subscribed in any
+  // audience wins; then pending; an unsubscribe/clean is a marketing opt-out.
+  useEffect(() => {
+    if (!data) return
+    let verdict: LeadConsent = "not_in_mailchimp"
+    if (data.found) {
+      const statuses = data.audiences.map((a) => a.status)
+      if (statuses.includes("subscribed")) verdict = "subscribed"
+      else if (statuses.includes("pending")) verdict = "pending"
+      else if (statuses.some((s) => s === "unsubscribed" || s === "cleaned")) verdict = "opted_out"
+    }
+    onConsentResolved?.(verdict)
+  }, [data, onConsentResolved])
 
   if (!normalizedEmail) return null
 
@@ -250,13 +268,10 @@ export function MailchimpRecordPanel({ email, firstName, lastName }: MailchimpRe
             </div>
             <p className="text-sm font-medium text-neutral-900 mb-1">Not in any Mailchimp audience</p>
             <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-              Push this contact from Submissions or the Inbox to start tracking email engagement here.
+              Only opted-in contacts sync to Mailchimp (automatically, on consent) — there&apos;s no manual
+              add, which keeps Mailchimp the single source of consent. They&apos;ll appear here once they opt
+              in or engage a campaign.
             </p>
-            {(firstName || lastName) && (
-              <p className="text-[11px] text-neutral-400 mt-2 tabular-nums">
-                Will use: {[firstName, lastName].filter(Boolean).join(" ")}
-              </p>
-            )}
           </div>
         )}
 

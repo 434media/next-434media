@@ -1,7 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { deleteLead, getLeadById, updateLead } from "@/lib/firestore-leads"
-import type { LeadUpdateInput } from "@/types/crm-types"
+import { markPartnerListMemberPromoted } from "@/lib/firestore-partner-list-members"
+import { markEventRegistrationPromoted } from "@/lib/firestore-event-registrations"
+import { markEmailSignupPromoted } from "@/lib/firestore-email-signups"
+import { markContactFormPromoted } from "@/lib/firestore-contact-forms"
+import type { Lead, LeadUpdateInput } from "@/types/crm-types"
+
+// Clear the promotion backlink on the audience record a lead was promoted from,
+// so deleting the lead returns that record to a normal, re-promotable state
+// (undo a mistaken promotion). Best-effort; logged on failure. Apollo-sourced
+// leads have no audience record, so they're skipped.
+async function clearAudienceBacklink(ref: NonNullable<Lead["origin_ref"]>): Promise<void> {
+  switch (ref.collection) {
+    case "partner_list_members":
+      return markPartnerListMemberPromoted(ref.id, null)
+    case "event_registrations":
+      return markEventRegistrationPromoted(ref.id, null)
+    case "email_signups":
+      return markEmailSignupPromoted(ref.id, null)
+    case "contact_forms":
+      return markContactFormPromoted(ref.id, null)
+    default:
+      return
+  }
+}
 
 export const runtime = "nodejs"
 
@@ -127,7 +150,21 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     const existing = await getLeadById(id)
     if (!existing) return NextResponse.json({ error: "Lead not found" }, { status: 404 })
     await deleteLead(id)
-    return NextResponse.json({ success: true })
+    // Undo the audience-side promotion backlink if this lead came from one, so
+    // the source record returns to the audience as re-promotable.
+    let clearedOrigin: string | null = null
+    if (existing.origin_ref) {
+      try {
+        await clearAudienceBacklink(existing.origin_ref)
+        clearedOrigin = existing.origin_ref.collection
+      } catch (e) {
+        console.error(
+          `[DELETE /api/admin/leads/${id}] backlink clear failed for ${existing.origin_ref.collection}/${existing.origin_ref.id}:`,
+          e,
+        )
+      }
+    }
+    return NextResponse.json({ success: true, clearedOrigin })
   } catch (err) {
     console.error(`[DELETE /api/admin/leads/${id}]`, err)
     return NextResponse.json(

@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
 import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
+import { isSuppressed } from "@/lib/firestore-suppression"
+import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -22,6 +24,9 @@ async function requireAdmin() {
 interface SendBody {
   subject: string
   body?: string // optional override; defaults to lead.outreach_draft
+  /** Deliberate, logged override to send a 1:1 message to a marketing opt-out.
+   *  Never overrides a hard bounce (cleaned). */
+  overrideOptOut?: boolean
 }
 
 // POST /api/admin/leads/[id]/send-outreach
@@ -71,6 +76,47 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       { error: `Cannot send to a ${lead.status} lead` },
       { status: 400 },
     )
+  }
+
+  // Consent + deliverability gate (Mailchimp is the single source of consent):
+  //   - cleaned (hard bounce)  → blocked, no override (can't deliver; hurts
+  //     sender reputation).
+  //   - unsubscribed / on the suppression list (marketing opt-out) → blocked
+  //     unless the rep explicitly overrides, since a 1:1 sales message is a
+  //     deliberate exception, not a campaign. Overrides are logged below.
+  // A consent-lookup hiccup doesn't hard-fail a legitimate send — we log and
+  // proceed (the cases above are the exception, not the rule).
+  const overrideOptOut = body.overrideOptOut === true
+  let optedOutOverridden = false
+  try {
+    const [suppressed, mc] = await Promise.all([
+      isSuppressed(lead.email),
+      getMailchimpMemberProfile(lead.email).catch(() => null),
+    ])
+    const statuses = (mc?.audiences ?? []).map((a) => a.status)
+    if (statuses.includes("cleaned")) {
+      return NextResponse.json(
+        {
+          error: `${lead.email} hard-bounced in Mailchimp (cleaned) — outreach is blocked to protect deliverability.`,
+          code: "hard_bounce",
+        },
+        { status: 409 },
+      )
+    }
+    const optedOut = suppressed || statuses.includes("unsubscribed")
+    if (optedOut && !overrideOptOut) {
+      return NextResponse.json(
+        {
+          error: `${lead.email} opted out of marketing email. This is a 1:1 sales message — resend with overrideOptOut to send anyway.`,
+          code: "opted_out",
+          canOverride: true,
+        },
+        { status: 409 },
+      )
+    }
+    optedOutOverridden = optedOut && overrideOptOut
+  } catch (err) {
+    console.error(`[send-outreach] consent lookup failed for ${lead.email}:`, err)
   }
 
   // Pick sender: outreach default, validated against verified domain
@@ -124,7 +170,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     await appendLeadActivity(id, {
       type: "outreach_sent",
       actor: auth.session.email,
-      detail: `Sent “${subject}” · follow-up ${followUpDate}`,
+      detail: `Sent “${subject}” · follow-up ${followUpDate}${optedOutOverridden ? " · ⚠ sent despite marketing opt-out" : ""}`,
     }).catch(() => {})
     return NextResponse.json({ success: true, lead: updated, emailId })
   } catch (err) {

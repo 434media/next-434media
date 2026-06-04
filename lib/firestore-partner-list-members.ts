@@ -248,12 +248,14 @@ export async function deletePartnerListMember(id: string): Promise<void> {
  */
 export async function markPartnerListMemberPromoted(
   id: string,
-  leadId: string,
+  leadId: string | null,
 ): Promise<void> {
+  // leadId null = un-promote: clear the backlink so the cohort member returns
+  // to a normal, re-promotable state (used when a mistaken promotion is undone).
   const db = getDb()
   await db.collection(COLLECTION).doc(id).update({
-    promotedLeadId: leadId,
-    promotedAt: new Date().toISOString(),
+    promotedLeadId: leadId ?? null,
+    promotedAt: leadId ? new Date().toISOString() : null,
     updatedAt: new Date().toISOString(),
   })
 }

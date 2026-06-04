@@ -312,12 +312,13 @@ export function contactFormsToCSV(submissions: ContactFormSubmission[]): string 
  */
 export async function markContactFormPromoted(
   id: string,
-  leadId: string,
+  leadId: string | null,
 ): Promise<void> {
-  const update = {
-    promotedLeadId: leadId,
-    promotedAt: new Date().toISOString(),
-  }
+  // leadId null = un-promote: clear the backlink so the submission returns to a
+  // normal, re-promotable state (used when a mistaken promotion is undone).
+  const update = leadId
+    ? { promotedLeadId: leadId, promotedAt: new Date().toISOString() }
+    : { promotedLeadId: null, promotedAt: null }
 
   if (id.startsWith("aimsatx:")) {
     const realId = id.replace("aimsatx:", "")

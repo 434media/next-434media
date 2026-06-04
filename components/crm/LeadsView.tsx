@@ -18,11 +18,12 @@ import {
   X,
   Archive,
   ArrowUpDown,
+  ChevronDown,
+  Check,
   Loader2,
 } from "lucide-react"
 import type { Lead, LeadPriority, LeadStatus } from "@/types/crm-types"
 import { HowItWorks } from "@/components/admin/HowItWorks"
-import { LegendPopover } from "@/components/admin/LegendPopover"
 import { useSelection } from "@/components/admin/SubmissionStateUI"
 import { TEAM_MEMBERS } from "@/components/crm/types"
 
@@ -261,18 +262,16 @@ export function LeadsView({
         />
       </div>
 
-      {/* Search row */}
-      <div className="bg-white rounded-xl border border-neutral-200 p-3 mb-4 shadow-sm">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300" />
-          <input
-            type="text"
-            placeholder="Search by name, company, email, industry, location, tag…"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 text-[13px]"
-          />
-        </div>
+      {/* Search — flush, no card chrome (matches the Audiences/Inbox surfaces). */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search by name, company, email, industry, location, tag…"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400 text-[13px] font-normal text-neutral-700 placeholder:text-neutral-400"
+        />
       </div>
 
       {/* Summary line */}
@@ -302,43 +301,30 @@ export function LeadsView({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Ownership filter */}
-          <select
+          {/* Ownership filter — custom dropdown to match the app's idiom. */}
+          <Dropdown
+            ariaLabel="Filter by owner"
             value={assignedFilter}
-            onChange={(e) => setAssignedFilter(e.target.value as AssignedFilter)}
-            aria-label="Filter by owner"
-            className="h-8 px-2 text-[12px] text-neutral-700 bg-white ring-1 ring-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
-          >
-            <option value="all">All owners</option>
-            {currentUserName && <option value="mine">Assigned to me</option>}
-            <option value="unassigned">Unassigned</option>
-          </select>
+            onChange={(v) => setAssignedFilter(v as AssignedFilter)}
+            options={[
+              { value: "all", label: "All owners" },
+              ...(currentUserName ? [{ value: "mine", label: "Assigned to me" }] : []),
+              { value: "unassigned", label: "Unassigned" },
+            ]}
+          />
           {/* Sort */}
-          <label className="inline-flex items-center gap-1 h-8 px-2 ring-1 ring-neutral-200 rounded-md text-[12px] text-neutral-600">
-            <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as LeadSort)}
-              aria-label="Sort leads"
-              className="bg-transparent text-[12px] text-neutral-700 focus:outline-none"
-            >
-              <option value="score">Score</option>
-              <option value="recent">Recently updated</option>
-              <option value="contacted">Last contacted</option>
-              <option value="company">Company</option>
-            </select>
-          </label>
-          {/* Status legend — maps the row status dots to their meaning. */}
-          <LegendPopover
-          title="Lead statuses"
-          items={[
-            { dotClass: STATUS_DOT.new, label: "New" },
-            { dotClass: STATUS_DOT.ready, label: "Ready" },
-            { dotClass: STATUS_DOT.contacted, label: "Contacted" },
-            { dotClass: STATUS_DOT.engaged, label: "Engaged" },
-            { dotClass: STATUS_DOT.converted, label: "Converted" },
-            { dotClass: STATUS_DOT.archived, label: "Archived" },
-          ]}
+          <Dropdown
+            ariaLabel="Sort leads"
+            label="Sort"
+            icon={<ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />}
+            value={sort}
+            onChange={(v) => setSort(v as LeadSort)}
+            options={[
+              { value: "score", label: "Score" },
+              { value: "recent", label: "Recently updated" },
+              { value: "contacted", label: "Last contacted" },
+              { value: "company", label: "Company" },
+            ]}
           />
         </div>
       </div>
@@ -403,6 +389,77 @@ export function LeadsView({
 }
 
 // ─────────── sub-components ───────────
+
+// Custom dropdown matching the app's idiom (Date ▾ / ExportMenu) — replaces the
+// native <select> for owner + sort. Click-away closes via an invisible backdrop.
+function Dropdown({
+  value,
+  options,
+  onChange,
+  label,
+  icon,
+  ariaLabel,
+}: {
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  label?: string
+  icon?: React.ReactNode
+  ariaLabel?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const current = options.find((o) => o.value === value)
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 h-8 px-2.5 text-[12px] font-medium text-neutral-600 bg-white border border-neutral-200/70 rounded-md hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+      >
+        {icon}
+        {label && <span className="text-neutral-400">{label}:</span>}
+        {current?.label}
+        <ChevronDown className="w-3 h-3 text-neutral-400" />
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-hidden="true"
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+          <div
+            role="menu"
+            className="absolute right-0 top-full mt-1 z-20 min-w-40 py-1 rounded-md border border-neutral-200 bg-white shadow-md"
+          >
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onChange(o.value)
+                  setOpen(false)
+                }}
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-[12px] hover:bg-neutral-50 transition-colors ${
+                  o.value === value ? "text-neutral-900 font-medium" : "text-neutral-600"
+                }`}
+              >
+                {o.label}
+                {o.value === value && <Check className="w-3.5 h-3.5 text-neutral-900" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 function ViewChip({
   active,
