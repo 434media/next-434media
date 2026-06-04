@@ -403,6 +403,7 @@ export default function SalesCRMPage() {
     handleAddTask,
     handleOpenTaskFromNotification,
     handleDeleteTask,
+    handleBulkDeleteTasks,
     handleDeleteTeamTasks,
     handleSaveTask,
     handleFileUpload,
@@ -937,6 +938,7 @@ export default function SalesCRMPage() {
             onAddTask={handleAddTask}
             onOpenTask={openTaskModal}
             onQuickStatusChange={handleQuickStatusChange}
+            onBulkDelete={handleBulkDeleteTasks}
           />
         )}
 

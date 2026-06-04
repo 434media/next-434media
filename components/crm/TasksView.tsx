@@ -13,9 +13,12 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Trash2,
+  X,
 } from "lucide-react"
 import { getDueDateStatus, formatDate, BRANDS, normalizeAssigneeName, isValidAssigneeName, parseLocalDate } from "./types"
 import type { Task } from "./types"
+import { useSelection } from "@/components/admin/SubmissionStateUI"
 
 type UrgencyFilter = "all" | "overdue" | "due-soon" | "on-track"
 
@@ -73,6 +76,7 @@ interface TasksViewProps {
   onAddTask: () => void
   onOpenTask: (task: Task) => void
   onQuickStatusChange?: (taskId: string, newStatus: string) => void
+  onBulkDelete?: (ids: string[]) => Promise<void> | void
 }
 
 type StatusSort = "default" | "not_started" | "in_progress" | "to_do" | "ready_for_review" | "completed"
@@ -88,10 +92,12 @@ export function TasksView({
   onAddTask,
   onOpenTask,
   onQuickStatusChange,
+  onBulkDelete,
 }: TasksViewProps) {
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all")
   const [showCompleted, setShowCompleted] = useState(false)
   const [statusSort, setStatusSort] = useState<StatusSort>("default")
+  const { selected, toggle, set, clear } = useSelection()
 
   // Helper to check if a task is assigned to a specific person (primary OR secondary)
   const isAssignedTo = (task: Task, assignee: string): boolean => {
@@ -227,6 +233,12 @@ export function TasksView({
   // Counts for quick stats
   const overdueCount = sortedTasks.filter(t => getDueDateStatus(t.due_date, t.status) === "overdue").length
   const approachingCount = sortedTasks.filter(t => getDueDateStatus(t.due_date, t.status) === "approaching").length
+
+  // Multi-select (bulk delete) over the currently-visible rows
+  const allVisibleIds = sortedTasks.map((t) => t.id)
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
+  const someSelected = allVisibleIds.some((id) => selected.has(id))
+  const toggleAll = () => (allSelected ? clear() : set(allVisibleIds))
 
   // Reusable mono filter-pill class. Active = dark fill, inactive = light + ring.
   const filterPillClass = (active: boolean, disabled: boolean) =>
@@ -388,6 +400,16 @@ export function TasksView({
             <table className="w-full">
               <thead className="bg-neutral-50/60 sticky top-0 z-10 border-b border-neutral-100">
                 <tr>
+                  <th className="w-10 px-4 py-2.5">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all tasks"
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected }}
+                      onChange={toggleAll}
+                      className="rounded border-neutral-300 align-middle"
+                    />
+                  </th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em]">
                     Task
                   </th>
@@ -413,8 +435,19 @@ export function TasksView({
                     <tr
                       key={task.id}
                       onClick={() => onOpenTask(task)}
-                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                      className={`transition-colors cursor-pointer ${selected.has(task.id) ? "bg-neutral-50" : "hover:bg-neutral-50"}`}
                     >
+                      {/* Multi-select checkbox — its own cell; stops the row from
+                          opening when toggled */}
+                      <td className="px-4 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${task.title || "task"}`}
+                          checked={selected.has(task.id)}
+                          onChange={() => toggle(task.id)}
+                          className="rounded border-neutral-300 mt-1"
+                        />
+                      </td>
                       {/* Task title — colored dot encodes urgency at the row level */}
                       <td className="px-4 py-3.5">
                         <div className="flex items-start gap-2.5 max-w-md">
@@ -545,6 +578,36 @@ export function TasksView({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Floating bulk-action bar — Vercel/Linear pattern; appears when rows are
+          selected. Lets you clear out a batch of old tasks in one go. */}
+      {onBulkDelete && selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 pl-4 pr-2 py-2 rounded-full bg-neutral-900 text-white shadow-lg">
+          <span className="text-sm font-medium tabular-nums">
+            {selected.size} selected
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              const ids = Array.from(selected)
+              await onBulkDelete(ids)
+              clear()
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete
+          </button>
+          <button
+            type="button"
+            onClick={clear}
+            aria-label="Clear selection"
+            className="p-1.5 rounded-full hover:bg-white/10 text-neutral-300 hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>

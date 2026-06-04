@@ -240,6 +240,28 @@ export function useTaskHandlers({
     }
   }
 
+  // Bulk-delete tasks by id (from the table's multi-select). Deletes in parallel,
+  // tolerates partial failure, and reports how many actually went.
+  const handleBulkDeleteTasks = async (ids: string[]) => {
+    if (ids.length === 0) return
+    if (!confirm(`Delete ${ids.length} task${ids.length === 1 ? "" : "s"}? This action cannot be undone.`)) return
+
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/admin/crm/tasks?id=${id}`, { method: "DELETE", credentials: "include" }).then((r) => {
+          if (!r.ok) throw new Error(id)
+        })
+      )
+    )
+    const failed = results.filter((r) => r.status === "rejected").length
+    if (failed === 0) {
+      setToast({ message: `${ids.length} task${ids.length === 1 ? "" : "s"} deleted`, type: "success" })
+    } else {
+      setToast({ message: `Deleted ${ids.length - failed} of ${ids.length}; ${failed} failed`, type: "error" })
+    }
+    loadTasks()
+  }
+
   // Delete all tasks assigned to Team
   const handleDeleteTeamTasks = async () => {
     if (!confirm("Are you sure you want to delete ALL tasks assigned to Team? This action cannot be undone.")) return
@@ -887,6 +909,7 @@ export function useTaskHandlers({
     handleAddTask,
     handleOpenTaskFromNotification,
     handleDeleteTask,
+    handleBulkDeleteTasks,
     handleDeleteTeamTasks,
     handleSaveTask,
     handleFileUpload,
