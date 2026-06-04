@@ -9,7 +9,8 @@ import {
   ChevronUp,
   TrendingUp,
   Plus,
-  Layers
+  Layers,
+  Filter
 } from "lucide-react"
 import { 
   formatCurrency, 
@@ -22,7 +23,9 @@ import {
   TEAM_MEMBERS
 } from "./types"
 import { ArchivedOpportunitiesSection } from "./ArchivedOpportunitiesSection"
-import type { 
+import { Dropdown } from "./Dropdown"
+import { HowItWorks } from "@/components/admin/HowItWorks"
+import type {
   Client, 
   Task, 
   Disposition, 
@@ -96,7 +99,7 @@ function PlatformGoalsSummary({
   onToggle: () => void
 }) {
   return (
-    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden mb-6">
+    <div className="bg-white rounded-lg border border-neutral-200/70 overflow-hidden mb-6">
       <button
         onClick={onToggle}
         className="w-full p-4 flex items-center justify-between hover:bg-neutral-50 transition-colors"
@@ -172,7 +175,7 @@ function PlatformGoalsSummary({
                 return (
                   <div
                     key={goal.brand}
-                    className="p-4 rounded-md ring-1 ring-neutral-200/70 bg-white"
+                    className="p-4 rounded-md border border-neutral-200/70 bg-white"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100 text-neutral-700">
@@ -271,7 +274,7 @@ function KanbanCard({
         stiffness: 400, 
         damping: 25 
       }}
-      className={`group p-3 rounded-md bg-white ring-1 ring-neutral-200/70 hover:ring-neutral-300 hover:-translate-y-0.5 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-[transform,box-shadow,outline-color] cursor-grab active:cursor-grabbing ${
+      className={`group p-3 rounded-md bg-white border border-neutral-200/70 hover:border-neutral-300 hover:-translate-y-0.5 hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-[transform,box-shadow,outline-color] cursor-grab active:cursor-grabbing ${
         isStacked && stackIndex > 0 ? "absolute inset-0" : "relative"
       } ${isStacked && stackIndex > 0 && !isHovered ? "pointer-events-none" : ""} ${
         isLinkedClient ? "ring-2 ring-neutral-900/30" : ""
@@ -773,28 +776,29 @@ export function OpportunitiesKanbanView({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header — title + funnel context, matching the Leads/Clients idiom */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h3 className="text-lg font-medium text-neutral-900">Opportunities Pipeline</h3>
-          <p className="text-sm text-neutral-500 mt-1">
-            Drag items between columns to update their status
+          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
+            Opportunities
+          </h2>
+          <p className="text-[13px] text-neutral-500 mt-1">
+            Active deals in your pipeline — where qualified leads become won clients.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Assignee Filter */}
+          {/* Assignee Filter — shared dropdown (matches the app idiom) */}
           {onAssigneeFilterChange && (
-            <select
+            <Dropdown
+              ariaLabel="Filter opportunities by assignee"
+              icon={<Filter className="w-3.5 h-3.5 text-neutral-400" />}
               value={assigneeFilter}
-              onChange={(e) => onAssigneeFilterChange(e.target.value)}
-              className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400"
-              aria-label="Filter opportunities by assignee"
-            >
-              <option value="all">All assignees</option>
-              {allAssignees.map((assignee) => (
-                <option key={assignee} value={assignee}>{assignee}</option>
-              ))}
-            </select>
+              onChange={onAssigneeFilterChange}
+              options={[
+                { value: "all", label: "All assignees" },
+                ...allAssignees.map((a) => ({ value: a, label: a })),
+              ]}
+            />
           )}
           {/* Add Opportunity Button */}
           {onAddOpportunity && (
@@ -808,6 +812,16 @@ export function OpportunitiesKanbanView({
           )}
         </div>
       </div>
+
+      {/* How it works — dismissible first-run intro (shared across the funnel pages) */}
+      <HowItWorks
+        storageKey="opportunitiesIntroDismissed"
+        steps={[
+          { title: "Columns are deal stages", detail: "Pitched deals move on to Closed Won or Closed Lost." },
+          { title: "Drag to update", detail: "Drag a card between columns to change its disposition." },
+          { title: "DOC & goals", detail: "A card's DOC % is your depth of conviction; the goals bar tracks pacing to target." },
+        ]}
+      />
 
       {/* Platform Goals Section */}
       <PlatformGoalsSummary 
@@ -838,7 +852,7 @@ export function OpportunitiesKanbanView({
 
       {/* Empty State — single CTA, action-led */}
       {totalOpportunities === 0 && (
-        <div className="text-center py-14 bg-white rounded-md ring-1 ring-neutral-200/70">
+        <div className="text-center py-14 bg-white rounded-md border border-neutral-200/70">
           <div className="grid h-10 w-10 place-items-center rounded-md bg-neutral-100 text-neutral-700 mx-auto mb-4">
             <Target className="w-5 h-5" />
           </div>

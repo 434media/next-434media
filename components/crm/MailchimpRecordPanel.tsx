@@ -324,9 +324,6 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
 
                   {/* Meta row */}
                   <div className="mt-2 flex items-center gap-3 text-[11px] text-neutral-500 tabular-nums">
-                    {typeof aud.rating === "number" && (
-                      <span title="Mailchimp member rating (1–5)">{"★".repeat(aud.rating)}{"☆".repeat(Math.max(0, 5 - aud.rating))}</span>
-                    )}
                     {aud.timestampSignup && <span>Joined {formatRelative(aud.timestampSignup)}</span>}
                     {aud.lastChanged && <span>· Updated {formatRelative(aud.lastChanged)}</span>}
                   </div>
