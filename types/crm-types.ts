@@ -406,87 +406,11 @@ export interface CompletedTask extends Task {
   completion_notes?: string
 }
 
-// ============================================
-// LEADS (Closed/Archived)
-// ============================================
-export interface ClosedLostLead extends BaseRecord {
-  // Basic Info
-  name: string
-  company_name?: string
-  email?: string
-  phone?: string
-  
-  // Lead Info
-  lead_source?: string
-  initial_contact_date?: string
-  
-  // Loss Info
-  closed_date: string
-  lost_reason: string
-  lost_to_competitor?: string
-  
-  // Value
-  potential_value?: number
-  
-  // Notes
-  notes?: string
-  lessons_learned?: string
-  
-  // Original assignment
-  original_owner?: string
-}
-
-export interface ClosedWonLead extends BaseRecord {
-  // Basic Info
-  name: string
-  company_name?: string
-  email?: string
-  phone?: string
-  
-  // Lead Info
-  lead_source?: string
-  initial_contact_date?: string
-  
-  // Win Info
-  closed_date: string
-  won_reason?: string
-  
-  // Value
-  deal_value: number
-  
-  // Conversion
-  converted_to_client_id?: string
-  converted_to_opportunity_id?: string
-  
-  // Notes
-  notes?: string
-  success_factors?: string
-  
-  // Original assignment
-  owner?: string
-}
-
-export interface ArchivedLead extends BaseRecord {
-  // Basic Info
-  name: string
-  company_name?: string
-  email?: string
-  phone?: string
-  
-  // Archive Info
-  archived_date: string
-  archive_reason: string
-  
-  // Previous Status
-  previous_status?: string
-  previous_stage?: string
-  
-  // Notes
-  notes?: string
-  
-  // Original assignment
-  original_owner?: string
-}
+// Note: the closed-won/lost/archived lifecycle now lives on ClientRecord
+// (is_opportunity + disposition=closed_won|closed_lost, plus is_archived). The
+// former ClosedWonLead / ClosedLostLead / ArchivedLead interfaces backed a frozen
+// Airtable import (crm_*_leads collections, kept as a read-only cold archive) and
+// were retired once nothing read or wrote those collections.
 
 // ============================================
 // PLATFORMS
@@ -821,8 +745,8 @@ export interface CRMDashboardStats {
   activeClients: number
   totalOpportunities: number
   pipelineValue: number
-  closedWonThisMonth: number
-  closedWonRevenue: number
+  closedWonCount: number
+  closedWonValue: number
   tasksToday: number
   tasksOverdue: number
   conversionRate: number

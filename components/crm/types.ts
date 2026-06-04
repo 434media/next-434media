@@ -13,8 +13,8 @@ export interface DashboardStats {
   activeClients: number
   totalOpportunities: number
   pipelineValue: number
-  closedWonThisMonth: number
-  closedWonRevenue: number
+  closedWonCount: number
+  closedWonValue: number
   closedLostRevenue: number
   tasksToday: number
   tasksOverdue: number

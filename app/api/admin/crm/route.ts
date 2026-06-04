@@ -5,7 +5,6 @@ import {
   getOpportunities,
   getSalesReps,
   getAllTasks,
-  getClosedWonLeads,
 } from "@/lib/firestore-crm"
 import type { OpportunityStage } from "@/types/crm-types"
 
@@ -46,12 +45,11 @@ export async function GET() {
     }
 
     // Fetch all data ONCE - no duplicate reads
-    const [clients, opportunities, salesReps, allTasks, closedWon] = await Promise.all([
+    const [clients, opportunities, salesReps, allTasks] = await Promise.all([
       getClients().catch(() => []),
       getOpportunities().catch(() => []),
       getSalesReps().catch(() => []),
       getAllTasks().catch(() => []),
-      getClosedWonLeads().catch(() => []),
     ])
 
     // Check if data is empty (likely quota exceeded)
@@ -67,15 +65,17 @@ export async function GET() {
       0
     )
 
-    // This month's closed won
+    // Closed won — all-time, from the live source (crm_clients opportunities with
+    // stage=closed_won). The crm_clients opps don't carry a reliable close date, so
+    // we report the all-time count + summed value rather than a misleading "this
+    // month" slice. (Previously read the frozen crm_closed_won_leads Airtable
+    // import, which had no dollar values and fed no UI.)
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const closedWonThisMonth = closedWon.filter((lead) => {
-      const closeDate = new Date(lead.closed_date)
-      return closeDate >= monthStart
-    })
-    const closedWonRevenue = closedWonThisMonth.reduce(
-      (sum, lead) => sum + (lead.deal_value || 0),
+    const closedWonOpportunities = opportunities.filter(
+      (o) => o.stage === "closed_won"
+    )
+    const closedWonValue = closedWonOpportunities.reduce(
+      (sum, o) => sum + (o.value || 0),
       0
     )
 
@@ -103,8 +103,8 @@ export async function GET() {
       activeClients,
       totalOpportunities: opportunities.length,
       pipelineValue,
-      closedWonThisMonth: closedWonThisMonth.length,
-      closedWonRevenue,
+      closedWonCount: closedWonOpportunities.length,
+      closedWonValue,
       tasksToday,
       tasksOverdue,
       conversionRate: Math.round(conversionRate * 10) / 10,

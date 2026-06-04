@@ -8,14 +8,10 @@ import type {
   MasterListItem,
   DailySummary,
   Task,
-  ClosedLostLead,
-  ClosedWonLead,
-  ArchivedLead,
   Platform,
   SalesRep,
   BarbPieChart,
   PieSlice,
-  CRMDashboardStats,
   PipelineColumn,
   OpportunityStage,
 } from "../types/crm-types"
@@ -977,41 +973,18 @@ export async function uncompleteTask(
 }
 
 // ============================================
-// LEADS OPERATIONS (Closed/Archived)
+// LEADS LIFECYCLE (Closed Won/Lost/Archived)
 // ============================================
-const CLOSED_LOST_COLLECTION = "crm_closed_lost_leads"
-const CLOSED_WON_COLLECTION = "crm_closed_won_leads"
-const ARCHIVED_COLLECTION = "crm_archived_leads"
-
-export async function getClosedLostLeads(): Promise<ClosedLostLead[]> {
-  return getAllFromCollection<ClosedLostLead>(CLOSED_LOST_COLLECTION)
-}
-
-export async function getClosedWonLeads(): Promise<ClosedWonLead[]> {
-  return getAllFromCollection<ClosedWonLead>(CLOSED_WON_COLLECTION)
-}
-
-export async function getArchivedLeads(): Promise<ArchivedLead[]> {
-  return getAllFromCollection<ArchivedLead>(ARCHIVED_COLLECTION)
-}
-
-export async function createClosedLostLead(
-  data: Omit<ClosedLostLead, "id" | "created_at" | "updated_at">
-): Promise<ClosedLostLead> {
-  return createDocument<ClosedLostLead>(CLOSED_LOST_COLLECTION, data)
-}
-
-export async function createClosedWonLead(
-  data: Omit<ClosedWonLead, "id" | "created_at" | "updated_at">
-): Promise<ClosedWonLead> {
-  return createDocument<ClosedWonLead>(CLOSED_WON_COLLECTION, data)
-}
-
-export async function createArchivedLead(
-  data: Omit<ArchivedLead, "id" | "created_at" | "updated_at">
-): Promise<ArchivedLead> {
-  return createDocument<ArchivedLead>(ARCHIVED_COLLECTION, data)
-}
+// The live closed-won/lost/archived lifecycle lives on crm_clients: opportunities
+// carry disposition=closed_won|closed_lost (written by the kanban UI) and an
+// is_archived flag. There is one source of truth — crm_clients.
+//
+// The crm_closed_won_leads / crm_closed_lost_leads / crm_archived_leads
+// collections are a frozen, read-only Airtable import (_migrated_at 2025-12-30):
+// real historical closed deals from the old CRM, with no dollar values or close
+// dates carried over. Nothing in the app writes or reads them anymore, so the
+// get*/create* helpers were retired. The data is kept in Firestore as a cold
+// archive of pre-app deal history; do not wire it back into live surfaces.
 
 // ============================================
 // PLATFORMS OPERATIONS
@@ -1100,77 +1073,6 @@ export async function getSlicesByChartId(chartId: string): Promise<PieSlice[]> {
       .filter((item): item is PieSlice => item !== null)
   } catch (error) {
     console.error("Error fetching pie slices:", error)
-    throw error
-  }
-}
-
-// ============================================
-// DASHBOARD STATS
-// ============================================
-export async function getCRMDashboardStats(): Promise<CRMDashboardStats> {
-  try {
-    const [clients, opportunities, allTasks, closedWon] = await Promise.all([
-      getClients(),
-      getOpportunities(),
-      getAllTasks(),
-      getClosedWonLeads(),
-    ])
-
-    const activeClients = clients.filter((c) => c.status === "active").length
-    
-    // Calculate pipeline value (only non-closed stages)
-    const pipelineOpportunities = opportunities.filter(
-      (o) => o.stage !== "closed_won" && o.stage !== "closed_lost"
-    )
-    const pipelineValue = pipelineOpportunities.reduce(
-      (sum, o) => sum + (o.value || 0),
-      0
-    )
-
-    // This month's closed won
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const closedWonThisMonth = closedWon.filter((lead) => {
-      const closeDate = new Date(lead.closed_date)
-      return closeDate >= monthStart
-    })
-    const closedWonRevenue = closedWonThisMonth.reduce(
-      (sum, lead) => sum + (lead.deal_value || 0),
-      0
-    )
-
-    // Today's tasks
-    const today = new Date().toISOString().split("T")[0]
-    const tasksToday = allTasks.filter(
-      (t) => t.due_date?.startsWith(today) && t.status !== "completed"
-    ).length
-    
-    // Overdue tasks
-    const tasksOverdue = allTasks.filter((t) => {
-      if (!t.due_date || t.status === "completed") return false
-      return new Date(t.due_date) < now
-    }).length
-
-    // Conversion rate (won / total closed)
-    const totalClosed = opportunities.filter(
-      (o) => o.stage === "closed_won" || o.stage === "closed_lost"
-    ).length
-    const won = opportunities.filter((o) => o.stage === "closed_won").length
-    const conversionRate = totalClosed > 0 ? (won / totalClosed) * 100 : 0
-
-    return {
-      totalClients: clients.length,
-      activeClients,
-      totalOpportunities: opportunities.length,
-      pipelineValue,
-      closedWonThisMonth: closedWonThisMonth.length,
-      closedWonRevenue,
-      tasksToday,
-      tasksOverdue,
-      conversionRate: Math.round(conversionRate * 10) / 10,
-    }
-  } catch (error) {
-    console.error("Error calculating dashboard stats:", error)
     throw error
   }
 }
