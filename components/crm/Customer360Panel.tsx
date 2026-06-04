@@ -59,44 +59,43 @@ function fmtDateTime(iso: string): string {
   }
 }
 
+// Restrained, on-system palette: engagement events are neutral; opportunity
+// activity uses the sky "opportunity" accent; won is emerald, lost is red.
 const TIMELINE_ICONS: Record<TimelineEntryKind, { icon: typeof Mail; color: string; bg: string }> = {
-  client_created: { icon: UserPlus, color: "text-neutral-700", bg: "bg-neutral-100" },
-  email_signup: { icon: Mail, color: "text-blue-700", bg: "bg-blue-50" },
-  contact_form: { icon: Send, color: "text-amber-700", bg: "bg-amber-50" },
-  mailchimp_signup: { icon: Mail, color: "text-pink-700", bg: "bg-pink-50" },
-  opportunity_created: { icon: Target, color: "text-emerald-700", bg: "bg-emerald-50" },
-  opportunity_stage_change: { icon: Activity, color: "text-emerald-700", bg: "bg-emerald-50" },
-  opportunity_won: { icon: TrendingUp, color: "text-emerald-700", bg: "bg-emerald-50" },
-  opportunity_lost: { icon: TrendingDown, color: "text-rose-700", bg: "bg-rose-50" },
+  client_created: { icon: UserPlus, color: "text-neutral-600", bg: "bg-neutral-100" },
+  email_signup: { icon: Mail, color: "text-neutral-600", bg: "bg-neutral-100" },
+  contact_form: { icon: Send, color: "text-neutral-600", bg: "bg-neutral-100" },
+  mailchimp_signup: { icon: Mail, color: "text-neutral-600", bg: "bg-neutral-100" },
+  opportunity_created: { icon: Target, color: "text-sky-600", bg: "bg-sky-50" },
+  opportunity_stage_change: { icon: Activity, color: "text-sky-600", bg: "bg-sky-50" },
+  opportunity_won: { icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50" },
+  opportunity_lost: { icon: TrendingDown, color: "text-red-600", bg: "bg-red-50" },
 }
 
+// Mono card matching the Dashboard KPI idiom: neutral chrome, a small accent dot
+// encodes intent (sky = pipeline, emerald = won), the number is the message.
 function StatTile({
   label,
   value,
   sub,
   icon: Icon,
-  tone = "neutral",
+  accent = "neutral",
 }: {
   label: string
   value: string | number
   sub?: string
   icon: typeof Mail
-  tone?: "neutral" | "emerald" | "teal" | "blue" | "amber"
+  accent?: "neutral" | "sky" | "emerald"
 }) {
-  const tones = {
-    neutral: "border-neutral-200 bg-white",
-    emerald: "border-emerald-200 bg-emerald-50/40",
-    teal: "border-teal-200 bg-teal-50/40",
-    blue: "border-blue-200 bg-blue-50/40",
-    amber: "border-amber-200 bg-amber-50/40",
-  }
+  const dot = { neutral: "bg-neutral-300", sky: "bg-sky-500", emerald: "bg-emerald-500" }[accent]
   return (
-    <div className={`rounded-lg border ${tones[tone]} p-3`}>
+    <div className="rounded-lg border border-neutral-200 bg-white p-3">
       <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-wide">
-        <Icon className="w-3.5 h-3.5" />
+        <span className={`inline-block h-1 w-1 rounded-full ${dot}`} aria-hidden="true" />
+        <Icon className="w-3.5 h-3.5 text-neutral-400" />
         <span>{label}</span>
       </div>
-      <div className="mt-1 text-lg font-bold text-neutral-900 leading-tight">{value}</div>
+      <div className="mt-1 text-lg font-semibold text-neutral-900 leading-tight tabular-nums">{value}</div>
       {sub && <div className="text-[11px] text-neutral-400 mt-0.5">{sub}</div>}
     </div>
   )
@@ -260,28 +259,26 @@ export function Customer360Panel({ clientId }: Customer360PanelProps) {
           value={fmtCurrency(summary.pipelineValue)}
           sub={`${summary.opportunitiesOpen} ${summary.opportunitiesOpen === 1 ? "deal" : "deals"}`}
           icon={Target}
-          tone="teal"
+          accent="sky"
         />
         <StatTile
           label="Won"
           value={fmtCurrency(summary.wonValue)}
           sub={`${summary.opportunitiesWon} ${summary.opportunitiesWon === 1 ? "deal" : "deals"}`}
           icon={CheckCircle2}
-          tone="emerald"
+          accent="emerald"
         />
         <StatTile
           label="Email signups"
           value={summary.emailSignupCount}
           sub={summary.mailchimpSubscriptions ? `${summary.mailchimpSubscriptions} Mailchimp lists` : "Not subscribed"}
           icon={Mail}
-          tone="blue"
         />
         <StatTile
           label="Contact forms"
           value={summary.contactFormCount}
           sub={summary.contactFormCount === 0 ? "No submissions" : "Form submissions"}
           icon={FileText}
-          tone="amber"
         />
       </div>
 

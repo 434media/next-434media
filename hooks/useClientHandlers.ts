@@ -431,6 +431,28 @@ export function useClientHandlers({
     }
   }
 
+  // Bulk-delete clients from the table multi-select. Parallel, partial-failure
+  // tolerant, reports how many actually went.
+  const handleBulkDeleteClients = async (ids: string[]) => {
+    if (ids.length === 0) return
+    if (!confirm(`Delete ${ids.length} client${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return
+
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/admin/crm/clients?id=${id}`, { method: "DELETE", credentials: "include" }).then((r) => {
+          if (!r.ok) throw new Error(id)
+        })
+      )
+    )
+    const failed = results.filter((r) => r.status === "rejected").length
+    if (failed === 0) {
+      setToast({ message: `${ids.length} client${ids.length === 1 ? "" : "s"} deleted`, type: "success" })
+    } else {
+      setToast({ message: `Deleted ${ids.length - failed} of ${ids.length}; ${failed} failed`, type: "error" })
+    }
+    loadClients()
+  }
+
   // Archive opportunity — fully optimistic.
   const handleArchiveOpportunity = async (clientId: string) => {
     const previousClient = clients.find(c => c.id === clientId)
@@ -594,6 +616,7 @@ export function useClientHandlers({
     handleSaveClient,
     handleSaveOpportunity,
     handleDeleteClient,
+    handleBulkDeleteClients,
     handleArchiveOpportunity,
     handleRestoreOpportunity,
     handleUpdateClientDisposition,

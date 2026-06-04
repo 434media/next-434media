@@ -454,6 +454,7 @@ export default function SalesCRMPage() {
     handleSaveClient,
     handleSaveOpportunity,
     handleDeleteClient,
+    handleBulkDeleteClients,
     handleArchiveOpportunity,
     handleRestoreOpportunity,
     handleUpdateClientDisposition,
@@ -938,6 +939,7 @@ export default function SalesCRMPage() {
               setShowClientForm(true)
             }}
             onEditClient={handleEditClient}
+            onBulkDelete={handleBulkDeleteClients}
           />
         )}
 

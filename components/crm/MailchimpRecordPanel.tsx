@@ -220,7 +220,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
   }
 
   return (
-    <div className="bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
+    <div className="bg-white rounded-md border border-neutral-200/70 overflow-hidden">
       {/* Header */}
       <div className="border-b border-neutral-100 px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -235,7 +235,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
         <button
           onClick={() => load()}
           disabled={isLoading}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-neutral-200/70 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
           aria-label="Refresh Mailchimp data"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -246,7 +246,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
       {/* Body */}
       <div className="p-4 space-y-4">
         {error && (
-          <div className="flex items-start gap-2 px-3 py-2 rounded-md ring-1 ring-red-200 bg-red-50">
+          <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-red-200 bg-red-50">
             <AlertCircle className="w-3.5 h-3.5 text-red-600 mt-0.5 shrink-0" />
             <p className="text-xs text-red-700">{error}</p>
           </div>
@@ -281,7 +281,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
             {audiences.map((aud) => {
               const isSubscribed = aud.status === "subscribed"
               return (
-                <div key={aud.audienceId} className="rounded-md ring-1 ring-neutral-200/70 p-3">
+                <div key={aud.audienceId} className="rounded-md border border-neutral-200/70 p-3">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span
@@ -290,7 +290,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
                       />
                       <p className="text-sm font-medium text-neutral-900 truncate">{aud.audienceName}</p>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.16em] bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.16em] bg-neutral-100 text-neutral-700 border border-neutral-200/70 shrink-0">
                       {aud.status}
                     </span>
                   </div>
@@ -303,7 +303,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
                       aud.tags.map((t) => (
                         <span
                           key={`${aud.audienceId}-${t.id}-${t.name}`}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md ring-1 ring-neutral-200 bg-white text-[11px] text-neutral-700"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-neutral-200/70 bg-white text-[11px] text-neutral-700"
                         >
                           <TagIcon className="w-2.5 h-2.5 text-neutral-400" />
                           {t.name}
@@ -341,7 +341,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
                   <select
                     value={tagAudienceId}
                     onChange={(e) => setTagAudienceId(e.target.value)}
-                    className="h-8 px-2 rounded-md ring-1 ring-neutral-200 bg-white text-xs text-neutral-700 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                    className="h-8 px-2 rounded-md border border-neutral-200/70 bg-white text-xs text-neutral-700 focus:border-neutral-400 focus:outline-none"
                     aria-label="Audience for tag"
                   >
                     {audiences.map((a) => (
@@ -362,7 +362,7 @@ export function MailchimpRecordPanel({ email, onConsentResolved }: MailchimpReco
                     }
                   }}
                   placeholder="Add a tag…"
-                  className="flex-1 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs text-neutral-900 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
+                  className="flex-1 h-8 px-3 rounded-md border border-neutral-200/70 bg-white text-xs text-neutral-900 focus:border-neutral-400 focus:outline-none"
                 />
                 <button
                   onClick={addTag}

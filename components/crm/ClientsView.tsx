@@ -1,10 +1,25 @@
 "use client"
 
-import { Search, Plus, Mail, Phone, Users, Calendar, Filter, AlertCircle, Clock } from "lucide-react"
+import { Search, Plus, Mail, Phone, Users, Calendar, Filter, AlertCircle, Clock, Target, CheckCircle2, Trash2 } from "lucide-react"
 import { formatDate, normalizeAssigneeName, TEAM_MEMBERS, getDueDateStatus } from "./types"
 import { Dropdown } from "./Dropdown"
 import { HowItWorks } from "@/components/admin/HowItWorks"
+import { useSelection, BulkActionBar } from "@/components/admin/SubmissionStateUI"
 import type { Client } from "./types"
+
+function fmtCurrency(v: number): string {
+  return v.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+}
+
+// Restrained status dots — relationship state at a glance.
+const STATUS_DOT: Record<string, string> = {
+  active: "bg-emerald-500",
+  prospect: "bg-neutral-400",
+  lead: "bg-sky-500",
+  inactive: "bg-neutral-300",
+  churned: "bg-red-500",
+  lost: "bg-red-500",
+}
 
 interface ClientsViewProps {
   clients: Client[]
@@ -16,6 +31,7 @@ interface ClientsViewProps {
   onAssigneeFilterChange: (assignee: string) => void
   onAddClient: () => void
   onEditClient: (client: Client) => void
+  onBulkDelete?: (ids: string[]) => Promise<void> | void
 }
 
 export function ClientsView({
@@ -28,10 +44,27 @@ export function ClientsView({
   onAssigneeFilterChange,
   onAddClient,
   onEditClient,
+  onBulkDelete,
 }: ClientsViewProps) {
+  const { selected, toggle, set, clear } = useSelection()
+
   // Use only the predefined team members for the dropdown
   // This ensures only full names appear, not partial names from data
   const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
+
+  // Per-client pipeline via the opportunity→client FK. Opportunities are
+  // crm_clients rows (is_opportunity=true) whose client_id points to a client.
+  const pipelineByClient = new Map<string, { open: number; openValue: number; won: number }>()
+  for (const c of clients) {
+    if (!c.is_opportunity || !c.client_id) continue
+    const e = pipelineByClient.get(c.client_id) ?? { open: 0, openValue: 0, won: 0 }
+    if (c.disposition === "closed_won") e.won++
+    else if (c.disposition !== "closed_lost") {
+      e.open++
+      e.openValue += c.pitch_value || 0
+    }
+    pipelineByClient.set(c.client_id, e)
+  }
 
   // First, deduplicate clients by company_name + department to ensure each company/department combo appears only once
   // This handles the case where a company has multiple opportunities - we want ONE client entry per department
@@ -111,6 +144,12 @@ export function ClientsView({
     return client.contacts?.length || (client.name || client.email || client.phone ? 1 : 0)
   }
 
+  // Multi-select over the visible rows
+  const allVisibleIds = sortedClients.map((c) => c.id)
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id))
+  const someSelected = allVisibleIds.some((id) => selected.has(id))
+  const toggleAll = () => (allSelected ? clear() : set(allVisibleIds))
+
   return (
     <div>
       {/* Header — title + funnel context, matching the Leads/Audiences/Inbox idiom */}
@@ -185,6 +224,16 @@ export function ClientsView({
           <table className="w-full table-fixed">
             <thead className="bg-neutral-50/60 sticky top-0 z-10 border-b border-neutral-100">
               <tr>
+                <th className="w-10 px-4 py-2.5 bg-neutral-50/60">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all clients"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected }}
+                    onChange={toggleAll}
+                    className="rounded border-neutral-300 align-middle"
+                  />
+                </th>
                 <th className="w-[25%] px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em] bg-neutral-50/60">
                   Client
                 </th>
@@ -200,28 +249,61 @@ export function ClientsView({
               {sortedClients.map((client) => {
                   const primaryContact = getPrimaryContact(client)
                   const contactCount = getContactCount(client)
-                  
+                  const pipeline = pipelineByClient.get(client.id)
+
                   return (
                     <tr
                       key={client.id}
                       onClick={() => onEditClient(client)}
-                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                      className={`transition-colors cursor-pointer ${selected.has(client.id) ? "bg-neutral-50" : "hover:bg-neutral-50"}`}
                     >
+                      {/* Multi-select checkbox — stops the row from opening */}
+                      <td className="px-4 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${client.company_name || client.name || "client"}`}
+                          checked={selected.has(client.id)}
+                          onChange={() => toggle(client.id)}
+                          className="rounded border-neutral-300 mt-0.5"
+                        />
+                      </td>
                       {/* Client */}
                       <td className="px-4 py-3.5">
                         <div className="min-w-0">
-                          <p className="font-medium text-sm text-neutral-900 truncate">{client.company_name || client.name || "Unnamed Client"}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm text-neutral-900 truncate">{client.company_name || client.name || "Unnamed Client"}</p>
+                            {client.status && (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-neutral-100 text-[10px] font-medium text-neutral-600 capitalize">
+                                <span className={`inline-block h-1 w-1 rounded-full ${STATUS_DOT[client.status] ?? "bg-neutral-400"}`} aria-hidden="true" />
+                                {client.status}
+                              </span>
+                            )}
+                          </div>
                           {client.department && (
                             <p className="text-xs text-neutral-500 mt-0.5 truncate">
                               {client.department}
                             </p>
                           )}
-                          {contactCount > 1 && (
-                            <p className="inline-flex items-center gap-1 text-xs text-neutral-500 mt-0.5">
-                              <Users className="w-3 h-3 shrink-0" />
-                              <span>{contactCount} contacts</span>
-                            </p>
-                          )}
+                          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5 text-xs text-neutral-500">
+                            {contactCount > 1 && (
+                              <span className="inline-flex items-center gap-1">
+                                <Users className="w-3 h-3 shrink-0" />
+                                {contactCount} contacts
+                              </span>
+                            )}
+                            {pipeline && pipeline.open > 0 && (
+                              <span className="inline-flex items-center gap-1 text-sky-700">
+                                <Target className="w-3 h-3 shrink-0" />
+                                {pipeline.open} {pipeline.open === 1 ? "deal" : "deals"} · <span className="tabular-nums">{fmtCurrency(pipeline.openValue)}</span>
+                              </span>
+                            )}
+                            {pipeline && pipeline.open === 0 && pipeline.won > 0 && (
+                              <span className="inline-flex items-center gap-1 text-emerald-700">
+                                <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                {pipeline.won} won
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       {/* Primary Contact */}
@@ -289,6 +371,26 @@ export function ClientsView({
           </table>
         </div>
       </div>
+      )}
+
+      {/* Bulk-action bar — the shared component (same as Tasks / Audiences / Inbox) */}
+      {onBulkDelete && (
+        <BulkActionBar
+          count={selected.size}
+          onClear={clear}
+          actions={[
+            {
+              key: "delete",
+              label: "Delete",
+              icon: Trash2,
+              destructive: true,
+              run: async () => {
+                await onBulkDelete(Array.from(selected))
+                clear()
+              },
+            },
+          ]}
+        />
       )}
     </div>
   )
