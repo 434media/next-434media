@@ -14,11 +14,10 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  X,
 } from "lucide-react"
 import { getDueDateStatus, formatDate, BRANDS, normalizeAssigneeName, isValidAssigneeName, parseLocalDate } from "./types"
 import type { Task } from "./types"
-import { useSelection } from "@/components/admin/SubmissionStateUI"
+import { useSelection, BulkActionBar } from "@/components/admin/SubmissionStateUI"
 
 type UrgencyFilter = "all" | "overdue" | "due-soon" | "on-track"
 
@@ -581,34 +580,25 @@ export function TasksView({
         </div>
       )}
 
-      {/* Floating bulk-action bar — Vercel/Linear pattern; appears when rows are
-          selected. Lets you clear out a batch of old tasks in one go. */}
-      {onBulkDelete && selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 pl-4 pr-2 py-2 rounded-full bg-neutral-900 text-white shadow-lg">
-          <span className="text-sm font-medium tabular-nums">
-            {selected.size} selected
-          </span>
-          <button
-            type="button"
-            onClick={async () => {
-              const ids = Array.from(selected)
-              await onBulkDelete(ids)
-              clear()
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete
-          </button>
-          <button
-            type="button"
-            onClick={clear}
-            aria-label="Clear selection"
-            className="p-1.5 rounded-full hover:bg-white/10 text-neutral-300 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Bulk-action bar — the shared component used by the Audiences/Inbox tabs,
+          so multi-select looks and behaves identically across the app. */}
+      {onBulkDelete && (
+        <BulkActionBar
+          count={selected.size}
+          onClear={clear}
+          actions={[
+            {
+              key: "delete",
+              label: "Delete",
+              icon: Trash2,
+              destructive: true,
+              run: async () => {
+                await onBulkDelete(Array.from(selected))
+                clear()
+              },
+            },
+          ]}
+        />
       )}
     </div>
   )
