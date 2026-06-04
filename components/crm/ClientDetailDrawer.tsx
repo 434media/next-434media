@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import {
   Loader2,
@@ -15,10 +15,9 @@ import {
   Phone,
   Calendar,
 } from "lucide-react"
-import { TEAM_MEMBERS } from "./types"
-import type { TeamMember } from "./types"
 import { Customer360Panel } from "./Customer360Panel"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 interface ContactFormData {
   id: string
@@ -81,73 +80,17 @@ export function ClientDetailDrawer({
   clientId,
 }: ClientDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const [activeTab, setActiveTab] = useState<"edit" | "360">("edit")
   const showCustomer360Tab = isEditing && !!clientId
+
+  // Assignable roster (read-only) — shared with the other drawers. Management
+  // lives in CRM Settings → Team members.
+  const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
 
   // Reset to edit tab whenever the drawer opens for a new client
   useEffect(() => {
     if (open) setActiveTab("edit")
   }, [open, clientId])
-
-  // Fetch team members from Firestore
-  const fetchTeamMembers = useCallback(async () => {
-    setIsLoadingMembers(true)
-    try {
-      const response = await fetch("/api/admin/team-members")
-      const data = await response.json()
-      
-      // Get Firestore members (active only)
-      const firestoreMembers: TeamMember[] = data.success && data.data 
-        ? data.data.filter((m: TeamMember) => m.isActive)
-        : []
-      
-      // Create default team members for merging
-      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }))
-      
-      // Merge: use Firestore members + add any default members not already in Firestore
-      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
-      const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
-      
-      const missingDefaults = defaultMembers.filter(d => 
-        !firestoreNames.has(d.name.toLowerCase()) && 
-        (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
-      )
-      
-      // Combine and sort by name
-      const allMembers = [...firestoreMembers, ...missingDefaults]
-      allMembers.sort((a, b) => a.name.localeCompare(b.name))
-      
-      setTeamMembers(allMembers)
-    } catch {
-      // Fallback to default TEAM_MEMBERS
-      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })))
-    } finally {
-      setIsLoadingMembers(false)
-    }
-  }, [])
-
-  // Fetch team members when drawer opens
-  useEffect(() => {
-    if (open) {
-      fetchTeamMembers()
-    }
-  }, [open, fetchTeamMembers])
 
   // Toggle contact expansion
   const toggleContact = (contactId: string) => {
@@ -315,7 +258,7 @@ export function ClientDetailDrawer({
                   type="text"
                   value={formData.company_name}
                   onChange={(e) => onFormChange({ ...formData, company_name: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400"
+                  className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
                   placeholder="e.g., Velocity TX"
                 />
               </div>
@@ -329,7 +272,7 @@ export function ClientDetailDrawer({
                   type="text"
                   value={formData.department || ""}
                   onChange={(e) => onFormChange({ ...formData, department: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400"
+                  className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
                   placeholder="e.g., Marketing, HR, IT, Sales..."
                 />
                 <p className="text-xs text-neutral-500 mt-1">
@@ -346,7 +289,7 @@ export function ClientDetailDrawer({
                   <button
                     type="button"
                     onClick={addContact}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-50 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-neutral-700 border border-neutral-200/70 hover:border-neutral-300 hover:bg-neutral-50 rounded-md transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add contact
@@ -355,7 +298,7 @@ export function ClientDetailDrawer({
 
                 {formData.contacts.length === 0 ? (
                   <div className="p-4 text-center text-neutral-400 text-sm border border-dashed border-neutral-300 rounded-lg bg-neutral-50">
-                    No contacts added yet. Click "Add Contact" to add your first contact.
+                    No contacts yet — use the Add contact button above to add the first one.
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -367,7 +310,7 @@ export function ClientDetailDrawer({
                       return (
                         <div
                           key={contact.id}
-                          className="rounded-md ring-1 ring-neutral-200/70 bg-white overflow-hidden"
+                          className="rounded-md border border-neutral-200/70 bg-white overflow-hidden"
                         >
                           {/* Contact Header - Always Visible */}
                           <button
@@ -386,7 +329,7 @@ export function ClientDetailDrawer({
                                   </span>
                                   {contact.is_primary && (
                                     <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
-                                      <span className="inline-block h-1 w-1 rounded-full bg-blue-500" aria-hidden="true" />
+                                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900" aria-hidden="true" />
                                       Primary
                                     </span>
                                   )}
@@ -436,7 +379,7 @@ export function ClientDetailDrawer({
                                         type="text"
                                         value={contact.first_name}
                                         onChange={(e) => updateContact(contact.id, "first_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="First name"
                                       />
                                     </div>
@@ -446,7 +389,7 @@ export function ClientDetailDrawer({
                                         type="text"
                                         value={contact.last_name}
                                         onChange={(e) => updateContact(contact.id, "last_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="Last name"
                                       />
                                     </div>
@@ -459,7 +402,7 @@ export function ClientDetailDrawer({
                                         type="email"
                                         value={contact.email}
                                         onChange={(e) => updateContact(contact.id, "email", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="email@company.com"
                                       />
                                     </div>
@@ -469,7 +412,7 @@ export function ClientDetailDrawer({
                                         type="tel"
                                         value={contact.phone}
                                         onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="(555) 123-4567"
                                       />
                                     </div>
@@ -481,7 +424,7 @@ export function ClientDetailDrawer({
                                       type="text"
                                       value={contact.role}
                                       onChange={(e) => updateContact(contact.id, "role", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                      className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                       placeholder="e.g., CEO, Marketing Director"
                                     />
                                   </div>
@@ -493,7 +436,7 @@ export function ClientDetailDrawer({
                                       type="date"
                                       value={contact.date_of_birth || ""}
                                       onChange={(e) => updateContact(contact.id, "date_of_birth", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                      className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                     />
                                   </div>
 
@@ -504,7 +447,7 @@ export function ClientDetailDrawer({
                                       type="text"
                                       value={contact.address || ""}
                                       onChange={(e) => updateContact(contact.id, "address", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                      className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                       placeholder="Street address"
                                     />
                                   </div>
@@ -517,7 +460,7 @@ export function ClientDetailDrawer({
                                         type="text"
                                         value={contact.city || ""}
                                         onChange={(e) => updateContact(contact.id, "city", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="City"
                                       />
                                     </div>
@@ -527,7 +470,7 @@ export function ClientDetailDrawer({
                                         type="text"
                                         value={contact.state || ""}
                                         onChange={(e) => updateContact(contact.id, "state", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="State"
                                       />
                                     </div>
@@ -537,7 +480,7 @@ export function ClientDetailDrawer({
                                         type="text"
                                         value={contact.zipcode || ""}
                                         onChange={(e) => updateContact(contact.id, "zipcode", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="Zipcode"
                                       />
                                     </div>
@@ -583,7 +526,7 @@ export function ClientDetailDrawer({
                   <select
                     value={formData.source || ""}
                     onChange={(e) => onFormChange({ ...formData, source: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >
                     <option value="">Select source...</option>
                     <option value="existing">Existing</option>
@@ -606,7 +549,7 @@ export function ClientDetailDrawer({
                     type="date"
                     value={formData.next_followup_date}
                     onChange={(e) => onFormChange({ ...formData, next_followup_date: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   />
                 </div>
               </div>
@@ -614,21 +557,13 @@ export function ClientDetailDrawer({
               {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1.5">Notes</label>
-                <div className="relative">
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
-                    rows={4}
-                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400 resize-y min-h-30 max-h-75"
-                    placeholder="Additional notes about this contact..."
-                  />
-                  <div className="absolute bottom-2 right-2 pointer-events-none text-neutral-300">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 10 10">
-                      <path d="M9 9H7v-1h1V7h1v2zm0-4H8V4h1v1zm-4 4H4V8h1v1zm4-8H8V0h1v1zM5 1H4V0h1v1zM1 9H0V7h1v2zm0-4H0V4h1v1zM1 1H0V0h1v1z" opacity="0.5"/>
-                    </svg>
-                  </div>
-                </div>
-                <p className="text-xs text-neutral-400 mt-1">Drag corner to resize</p>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-y min-h-30 max-h-75"
+                  placeholder="Additional notes about this client..."
+                />
               </div>
 
               {/* Assignee Dropdown */}
@@ -642,7 +577,7 @@ export function ClientDetailDrawer({
                 <select
                   value={formData.assigned_to || ""}
                   onChange={(e) => onFormChange({ ...formData, assigned_to: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                  className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   disabled={isLoadingMembers}
                 >
                   <option value="">{isLoadingMembers ? "Loading..." : "Select assignee..."}</option>
