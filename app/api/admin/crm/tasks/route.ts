@@ -11,6 +11,7 @@ import {
   getMasterListItemById,
   updateMasterListItem,
   deleteMasterListItem,
+  isTaskMigrationCompleted,
 } from "@/lib/firestore-crm"
 
 async function requireAdmin() {
@@ -122,17 +123,22 @@ export async function PUT(request: NextRequest) {
     const { id, owner: _owner, ...updates } = body
     void _owner // legacy field, ignored
 
-    // First check master list (legacy data source). Master-list-derived tasks
-    // get persisted back to the master list, not the unified collection.
-    const masterListItem = await getMasterListItemById(id)
-    if (masterListItem) {
-      const masterListUpdates = mapToMasterListUpdates(updates)
-      await updateMasterListItem(id, masterListUpdates)
-      return NextResponse.json({
-        success: true,
-        task: { id, ...updates },
-        source: "master_list",
-      })
+    // Only persist back to the legacy master_list PRE-migration. Post-migration
+    // the unified `crm_tasks` collection is authoritative; the master_list docs
+    // are stale same-id duplicates, so routing edits there left the live
+    // `crm_tasks` doc unchanged (the edit reverted on refresh).
+    const migrated = await isTaskMigrationCompleted()
+    if (!migrated) {
+      const masterListItem = await getMasterListItemById(id)
+      if (masterListItem) {
+        const masterListUpdates = mapToMasterListUpdates(updates)
+        await updateMasterListItem(id, masterListUpdates)
+        return NextResponse.json({
+          success: true,
+          task: { id, ...updates },
+          source: "master_list",
+        })
+      }
     }
 
     // Status transition shortcuts
@@ -171,19 +177,27 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Task ID is required" }, { status: 400 })
     }
 
-    // Check master list first
-    const masterListItem = await getMasterListItemById(id)
-    if (masterListItem) {
-      await deleteMasterListItem(id)
-      return NextResponse.json({ success: true, message: "Task deleted", source: "master_list" })
+    // Only consult the legacy master_list PRE-migration. Post-migration the
+    // unified `crm_tasks` collection is the source of truth, and the master_list
+    // docs are stale duplicates that share the same ids — so the old
+    // "check master_list first" routed deletes to the invisible copy and left
+    // the live `crm_tasks` doc untouched (it reappeared on refresh).
+    const migrated = await isTaskMigrationCompleted()
+    if (!migrated) {
+      const masterListItem = await getMasterListItemById(id)
+      if (masterListItem) {
+        await deleteMasterListItem(id)
+        return NextResponse.json({ success: true, message: "Task deleted", source: "master_list" })
+      }
     }
 
-    try {
-      await deleteUnifiedTask(id)
-    } catch (err) {
-      // Idempotent — if the task doesn't exist anywhere, succeed silently
-      console.log(`[Tasks API] Task ${id} not found, treating as already deleted:`, err)
+    // Verify the task exists before reporting success — a silent no-op delete
+    // used to masquerade as success.
+    const existing = await getUnifiedTaskById(id)
+    if (!existing) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 })
     }
+    await deleteUnifiedTask(id)
     return NextResponse.json({ success: true, message: "Task deleted" })
   } catch (error) {
     console.error("Error deleting task:", error)

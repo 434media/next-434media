@@ -726,6 +726,15 @@ export async function deleteAllTasksFromOwner(owner: TaskOwner): Promise<number>
 // Get all tasks across all owners (parallel fetch for efficiency)
 // Also includes tasks from the master list
 export async function getAllTasks(): Promise<Task[]> {
+  // Post-migration the unified `crm_tasks` collection is the single source of
+  // truth — the legacy per-owner + master_list collections were cleaned up, so
+  // combining them here would return nothing. Read the unified collection
+  // instead (this is what /api/admin/crm's dashboard stats rely on).
+  if (await isTaskMigrationCompleted()) {
+    return getUnifiedTasks()
+  }
+
+  // Pre-migration: combine the legacy per-owner collections + master list.
   // Check cache first for the combined result
   const cacheKey = "all_tasks_combined"
   const cached = getCached<Task[]>(cacheKey)
@@ -1407,7 +1416,7 @@ export async function getContentPostByGenerationRequestId(
 const UNIFIED_TASKS = "crm_tasks"
 const META_TASK_MIGRATION_KEY = "crm_meta:task_migration"
 
-async function isTaskMigrationCompleted(): Promise<boolean> {
+export async function isTaskMigrationCompleted(): Promise<boolean> {
   const cached = getCached<boolean>(META_TASK_MIGRATION_KEY)
   if (cached !== null) return cached
   try {
