@@ -216,7 +216,7 @@ export function TaskDetailDrawer({
               <button
                 type="button"
                 onClick={onBackToLinkedItems}
-                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 text-sm font-medium transition-colors"
                 title="Back to linked items"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -256,23 +256,23 @@ export function TaskDetailDrawer({
         {/* Basic Info Section */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Title *</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Title *</label>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => onFormChange({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     placeholder="Task title"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Description</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => onFormChange({ ...formData, description: e.target.value })}
                     rows={4}
-                    className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-25 max-h-75"
+                    className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:bg-white resize-y min-h-25 max-h-75"
                     placeholder="Task description..."
                   />
                 </div>
@@ -280,18 +280,18 @@ export function TaskDetailDrawer({
                 {/* Created-by / date — reference metadata, only meaningful once the
                     task exists. Shown as a muted line, not disabled inputs. */}
                 {!isNew && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-neutral-400">
                     Created by {task.created_by || "—"} · {formatDate(task.created_at)}
                   </p>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Status</label>
                     <select
                       value={formData.status}
                       onChange={(e) => onFormChange({ ...formData, status: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     >
                       <option value="not_started">Not Started</option>
                       <option value="in_progress">In Progress</option>
@@ -301,11 +301,11 @@ export function TaskDetailDrawer({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Platform</label>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Platform</label>
                     <select
                       value={formData.brand}
                       onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     >
                       <option value="">No platform</option>
                       {BRANDS.map((brand) => (
@@ -317,16 +317,16 @@ export function TaskDetailDrawer({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Due Date</label>
                     <input
                       type="date"
                       value={formData.due_date}
                       onChange={(e) => onFormChange({ ...formData, due_date: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Link to</label>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Link to</label>
                     <div className="relative">
                       <button
                         type="button"
@@ -334,12 +334,12 @@ export function TaskDetailDrawer({
                           setShowLinkDropdown(!showLinkDropdown)
                           setLinkSearchQuery("")
                         }}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white flex items-center justify-between"
                       >
-                        <span className={(formData.opportunity_id || formData.client_id) ? "text-gray-900 truncate" : "text-gray-400"}>
+                        <span className={(formData.opportunity_id || formData.client_id) ? "text-neutral-900 truncate" : "text-neutral-400"}>
                           {linkedLabel || "Nothing linked"}
                         </span>
-                        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showLinkDropdown ? "rotate-180" : ""}`} />
+                        <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform shrink-0 ${showLinkDropdown ? "rotate-180" : ""}`} />
                       </button>
                       
                       {/* Link-to dropdown menu */}
@@ -349,18 +349,18 @@ export function TaskDetailDrawer({
                             initial={{ opacity: 0, y: -8 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -8 }}
-                            className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                            className="absolute z-30 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
                           >
                             {/* Search input */}
-                            <div className="p-2 border-b border-gray-100">
+                            <div className="p-2 border-b border-neutral-100">
                               <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                                 <input
                                   type="text"
                                   value={linkSearchQuery}
                                   onChange={(e) => setLinkSearchQuery(e.target.value)}
                                   placeholder="Search clients & opportunities..."
-                                  className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500 focus:bg-white"
+                                  className="w-full pl-8 pr-3 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400 focus:bg-white"
                                   autoFocus
                                   onClick={(e) => e.stopPropagation()}
                                 />
@@ -376,17 +376,17 @@ export function TaskDetailDrawer({
                                   setShowLinkDropdown(false)
                                   setLinkSearchQuery("")
                                 }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                               >
-                                <span className="text-gray-500">Nothing linked</span>
-                                {!formData.client_id && !formData.opportunity_id && <Check className="w-4 h-4 text-blue-600" />}
+                                <span className="text-neutral-500">Nothing linked</span>
+                                {!formData.client_id && !formData.opportunity_id && <Check className="w-4 h-4 text-neutral-900" />}
                               </button>
                               
-                              <div className="border-t border-gray-100" />
+                              <div className="border-t border-neutral-100" />
                               
                               {/* Filtered options (clients + opportunities) */}
                               {filteredLinkOptions.length === 0 ? (
-                                <div className="px-3 py-4 text-center text-sm text-gray-500">
+                                <div className="px-3 py-4 text-center text-sm text-neutral-500">
                                   {linkSearchQuery ? "No matches found" : "Nothing available"}
                                 </div>
                               ) : (
@@ -409,27 +409,27 @@ export function TaskDetailDrawer({
                                           setShowLinkDropdown(false)
                                           setLinkSearchQuery("")
                                         }}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between gap-2"
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between gap-2"
                                       >
                                         <div className="flex items-center gap-2 min-w-0">
                                           {isOpp ? (
                                             <Target className="w-4 h-4 text-sky-500 shrink-0" />
                                           ) : (
-                                            <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
+                                            <Building2 className="w-4 h-4 text-neutral-400 shrink-0" />
                                           )}
-                                          <span className="text-gray-900 truncate">{option.name}</span>
+                                          <span className="text-neutral-900 truncate">{option.name}</span>
                                           {isOpp && (
                                             <span className="shrink-0 px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 text-[10px] font-medium uppercase tracking-wide">
                                               Opp
                                             </span>
                                           )}
                                         </div>
-                                        {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                        {selected && <Check className="w-4 h-4 text-neutral-900 shrink-0" />}
                                       </button>
                                     )
                                   })}
                                   {linkOptions.length > 50 && (
-                                    <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50">
+                                    <div className="px-3 py-2 text-center text-xs text-neutral-500 bg-neutral-50">
                                       Showing {Math.min(50, filteredLinkOptions.length)} of {linkOptions.length}. Type to search for more.
                                     </div>
                                   )}
@@ -454,15 +454,15 @@ export function TaskDetailDrawer({
                 </div>
 
                 {/* Assignment Section */}
-                <div className="pt-4 border-t border-gray-200">
+                <div className="pt-4 border-t border-neutral-200">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-gray-500" />
-                      <label className="text-sm font-medium text-gray-700">Assignment</label>
+                      <Users className="w-4 h-4 text-neutral-500" />
+                      <label className="text-sm font-medium text-neutral-700">Assignment</label>
                     </div>
                     <a
                       href="/admin/crm/settings?tab=team"
-                      className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                      className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
                     >
                       Manage team →
                     </a>
@@ -470,17 +470,17 @@ export function TaskDetailDrawer({
                   <div className="grid grid-cols-2 gap-3">
                     {/* Primary Assignee */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Primary</label>
+                      <label className="block text-xs font-medium text-neutral-500 mb-1.5">Primary</label>
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => setShowDropdown(!showDropdown)}
-                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between"
+                          className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white flex items-center justify-between"
                         >
-                          <span className={formData.assigned_to ? "text-gray-900 truncate" : "text-gray-400"}>
+                          <span className={formData.assigned_to ? "text-neutral-900 truncate" : "text-neutral-400"}>
                             {formData.assigned_to || "Select..."}
                           </span>
-                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showDropdown ? "rotate-180" : ""}`} />
+                          <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform shrink-0 ${showDropdown ? "rotate-180" : ""}`} />
                         </button>
                         
                         {/* Dropdown menu */}
@@ -490,7 +490,7 @@ export function TaskDetailDrawer({
                               initial={{ opacity: 0, y: -8 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -8 }}
-                              className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                              className="absolute z-20 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
                             >
                               <div className="max-h-64 overflow-y-auto">
                                 {/* Unassigned option */}
@@ -500,18 +500,18 @@ export function TaskDetailDrawer({
                                     onFormChange({ ...formData, assigned_to: "Unassigned" })
                                     setShowDropdown(false)
                                   }}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                                 >
-                                  <span className="text-gray-500">Unassigned</span>
-                                  {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-blue-600" />}
+                                  <span className="text-neutral-500">Unassigned</span>
+                                  {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-neutral-900" />}
                                 </button>
                                 
-                                <div className="border-t border-gray-100" />
+                                <div className="border-t border-neutral-100" />
                                 
                                 {/* Team members */}
                                 {isLoadingMembers ? (
                                   <div className="px-3 py-4 text-center">
-                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
+                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
                                   </div>
                                 ) : (
                                   <>
@@ -523,10 +523,10 @@ export function TaskDetailDrawer({
                                           onFormChange({ ...formData, assigned_to: member.name })
                                           setShowDropdown(false)
                                         }}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                                       >
-                                        <span className="text-gray-900 truncate">{member.name}</span>
-                                        {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                        <span className="text-neutral-900 truncate">{member.name}</span>
+                                        {formData.assigned_to === member.name && <Check className="w-4 h-4 text-neutral-900 shrink-0" />}
                                       </button>
                                     ))}
                                   </>
@@ -547,21 +547,21 @@ export function TaskDetailDrawer({
 
                     {/* Secondary Assignee - Multi-select */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Secondary (Multi-select)</label>
+                      <label className="block text-xs font-medium text-neutral-500 mb-1.5">Secondary (Multi-select)</label>
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => setShowSecondaryDropdown(!showSecondaryDropdown)}
-                          className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white flex items-center justify-between min-h-9.5"
+                          className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white flex items-center justify-between min-h-9.5"
                         >
-                          <span className={formData.secondary_assigned_to.length > 0 ? "text-gray-900 truncate" : "text-gray-400"}>
+                          <span className={formData.secondary_assigned_to.length > 0 ? "text-neutral-900 truncate" : "text-neutral-400"}>
                             {formData.secondary_assigned_to.length > 0 
                               ? formData.secondary_assigned_to.length === 1 
                                 ? formData.secondary_assigned_to[0]
                                 : `${formData.secondary_assigned_to.length} selected`
                               : "None"}
                           </span>
-                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showSecondaryDropdown ? "rotate-180" : ""}`} />
+                          <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform shrink-0 ${showSecondaryDropdown ? "rotate-180" : ""}`} />
                         </button>
                         
                         {/* Selected members chips */}
@@ -570,7 +570,7 @@ export function TaskDetailDrawer({
                             {formData.secondary_assigned_to.map((name) => (
                               <span
                                 key={name}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-neutral-100 text-neutral-900 text-xs rounded-full"
                               >
                                 {name}
                                 <button
@@ -581,7 +581,7 @@ export function TaskDetailDrawer({
                                       secondary_assigned_to: formData.secondary_assigned_to.filter(n => n !== name)
                                     })
                                   }}
-                                  className="hover:text-blue-900"
+                                  className="hover:text-neutral-900"
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
@@ -597,7 +597,7 @@ export function TaskDetailDrawer({
                               initial={{ opacity: 0, y: -8 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -8 }}
-                              className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                              className="absolute z-20 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
                             >
                               <div className="max-h-64 overflow-y-auto">
                                 <button
@@ -606,17 +606,17 @@ export function TaskDetailDrawer({
                                     onFormChange({ ...formData, secondary_assigned_to: [] })
                                     setShowSecondaryDropdown(false)
                                   }}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                                 >
-                                  <span className="text-gray-500">Clear all</span>
-                                  {formData.secondary_assigned_to.length === 0 && <Check className="w-4 h-4 text-blue-600" />}
+                                  <span className="text-neutral-500">Clear all</span>
+                                  {formData.secondary_assigned_to.length === 0 && <Check className="w-4 h-4 text-neutral-900" />}
                                 </button>
                                 
-                                <div className="border-t border-gray-100" />
+                                <div className="border-t border-neutral-100" />
                                 
                                 {isLoadingMembers ? (
                                   <div className="px-3 py-4 text-center">
-                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
+                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
                                   </div>
                                 ) : (
                                   <>
@@ -639,10 +639,10 @@ export function TaskDetailDrawer({
                                               })
                                             }
                                           }}
-                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? "bg-blue-50" : "hover:bg-gray-50"}`}
+                                          className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${isSelected ? "bg-neutral-100" : "hover:bg-neutral-50"}`}
                                         >
-                                          <span className="text-gray-900 truncate">{member.name}</span>
-                                          {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                          <span className="text-neutral-900 truncate">{member.name}</span>
+                                          {isSelected && <Check className="w-4 h-4 text-neutral-900 shrink-0" />}
                                         </button>
                                       )
                                     })}
@@ -650,11 +650,11 @@ export function TaskDetailDrawer({
                                 )}
                                 {formData.secondary_assigned_to.length > 0 && (
                                   <>
-                                    <div className="border-t border-gray-100" />
+                                    <div className="border-t border-neutral-100" />
                                     <button
                                       type="button"
                                       onClick={() => setShowSecondaryDropdown(false)}
-                                      className="w-full px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2 font-medium"
+                                      className="w-full px-3 py-2 text-left text-sm text-neutral-600 hover:bg-neutral-50 flex items-center justify-center gap-2 font-medium"
                                     >
                                       Done
                                     </button>
@@ -679,28 +679,28 @@ export function TaskDetailDrawer({
 
               {/* Web Links Section — detail-only (hidden while creating) */}
               {!isNew && (
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="pt-4 border-t border-neutral-200">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
                   <Link2 className="w-4 h-4 inline mr-2" />
                   Web Links
                 </label>
                 <div className="space-y-2">
                   {formData.web_links.map((link, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
-                      <ExternalLink className="w-4 h-4 text-gray-400 shrink-0" />
+                    <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
+                      <ExternalLink className="w-4 h-4 text-neutral-400 shrink-0" />
                       <a 
                         href={link} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-700 truncate flex-1"
+                        className="text-sm text-neutral-900 hover:text-neutral-700 truncate flex-1"
                       >
                         {link}
                       </a>
                       <button
                         onClick={() => onRemoveLink(index)}
-                        className="p-1 rounded hover:bg-gray-200 transition-colors"
+                        className="p-1 rounded hover:bg-neutral-200 transition-colors"
                       >
-                        <X className="w-4 h-4 text-gray-400" />
+                        <X className="w-4 h-4 text-neutral-400" />
                       </button>
                     </div>
                   ))}
@@ -711,14 +711,14 @@ export function TaskDetailDrawer({
                       onChange={(e) => onNewLinkChange(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onAddLink())}
                       placeholder="Add a link (https://...)"
-                      className="flex-1 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      className="flex-1 px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     />
                     <button
                       onClick={onAddLink}
                       disabled={!newLink.trim()}
-                      className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition-colors disabled:opacity-50"
+                      className="px-3 py-2 bg-neutral-200 hover:bg-neutral-300 rounded-lg text-sm transition-colors disabled:opacity-50"
                     >
-                      <Plus className="w-4 h-4 text-gray-700" />
+                      <Plus className="w-4 h-4 text-neutral-700" />
                     </button>
                   </div>
                 </div>
@@ -727,8 +727,8 @@ export function TaskDetailDrawer({
 
               {/* File Attachments Section — detail-only */}
               {!isNew && (
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="pt-4 border-t border-neutral-200">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
                   <Upload className="w-4 h-4 inline mr-2" />
                   Attachments
                 </label>
@@ -737,28 +737,28 @@ export function TaskDetailDrawer({
                 {attachments.length > 0 && (
                   <div className="space-y-2 mb-3">
                     {attachments.map((attachment) => (
-                      <div key={attachment.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
+                      <div key={attachment.id} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
                         {attachment.type === "image" ? (
                           <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
                         ) : (
-                          <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                          <FileText className="w-4 h-4 text-neutral-900 shrink-0" />
                         )}
                         <a 
                           href={attachment.url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-700 truncate flex-1"
+                          className="text-sm text-neutral-900 hover:text-neutral-700 truncate flex-1"
                         >
                           {attachment.name}
                         </a>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-neutral-500">
                           {attachment.uploaded_by}
                         </span>
                         <button
                           onClick={() => onRemoveAttachment(attachment.id)}
-                          className="p-1 rounded hover:bg-gray-200 transition-colors"
+                          className="p-1 rounded hover:bg-neutral-200 transition-colors"
                         >
-                          <X className="w-4 h-4 text-gray-400" />
+                          <X className="w-4 h-4 text-neutral-400" />
                         </button>
                       </div>
                     ))}
@@ -787,27 +787,27 @@ export function TaskDetailDrawer({
                   }}
                   className={`relative rounded-lg border-2 border-dashed transition-all ${
                     isDragOver 
-                      ? "border-blue-500 bg-blue-50" 
-                      : "border-gray-300 hover:border-gray-400 bg-gray-50"
+                      ? "border-neutral-400 bg-neutral-100" 
+                      : "border-neutral-300 hover:border-neutral-400 bg-neutral-50"
                   }`}
                 >
                   <label className="flex items-center justify-center gap-2 p-4 cursor-pointer">
                     {isUploadingFile ? (
                       <>
-                        <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                        <span className="text-sm text-gray-500">Uploading...</span>
+                        <Loader2 className="w-5 h-5 text-neutral-400 animate-spin" />
+                        <span className="text-sm text-neutral-500">Uploading...</span>
                       </>
                     ) : isDragOver ? (
                       <>
-                        <Upload className="w-5 h-5 text-blue-500" />
-                        <span className="text-sm text-blue-600 font-medium">
+                        <Upload className="w-5 h-5 text-neutral-900" />
+                        <span className="text-sm text-neutral-900 font-medium">
                           Drop files here
                         </span>
                       </>
                     ) : (
                       <>
-                        <Upload className="w-5 h-5 text-gray-400" />
-                        <span className="text-sm text-gray-500">
+                        <Upload className="w-5 h-5 text-neutral-400" />
+                        <span className="text-sm text-neutral-500">
                           Drag & drop files here, or click to browse
                         </span>
                       </>
@@ -822,28 +822,28 @@ export function TaskDetailDrawer({
                     />
                   </label>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-neutral-500 mt-2">
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
               </div>
               )}
 
-              <div className="pt-4 border-t border-gray-200 space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
+              <div className="pt-4 border-t border-neutral-200 space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 border border-neutral-200">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-sky-100' : 'bg-gray-200'}`}>
-                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-sky-600' : 'text-gray-500'}`} />
+                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-sky-100' : 'bg-neutral-200'}`}>
+                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-sky-600' : 'text-neutral-500'}`} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Track in pipeline</p>
-                      <p className="text-xs text-gray-500">Show this task as a card in the opportunities pipeline</p>
+                      <p className="text-sm font-medium text-neutral-900">Track in pipeline</p>
+                      <p className="text-xs text-neutral-500">Show this task as a card in the opportunities pipeline</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => onFormChange({ ...formData, is_opportunity: !formData.is_opportunity })}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      formData.is_opportunity ? 'bg-sky-600' : 'bg-gray-300'
+                      formData.is_opportunity ? 'bg-sky-600' : 'bg-neutral-300'
                     }`}
                   >
                     <span
@@ -857,7 +857,7 @@ export function TaskDetailDrawer({
                 {/* Linking to a parent opportunity is done via "Link to" above;
                     this toggle only controls pipeline visibility. */}
                 {formData.is_opportunity && (
-                  <p className="pl-12 text-xs text-gray-500">
+                  <p className="pl-12 text-xs text-neutral-500">
                     Appears in the pipeline&apos;s Pitched column by default — drag it in the kanban to set its stage.
                   </p>
                 )}
@@ -865,8 +865,8 @@ export function TaskDetailDrawer({
 
               {/* Comments Section — detail-only */}
               {!isNew && (
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <div className="pt-4 border-t border-neutral-200">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
                   <MessageSquare className="w-4 h-4 inline mr-2" />
                   Comments & Updates
                 </label>
@@ -875,7 +875,7 @@ export function TaskDetailDrawer({
                 <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
                   {task.comments && task.comments.length > 0 ? (
                     task.comments.map((comment) => (
-                      <div key={comment.id} className="p-3 rounded-lg bg-gray-50 border border-gray-100 group">
+                      <div key={comment.id} className="p-3 rounded-lg bg-neutral-50 border border-neutral-100 group">
                         <div className="flex items-start gap-2">
                           {comment.author_avatar ? (
                             <img 
@@ -884,8 +884,8 @@ export function TaskDetailDrawer({
                               className="w-8 h-8 rounded-full"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                              <span className="text-xs font-medium text-gray-600">
+                            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                              <span className="text-xs font-medium text-neutral-600">
                                 {comment.author_name.charAt(0).toUpperCase()}
                               </span>
                             </div>
@@ -893,13 +893,13 @@ export function TaskDetailDrawer({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-900">
+                                <span className="text-sm font-medium text-neutral-900">
                                   {comment.author_name}
                                 </span>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-neutral-500">
                                   {formatDate(comment.created_at)}
                                   {comment.updated_at && comment.updated_at !== comment.created_at && (
-                                    <span className="ml-1 text-gray-400">(edited)</span>
+                                    <span className="ml-1 text-neutral-400">(edited)</span>
                                   )}
                                 </span>
                               </div>
@@ -914,10 +914,10 @@ export function TaskDetailDrawer({
                                           setEditingCommentId(comment.id)
                                           setEditCommentContent(comment.content)
                                         }}
-                                        className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                        className="p-1 rounded hover:bg-neutral-200 transition-colors"
                                         title="Edit comment"
                                       >
-                                        <Pencil className="w-3 h-3 text-gray-400 hover:text-blue-600" />
+                                        <Pencil className="w-3 h-3 text-neutral-400 hover:text-neutral-900" />
                                       </button>
                                       {onDeleteComment && (
                                         <button
@@ -927,10 +927,10 @@ export function TaskDetailDrawer({
                                               onDeleteComment(comment.id)
                                             }
                                           }}
-                                          className="p-1 rounded hover:bg-gray-200 transition-colors"
+                                          className="p-1 rounded hover:bg-neutral-200 transition-colors"
                                           title="Delete comment"
                                         >
-                                          <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-600" />
+                                          <Trash2 className="w-3 h-3 text-neutral-400 hover:text-red-600" />
                                         </button>
                                       )}
                                     </>
@@ -945,7 +945,7 @@ export function TaskDetailDrawer({
                                   value={editCommentContent}
                                   onChange={(e) => setEditCommentContent(e.target.value)}
                                   rows={3}
-                                  className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-y min-h-15 max-h-50"
+                                  className="w-full px-3 py-2 rounded-lg bg-white border border-neutral-300 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 resize-y min-h-15 max-h-50"
                                   autoFocus
                                 />
                                 <div className="flex gap-2">
@@ -959,7 +959,7 @@ export function TaskDetailDrawer({
                                       setEditCommentContent("")
                                     }}
                                     disabled={!editCommentContent.trim()}
-                                    className="px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 disabled:opacity-50"
+                                    className="px-2 py-1 bg-neutral-900 text-white text-xs font-medium rounded hover:bg-neutral-800 disabled:opacity-50"
                                   >
                                     Save
                                   </button>
@@ -969,14 +969,14 @@ export function TaskDetailDrawer({
                                       setEditingCommentId(null)
                                       setEditCommentContent("")
                                     }}
-                                    className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300"
+                                    className="px-2 py-1 bg-neutral-200 text-neutral-700 text-xs font-medium rounded hover:bg-neutral-300"
                                   >
                                     Cancel
                                   </button>
                                 </div>
                               </div>
                             ) : (
-                              <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                              <p className="text-sm text-neutral-600 whitespace-pre-wrap">
                                 {comment.content}
                               </p>
                             )}
@@ -985,7 +985,7 @@ export function TaskDetailDrawer({
                                 {comment.mentions.map((email) => {
                                   const member = TEAM_MEMBERS.find(m => m.email === email)
                                   return member ? (
-                                    <span key={email} className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
+                                    <span key={email} className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-900 text-xs">
                                       @{member.name}
                                     </span>
                                   ) : null
@@ -997,7 +997,7 @@ export function TaskDetailDrawer({
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-400 text-center py-4">No comments yet</p>
+                    <p className="text-sm text-neutral-400 text-center py-4">No comments yet</p>
                   )}
                 </div>
 
@@ -1012,8 +1012,8 @@ export function TaskDetailDrawer({
                           className="w-8 h-8 rounded-full"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                          <span className="text-xs font-medium text-gray-600">
+                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                          <span className="text-xs font-medium text-neutral-600">
                             {currentUser.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -1024,12 +1024,12 @@ export function TaskDetailDrawer({
                         value={newComment}
                         onChange={(e) => onNewCommentChange(e.target.value)}
                         rows={3}
-                        className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-17.5 max-h-50"
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:bg-white resize-y min-h-17.5 max-h-50"
                         placeholder="Add a comment... (use @name to mention someone)"
                       />
                       {/* Tag options helper - shows available team members for tagging */}
                       <div className="flex flex-wrap gap-1 mt-1.5 mb-2">
-                        <span className="text-xs text-gray-400 mr-1">Tag:</span>
+                        <span className="text-xs text-neutral-400 mr-1">Tag:</span>
                         {teamMembers.filter(m => {
                           if (m.isActive === false) return false
                           // Filter out test/demo team member entries
@@ -1049,7 +1049,7 @@ export function TaskDetailDrawer({
                                 onNewCommentChange(currentText + (currentText.endsWith(' ') || currentText === '' ? '' : ' ') + tagText)
                               }
                             }}
-                            className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs transition-colors"
+                            className="px-1.5 py-0.5 rounded bg-neutral-100 hover:bg-neutral-200 text-neutral-900 text-xs transition-colors"
                             title={`Tag ${member.name}`}
                           >
                             @{member.name.split(' ')[0]}
@@ -1057,13 +1057,13 @@ export function TaskDetailDrawer({
                         ))}
                       </div>
                       <div className="flex justify-between items-center">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-neutral-500">
                           Commenting as {currentUser.name}
                         </p>
                         <button
                           onClick={onAddComment}
                           disabled={!newComment.trim()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
                         >
                           <Send className="w-3 h-3" />
                           Comment
@@ -1072,7 +1072,7 @@ export function TaskDetailDrawer({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400 text-center py-2">
+                  <p className="text-sm text-neutral-400 text-center py-2">
                     Sign in to leave comments
                   </p>
                 )}
