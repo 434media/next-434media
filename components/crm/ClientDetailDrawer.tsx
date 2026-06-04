@@ -14,6 +14,8 @@ import {
   Mail,
   Phone,
   Calendar,
+  Target,
+  ChevronRight,
 } from "lucide-react"
 import { Customer360Panel } from "./Customer360Panel"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
@@ -52,7 +54,9 @@ interface ClientDetailDrawerProps {
   isEditing: boolean
   isSaving: boolean
   formData: ClientFormData
-  opportunities: { id: string; company_name?: string; title?: string }[]
+  /** This client's opportunities (scoped + with stage/value) — powers the
+      pipeline strip and the Customer 360 jump. */
+  opportunities: { id: string; name: string; stage: string; value: number }[]
   onFormChange: (data: ClientFormData) => void
   onSave: () => void
   onClose: () => void
@@ -65,6 +69,10 @@ interface ClientDetailDrawerProps {
 // Generate unique ID for new contacts
 function generateContactId(): string {
   return `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+function fmtCurrency(value: number): string {
+  return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })
 }
 
 export function ClientDetailDrawer({
@@ -82,6 +90,13 @@ export function ClientDetailDrawer({
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<"edit" | "360">("edit")
   const showCustomer360Tab = isEditing && !!clientId
+
+  // This client's pipeline at a glance — surfaced in the edit tab so the form
+  // isn't blind to the commercial relationship. Full detail lives in 360.
+  const openOpps = opportunities.filter((o) => o.stage !== "closed_won" && o.stage !== "closed_lost")
+  const wonOpps = opportunities.filter((o) => o.stage === "closed_won")
+  const openValue = openOpps.reduce((sum, o) => sum + (o.value || 0), 0)
+  const showPipelineStrip = showCustomer360Tab && opportunities.length > 0
 
   // Assignable roster (read-only) — shared with the other drawers. Management
   // lives in CRM Settings → Team members.
@@ -249,6 +264,36 @@ export function ClientDetailDrawer({
 
       {/* Scrollable Content (edit tab) */}
       <div className={`p-4 space-y-5 ${showCustomer360Tab && activeTab !== "edit" ? "hidden" : ""}`}>
+        {/* Pipeline strip — this client's deals at a glance; jumps to Customer 360 */}
+        {showPipelineStrip && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("360")}
+            className="w-full flex items-center justify-between gap-3 rounded-md border border-neutral-200/70 bg-neutral-50 px-3 py-2.5 text-left hover:bg-neutral-100 transition-colors"
+          >
+            <span className="flex items-center gap-2 min-w-0 text-[13px] text-neutral-600">
+              <Target className="w-4 h-4 text-sky-500 shrink-0" />
+              {openOpps.length > 0 && (
+                <span>
+                  <span className="font-semibold text-neutral-900">{openOpps.length}</span> open
+                  {openValue > 0 && (
+                    <> · <span className="font-semibold text-neutral-900 tabular-nums">{fmtCurrency(openValue)}</span></>
+                  )}
+                </span>
+              )}
+              {openOpps.length > 0 && wonOpps.length > 0 && <span className="text-neutral-300">·</span>}
+              {wonOpps.length > 0 && (
+                <span className="font-semibold text-emerald-600">{wonOpps.length} won</span>
+              )}
+              {openOpps.length === 0 && wonOpps.length === 0 && <span>Opportunities</span>}
+            </span>
+            <span className="shrink-0 inline-flex items-center gap-0.5 text-[12px] font-medium text-neutral-500">
+              Customer 360
+              <ChevronRight className="w-3.5 h-3.5" />
+            </span>
+          </button>
+        )}
+
         {/* Client Name - Primary Field */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1.5">

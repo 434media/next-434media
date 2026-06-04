@@ -112,6 +112,7 @@ export interface ClientRecord extends BaseRecord {
   pitch_value?: number
   source?: string
   is_opportunity?: boolean
+  client_id?: string  // On an opportunity row: FK to its parent client row (the won/active account)
   disposition?: "open" | "pitched" | "closed_won" | "closed_lost"
   doc?: "25" | "50" | "75" | "90" | "100"
   web_links?: string[]  // Array of URLs for opportunities

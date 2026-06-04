@@ -354,6 +354,7 @@ function normalizeClientData(rawData: Record<string, unknown>): ClientRecord {
     pitch_value: (rawData.pitch_value || rawData.deal_value || 0) as number,
     source: (rawData.source || rawData.lead_source || "") as string,
     is_opportunity: (rawData.is_opportunity || false) as boolean,
+    client_id: (rawData.client_id || undefined) as string | undefined,
     disposition: (rawData.disposition || undefined) as ClientRecord["disposition"],
     doc: (rawData.doc || undefined) as ClientRecord["doc"],
     web_links: (rawData.web_links || []) as string[],
@@ -440,8 +441,10 @@ function clientOpportunityToOpportunity(c: ClientRecord): Opportunity {
     id: c.id,
     created_at: c.created_at,
     updated_at: c.updated_at,
+    // The opportunity's FK to its parent client row. Previously this was set to
+    // c.id (self), which made getOpportunitiesByClient never match a real client.
     name: c.title || c.company_name || c.name || "Untitled opportunity",
-    client_id: c.id,
+    client_id: c.client_id || "",
     client_name: c.company_name || c.name,
     stage,
     value: c.pitch_value ?? 0,

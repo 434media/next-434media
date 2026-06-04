@@ -294,7 +294,12 @@ export function useClientHandlers({
       const method = isEditingOpportunity && opportunityForm.existing_company_id ? "PUT" : "POST"
       const body = isEditingOpportunity && opportunityForm.existing_company_id
         ? { ...opportunityData, id: opportunityForm.existing_company_id }
-        : opportunityData
+        : {
+            ...opportunityData,
+            // Persist the parent-client FK chosen via the company picker, so the
+            // new opportunity surfaces under that client's pipeline / Customer 360.
+            ...(opportunityForm.linked_company_id ? { client_id: opportunityForm.linked_company_id } : {}),
+          }
 
       const response = await fetch("/api/admin/crm/clients", {
         method,

@@ -966,7 +966,18 @@ export default function SalesCRMPage() {
         isEditing={!!editingClient}
         isSaving={isSaving}
         formData={clientForm}
-        opportunities={clients.filter(c => c.is_opportunity).map(c => ({ id: c.id, company_name: c.company_name, title: c.title }))}
+        opportunities={
+          editingClient
+            ? clients
+                .filter((c) => c.is_opportunity && c.client_id === editingClient.id)
+                .map((c) => ({
+                  id: c.id,
+                  name: c.title || c.company_name || c.name || "Opportunity",
+                  stage: c.disposition || "pitched",
+                  value: c.pitch_value || 0,
+                }))
+            : []
+        }
         onFormChange={setClientForm}
         onSave={handleSaveClient}
         onClose={() => closeClientDrawer()}

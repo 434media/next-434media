@@ -87,6 +87,7 @@ export interface Client {
   tags?: string[]  // CRM tags for categorization and filtering
   is_opportunity?: boolean  // Whether to show in pipeline/opportunities view
   opportunity_id?: string  // ID of linked opportunity (when this is a contact linked to an opportunity)
+  client_id?: string  // On an opportunity row: FK to its parent client row (the won/active account)
   disposition?: Disposition  // Opportunity stage: pitched, closed_won, closed_lost
   doc?: DOC  // Degree of Confidence: 25, 50, 75, 90 (percentage probability)
   industry?: string  // Deprecated: use brand instead
