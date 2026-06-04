@@ -3,6 +3,7 @@
 import { Search, Plus, Mail, Phone, Users, Calendar, Filter, AlertCircle, Clock } from "lucide-react"
 import { formatDate, normalizeAssigneeName, TEAM_MEMBERS, getDueDateStatus } from "./types"
 import { Dropdown } from "./Dropdown"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { Client } from "./types"
 
 interface ClientsViewProps {
@@ -111,70 +112,92 @@ export function ClientsView({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex flex-wrap flex-1 gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search clients by name or email..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
-            />
-          </div>
-          {/* Assignee Filter — custom dropdown (matches the app idiom). */}
-          <Dropdown
-            ariaLabel="Filter by assignee"
-            icon={<Filter className="w-3.5 h-3.5 text-neutral-400" />}
-            value={assigneeFilter}
-            onChange={onAssigneeFilterChange}
-            options={[
-              { value: "all", label: "All Assignees" },
-              ...allAssignees.map((a) => ({ value: a, label: a })),
-            ]}
-          />
+    <div>
+      {/* Header — title + funnel context, matching the Leads/Audiences/Inbox idiom */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
+            Clients
+          </h2>
+          <p className="text-[13px] text-neutral-500 mt-1">
+            Your won and active customer accounts — converted from qualified leads and closed opportunities.
+          </p>
         </div>
         <button
           onClick={onAddClient}
-          className="flex items-center gap-2 px-4 py-2.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800 transition-colors shrink-0"
         >
-          <Plus className="w-4 h-4" />
-          Add Client
+          <Plus className="w-3.5 h-3.5" />
+          Add client
         </button>
       </div>
 
-      {/* Clients Table - Focused on Client, Primary Contact, Follow Up */}
+      {/* How it works — dismissible first-run intro (shared across the funnel pages). */}
+      <HowItWorks
+        className="mb-4"
+        storageKey="clientsIntroDismissed"
+        steps={[
+          { title: "Clients are your active accounts", detail: "Companies you've won — each with its own contacts and follow-ups." },
+          { title: "Sorted by follow-up", detail: "The most overdue follow-ups surface first, so nothing slips." },
+          { title: "Open to manage", detail: "Click a client for its contacts, opportunities, tasks, and history." },
+        ]}
+      />
+
+      {/* Toolbar — search + assignee filter */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-300 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search clients by name or email…"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-md bg-white border border-neutral-200/70 text-[13px] text-neutral-700 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
+          />
+        </div>
+        {/* Assignee Filter — custom dropdown (matches the app idiom). */}
+        <Dropdown
+          ariaLabel="Filter by assignee"
+          icon={<Filter className="w-3.5 h-3.5 text-neutral-400" />}
+          value={assigneeFilter}
+          onChange={onAssigneeFilterChange}
+          options={[
+            { value: "all", label: "All Assignees" },
+            ...allAssignees.map((a) => ({ value: a, label: a })),
+          ]}
+        />
+      </div>
+
+      {/* Clients table — or an empty/onboarding state when there's nothing to show */}
+      {sortedClients.length === 0 ? (
+        <ClientsEmptyState
+          filtered={searchQuery.trim() !== "" || assigneeFilter !== "all" || sourceFilter !== "all"}
+          onClear={() => {
+            onSearchChange("")
+            onAssigneeFilterChange("all")
+            onSourceFilterChange("all")
+          }}
+          onCreate={onAddClient}
+        />
+      ) : (
       <div className="rounded-md border border-neutral-200/70 overflow-hidden bg-white">
         <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
           <table className="w-full table-fixed">
-            <thead className="bg-neutral-50 sticky top-0 z-10 shadow-sm">
+            <thead className="bg-neutral-50/60 sticky top-0 z-10 border-b border-neutral-100">
               <tr>
-                <th className="w-[25%] px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider bg-neutral-50">
+                <th className="w-[25%] px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em] bg-neutral-50/60">
                   Client
                 </th>
-                <th className="w-[40%] px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider bg-neutral-50">
+                <th className="w-[40%] px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em] bg-neutral-50/60">
                   Primary Contact
                 </th>
-                <th className="w-[35%] px-4 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider hidden md:table-cell bg-neutral-50">
+                <th className="w-[35%] px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em] hidden md:table-cell bg-neutral-50/60">
                   Follow Up
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {sortedClients.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-4 py-12 text-center text-neutral-400">
-                    <div className="flex flex-col items-center gap-2">
-                      <Users className="w-8 h-8 text-neutral-300" />
-                      <p className="text-sm">{clients.length === 0 ? "No clients yet. Add your first client!" : "No clients match your search"}</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                sortedClients.map((client) => {
+              {sortedClients.map((client) => {
                   const primaryContact = getPrimaryContact(client)
                   const contactCount = getContactCount(client)
                   
@@ -261,12 +284,54 @@ export function ClientsView({
                       </td>
                     </tr>
                   )
-                })
-              )}
+                })}
             </tbody>
           </table>
         </div>
       </div>
+      )}
+    </div>
+  )
+}
+
+// Empty / first-run state for the Clients table. Distinguishes "filters hid
+// everything" (offer a clear) from "no clients yet" (explain where clients come
+// from + a primary CTA) — mirrors the Leads EmptyState.
+function ClientsEmptyState({
+  filtered,
+  onClear,
+  onCreate,
+}: {
+  filtered: boolean
+  onClear: () => void
+  onCreate: () => void
+}) {
+  if (filtered) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white rounded-md border border-neutral-200/70">
+        <Search className="w-8 h-8 text-neutral-300 mb-3" />
+        <p className="text-sm font-medium text-neutral-700">No clients match your filters</p>
+        <button onClick={onClear} className="mt-3 text-[13px] text-neutral-600 hover:text-neutral-900 underline">
+          Clear filters
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white rounded-md border border-neutral-200/70">
+      <Users className="w-8 h-8 text-neutral-300 mb-3" />
+      <p className="text-sm font-medium text-neutral-700">No clients yet</p>
+      <p className="text-[12px] text-neutral-500 mt-1 max-w-md">
+        Clients are your won accounts — they arrive when you convert a qualified lead or close an
+        opportunity. You can also add one manually.
+      </p>
+      <button
+        onClick={onCreate}
+        className="mt-4 flex items-center gap-1.5 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        Add first client
+      </button>
     </div>
   )
 }
