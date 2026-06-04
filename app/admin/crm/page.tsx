@@ -236,7 +236,10 @@ export default function SalesCRMPage() {
   }
 
   const loadDashboard = async () => {
-    setIsLoading(true)
+    // Only show the full-page skeleton on the very first load (no data yet).
+    // Re-visits to the Dashboard tab refresh in the background so the page
+    // doesn't flash a skeleton like a hard reload — matching the other tabs.
+    if (!stats) setIsLoading(true)
     setError(null)
     try {
       const response = await fetch("/api/admin/crm")
