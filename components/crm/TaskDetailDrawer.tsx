@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { 
   X, 
@@ -17,13 +17,10 @@ import {
   ExternalLink,
   Send,
   Trash2,
-  UserPlus,
-  UserMinus,
   Users,
   Check,
   ChevronDown,
   Pencil,
-  Settings,
   Target,
   Search,
   Building2,
@@ -39,8 +36,9 @@ import {
   DOC_OPTIONS,
   SOCIAL_PLATFORM_OPTIONS
 } from "./types"
-import type { Task, TaskAttachment, TaskComment, CurrentUser, Brand, TeamMember, Disposition, DOC, SocialPlatform } from "./types"
+import type { Task, TaskAttachment, TaskComment, CurrentUser, Brand, Disposition, DOC, SocialPlatform } from "./types"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 interface TaskFormData {
   title: string
@@ -140,32 +138,21 @@ export function TaskDetailDrawer({
   onBackToLinkedItems,
   showBackButton = false,
 }: TaskDetailDrawerProps) {
-  // State for team member management
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
-  const [showAddMember, setShowAddMember] = useState(false)
-  const [showAddSecondaryMember, setShowAddSecondaryMember] = useState(false)
-  const [showManageMembers, setShowManageMembers] = useState(false)
-  const [newMemberName, setNewMemberName] = useState("")
-  const [newMemberEmail, setNewMemberEmail] = useState("")
-  const [isAddingMember, setIsAddingMember] = useState(false)
-  const [memberError, setMemberError] = useState("")
+  // Assignable roster (read-only). Management lives in CRM Settings → Team
+  // members; refetched each time the drawer opens.
+  const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
+
+  // Assignee dropdown open state
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSecondaryDropdown, setShowSecondaryDropdown] = useState(false)
-  
+
   // State for drag-and-drop file upload
   const [isDragOver, setIsDragOver] = useState(false)
-  
+
   // State for comment editing
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentContent, setEditCommentContent] = useState("")
-  
-  // State for editing existing team members
-  const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
-  const [editMemberName, setEditMemberName] = useState("")
-  const [editMemberEmail, setEditMemberEmail] = useState("")
-  const [isSavingMember, setIsSavingMember] = useState(false)
-  
+
   // State for client dropdown
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [clientSearchQuery, setClientSearchQuery] = useState("")
@@ -189,200 +176,6 @@ export function TaskDetailDrawer({
   const filteredClients = uniqueClients.filter((client) => {
     return client.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
   })
-
-  // Fetch team members from Firestore
-  const fetchTeamMembers = useCallback(async () => {
-    setIsLoadingMembers(true)
-    try {
-      const response = await fetch("/api/admin/team-members")
-      const data = await response.json()
-      
-      // Get Firestore members (active only)
-      const firestoreMembers: TeamMember[] = data.success && data.data 
-        ? data.data.filter((m: TeamMember) => m.isActive)
-        : []
-      
-      // Create default team members for merging
-      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }))
-      
-      // Merge: use Firestore members + add any default members not already in Firestore
-      // This ensures the full list is always shown, including both Firestore and default members
-      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
-      const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
-      
-      const missingDefaults = defaultMembers.filter(d => 
-        !firestoreNames.has(d.name.toLowerCase()) && 
-        (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
-      )
-      
-      // Combine Firestore members with any missing defaults
-      const allMembers = [...firestoreMembers, ...missingDefaults]
-      
-      // Sort by name for consistent ordering
-      allMembers.sort((a, b) => a.name.localeCompare(b.name))
-      
-      setTeamMembers(allMembers)
-    } catch {
-      // Fallback to default TEAM_MEMBERS on error
-      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })))
-    } finally {
-      setIsLoadingMembers(false)
-    }
-  }, [])
-
-  // Fetch team members when drawer opens
-  useEffect(() => {
-    if (open) {
-      fetchTeamMembers()
-    }
-  }, [open, fetchTeamMembers])
-
-  // Add new team member (for primary or secondary assignment)
-  const handleAddMember = async (forSecondary = false) => {
-    if (!newMemberName.trim()) {
-      setMemberError("Name is required")
-      return
-    }
-    
-    setIsAddingMember(true)
-    setMemberError("")
-    
-    try {
-      const response = await fetch("/api/admin/team-members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newMemberName.trim(),
-          email: newMemberEmail.trim(),
-        }),
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        // Add to local state and select the new member for the appropriate field
-        setTeamMembers(prev => [...prev, data.data])
-        if (forSecondary) {
-          onFormChange({ ...formData, secondary_assigned_to: [...formData.secondary_assigned_to, data.data.name] })
-          setShowAddSecondaryMember(false)
-        } else {
-          onFormChange({ ...formData, assigned_to: data.data.name })
-          setShowAddMember(false)
-        }
-        setNewMemberName("")
-        setNewMemberEmail("")
-      } else {
-        setMemberError(data.error || "Failed to add member")
-      }
-    } catch {
-      setMemberError("Failed to add member")
-    } finally {
-      setIsAddingMember(false)
-    }
-  }
-
-  // Delete team member
-  const handleDeleteMember = async (member: TeamMember) => {
-    if (!confirm(`Remove ${member.name} from the team? This will hide them from future assignments.`)) {
-      return
-    }
-    
-    try {
-      const response = await fetch(`/api/admin/team-members?id=${member.id}`, {
-        method: "DELETE",
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        setTeamMembers(prev => prev.filter(m => m.id !== member.id))
-        // If the deleted member was selected, clear the selection
-        if (formData.assigned_to === member.name) {
-          onFormChange({ ...formData, assigned_to: "" })
-        }
-      }
-    } catch (error) {
-      console.error("Failed to delete member:", error)
-    }
-  }
-
-  // Start editing a team member
-  const handleStartEdit = (member: TeamMember) => {
-    setEditingMemberId(member.id)
-    setEditMemberName(member.name)
-    setEditMemberEmail(member.email)
-    setMemberError("")
-  }
-
-  // Cancel editing
-  const handleCancelEdit = () => {
-    setEditingMemberId(null)
-    setEditMemberName("")
-    setEditMemberEmail("")
-    setMemberError("")
-  }
-
-  // Save edited team member
-  const handleSaveMember = async (memberId: string) => {
-    if (!editMemberName.trim()) {
-      setMemberError("Name is required")
-      return
-    }
-
-    setIsSavingMember(true)
-    setMemberError("")
-
-    try {
-      const response = await fetch("/api/admin/team-members", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: memberId,
-          name: editMemberName.trim(),
-          email: editMemberEmail.trim(),
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        // Update local state
-        const oldMember = teamMembers.find(m => m.id === memberId)
-        setTeamMembers(prev =>
-          prev.map(m =>
-            m.id === memberId
-              ? { ...m, name: editMemberName.trim(), email: editMemberEmail.trim() }
-              : m
-          )
-        )
-        // Update the form if this member was selected
-        if (oldMember && formData.assigned_to === oldMember.name) {
-          onFormChange({ ...formData, assigned_to: editMemberName.trim() })
-        }
-        handleCancelEdit()
-      } else {
-        setMemberError(data.error || "Failed to update member")
-      }
-    } catch {
-      setMemberError("Failed to update member")
-    } finally {
-      setIsSavingMember(false)
-    }
-  }
 
   if (!task) return null
 
@@ -679,9 +472,17 @@ export function TaskDetailDrawer({
 
                 {/* Assignment Section */}
                 <div className="pt-4 border-t border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <label className="text-sm font-medium text-gray-700">Assignment</label>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-gray-500" />
+                      <label className="text-sm font-medium text-gray-700">Assignment</label>
+                    </div>
+                    <a
+                      href="/admin/crm/settings?tab=team"
+                      className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                      Manage team →
+                    </a>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {/* Primary Assignee */}
@@ -732,71 +533,26 @@ export function TaskDetailDrawer({
                                 ) : (
                                   <>
                                     {teamMembers.map((member) => (
-                                      <div
+                                      <button
                                         key={member.id}
-                                        className="flex items-center justify-between hover:bg-gray-50 group"
+                                        type="button"
+                                        onClick={() => {
+                                          onFormChange({ ...formData, assigned_to: member.name })
+                                          setShowDropdown(false)
+                                        }}
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
                                       >
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            onFormChange({ ...formData, assigned_to: member.name })
-                                            setShowDropdown(false)
-                                          }}
-                                          className="flex-1 px-3 py-2 text-left text-sm flex items-center justify-between"
-                                        >
-                                          <div className="truncate">
-                                            <span className="text-gray-900">{member.name}</span>
-                                          </div>
-                                          {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-                                        </button>
-                                        {!member.id.startsWith("default-") && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleDeleteMember(member)
-                                            }}
-                                            className="px-2 py-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-                                            title={`Remove ${member.name}`}
-                                          >
-                                            <UserMinus className="w-4 h-4" />
-                                          </button>
-                                        )}
-                                      </div>
+                                        <span className="text-gray-900 truncate">{member.name}</span>
+                                        {formData.assigned_to === member.name && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                      </button>
                                     ))}
                                   </>
                                 )}
-                                
-                                <div className="border-t border-gray-100" />
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowAddMember(true)
-                                    setShowDropdown(false)
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
-                                >
-                                  <UserPlus className="w-4 h-4" />
-                                  Add new member
-                                </button>
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowManageMembers(!showManageMembers)
-                                    setShowDropdown(false)
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                  <Settings className="w-4 h-4" />
-                                  Manage members
-                                </button>
                               </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
-                        
+
                         {showDropdown && (
                           <div
                             className="fixed inset-0 z-10"
@@ -909,21 +665,6 @@ export function TaskDetailDrawer({
                                     })}
                                   </>
                                 )}
-                                
-                                <div className="border-t border-gray-100" />
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowAddSecondaryMember(true)
-                                    setShowSecondaryDropdown(false)
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
-                                >
-                                  <UserPlus className="w-4 h-4" />
-                                  Add new member
-                                </button>
-                                
                                 {formData.secondary_assigned_to.length > 0 && (
                                   <>
                                     <div className="border-t border-gray-100" />
@@ -950,220 +691,6 @@ export function TaskDetailDrawer({
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Add new member form (shared for both primary and secondary) */}
-                  <AnimatePresence>
-                    {(showAddMember || showAddSecondaryMember) && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-medium text-blue-900">Add New Team Member</h4>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowAddMember(false)
-                              setShowAddSecondaryMember(false)
-                              setNewMemberName("")
-                              setNewMemberEmail("")
-                              setMemberError("")
-                            }}
-                            className="text-blue-400 hover:text-blue-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={newMemberName}
-                            onChange={(e) => setNewMemberName(e.target.value)}
-                            placeholder="Full name (required)"
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                          />
-                          <input
-                            type="email"
-                            value={newMemberEmail}
-                            onChange={(e) => setNewMemberEmail(e.target.value)}
-                            placeholder="Email (optional)"
-                            className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                          />
-                          {memberError && (
-                            <p className="text-xs text-red-600">{memberError}</p>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleAddMember(showAddSecondaryMember)}
-                            disabled={isAddingMember || !newMemberName.trim()}
-                            className="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                          >
-                            {isAddingMember ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Adding...
-                              </>
-                            ) : (
-                              <>
-                                <UserPlus className="w-4 h-4" />
-                                Add Team Member
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  {/* Team Management Panel */}
-                  <AnimatePresence>
-                    {showManageMembers && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                            <Settings className="w-4 h-4" />
-                            Manage Team Members
-                          </h4>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowManageMembers(false)
-                              handleCancelEdit()
-                            }}
-                            className="text-gray-400 hover:text-gray-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        
-                        {memberError && showManageMembers && (
-                          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
-                            {memberError}
-                          </div>
-                        )}
-                        
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {isLoadingMembers ? (
-                            <div className="py-4 text-center">
-                              <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
-                              <p className="text-xs text-gray-500 mt-2">Loading team members...</p>
-                            </div>
-                          ) : teamMembers.length === 0 ? (
-                            <p className="text-sm text-gray-500 text-center py-4">
-                              No team members yet. Add one using the dropdown above.
-                            </p>
-                          ) : (
-                            teamMembers.map((member) => (
-                              <div
-                                key={member.id}
-                                className="p-3 bg-white border border-gray-200 rounded-lg"
-                              >
-                                {editingMemberId === member.id ? (
-                                  <div className="space-y-2">
-                                    <input
-                                      type="text"
-                                      value={editMemberName}
-                                      onChange={(e) => setEditMemberName(e.target.value)}
-                                      placeholder="Full name"
-                                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                    />
-                                    <input
-                                      type="email"
-                                      value={editMemberEmail}
-                                      onChange={(e) => setEditMemberEmail(e.target.value)}
-                                      placeholder="Email address"
-                                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
-                                    />
-                                    <div className="flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSaveMember(member.id)}
-                                        disabled={isSavingMember || !editMemberName.trim()}
-                                        className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
-                                      >
-                                        {isSavingMember ? (
-                                          <Loader2 className="w-3 h-3 animate-spin" />
-                                        ) : (
-                                          <Check className="w-3 h-3" />
-                                        )}
-                                        Save
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={handleCancelEdit}
-                                        className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-gray-900 truncate">
-                                        {member.name}
-                                      </p>
-                                      {member.email && (
-                                        <p className="text-xs text-gray-500 truncate">
-                                          {member.email}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-1 ml-2">
-                                      {!member.id.startsWith("default-") && (
-                                        <>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleStartEdit(member)}
-                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                            title="Edit member"
-                                          >
-                                            <Pencil className="w-4 h-4" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteMember(member)}
-                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                            title="Remove member"
-                                          >
-                                            <Trash2 className="w-4 h-4" />
-                                          </button>
-                                        </>
-                                      )}
-                                      {member.id.startsWith("default-") && (
-                                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                                          Default
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowManageMembers(false)
-                            setShowAddMember(true)
-                          }}
-                          className="w-full mt-3 px-3 py-2 border border-dashed border-gray-300 text-gray-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                          Add new team member
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
               </div>
 
