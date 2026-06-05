@@ -2,6 +2,11 @@
   "name": "next-434media",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.4.1",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -27,7 +32,6 @@
     "@vercel/analytics": "^1.5.0",
     "@vercel/blob": "^2.0.0",
     "ai": "^6.0.193",
-    "axios": "^1.8.2",
     "botid": "^1.5.10",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",

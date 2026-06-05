@@ -35,10 +35,20 @@ async function process(email: string, token: string): Promise<boolean> {
   return true
 }
 
+// Escape user-derived text before interpolating into the HTML response. The
+// email comes off the query string; even though the success path is HMAC-token
+// gated, we never reflect it raw.
+function escapeHtml(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  )
+}
+
 function confirmationPage(ok: boolean, email: string): NextResponse {
   const heading = ok ? "You&rsquo;re unsubscribed" : "Link not valid"
   const detail = ok
-    ? `${email} will no longer receive 434 Media broadcasts.`
+    ? `${escapeHtml(email)} will no longer receive 434 Media broadcasts.`
     : "This unsubscribe link is invalid or has expired."
   const html = `<!doctype html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Unsubscribe</title></head>
 <body style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#041C32;background:#fff;">

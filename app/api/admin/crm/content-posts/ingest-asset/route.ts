@@ -63,6 +63,25 @@ function isSafeRemoteUrl(raw: string): URL | null {
   return u
 }
 
+// Follow redirects MANUALLY, re-validating every hop against isSafeRemoteUrl.
+// With redirect:"follow", a public URL could 30x-redirect to an internal host
+// (e.g. cloud metadata at 169.254.169.254) and slip past the allowlist above —
+// the redirect target is never checked. This re-runs the guard on each Location
+// and caps the chain length.
+async function fetchAllowingSafeRedirects(start: URL, maxHops = 5): Promise<Response> {
+  let current = start
+  for (let hop = 0; hop <= maxHops; hop++) {
+    const res = await fetch(current.toString(), { redirect: "manual" })
+    if (res.status < 300 || res.status >= 400) return res
+    const location = res.headers.get("location")
+    if (!location) return res
+    const next = isSafeRemoteUrl(new URL(location, current).toString())
+    if (!next) throw new Error("unsafe redirect target")
+    current = next
+  }
+  throw new Error("too many redirects")
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const session = await getSession()
   if (!session) {
@@ -87,10 +106,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
   }
 
-  // Fetch the remote asset.
+  // Fetch the remote asset — redirects are followed manually and re-validated.
   let res: Response
   try {
-    res = await fetch(safeUrl.toString(), { redirect: "follow" })
+    res = await fetchAllowingSafeRedirects(safeUrl)
   } catch (err) {
     console.error("[ingest-asset] fetch failed:", err)
     return NextResponse.json({ error: "Could not fetch the asset URL" }, { status: 502 })

@@ -45,3 +45,7 @@ next-env.d.ts
 /public/uploads/*
 !/public/uploads/.gitkeep
 _aim2026_import.xlsx
+
+# Single package manager: pnpm only (see packageManager field)
+package-lock.json
+yarn.lock

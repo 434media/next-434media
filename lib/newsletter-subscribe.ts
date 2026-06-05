@@ -1,4 +1,3 @@
-import axios from "axios"
 import crypto from "crypto"
 import { saveEmailSignup } from "@/lib/firestore-email-signups"
 import { normalizeTags } from "@/lib/mailchimp-tags"
@@ -40,6 +39,37 @@ export interface SubscribeEmailResult {
 }
 
 /**
+ * Mailchimp REST call via native fetch (replaces axios). Resolves for ALL HTTP
+ * statuses — only a network error rejects — and returns a normalized
+ * { status, data }, so callers inspect the status themselves (mirroring the old
+ * axios `validateStatus: (s) => s < 500`). Auth is Basic apikey:<key>. The body
+ * is parsed as JSON with a raw-text fallback, so a non-JSON error page (e.g. an
+ * HTML auth failure) is still surfaced for handleMailchimpError to detect.
+ */
+async function mailchimpRequest(
+  method: "POST" | "PATCH",
+  url: string,
+  body: unknown,
+): Promise<{ status: number; data: unknown }> {
+  const res = await fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Basic ${Buffer.from(`apikey:${apiKey}`).toString("base64")}`,
+    },
+    body: JSON.stringify(body),
+  })
+  const text = await res.text()
+  let data: unknown = text
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    /* keep raw text — handleMailchimpError detects HTML auth pages */
+  }
+  return { status: res.status, data }
+}
+
+/**
  * Persist an email signup to Firestore and upsert it into Mailchimp with
  * canonical tags. Mailchimp/Firestore run concurrently; failures are collected
  * as warnings rather than thrown, so a public signup never 500s over a
@@ -55,7 +85,7 @@ export async function subscribeEmail(opts: SubscribeEmailOpts): Promise<Subscrib
   // Mailchimp even if a caller passes something off-taxonomy.
   const { canonical: tags, dropped: droppedTags } = normalizeTags(opts.tags)
   if (droppedTags.length > 0) {
-    console.warn(`[subscribeEmail] dropped non-canonical tags for ${email}:`, droppedTags)
+    console.warn("[subscribeEmail] dropped non-canonical tags:", email, droppedTags)
   }
 
   const warnings: string[] = []
@@ -75,18 +105,14 @@ export async function subscribeEmail(opts: SubscribeEmailOpts): Promise<Subscrib
 
   if (mailchimpEnabled) {
     promises.push(
-      axios.post(
+      mailchimpRequest(
+        "POST",
         `https://${datacenter}.api.mailchimp.com/3.0/lists/${listId}/members`,
         {
           email_address: email,
           status,
           tags,
           ...(opts.mergeFields ? { merge_fields: opts.mergeFields } : {}),
-        },
-        {
-          auth: { username: "apikey", password: apiKey! },
-          headers: { "Content-Type": "application/json" },
-          validateStatus: (s) => s < 500,
         },
       ),
     )
@@ -144,14 +170,16 @@ async function handleMailchimpError(
   if (typeof data === "object" && data && (data as { title?: string }).title === "Member Exists") {
     try {
       const emailHash = crypto.createHash("md5").update(email).digest("hex")
-      await axios.patch(
+      // fetch doesn't throw on 4xx/5xx (axios did by default), so inspect status.
+      const { status } = await mailchimpRequest(
+        "PATCH",
         `https://${datacenter}.api.mailchimp.com/3.0/lists/${listId}/members/${emailHash}`,
         { tags },
-        {
-          auth: { username: "apikey", password: apiKey! },
-          headers: { "Content-Type": "application/json" },
-        },
       )
+      if (status >= 400) {
+        console.error(`[subscribeEmail] Mailchimp PATCH returned ${status} for member:`, email)
+        warnings.push("Mailchimp update failed")
+      }
     } catch (updateError) {
       console.error("[subscribeEmail] Failed to update existing member:", updateError)
       warnings.push("Mailchimp update failed")
