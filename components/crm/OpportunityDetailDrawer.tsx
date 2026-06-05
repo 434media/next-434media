@@ -411,7 +411,9 @@ export function OpportunityDetailDrawer({
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">Opportunity</p>
-            <p className="text-[11px] text-neutral-400">Edit details, contacts, and close-out fields</p>
+            <p className="text-[11px] text-neutral-400">
+              {isEditing ? "Edit details, contacts, and close-out fields" : "Add a new deal to the pipeline"}
+            </p>
           </div>
         </div>
 
@@ -994,7 +996,9 @@ export function OpportunityDetailDrawer({
                 </div>
               </div>
 
-              {/* Web Links Section */}
+              {/* Web Links + Attachments — detail-only (hidden while creating a new deal) */}
+              {isEditing && (
+              <>
               <div className="pt-4 border-t border-neutral-200">
                 <label className="block text-sm font-medium text-neutral-700 mb-3">
                   <Link2 className="w-4 h-4 inline mr-2" />
@@ -1130,6 +1134,8 @@ export function OpportunityDetailDrawer({
                   Supports images, PDF, DOC, XLS, TXT (max 50MB per file)
                 </p>
               </div>
+              </>
+              )}
 
               {/* Notes */}
               <div>
