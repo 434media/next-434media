@@ -64,6 +64,8 @@ interface ClientDetailDrawerProps {
   onDelete?: (id: string) => void | Promise<void>
   /** When set (and isEditing is true), enables the "360 view" tab. */
   clientId?: string | null
+  /** Which tab to open on (e.g. "360" when arriving from an opportunity). Defaults to "edit". */
+  initialTab?: "edit" | "360"
 }
 
 // Generate unique ID for new contacts
@@ -86,6 +88,7 @@ export function ClientDetailDrawer({
   onClose,
   onDelete,
   clientId,
+  initialTab = "edit",
 }: ClientDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<"edit" | "360">("edit")
@@ -102,10 +105,11 @@ export function ClientDetailDrawer({
   // lives in CRM Settings → Team members.
   const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
 
-  // Reset to edit tab whenever the drawer opens for a new client
+  // On open, land on the requested tab (defaults to edit; "360" when arriving
+  // from a linked opportunity). Falls back to edit if the 360 tab isn't available.
   useEffect(() => {
-    if (open) setActiveTab("edit")
-  }, [open, clientId])
+    if (open) setActiveTab(initialTab === "360" && isEditing && !!clientId ? "360" : "edit")
+  }, [open, clientId, initialTab, isEditing])
 
   // Toggle contact expansion
   const toggleContact = (contactId: string) => {

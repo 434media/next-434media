@@ -10,6 +10,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   User,
   Mail,
   Phone,
@@ -62,6 +63,7 @@ interface OpportunityFormData {
   doc: DOC | ""
   web_links: string[]
   docs: string[]
+  client_id?: string | null  // FK to the parent client row (for the Customer 360 jump)
 }
 
 interface OpportunityDetailDrawerProps {
@@ -74,6 +76,8 @@ interface OpportunityDetailDrawerProps {
   onSave: () => void
   onClose: () => void
   onArchive?: () => void  // Archive the opportunity (only shown for closed won/lost when editing)
+  /** Jump to the parent client's Customer 360 (only when the opp is linked). */
+  onViewCustomer360?: (clientId: string) => void
 }
 
 // Generate unique ID for new contacts
@@ -91,6 +95,7 @@ export function OpportunityDetailDrawer({
   onSave,
   onClose,
   onArchive,
+  onViewCustomer360,
 }: OpportunityDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
@@ -125,6 +130,12 @@ export function OpportunityDetailDrawer({
   const filteredCompanies = uniqueCompanies.filter(company =>
     company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
   )
+
+  // The parent client this opportunity is linked to (via the client_id FK) —
+  // powers the "jump to Customer 360" affordance when editing an existing deal.
+  const linkedClient = formData.client_id
+    ? existingClients.find((c) => c.id === formData.client_id) ?? null
+    : null
 
   // Handle adding a new link
   const handleAddLink = () => {
@@ -403,6 +414,26 @@ export function OpportunityDetailDrawer({
             <p className="text-[11px] text-neutral-400">Edit details, contacts, and close-out fields</p>
           </div>
         </div>
+
+        {/* Linked client → jump to the full Customer 360 (only for saved, linked deals) */}
+        {linkedClient && onViewCustomer360 && (
+          <button
+            type="button"
+            onClick={() => onViewCustomer360(linkedClient.id)}
+            className="w-full flex items-center justify-between gap-3 rounded-md border border-neutral-200/70 bg-neutral-50 px-3 py-2.5 text-left hover:bg-neutral-100 transition-colors"
+          >
+            <span className="flex items-center gap-2 min-w-0 text-[13px] text-neutral-600">
+              <Building2 className="w-4 h-4 text-neutral-400 shrink-0" />
+              <span className="truncate">
+                Client: <span className="font-medium text-neutral-900">{linkedClient.company_name || linkedClient.name}</span>
+              </span>
+            </span>
+            <span className="shrink-0 inline-flex items-center gap-0.5 text-[12px] font-medium text-neutral-500">
+              Customer 360
+              <ChevronRight className="w-3.5 h-3.5" />
+            </span>
+          </button>
+        )}
 
         {/* Client Name - Dropdown with search */}
               <div>

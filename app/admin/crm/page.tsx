@@ -171,6 +171,8 @@ export default function SalesCRMPage() {
   // Client form state
   const [showClientForm, setShowClientForm] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
+  // Which tab the client drawer opens on — set to "360" when jumping from an opportunity.
+  const [clientInitialTab, setClientInitialTab] = useState<"edit" | "360">("edit")
   const [clientForm, setClientForm] = useState<ClientFormData>(EMPTY_CLIENT_FORM)
 
   // Opportunity form state
@@ -546,6 +548,7 @@ export default function SalesCRMPage() {
   const closeClientDrawer = () => {
     setShowClientForm(false)
     setEditingClient(null)
+    setClientInitialTab("edit")  // reset so the next normal open lands on Edit
     if (searchParams?.get("open")) {
       const params = new URLSearchParams(searchParams.toString())
       params.delete("open")
@@ -985,6 +988,7 @@ export default function SalesCRMPage() {
         onClose={() => closeClientDrawer()}
         onDelete={handleDeleteClient}
         clientId={editingClient?.id ?? null}
+        initialTab={clientInitialTab}
       />
 
       {/* Opportunity Detail Drawer */}
@@ -998,6 +1002,13 @@ export default function SalesCRMPage() {
         onSave={handleSaveOpportunity}
         onClose={closeOpportunityDrawer}
         onArchive={opportunityForm.existing_company_id ? () => handleArchiveOpportunity(opportunityForm.existing_company_id!) : undefined}
+        onViewCustomer360={(clientId) => {
+          const client = clients.find((c) => c.id === clientId)
+          if (!client) return
+          closeOpportunityDrawer()
+          setClientInitialTab("360")
+          handleEditClient(client)
+        }}
       />
 
       {/* Task Detail Drawer */}

@@ -57,6 +57,7 @@ export interface OpportunityFormData {
   doc: DOC | ""
   web_links: string[]
   docs: string[]
+  client_id?: string | null  // FK to the parent client row (for the Customer 360 jump)
 }
 
 export const EMPTY_CLIENT_FORM: ClientFormData = {
@@ -594,6 +595,7 @@ export function useClientHandlers({
       doc: client.doc || "",
       web_links: client.web_links || [],
       docs: client.docs || [],
+      client_id: client.client_id || null,
     })
     setIsEditingOpportunity(true)
     setShowOpportunityForm(true)
