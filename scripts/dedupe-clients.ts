@@ -28,7 +28,14 @@
 import { getDb } from "../lib/firebase-admin"
 
 const APPLY = process.argv.includes("--apply")
+// --strict also collapses internal whitespace and strips punctuation, so
+// "Accenture Federal   Services" / "Accenture Federal Services" and
+// "Supergoop" / "Supergoop!" group together (near-duplicates the plain
+// trim+lowercase pass misses). Contact dedup still uses the loose key.
+const STRICT = process.argv.includes("--strict")
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase()
+const strictNorm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+const groupKeyOf = (s: unknown) => (STRICT ? strictNorm(s) : norm(s))
 
 type Row = { id: string; ref: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }
 type Contact = Record<string, unknown>
@@ -104,9 +111,9 @@ async function main() {
   // Group client rows by company + department
   const groups = new Map<string, Row[]>()
   for (const c of clients) {
-    const co = norm(c.data.company_name || c.data.name)
+    const co = groupKeyOf(c.data.company_name || c.data.name)
     if (!co) continue
-    const key = `${co}|${norm(c.data.department)}`
+    const key = `${co}|${groupKeyOf(c.data.department)}`
     const arr = groups.get(key) ?? []
     arr.push(c)
     groups.set(key, arr)
