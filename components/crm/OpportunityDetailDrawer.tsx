@@ -1,25 +1,21 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { 
-  X, 
-  Loader2, 
-  CheckCircle2, 
-  Plus, 
-  Trash2, 
-  ChevronDown, 
+import {
+  X,
+  Loader2,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  ChevronDown,
   ChevronUp,
   User,
   Mail,
   Phone,
   DollarSign,
   Calendar,
-  UserPlus,
-  UserMinus,
   Check,
-  Pencil,
-  Settings,
   Building2,
   Target,
   Link2,
@@ -28,9 +24,10 @@ import {
   ExternalLink,
   Archive
 } from "lucide-react"
-import { TEAM_MEMBERS, BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
-import type { Brand, TeamMember, Disposition, DOC, Client } from "./types"
+import { BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
+import type { Brand, Disposition, DOC, Client } from "./types"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 interface ContactFormData {
   id: string
@@ -104,22 +101,10 @@ export function OpportunityDetailDrawer({
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   
-  // State for team member management
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
-  const [showAddMember, setShowAddMember] = useState(false)
-  const [showManageMembers, setShowManageMembers] = useState(false)
-  const [newMemberName, setNewMemberName] = useState("")
-  const [newMemberEmail, setNewMemberEmail] = useState("")
-  const [isAddingMember, setIsAddingMember] = useState(false)
-  const [memberError, setMemberError] = useState("")
+  // Assignable roster (read-only) — shared with the other drawers. Management
+  // lives in CRM Settings → Team members.
+  const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
-  
-  // State for editing existing team members
-  const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
-  const [editMemberName, setEditMemberName] = useState("")
-  const [editMemberEmail, setEditMemberEmail] = useState("")
-  const [isSavingMember, setIsSavingMember] = useState(false)
 
   // Get unique company names from existing clients
   // Use case-insensitive comparison to prevent duplicates like "HEB" and "HEB "
@@ -246,191 +231,6 @@ export function OpportunityDetailDrawer({
     setIsUploadingFile(false)
     // Reset the input
     e.target.value = ""
-  }
-
-  // Fetch team members from Firestore
-  const fetchTeamMembers = useCallback(async () => {
-    setIsLoadingMembers(true)
-    try {
-      const response = await fetch("/api/admin/team-members")
-      const data = await response.json()
-      
-      // Get Firestore members (active only)
-      const firestoreMembers: TeamMember[] = data.success && data.data 
-        ? data.data.filter((m: TeamMember) => m.isActive)
-        : []
-      
-      // Create default team members for merging
-      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }))
-      
-      // Merge: use Firestore members + add any default members not already in Firestore
-      // This ensures the full list is always shown, including both Firestore and default members
-      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
-      const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
-      
-      const missingDefaults = defaultMembers.filter(d => 
-        !firestoreNames.has(d.name.toLowerCase()) && 
-        (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
-      )
-      
-      // Combine Firestore members with any missing defaults
-      const allMembers = [...firestoreMembers, ...missingDefaults]
-      
-      // Sort by name for consistent ordering
-      allMembers.sort((a, b) => a.name.localeCompare(b.name))
-      
-      setTeamMembers(allMembers)
-    } catch {
-      // Fallback to default TEAM_MEMBERS on error
-      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })))
-    } finally {
-      setIsLoadingMembers(false)
-    }
-  }, [])
-
-  // Fetch team members when drawer opens
-  useEffect(() => {
-    if (open) {
-      fetchTeamMembers()
-    }
-  }, [open, fetchTeamMembers])
-
-  // Add new team member
-  const handleAddMember = async () => {
-    if (!newMemberName.trim()) {
-      setMemberError("Name is required")
-      return
-    }
-    
-    setIsAddingMember(true)
-    setMemberError("")
-    
-    try {
-      const response = await fetch("/api/admin/team-members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newMemberName.trim(),
-          email: newMemberEmail.trim(),
-        }),
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        setTeamMembers(prev => [...prev, data.data])
-        onFormChange({ ...formData, assigned_to: data.data.name })
-        setNewMemberName("")
-        setNewMemberEmail("")
-        setShowAddMember(false)
-      } else {
-        setMemberError(data.error || "Failed to add member")
-      }
-    } catch {
-      setMemberError("Failed to add member")
-    } finally {
-      setIsAddingMember(false)
-    }
-  }
-
-  // Delete team member
-  const handleDeleteMember = async (member: TeamMember) => {
-    if (!confirm(`Remove ${member.name} from the team? This will hide them from future assignments.`)) {
-      return
-    }
-    
-    try {
-      const response = await fetch(`/api/admin/team-members?id=${member.id}`, {
-        method: "DELETE",
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        setTeamMembers(prev => prev.filter(m => m.id !== member.id))
-        if (formData.assigned_to === member.name) {
-          onFormChange({ ...formData, assigned_to: "" })
-        }
-      }
-    } catch (error) {
-      console.error("Failed to delete member:", error)
-    }
-  }
-
-  // Start editing a team member
-  const handleStartEdit = (member: TeamMember) => {
-    setEditingMemberId(member.id)
-    setEditMemberName(member.name)
-    setEditMemberEmail(member.email)
-    setMemberError("")
-  }
-
-  // Cancel editing
-  const handleCancelEdit = () => {
-    setEditingMemberId(null)
-    setEditMemberName("")
-    setEditMemberEmail("")
-    setMemberError("")
-  }
-
-  // Save edited team member
-  const handleSaveMember = async (memberId: string) => {
-    if (!editMemberName.trim()) {
-      setMemberError("Name is required")
-      return
-    }
-
-    setIsSavingMember(true)
-    setMemberError("")
-
-    try {
-      const response = await fetch("/api/admin/team-members", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: memberId,
-          name: editMemberName.trim(),
-          email: editMemberEmail.trim(),
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        const oldMember = teamMembers.find(m => m.id === memberId)
-        setTeamMembers(prev =>
-          prev.map(m =>
-            m.id === memberId
-              ? { ...m, name: editMemberName.trim(), email: editMemberEmail.trim() }
-              : m
-          )
-        )
-        if (oldMember && formData.assigned_to === oldMember.name) {
-          onFormChange({ ...formData, assigned_to: editMemberName.trim() })
-        }
-        handleCancelEdit()
-      } else {
-        setMemberError(data.error || "Failed to update member")
-      }
-    } catch {
-      setMemberError("Failed to update member")
-    } finally {
-      setIsSavingMember(false)
-    }
   }
 
   // Toggle contact expansion
@@ -788,7 +588,7 @@ export function OpportunityDetailDrawer({
                                   </span>
                                   {contact.is_primary && (
                                     <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-100 text-neutral-700">
-                                      <span className="inline-block h-1 w-1 rounded-full bg-blue-500" aria-hidden="true" />
+                                      <span className="inline-block h-1 w-1 rounded-full bg-neutral-900" aria-hidden="true" />
                                       Primary
                                     </span>
                                   )}
@@ -1092,69 +892,26 @@ export function OpportunityDetailDrawer({
                           ) : (
                             <>
                               {teamMembers.map((member) => (
-                                <div
+                                <button
                                   key={member.id}
-                                  className="flex items-center justify-between hover:bg-neutral-50 group"
+                                  type="button"
+                                  onClick={() => {
+                                    onFormChange({ ...formData, assigned_to: member.name })
+                                    setShowAssigneeDropdown(false)
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      onFormChange({ ...formData, assigned_to: member.name })
-                                      setShowAssigneeDropdown(false)
-                                    }}
-                                    className="flex-1 px-3 py-2 text-left text-sm flex items-center justify-between"
-                                  >
-                                    <div>
-                                      <span className="text-neutral-900">{member.name}</span>
-                                      {member.email && (
-                                        <span className="text-neutral-400 text-xs ml-2">{member.email}</span>
-                                      )}
-                                    </div>
-                                    {formData.assigned_to === member.name && <Check className="w-4 h-4 text-neutral-900" />}
-                                  </button>
-                                  {!member.id.startsWith("default-") && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleDeleteMember(member)
-                                      }}
-                                      className="px-2 py-2 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-opacity"
-                                      title={`Remove ${member.name}`}
-                                    >
-                                      <UserMinus className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
+                                  <div>
+                                    <span className="text-neutral-900">{member.name}</span>
+                                    {member.email && (
+                                      <span className="text-neutral-400 text-xs ml-2">{member.email}</span>
+                                    )}
+                                  </div>
+                                  {formData.assigned_to === member.name && <Check className="w-4 h-4 text-neutral-900" />}
+                                </button>
                               ))}
                             </>
                           )}
-                          
-                          <div className="border-t border-neutral-100" />
-                          
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowAddMember(true)
-                              setShowAssigneeDropdown(false)
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-neutral-900 hover:bg-neutral-50 flex items-center gap-2"
-                          >
-                            <UserPlus className="w-4 h-4" />
-                            Add new team member
-                          </button>
-                          
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowManageMembers(true)
-                              setShowAssigneeDropdown(false)
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50 flex items-center gap-2"
-                          >
-                            <Settings className="w-4 h-4" />
-                            Manage team members
-                          </button>
                         </div>
                       </motion.div>
                     )}
@@ -1206,222 +963,6 @@ export function OpportunityDetailDrawer({
                 </div>
               </div>
 
-              {/* Add new member form */}
-              <AnimatePresence>
-                {showAddMember && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="p-3 bg-neutral-50 border border-neutral-200/70 rounded-md"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-neutral-900">Add team member</h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAddMember(false)
-                          setNewMemberName("")
-                          setNewMemberEmail("")
-                          setMemberError("")
-                        }}
-                        aria-label="Close add team member"
-                        className="grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 -mr-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={newMemberName}
-                        onChange={(e) => setNewMemberName(e.target.value)}
-                        placeholder="Full name (required)"
-                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
-                      />
-                      <input
-                        type="email"
-                        value={newMemberEmail}
-                        onChange={(e) => setNewMemberEmail(e.target.value)}
-                        placeholder="Email (optional)"
-                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
-                      />
-                      {memberError && (
-                        <p className="text-xs text-red-600">{memberError}</p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleAddMember}
-                        disabled={isAddingMember || !newMemberName.trim()}
-                        className="w-full px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {isAddingMember ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Adding...
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="w-4 h-4" />
-                            Add Team Member
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Team Management Panel */}
-              <AnimatePresence>
-                {showManageMembers && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-neutral-900 flex items-center gap-2">
-                        <Settings className="w-4 h-4" />
-                        Manage Team Members
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowManageMembers(false)
-                          handleCancelEdit()
-                        }}
-                        className="text-neutral-400 hover:text-neutral-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    
-                    {memberError && showManageMembers && (
-                      <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
-                        {memberError}
-                      </div>
-                    )}
-                    
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {isLoadingMembers ? (
-                        <div className="py-4 text-center">
-                          <Loader2 className="w-5 h-5 animate-spin mx-auto text-neutral-400" />
-                          <p className="text-xs text-neutral-500 mt-2">Loading team members...</p>
-                        </div>
-                      ) : teamMembers.length === 0 ? (
-                        <p className="text-sm text-neutral-500 text-center py-4">
-                          No team members yet. Add one using the dropdown above.
-                        </p>
-                      ) : (
-                        teamMembers.map((member) => (
-                          <div
-                            key={member.id}
-                            className="p-3 bg-white border border-neutral-200 rounded-lg"
-                          >
-                            {editingMemberId === member.id ? (
-                              <div className="space-y-2">
-                                <input
-                                  type="text"
-                                  value={editMemberName}
-                                  onChange={(e) => setEditMemberName(e.target.value)}
-                                  placeholder="Full name"
-                                  className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-300 text-sm text-neutral-900 focus:outline-none focus:border-blue-500"
-                                />
-                                <input
-                                  type="email"
-                                  value={editMemberEmail}
-                                  onChange={(e) => setEditMemberEmail(e.target.value)}
-                                  placeholder="Email address"
-                                  className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-300 text-sm text-neutral-900 focus:outline-none focus:border-blue-500"
-                                />
-                                <div className="flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSaveMember(member.id)}
-                                    disabled={isSavingMember || !editMemberName.trim()}
-                                    className="flex-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
-                                  >
-                                    {isSavingMember ? (
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                      <Check className="w-3 h-3" />
-                                    )}
-                                    Save
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={handleCancelEdit}
-                                    className="px-3 py-1.5 bg-neutral-200 text-neutral-700 text-xs font-medium rounded-lg hover:bg-neutral-300"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-neutral-900 truncate">
-                                    {member.name}
-                                  </p>
-                                  {member.email && (
-                                    <p className="text-xs text-neutral-500 truncate">
-                                      {member.email}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1 ml-2">
-                                  {!member.id.startsWith("default-") && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleStartEdit(member)}
-                                        aria-label={`Edit ${member.name}`}
-                                        className="grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
-                                        title="Edit member"
-                                      >
-                                        <Pencil className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteMember(member)}
-                                        aria-label={`Remove ${member.name}`}
-                                        className="grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                        title="Remove member"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                  {member.id.startsWith("default-") && (
-                                    <span className="text-xs text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded">
-                                      Default
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowManageMembers(false)
-                        setShowAddMember(true)
-                      }}
-                      className="w-full mt-3 px-3 py-2 border border-dashed border-neutral-300 text-neutral-500 text-sm rounded-lg hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      Add new team member
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {/* Web Links Section */}
               <div className="pt-4 border-t border-neutral-200">
                 <label className="block text-sm font-medium text-neutral-700 mb-3">
@@ -1436,7 +977,7 @@ export function OpportunityDetailDrawer({
                         href={link} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-700 truncate flex-1"
+                        className="text-sm text-neutral-900 hover:text-neutral-700 truncate flex-1"
                       >
                         {link}
                       </a>
@@ -1456,7 +997,7 @@ export function OpportunityDetailDrawer({
                       onChange={(e) => setNewLink(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddLink())}
                       placeholder="Add a link (https://...)"
-                      className="flex-1 px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                      className="flex-1 px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:bg-white"
                     />
                     <button
                       type="button"
@@ -1482,12 +1023,12 @@ export function OpportunityDetailDrawer({
                   <div className="space-y-2 mb-3">
                     {formData.docs.map((doc, index) => (
                       <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
-                        <FileText className={`w-4 h-4 flex-shrink-0 ${doc.startsWith("/uploads/") ? "text-emerald-600" : "text-blue-600"}`} />
+                        <FileText className={`w-4 h-4 flex-shrink-0 ${doc.startsWith("/uploads/") ? "text-emerald-600" : "text-neutral-900"}`} />
                         <a 
                           href={doc} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-700 truncate flex-1"
+                          className="text-sm text-neutral-900 hover:text-neutral-700 truncate flex-1"
                         >
                           {doc.startsWith("/uploads/") 
                             ? (doc.split("/").pop()?.split("-").slice(1).join("-") || doc)
