@@ -82,7 +82,7 @@ function KPICard({
   }
 
   return (
-    <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70 transition-shadow hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]">
+    <div className="p-4 md:p-5 rounded-lg bg-white border border-neutral-200/70 transition-shadow hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]">
       <div className="flex items-start justify-between mb-3">
         <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
           <Icon className="w-4 h-4" />
@@ -130,7 +130,7 @@ function OpportunityProgressChart({
   const lostPercent = totalOpportunities > 0 ? (lostCount / totalOpportunities) * 100 : 0
 
   return (
-    <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70 col-span-2 lg:col-span-1">
+    <div className="p-4 md:p-5 rounded-lg bg-white border border-neutral-200/70 col-span-2 lg:col-span-1">
       <div className="flex items-center gap-2 mb-3">
         <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
           <Target className="w-4 h-4" />
@@ -255,7 +255,7 @@ function PipelineConfidence({
   }
 
   return (
-    <div className="p-4 md:p-5 rounded-lg bg-white ring-1 ring-neutral-200/70">
+    <div className="p-4 md:p-5 rounded-lg bg-white border border-neutral-200/70">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
@@ -399,7 +399,7 @@ function ActiveOpportunitiesList({
   })
 
   return (
-    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden">
+    <div className="bg-white rounded-lg border border-neutral-200/70 overflow-hidden">
       <div className="p-4 border-b border-neutral-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -612,7 +612,7 @@ function TaskSummaryCard({
   )
 
   return (
-    <div className="bg-white rounded-lg ring-1 ring-neutral-200/70 overflow-hidden">
+    <div className="bg-white rounded-lg border border-neutral-200/70 overflow-hidden">
       <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-neutral-500" />
@@ -800,7 +800,7 @@ export function DashboardView({
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <KPICard label="Budget" value={formatCurrency(totalBudget, true)} subLabel="Annual sales goal" icon={RocketIcon} color="neutral" />
         <KPICard label="Remaining" value={formatCurrency(remaining, true)} subLabel="Budget - Won (100% DOC)" icon={Target} color="amber" />
-        <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won 100% + Pitched 90%" icon={TrendingUp} color="blue" />
+        <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won 100% + Pitched 90%" icon={TrendingUp} color="sky" />
         <KPICard label="Total Pitched" value={formatCurrency(totalPitched, true)} subLabel="All opportunities" icon={BarChart3} color="sky" />
 
         {/* Opportunity Flow Chart */}
