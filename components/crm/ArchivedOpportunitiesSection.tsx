@@ -16,7 +16,8 @@ import {
   XCircle
 } from "lucide-react"
 import { formatCurrency, formatDate, BRAND_GOALS, TEAM_MEMBERS } from "./types"
-import type { Client, Brand, Disposition } from "./types"
+import { Dropdown } from "./Dropdown"
+import type { Client } from "./types"
 
 interface ArchivedOpportunitiesSectionProps {
   archivedOpportunities: Client[]
@@ -103,7 +104,7 @@ export function ArchivedOpportunitiesSection({
   }
 
   return (
-    <div className="mt-8 bg-white rounded-md ring-1 ring-neutral-200/70 overflow-hidden">
+    <div className="mt-8 bg-white rounded-md border border-neutral-200/70 overflow-hidden">
       {/* Header - Always visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -162,56 +163,35 @@ export function ArchivedOpportunitiesSection({
                     <span>Filters</span>
                   </div>
 
-                  {/* Year Filter */}
-                  <select
+                  {/* Filters — shared Dropdown (matches the app idiom) */}
+                  <Dropdown
+                    ariaLabel="Filter by year"
                     value={yearFilter}
-                    onChange={(e) => setYearFilter(e.target.value)}
-                    className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400"
-                    aria-label="Filter by year"
-                  >
-                    <option value="all">All years</option>
-                    {uniqueYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-
-                  {/* Brand Filter */}
-                  <select
+                    onChange={setYearFilter}
+                    options={[{ value: "all", label: "All years" }, ...uniqueYears.map((y) => ({ value: y, label: y }))]}
+                  />
+                  <Dropdown
+                    ariaLabel="Filter by brand"
                     value={brandFilter}
-                    onChange={(e) => setBrandFilter(e.target.value)}
-                    className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400"
-                    aria-label="Filter by brand"
-                  >
-                    <option value="all">All brands</option>
-                    {BRAND_GOALS.map(goal => (
-                      <option key={goal.brand} value={goal.brand}>{goal.brand}</option>
-                    ))}
-                  </select>
-
-                  {/* Outcome Filter */}
-                  <select
+                    onChange={setBrandFilter}
+                    options={[{ value: "all", label: "All brands" }, ...BRAND_GOALS.map((g) => ({ value: g.brand, label: g.brand }))]}
+                  />
+                  <Dropdown
+                    ariaLabel="Filter by outcome"
                     value={outcomeFilter}
-                    onChange={(e) => setOutcomeFilter(e.target.value)}
-                    className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400"
-                    aria-label="Filter by outcome"
-                  >
-                    <option value="all">All outcomes</option>
-                    <option value="closed_won">Won</option>
-                    <option value="closed_lost">Lost</option>
-                  </select>
-
-                  {/* Assignee Filter */}
-                  <select
+                    onChange={setOutcomeFilter}
+                    options={[
+                      { value: "all", label: "All outcomes" },
+                      { value: "closed_won", label: "Won" },
+                      { value: "closed_lost", label: "Lost" },
+                    ]}
+                  />
+                  <Dropdown
+                    ariaLabel="Filter by assignee"
                     value={assigneeFilter}
-                    onChange={(e) => setAssigneeFilter(e.target.value)}
-                    className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400"
-                    aria-label="Filter by assignee"
-                  >
-                    <option value="all">All assignees</option>
-                    {allTeamMembers.map(assignee => (
-                      <option key={assignee} value={assignee}>{assignee}</option>
-                    ))}
-                  </select>
+                    onChange={setAssigneeFilter}
+                    options={[{ value: "all", label: "All assignees" }, ...allTeamMembers.map((a) => ({ value: a, label: a }))]}
+                  />
 
                   {/* Results count */}
                   <span className="text-xs tabular-nums text-neutral-500 ml-auto">
@@ -313,7 +293,7 @@ export function ArchivedOpportunitiesSection({
                             onRestoreOpportunity(opportunity.id)
                           }}
                           aria-label={`Restore ${opportunity.title || opportunity.company_name || opportunity.name} to active kanban`}
-                          className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-100 rounded-md transition-colors shrink-0"
+                          className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-medium text-neutral-700 border border-neutral-200/70 hover:border-neutral-300 hover:bg-neutral-100 rounded-md transition-colors shrink-0"
                           title="Restore to active kanban"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
