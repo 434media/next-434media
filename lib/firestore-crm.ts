@@ -806,7 +806,7 @@ export async function getAllTasks(): Promise<Task[]> {
         if (productionName.includes("434")) brand = "434 Media"
         else if (productionName.includes("TXMX") || productionName.includes("Boxing")) brand = "TXMX Boxing"
         else if (productionName.includes("Vemos") || productionName.includes("Vamos")) brand = "Vemos Vamos"
-        else if (productionName.includes("DEVSA")) brand = "DEVSA TV"
+        else if (productionName.includes("DEVSA")) brand = "DEVSA"
         else if (productionName.includes("Digital Canvas")) brand = "Digital Canvas"
       }
       // Fallback to team array

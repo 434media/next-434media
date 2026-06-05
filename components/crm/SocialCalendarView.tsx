@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "motion/react"
 import {
@@ -20,9 +20,10 @@ import {
   Check,
   Trash2,
 } from "lucide-react"
-import type { ContentPost, SocialPlatform, ContentPostStatus, TeamMember } from "./types"
-import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS, TEAM_MEMBERS } from "./types"
+import type { ContentPost, SocialPlatform, ContentPostStatus } from "./types"
+import { SOCIAL_PLATFORM_OPTIONS, CONTENT_POST_STATUS_OPTIONS, BRANDS } from "./types"
 import { HowItWorks } from "@/components/admin/HowItWorks"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { LegendPopover } from "@/components/admin/LegendPopover"
 
 interface SocialCalendarViewProps {
@@ -278,7 +279,8 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set())
   // Social-platform slicer (post.social_platforms: IG / TikTok / …).
   const [selectedSocials, setSelectedSocials] = useState<Set<string>>(new Set())
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  // Shared roster (active Firestore members) for the User slicer — no seed names.
+  const { members: teamMembers } = useTeamMembers()
   // Filters popover holds the User + Platform slicers. Status isn't a filter
   // here — it's the Board's columns (and the Calendar shows dated posts only).
   const [showFilters, setShowFilters] = useState(false)
@@ -311,23 +313,6 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
     return () => clearTimeout(t)
   }, [highlightColumn])
 
-  const fetchTeamMembers = useCallback(async () => {
-    try {
-      const response = await fetch("/api/admin/team-members")
-      const data = await response.json()
-      const firestoreMembers: TeamMember[] = data.success && data.data ? data.data.filter((m: TeamMember) => m.isActive) : []
-      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({ id: `default-${i}`, name: m.name, email: m.email, isActive: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }))
-      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
-      const missingDefaults = defaultMembers.filter(d => !firestoreNames.has(d.name.toLowerCase()))
-      const allMembers = [...firestoreMembers, ...missingDefaults]
-      allMembers.sort((a, b) => a.name.localeCompare(b.name))
-      setTeamMembers(allMembers)
-    } catch {
-      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({ id: `default-${i}`, name: m.name, email: m.email, isActive: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() })))
-    }
-  }, [])
-
-  useEffect(() => { fetchTeamMembers() }, [fetchTeamMembers])
 
   // Close the Filters popover on outside-click / Escape.
   useEffect(() => {

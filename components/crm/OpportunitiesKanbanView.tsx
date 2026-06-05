@@ -12,25 +12,26 @@ import {
   Layers,
   Filter
 } from "lucide-react"
-import { 
-  formatCurrency, 
-  formatDate, 
-  BRAND_GOALS, 
+import {
+  formatCurrency,
+  formatDate,
   DISPOSITION_OPTIONS,
   DOC_OPTIONS,
   normalizeAssigneeName,
-  isValidAssigneeName,
-  TEAM_MEMBERS
+  isValidAssigneeName
 } from "./types"
 import { ArchivedOpportunitiesSection } from "./ArchivedOpportunitiesSection"
 import { Dropdown } from "./Dropdown"
 import { HowItWorks } from "@/components/admin/HowItWorks"
+import { useBrandGoals } from "@/hooks/useBrandGoals"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import type {
-  Client, 
-  Task, 
-  Disposition, 
-  DOC, 
-  Brand 
+  Client,
+  Task,
+  Disposition,
+  DOC,
+  Brand,
+  BrandGoal
 } from "./types"
 
 // Type for kanban items (can be client or task)
@@ -76,7 +77,7 @@ interface OpportunitiesKanbanViewProps {
 }
 
 // Helper to check if a brand matches a goal (supports combined brands like 434 Media + Digital Canvas)
-function matchesBrandGoal(itemBrand: Brand | undefined, goal: typeof BRAND_GOALS[0]): boolean {
+function matchesBrandGoal(itemBrand: Brand | undefined, goal: BrandGoal): boolean {
   if (!itemBrand) return false
   // If goal has includedBrands, check if item's brand is in that array
   if (goal.includedBrands && goal.includedBrands.length > 0) {
@@ -98,6 +99,7 @@ function PlatformGoalsSummary({
   isExpanded: boolean
   onToggle: () => void
 }) {
+  const { goals: brandGoals } = useBrandGoals()
   return (
     <div className="bg-white rounded-lg border border-neutral-200/70 overflow-hidden mb-6">
       <button
@@ -115,7 +117,7 @@ function PlatformGoalsSummary({
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex items-center gap-5">
-            {BRAND_GOALS.map((goal) => {
+            {brandGoals.map((goal) => {
               const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
               const wonRevenue = brandClients
                 .filter(c => c.disposition === "closed_won")
@@ -154,7 +156,7 @@ function PlatformGoalsSummary({
             className="overflow-hidden border-t border-neutral-100"
           >
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {BRAND_GOALS.map((goal) => {
+              {brandGoals.map((goal) => {
                 const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
                 const brandTasks = tasks.filter(t => matchesBrandGoal(t.brand, goal) && t.is_opportunity)
                 const totalItems = brandClients.length + brandTasks.length
@@ -589,6 +591,8 @@ export function OpportunitiesKanbanView({
 }: OpportunitiesKanbanViewProps) {
   const [showGoals, setShowGoals] = useState(false)
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: "client" | "task" } | null>(null)
+  // Live roster (active Firestore members) for the assignee filter — no seed names.
+  const { members: teamMembers } = useTeamMembers()
 
   // Filter only opportunity items - separate active from archived
   const allOpportunityClients = clients.filter(c => c.is_opportunity)
@@ -610,9 +614,9 @@ export function OpportunitiesKanbanView({
     )
   ).sort()
 
-  // Also include team members who may not have any opportunities yet
+  // Also include active team members who may not have any opportunities yet
   const allAssignees = Array.from(
-    new Set([...uniqueAssignees, ...TEAM_MEMBERS.map(m => m.name)])
+    new Set([...uniqueAssignees, ...teamMembers.map(m => m.name)])
   ).sort()
 
   // Filter opportunities by assignee (compare normalized names)

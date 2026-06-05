@@ -4,19 +4,19 @@ import { useEffect, useState } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { ShieldCheck, Users, Target } from "lucide-react"
 import { TeamMembersTab } from "./TeamMembersTab"
-import { GoalsTab } from "./GoalsTab"
+import { BrandGoalsTab } from "./BrandGoalsTab"
 import type { CurrentUser } from "../types"
 
 interface SettingsShellProps {
   currentUser: CurrentUser
 }
 
-type TabKey = "team" | "goals"
-const VALID_TABS = new Set<TabKey>(["team", "goals"])
+type TabKey = "team" | "brand-goals"
+const VALID_TABS = new Set<TabKey>(["team", "brand-goals"])
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { key: "team", label: "Team members", icon: Users },
-  { key: "goals", label: "Goals", icon: Target },
+  { key: "brand-goals", label: "Brand goals", icon: Target },
 ]
 
 export function SettingsShell({ currentUser }: SettingsShellProps) {
@@ -46,18 +46,24 @@ export function SettingsShell({ currentUser }: SettingsShellProps) {
   return (
     <div className="min-h-full bg-neutral-50 text-neutral-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
-        <header className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <ShieldCheck className="w-5 h-5 text-amber-600" />
-            <h1 className="text-xl font-bold tracking-tight text-neutral-900">CRM Settings</h1>
-            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wider">
-              Super Admin
-            </span>
+        <header className="mb-6 flex items-start gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-amber-600 shrink-0">
+            <ShieldCheck className="w-4 h-4" />
           </div>
-          <p className="text-[13px] text-neutral-500 leading-relaxed max-w-2xl">
-            Configuration that used to require a developer. Changes here are visible immediately to
-            everyone on the CRM.
-          </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-semibold leading-tight tracking-tight text-neutral-900">
+                CRM Settings
+              </h1>
+              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wider">
+                Super Admin
+              </span>
+            </div>
+            <p className="mt-1 text-[13px] text-neutral-500 leading-relaxed max-w-2xl">
+              Configuration that used to require a developer. Changes here are visible immediately to
+              everyone on the CRM.
+            </p>
+          </div>
         </header>
 
         {/* Tab nav */}
@@ -83,7 +89,7 @@ export function SettingsShell({ currentUser }: SettingsShellProps) {
         </div>
 
         {activeTab === "team" && <TeamMembersTab currentUser={currentUser} />}
-        {activeTab === "goals" && <GoalsTab />}
+        {activeTab === "brand-goals" && <BrandGoalsTab />}
       </div>
     </div>
   )

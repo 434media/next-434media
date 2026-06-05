@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { 
   X, 
   Loader2, 
@@ -20,13 +20,13 @@ import {
   XCircle,
   Images,
 } from "lucide-react"
-import { 
-  BRANDS, 
-  TEAM_MEMBERS,
+import {
+  BRANDS,
   SOCIAL_PLATFORM_OPTIONS,
   CONTENT_POST_STATUS_OPTIONS,
 } from "./types"
-import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TeamMember, TaskComment, CurrentUser, Asset, StoredAsset } from "./types"
+import type { ContentPost, ContentPostStatus, Brand, SocialPlatform, TaskComment, CurrentUser, Asset, StoredAsset } from "./types"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { GeneratePanel } from "./GeneratePanel"
 import { AssetLibraryPicker } from "./AssetLibraryPicker"
@@ -111,8 +111,8 @@ export function ContentDetailDrawer({
 }: ContentDetailDrawerProps) {
   const [formData, setFormData] = useState(getDefaultFormData())
   const [isUploadingFile, setIsUploadingFile] = useState(false)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false)
+  // Shared roster (active Firestore members), fetched when the drawer opens.
+  const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [newLink, setNewLink] = useState("")
   const [newComment, setNewComment] = useState("")
@@ -179,63 +179,6 @@ export function ContentDetailDrawer({
       setIngestError(null)
     }
   }, [open, post])
-
-  const fetchTeamMembers = useCallback(async () => {
-    setIsLoadingMembers(true)
-    try {
-      const response = await fetch("/api/admin/team-members")
-      const data = await response.json()
-      
-      const firestoreMembers: TeamMember[] = data.success && data.data 
-        ? data.data.filter((m: TeamMember) => m.isActive)
-        : []
-      
-      const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }))
-      
-      const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
-      const missingDefaults = defaultMembers.filter(d => 
-        !firestoreNames.has(d.name.toLowerCase())
-      )
-      
-      // Exclude certain names from tag options (check both full name AND first name)
-      const EXCLUDED_FIRST_NAMES = ["elon", "elton", "testing", "guna", "barbara", "nichole", "barb", "test"]
-      
-      const allMembers = [...firestoreMembers, ...missingDefaults]
-        .filter(m => {
-          const nameLower = m.name.toLowerCase()
-          const firstNameLower = m.name.split(' ')[0].toLowerCase()
-          // Exclude if first name matches any excluded name
-          return !EXCLUDED_FIRST_NAMES.includes(firstNameLower) && !EXCLUDED_FIRST_NAMES.includes(nameLower)
-        })
-      allMembers.sort((a, b) => a.name.localeCompare(b.name))
-      
-      setTeamMembers(allMembers)
-    } catch {
-      setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-        id: `default-${i}`,
-        name: m.name,
-        email: m.email,
-        isActive: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })))
-    } finally {
-      setIsLoadingMembers(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (open) {
-      fetchTeamMembers()
-    }
-  }, [open, fetchTeamMembers])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

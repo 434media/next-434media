@@ -18,7 +18,6 @@ import {
 import {
   formatCurrency,
   formatDate,
-  BRAND_GOALS,
   DISPOSITION_OPTIONS,
 } from "./types"
 import type {
@@ -29,8 +28,10 @@ import type {
   Task,
   Disposition,
   Brand,
+  BrandGoal,
   CurrentUser,
 } from "./types"
+import { useBrandGoals } from "@/hooks/useBrandGoals"
 
 interface DashboardViewProps {
   stats: DashboardStats
@@ -46,7 +47,7 @@ interface DashboardViewProps {
 }
 
 // Helper to match brand goals (including combined 434 Media / Digital Canvas)
-function matchesBrandGoal(itemBrand: Brand | undefined, goal: typeof BRAND_GOALS[0]): boolean {
+function matchesBrandGoal(itemBrand: Brand | undefined, goal: BrandGoal): boolean {
   if (!itemBrand) return false
   if (goal.includedBrands && goal.includedBrands.length > 0) {
     return goal.includedBrands.includes(itemBrand)
@@ -489,6 +490,7 @@ function ActiveOpportunitiesList({
 
 // Platform Goals Progress (uses opportunity clients only for budget tracking)
 function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
+  const { goals: brandGoals } = useBrandGoals()
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
@@ -500,7 +502,7 @@ function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
       </div>
 
       <div className="p-4 space-y-4">
-        {BRAND_GOALS.map((goal) => {
+        {brandGoals.map((goal) => {
           const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
           const wonRevenue = brandClients
             .filter(c => c.disposition === "closed_won")

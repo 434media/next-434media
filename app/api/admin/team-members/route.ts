@@ -221,15 +221,18 @@ export async function DELETE(request: Request) {
     const memberEmail = (doc.data()?.email as string | undefined)?.toLowerCase()
     if (memberEmail && memberEmail === authResult.session.email.toLowerCase()) {
       return NextResponse.json(
-        { success: false, error: "You cannot deactivate your own account" },
+        { success: false, error: "You cannot delete your own account" },
         { status: 400 },
       )
     }
 
-    await db.collection(TEAM_MEMBERS_COLLECTION).doc(id).update({
-      isActive: false,
-      updated_at: new Date().toISOString(),
-    })
+    // Hard delete — actually remove the row. Assignments reference the assignee
+    // by name string (not this doc id), so removing a member orphans no records;
+    // historical "assigned to X" labels stay intact, the name just drops out of
+    // future pickers. Deactivate (PATCH isActive:false) is the reversible path.
+    // The super-admin fallback (Marcos/Jesse) is re-created by the GET backfill,
+    // so they cannot be permanently removed by design.
+    await db.collection(TEAM_MEMBERS_COLLECTION).doc(id).delete()
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting team member:", error)

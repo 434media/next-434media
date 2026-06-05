@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   XCircle
 } from "lucide-react"
-import { formatCurrency, formatDate, BRAND_GOALS, TEAM_MEMBERS } from "./types"
+import { formatCurrency, formatDate, BRAND_GOALS } from "./types"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { Dropdown } from "./Dropdown"
 import type { Client } from "./types"
 
@@ -38,6 +39,8 @@ export function ArchivedOpportunitiesSection({
   const [outcomeFilter, setOutcomeFilter] = useState<string>("all")
   // Default to current user if provided, otherwise show all
   const [assigneeFilter, setAssigneeFilter] = useState<string>(currentUserName || "all")
+  // Live roster (active Firestore members) for the assignee filter — no seeds.
+  const { members: teamMembers } = useTeamMembers()
 
   // Get unique years from archived opportunities
   const uniqueYears = useMemo(() => {
@@ -54,8 +57,8 @@ export function ArchivedOpportunitiesSection({
 
   // Get all team members for the assignee filter dropdown
   const allTeamMembers = useMemo(() => {
-    return TEAM_MEMBERS.map(m => m.name).sort()
-  }, [])
+    return teamMembers.map(m => m.name).sort()
+  }, [teamMembers])
 
   // Filter archived opportunities
   const filteredOpportunities = useMemo(() => {

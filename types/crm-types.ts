@@ -108,7 +108,7 @@ export interface ClientRecord extends BaseRecord {
   linkedin_url?: string
   
   // Sales/Opportunity fields
-  brand?: "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing"
+  brand?: "434 Media" | "Vemos Vamos" | "DEVSA" | "Digital Canvas" | "TXMX Boxing"
   pitch_value?: number
   source?: string
   is_opportunity?: boolean
@@ -302,11 +302,11 @@ export interface DailySummary extends BaseRecord {
 // ============================================
 
 // Brand type for task assignment
-export type Brand = 
-  | "434 Media" 
-  | "Vemos Vamos" 
-  | "DEVSA TV" 
-  | "Digital Canvas" 
+export type Brand =
+  | "434 Media"
+  | "Vemos Vamos"
+  | "DEVSA"
+  | "Digital Canvas"
   | "TXMX Boxing"
 
 // Task attachment interface

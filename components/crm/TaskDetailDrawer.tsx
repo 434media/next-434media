@@ -820,7 +820,12 @@ export function TaskDetailDrawer({
                             {comment.mentions && comment.mentions.length > 0 && !editingCommentId && (
                               <div className="flex gap-1 mt-2">
                                 {comment.mentions.map((email) => {
-                                  const member = TEAM_MEMBERS.find(m => m.email === email)
+                                  // Resolve against the live roster first (so
+                                  // manually-added members render), then fall
+                                  // back to the static map for legacy mentions.
+                                  const member =
+                                    teamMembers.find(m => m.email?.toLowerCase() === email?.toLowerCase()) ??
+                                    TEAM_MEMBERS.find(m => m.email === email)
                                   return member ? (
                                     <span key={email} className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-900 text-xs">
                                       @{member.name}

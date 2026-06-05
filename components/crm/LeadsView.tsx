@@ -24,7 +24,7 @@ import type { Lead, LeadPriority, LeadStatus } from "@/types/crm-types"
 import { HowItWorks } from "@/components/admin/HowItWorks"
 import { useSelection } from "@/components/admin/SubmissionStateUI"
 import { Dropdown } from "@/components/crm/Dropdown"
-import { TEAM_MEMBERS } from "@/components/crm/types"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 type LeadView = "priority" | "all" | "followup"
 type LeadSort = "score" | "recent" | "contacted" | "company"
@@ -557,6 +557,7 @@ function BulkBar({
   onApply: (patch: { status?: LeadStatus; assigned_to?: string; addTags?: string[] }) => Promise<void>
 }) {
   const [busy, setBusy] = useState(false)
+  const { members: teamMembers } = useTeamMembers()
 
   const apply = async (patch: { status?: LeadStatus; assigned_to?: string }) => {
     setBusy(true)
@@ -603,8 +604,8 @@ function BulkBar({
         className="h-7 px-2 text-[12px] bg-neutral-800 text-neutral-100 rounded-md focus:outline-none disabled:opacity-50"
       >
         <option value="" disabled>Assign to…</option>
-        {TEAM_MEMBERS.map((m) => (
-          <option key={m.email} value={m.name}>{m.name}</option>
+        {teamMembers.map((m) => (
+          <option key={m.id} value={m.name}>{m.name}</option>
         ))}
       </select>
 

@@ -3,8 +3,9 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { RefreshCw, ChevronDown, ChevronUp, Target, GripVertical } from "lucide-react"
-import { formatCurrency, formatDate, BRAND_GOALS, BRANDS } from "./types"
+import { formatCurrency, formatDate } from "./types"
 import type { PipelineColumn, Opportunity, Brand, Client } from "./types"
+import { useBrandGoals } from "@/hooks/useBrandGoals"
 
 interface PipelineViewProps {
   pipeline: PipelineColumn[]
@@ -283,6 +284,7 @@ function DropColumn({
 
 export function PipelineView({ pipeline, clients = [], onRefresh, onClientClick, onDragEnd }: PipelineViewProps) {
   const [expandedBrand, setExpandedBrand] = useState<Brand | null>(null)
+  const { goals: brandGoals } = useBrandGoals()
 
   const handleToggleBrand = (brand: Brand) => {
     setExpandedBrand(prev => prev === brand ? null : brand)
@@ -308,7 +310,7 @@ export function PipelineView({ pipeline, clients = [], onRefresh, onClientClick,
 
       {/* Brand Goal Cards */}
       <div className="space-y-4">
-        {BRAND_GOALS.map((brandGoal) => (
+        {brandGoals.map((brandGoal) => (
           <BrandGoalCard
             key={brandGoal.brand}
             brand={brandGoal.brand}

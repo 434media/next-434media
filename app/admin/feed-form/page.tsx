@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "motion/react"
 import { useRouter } from "next/navigation"
 
 import { Toast } from "@/components/crm/Toast"
-import type { Toast as ToastType, CurrentUser, TeamMember } from "@/components/crm/types"
-import { TEAM_MEMBERS } from "@/components/crm/types"
+import type { Toast as ToastType, CurrentUser } from "@/components/crm/types"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import {
   Loader2,
   Send,
@@ -44,7 +44,8 @@ export default function FeedFormPage() {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentContent, setEditCommentContent] = useState("")
   const [expandedFeedComments, setExpandedFeedComments] = useState<Set<string>>(new Set())
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  // Shared roster (active Firestore members) for @-mention tagging — no seeds.
+  const { members: teamMembers } = useTeamMembers()
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [filterType, setFilterType] = useState<string>("all")
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" })
@@ -183,50 +184,6 @@ export default function FeedFormPage() {
     loadCurrentUser()
   }, [])
 
-  // Load team members for @-mention tagging
-  useEffect(() => {
-    const fetchTeamMembers = async () => {
-      try {
-        const response = await fetch("/api/admin/team-members")
-        const data = await response.json()
-        
-        const firestoreMembers: TeamMember[] = data.success && data.data
-          ? data.data.filter((m: TeamMember) => m.isActive)
-          : []
-        
-        const defaultMembers = TEAM_MEMBERS.map((m, i) => ({
-          id: `default-${i}`,
-          name: m.name,
-          email: m.email,
-          isActive: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
-        
-        const firestoreNames = new Set(firestoreMembers.map(m => m.name.toLowerCase()))
-        const firestoreEmails = new Set(firestoreMembers.map(m => m.email?.toLowerCase()).filter(Boolean))
-        
-        const missingDefaults = defaultMembers.filter(d =>
-          !firestoreNames.has(d.name.toLowerCase()) &&
-          (!d.email || !firestoreEmails.has(d.email.toLowerCase()))
-        )
-        
-        const allMembers = [...firestoreMembers, ...missingDefaults]
-        allMembers.sort((a, b) => a.name.localeCompare(b.name))
-        setTeamMembers(allMembers)
-      } catch {
-        setTeamMembers(TEAM_MEMBERS.map((m, i) => ({
-          id: `default-${i}`,
-          name: m.name,
-          email: m.email,
-          isActive: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })))
-      }
-    }
-    fetchTeamMembers()
-  }, [])
 
   // Auto-save draft to localStorage when form changes
   useEffect(() => {

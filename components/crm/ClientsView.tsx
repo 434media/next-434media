@@ -1,10 +1,11 @@
 "use client"
 
 import { Search, Plus, Mail, Phone, Users, Calendar, Filter, AlertCircle, Clock, Target, CheckCircle2, Trash2 } from "lucide-react"
-import { formatDate, normalizeAssigneeName, TEAM_MEMBERS, getDueDateStatus } from "./types"
+import { formatDate, normalizeAssigneeName, getDueDateStatus } from "./types"
 import { Dropdown } from "./Dropdown"
 import { HowItWorks } from "@/components/admin/HowItWorks"
 import { useSelection, BulkActionBar } from "@/components/admin/SubmissionStateUI"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import type { Client } from "./types"
 
 function fmtCurrency(v: number): string {
@@ -48,9 +49,10 @@ export function ClientsView({
 }: ClientsViewProps) {
   const { selected, toggle, set, clear } = useSelection()
 
-  // Use only the predefined team members for the dropdown
-  // This ensures only full names appear, not partial names from data
-  const allAssignees = TEAM_MEMBERS.map(m => m.name).sort()
+  // Live roster (active Firestore members), so the assignee filter reflects
+  // exactly who's on the team — no built-in seed names.
+  const { members: teamMembers } = useTeamMembers()
+  const allAssignees = teamMembers.map((m) => m.name).sort()
 
   // Per-client pipeline via the opportunity→client FK. Opportunities are
   // crm_clients rows (is_opportunity=true) whose client_id points to a client.

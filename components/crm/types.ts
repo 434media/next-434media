@@ -117,7 +117,7 @@ export interface Client {
 }
 
 // Brand type
-export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA TV" | "Digital Canvas" | "TXMX Boxing" | "AIMSATX"
+export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA" | "Digital Canvas" | "TXMX Boxing" | "AIMSATX"
 
 // Disposition (opportunity stage) type - used in kanban columns
 export type Disposition = "pitched" | "closed_won" | "closed_lost"
@@ -152,25 +152,21 @@ export interface BrandGoal {
   includedBrands?: Brand[]
 }
 
-// Helper to check if a brand belongs to the 434 Media group (parent company)
+// Helper to check if a brand belongs to the 434 Media group (parent company).
+// Digital Canvas is now tracked as its own standalone brand goal.
 export function is434MediaGroup(brand: Brand | undefined): boolean {
-  return brand === "434 Media" || brand === "Digital Canvas"
+  return brand === "434 Media"
 }
 
 // Brands that belong to the 434 Media parent company
-export const MEDIA_434_BRANDS: Brand[] = ["434 Media", "Digital Canvas"]
+export const MEDIA_434_BRANDS: Brand[] = ["434 Media"]
 
 export const BRAND_GOALS: BrandGoal[] = [
-  { brand: "TXMX Boxing", annualGoal: 1000000, color: "#000000", description: "Sports & Entertainment" },
-  { brand: "Vemos Vamos", annualGoal: 250000, color: "#fc0000", description: "Bilingual Studio & Agency" },
-  { brand: "DEVSA TV", annualGoal: 250000, color: "#c454f0", description: "Documentary & Video Production" },
-  { 
-    brand: "434 Media", 
-    annualGoal: 250000, 
-    color: "#fa6400", 
-    description: "Parent Company & Digital Canvas",
-    includedBrands: ["434 Media", "Digital Canvas"]
-  },
+  { brand: "TXMX Boxing", annualGoal: 1000000, color: "#000000", description: "FanOS Sports & Entertainment" },
+  { brand: "Vemos Vamos", annualGoal: 250000, color: "#fc0000", description: "Bilingual Studio" },
+  { brand: "DEVSA", annualGoal: 250000, color: "#c454f0", description: "Conferences and Workshops" },
+  { brand: "434 Media", annualGoal: 250000, color: "#fa6400", description: "Parent Company" },
+  { brand: "Digital Canvas", annualGoal: 250000, color: "#0d9488", description: "AI Builder Program + Workshops" },
 ]
 
 // Task attachment interface
@@ -437,7 +433,7 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
 }
 
 // Brand options
-export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA TV", "Digital Canvas", "TXMX Boxing", "AIMSATX"]
+export const BRANDS: Brand[] = ["434 Media", "Vemos Vamos", "DEVSA", "Digital Canvas", "TXMX Boxing", "AIMSATX"]
 
 // Shared owner map: maps assignee display names to Firestore task collection owners
 // Used across task handlers to determine which collection a task belongs to

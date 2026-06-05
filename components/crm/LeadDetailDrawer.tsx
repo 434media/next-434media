@@ -29,7 +29,7 @@ import { Tag } from "@/components/admin/Tag"
 import { MailchimpRecordPanel, type LeadConsent } from "@/components/crm/MailchimpRecordPanel"
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch } from "@/types/crm-types"
-import { TEAM_MEMBERS } from "@/components/crm/types"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 interface LeadDetailDrawerProps {
   open: boolean
@@ -193,6 +193,8 @@ export function LeadDetailDrawer({
   onResearch,
 }: LeadDetailDrawerProps) {
   const [form, setForm] = useState<FormState>(fromLead(lead))
+  // Live roster (active Firestore members) for the assignee picker — no seeds.
+  const { members: teamMembers } = useTeamMembers(open)
   const [tagInput, setTagInput] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -645,9 +647,9 @@ export function LeadDetailDrawer({
             onChange={(v) => update("assigned_to", v)}
             options={[
               { value: "", label: "Unassigned" },
-              ...TEAM_MEMBERS.map((m) => ({ value: m.name, label: m.name })),
+              ...teamMembers.map((m) => ({ value: m.name, label: m.name })),
               // Preserve a legacy/free-text owner not in the current roster.
-              ...(form.assigned_to && !TEAM_MEMBERS.some((m) => m.name === form.assigned_to)
+              ...(form.assigned_to && !teamMembers.some((m) => m.name === form.assigned_to)
                 ? [{ value: form.assigned_to, label: `${form.assigned_to} (legacy)` }]
                 : []),
             ]}

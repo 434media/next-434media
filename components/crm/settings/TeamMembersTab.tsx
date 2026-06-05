@@ -135,7 +135,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
   }
 
   const handleDelete = async (member: TeamMember) => {
-    if (!confirm(`Permanently soft-delete ${member.name}? They'll be hidden from assignee dropdowns.`)) return
+    if (!confirm(`Permanently delete ${member.name}? This removes the row entirely. Past assignments keep their name; they just won't appear in assignee pickers. Use Deactivate instead if you might restore them.`)) return
     setPendingId(member.id)
     try {
       const res = await fetch(`/api/admin/team-members?id=${member.id}`, { method: "DELETE" })
@@ -198,7 +198,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
                 type="text"
                 value={newMember.name}
                 onChange={(e) => setNewMember((m) => ({ ...m, name: e.target.value }))}
-                className="w-full px-3 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
                 placeholder="Full name"
                 required
               />
@@ -211,7 +211,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
                 type="email"
                 value={newMember.email}
                 onChange={(e) => setNewMember((m) => ({ ...m, email: e.target.value }))}
-                className="w-full px-3 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
                 placeholder="name@434media.com"
               />
             </div>
@@ -223,7 +223,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
             <select
               value={newMember.role}
               onChange={(e) => setNewMember((m) => ({ ...m, role: e.target.value as AdminRole }))}
-              className="w-full px-3 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
             >
               <option value="crm_only">CRM Only</option>
               <option value="full_admin">Full Admin</option>
