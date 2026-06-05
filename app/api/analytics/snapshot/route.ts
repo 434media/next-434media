@@ -104,7 +104,7 @@ async function fetchLive(
         )
     }
   } catch (liveErr) {
-    console.error(`[Analytics Snapshot] Live fallback failed for endpoint=${endpoint}:`, liveErr)
+    console.error("[Analytics Snapshot] Live fallback failed for endpoint:", endpoint, liveErr)
     return NextResponse.json(
       {
         error: liveErr instanceof Error ? liveErr.message : "Live data fallback failed",

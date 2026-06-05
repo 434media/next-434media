@@ -91,7 +91,7 @@ async function latestForKey<T>(
       throw queryErr
     }
   } catch (error) {
-    console.error(`[analytics-snapshots] Failed to read ${collection} for ${field}=${value}:`, error)
+    console.error("[analytics-snapshots] Failed to read:", { collection, field, value }, error)
     return null
   }
 }

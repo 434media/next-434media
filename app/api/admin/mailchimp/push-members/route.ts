@@ -99,7 +99,9 @@ export async function POST(request: NextRequest) {
   try {
     const result = await pushMembersToMailchimp(audienceId, sanitized, statusRaw, tags)
     console.log(
-      `[push-members] ${auth.session.email} pushed to audience ${audienceId}:`,
+      "[push-members] pushed to audience:",
+      auth.session.email,
+      audienceId,
       JSON.stringify({
         attempted: result.attempted,
         new: result.newMembers,

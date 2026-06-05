@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       outcomes.push(outcome)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error"
-      console.error(`[promote-from-audience] ${collection}/${id} failed:`, err)
+      console.error("[promote-from-audience] item failed:", collection, id, err)
       outcomes.push({ id, status: "failed", error: message })
     }
   }

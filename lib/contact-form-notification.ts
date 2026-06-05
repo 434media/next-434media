@@ -5,7 +5,9 @@ import { getResend, DEFAULT_FROM } from "@/lib/resend"
 // grows (Resend accepts a comma-joined string or array for `to`).
 const INBOX_NOTIFY_TO = process.env.INBOX_NOTIFY_TO || "marcos@434media.com"
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Linear-time email check. Domain labels exclude '.' so the dot is matched only
+// by the literal \., avoiding the polynomial backtracking of `[^\s@]+\.[^\s@]+`.
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 
 export interface ContactFormNotification {
   id?: string

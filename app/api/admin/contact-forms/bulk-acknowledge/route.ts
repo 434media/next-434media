@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       if (error) throw new Error(error.message ?? JSON.stringify(error))
       if (!data?.id) throw new Error("Resend returned no email id")
     } catch (err) {
-      console.error(`[POST /bulk-acknowledge] Resend send failed for ${email}:`, err)
+      console.error("[POST /bulk-acknowledge] Resend send failed for:", email, err)
       results.push({
         submissionId,
         email,
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
       await setSubmissionState("contact_forms", submissionId, "replied", auth.session.email)
       results.push({ submissionId, email, status: "sent" })
     } catch (err) {
-      console.error(`[POST /bulk-acknowledge] state update failed for ${submissionId}:`, err)
+      console.error("[POST /bulk-acknowledge] state update failed for:", submissionId, err)
       results.push({
         submissionId,
         email,

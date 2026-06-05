@@ -848,7 +848,7 @@ export async function getCohortRetention(
     response = result[0]
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.warn(`[GA4] cohort report rejected for property ${targetPropertyId}:`, message)
+    console.warn("[GA4] cohort report rejected for property:", targetPropertyId, message)
     // Friendly translation of the most common GA4 cohort rejections.
     let reason = "GA4 rejected the cohort spec for this property."
     if (message.includes("INVALID_ARGUMENT")) {

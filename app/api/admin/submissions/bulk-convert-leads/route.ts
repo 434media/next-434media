@@ -162,7 +162,9 @@ export async function POST(request: NextRequest) {
   }
 
   console.log(
-    `[bulk-convert-leads] ${auth.session.email} converted ${source}:`,
+    "[bulk-convert-leads] converted:",
+    auth.session.email,
+    source,
     JSON.stringify({
       attempted: result.attempted,
       created: result.created,

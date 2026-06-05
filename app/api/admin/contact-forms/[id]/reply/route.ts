@@ -19,7 +19,9 @@ import { setSubmissionState } from "@/lib/firestore-submission-states"
 export const runtime = "nodejs"
 export const maxDuration = 30
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Linear-time email check — domain labels exclude '.' to avoid polynomial
+// backtracking (the dot is matched only by the literal \.).
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/
 
 interface ReplyBody {
   to: string

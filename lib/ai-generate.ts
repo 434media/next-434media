@@ -73,7 +73,7 @@ function blobName(ext: string): string {
 // Surface those in logs so dropped settings are debuggable instead of invisible.
 function logWarnings(modelId: string, warnings: unknown): void {
   if (Array.isArray(warnings) && warnings.length > 0) {
-    console.warn(`[ai-generate] ${modelId} warnings:`, JSON.stringify(warnings))
+    console.warn("[ai-generate] model warnings:", modelId, JSON.stringify(warnings))
   }
 }
 

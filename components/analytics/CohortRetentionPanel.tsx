@@ -243,7 +243,7 @@ export function CohortRetentionPanel({ propertyId, setError }: CohortRetentionPa
             weeks later. Week 0 is the cohort itself (always 100%).
           </span>
           <a
-            href={`https://analytics.google.com/analytics/web/#/p${propertyId}/reports/explorer?params=_u..nav%3Dmaui&r=cohort`}
+            href={`https://analytics.google.com/analytics/web/#/p${encodeURIComponent(propertyId)}/reports/explorer?params=_u..nav%3Dmaui&r=cohort`}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-3 shrink-0 inline-flex items-center gap-1 hover:text-neutral-700"
