@@ -29,6 +29,7 @@ import { BRANDS, BRAND_GOALS, DISPOSITION_OPTIONS, DOC_OPTIONS } from "./types"
 import type { Brand, Disposition, DOC, Client } from "./types"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
+import { Combobox } from "./Combobox"
 
 interface ContactFormData {
   id: string
@@ -98,9 +99,7 @@ export function OpportunityDetailDrawer({
   onViewCustomer360,
 }: OpportunityDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
-  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
-  const [companySearchQuery, setCompanySearchQuery] = useState("")
-  
+
   // State for web links and file upload
   const [newLink, setNewLink] = useState("")
   const [isUploadingFile, setIsUploadingFile] = useState(false)
@@ -109,7 +108,6 @@ export function OpportunityDetailDrawer({
   // Assignable roster (read-only) — shared with the other drawers. Management
   // lives in CRM Settings → Team members.
   const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
-  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
 
   // Get unique company names from existing clients
   // Use case-insensitive comparison to prevent duplicates like "HEB" and "HEB "
@@ -125,11 +123,6 @@ export function OpportunityDetailDrawer({
       return acc
     }, [] as { id: string; name: string }[])
     .sort((a, b) => a.name.localeCompare(b.name))
-
-  // Filter companies based on search query
-  const filteredCompanies = uniqueCompanies.filter(company =>
-    company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
-  )
 
   // The parent client this opportunity is linked to (via the client_id FK) —
   // powers the "jump to Customer 360" affordance when editing an existing deal.
@@ -335,8 +328,6 @@ export function OpportunityDetailDrawer({
         linked_company_id: null,
       })
     }
-    setShowCompanyDropdown(false)
-    setCompanySearchQuery("")
   }
 
   const drawerTitle = isEditing
@@ -445,108 +436,27 @@ export function OpportunityDetailDrawer({
                     Client Name *
                   </span>
                 </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-                    className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-left focus:outline-none focus:border-neutral-400 flex items-center justify-between"
-                  >
-                    <span className={formData.company_name ? "text-neutral-900" : "text-neutral-400"}>
-                      {formData.company_name || "Select or create client..."}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${showCompanyDropdown ? "rotate-180" : ""}`} />
-                  </button>
-
-                  <AnimatePresence>
-                    {showCompanyDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className="absolute z-30 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
-                      >
-                        {/* Search input */}
-                        <div className="p-2 border-b border-neutral-100">
-                          <input
-                            type="text"
-                            value={companySearchQuery}
-                            onChange={(e) => {
-                              setCompanySearchQuery(e.target.value)
-                            }}
-                            placeholder="Search or type new client name..."
-                            className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
-                            autoFocus
-                          />
-                        </div>
-
-                        <div className="max-h-64 overflow-y-auto">
-                          {/* Create new company option */}
-                          {companySearchQuery && !filteredCompanies.find(c => c.name.toLowerCase() === companySearchQuery.toLowerCase()) && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onFormChange({
-                                    ...formData,
-                                    company_name: companySearchQuery,
-                                    existing_company_id: null,
-                                    linked_company_id: null,
-                                    contacts: [], // Clear contacts for new client
-                                  })
-                                  setShowCompanyDropdown(false)
-                                  setCompanySearchQuery("")
-                                }}
-                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 flex items-center gap-2 text-neutral-900 font-medium"
-                              >
-                                <Plus className="w-4 h-4" />
-                                Create new: {companySearchQuery}
-                              </button>
-                              <div className="border-t border-neutral-100" />
-                            </>
-                          )}
-
-                          {/* Existing clients */}
-                          {filteredCompanies.length > 0 ? (
-                            <>
-                              {filteredCompanies.slice(0, 50).map((company) => (
-                                <button
-                                  key={company.id}
-                                  type="button"
-                                  onClick={() => handleSelectCompany(company)}
-                                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
-                                >
-                                  <span className="text-neutral-900">{company.name}</span>
-                                  {formData.existing_company_id === company.id && (
-                                    <Check className="w-4 h-4 text-neutral-900" />
-                                  )}
-                                </button>
-                              ))}
-                              {uniqueCompanies.length > 50 && (
-                                <div className="px-3 py-2 text-center text-xs text-neutral-500 bg-neutral-50">
-                                  Showing {Math.min(50, filteredCompanies.length)} of {uniqueCompanies.length} clients. Type to search for more.
-                                </div>
-                              )}
-                            </>
-                          ) : !companySearchQuery ? (
-                            <div className="px-3 py-4 text-center text-sm text-neutral-500">
-                              No existing clients. Type to create one.
-                            </div>
-                          ) : null}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {showCompanyDropdown && (
-                    <div
-                      className="fixed inset-0 z-20"
-                      onClick={() => {
-                        setShowCompanyDropdown(false)
-                        setCompanySearchQuery("")
-                      }}
-                    />
-                  )}
-                </div>
+                <Combobox
+                  ariaLabel="Client / company"
+                  searchable
+                  placeholder="Select or create client…"
+                  searchPlaceholder="Search or type new client name…"
+                  emptyText="No existing clients. Type to create one."
+                  triggerLabel={formData.company_name}
+                  value={formData.linked_company_id || formData.existing_company_id || ""}
+                  onChange={(val, opt) => handleSelectCompany(opt ? { id: opt.value, name: opt.label } : null)}
+                  onCreateNew={(query) =>
+                    onFormChange({
+                      ...formData,
+                      company_name: query,
+                      existing_company_id: null,
+                      linked_company_id: null,
+                      contacts: [],
+                    })
+                  }
+                  createNewLabel={(q) => `Create new: ${q}`}
+                  options={uniqueCompanies.map((c) => ({ value: c.id, label: c.name }))}
+                />
                 {formData.linked_company_id && !isEditing && (
                   <p className="text-xs text-neutral-700 mt-1 flex items-center gap-1">
                     <Check className="w-3 h-3" />
@@ -883,80 +793,19 @@ export function OpportunityDetailDrawer({
               {/* Assigned To */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1.5">Assigned To</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 flex items-center justify-between"
-                  >
-                    <span className={formData.assigned_to ? "text-neutral-900" : "text-neutral-400"}>
-                      {formData.assigned_to || "Select team member..."}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${showAssigneeDropdown ? "rotate-180" : ""}`} />
-                  </button>
-                  
-                  <AnimatePresence>
-                    {showAssigneeDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className="absolute z-20 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
-                      >
-                        <div className="max-h-64 overflow-y-auto">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onFormChange({ ...formData, assigned_to: "Unassigned" })
-                              setShowAssigneeDropdown(false)
-                            }}
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
-                          >
-                            <span className="text-neutral-500">Unassigned</span>
-                            {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-neutral-900" />}
-                          </button>
-                          
-                          <div className="border-t border-neutral-100" />
-                          
-                          {isLoadingMembers ? (
-                            <div className="px-3 py-4 text-center">
-                              <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
-                            </div>
-                          ) : (
-                            <>
-                              {teamMembers.map((member) => (
-                                <button
-                                  key={member.id}
-                                  type="button"
-                                  onClick={() => {
-                                    onFormChange({ ...formData, assigned_to: member.name })
-                                    setShowAssigneeDropdown(false)
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
-                                >
-                                  <div>
-                                    <span className="text-neutral-900">{member.name}</span>
-                                    {member.email && (
-                                      <span className="text-neutral-400 text-xs ml-2">{member.email}</span>
-                                    )}
-                                  </div>
-                                  {formData.assigned_to === member.name && <Check className="w-4 h-4 text-neutral-900" />}
-                                </button>
-                              ))}
-                            </>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  {showAssigneeDropdown && (
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowAssigneeDropdown(false)}
-                    />
-                  )}
-                </div>
+                <Combobox
+                  ariaLabel="Assigned to"
+                  searchable
+                  placeholder={isLoadingMembers ? "Loading team…" : "Select team member…"}
+                  searchPlaceholder="Search team members…"
+                  emptyText="No team members"
+                  value={formData.assigned_to || ""}
+                  onChange={(val) => onFormChange({ ...formData, assigned_to: val })}
+                  options={[
+                    { value: "Unassigned", label: "Unassigned" },
+                    ...teamMembers.map((m) => ({ value: m.name, label: m.name, sublabel: m.email || undefined })),
+                  ]}
+                />
               </div>
 
               {/* Disposition & DOC */}

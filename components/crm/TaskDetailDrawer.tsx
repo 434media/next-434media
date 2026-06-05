@@ -22,7 +22,6 @@ import {
   ChevronDown,
   Pencil,
   Target,
-  Search,
   Building2,
   ArrowLeft
 } from "lucide-react"
@@ -36,6 +35,7 @@ import type { Task, TaskAttachment, CurrentUser, Brand } from "./types"
 import type { TaskFormData } from "@/hooks/useTaskHandlers"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
+import { Combobox } from "./Combobox"
 
 // Simplified opportunity type for selection
 interface OpportunityOption {
@@ -116,8 +116,7 @@ export function TaskDetailDrawer({
   // members; refetched each time the drawer opens.
   const { members: teamMembers, isLoading: isLoadingMembers } = useTeamMembers(open)
 
-  // Assignee dropdown open state
-  const [showDropdown, setShowDropdown] = useState(false)
+  // Secondary-assignee dropdown open state (multi-select, still bespoke)
   const [showSecondaryDropdown, setShowSecondaryDropdown] = useState(false)
 
   // State for drag-and-drop file upload
@@ -126,10 +125,6 @@ export function TaskDetailDrawer({
   // State for comment editing
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentContent, setEditCommentContent] = useState("")
-
-  // State for the "Link to" picker (links the task to a client or opportunity)
-  const [showLinkDropdown, setShowLinkDropdown] = useState(false)
-  const [linkSearchQuery, setLinkSearchQuery] = useState("")
 
   // Unified "Link to" options: opportunities (tagged) + plain clients. Both are
   // crm_clients rows; tagging each row lets the picker set the right foreign key
@@ -155,15 +150,6 @@ export function TaskDetailDrawer({
         [] as { id: string; name: string; kind: "client" }[],
       ),
   ].sort((a, b) => a.name.localeCompare(b.name))
-
-  const filteredLinkOptions = linkOptions.filter((o) =>
-    o.name.toLowerCase().includes(linkSearchQuery.toLowerCase()),
-  )
-
-  // Trigger label: the linked opportunity's name, else the linked client name.
-  const linkedLabel = formData.opportunity_id
-    ? linkOptions.find((o) => o.id === formData.opportunity_id)?.name ?? "Linked opportunity"
-    : formData.client_name || ""
 
   if (!task) return null
 
@@ -327,129 +313,40 @@ export function TaskDetailDrawer({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1.5">Link to</label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowLinkDropdown(!showLinkDropdown)
-                          setLinkSearchQuery("")
-                        }}
-                        className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white flex items-center justify-between"
-                      >
-                        <span className={(formData.opportunity_id || formData.client_id) ? "text-neutral-900 truncate" : "text-neutral-400"}>
-                          {linkedLabel || "Nothing linked"}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform shrink-0 ${showLinkDropdown ? "rotate-180" : ""}`} />
-                      </button>
-                      
-                      {/* Link-to dropdown menu */}
-                      <AnimatePresence>
-                        {showLinkDropdown && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            className="absolute z-30 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
-                          >
-                            {/* Search input */}
-                            <div className="p-2 border-b border-neutral-100">
-                              <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                                <input
-                                  type="text"
-                                  value={linkSearchQuery}
-                                  onChange={(e) => setLinkSearchQuery(e.target.value)}
-                                  placeholder="Search clients & opportunities..."
-                                  className="w-full pl-8 pr-3 py-2 text-sm bg-neutral-50 border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400 focus:bg-white"
-                                  autoFocus
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="max-h-48 overflow-y-auto">
-                              {/* Nothing-linked option */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onFormChange({ ...formData, client_id: "", client_name: "", opportunity_id: "" })
-                                  setShowLinkDropdown(false)
-                                  setLinkSearchQuery("")
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
-                              >
-                                <span className="text-neutral-500">Nothing linked</span>
-                                {!formData.client_id && !formData.opportunity_id && <Check className="w-4 h-4 text-neutral-900" />}
-                              </button>
-                              
-                              <div className="border-t border-neutral-100" />
-                              
-                              {/* Filtered options (clients + opportunities) */}
-                              {filteredLinkOptions.length === 0 ? (
-                                <div className="px-3 py-4 text-center text-sm text-neutral-500">
-                                  {linkSearchQuery ? "No matches found" : "Nothing available"}
-                                </div>
-                              ) : (
-                                <>
-                                  {filteredLinkOptions.slice(0, 50).map((option) => {
-                                    const isOpp = option.kind === "opportunity"
-                                    const selected = isOpp
-                                      ? formData.opportunity_id === option.id
-                                      : formData.client_id === option.id
-                                    return (
-                                      <button
-                                        key={`${option.kind}-${option.id}`}
-                                        type="button"
-                                        onClick={() => {
-                                          onFormChange(
-                                            isOpp
-                                              ? { ...formData, opportunity_id: option.id, client_id: "", client_name: "" }
-                                              : { ...formData, client_id: option.id, client_name: option.name, opportunity_id: "" }
-                                          )
-                                          setShowLinkDropdown(false)
-                                          setLinkSearchQuery("")
-                                        }}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between gap-2"
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          {isOpp ? (
-                                            <Target className="w-4 h-4 text-sky-500 shrink-0" />
-                                          ) : (
-                                            <Building2 className="w-4 h-4 text-neutral-400 shrink-0" />
-                                          )}
-                                          <span className="text-neutral-900 truncate">{option.name}</span>
-                                          {isOpp && (
-                                            <span className="shrink-0 px-1.5 py-0.5 rounded bg-sky-50 text-sky-600 text-[10px] font-medium uppercase tracking-wide">
-                                              Opp
-                                            </span>
-                                          )}
-                                        </div>
-                                        {selected && <Check className="w-4 h-4 text-neutral-900 shrink-0" />}
-                                      </button>
-                                    )
-                                  })}
-                                  {linkOptions.length > 50 && (
-                                    <div className="px-3 py-2 text-center text-xs text-neutral-500 bg-neutral-50">
-                                      Showing {Math.min(50, filteredLinkOptions.length)} of {linkOptions.length}. Type to search for more.
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                      
-                      {showLinkDropdown && (
-                        <div
-                          className="fixed inset-0 z-20"
-                          onClick={() => {
-                            setShowLinkDropdown(false)
-                            setLinkSearchQuery("")
-                          }}
-                        />
-                      )}
-                    </div>
+                    <Combobox
+                      ariaLabel="Link this task to a client or opportunity"
+                      searchable
+                      placeholder="Nothing linked"
+                      searchPlaceholder="Search clients & opportunities…"
+                      emptyText="Nothing available"
+                      value={formData.opportunity_id || formData.client_id || ""}
+                      onChange={(val) => {
+                        if (!val) {
+                          onFormChange({ ...formData, client_id: "", client_name: "", opportunity_id: "" })
+                          return
+                        }
+                        const picked = linkOptions.find((o) => o.id === val)
+                        if (picked?.kind === "opportunity") {
+                          onFormChange({ ...formData, opportunity_id: val, client_id: "", client_name: "" })
+                        } else {
+                          onFormChange({ ...formData, client_id: val, client_name: picked?.name ?? "", opportunity_id: "" })
+                        }
+                      }}
+                      options={[
+                        { value: "", label: "Nothing linked" },
+                        ...linkOptions.map((o) => ({
+                          value: o.id,
+                          label: o.name,
+                          badge: o.kind === "opportunity" ? "Opp" : undefined,
+                          icon:
+                            o.kind === "opportunity" ? (
+                              <Target className="w-4 h-4 text-sky-500 shrink-0" />
+                            ) : (
+                              <Building2 className="w-4 h-4 text-neutral-400 shrink-0" />
+                            ),
+                        })),
+                      ]}
+                    />
                   </div>
                 </div>
 
@@ -471,78 +368,18 @@ export function TaskDetailDrawer({
                     {/* Primary Assignee */}
                     <div>
                       <label className="block text-xs font-medium text-neutral-500 mb-1.5">Primary</label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setShowDropdown(!showDropdown)}
-                          className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 focus:bg-white flex items-center justify-between"
-                        >
-                          <span className={formData.assigned_to ? "text-neutral-900 truncate" : "text-neutral-400"}>
-                            {formData.assigned_to || "Select..."}
-                          </span>
-                          <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform shrink-0 ${showDropdown ? "rotate-180" : ""}`} />
-                        </button>
-                        
-                        {/* Dropdown menu */}
-                        <AnimatePresence>
-                          {showDropdown && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              className="absolute z-20 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
-                            >
-                              <div className="max-h-64 overflow-y-auto">
-                                {/* Unassigned option */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onFormChange({ ...formData, assigned_to: "Unassigned" })
-                                    setShowDropdown(false)
-                                  }}
-                                  className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
-                                >
-                                  <span className="text-neutral-500">Unassigned</span>
-                                  {formData.assigned_to === "Unassigned" && <Check className="w-4 h-4 text-neutral-900" />}
-                                </button>
-                                
-                                <div className="border-t border-neutral-100" />
-                                
-                                {/* Team members */}
-                                {isLoadingMembers ? (
-                                  <div className="px-3 py-4 text-center">
-                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-400" />
-                                  </div>
-                                ) : (
-                                  <>
-                                    {teamMembers.map((member) => (
-                                      <button
-                                        key={member.id}
-                                        type="button"
-                                        onClick={() => {
-                                          onFormChange({ ...formData, assigned_to: member.name })
-                                          setShowDropdown(false)
-                                        }}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 flex items-center justify-between"
-                                      >
-                                        <span className="text-neutral-900 truncate">{member.name}</span>
-                                        {formData.assigned_to === member.name && <Check className="w-4 h-4 text-neutral-900 shrink-0" />}
-                                      </button>
-                                    ))}
-                                  </>
-                                )}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
-                        {showDropdown && (
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setShowDropdown(false)}
-                          />
-                        )}
-                      </div>
+                      <Combobox
+                        ariaLabel="Primary assignee"
+                        searchable
+                        placeholder="Select…"
+                        searchPlaceholder="Search members…"
+                        value={formData.assigned_to || ""}
+                        onChange={(val) => onFormChange({ ...formData, assigned_to: val })}
+                        options={[
+                          { value: "Unassigned", label: "Unassigned" },
+                          ...teamMembers.map((m) => ({ value: m.name, label: m.name, sublabel: m.email || undefined })),
+                        ]}
+                      />
                     </div>
 
                     {/* Secondary Assignee - Multi-select */}
