@@ -616,7 +616,7 @@ export function OpportunityDetailDrawer({
                   <button
                     type="button"
                     onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-                    className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-left focus:outline-none focus:ring-neutral-400 flex items-center justify-between"
+                    className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-left focus:outline-none focus:border-neutral-400 flex items-center justify-between"
                   >
                     <span className={formData.company_name ? "text-neutral-900" : "text-neutral-400"}>
                       {formData.company_name || "Select or create client..."}
@@ -641,7 +641,7 @@ export function OpportunityDetailDrawer({
                               setCompanySearchQuery(e.target.value)
                             }}
                             placeholder="Search or type new client name..."
-                            className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                            className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                             autoFocus
                           />
                         </div>
@@ -666,7 +666,7 @@ export function OpportunityDetailDrawer({
                                 className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 flex items-center gap-2 text-neutral-900 font-medium"
                               >
                                 <Plus className="w-4 h-4" />
-                                Create new: "{companySearchQuery}"
+                                Create new: {companySearchQuery}
                               </button>
                               <div className="border-t border-neutral-100" />
                             </>
@@ -734,7 +734,7 @@ export function OpportunityDetailDrawer({
                   type="text"
                   value={formData.title}
                   onChange={(e) => onFormChange({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-neutral-400"
+                  className="w-full px-3 py-2.5 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400"
                   placeholder="Enter opportunity title..."
                 />
               </div>
@@ -748,7 +748,7 @@ export function OpportunityDetailDrawer({
                   <button
                     type="button"
                     onClick={addContact}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:ring-neutral-300 hover:bg-neutral-50 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium text-neutral-700 border border-neutral-200/70 hover:border-neutral-300 hover:bg-neutral-50 rounded-md transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Contact
@@ -757,7 +757,7 @@ export function OpportunityDetailDrawer({
 
                 {formData.contacts.length === 0 ? (
                   <div className="p-4 text-center text-neutral-400 text-sm border border-dashed border-neutral-300 rounded-lg bg-neutral-50">
-                    No contacts added yet. Click "Add Contact" to add your first contact.
+                    No contacts yet — use the Add contact button above to add the first one.
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -838,7 +838,7 @@ export function OpportunityDetailDrawer({
                                         type="text"
                                         value={contact.first_name}
                                         onChange={(e) => updateContact(contact.id, "first_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="First name"
                                       />
                                     </div>
@@ -848,7 +848,7 @@ export function OpportunityDetailDrawer({
                                         type="text"
                                         value={contact.last_name}
                                         onChange={(e) => updateContact(contact.id, "last_name", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="Last name"
                                       />
                                     </div>
@@ -861,7 +861,7 @@ export function OpportunityDetailDrawer({
                                         type="email"
                                         value={contact.email}
                                         onChange={(e) => updateContact(contact.id, "email", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="email@company.com"
                                       />
                                     </div>
@@ -871,7 +871,7 @@ export function OpportunityDetailDrawer({
                                         type="tel"
                                         value={contact.phone}
                                         onChange={(e) => updateContact(contact.id, "phone", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="(555) 123-4567"
                                       />
                                     </div>
@@ -883,7 +883,7 @@ export function OpportunityDetailDrawer({
                                       type="text"
                                       value={contact.role}
                                       onChange={(e) => updateContact(contact.id, "role", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                      className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                       placeholder="e.g., CEO, Marketing Director"
                                     />
                                   </div>
@@ -894,7 +894,7 @@ export function OpportunityDetailDrawer({
                                       type="date"
                                       value={contact.date_of_birth || ""}
                                       onChange={(e) => updateContact(contact.id, "date_of_birth", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                      className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                     />
                                   </div>
 
@@ -904,7 +904,7 @@ export function OpportunityDetailDrawer({
                                       type="text"
                                       value={contact.address || ""}
                                       onChange={(e) => updateContact(contact.id, "address", e.target.value)}
-                                      className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                      className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                       placeholder="Street address"
                                     />
                                   </div>
@@ -916,7 +916,7 @@ export function OpportunityDetailDrawer({
                                         type="text"
                                         value={contact.city || ""}
                                         onChange={(e) => updateContact(contact.id, "city", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="City"
                                       />
                                     </div>
@@ -926,7 +926,7 @@ export function OpportunityDetailDrawer({
                                         type="text"
                                         value={contact.state || ""}
                                         onChange={(e) => updateContact(contact.id, "state", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="State"
                                       />
                                     </div>
@@ -936,7 +936,7 @@ export function OpportunityDetailDrawer({
                                         type="text"
                                         value={contact.zipcode || ""}
                                         onChange={(e) => updateContact(contact.id, "zipcode", e.target.value)}
-                                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                                         placeholder="Zipcode"
                                       />
                                     </div>
@@ -982,7 +982,7 @@ export function OpportunityDetailDrawer({
                   <select
                     value={formData.source || ""}
                     onChange={(e) => onFormChange({ ...formData, source: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >
                     <option value="">Select source...</option>
                     <option value="existing">Existing</option>
@@ -999,7 +999,7 @@ export function OpportunityDetailDrawer({
                   <select
                     value={formData.brand}
                     onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >
                     <option value="">Select platform...</option>
                     {BRANDS.map((brand) => {
@@ -1027,7 +1027,7 @@ export function OpportunityDetailDrawer({
                     type="number"
                     value={formData.pitch_value}
                     onChange={(e) => onFormChange({ ...formData, pitch_value: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                     placeholder="e.g., 50000"
                   />
                 </div>
@@ -1042,7 +1042,7 @@ export function OpportunityDetailDrawer({
                     type="date"
                     value={formData.next_followup_date}
                     onChange={(e) => onFormChange({ ...formData, next_followup_date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   />
                 </div>
               </div>
@@ -1054,7 +1054,7 @@ export function OpportunityDetailDrawer({
                   <button
                     type="button"
                     onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400 flex items-center justify-between"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 flex items-center justify-between"
                   >
                     <span className={formData.assigned_to ? "text-neutral-900" : "text-neutral-400"}>
                       {formData.assigned_to || "Select team member..."}
@@ -1178,7 +1178,7 @@ export function OpportunityDetailDrawer({
                   <select
                     value={formData.disposition || "pitched"}
                     onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >
                     {DISPOSITION_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -1194,7 +1194,7 @@ export function OpportunityDetailDrawer({
                   <select
                     value={formData.doc || ""}
                     onChange={(e) => onFormChange({ ...formData, doc: e.target.value as DOC })}
-                    className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                    className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >
                     <option value="">Select probability...</option>
                     {DOC_OPTIONS.map((option) => (
@@ -1213,7 +1213,7 @@ export function OpportunityDetailDrawer({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="p-3 bg-neutral-50 ring-1 ring-neutral-200 rounded-md"
+                    className="p-3 bg-neutral-50 border border-neutral-200/70 rounded-md"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium text-neutral-900">Add team member</h4>
@@ -1237,14 +1237,14 @@ export function OpportunityDetailDrawer({
                         value={newMemberName}
                         onChange={(e) => setNewMemberName(e.target.value)}
                         placeholder="Full name (required)"
-                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                       />
                       <input
                         type="email"
                         value={newMemberEmail}
                         onChange={(e) => setNewMemberEmail(e.target.value)}
                         placeholder="Email (optional)"
-                        className="w-full px-3 py-2 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-neutral-400"
+                        className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                       />
                       {memberError && (
                         <p className="text-xs text-red-600">{memberError}</p>
@@ -1562,21 +1562,13 @@ export function OpportunityDetailDrawer({
               {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1.5">Notes</label>
-                <div className="relative">
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
-                    rows={4}
-                    className="w-full px-3 py-2 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-blue-500 focus:bg-white resize-y min-h-[100px] max-h-[300px]"
-                    placeholder="Additional notes about this opportunity..."
-                  />
-                  <div className="absolute bottom-2 right-2 pointer-events-none text-gray-300">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 10 10">
-                      <path d="M9 9H7v-1h1V7h1v2zm0-4H8V4h1v1zm-4 4H4V8h1v1zm4-8H8V0h1v1zM5 1H4V0h1v1zM1 9H0V7h1v2zm0-4H0V4h1v1zM1 1H0V0h1v1z" opacity="0.5"/>
-                    </svg>
-                  </div>
-                </div>
-                <p className="text-xs text-neutral-400 mt-1">Drag corner to resize</p>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-y min-h-[100px] max-h-[300px]"
+                  placeholder="Additional notes about this opportunity..."
+                />
               </div>
       </div>
     </DetailDrawer>
