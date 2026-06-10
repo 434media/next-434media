@@ -132,7 +132,7 @@ function getAnalyticsClient(): BetaAnalyticsDataClient {
 
       analyticsDataClient = new BetaAnalyticsDataClient({
         credentials: credentials as { client_email: string; private_key: string },
-        projectId: process.env.GCP_PROJECT_ID || credentials.project_id,
+        projectId: credentials.project_id,
       })
 
       console.log("[GA4] Analytics client initialized successfully")
@@ -143,6 +143,19 @@ function getAnalyticsClient(): BetaAnalyticsDataClient {
   }
 
   return analyticsDataClient
+}
+
+// Derive the GCP project id from the service-account key — single source of
+// truth (replaces the former standalone GCP_PROJECT_ID env var).
+function getServiceAccountProjectId(): string | undefined {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+  if (!raw) return undefined
+  try {
+    const sanitized = raw.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+    return JSON.parse(sanitized).project_id
+  } catch {
+    return undefined
+  }
 }
 
 // Get property ID from environment variable or use provided propertyId
@@ -188,7 +201,7 @@ export async function testAnalyticsConnection(propertyId?: string): Promise<Anal
       propertyId: targetPropertyId,
       dimensionCount: response.dimensions?.length || 0,
       metricCount: response.metrics?.length || 0,
-      projectId: process.env.GCP_PROJECT_ID,
+      projectId: getServiceAccountProjectId(),
       availableProperties: getAvailableProperties(),
       defaultPropertyId: process.env.GA4_PROPERTY_ID,
     }

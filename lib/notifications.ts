@@ -25,7 +25,11 @@ interface ServiceAccountCredentials {
 }
 
 function getCredentials(): ServiceAccountCredentials | null {
-  // Use Firebase Admin SDK credentials for Gmail API
+  // Gmail send uses a SEPARATE service account (firebase-adminsdk@) that has
+  // domain-wide delegation authorized in Google Workspace for gmail.send. This
+  // is the one Google credential NOT folded into GOOGLE_SERVICE_ACCOUNT_KEY:
+  // the digitalcanvas@ SA in that key isn't authorized for Gmail delegation.
+  // To consolidate, authorize that SA's client_id in Workspace, then switch here.
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
 

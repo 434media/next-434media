@@ -1,4 +1,4 @@
-import { getDb, getNamedDb, getDigitalCanvasDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
+import { getDb, getNamedDb, COLLECTIONS, NAMED_DATABASES } from "./firebase-admin"
 import { getSaTechDay2026RoleTags } from "./event-roles/sa-tech-day-2026"
 
 // Event Registration interface
@@ -213,69 +213,18 @@ async function getTechdayRegistrations(filters?: { event?: string }): Promise<Ev
 }
 
 /**
- * Fetch registrations from the Digital Canvas Firestore project (media-analytics-proxy).
- * Digital Canvas writes to the "event-registrations" collection (hyphenated)
- * in a completely separate GCP project.
- */
-async function getDigitalCanvasRegistrations(filters?: { event?: string }): Promise<EventRegistration[]> {
-  try {
-    // If filtering by a non-MHTH event, skip
-    if (filters?.event && filters.event !== "MoreHumanThanHuman2026") return []
-
-    const dcDb = getDigitalCanvasDb()
-    const snapshot = await dcDb.collection("event-registrations").get()
-    return snapshot.docs.map((doc) => {
-      const data = doc.data()
-
-      // Canonical namespaced tags for every MHTH registrant. Mirrors the
-      // pattern used for techday: site:* (provenance / brand-owned property),
-      // event:* (event identifier with year), role:* (default attendee).
-      // Raw `data.tags` passthrough preserves any registration-form-specific
-      // tags so we don't lose data the form may have attached.
-      const incomingTags = Array.isArray(data.tags) ? (data.tags as string[]) : []
-      const tags: string[] = [
-        "site:digitalcanvas",
-        "event:more-human-than-human-2026",
-        "role:mhth-attendee",
-        ...incomingTags,
-      ]
-
-      return {
-        id: `dc:${doc.id}`,
-        email: data.email || "",
-        firstName: data.firstName || "",
-        lastName: data.lastName || "",
-        fullName: data.fullName || "",
-        company: data.company || null,
-        subscribeToFeed: data.subscribeToFeed || false,
-        event: data.event || "MoreHumanThanHuman2026",
-        eventName: data.eventName || "More Human Than Human",
-        eventDate: toISOString(data.eventDate || "2026-02-28"),
-        registeredAt: toISOString(data.registeredAt || data.createdAt || ""),
-        source: data.source || "web-digitalcanvas",
-        tags,
-        pageUrl: data.pageUrl || "",
-        checkedIn: data.checkedIn || false,
-        checkedInAt: data.checkedInAt ? toISOString(data.checkedInAt) : "",
-        _dbSource: "digitalcanvas",
-      }
-    })
-  } catch (error) {
-    console.error("Error fetching Digital Canvas registrations:", error)
-    return []
-  }
-}
-
-/**
  * Fetch registrations from the `digitalcanvas` NAMED database (434 Media
  * project) — Digital Canvas workshops such as "Lead with Ops. Layer in AI."
  *
- * Distinct from getDigitalCanvasRegistrations() above, which reads the separate
- * media-analytics-proxy GCP project (MHTH). Two quirks of this DB: tags are
- * stored as a JSON-encoded *string* (not an array), and the newsletter signal
- * is the `optInForUpdates` flag on the registration form (there's no separate
- * email-signups collection — opted-in registrants are the newsletter contacts).
- * Records carry the `dcw:` id prefix so writes route back here, not to `dc:`.
+ * (Historical MHTH registrations once lived in a separate media-analytics-proxy
+ * GCP project; they were migrated into the default DB's event_registrations and
+ * that external read was retired.)
+ *
+ * Two quirks of this DB: tags are stored as a JSON-encoded *string* (not an
+ * array), and the newsletter signal is the `optInForUpdates` flag on the
+ * registration form (there's no separate email-signups collection — opted-in
+ * registrants are the newsletter contacts). Records carry the `dcw:` id prefix
+ * so writes route back here.
  */
 function mapDcWorkshopDoc(doc: FirebaseFirestore.DocumentSnapshot): EventRegistration {
   const data = doc.data()!
@@ -396,10 +345,9 @@ export async function getEventRegistrations(filters?: {
       query = query.where("source", "==", filters.source)
     }
 
-    const [defaultSnapshot, techdayRegs, dcRegs, dcWorkshopRegs] = await Promise.all([
+    const [defaultSnapshot, techdayRegs, dcWorkshopRegs] = await Promise.all([
       query.get(),
       getTechdayRegistrations(filters),
-      getDigitalCanvasRegistrations(filters),
       getDigitalCanvasWorkshopRegistrations(filters),
     ])
 
@@ -419,11 +367,10 @@ export async function getEventRegistrations(filters?: {
       return defaultRegs
     }
 
-    // Merge and deduplicate across default DB + named DBs + separate projects.
+    // Merge and deduplicate across default DB + named DBs.
     const allRegs = deduplicateRegistrations([
       ...defaultRegs,
       ...techdayRegs,
-      ...dcRegs,
       ...dcWorkshopRegs,
     ])
     setRegCache(cacheKey, allRegs)
@@ -519,13 +466,6 @@ export async function updateEventRegistration(
       const realId = id.replace("techday:", "")
       const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
       await tdDb.collection("registrations").doc(realId).update(fields)
-      invalidateRegistrationsCache()
-      return { success: true }
-    }
-    if (id.startsWith("dc:")) {
-      const realId = id.replace("dc:", "")
-      const dcDb = getDigitalCanvasDb()
-      await dcDb.collection("event-registrations").doc(realId).update(fields)
       invalidateRegistrationsCache()
       return { success: true }
     }
@@ -656,15 +596,6 @@ export async function deleteEventRegistration(id: string): Promise<{ success: bo
       return { success: true }
     }
 
-    // Check if this is a digitalcanvas-prefixed ID (external MHTH project)
-    if (id.startsWith("dc:")) {
-      const realId = id.replace("dc:", "")
-      const dcDb = getDigitalCanvasDb()
-      await dcDb.collection("event-registrations").doc(realId).delete()
-      invalidateRegistrationsCache()
-      return { success: true }
-    }
-
     // Digital Canvas workshops named DB (434 Media project)
     if (id.startsWith("dcw:")) {
       const realId = id.replace("dcw:", "")
@@ -711,7 +642,7 @@ export function eventRegistrationsToCSV(registrations: EventRegistration[]): str
 
 /**
  * Mark an event registration as promoted to the leads pipeline. Routes the
- * write to the right database based on the id prefix (techday: / dc: / default).
+ * write to the right database based on the id prefix (techday: / dcw: / default).
  * Called by /api/admin/leads/promote-from-audience.
  */
 export async function markEventRegistrationPromoted(
@@ -728,13 +659,6 @@ export async function markEventRegistrationPromoted(
     const realId = id.replace("techday:", "")
     const tdDb = getNamedDb(NAMED_DATABASES.TECHDAY)
     await tdDb.collection("registrations").doc(realId).update(update)
-    invalidateRegistrationsCache()
-    return
-  }
-  if (id.startsWith("dc:")) {
-    const realId = id.replace("dc:", "")
-    const dcDb = getDigitalCanvasDb()
-    await dcDb.collection("event-registrations").doc(realId).update(update)
     invalidateRegistrationsCache()
     return
   }
@@ -763,12 +687,6 @@ export async function getEventRegistrationById(
     const doc = await tdDb.collection("registrations").doc(realId).get()
     if (!doc.exists) return null
     return mapTechdayDoc(doc)
-  }
-  if (id.startsWith("dc:")) {
-    // Digital Canvas mapping isn't a single doc fetch — the existing code
-    // pulls them in bulk via a different path. Defer dc: promotion until the
-    // dc-specific mapper is wired here.
-    return null
   }
   if (id.startsWith("dcw:")) {
     const realId = id.replace("dcw:", "")

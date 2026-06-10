@@ -287,11 +287,14 @@ some integrations are configured **per brand** with a suffix (e.g.
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ADMIN_PASSWORD=your-admin-password          # legacy guard on a few analytics/IG routes
 
-# FIREBASE / FIRESTORE (Admin SDK — server)
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-# Firebase web SDK (client) — NEXT_PUBLIC_FIREBASE_* keys for auth
+# GOOGLE / FIREBASE (server) — single service-account key.
+# GOOGLE_SERVICE_ACCOUNT_KEY is the ONE source of truth for Firestore Admin, GA4,
+# and Search Console; the project ID is read from it (no separate FIREBASE_PROJECT_ID
+# or GCP_PROJECT_ID). See the GOOGLE ANALYTICS block below for the key itself.
+# Firebase web SDK (client) — NEXT_PUBLIC_FIREBASE_* keys for auth.
+# Exception: Gmail notifications use a separate delegation-enabled service account:
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com  # notifications.ts Gmail only
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"  # notifications.ts Gmail only
 
 # MAILCHIMP
 MAILCHIMP_API_KEY=xxxxxxxxxx-us1

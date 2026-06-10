@@ -55,6 +55,41 @@ async function getAimsatxEmailSignups(filters?: { source?: string }): Promise<Fi
 }
 
 /**
+ * Fetch newsletter signups from the vemosvamos named database. The VemosVamos
+ * site writes to a `newsletter_signups` collection (fields: email, source,
+ * createdAt); normalize to the shared shape at READ time — no migration needed.
+ */
+async function getVemosVamosEmailSignups(filters?: { source?: string }): Promise<FirestoreEmailSignup[]> {
+  try {
+    if (filters?.source && filters.source.toLowerCase() !== "vemosvamos") return []
+
+    const vvDb = getNamedDb(NAMED_DATABASES.VEMOSVAMOS)
+    const snapshot = await vvDb.collection("newsletter_signups").get()
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: `vemosvamos:${doc.id}`,
+        email: data.email || "",
+        source: "VemosVamos",
+        created_at: data.createdAt || data.created_at || "",
+        mailchimp_synced: data.mailchimp_synced || false,
+        mailchimp_tags: data.tags || data.mailchimp_tags || [],
+        page_url: data.pageUrl || data.page_url || "",
+        promotedLeadId: data.promotedLeadId || undefined,
+        promotedAt: data.promotedAt || undefined,
+        _dbSource: "vemosvamos",
+      }
+    })
+  } catch (error) {
+    console.error("Error fetching vemosvamos email signups:", error)
+    return []
+  }
+}
+
+// Sources that live in a named DB and merge in alongside the default DB.
+const NAMED_DB_SOURCES = new Set(["aim", "vemosvamos"])
+
+/**
  * Deduplicate email signups across databases by email+source
  */
 function deduplicateEmailSignups(signups: FirestoreEmailSignup[]): FirestoreEmailSignup[] {
@@ -116,6 +151,13 @@ export async function deleteEmailSignup(id: string): Promise<{ success: boolean;
       console.log(`[Firestore] Deleted aimsatx email signup: ${realId}`)
       return { success: true }
     }
+    if (id.startsWith("vemosvamos:")) {
+      const realId = id.replace("vemosvamos:", "")
+      const vvDb = getNamedDb(NAMED_DATABASES.VEMOSVAMOS)
+      await vvDb.collection("newsletter_signups").doc(realId).delete()
+      console.log(`[Firestore] Deleted vemosvamos newsletter signup: ${realId}`)
+      return { success: true }
+    }
 
     const db = getDb()
     
@@ -154,23 +196,24 @@ export async function getEmailSignups(filters?: {
       query = query.where("source", "==", filters.source)
     }
     
-    const [defaultSnapshot, aimsSignups] = await Promise.all([
+    const [defaultSnapshot, aimsSignups, vvSignups] = await Promise.all([
       query.get(),
       getAimsatxEmailSignups(filters),
+      getVemosVamosEmailSignups(filters),
     ])
-    
+
     const defaultSignups = defaultSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
       _dbSource: "default",
     })) as FirestoreEmailSignup[]
-    
-    // If filtering by source and it's not aim, only return default
+
+    // If filtering by a source that doesn't live in a named DB, only return default
     let signups: FirestoreEmailSignup[]
-    if (filters?.source && filters.source.toLowerCase() !== "aim") {
+    if (filters?.source && !NAMED_DB_SOURCES.has(filters.source.toLowerCase())) {
       signups = defaultSignups
     } else {
-      signups = deduplicateEmailSignups([...defaultSignups, ...aimsSignups])
+      signups = deduplicateEmailSignups([...defaultSignups, ...aimsSignups, ...vvSignups])
     }
     
     // Client-side date filtering
@@ -205,17 +248,21 @@ export async function getEmailSignups(filters?: {
 export async function getEmailSources(): Promise<string[]> {
   try {
     const db = getDb()
-    const [defaultSnapshot, aimsSignups] = await Promise.all([
+    const [defaultSnapshot, aimsSignups, vvSignups] = await Promise.all([
       db.collection(COLLECTION_NAME).get(),
       getAimsatxEmailSignups(),
+      getVemosVamosEmailSignups(),
     ])
-    
+
     const sources = new Set<string>()
     defaultSnapshot.docs.forEach((doc) => {
       const data = doc.data()
       if (data.source) sources.add(data.source)
     })
     aimsSignups.forEach((s) => {
+      if (s.source) sources.add(s.source)
+    })
+    vvSignups.forEach((s) => {
       if (s.source) sources.add(s.source)
     })
     
@@ -273,7 +320,7 @@ export function emailSignupsToCSV(signups: FirestoreEmailSignup[]): string {
 
 /**
  * Mark an email signup as promoted to the leads pipeline. Routes the write
- * to the right database based on the id prefix (aimsatx: / default).
+ * to the right database based on the id prefix (aimsatx: / vemosvamos: / default).
  */
 export async function markEmailSignupPromoted(
   id: string,
@@ -289,6 +336,12 @@ export async function markEmailSignupPromoted(
     const realId = id.replace("aimsatx:", "")
     const aimsDb = getNamedDb(NAMED_DATABASES.AIMSATX)
     await aimsDb.collection("email_signups").doc(realId).update(update)
+    return
+  }
+  if (id.startsWith("vemosvamos:")) {
+    const realId = id.replace("vemosvamos:", "")
+    const vvDb = getNamedDb(NAMED_DATABASES.VEMOSVAMOS)
+    await vvDb.collection("newsletter_signups").doc(realId).update(update)
     return
   }
   const db = getDb()
@@ -318,6 +371,25 @@ export async function getEmailSignupById(
       promotedLeadId: data.promotedLeadId || undefined,
       promotedAt: data.promotedAt || undefined,
       _dbSource: "aimsatx",
+    }
+  }
+  if (id.startsWith("vemosvamos:")) {
+    const realId = id.replace("vemosvamos:", "")
+    const vvDb = getNamedDb(NAMED_DATABASES.VEMOSVAMOS)
+    const doc = await vvDb.collection("newsletter_signups").doc(realId).get()
+    if (!doc.exists) return null
+    const data = doc.data()!
+    return {
+      id: `vemosvamos:${realId}`,
+      email: data.email || "",
+      source: "VemosVamos",
+      created_at: data.createdAt || data.created_at || "",
+      mailchimp_synced: data.mailchimp_synced || false,
+      mailchimp_tags: data.tags || data.mailchimp_tags || [],
+      page_url: data.pageUrl || data.page_url || "",
+      promotedLeadId: data.promotedLeadId || undefined,
+      promotedAt: data.promotedAt || undefined,
+      _dbSource: "vemosvamos",
     }
   }
   const db = getDb()

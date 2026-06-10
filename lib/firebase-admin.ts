@@ -12,47 +12,28 @@ interface ServiceAccountCredentials {
 }
 
 function getCredentials(): ServiceAccountCredentials {
-  // Option 1: Use the same GOOGLE_SERVICE_ACCOUNT_KEY as analytics (full JSON)
+  // GOOGLE_SERVICE_ACCOUNT_KEY is the single source of truth for the 434 Media
+  // service account — Firestore Admin, GA4, and Search Console all use this key.
+  // (The Gmail-notification path in lib/notifications.ts is the one exception:
+  // it uses a separate delegation-enabled SA via FIREBASE_CLIENT_EMAIL/KEY.)
   const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (serviceAccountKey) {
-    try {
-      // Sanitize control characters (e.g. literal newlines in the private_key field)
-      const sanitized = serviceAccountKey.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
-      const credentials = JSON.parse(sanitized)
-      return {
-        project_id: credentials.project_id,
-        client_email: credentials.client_email,
-        private_key: credentials.private_key,
-      }
-    } catch {
-      // GOOGLE_SERVICE_ACCOUNT_KEY is malformed — will fall back to separate FIREBASE_* env vars
-    }
+  if (!serviceAccountKey) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is not set — it is required for Firebase Admin / Firestore.")
   }
-
-  // Option 2: Fall back to separate FIREBASE_* variables
-  const projectId = process.env.FIREBASE_PROJECT_ID
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY
-
-  if (projectId && clientEmail && privateKey) {
-    // Handle common private key encoding issues:
-    // 1. Literal \n strings that need to be real newlines
-    privateKey = privateKey.replace(/\\n/g, "\n")
-    // 2. Remove surrounding quotes if env var was double-quoted
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-      privateKey = privateKey.slice(1, -1).replace(/\\n/g, "\n")
-    }
-    
+  try {
+    // Sanitize control characters (e.g. literal newlines in the private_key field)
+    const sanitized = serviceAccountKey.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+    const credentials = JSON.parse(sanitized)
     return {
-      project_id: projectId,
-      client_email: clientEmail,
-      private_key: privateKey,
+      project_id: credentials.project_id,
+      client_email: credentials.client_email,
+      private_key: credentials.private_key,
     }
+  } catch (err) {
+    throw new Error(
+      `GOOGLE_SERVICE_ACCOUNT_KEY is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
-
-  throw new Error(
-    "Firebase configuration is missing. Set either GOOGLE_SERVICE_ACCOUNT_KEY (JSON) or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY"
-  )
 }
 
 function getFirebaseApp(): admin.app.App {
@@ -141,61 +122,15 @@ export function getNamedDb(databaseId: string): admin.firestore.Firestore {
 export const NAMED_DATABASES = {
   TECHDAY: "techday",
   AIMSATX: "aimsatx",
-  // Digital Canvas workshops (e.g. "Lead with Ops. Layer in AI."). Note: this is
-  // a NAMED database in the 434 Media project — distinct from the external
-  // media-analytics-proxy project read via getDigitalCanvasDb() (MHTH event).
+  // Digital Canvas workshops (e.g. "Lead with Ops. Layer in AI.") — a NAMED
+  // database in the 434 Media project. (Historical MHTH registrations once lived
+  // in a separate media-analytics-proxy GCP project; they were migrated into the
+  // default DB and that external connection was retired.)
   DIGITALCANVAS: "digitalcanvas",
+  // VemosVamos newsletter signups live in a named DB; read at READ time and
+  // surfaced in the Audiences → Newsletter "VemosVamos" cohort.
+  VEMOSVAMOS: "vemosvamos",
 } as const
-
-// ── External project: Digital Canvas (media-analytics-proxy) ──
-// The Digital Canvas site writes MHTH event registrations to its own
-// GCP project ("media-analytics-proxy") instead of the 434 Media project.
-// We connect to it as a separate Firebase app to read those registrations.
-let digitalCanvasDb: admin.firestore.Firestore | undefined
-
-export function getDigitalCanvasDb(): admin.firestore.Firestore {
-  if (digitalCanvasDb) return digitalCanvasDb
-
-  const appName = "digitalcanvas"
-
-  // Check if app already exists
-  const existing = admin.apps.find((a) => a?.name === appName)
-  if (existing) {
-    digitalCanvasDb = existing.firestore()
-    return digitalCanvasDb
-  }
-
-  const raw = process.env.DIGITALCANVAS_SERVICE_ACCOUNT_KEY
-  if (!raw) {
-    throw new Error(
-      "DIGITALCANVAS_SERVICE_ACCOUNT_KEY is not set. Cannot connect to Digital Canvas Firestore."
-    )
-  }
-
-  // Sanitize control characters (e.g. literal newlines in the private_key field)
-  const sanitized = raw.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
-  const creds = JSON.parse(sanitized)
-  const dcApp = admin.initializeApp(
-    {
-      credential: admin.credential.cert({
-        projectId: creds.project_id,
-        clientEmail: creds.client_email,
-        privateKey: creds.private_key,
-      }),
-    },
-    appName
-  )
-
-  digitalCanvasDb = dcApp.firestore()
-  try {
-    digitalCanvasDb.settings({ ignoreUndefinedProperties: true })
-  } catch {
-    // Settings already applied
-  }
-
-  console.log("[Firestore] Digital Canvas project (media-analytics-proxy) initialized")
-  return digitalCanvasDb
-}
 
 // Collection names - maps to different Firestore collections
 export const COLLECTIONS = {

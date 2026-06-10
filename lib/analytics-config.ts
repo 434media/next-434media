@@ -1,3 +1,16 @@
+// Derive the GCP project id from the service-account key — single source of
+// truth (replaces the former standalone GCP_PROJECT_ID env var).
+function deriveGcpProjectId(): string | undefined {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+  if (!raw) return undefined
+  try {
+    const sanitized = raw.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+    return JSON.parse(sanitized).project_id
+  } catch {
+    return undefined
+  }
+}
+
 // Multi-Property Google Analytics 4 Configuration
 export const analyticsConfig = {
   // Google Analytics Property IDs
@@ -9,8 +22,8 @@ export const analyticsConfig = {
   ga4PropertyIdAmpd: process.env.GA4_PROPERTY_ID_AMPD,
   ga4PropertyIdDigitalCanvas: process.env.GA4_PROPERTY_ID_DIGITALCANVAS,
 
-  // Google Cloud Project
-  gcpProjectId: process.env.GCP_PROJECT_ID,
+  // Google Cloud Project — derived from GOOGLE_SERVICE_ACCOUNT_KEY (no separate env var)
+  gcpProjectId: deriveGcpProjectId(),
 
   // Service Account Authentication for Google Analytics (JSON key)
   // This is separate from Firebase Auth - used only for GA4 Data API
@@ -54,8 +67,7 @@ export function getPropertyIdByKey(envKey: string): string | undefined {
 export function getMissingEnvironmentVariables(): string[] {
   const missing = []
 
-  // Core required variables
-  if (!analyticsConfig.gcpProjectId) missing.push("GCP_PROJECT_ID")
+  // Core required variable — the project id is derived from this key.
   if (!analyticsConfig.googleServiceAccountKey) missing.push("GOOGLE_SERVICE_ACCOUNT_KEY")
 
   // Property IDs (at least main property should be configured)
@@ -144,7 +156,6 @@ export function getConfigurationStatus() {
       GA4_PROPERTY_ID_SALUTE: !!process.env.GA4_PROPERTY_ID_SALUTE,
       GA4_PROPERTY_ID_AMPD: !!process.env.GA4_PROPERTY_ID_AMPD,
       GA4_PROPERTY_ID_DIGITALCANVAS: !!process.env.GA4_PROPERTY_ID_DIGITALCANVAS,
-      GCP_PROJECT_ID: !!process.env.GCP_PROJECT_ID,
       GOOGLE_SERVICE_ACCOUNT_KEY: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
     },
   }
