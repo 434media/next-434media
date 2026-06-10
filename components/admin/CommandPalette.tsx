@@ -515,7 +515,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] px-4" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-60 flex items-start justify-center pt-[15vh] px-4" role="dialog" aria-modal="true">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
