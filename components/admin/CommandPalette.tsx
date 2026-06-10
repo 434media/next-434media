@@ -220,15 +220,6 @@ const STATIC_ITEMS: CommandItem[] = [
     run: (router) => router.push("/admin/analytics-instagram"),
   },
   {
-    id: "nav-analytics-linkedin",
-    label: "Analytics — LinkedIn",
-    hint: "Company page, posts, followers",
-    icon: BarChart3,
-    section: "Navigate",
-    search: "analytics linkedin social",
-    run: (router) => router.push("/admin/analytics-linkedin"),
-  },
-  {
     id: "nav-content-calendar",
     label: "Content — Calendar",
     hint: "Social content calendar & approvals",

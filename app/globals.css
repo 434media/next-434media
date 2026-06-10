@@ -43,6 +43,9 @@ html, body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100%;
+  /* Non-static so Framer Motion's useScroll({ target }) can measure scroll
+     offset against the document scroll root without warning. */
+  position: relative;
 }
 
 /* ==========================================================================

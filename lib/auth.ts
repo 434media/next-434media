@@ -32,7 +32,6 @@ export const ADMIN_SECTIONS = {
   dashboard: { path: '/admin', roles: ['full_admin', 'crm_only'] },
   analytics: { path: '/admin/analytics', roles: ['full_admin'] },
   analyticsInstagram: { path: '/admin/analytics-instagram', roles: ['full_admin'] },
-  analyticsLinkedin: { path: '/admin/analytics-linkedin', roles: ['full_admin'] },
   analyticsWeb: { path: '/admin/analytics-web', roles: ['full_admin'] },
   blog: { path: '/admin/blog', roles: ['full_admin'] },
   crm: { path: '/admin/crm', roles: ['full_admin', 'crm_only'] },
