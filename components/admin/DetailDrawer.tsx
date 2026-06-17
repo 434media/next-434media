@@ -52,7 +52,11 @@ export function DetailDrawer({
   const panelRef = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
-  // Focus management — trap inside, restore on close
+  // Focus the panel when it opens; restore focus when it closes. Depends ONLY on
+  // `open` so it runs on the open/close transition — never on every re-render.
+  // (If it also depended on `onClose`, a parent passing an inline arrow function
+  // would re-run this on each keystroke and yank focus to the first focusable —
+  // the close button — letting only one character be typed.)
   useEffect(() => {
     if (!open) return
     previouslyFocused.current = (document.activeElement as HTMLElement) ?? null
@@ -63,7 +67,17 @@ export function DetailDrawer({
       )
       ;(firstFocusable ?? panel).focus()
     }
+    return () => {
+      previouslyFocused.current?.focus?.()
+    }
+  }, [open])
 
+  // Esc to close + Tab focus trap. Separate from the focus-on-open effect so it
+  // can depend on `onClose`/`closeOnEscape` (re-subscribing the listener) without
+  // re-triggering focus.
+  useEffect(() => {
+    if (!open) return
+    const panel = panelRef.current
     const handleKey = (e: KeyboardEvent) => {
       if (!closeOnEscape) return
       if (e.key === "Escape") {
@@ -88,12 +102,8 @@ export function DetailDrawer({
         }
       }
     }
-
     window.addEventListener("keydown", handleKey)
-    return () => {
-      window.removeEventListener("keydown", handleKey)
-      previouslyFocused.current?.focus?.()
-    }
+    return () => window.removeEventListener("keydown", handleKey)
   }, [open, closeOnEscape, onClose])
 
   // Prevent background scroll while open
