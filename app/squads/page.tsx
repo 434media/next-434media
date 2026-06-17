@@ -321,12 +321,15 @@ function ClosingSlide() {
       <motion.div variants={item} className="text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400">
         Five teams · one cohort
       </motion.div>
-      <motion.h2 variants={item} className="mt-5 text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white">
-        GTM finds it. Onboarding frames it.
-        <br />
-        Builders ship it. Storytellers tell it.
-        <br />
-        Analytics proves it.
+      <motion.h2
+        variants={item}
+        className="mt-5 max-w-4xl text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] text-balance text-white"
+      >
+        <span className="whitespace-nowrap">GTM finds it.</span>{" "}
+        <span className="whitespace-nowrap">Onboarding frames it.</span>{" "}
+        <span className="whitespace-nowrap">Builders ship it.</span>{" "}
+        <span className="whitespace-nowrap">Storytellers tell it.</span>{" "}
+        <span className="whitespace-nowrap">Analytics proves it.</span>
       </motion.h2>
       <motion.p variants={item} className="mt-6 sm:mt-7 text-lg sm:text-xl text-slate-300">
         Every team owns a stage of the same pipeline — and the cohort runs end-to-end, from a real industry problem
