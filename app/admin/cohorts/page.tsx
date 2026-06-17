@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Loader2, Plus, Trash2, Users, AlertTriangle, CheckCircle2, XCircle } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
@@ -302,30 +303,39 @@ function CohortsInner() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {cohorts.map((c) => (
-              <button
+              <div
                 key={c.id}
-                type="button"
-                onClick={() => openEdit(c)}
-                className="text-left bg-white border border-neutral-200 rounded-lg p-4 hover:border-neutral-300 hover:shadow-sm transition-all"
+                className="bg-white border border-neutral-200 rounded-lg hover:border-neutral-300 hover:shadow-sm transition-all"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-[14px] font-semibold text-neutral-900 truncate">{c.name}</span>
-                  <span
-                    className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded border ${STATUS_COLORS[c.status]}`}
+                <Link href={`/admin/cohorts/${c.id}`} className="block text-left p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[14px] font-semibold text-neutral-900 truncate">{c.name}</span>
+                    <span
+                      className={`shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded border ${STATUS_COLORS[c.status]}`}
+                    >
+                      {STATUS_LABELS[c.status]}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[12px] text-neutral-500">
+                    {VERTICAL_LABELS[c.vertical]} · {c.hostBrand}
+                  </div>
+                  {c.sponsorName && (
+                    <div className="mt-0.5 text-[12px] text-neutral-400">Sponsor: {c.sponsorName}</div>
+                  )}
+                  {c.demoDayDate && (
+                    <div className="mt-2 text-[11px] text-neutral-400">Demo day {c.demoDayDate}</div>
+                  )}
+                </Link>
+                <div className="px-4 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(c)}
+                    className="text-[11px] font-medium text-neutral-400 hover:text-neutral-700"
                   >
-                    {STATUS_LABELS[c.status]}
-                  </span>
+                    Edit details &amp; builders
+                  </button>
                 </div>
-                <div className="mt-1 text-[12px] text-neutral-500">
-                  {VERTICAL_LABELS[c.vertical]} · {c.hostBrand}
-                </div>
-                {c.sponsorName && (
-                  <div className="mt-0.5 text-[12px] text-neutral-400">Sponsor: {c.sponsorName}</div>
-                )}
-                {c.demoDayDate && (
-                  <div className="mt-2 text-[11px] text-neutral-400">Demo day {c.demoDayDate}</div>
-                )}
-              </button>
+              </div>
             ))}
           </div>
         )}

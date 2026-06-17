@@ -16,6 +16,7 @@ import type {
   OpportunityStage,
   Cohort,
   Builder,
+  CohortTask,
 } from "../types/crm-types"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 
@@ -477,6 +478,36 @@ export async function updateBuilder(id: string, updates: Partial<Builder>): Prom
 
 export async function deleteBuilder(id: string): Promise<void> {
   return deleteDocument(CRM_COLLECTIONS.BUILDERS, id)
+}
+
+export async function getCohortTasksByCohort(cohortId: string): Promise<CohortTask[]> {
+  try {
+    const db = getDb()
+    const snapshot = await db
+      .collection(CRM_COLLECTIONS.COHORT_TASKS)
+      .where("cohortId", "==", cohortId)
+      .get()
+    return snapshot.docs
+      .map((doc) => docToData<CohortTask>(doc))
+      .filter((t): t is CohortTask => t !== null)
+  } catch (error) {
+    console.error("Error fetching cohort tasks:", error)
+    throw error
+  }
+}
+
+export async function createCohortTask(
+  data: Omit<CohortTask, "id" | "created_at" | "updated_at">
+): Promise<CohortTask> {
+  return createDocument<CohortTask>(CRM_COLLECTIONS.COHORT_TASKS, data)
+}
+
+export async function updateCohortTask(id: string, updates: Partial<CohortTask>): Promise<CohortTask> {
+  return updateDocument<CohortTask>(CRM_COLLECTIONS.COHORT_TASKS, id, updates)
+}
+
+export async function deleteCohortTask(id: string): Promise<void> {
+  return deleteDocument(CRM_COLLECTIONS.COHORT_TASKS, id)
 }
 
 // ============================================

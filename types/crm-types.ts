@@ -1,6 +1,8 @@
 // CRM Types for 434 Media Sales CRM
 // Migrated from Airtable Base: app6lXqEqHFG9ZJ20
 
+import type { SquadKey } from "../components/crm/types"
+
 // Base record interface with common fields
 export interface BaseRecord {
   id: string
@@ -540,6 +542,7 @@ export const CRM_COLLECTIONS = {
   // Digital Canvas cohort program
   COHORTS: "crm_cohorts",
   BUILDERS: "crm_builders",
+  COHORT_TASKS: "crm_cohort_tasks",
 } as const
 
 // ============================================
@@ -623,6 +626,32 @@ export interface Builder {
   notes?: string
   created_at: string
   updated_at: string
+}
+
+// A cohort task — the squad-grouped work board for a cohort (Section 3). Reuses
+// the Task shape (status / priority / comments / attachments) but lives in ONE
+// collection (crm_cohort_tasks), NOT the owner-partitioned crm_tasks_* set, so
+// interns can own tasks without per-person collections. assigned_to is a
+// team-member id/email, not an OWNER_MAP bucket.
+export interface CohortTask {
+  id: string
+  cohortId: string // FK → crm_cohorts
+  squad: SquadKey // which squad owns it
+  week?: number // 1–6 cadence bucket
+  isDeliverable?: boolean // the "Ship by Friday" items
+  title: string
+  description?: string
+  assigned_to?: string
+  status: TaskStatus
+  priority?: Priority
+  due_date?: string
+  tags?: string[]
+  web_links?: string[]
+  attachments?: TaskAttachment[]
+  comments?: TaskComment[]
+  created_at: string
+  updated_at: string
+  created_by?: string
 }
 
 // ============================================

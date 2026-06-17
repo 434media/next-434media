@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireFullAdmin } from "@/lib/auth"
 import {
   getCohorts,
+  getCohortById,
   createCohort,
   updateCohort,
   deleteCohort,
@@ -40,11 +41,17 @@ const VALID_BRANDS = [
   "TXMX Boxing",
 ]
 
-// GET — list all cohorts
-export async function GET() {
+// GET — list all cohorts, or a single cohort (?id=)
+export async function GET(request: NextRequest) {
   const auth = await requireFullAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
+    const id = new URL(request.url).searchParams.get("id")
+    if (id) {
+      const cohort = await getCohortById(id)
+      if (!cohort) return NextResponse.json({ success: false, error: "Cohort not found" }, { status: 404 })
+      return NextResponse.json({ success: true, data: cohort })
+    }
     const cohorts = await getCohorts({ fresh: true })
     return NextResponse.json({ success: true, data: cohorts })
   } catch (error) {
