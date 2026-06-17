@@ -16,8 +16,8 @@ export default function Footer() {
   const footerRef = useRef<HTMLElement>(null)
   const currentYear = new Date().getFullYear()
 
-  // Hide the public footer on admin routes
-  if (pathname?.startsWith("/admin")) {
+  // Hide the public footer on admin routes and the full-screen squads deck
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/squads")) {
     return null
   }
 
