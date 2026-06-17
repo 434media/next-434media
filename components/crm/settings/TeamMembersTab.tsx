@@ -11,9 +11,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  X,
 } from "lucide-react"
 import { SQUAD_LABELS, type SquadKey, type CurrentUser } from "../types"
+import { DetailDrawer } from "@/components/admin/DetailDrawer"
 
 type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
 
@@ -174,8 +174,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
     })
   }
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSaveEdit = async () => {
     if (!editing) return
     setSavingEdit(true)
     try {
@@ -323,7 +322,17 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
             return (
               <div
                 key={member.id}
-                className={`flex items-center gap-3 px-4 py-3 ${member.isActive ? "" : "opacity-60"}`}
+                onClick={() => openEdit(member)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    openEdit(member)
+                  }
+                }}
+                title="Edit profile"
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-neutral-50 transition-colors ${member.isActive ? "" : "opacity-60"}`}
               >
                 <div className="shrink-0 w-8 h-8 rounded-full bg-neutral-100 text-neutral-500 flex items-center justify-center">
                   {member.role === "crm_super_admin" ? (
@@ -336,14 +345,9 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(member)}
-                      className="text-[13px] font-semibold text-neutral-900 truncate text-left hover:underline"
-                      title="Edit profile"
-                    >
+                    <span className="text-[13px] font-semibold text-neutral-900 truncate">
                       {member.name}
-                    </button>
+                    </span>
                     {self && (
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
                         you
@@ -362,6 +366,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
                   value={member.role}
                   disabled={pendingId === member.id || self}
                   onChange={(e) => handleRoleChange(member, e.target.value as AdminRole)}
+                  onClick={(e) => e.stopPropagation()}
                   title={self ? "You cannot change your own role" : undefined}
                   className={`px-2 py-1 text-[11px] font-medium rounded border ${roleCfg.color} disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
@@ -373,7 +378,10 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
 
                 <button
                   type="button"
-                  onClick={() => handleToggleActive(member)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleToggleActive(member)
+                  }}
                   disabled={pendingId === member.id || self}
                   title={self ? "You cannot deactivate yourself" : member.isActive ? "Deactivate" : "Reactivate"}
                   className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -389,7 +397,10 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
 
                 <button
                   type="button"
-                  onClick={() => handleDelete(member)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(member)
+                  }}
                   disabled={pendingId === member.id || self}
                   title={self ? "You cannot delete yourself" : "Delete"}
                   className="text-neutral-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -407,117 +418,101 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
         </div>
       )}
 
-      {editing && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => setEditing(null)}
-            className="absolute inset-0 bg-black/30"
-          />
-          <div className="relative w-full max-w-sm h-full bg-white shadow-xl border-l border-neutral-200 flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
-              <h3 className="text-sm font-semibold text-neutral-900">Edit profile</h3>
-              <button
-                type="button"
-                onClick={() => setEditing(null)}
-                className="text-neutral-400 hover:text-neutral-700"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <form onSubmit={handleSaveEdit} className="flex flex-col flex-1 min-h-0">
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                    {ROLE_LABELS[editing.role]?.label ?? "Member"}
-                  </span>
-                  {editing.squad && (
-                    <span className="text-[11px] text-neutral-500">· {SQUAD_LABELS[editing.squad]}</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-                      First name
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.firstName}
-                      onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-                      Last name
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.lastName}
-                      onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-                    Email
-                  </label>
-                  <div className="px-3 py-2 text-sm bg-neutral-50 border border-neutral-200/70 rounded-md text-neutral-500">
-                    {editing.email || "—"}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-                    Squad
-                  </label>
-                  <select
-                    value={editForm.squad}
-                    onChange={(e) => setEditForm((f) => ({ ...f, squad: e.target.value as SquadKey | "" }))}
-                    className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
-                  >
-                    <option value="">Unassigned</option>
-                    {(Object.keys(SQUAD_LABELS) as SquadKey[]).map((k) => (
-                      <option key={k} value={k}>
-                        {SQUAD_LABELS[k]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
-                    Phone <span className="text-neutral-300 normal-case">(optional)</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
-                  />
-                </div>
-              </div>
-              <div className="px-5 py-3 border-t border-neutral-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditing(null)}
-                  className="px-3 py-1.5 rounded-md text-[12px] font-medium text-neutral-600 hover:text-neutral-900"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEdit}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 text-white text-[12px] font-semibold hover:bg-neutral-800 disabled:opacity-50"
-                >
-                  {savingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Save
-                </button>
-              </div>
-            </form>
+      <DetailDrawer
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="Edit profile"
+        subtitle={editing?.email || undefined}
+        width="md"
+        badge={
+          editing ? (
+            <span
+              className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${
+                (ROLE_LABELS[editing.role] ?? ROLE_LABELS.crm_only).color
+              }`}
+            >
+              {(ROLE_LABELS[editing.role] ?? ROLE_LABELS.crm_only).label}
+            </span>
+          ) : undefined
+        }
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="px-3 py-1.5 rounded-md text-[12px] font-medium text-neutral-600 hover:text-neutral-900"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveEdit}
+              disabled={savingEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 text-white text-[12px] font-semibold hover:bg-neutral-800 disabled:opacity-50"
+            >
+              {savingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Save
+            </button>
           </div>
-        </div>
-      )}
+        }
+      >
+        {editing && (
+          <div className="px-4 sm:px-5 py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                  First name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                  Last name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                Squad
+              </label>
+              <select
+                value={editForm.squad}
+                onChange={(e) => setEditForm((f) => ({ ...f, squad: e.target.value as SquadKey | "" }))}
+                className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+              >
+                <option value="">Unassigned</option>
+                {(Object.keys(SQUAD_LABELS) as SquadKey[]).map((k) => (
+                  <option key={k} value={k}>
+                    {SQUAD_LABELS[k]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                Phone <span className="text-neutral-300 normal-case">(optional)</span>
+              </label>
+              <input
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+              />
+            </div>
+          </div>
+        )}
+      </DetailDrawer>
     </div>
   )
 }
