@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { requireSendCapable } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
 import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 import { isSuppressed } from "@/lib/firestore-suppression"
@@ -11,15 +11,6 @@ export const maxDuration = 30
 // Default follow-up window: if there's no reply in 5 business days, surface
 // the lead in the Follow-ups Due chip on the leads tab.
 const FOLLOWUP_DAYS = 5
-
-async function requireAdmin() {
-  const session = await getSession()
-  if (!session) return { error: "Unauthorized", status: 401 as const }
-  if (!isAuthorizedAdmin(session.email)) {
-    return { error: "Forbidden: Admin access required", status: 403 as const }
-  }
-  return { session }
-}
 
 interface SendBody {
   subject: string
@@ -37,7 +28,7 @@ interface SendBody {
 // set to the sending rep so replies route directly to them, not to a
 // shared transactional inbox.
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin()
+  const auth = await requireSendCapable()
   if ("error" in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }

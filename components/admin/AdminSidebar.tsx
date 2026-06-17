@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-type AdminRole = "crm_super_admin" | "full_admin" | "crm_only"
+type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
 
 // Hardcoded super-admin fallback — kept in sync with lib/auth.ts CRM_SUPER_ADMIN_FALLBACK.
 // Used so the sidebar can render the Settings entry without an async Firestore lookup.
@@ -78,7 +78,7 @@ const OVERVIEW_ITEM: SidebarLink = {
   href: "/admin",
   matchPrefix: "/admin",
   exact: true,
-  roles: ["crm_super_admin", "full_admin", "crm_only"],
+  roles: ["crm_super_admin", "full_admin", "crm_only", "intern"],
 }
 
 // Sections mirror the lifecycle: "Pipeline" runs in funnel order
@@ -111,7 +111,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Flag,
         href: "/admin/leads",
         matchPrefix: "/admin/leads",
-        roles: ["full_admin", "crm_only"],
+        roles: ["full_admin", "crm_only", "intern"],
       },
       {
         id: "crm",
@@ -119,7 +119,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Rocket,
         href: "/admin/crm",
         matchPrefix: "/admin/crm",
-        roles: ["full_admin", "crm_only"],
+        roles: ["full_admin", "crm_only", "intern"],
       },
     ],
   },
@@ -133,7 +133,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: BarChart3,
         href: "/admin/analytics",
         matchPrefix: "/admin/analytics",
-        roles: ["full_admin"],
+        roles: ["full_admin", "intern"],
       },
     ],
   },
@@ -152,7 +152,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/content/studio",
         matchPrefix: "/admin/content/studio",
         description: "Generate images & video with AI — saved to your library",
-        roles: ["full_admin", "crm_only"],
+        roles: ["full_admin", "crm_only", "intern"],
       },
       {
         id: "content-calendar",
@@ -163,7 +163,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         // Exact so it doesn't stay highlighted on the /admin/content/studio sibling.
         exact: true,
         description: "Plan, review & schedule social posts",
-        roles: ["full_admin", "crm_only"],
+        roles: ["full_admin", "crm_only", "intern"],
       },
       {
         id: "feed",
@@ -203,7 +203,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: FileText,
         href: "/admin/sops",
         matchPrefix: "/admin/sops",
-        roles: ["full_admin"],
+        roles: ["full_admin", "intern"],
       },
     ],
   },

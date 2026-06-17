@@ -161,7 +161,7 @@ export default function LeadsPage() {
   }, [showLeadDrawer, selectedLead?.id])
 
   return (
-    <AdminRoleGuard allowedRoles={["full_admin", "crm_only"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
         <Toast toast={toast} />
 

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { requireSendCapable } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, RESEND_DOMAIN, assertVerifiedSender } from "@/lib/resend"
 import { setSubmissionState } from "@/lib/firestore-submission-states"
 
@@ -29,17 +29,8 @@ interface ReplyBody {
   body: string
 }
 
-async function requireAdmin() {
-  const session = await getSession()
-  if (!session) return { error: "Unauthorized", status: 401 as const }
-  if (!isAuthorizedAdmin(session.email)) {
-    return { error: "Forbidden: Admin access required", status: 403 as const }
-  }
-  return { session }
-}
-
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin()
+  const auth = await requireSendCapable()
   if ("error" in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }

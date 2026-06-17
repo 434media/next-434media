@@ -4,7 +4,9 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Shield, AlertCircle } from "lucide-react"
 
-type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only'
+// Mirrors AdminRole in lib/auth.ts — kept local because this is a client
+// component (lib/auth pulls in next/headers). Keep the two in sync.
+type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only' | 'intern'
 
 // Hardcoded super-admin fallback — same list as lib/auth.ts CRM_SUPER_ADMIN_FALLBACK.
 // Used to upgrade the effective role for sidebar/page guards before any

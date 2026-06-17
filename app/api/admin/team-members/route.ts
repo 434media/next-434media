@@ -7,12 +7,19 @@ import {
   CRM_SUPER_ADMIN_FALLBACK,
   type AdminRole,
 } from "@/lib/auth"
+import type { SquadKey } from "@/components/crm/types"
 
 const TEAM_MEMBERS_COLLECTION = "crm_team_members"
+const VALID_ROLES = ["crm_super_admin", "full_admin", "crm_only", "intern"]
+const VALID_SQUADS = ["domain", "build", "story_media", "gtm", "analytics"]
 
 export interface TeamMember {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  squad?: SquadKey | null
   email: string
   isActive: boolean
   role: AdminRole
@@ -176,7 +183,7 @@ export async function POST(request: Request) {
       name: name.trim(),
       email: trimmedEmail,
       isActive: true,
-      role: (role && ["crm_super_admin", "full_admin", "crm_only"].includes(role) ? role : "crm_only") as AdminRole,
+      role: (role && VALID_ROLES.includes(role) ? role : "crm_only") as AdminRole,
       created_at: now,
       updated_at: now,
     }
@@ -252,12 +259,16 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { id, name, email, isActive, role } = body as {
+    const { id, name, email, isActive, role, firstName, lastName, phone, squad } = body as {
       id?: string
       name?: string
       email?: string
       isActive?: boolean
       role?: AdminRole
+      firstName?: string
+      lastName?: string
+      phone?: string
+      squad?: SquadKey | null
     }
 
     if (!id) {
@@ -302,13 +313,33 @@ export async function PATCH(request: Request) {
     if (email !== undefined) updates.email = email.trim().toLowerCase()
     if (isActive !== undefined) updates.isActive = isActive
     if (role !== undefined) {
-      if (!["crm_super_admin", "full_admin", "crm_only"].includes(role)) {
+      if (!VALID_ROLES.includes(role)) {
         return NextResponse.json(
           { success: false, error: `Invalid role: ${role}` },
           { status: 400 },
         )
       }
       updates.role = role
+    }
+    if (firstName !== undefined) updates.firstName = firstName.trim()
+    if (lastName !== undefined) updates.lastName = lastName.trim()
+    if (phone !== undefined) updates.phone = phone.trim()
+    if (squad !== undefined) {
+      if (squad !== null && !VALID_SQUADS.includes(squad)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid squad: ${squad}` },
+          { status: 400 },
+        )
+      }
+      updates.squad = squad
+    }
+    // Keep `name` consistent with first/last (the rest of the app reads `name`):
+    // when either name part is edited, recompose the display name from them.
+    if (firstName !== undefined || lastName !== undefined) {
+      const fn = (firstName ?? existing.firstName ?? "").trim()
+      const ln = (lastName ?? existing.lastName ?? "").trim()
+      const composed = [fn, ln].filter(Boolean).join(" ").trim()
+      if (composed) updates.name = composed
     }
 
     await db.collection(TEAM_MEMBERS_COLLECTION).doc(id).update(updates)

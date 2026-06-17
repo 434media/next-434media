@@ -11,14 +11,19 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  X,
 } from "lucide-react"
-import type { CurrentUser } from "../types"
+import { SQUAD_LABELS, type SquadKey, type CurrentUser } from "../types"
 
-type AdminRole = "crm_super_admin" | "full_admin" | "crm_only"
+type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
 
 interface TeamMember {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  squad?: SquadKey | null
   email: string
   isActive: boolean
   role: AdminRole
@@ -30,6 +35,7 @@ const ROLE_LABELS: Record<AdminRole, { label: string; color: string }> = {
   crm_super_admin: { label: "Super Admin", color: "bg-amber-50 text-amber-700 border-amber-200" },
   full_admin: { label: "Full Admin", color: "bg-blue-50 text-blue-700 border-blue-200" },
   crm_only: { label: "CRM Only", color: "bg-neutral-100 text-neutral-600 border-neutral-200" },
+  intern: { label: "Intern", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 }
 
 export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
@@ -41,6 +47,14 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
   const [newMember, setNewMember] = useState({ name: "", email: "", role: "crm_only" as AdminRole })
   const [savingNew, setSavingNew] = useState(false)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [editing, setEditing] = useState<TeamMember | null>(null)
+  const [editForm, setEditForm] = useState<{ firstName: string; lastName: string; phone: string; squad: SquadKey | "" }>({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    squad: "",
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const refresh = async () => {
     setLoading(true)
@@ -150,6 +164,44 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
     }
   }
 
+  const openEdit = (member: TeamMember) => {
+    setEditing(member)
+    setEditForm({
+      firstName: member.firstName ?? "",
+      lastName: member.lastName ?? "",
+      phone: member.phone ?? "",
+      squad: member.squad ?? "",
+    })
+  }
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editing) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch("/api/admin/team-members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editing.id,
+          firstName: editForm.firstName,
+          lastName: editForm.lastName,
+          phone: editForm.phone,
+          squad: editForm.squad === "" ? null : editForm.squad,
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Failed to save profile")
+      setToast({ message: "Profile updated", type: "success" })
+      setEditing(null)
+      await refresh()
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to save profile", type: "error" })
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const isSelf = (member: TeamMember) => member.email.toLowerCase() === currentUser.email.toLowerCase()
 
   return (
@@ -228,6 +280,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
               <option value="crm_only">CRM Only</option>
               <option value="full_admin">Full Admin</option>
               <option value="crm_super_admin">Super Admin</option>
+              <option value="intern">Intern</option>
             </select>
           </div>
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -283,9 +336,14 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-neutral-900 truncate">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(member)}
+                      className="text-[13px] font-semibold text-neutral-900 truncate text-left hover:underline"
+                      title="Edit profile"
+                    >
                       {member.name}
-                    </span>
+                    </button>
                     {self && (
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
                         you
@@ -310,6 +368,7 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
                   <option value="crm_only">CRM Only</option>
                   <option value="full_admin">Full Admin</option>
                   <option value="crm_super_admin">Super Admin</option>
+                  <option value="intern">Intern</option>
                 </select>
 
                 <button
@@ -345,6 +404,118 @@ export function TeamMembersTab({ currentUser }: { currentUser: CurrentUser }) {
               No team members yet. Click "Add member" to add the first one.
             </div>
           )}
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setEditing(null)}
+            className="absolute inset-0 bg-black/30"
+          />
+          <div className="relative w-full max-w-sm h-full bg-white shadow-xl border-l border-neutral-200 flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+              <h3 className="text-sm font-semibold text-neutral-900">Edit profile</h3>
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="text-neutral-400 hover:text-neutral-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                    {ROLE_LABELS[editing.role]?.label ?? "Member"}
+                  </span>
+                  {editing.squad && (
+                    <span className="text-[11px] text-neutral-500">· {SQUAD_LABELS[editing.squad]}</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                      First name
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.firstName}
+                      onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                      Last name
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.lastName}
+                      onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                    Email
+                  </label>
+                  <div className="px-3 py-2 text-sm bg-neutral-50 border border-neutral-200/70 rounded-md text-neutral-500">
+                    {editing.email || "—"}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                    Squad
+                  </label>
+                  <select
+                    value={editForm.squad}
+                    onChange={(e) => setEditForm((f) => ({ ...f, squad: e.target.value as SquadKey | "" }))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+                  >
+                    <option value="">Unassigned</option>
+                    {(Object.keys(SQUAD_LABELS) as SquadKey[]).map((k) => (
+                      <option key={k} value={k}>
+                        {SQUAD_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1">
+                    Phone <span className="text-neutral-300 normal-case">(optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm bg-white border border-neutral-200/70 rounded-md focus:outline-none focus:border-neutral-400"
+                  />
+                </div>
+              </div>
+              <div className="px-5 py-3 border-t border-neutral-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(null)}
+                  className="px-3 py-1.5 rounded-md text-[12px] font-medium text-neutral-600 hover:text-neutral-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 text-white text-[12px] font-semibold hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {savingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

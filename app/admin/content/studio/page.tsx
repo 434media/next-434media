@@ -136,7 +136,7 @@ export default function StudioPage() {
   const shown = filter === "all" ? assets : assets.filter((a) => a.kind === filter)
 
   return (
-    <AdminRoleGuard allowedRoles={["full_admin", "crm_only"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {/* Header */}

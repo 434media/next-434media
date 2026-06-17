@@ -482,10 +482,27 @@ export const TEAM_MEMBERS = [
   { name: "Nichole Snow", email: "nichole@434media.com" },
 ]
 
-// TeamMember type for Firestore
+// Cohort squad assignment (Digital Canvas program). Optional — undefined/null for
+// non-cohort staff. Distinct from AdminRole (access) and from a painpoint vertical.
+export type SquadKey = "domain" | "build" | "story_media" | "gtm" | "analytics"
+
+export const SQUAD_LABELS: Record<SquadKey, string> = {
+  domain: "Domain & Painpoints",
+  build: "Build",
+  story_media: "Story & Media",
+  gtm: "GTM",
+  analytics: "Analytics",
+}
+
+// TeamMember type for Firestore. `name` stays the canonical display field; when
+// firstName/lastName are set it's derived from them (server-side, on write).
 export interface TeamMember {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  squad?: SquadKey | null
   email: string
   isActive: boolean
   created_at: string

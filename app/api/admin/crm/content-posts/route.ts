@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSession, isAuthorizedAdmin } from "@/lib/auth"
+import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
 import {
   getContentPosts,
   getContentPostById,
@@ -144,6 +144,24 @@ export async function PUT(request: NextRequest) {
     // an edit to one already there) — the email should fire only on entry.
     const existing = await getContentPostById(id)
     const prevStatus = existing?.status
+
+    // Producers (intern / crm_only) may edit drafts and submit for review, but
+    // moving a post INTO an approved/scheduled/posted state is an operator
+    // action — gate those transitions by role. Editing a post already in such a
+    // state (status unchanged) stays allowed.
+    const RESTRICTED_STATUSES = ["approved", "rejected", "scheduled", "posted"]
+    if (
+      body.status &&
+      body.status !== prevStatus &&
+      RESTRICTED_STATUSES.includes(body.status) &&
+      !canSend(authResult.session.role) &&
+      !(await isCrmSuperAdmin(authResult.session.email))
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden: your role can edit drafts but not approve, schedule, or publish content" },
+        { status: 403 }
+      )
+    }
 
     const updates = {
       user: body.user,

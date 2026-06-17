@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
 export type AuthProvider = 'google' | 'firebase'
-export type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only'
+export type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only' | 'intern'
 
 /**
  * Hardcoded fallback list of CRM super admins. Used when the Firestore
@@ -27,14 +27,21 @@ export interface User {
   role?: AdminRole
 }
 
-// Define which admin sections each role can access
+// Define which admin sections each role can access.
+//
+// `intern` is a broad-read / narrow-act role (cohort interns): it can VIEW the
+// dashboard, CRM, and analytics (read-only — mutating analytics actions like
+// goals/annotations are gated at the route level), but is excluded from publish
+// and marketing-ops surfaces (blog, email lists, events, feed form). Page-level
+// surfaces gated by <AdminRoleGuard> (leads, content, the cohort board, SOPs)
+// grant `intern` separately on each page.
 export const ADMIN_SECTIONS = {
-  dashboard: { path: '/admin', roles: ['full_admin', 'crm_only'] },
-  analytics: { path: '/admin/analytics', roles: ['full_admin'] },
-  analyticsInstagram: { path: '/admin/analytics-instagram', roles: ['full_admin'] },
-  analyticsWeb: { path: '/admin/analytics-web', roles: ['full_admin'] },
+  dashboard: { path: '/admin', roles: ['full_admin', 'crm_only', 'intern'] },
+  analytics: { path: '/admin/analytics', roles: ['full_admin', 'intern'] },
+  analyticsInstagram: { path: '/admin/analytics-instagram', roles: ['full_admin', 'intern'] },
+  analyticsWeb: { path: '/admin/analytics-web', roles: ['full_admin', 'intern'] },
   blog: { path: '/admin/blog', roles: ['full_admin'] },
-  crm: { path: '/admin/crm', roles: ['full_admin', 'crm_only'] },
+  crm: { path: '/admin/crm', roles: ['full_admin', 'crm_only', 'intern'] },
   emailLists: { path: '/admin/email-lists', roles: ['full_admin'] },
   events: { path: '/admin/events', roles: ['full_admin'] },
   feedForm: { path: '/admin/feed-form', roles: ['full_admin'] },
@@ -48,7 +55,7 @@ export type AdminSection = keyof typeof ADMIN_SECTIONS
 export function canAccessSection(user: User | null, section: AdminSection): boolean {
   if (!user) return false
   const role = user.role || 'crm_only'
-  return ADMIN_SECTIONS[section].roles.includes(role)
+  return (ADMIN_SECTIONS[section].roles as readonly AdminRole[]).includes(role)
 }
 
 /**
@@ -61,7 +68,7 @@ export function canAccessPath(user: User | null, path: string): boolean {
   // Find matching section for this path
   for (const section of Object.values(ADMIN_SECTIONS)) {
     if (path.startsWith(section.path) && section.path !== '/admin') {
-      return section.roles.includes(role)
+      return (section.roles as readonly AdminRole[]).includes(role)
     }
   }
   
@@ -70,12 +77,49 @@ export function canAccessPath(user: User | null, path: string): boolean {
 }
 
 /**
- * Get the role for a user based on their auth provider
+ * Provider-based role FALLBACK — used only when a user has no explicit
+ * `crm_team_members.role` record. Real roles come from `resolveRole` below.
+ *  - Google OAuth is workspace-restricted to @434media.com (verified staff) → full_admin.
+ *  - Firebase email/password is how the cohort self-registers → intern (least-privilege).
  */
 export function getRoleForProvider(authProvider: AuthProvider): AdminRole {
-  // Google Workspace users get full admin access
-  // Firebase email/password users get CRM-only access
-  return authProvider === 'google' ? 'full_admin' : 'crm_only'
+  return authProvider === 'google' ? 'full_admin' : 'intern'
+}
+
+/**
+ * Resolve a user's effective admin role at login. Firestore is the source of
+ * truth; the provider fallback only catches users with no record yet. Order:
+ *   1. super-admin fallback list (owners) → crm_super_admin
+ *   2. explicit crm_team_members.role (set via settings / the 1.0 backfill)
+ *   3. provider fallback (getRoleForProvider)
+ *
+ * Server-side only — uses firebase-admin via dynamic import.
+ */
+export async function resolveRole(email: string, provider: AuthProvider): Promise<AdminRole> {
+  const lower = email.toLowerCase()
+  if (isCrmSuperAdminFromFallback(lower)) return 'crm_super_admin'
+  try {
+    const { getDb } = await import('./firebase-admin')
+    const snap = await getDb()
+      .collection('crm_team_members')
+      .where('email', '==', lower)
+      .limit(1)
+      .get()
+    if (!snap.empty) {
+      const role = snap.docs[0].data().role
+      if (
+        role === 'crm_super_admin' ||
+        role === 'full_admin' ||
+        role === 'crm_only' ||
+        role === 'intern'
+      ) {
+        return role
+      }
+    }
+  } catch (error) {
+    console.error('[auth] resolveRole lookup failed; using provider fallback:', error)
+  }
+  return getRoleForProvider(provider)
 }
 
 export async function getSession(): Promise<User | null> {
@@ -178,5 +222,41 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
   } catch (error) {
     console.error('[auth] isCrmSuperAdmin Firestore lookup failed; using fallback:', error)
     return isCrmSuperAdminFromFallback(lower)
+  }
+}
+
+/**
+ * Roles permitted to trigger OUTBOUND sends (Resend) on a user's behalf.
+ * `crm_only` — which is every Firebase-auth user today, i.e. the interns —
+ * and the future `intern` role are deliberately excluded: they can draft, not send.
+ */
+export const SEND_CAPABLE_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin']
+
+export function canSend(role?: AdminRole | null): boolean {
+  return !!role && SEND_CAPABLE_ROLES.includes(role)
+}
+
+/**
+ * Guard for outbound-send API routes (anything that calls Resend for a user).
+ * Returns the session when the caller may send, otherwise an error to 4xx on.
+ *
+ * Blocks `crm_only` sessions (the interns) from firing 1:1 sends. Staff send via
+ * Google (`full_admin`). A super admin always passes via the Firestore-backed
+ * check — even on a stale session role — so the two owners are never locked out.
+ */
+export async function requireSendCapable(): Promise<
+  { session: User } | { error: string; status: 401 | 403 }
+> {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized', status: 401 }
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: 'Forbidden: Admin access required', status: 403 }
+  }
+  if (canSend(session.role) || (await isCrmSuperAdmin(session.email))) {
+    return { session }
+  }
+  return {
+    error: 'Forbidden: your role can draft but not send email. Ask an admin to send this.',
+    status: 403,
   }
 }

@@ -277,7 +277,7 @@ export default function SOPsPage() {
   // Render
   // ════════════════════════════════════
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "intern"]}>
       <div className="min-h-dvh bg-white">
         {/* Toast */}
         {toast && (

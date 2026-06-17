@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { setSession, isWorkspaceEmail, getRoleForProvider } from '@/lib/auth'
+import { setSession, isWorkspaceEmail, resolveRole } from '@/lib/auth'
 
 interface GoogleTokenResponse {
   access_token: string
@@ -105,13 +105,15 @@ export async function GET(request: NextRequest) {
     // Note: Google Workspace accounts with 'hd' parameter are always verified,
     // so we don't need to check email_verified for workspace accounts
 
-    // Create session with full admin role for Google Workspace users
+    // Role from Firestore (crm_team_members.role), falling back to full_admin
+    // for verified workspace staff with no record yet.
+    const role = await resolveRole(userInfo.email, 'google')
     await setSession({
       email: userInfo.email,
       name: userInfo.name,
       picture: userInfo.picture,
       authProvider: 'google',
-      role: getRoleForProvider('google'),
+      role,
     })
 
     // Clear OAuth state cookie
