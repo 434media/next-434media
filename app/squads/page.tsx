@@ -97,31 +97,31 @@ const SQUADS: SquadSlide[] = [
   {
     kind: "squad",
     num: "01",
-    name: "Domain & Painpoints",
+    name: "Underwriter Onboarding",
     tagline: "The translation layer.",
-    what: "Captures real industry problems as the Underwriter Problem Set — written so a salesperson and a builder both understand them cold.",
+    what: "Architects the intake framework that pulls venture-credible pain points out of corporate underwriters — captured so a salesperson and a builder both understand them cold.",
     does: [
-      "Design the write-up template + the underwriter question guide",
-      "Author 12–15 cybersecurity & fintech painpoints",
+      "Architect the Underwriter Intake Framework — the question architecture",
+      "Extract highly specific, venture-credible pain points (no generic answers)",
       "Label every problem by industry vertical",
     ],
-    team: "Cyber-defense / fraud-ops veteran (lead) + 1 cybersecurity",
-    deliverable: "The Underwriter Problem Set",
+    team: "Stephanie & Robert",
+    deliverable: "The Underwriter Intake Framework",
     icon: Target,
     accent: "indigo",
   },
   {
     kind: "squad",
     num: "02",
-    name: "Build",
-    tagline: "The engineering squad.",
-    what: "Turns the painpoint template into working software — the public intake form and the record type the whole program runs on.",
+    name: "Builder",
+    tagline: "The engineering team.",
+    what: "Turns the intake framework into working software — client-facing forms on the Digital Canvas site, with submissions flowing into the 434 admin to manage.",
     does: [
-      "Build the public painpoint intake form",
-      "Build the painpoint record + vetting surface in the admin",
-      "Wire the activate-to-cohort step that closes the loop",
+      "Build the client-facing intake forms on the Digital Canvas site",
+      "Submissions flow to the shared database, managed in the 434 admin",
+      "Work in the Digital Canvas repo via branches & pull requests",
     ],
-    team: "2 computer science",
+    team: "Jose & Gerardo",
     deliverable: "The live intake pipeline",
     icon: Hammer,
     accent: "emerald",
@@ -129,16 +129,16 @@ const SQUADS: SquadSlide[] = [
   {
     kind: "squad",
     num: "03",
-    name: "Story & Media",
+    name: "Storytellers",
     tagline: "434 Media's production arm.",
-    what: "Captures the whole program as investor-grade media that the cohort and its sponsors keep forever.",
+    what: "Captures the program — and the partners behind it — as investor-grade media, aligned in tone, visual style, and vibe.",
     does: [
-      "Builder profiles + demo-day footage",
-      "Investor-grade recap content",
+      "Study the partners' tone & style (434 Media, DevSA, Alamo Angels)",
+      "Builder profiles, demo-day footage & recap content",
       "A reusable brand kit & content templates — finished with sound",
     ],
-    team: "2 film & media + 1 digital music",
-    deliverable: "Media kit + cohort footage",
+    team: "Jorge, Tommy & J'Lauren",
+    deliverable: "Brand alignment + cohort media",
     icon: Clapperboard,
     accent: "fuchsia",
   },
@@ -147,13 +147,13 @@ const SQUADS: SquadSlide[] = [
     num: "04",
     name: "GTM",
     tagline: "The underwriter-sales engine.",
-    what: "Finds and pitches the corporate sponsors who claim a vertical and own a 6-week cohort.",
+    what: "Finds and pitches the corporate sponsors who claim a vertical and own a cohort — powered by Apollo inside the 434 admin.",
     does: [
+      "Master Apollo for outbound sales & prospecting",
       "Build scored target lists of candidate underwriters",
-      "Craft the outreach templates & the sales playbook",
-      "Hand warm sponsors to Domain to author their problems",
+      "Hand warm sponsors to Onboarding to frame their problems",
     ],
-    team: "Communications (lead) + 1 cybersecurity",
+    team: "Lee & Ethan",
     deliverable: "A repeatable sponsor-recruitment engine",
     icon: Megaphone,
     accent: "amber",
@@ -162,15 +162,15 @@ const SQUADS: SquadSlide[] = [
     kind: "squad",
     num: "05",
     name: "Analytics",
-    tagline: "The measurement squad.",
-    what: "Quantifies the opportunity and the impact — turning “a real problem” into “a real, sized market.”",
+    tagline: "The cohort-health team.",
+    what: "Measures how the cohort and its builders are doing — borrowing the data playbook of top accelerators to turn progress into proof.",
     does: [
-      "Market sizing for every painpoint",
-      "Cohort health & builder-progress metrics",
+      "Build the Cohort Health Framework — KPIs + builder health checks",
+      "Benchmark against top accelerators (Y Combinator, Techstars)",
       "The demo-day dashboard investors and sponsors see",
     ],
-    team: "1 cybersecurity",
-    deliverable: "Sized markets + the demo-day dashboard",
+    team: "Estrella",
+    deliverable: "The Cohort Health Framework + demo-day dashboard",
     icon: BarChart3,
     accent: "sky",
   },
@@ -194,15 +194,15 @@ function TitleSlide() {
         Digital Canvas · AI-Builder Program
       </motion.div>
       <motion.h1 variants={item} className="mt-5 text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white">
-        Meet the Squads
+        Meet the Teams
       </motion.h1>
       <motion.p variants={item} className="mt-6 text-lg sm:text-2xl text-slate-300 leading-relaxed">
-        Five squads, one pipeline — from a real industry problem to demo day.
+        Five teams, one pipeline — from a real industry problem to demo day.
       </motion.p>
       <motion.div variants={item} className="mt-10 flex flex-wrap gap-x-8 gap-y-2 text-[15px] text-slate-400">
         <span>10 interns</span>
         <span className="text-slate-600">·</span>
-        <span>5 squads</span>
+        <span>5 teams</span>
         <span className="text-slate-600">·</span>
         <span>6 weeks</span>
         <span className="text-slate-600">·</span>
@@ -267,7 +267,7 @@ function SquadSlideView({ s }: { s: SquadSlide }) {
         </motion.div>
         <div className="min-w-0">
           <motion.div variants={item} className="font-mono text-[13px] sm:text-[14px] text-slate-500">
-            Squad {s.num}
+            Team {s.num}
           </motion.div>
           <motion.h2 variants={item} className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
             {s.name}
@@ -319,17 +319,17 @@ function ClosingSlide() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="max-w-4xl">
       <motion.div variants={item} className="text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400">
-        Five squads · one cohort
+        Five teams · one cohort
       </motion.div>
       <motion.h2 variants={item} className="mt-5 text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white">
-        GTM finds it. Domain frames it.
+        GTM finds it. Onboarding frames it.
         <br />
-        Build ships it. Story tells it.
+        Builders ship it. Storytellers tell it.
         <br />
         Analytics proves it.
       </motion.h2>
       <motion.p variants={item} className="mt-6 sm:mt-7 text-lg sm:text-xl text-slate-300">
-        Every squad owns a stage of the same pipeline — and the cohort runs end-to-end, from a real industry problem
+        Every team owns a stage of the same pipeline — and the cohort runs end-to-end, from a real industry problem
         to demo day.
       </motion.p>
       <motion.div variants={item} className="mt-10 text-2xl font-semibold text-white">
@@ -406,7 +406,7 @@ export default function SquadsDeckPage() {
       {/* Top bar */}
       <div className="relative z-10 flex-none flex items-center justify-between px-6 sm:px-14 pt-5 pb-3 gap-3">
         <div className="text-[11px] sm:text-[12px] font-semibold tracking-[0.18em] uppercase text-slate-500 truncate">
-          Digital Canvas — Squads
+          Digital Canvas — Teams
         </div>
         <div className="font-mono text-[12px] text-slate-500 shrink-0">
           {String(i + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
