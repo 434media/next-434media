@@ -193,10 +193,10 @@ function TitleSlide() {
       <motion.div variants={item} className="text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400">
         Digital Canvas · AI-Builder Program
       </motion.div>
-      <motion.h1 variants={item} className="mt-5 text-6xl sm:text-7xl font-bold tracking-tight text-white">
+      <motion.h1 variants={item} className="mt-5 text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white">
         Meet the Squads
       </motion.h1>
-      <motion.p variants={item} className="mt-6 text-xl sm:text-2xl text-slate-300 leading-relaxed">
+      <motion.p variants={item} className="mt-6 text-lg sm:text-2xl text-slate-300 leading-relaxed">
         Five squads, one pipeline — from a real industry problem to demo day.
       </motion.p>
       <motion.div variants={item} className="mt-10 flex flex-wrap gap-x-8 gap-y-2 text-[15px] text-slate-400">
@@ -218,27 +218,29 @@ function OverviewSlide() {
       <motion.div variants={item} className="text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400">
         How it fits together
       </motion.div>
-      <motion.h2 variants={item} className="mt-4 text-4xl sm:text-5xl font-bold tracking-tight text-white">
+      <motion.h2 variants={item} className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-white">
         One pipeline, five owners
       </motion.h2>
-      <motion.div variants={item} className="mt-8 flex flex-wrap items-center gap-3 text-[15px]">
+      <motion.div variants={item} className="mt-8 flex flex-wrap items-center gap-2.5 text-[13px] sm:text-[15px]">
         {[
           "An underwriter authors the problem set",
           "Builders ship prototypes against it",
           "Demo day to investors",
         ].map((step, i) => (
-          <div key={step} className="flex items-center gap-3">
-            <span className="rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-slate-200">{step}</span>
-            {i < 2 && <ArrowRight className="w-4 h-4 text-slate-600" />}
+          <div key={step} className="flex items-center gap-2.5">
+            <span className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-slate-200">
+              {step}
+            </span>
+            {i < 2 && <ArrowRight className="hidden sm:block w-4 h-4 text-slate-600" />}
           </div>
         ))}
       </motion.div>
-      <motion.div variants={item} className="mt-10 grid grid-cols-1 sm:grid-cols-5 gap-3">
+      <motion.div variants={item} className="mt-8 sm:mt-10 grid grid-cols-2 sm:grid-cols-5 gap-3">
         {SQUADS.map((s) => {
           const a = ACCENTS[s.accent]
           const Icon = s.icon
           return (
-            <div key={s.num} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div key={s.num} className="rounded-xl border border-white/10 bg-white/3 p-4">
               <Icon className={`w-5 h-5 ${a.text}`} />
               <div className="mt-3 text-[11px] font-mono text-slate-500">{s.num}</div>
               <div className="text-[14px] font-semibold text-white leading-tight">{s.name}</div>
@@ -256,27 +258,27 @@ function SquadSlideView({ s }: { s: SquadSlide }) {
   const Icon = s.icon
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="max-w-5xl w-full">
-      <div className="flex items-start gap-5">
+      <div className="flex items-start gap-4 sm:gap-5">
         <motion.div
           variants={item}
-          className={`shrink-0 grid place-items-center w-16 h-16 rounded-2xl border ${a.chip}`}
+          className={`shrink-0 grid place-items-center w-12 h-12 sm:w-16 sm:h-16 rounded-2xl border ${a.chip}`}
         >
-          <Icon className={`w-8 h-8 ${a.text}`} />
+          <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${a.text}`} />
         </motion.div>
         <div className="min-w-0">
-          <motion.div variants={item} className="font-mono text-[14px] text-slate-500">
+          <motion.div variants={item} className="font-mono text-[13px] sm:text-[14px] text-slate-500">
             Squad {s.num}
           </motion.div>
-          <motion.h2 variants={item} className="text-4xl sm:text-5xl font-bold tracking-tight text-white">
+          <motion.h2 variants={item} className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
             {s.name}
           </motion.h2>
-          <motion.div variants={item} className={`mt-2 text-xl font-medium ${a.text}`}>
+          <motion.div variants={item} className={`mt-1.5 sm:mt-2 text-lg sm:text-xl font-medium ${a.text}`}>
             {s.tagline}
           </motion.div>
         </div>
       </div>
 
-      <motion.p variants={item} className="mt-7 max-w-3xl text-lg sm:text-xl text-slate-300 leading-relaxed">
+      <motion.p variants={item} className="mt-6 sm:mt-7 max-w-3xl text-base sm:text-xl text-slate-300 leading-relaxed">
         {s.what}
       </motion.p>
 
@@ -319,14 +321,14 @@ function ClosingSlide() {
       <motion.div variants={item} className="text-[13px] font-semibold tracking-[0.2em] uppercase text-slate-400">
         Five squads · one cohort
       </motion.div>
-      <motion.h2 variants={item} className="mt-5 text-5xl sm:text-6xl font-bold tracking-tight text-white">
+      <motion.h2 variants={item} className="mt-5 text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white">
         GTM finds it. Domain frames it.
         <br />
         Build ships it. Story tells it.
         <br />
         Analytics proves it.
       </motion.h2>
-      <motion.p variants={item} className="mt-7 text-xl text-slate-300">
+      <motion.p variants={item} className="mt-6 sm:mt-7 text-lg sm:text-xl text-slate-300">
         Every squad owns a stage of the same pipeline — and the cohort runs end-to-end, from a real industry problem
         to demo day.
       </motion.p>
@@ -372,7 +374,7 @@ export default function SquadsDeckPage() {
   }, [go, total])
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-slate-950 text-white select-none">
+    <div className="fixed inset-0 overflow-hidden bg-slate-950 text-white select-none flex flex-col">
       {/* Accent glow — shifts per slide */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -385,36 +387,7 @@ export default function SquadsDeckPage() {
         />
       </AnimatePresence>
 
-      {/* Top bar */}
-      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-8 sm:px-14 py-6 z-10">
-        <div className="text-[12px] font-semibold tracking-[0.18em] uppercase text-slate-500">
-          Digital Canvas — Squads
-        </div>
-        <div className="font-mono text-[12px] text-slate-500">
-          {String(i + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
-        </div>
-      </div>
-
-      {/* Slide stage */}
-      <div className="absolute inset-0 flex items-center px-8 sm:px-14 lg:px-24">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full"
-          >
-            {slide.kind === "title" && <TitleSlide />}
-            {slide.kind === "overview" && <OverviewSlide />}
-            {slide.kind === "squad" && <SquadSlideView s={slide} />}
-            {slide.kind === "closing" && <ClosingSlide />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Big ghost number for squad slides */}
+      {/* Big ghost number for squad slides (decorative, behind; desktop only) */}
       {slide.kind === "squad" && (
         <AnimatePresence mode="wait">
           <motion.div
@@ -423,15 +396,46 @@ export default function SquadsDeckPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
-            className={`pointer-events-none absolute bottom-[-4vw] right-6 font-bold leading-none text-[34vw] ${accent.ghost}`}
+            className={`pointer-events-none absolute bottom-[-4vw] right-6 font-bold leading-none text-[34vw] hidden sm:block ${accent.ghost}`}
           >
             {slide.num}
           </motion.div>
         </AnimatePresence>
       )}
 
+      {/* Top bar */}
+      <div className="relative z-10 flex-none flex items-center justify-between px-6 sm:px-14 pt-5 pb-3 gap-3">
+        <div className="text-[11px] sm:text-[12px] font-semibold tracking-[0.18em] uppercase text-slate-500 truncate">
+          Digital Canvas — Squads
+        </div>
+        <div className="font-mono text-[12px] text-slate-500 shrink-0">
+          {String(i + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+        </div>
+      </div>
+
+      {/* Slide stage — scrolls when content exceeds the viewport (mobile) */}
+      <div className="relative z-10 flex-1 overflow-y-auto overscroll-contain px-6 sm:px-14 lg:px-24">
+        <div className="min-h-full flex items-center py-5">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full"
+            >
+              {slide.kind === "title" && <TitleSlide />}
+              {slide.kind === "overview" && <OverviewSlide />}
+              {slide.kind === "squad" && <SquadSlideView s={slide} />}
+              {slide.kind === "closing" && <ClosingSlide />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+
       {/* Bottom controls */}
-      <div className="absolute bottom-0 inset-x-0 flex items-center justify-between px-8 sm:px-14 py-6 z-10">
+      <div className="relative z-10 flex-none flex items-center justify-between px-6 sm:px-14 pt-3 pb-5 gap-3">
         <div className="flex items-center gap-2">
           {SLIDES.map((_, idx) => (
             <button
