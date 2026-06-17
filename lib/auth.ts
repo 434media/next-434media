@@ -260,3 +260,22 @@ export async function requireSendCapable(): Promise<
     status: 403,
   }
 }
+
+/**
+ * Guard for operator-only API routes (cohort/sponsor/program management, etc.).
+ * Allows full_admin + super admins; blocks crm_only and intern. Same role set as
+ * sends/publishes, named for intent at the call site.
+ */
+export async function requireFullAdmin(): Promise<
+  { session: User } | { error: string; status: 401 | 403 }
+> {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized', status: 401 }
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: 'Forbidden: Admin access required', status: 403 }
+  }
+  if (canSend(session.role) || (await isCrmSuperAdmin(session.email))) {
+    return { session }
+  }
+  return { error: 'Forbidden: full admin access required', status: 403 }
+}

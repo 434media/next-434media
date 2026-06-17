@@ -537,7 +537,93 @@ export const CRM_COLLECTIONS = {
   // independently of any content post, browsable + reusable in the Studio.
   ASSETS: "crm_assets",
   LEADS: "leads",
+  // Digital Canvas cohort program
+  COHORTS: "crm_cohorts",
+  BUILDERS: "crm_builders",
 } as const
+
+// ============================================
+// DIGITAL CANVAS COHORT — cohort + builder model
+// ============================================
+
+// Industry vertical for cohorts and painpoints. ONE shared enum (reused by the
+// painpoint pipeline + GTM targeting). Distinct from a team member's SquadKey
+// (which intern team) and from AdminRole (access).
+export type Vertical =
+  | "cybersecurity"
+  | "fintech"
+  | "military"
+  | "health"
+  | "science"
+  | "education"
+  | "aerospace"
+  | "other"
+
+export const VERTICAL_LABELS: Record<Vertical, string> = {
+  cybersecurity: "Cybersecurity",
+  fintech: "Fintech",
+  military: "Military",
+  health: "Health",
+  science: "Science",
+  education: "Education",
+  aerospace: "Aerospace",
+  other: "Other",
+}
+
+// A cohort = one ~6-week Digital Canvas program instance. The sponsor
+// (underwriter) is a reused crm_clients record (tagged "underwriter"); only the
+// link lives here. Painpoints (Section 4) point at a cohort via cohortId.
+export type CohortStatus =
+  | "forming" // sponsor committed, scoping
+  | "problem_set" // authoring + vetting painpoints
+  | "recruiting" // open for builder applications
+  | "active" // workshop weekend + 6-week bridge
+  | "demo_day"
+  | "complete"
+  | "cancelled"
+
+export interface Cohort {
+  id: string
+  name: string
+  vertical: Vertical
+  hostBrand: Brand
+  sponsorClientId?: string | null // FK → crm_clients (the underwriter)
+  sponsorName?: string // denormalized for display
+  status: CohortStatus
+  workshopDate?: string
+  bridgeStart?: string
+  bridgeEnd?: string
+  demoDayDate?: string
+  capacity?: number
+  notes?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+}
+
+// A builder = an external program participant (solo or 2–3 person team). NOT a
+// crm_team_members record — builders never get an admin login. The status
+// rollup across a cohort's builders is the source for cohort metrics (Section 7).
+export type BuilderStatus =
+  | "applied"
+  | "accepted"
+  | "active"
+  | "shipped"
+  | "demoed"
+  | "withdrawn"
+
+export interface Builder {
+  id: string
+  cohortId: string // FK → crm_cohorts
+  name: string
+  teamName?: string
+  email?: string
+  status: BuilderStatus
+  prototypeUrl?: string
+  notes?: string
+  created_at: string
+  updated_at: string
+}
 
 // ============================================
 // LEADS — upstream layer before opportunities

@@ -10,6 +10,7 @@ import {
   Layers,
   ClipboardList,
   FileText,
+  GraduationCap,
   Flag,
   Megaphone,
   Calendar,
@@ -189,6 +190,14 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     id: "workspace",
     title: "Workspace",
     items: [
+      {
+        id: "cohorts",
+        label: "Cohorts",
+        icon: GraduationCap,
+        href: "/admin/cohorts",
+        matchPrefix: "/admin/cohorts",
+        roles: ["full_admin"],
+      },
       {
         id: "projects",
         label: "Projects",

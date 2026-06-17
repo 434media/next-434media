@@ -14,6 +14,8 @@ import type {
   PieSlice,
   PipelineColumn,
   OpportunityStage,
+  Cohort,
+  Builder,
 } from "../types/crm-types"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 
@@ -415,6 +417,66 @@ export async function getClientsByStatus(status: string): Promise<ClientRecord[]
     console.error("Error fetching clients by status:", error)
     throw error
   }
+}
+
+// ============================================
+// COHORTS & BUILDERS (Digital Canvas program)
+// ============================================
+
+export async function getCohorts(options?: { fresh?: boolean }): Promise<Cohort[]> {
+  return getAllFromCollection<Cohort>(CRM_COLLECTIONS.COHORTS, options)
+}
+
+export async function getCohortById(id: string): Promise<Cohort | null> {
+  return getById<Cohort>(CRM_COLLECTIONS.COHORTS, id)
+}
+
+export async function createCohort(
+  data: Omit<Cohort, "id" | "created_at" | "updated_at">
+): Promise<Cohort> {
+  return createDocument<Cohort>(CRM_COLLECTIONS.COHORTS, data)
+}
+
+export async function updateCohort(id: string, updates: Partial<Cohort>): Promise<Cohort> {
+  return updateDocument<Cohort>(CRM_COLLECTIONS.COHORTS, id, updates)
+}
+
+export async function deleteCohort(id: string): Promise<void> {
+  return deleteDocument(CRM_COLLECTIONS.COHORTS, id)
+}
+
+export async function getBuilders(): Promise<Builder[]> {
+  return getAllFromCollection<Builder>(CRM_COLLECTIONS.BUILDERS)
+}
+
+export async function getBuildersByCohort(cohortId: string): Promise<Builder[]> {
+  try {
+    const db = getDb()
+    const snapshot = await db
+      .collection(CRM_COLLECTIONS.BUILDERS)
+      .where("cohortId", "==", cohortId)
+      .get()
+    return snapshot.docs
+      .map((doc) => docToData<Builder>(doc))
+      .filter((b): b is Builder => b !== null)
+  } catch (error) {
+    console.error("Error fetching builders by cohort:", error)
+    throw error
+  }
+}
+
+export async function createBuilder(
+  data: Omit<Builder, "id" | "created_at" | "updated_at">
+): Promise<Builder> {
+  return createDocument<Builder>(CRM_COLLECTIONS.BUILDERS, data)
+}
+
+export async function updateBuilder(id: string, updates: Partial<Builder>): Promise<Builder> {
+  return updateDocument<Builder>(CRM_COLLECTIONS.BUILDERS, id, updates)
+}
+
+export async function deleteBuilder(id: string): Promise<void> {
+  return deleteDocument(CRM_COLLECTIONS.BUILDERS, id)
 }
 
 // ============================================
