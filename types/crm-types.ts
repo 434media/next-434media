@@ -543,6 +543,7 @@ export const CRM_COLLECTIONS = {
   COHORTS: "crm_cohorts",
   BUILDERS: "crm_builders",
   COHORT_TASKS: "crm_cohort_tasks",
+  PAINPOINTS: "crm_painpoints",
 } as const
 
 // ============================================
@@ -652,6 +653,82 @@ export interface CohortTask {
   created_at: string
   updated_at: string
   created_by?: string
+}
+
+// ============================================
+// DIGITAL CANVAS COHORT — painpoint intake pipeline (Section 4)
+// ============================================
+
+// The "front door" to the program: an underwriter's real operational problem,
+// captured once and translated for TWO audiences — a salesperson (why a sponsor
+// should fund solving it) and a workshop builder (what to ship against it). The
+// Underwriter Onboarding squad authors these; vetted ones are activated into a
+// cohort's problem set. Lifecycle: submitted → triaged → vetted → activated,
+// with rejected/archived as terminal parking.
+export type PainpointStatus =
+  | "submitted" // raw intake (public form or manual), not yet reviewed
+  | "triaged" // reviewed, kept — worth developing
+  | "vetted" // passed the venture-credibility bar (cost + workaround + evidence)
+  | "activated" // assigned to a cohort's problem set
+  | "rejected" // generic / not credible
+  | "archived" // parked for a future cohort
+
+export type PainpointSource =
+  | "public_form" // submitted via the public intake form
+  | "manual" // entered by an intern/operator in the admin
+  | "interview" // captured from an underwriter conversation
+  | "inbox" // promoted from an inbox submission
+
+export interface Painpoint {
+  id: string
+  title: string // short, specific label
+  vertical: Vertical // shared industry enum
+  status: PainpointStatus
+  source: PainpointSource
+
+  // The underwriter who surfaced it (who feels the pain). Sponsor links to a
+  // reused crm_clients record tagged "underwriter"; name denormalized for display.
+  underwriterName?: string
+  underwriterRole?: string
+  sponsorClientId?: string | null // FK → crm_clients
+  sponsorName?: string
+
+  // Bi-audience translation — the Underwriter Onboarding squad's core artifact.
+  problemStatement: string // the raw operational problem, in the underwriter's terms
+  salesFraming?: string // why a sponsor/buyer cares — the GTM angle
+  builderBrief?: string // the buildable problem a workshop builder could ship against
+
+  // Venture-credibility / specificity (PAINstorming-style — forces the "highly
+  // specific, venture-credible" bar instead of generic answers).
+  whoIsAffected?: string // which role/team feels it
+  currentWorkaround?: string // what they do today (proves the pain is real)
+  costImpact?: string // quantified $ / time / risk — the market-sizing input (Section 7)
+  frequency?: string // how often it bites
+  evidence?: string // links/quotes backing the claim
+
+  // Program linkage — set when the painpoint is activated into a cohort.
+  cohortId?: string | null // FK → crm_cohorts
+  tags?: string[]
+  notes?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+}
+
+export const PAINPOINT_STATUS_LABELS: Record<PainpointStatus, string> = {
+  submitted: "Submitted",
+  triaged: "Triaged",
+  vetted: "Vetted",
+  activated: "Activated",
+  rejected: "Rejected",
+  archived: "Archived",
+}
+
+export const PAINPOINT_SOURCE_LABELS: Record<PainpointSource, string> = {
+  public_form: "Public form",
+  manual: "Manual",
+  interview: "Interview",
+  inbox: "Inbox",
 }
 
 // ============================================

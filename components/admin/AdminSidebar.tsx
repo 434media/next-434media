@@ -11,6 +11,7 @@ import {
   ClipboardList,
   FileText,
   GraduationCap,
+  Target,
   Flag,
   Megaphone,
   Calendar,
@@ -190,6 +191,16 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     id: "workspace",
     title: "Workspace",
     items: [
+      {
+        id: "painpoints",
+        label: "Painpoints",
+        icon: Target,
+        href: "/admin/painpoints",
+        matchPrefix: "/admin/painpoints",
+        description: "Underwriter problems → translated for sales & builders",
+        // Authored by the Underwriter Onboarding squad (interns); operators activate into cohorts.
+        roles: ["full_admin", "intern"],
+      },
       {
         id: "cohorts",
         label: "Cohorts",

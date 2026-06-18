@@ -17,6 +17,7 @@ import type {
   Cohort,
   Builder,
   CohortTask,
+  Painpoint,
 } from "../types/crm-types"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 
@@ -508,6 +509,46 @@ export async function updateCohortTask(id: string, updates: Partial<CohortTask>)
 
 export async function deleteCohortTask(id: string): Promise<void> {
   return deleteDocument(CRM_COLLECTIONS.COHORT_TASKS, id)
+}
+
+// ---- Painpoints (Section 4 — the program's intake front door) ----
+
+export async function getPainpoints(options?: { fresh?: boolean }): Promise<Painpoint[]> {
+  return getAllFromCollection<Painpoint>(CRM_COLLECTIONS.PAINPOINTS, options)
+}
+
+export async function getPainpointById(id: string): Promise<Painpoint | null> {
+  return getById<Painpoint>(CRM_COLLECTIONS.PAINPOINTS, id)
+}
+
+export async function getPainpointsByCohort(cohortId: string): Promise<Painpoint[]> {
+  try {
+    const db = getDb()
+    const snapshot = await db
+      .collection(CRM_COLLECTIONS.PAINPOINTS)
+      .where("cohortId", "==", cohortId)
+      .get()
+    return snapshot.docs
+      .map((doc) => docToData<Painpoint>(doc))
+      .filter((p): p is Painpoint => p !== null)
+  } catch (error) {
+    console.error("Error fetching painpoints by cohort:", error)
+    throw error
+  }
+}
+
+export async function createPainpoint(
+  data: Omit<Painpoint, "id" | "created_at" | "updated_at">
+): Promise<Painpoint> {
+  return createDocument<Painpoint>(CRM_COLLECTIONS.PAINPOINTS, data)
+}
+
+export async function updatePainpoint(id: string, updates: Partial<Painpoint>): Promise<Painpoint> {
+  return updateDocument<Painpoint>(CRM_COLLECTIONS.PAINPOINTS, id, updates)
+}
+
+export async function deletePainpoint(id: string): Promise<void> {
+  return deleteDocument(CRM_COLLECTIONS.PAINPOINTS, id)
 }
 
 // ============================================
