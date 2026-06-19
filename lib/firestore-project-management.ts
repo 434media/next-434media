@@ -546,6 +546,7 @@ function mapFirestoreToSOP(doc: admin.firestore.DocumentSnapshot): SOP {
     airtable_id: str(data.airtable_id),
     title: str(data.title) || "",
     category: str(data.category) || "Other",
+    vertical: (str(data.vertical) || undefined) as SOP["vertical"],
     department: str(data.department),
     description: str(data.description),
     content: str(data.content) || "",

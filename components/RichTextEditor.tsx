@@ -22,7 +22,7 @@ import {
   X,
   Image as ImageIcon,
 } from "lucide-react"
-import { Marked } from 'marked'
+import { renderMarkdown } from "@/lib/markdown"
 import { ImageUpload } from "./ImageUpload"
 
 interface RichTextEditorProps {
@@ -31,68 +31,6 @@ interface RichTextEditorProps {
   placeholder?: string
   minRows?: number
 }
-
-// Configure marked to match production exactly
-const syncMarked = new Marked({ 
-  async: false, 
-  gfm: true, // GitHub Flavored Markdown
-  breaks: true // Convert \n to <br> - important for line breaks
-})
-
-// Custom renderer for production-matching output (using marked v15+ API)
-const renderer = {
-  paragraph({ text }: { text: string }) {
-    return `<p class="mb-4 leading-relaxed">${text}</p>\n`
-  },
-  heading({ text, depth }: { text: string; depth: number }) {
-    const sizes: Record<number, string> = {
-      1: 'text-2xl font-bold mt-8 mb-4',
-      2: 'text-xl font-bold mt-6 mb-3',
-      3: 'text-lg font-semibold mt-5 mb-2',
-      4: 'text-base font-semibold mt-4 mb-2',
-      5: 'text-sm font-semibold mt-3 mb-1',
-      6: 'text-xs font-semibold mt-3 mb-1 uppercase tracking-wider',
-    }
-    return `<h${depth} class="${sizes[depth] || ''} text-gray-900">${text}</h${depth}>\n`
-  },
-  link({ href, title, text }: { href: string; title?: string | null; text: string }) {
-    const titleAttr = title ? ` title="${title}"` : ''
-    return `<a href="${href}"${titleAttr} class="text-blue-600 underline decoration-blue-300 underline-offset-2 hover:decoration-blue-600 transition-colors" target="_blank" rel="noopener noreferrer">${text}<svg class="inline-block w-3 h-3 ml-0.5 -mt-0.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`
-  },
-  strong({ text }: { text: string }) {
-    return `<strong class="font-semibold text-gray-900">${text}</strong>`
-  },
-  em({ text }: { text: string }) {
-    return `<em class="italic text-gray-700">${text}</em>`
-  },
-  codespan({ text }: { text: string }) {
-    return `<code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">${text}</code>`
-  },
-  code({ text, lang }: { text: string; lang?: string }) {
-    return `<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 text-sm"><code class="language-${lang || 'text'}">${text}</code></pre>\n`
-  },
-  blockquote({ text }: { text: string }) {
-    return `<blockquote class="border-l-4 border-gray-300 pl-4 my-4 text-gray-600 italic">${text}</blockquote>\n`
-  },
-  list({ items, ordered }: { items: Array<{ text: string }>; ordered: boolean }) {
-    const tag = ordered ? 'ol' : 'ul'
-    const cls = ordered ? 'list-decimal' : 'list-disc'
-    const body = items.map(item => `<li class="leading-relaxed">${item.text}</li>`).join('\n')
-    return `<${tag} class="${cls} pl-6 my-4 space-y-1 text-gray-700">${body}</${tag}>\n`
-  },
-  listitem({ text }: { text: string }) {
-    return `<li class="leading-relaxed">${text}</li>\n`
-  },
-  hr() {
-    return `<hr class="border-t border-gray-200 my-8" />\n`
-  },
-  br() {
-    return `<br />`
-  },
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-syncMarked.use({ renderer: renderer as any })
 
 export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: RichTextEditorProps) {
   const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'split'>('edit')
@@ -305,7 +243,7 @@ export function RichTextEditor({ value, onChange, placeholder, minRows = 8 }: Ri
       return '<p class="text-gray-400 italic">No content yet. Start typing to see a preview...</p>'
     }
     try {
-      return syncMarked.parse(value) as string
+      return renderMarkdown(value)
     } catch (error) {
       console.error('Markdown parsing error:', error)
       return `<p class="text-red-500">Error rendering preview</p>`

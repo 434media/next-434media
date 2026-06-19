@@ -20,69 +20,105 @@ import {
   Hash,
   ArrowLeft,
   ChevronDown,
-  Shield,
-  Lightbulb,
-  Handshake,
-  Award,
-  Flame,
   Upload,
   Link as LinkIcon,
   Image as ImageIcon,
   Paperclip,
   ExternalLink,
   Target,
-  Star,
-  Heart,
-  MapPin,
   Palette,
-  PenTool,
   Globe,
   Megaphone,
   FolderOpen,
+  Crosshair,
+  ClipboardList,
+  Hammer,
+  Clapperboard,
+  BarChart3,
+  Rocket,
+  LineChart,
 } from "lucide-react"
 import type { SOP, SOPAttachment } from "@/types/project-management-types"
 import { SOP_STATUSES } from "@/types/project-management-types"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { RichTextEditor } from "@/components/RichTextEditor"
 import { ImageUpload } from "@/components/ImageUpload"
+import { renderMarkdown } from "@/lib/markdown"
+import { VERTICAL_LABELS, type Vertical } from "@/types/crm-types"
 
-// ── Local categories (page-scoped, not from types) ──
-const DOC_CATEGORIES = ["Brands", "Design", "Web", "Marketing", "Other"] as const
-type DocCategory = (typeof DOC_CATEGORIES)[number]
+const VERTICAL_OPTIONS = Object.keys(VERTICAL_LABELS) as Vertical[]
 
-const CATEGORY_META: Record<
-  DocCategory,
-  { icon: React.ComponentType<{ className?: string }>; description: string }
-> = {
-  Brands: {
-    icon: Palette,
-    description: "Brand guidelines, identity systems, voice & tone, logo usage",
-  },
-  Design: {
-    icon: PenTool,
-    description: "Design systems, templates, creative workflows, visual standards",
-  },
-  Web: {
-    icon: Globe,
-    description: "Web development standards, CMS guides, deployment, tech docs",
-  },
-  Marketing: {
-    icon: Megaphone,
-    description: "Campaign playbooks, social media SOPs, content calendars",
-  },
-  Other: {
-    icon: FolderOpen,
-    description: "General documentation, onboarding checklists, resources",
-  },
+// ── Spaces & categories ──
+// SOPs serve two audiences: 434's evergreen company knowledge base, and the
+// Digital Canvas program's playbook/template home. Each gets its own "space".
+// Program categories mirror the squads page — "one pipeline, five owners" — in
+// flow order; the verb leads the description so the squad name stays the
+// scannable label.
+type SpaceKey = "company" | "program"
+
+interface CategoryDef {
+  key: string
+  space: SpaceKey
+  label: string
+  description: string
+  heading: string
+  icon: React.ComponentType<{ className?: string }>
 }
 
-const CORE_VALUES = [
-  { name: "Integrity", icon: Shield, text: "Do what you say you\u2019re going to do. Trust but verify." },
-  { name: "Creativity", icon: Lightbulb, text: "Stay curious, challenge the status quo, solve problems, think big." },
-  { name: "Collaboration", icon: Handshake, text: "We don\u2019t do it alone. You are the company you keep." },
-  { name: "Excellence", icon: Award, text: "If you\u2019re going to do it, do it right. Be accountable." },
-  { name: "Impact", icon: Flame, text: "Your time is valuable, so is everyone else\u2019s. Make it matter." },
+const SPACES: { key: SpaceKey; label: string }[] = [
+  { key: "company", label: "434 Media" },
+  { key: "program", label: "Digital Canvas Program" },
 ]
+
+const CATEGORIES: CategoryDef[] = [
+  // 434 Media — evergreen company knowledge base, mirroring the admin's modules + service lines
+  { key: "Brand & Design", space: "company", label: "Brand & Design", icon: Palette,
+    description: "Brand guidelines, identity, voice & tone, and the design system", heading: "Brand & Design System" },
+  { key: "Content & Production", space: "company", label: "Content & Production", icon: Clapperboard,
+    description: "Content studio, social, video, broadcast & event production", heading: "Content & Production" },
+  { key: "Sales & CRM", space: "company", label: "Sales & CRM", icon: Rocket,
+    description: "Pipeline ops: audiences, leads, outreach, consent & compliance", heading: "Sales & CRM" },
+  { key: "Analytics & Reporting", space: "company", label: "Analytics & Reporting", icon: LineChart,
+    description: "GA4, Instagram & portfolio reporting, and brand goals", heading: "Analytics & Reporting" },
+  { key: "Web & Tech", space: "company", label: "Web & Tech", icon: Globe,
+    description: "Web standards, CMS guides, deployment, technical docs", heading: "Web & Tech Docs" },
+  { key: "Operations", space: "company", label: "Operations", icon: FolderOpen,
+    description: "Onboarding, finance, HR, process & general resources", heading: "Operations & Resources" },
+  // Digital Canvas Program — the pipeline, in flow order (mirrors the squads page)
+  { key: "GTM", space: "program", label: "GTM", icon: Crosshair,
+    description: "Finds it · sponsors & target pipeline", heading: "GTM — Find the sponsors" },
+  { key: "Underwriter Onboarding", space: "program", label: "Underwriter Onboarding", icon: ClipboardList,
+    description: "Frames it · the underwriter intake framework", heading: "Underwriter Onboarding — Frame the problem" },
+  { key: "Builders", space: "program", label: "Builders", icon: Hammer,
+    description: "Ships it · the builder process", heading: "Builders — Ship the prototype" },
+  { key: "Storytellers", space: "program", label: "Storytellers", icon: Megaphone,
+    description: "Tells it · story, brand & cohort media", heading: "Storytellers — Tell the story" },
+  { key: "Analytics", space: "program", label: "Analytics", icon: BarChart3,
+    description: "Proves it · cohort health & demo-day metrics", heading: "Analytics — Prove the outcome" },
+]
+
+const CATEGORY_KEYS = CATEGORIES.map((c) => c.key)
+
+// Legacy categories (pre-spaces) → current keys, so existing docs never orphan.
+const CATEGORY_ALIASES: Record<string, string> = {
+  Brands: "Brand & Design",
+  Design: "Brand & Design",
+  Web: "Web & Tech",
+  Marketing: "Content & Production",
+  Other: "Operations",
+}
+
+function normalizeCategory(raw?: string): string {
+  if (raw && CATEGORY_KEYS.includes(raw)) return raw
+  return (raw && CATEGORY_ALIASES[raw]) || "Operations"
+}
+
+function catDef(key?: string): CategoryDef {
+  const norm = normalizeCategory(key)
+  return CATEGORIES.find((c) => c.key === norm) ?? CATEGORIES[0]
+}
+
+const categoriesInSpace = (space: SpaceKey) => CATEGORIES.filter((c) => c.space === space)
 
 type ViewMode = "docs" | "detail" | "edit" | "create"
 
@@ -90,6 +126,8 @@ interface Toast {
   message: string
   type: "success" | "error"
 }
+
+// Category headings now come from catDef().heading
 
 // ════════════════════════════════════════════
 // Component
@@ -105,7 +143,9 @@ export default function SOPsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sops, setSOPs] = useState<SOP[]>([])
   const [selectedSOP, setSelectedSOP] = useState<SOP | null>(null)
-  const [activeCategory, setActiveCategory] = useState<string | null>("Brands")
+  const [activeCategory, setActiveCategory] = useState<string | null>("Brand & Design")
+  const [activeVertical, setActiveVertical] = useState<Vertical | "all">("all")
+  const [showWelcome, setShowWelcome] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [linkInput, setLinkInput] = useState("")
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -129,6 +169,15 @@ export default function SOPsPage() {
   useEffect(() => {
     if (toast) { const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }
   }, [toast])
+  // One-time welcome banner — dismissal persists in localStorage.
+  useEffect(() => {
+    try { if (localStorage.getItem("sop-welcome-dismissed") !== "1") setShowWelcome(true) } catch { /* no-op */ }
+  }, [])
+
+  const dismissWelcome = () => {
+    setShowWelcome(false)
+    try { localStorage.setItem("sop-welcome-dismissed", "1") } catch { /* no-op */ }
+  }
 
   // ── Data ──
   const loadData = async () => {
@@ -173,7 +222,7 @@ export default function SOPsPage() {
   }
 
   const resetForm = () => {
-    setFormData({ title: "", category: activeCategory || "Brands", department: "", description: "", content: "", version: "1.0", status: "draft", owner: "", tags: [], attachments: [] })
+    setFormData({ title: "", category: activeCategory || "Brand & Design", department: "", description: "", content: "", version: "1.0", status: "draft", owner: "", tags: [], attachments: [] })
     setLinkInput(""); setShowLinkInput(false)
   }
 
@@ -185,7 +234,7 @@ export default function SOPsPage() {
 
   const openEdit = (sop: SOP) => {
     setSelectedSOP(sop)
-    setFormData({ title: sop.title, category: sop.category, department: sop.department, description: sop.description, content: sop.content, version: sop.version, status: sop.status, owner: sop.owner, tags: sop.tags, attachments: sop.attachments || [] })
+    setFormData({ title: sop.title, category: normalizeCategory(sop.category), vertical: sop.vertical, department: sop.department, description: sop.description, content: sop.content, version: sop.version, status: sop.status, owner: sop.owner, tags: sop.tags, attachments: sop.attachments || [] })
     setViewMode("edit")
   }
 
@@ -227,22 +276,36 @@ export default function SOPsPage() {
   const filteredSOPs = useMemo(() => {
     return sops.filter((s) => {
       const q = searchQuery.toLowerCase()
-      return !searchQuery || s.title?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q) || s.content?.toLowerCase().includes(q) || s.tags?.some((t) => t.toLowerCase().includes(q))
+      return !searchQuery || s.title?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q) || s.content?.toLowerCase().includes(q) || s.tags?.some((t) => t.toLowerCase().includes(q)) || (!!s.vertical && VERTICAL_LABELS[s.vertical].toLowerCase().includes(q))
     })
   }, [sops, searchQuery])
 
   const sopsByCategory = useMemo(() => {
     const map: Record<string, SOP[]> = {}
-    for (const cat of DOC_CATEGORIES) map[cat] = []
+    for (const key of CATEGORY_KEYS) map[key] = []
     for (const sop of filteredSOPs) {
-      const cat = DOC_CATEGORIES.includes(sop.category as DocCategory) ? sop.category : "Other"
-      map[cat].push(sop)
+      map[normalizeCategory(sop.category)].push(sop)
     }
     return map
   }, [filteredSOPs])
 
   // Active category docs for center panel
   const activeDocs = activeCategory ? (sopsByCategory[activeCategory] || []) : []
+
+  // Verticals actually in use — drives the filter control (and reconciles the
+  // category nav with the cohort vertical taxonomy).
+  const availableVerticals = useMemo(() => {
+    const set = new Set<Vertical>()
+    for (const s of sops) if (s.vertical) set.add(s.vertical)
+    return VERTICAL_OPTIONS.filter((v) => set.has(v))
+  }, [sops])
+
+  // When a vertical is selected, browse flattens to that vertical across all
+  // categories — the "obvious home" for cohort intake templates.
+  const verticalDocs = useMemo(() => {
+    if (activeVertical === "all") return []
+    return filteredSOPs.filter((s) => s.vertical === activeVertical)
+  }, [filteredSOPs, activeVertical])
 
   // "On this page" anchors for detail view
   const tocAnchors = useMemo(() => {
@@ -273,12 +336,39 @@ export default function SOPsPage() {
 
   const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : null
 
+  // Shared document list row — used by both category browse and vertical filter.
+  const docRow = (sop: SOP) => (
+    <div key={sop.id} onClick={() => openDetail(sop)} className="group flex items-start gap-4 p-4 rounded-xl bg-white border border-neutral-200 hover:border-neutral-300 hover:shadow-sm cursor-pointer transition-all">
+      <div className="w-8 h-8 rounded-lg bg-neutral-100 text-neutral-500 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-neutral-200 transition-colors">
+        <FileText className="w-3.5 h-3.5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <h3 className="text-[15px] font-semibold text-neutral-900 tracking-tight truncate">{sop.title}</h3>
+          {getStatusBadge(sop.status)}
+        </div>
+        {sop.description && <p className="text-[13px] text-neutral-500 leading-relaxed line-clamp-2 mb-1.5">{sop.description}</p>}
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-500 font-medium">
+          {sop.owner && <span className="flex items-center gap-1"><User className="w-3 h-3" />{sop.owner}</span>}
+          {sop.vertical && <span className="flex items-center gap-1 text-indigo-500"><Target className="w-3 h-3" />{VERTICAL_LABELS[sop.vertical]}</span>}
+          {sop.version && <span className="flex items-center gap-1"><Tag className="w-3 h-3" />v{sop.version}</span>}
+          {sop.attachments && sop.attachments.length > 0 && <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" />{sop.attachments.length}</span>}
+          {sop.updated_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(sop.updated_at)}</span>}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1">
+        <button onClick={(e) => { e.stopPropagation(); openEdit(sop) }} className="p-1.5 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
+        <button onClick={(e) => { e.stopPropagation(); handleDelete(sop.id) }} className="p-1.5 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+      </div>
+    </div>
+  )
+
   // ════════════════════════════════════
   // Render
   // ════════════════════════════════════
   return (
     <AdminRoleGuard allowedRoles={["full_admin", "intern"]}>
-      <div className="min-h-dvh bg-white">
+      <div className="min-h-full bg-neutral-50">
         {/* Toast */}
         {toast && (
           <div className="fixed top-4 right-4 z-50">
@@ -290,266 +380,199 @@ export default function SOPsPage() {
           </div>
         )}
 
-        {/* ── Sticky top bar ── */}
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-neutral-200">
-          <div className="max-w-360 mx-auto px-4 sm:px-6">
-            <div className="flex items-center justify-between h-14">
-              <div className="flex items-center gap-3">
-                {viewMode !== "docs" && (
-                  <button onClick={() => { setViewMode("docs"); setSelectedSOP(null) }} className="flex items-center gap-1.5 text-neutral-400 hover:text-neutral-700 transition-colors text-sm font-medium">
-                    <ArrowLeft className="w-4 h-4" /><span className="hidden sm:inline">Back</span>
-                  </button>
-                )}
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-neutral-600" />
-                  <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
-                    {viewMode === "create" ? "NEW DOCUMENT" : viewMode === "edit" ? "EDIT DOCUMENT" : viewMode === "detail" ? "DOCUMENT" : "434 MEDIA HUB"}
-                  </h1>
-                </div>
-              </div>
-
-              {/* Search (docs view only) */}
-              <div className="flex items-center gap-3">
-                {viewMode === "docs" && (
-                  <div className="relative hidden sm:block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-300" />
-                    <input type="text" placeholder="Search docs..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-56 pl-9 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all" />
-                  </div>
-                )}
-                {viewMode === "docs" && (
-                  <button onClick={() => openCreate(activeCategory || "Brands")} className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-all shadow-sm">
-                    <Plus className="w-3.5 h-3.5" /><span className="hidden sm:inline">New Document</span>
-                  </button>
-                )}
-                {(viewMode === "create" || viewMode === "edit") && (
-                  <button onClick={handleSave} disabled={isSaving || isUploading} className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-all disabled:opacity-50 shadow-sm">
-                    {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    {isSaving ? "Saving..." : "Save Document"}
-                  </button>
-                )}
-              </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-32">
+            <div className="text-center">
+              <Loader2 className="w-5 h-5 animate-spin text-neutral-300 mx-auto mb-3" />
+              <p className="text-neutral-500 text-[13px]">Loading...</p>
             </div>
           </div>
-        </header>
-
-        <main className="max-w-360 mx-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-32">
-              <div className="text-center">
-                <Loader2 className="w-5 h-5 animate-spin text-neutral-300 mx-auto mb-3" />
-                <p className="text-neutral-400 text-[13px]">Loading...</p>
+        ) : viewMode === "docs" ? (
+          /* ════════ DOCS ════════ */
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            {/* Standard admin header */}
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h1 className="text-lg font-semibold text-neutral-900">Knowledge Base</h1>
+                <p className="text-[12px] text-neutral-500">SOPs, brand guidelines, playbooks &amp; cohort intake templates.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {availableVerticals.length > 0 && (
+                  <select
+                    value={activeVertical}
+                    onChange={(e) => setActiveVertical(e.target.value as Vertical | "all")}
+                    className="px-2.5 py-2 bg-white border border-neutral-200 rounded-lg text-[12px] font-medium text-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+                    title="Filter by vertical"
+                  >
+                    <option value="all">All verticals</option>
+                    {availableVerticals.map((v) => <option key={v} value={v}>{VERTICAL_LABELS[v]}</option>)}
+                  </select>
+                )}
+                <div className="relative hidden sm:block">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-300" />
+                  <input type="text" placeholder="Search docs..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-56 pl-9 pr-3 py-2 bg-white border border-neutral-200 rounded-lg text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all" />
+                </div>
+                <button onClick={() => openCreate(activeCategory || "Brand & Design")} className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-all shadow-sm shrink-0">
+                  <Plus className="w-3.5 h-3.5" /><span className="hidden sm:inline">New Document</span>
+                </button>
               </div>
             </div>
-          ) : viewMode === "docs" ? (
-            <>
-              {/* ════════ HERO ════════ */}
-              <section className="border-b border-neutral-200">
-                <div className="px-4 sm:px-6 py-8 sm:py-10">
-                  <div className="relative overflow-hidden bg-neutral-900 rounded-2xl">
-                    <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-                    <div className="relative z-10 p-6 sm:p-8">
-                      {/* Row 1: Title + Mission */}
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 mb-5">
-                        <div className="max-w-md">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500 mb-1.5">Welcome to</p>
-                          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-[1.1] mb-1.5">434 Media Hub</h2>
-                          <p className="text-[13px] text-neutral-400 leading-relaxed">Your central knowledge base for onboarding, brand guidelines, design systems, web documentation, and marketing playbooks.</p>
-                        </div>
-                        <div className="flex items-start gap-2.5 lg:pt-1">
-                          <Target className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-0.5">Our Mission</p>
-                            <p className="text-[16px] sm:text-[17px] font-bold text-white leading-snug tracking-tight">Bold ideas, excellence in execution</p>
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Row 2: What We Do · Attitude · Location */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-5 border-t border-white/10 mb-5">
-                        <div className="flex items-start gap-2.5">
-                          <Star className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-1">What We Do</p>
-                            <p className="text-[12px] text-neutral-300 leading-[1.7]">Full-service brand storytelling, broadcast & digital media strategy, video production, web development, and event production.</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-2.5">
-                          <Heart className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-1">Our Attitude</p>
-                            <p className="text-[13px] font-semibold text-white leading-snug mb-0.5">Actions Speak Louder</p>
-                            <p className="text-[11px] text-neutral-400 leading-relaxed">Vision to Action{"\u2014"}drives everything from creative ideation to final execution.</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-2.5">
-                          <MapPin className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-1">Office</p>
-                            <p className="text-[12px] font-medium text-white leading-snug">Fine Silver</p>
-                            <p className="text-[11px] text-neutral-400 leading-relaxed">816 Camaron St., Suite 1.11<br />San Antonio, TX 78212</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Row 3: Core Values */}
-                      <div className="pt-5 border-t border-white/10">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500 mb-2.5">Core Values</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                          {CORE_VALUES.map((v) => { const Icon = v.icon; return (
-                            <div key={v.name} className="bg-white/5 border border-white/10 rounded-xl p-2.5 hover:bg-white/8 transition-colors group">
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center"><Icon className="w-2.5 h-2.5 text-neutral-300" /></div>
-                                <h4 className="text-[11px] font-bold text-white tracking-tight">{v.name}</h4>
-                              </div>
-                              <p className="text-[10px] text-neutral-400 leading-relaxed">{v.text}</p>
-                            </div>
-                          )})}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            {/* Dismissible welcome banner (replaces the old full hero) */}
+            {showWelcome && (
+              <div className="relative mb-5 rounded-xl border border-neutral-200 bg-white px-4 py-3 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 text-white flex items-center justify-center shrink-0"><BookOpen className="w-4 h-4" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-neutral-900">Welcome to the 434 Media Hub</p>
+                  <p className="text-[12px] text-neutral-500 leading-relaxed">Your central knowledge base — onboarding, brand & design systems, web docs, marketing playbooks, and cohort intake templates. Browse by category, or filter by vertical.</p>
                 </div>
-              </section>
+                <button onClick={dismissWelcome} className="p-1 text-neutral-300 hover:text-neutral-600 transition-colors shrink-0" title="Dismiss"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            )}
 
-              {/* ════════ DOCS THREE-COLUMN LAYOUT ════════ */}
-              <div className="flex min-h-[calc(100dvh-280px)]">
-                {/* ── Left Sidebar: Categories ── */}
-                <aside className="hidden md:block w-60 lg:w-64 border-r border-neutral-200 shrink-0">
-                  <div className="sticky top-30 px-4 py-6 overflow-y-auto max-h-[calc(100dvh-120px)]">
-                    <nav className="select-none">
-                      {DOC_CATEGORIES.map((cat) => {
-                        const meta = CATEGORY_META[cat]
-                        const Icon = meta.icon
-                        const docs = sopsByCategory[cat] || []
-                        const isOpen = activeCategory === cat
-
-                        return (
-                          <div key={cat} className="mb-0.5">
-                            <button
-                              onClick={() => setActiveCategory(isOpen ? null : cat)}
-                              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left transition-colors group ${isOpen ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"}`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Icon className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                                <span className="text-[13px] font-semibold tracking-tight truncate">{cat}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {docs.length > 0 && <span className="text-[10px] font-semibold text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded-full">{docs.length}</span>}
-                                <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-                              </div>
-                            </button>
-
-                            {isOpen && (
-                              <div className="mt-0.5 ml-3 pl-3 border-l border-neutral-200">
-                                <p className="text-[11px] text-neutral-400 leading-relaxed px-2 py-1.5 mb-0.5">{meta.description}</p>
-                                {docs.length === 0 ? (
-                                  <p className="text-[11px] text-neutral-400 italic px-2 py-1">No documents yet</p>
-                                ) : docs.map((sop) => (
-                                  <button key={sop.id} onClick={() => openDetail(sop)}
-                                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${selectedSOP?.id === sop.id ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-800"}`}>
-                                    <FileText className="w-3 h-3 shrink-0 opacity-50" />
-                                    <span className="text-[13px] font-medium truncate leading-snug">{sop.title}</span>
-                                  </button>
-                                ))}
-                                <button onClick={() => openCreate(cat)} className="w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
-                                  <Plus className="w-3 h-3 shrink-0" /><span className="text-[12px] font-medium">Add document</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </nav>
+            {activeVertical !== "all" ? (
+              /* ── Vertical filter: flat list across categories ── */
+              <div className="max-w-3xl">
+                <div className="mb-6">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-indigo-500 mb-1">{VERTICAL_LABELS[activeVertical]}</p>
+                  <h2 className="text-[22px] font-bold text-neutral-900 tracking-tight leading-tight mb-2">{VERTICAL_LABELS[activeVertical]} documents</h2>
+                  <p className="text-[14px] text-neutral-500 leading-relaxed">All documents tagged {VERTICAL_LABELS[activeVertical]}, across every category — e.g. cohort intake templates.</p>
+                </div>
+                {verticalDocs.length === 0 ? (
+                  <div className="text-center py-20 bg-white border border-neutral-200 rounded-xl">
+                    <BookOpen className="w-8 h-8 text-neutral-200 mx-auto mb-3" />
+                    <p className="text-[14px] font-medium text-neutral-600 mb-1">No {VERTICAL_LABELS[activeVertical]} documents yet</p>
+                    <p className="text-[13px] text-neutral-500 mb-6 max-w-sm mx-auto leading-relaxed">Create a document and set its vertical to {VERTICAL_LABELS[activeVertical]} to see it here.</p>
+                    <button onClick={() => openCreate("Operations")} className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-sm transition-colors"><Plus className="w-4 h-4" />Create Document</button>
                   </div>
+                ) : (
+                  <div className="space-y-2">{verticalDocs.map(docRow)}</div>
+                )}
+              </div>
+            ) : (
+              /* ── Category browse: left rail + center list ── */
+              <div className="flex gap-6">
+                {/* Left rail: categories — hairline divider marks it as section-level
+                    navigation, a tier below the global admin sidebar. */}
+                <aside className="hidden md:block w-56 lg:w-60 shrink-0 border-r border-neutral-200 pr-4">
+                  <nav className="sticky top-6 select-none space-y-4">
+                    {SPACES.map((space) => (
+                      <div key={space.key}>
+                        <p className="px-3 pb-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500">{space.label}</p>
+                        {categoriesInSpace(space.key).map((def) => {
+                          const Icon = def.icon
+                          const docs = sopsByCategory[def.key] || []
+                          const isOpen = activeCategory === def.key
+                          return (
+                            <div key={def.key} className="mb-0.5">
+                              <button
+                                onClick={() => setActiveCategory(isOpen ? null : def.key)}
+                                title={def.description}
+                                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left transition-colors group ${isOpen ? "bg-white border border-neutral-200 text-neutral-900 shadow-sm" : "text-neutral-500 hover:bg-white hover:text-neutral-700"}`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Icon className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                                  <span className="text-[13px] font-semibold tracking-tight truncate">{def.label}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {docs.length > 0 && <span className="text-[10px] font-semibold text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded-full">{docs.length}</span>}
+                                  <ChevronDown className={`w-3 h-3 text-neutral-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                                </div>
+                              </button>
+                              {isOpen && (
+                                <div className="mt-0.5 ml-3 pl-3 border-l border-neutral-200">
+                                  {docs.length === 0 ? (
+                                    <p className="text-[11px] text-neutral-500 italic px-2 py-1">No documents yet</p>
+                                  ) : docs.map((sop) => (
+                                    <button key={sop.id} onClick={() => openDetail(sop)}
+                                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${selectedSOP?.id === sop.id ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-white hover:text-neutral-800"}`}>
+                                      <FileText className="w-3 h-3 shrink-0 opacity-50" />
+                                      <span className="text-[13px] font-medium truncate leading-snug">{sop.title}</span>
+                                    </button>
+                                  ))}
+                                  <button onClick={() => openCreate(def.key)} className="w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded-md text-neutral-500 hover:text-neutral-700 hover:bg-white transition-colors">
+                                    <Plus className="w-3 h-3 shrink-0" /><span className="text-[12px] font-medium">Add document</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </nav>
                 </aside>
 
-                {/* ── Center: Document list / empty ── */}
-                <div className="flex-1 min-w-0">
-                  <div className="px-6 sm:px-8 lg:px-12 py-8 max-w-3xl mx-auto">
-                    {/* Mobile category selector */}
-                    <div className="md:hidden mb-6">
-                      <select value={activeCategory || ""} onChange={(e) => setActiveCategory(e.target.value || null)}
-                        className="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-[13px] font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">
-                        <option value="">All Categories</option>
-                        {DOC_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-
-                    {activeCategory ? (
-                      <>
-                        {/* Category header */}
-                        <div className="mb-8">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-1">{activeCategory}</p>
-                          <h2 className="text-[22px] sm:text-[26px] font-bold text-neutral-900 tracking-tight leading-tight mb-2">
-                            {activeCategory === "Brands" && "Brand Guidelines & Identity"}
-                            {activeCategory === "Design" && "Design Systems & Standards"}
-                            {activeCategory === "Web" && "Web Development Docs"}
-                            {activeCategory === "Marketing" && "Marketing Playbooks"}
-                            {activeCategory === "Other" && "General Resources"}
-                          </h2>
-                          <p className="text-[14px] text-neutral-500 leading-relaxed">{CATEGORY_META[activeCategory as DocCategory]?.description}</p>
-                        </div>
-
-                        {activeDocs.length === 0 ? (
-                          <div className="text-center py-20">
-                            <BookOpen className="w-8 h-8 text-neutral-200 mx-auto mb-3" />
-                            <p className="text-[14px] font-medium text-neutral-600 mb-1">No documents yet</p>
-                            <p className="text-[13px] text-neutral-400 mb-6 max-w-sm mx-auto leading-relaxed">Create the first document for {activeCategory} to start building the knowledge base.</p>
-                            <button onClick={() => openCreate(activeCategory)} className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-sm transition-colors">
-                              <Plus className="w-4 h-4" />Create Document
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            {activeDocs.map((sop) => (
-                              <div key={sop.id} onClick={() => openDetail(sop)} className="group flex items-start gap-4 px-4 py-4 -mx-4 rounded-xl hover:bg-neutral-50 cursor-pointer transition-colors">
-                                <div className="w-8 h-8 rounded-lg bg-neutral-100 text-neutral-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-neutral-200 transition-colors">
-                                  <FileText className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <h3 className="text-[15px] font-semibold text-neutral-900 tracking-tight truncate">{sop.title}</h3>
-                                    {getStatusBadge(sop.status)}
-                                  </div>
-                                  {sop.description && <p className="text-[13px] text-neutral-500 leading-relaxed line-clamp-2 mb-1.5">{sop.description}</p>}
-                                  <div className="flex items-center gap-3 text-[11px] text-neutral-400 font-medium">
-                                    {sop.owner && <span className="flex items-center gap-1"><User className="w-3 h-3" />{sop.owner}</span>}
-                                    {sop.version && <span className="flex items-center gap-1"><Tag className="w-3 h-3" />v{sop.version}</span>}
-                                    {sop.attachments && sop.attachments.length > 0 && <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" />{sop.attachments.length}</span>}
-                                    {sop.updated_at && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDate(sop.updated_at)}</span>}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1">
-                                  <button onClick={(e) => { e.stopPropagation(); openEdit(sop) }} className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>
-                                  <button onClick={(e) => { e.stopPropagation(); handleDelete(sop.id) }} className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-20">
-                        <BookOpen className="w-8 h-8 text-neutral-200 mx-auto mb-3" />
-                        <p className="text-[14px] font-medium text-neutral-600 mb-1">Select a category</p>
-                        <p className="text-[13px] text-neutral-400">Choose a category from the sidebar to browse documents.</p>
-                      </div>
-                    )}
+                {/* Center: document list */}
+                <div className="flex-1 min-w-0 max-w-3xl">
+                  {/* Mobile category selector */}
+                  <div className="md:hidden mb-5">
+                    <select value={activeCategory || ""} onChange={(e) => setActiveCategory(e.target.value || null)}
+                      className="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-[13px] font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">
+                      <option value="">All Categories</option>
+                      {SPACES.map((space) => (
+                        <optgroup key={space.key} label={space.label}>
+                          {categoriesInSpace(space.key).map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
                   </div>
+
+                  {activeCategory ? (
+                    <>
+                      <div className="mb-6">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-1">{catDef(activeCategory).space === "program" ? "Digital Canvas Program" : "434 Media"}</p>
+                        <h2 className="text-[22px] font-bold text-neutral-900 tracking-tight leading-tight mb-2">{catDef(activeCategory).heading}</h2>
+                        <p className="text-[14px] text-neutral-500 leading-relaxed">{catDef(activeCategory).description}</p>
+                      </div>
+
+                      {activeDocs.length === 0 ? (
+                        <div className="text-center py-20 bg-white border border-neutral-200 rounded-xl">
+                          <BookOpen className="w-8 h-8 text-neutral-200 mx-auto mb-3" />
+                          <p className="text-[14px] font-medium text-neutral-600 mb-1">No documents yet</p>
+                          <p className="text-[13px] text-neutral-500 mb-6 max-w-sm mx-auto leading-relaxed">Create the first document for {activeCategory} to start building the knowledge base.</p>
+                          <button onClick={() => openCreate(activeCategory)} className="inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-sm transition-colors">
+                            <Plus className="w-4 h-4" />Create Document
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">{activeDocs.map(docRow)}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-20">
+                      <BookOpen className="w-8 h-8 text-neutral-200 mx-auto mb-3" />
+                      <p className="text-[14px] font-medium text-neutral-600 mb-1">Select a category</p>
+                      <p className="text-[13px] text-neutral-500">Choose a category from the sidebar to browse documents.</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            </>
-          ) : viewMode === "detail" && selectedSOP ? (
-            /* ════════ DETAIL VIEW — three-column with TOC ════════ */
-            <div className="flex min-h-[calc(100dvh-120px)]">
-              {/* Left: back link + category context */}
-              <aside className="hidden lg:block w-60 border-r border-neutral-200 shrink-0">
-                <div className="sticky top-30 px-4 py-6">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-3">{selectedSOP.category}</p>
-                  {(sopsByCategory[selectedSOP.category] || []).map((sop) => (
+            )}
+          </div>
+        ) : viewMode === "detail" && selectedSOP ? (
+          /* ════════ DETAIL — three-column reader ════════ */
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            {/* Back + actions header */}
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <button onClick={() => { setViewMode("docs"); setSelectedSOP(null) }} className="flex items-center gap-1.5 text-neutral-500 hover:text-neutral-700 transition-colors text-sm font-medium">
+                <ArrowLeft className="w-4 h-4" /><span>Back</span>
+              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => openEdit(selectedSOP)} className="flex items-center gap-2 px-3 py-1.5 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg shadow-sm"><Edit2 className="w-3.5 h-3.5" />Edit</button>
+                <button onClick={() => handleDelete(selectedSOP.id)} className="flex items-center gap-2 px-3 py-1.5 text-[12px] font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+              </div>
+            </div>
+
+            <div className="flex gap-6">
+              {/* Left: sibling docs in category */}
+              <aside className="hidden lg:block w-56 shrink-0">
+                <div className="sticky top-6">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-3">{catDef(selectedSOP.category).label}</p>
+                  {(sopsByCategory[normalizeCategory(selectedSOP.category)] || []).map((sop) => (
                     <button key={sop.id} onClick={() => openDetail(sop)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 mb-0.5 rounded-md text-left transition-colors ${sop.id === selectedSOP.id ? "bg-neutral-900 text-white" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"}`}>
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 mb-0.5 rounded-md text-left transition-colors ${sop.id === selectedSOP.id ? "bg-neutral-900 text-white" : "text-neutral-500 hover:bg-white hover:text-neutral-700"}`}>
                       <FileText className="w-3 h-3 shrink-0 opacity-50" />
                       <span className="text-[13px] font-medium truncate">{sop.title}</span>
                     </button>
@@ -557,17 +580,23 @@ export default function SOPsPage() {
                 </div>
               </aside>
 
-              {/* Center: document content */}
-              <article className="flex-1 min-w-0 px-6 sm:px-8 lg:px-12 py-8 max-w-3xl mx-auto">
+              {/* Center: document */}
+              <article className="flex-1 min-w-0 max-w-3xl bg-white border border-neutral-200 rounded-2xl px-6 sm:px-8 py-8">
                 <header className="mb-8 pb-6 border-b border-neutral-100">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">{selectedSOP.category}</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-500">{catDef(selectedSOP.category).label}</span>
+                    {selectedSOP.vertical && (
+                      <>
+                        <span className="text-neutral-300">&middot;</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-indigo-500">{VERTICAL_LABELS[selectedSOP.vertical]}</span>
+                      </>
+                    )}
                     <span className="text-neutral-300">&middot;</span>
                     {getStatusBadge(selectedSOP.status)}
                   </div>
                   <h1 className="text-[28px] sm:text-[34px] font-bold text-neutral-900 tracking-tight leading-[1.12] mb-3">{selectedSOP.title}</h1>
                   {selectedSOP.description && <p className="text-[16px] text-neutral-500 leading-relaxed">{selectedSOP.description}</p>}
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 text-[12px] text-neutral-400 font-medium">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 text-[12px] text-neutral-500 font-medium">
                     {selectedSOP.owner && <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" />{selectedSOP.owner}</span>}
                     {selectedSOP.version && <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" />Version {selectedSOP.version}</span>}
                     {selectedSOP.updated_at && <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Updated {formatDate(selectedSOP.updated_at)}</span>}
@@ -579,6 +608,7 @@ export default function SOPsPage() {
                   <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {selectedSOP.attachments.filter((a) => a.type === "image").map((att, i) => (
                       <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl border border-neutral-200 hover:shadow-md transition-shadow">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={att.url} alt={att.filename || "Image"} className="w-full h-auto object-cover" />
                         {att.filename && <p className="px-3 py-2 text-[12px] text-neutral-500 bg-neutral-50 truncate">{att.filename}</p>}
                       </a>
@@ -586,16 +616,17 @@ export default function SOPsPage() {
                   </div>
                 ) : null}
 
-                {/* Content (rendered as rich text if contains markdown) */}
-                <div className="prose-434">
-                  <div className="whitespace-pre-wrap text-[15px] text-neutral-700 leading-[1.85] font-normal tracking-[0.01em]">{selectedSOP.content}</div>
-                </div>
+                {/* Content — rendered markdown (same renderer as the editor preview) */}
+                <div
+                  className="prose-434 text-[15px] text-neutral-700 leading-[1.85]"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedSOP.content || "") }}
+                />
 
                 {/* Tags */}
                 {selectedSOP.tags && selectedSOP.tags.length > 0 && (
                   <div className="pt-6 mt-8 border-t border-neutral-100">
                     <div className="flex flex-wrap gap-2">
-                      {selectedSOP.tags.map((tag, i) => <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-neutral-500 bg-neutral-100 rounded-lg"><Hash className="w-3 h-3 text-neutral-400" />{tag}</span>)}
+                      {selectedSOP.tags.map((tag, i) => <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-neutral-500 bg-neutral-100 rounded-lg"><Hash className="w-3 h-3 text-neutral-500" />{tag}</span>)}
                     </div>
                   </div>
                 )}
@@ -603,11 +634,11 @@ export default function SOPsPage() {
                 {/* File/link attachments */}
                 {selectedSOP.attachments?.filter((a) => a.type !== "image").length ? (
                   <div className="pt-6 mt-6 border-t border-neutral-100">
-                    <h4 className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 mb-3">Attachments</h4>
+                    <h4 className="text-[11px] font-semibold uppercase tracking-widest text-neutral-500 mb-3">Attachments</h4>
                     <div className="space-y-2">
                       {selectedSOP.attachments.filter((a) => a.type !== "image").map((att, i) => (
                         <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-neutral-50 hover:bg-neutral-100 border border-neutral-100 rounded-xl transition-colors group">
-                          <span className="text-neutral-400 group-hover:text-neutral-600">{getAttachmentIcon(att.type)}</span>
+                          <span className="text-neutral-500 group-hover:text-neutral-600">{getAttachmentIcon(att.type)}</span>
                           <span className="text-[13px] font-medium text-neutral-600 truncate flex-1">{att.filename || att.url}</span>
                           <ExternalLink className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
                         </a>
@@ -615,19 +646,13 @@ export default function SOPsPage() {
                     </div>
                   </div>
                 ) : null}
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-6 mt-8 border-t border-neutral-100">
-                  <button onClick={() => handleDelete(selectedSOP.id)} className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-                  <button onClick={() => openEdit(selectedSOP)} className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg shadow-sm"><Edit2 className="w-3.5 h-3.5" />Edit Document</button>
-                </div>
               </article>
 
               {/* Right: "On this page" TOC */}
               {tocAnchors.length > 0 && (
-                <aside className="hidden xl:block w-56 shrink-0">
-                  <div className="sticky top-30 px-4 py-6">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-400 mb-3">On this page</p>
+                <aside className="hidden xl:block w-52 shrink-0">
+                  <div className="sticky top-6">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-3">On this page</p>
                     <nav className="space-y-1">
                       {tocAnchors.map((a, i) => (
                         <p key={i} className={`text-[13px] font-medium text-neutral-500 hover:text-neutral-800 cursor-pointer transition-colors leading-snug ${a.level === 2 ? "pl-3" : a.level === 3 ? "pl-6" : ""}`}>{a.text}</p>
@@ -637,14 +662,27 @@ export default function SOPsPage() {
                 </aside>
               )}
             </div>
-          ) : (
-            /* ════════ FORM VIEW (Create / Edit) ════════ */
-            <div className="flex min-h-[calc(100dvh-120px)]">
-              {/* Main form area */}
-              <div className="flex-1 min-w-0 px-6 sm:px-8 lg:px-12 py-8 max-w-3xl mx-auto">
+          </div>
+        ) : (
+          /* ════════ FORM (Create / Edit) ════════ */
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+            {/* Back + Save header */}
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <button onClick={() => { setViewMode("docs"); setSelectedSOP(null); resetForm() }} className="flex items-center gap-1.5 text-neutral-500 hover:text-neutral-700 transition-colors text-sm font-medium">
+                <ArrowLeft className="w-4 h-4" /><span>Back</span>
+              </button>
+              <button onClick={handleSave} disabled={isSaving || isUploading} className="flex items-center gap-2 px-4 py-2 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition-all disabled:opacity-50 shadow-sm">
+                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {isSaving ? "Saving..." : "Save Document"}
+              </button>
+            </div>
+
+            <div className="flex gap-6">
+              {/* Main form */}
+              <div className="flex-1 min-w-0 max-w-3xl">
                 <div className="mb-6">
-                  <h2 className="text-[22px] sm:text-[26px] font-bold text-neutral-900 tracking-tight leading-tight">{viewMode === "create" ? "Create New Document" : "Edit Document"}</h2>
-                  <p className="text-[14px] text-neutral-500 mt-1 leading-relaxed">{viewMode === "create" ? "Add a new guide, SOP, or reference document for the team." : "Update the document details and content below."}</p>
+                  <h2 className="text-lg font-semibold text-neutral-900">{viewMode === "create" ? "Create New Document" : "Edit Document"}</h2>
+                  <p className="text-[13px] text-neutral-500 mt-0.5 leading-relaxed">{viewMode === "create" ? "Add a new guide, SOP, or reference document for the team." : "Update the document details and content below."}</p>
                 </div>
 
                 <div className="space-y-6">
@@ -702,37 +740,36 @@ export default function SOPsPage() {
                     {showLinkInput && (
                       <div className="flex items-center gap-2 mb-3">
                         <div className="relative flex-1">
-                          <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
+                          <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
                           <input type="url" value={linkInput} onChange={(e) => setLinkInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLink() }}} placeholder="https://..." autoFocus
                             className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200 rounded-lg text-[13px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 transition-all" />
                         </div>
                         <button type="button" onClick={addLink} className="px-3 py-2 text-[12px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg">Add</button>
-                        <button type="button" onClick={() => { setShowLinkInput(false); setLinkInput("") }} className="p-2 text-neutral-400 hover:text-neutral-600 rounded-lg"><X className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => { setShowLinkInput(false); setLinkInput("") }} className="p-2 text-neutral-500 hover:text-neutral-600 rounded-lg"><X className="w-3.5 h-3.5" /></button>
                       </div>
                     )}
 
                     <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md" onChange={(e) => { if (e.target.files?.length) handleFileUpload(e.target.files); e.target.value = "" }} className="hidden" />
 
                     <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-                      className={`border-2 border-dashed rounded-xl p-5 text-center transition-all ${isDragging ? "border-neutral-900 bg-neutral-50" : "border-neutral-200 hover:border-neutral-300"}`}>
+                      className={`border-2 border-dashed rounded-xl p-5 text-center transition-all ${isDragging ? "border-neutral-900 bg-white" : "border-neutral-200 bg-white hover:border-neutral-300"}`}>
                       {isUploading ? (
-                        <div className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin text-neutral-400" /><p className="text-[13px] text-neutral-500 font-medium">Uploading...</p></div>
+                        <div className="flex items-center justify-center gap-2"><Loader2 className="w-5 h-5 animate-spin text-neutral-500" /><p className="text-[13px] text-neutral-500 font-medium">Uploading...</p></div>
                       ) : (
-                        <><Upload className="w-5 h-5 text-neutral-300 mx-auto mb-1.5" /><p className="text-[13px] text-neutral-500 font-medium">Drag & drop files</p><p className="text-[11px] text-neutral-400 mt-0.5">PDFs, documents, images up to 50MB</p></>
+                        <><Upload className="w-5 h-5 text-neutral-300 mx-auto mb-1.5" /><p className="text-[13px] text-neutral-500 font-medium">Drag & drop files</p><p className="text-[11px] text-neutral-500 mt-0.5">PDFs, documents, images up to 50MB</p></>
                       )}
                     </div>
 
-                    {/* Attached list (non-cover-image) */}
                     {(formData.attachments || []).filter((a) => a.type !== "image").length > 0 && (
                       <div className="mt-3 space-y-2">
                         {(formData.attachments || []).filter((a) => a.type !== "image").map((att, i) => {
                           const realIdx = (formData.attachments || []).indexOf(att)
                           return (
-                            <div key={i} className="flex items-center gap-3 p-3 bg-neutral-50 border border-neutral-100 rounded-xl">
-                              <span className="text-neutral-400">{getAttachmentIcon(att.type)}</span>
+                            <div key={i} className="flex items-center gap-3 p-3 bg-white border border-neutral-200 rounded-xl">
+                              <span className="text-neutral-500">{getAttachmentIcon(att.type)}</span>
                               <span className="text-[13px] font-medium text-neutral-600 truncate flex-1">{att.filename || att.url}</span>
-                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="p-1 text-neutral-400 hover:text-neutral-600"><ExternalLink className="w-3.5 h-3.5" /></a>
-                              <button type="button" onClick={() => removeAttachment(realIdx)} className="p-1 text-neutral-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="p-1 text-neutral-500 hover:text-neutral-600"><ExternalLink className="w-3.5 h-3.5" /></a>
+                              <button type="button" onClick={() => removeAttachment(realIdx)} className="p-1 text-neutral-500 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
                             </div>
                           )
                         })}
@@ -741,7 +778,7 @@ export default function SOPsPage() {
                   </div>
 
                   {/* Bottom save */}
-                  <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
+                  <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
                     <button type="button" onClick={() => { setViewMode("docs"); setSelectedSOP(null); resetForm() }} className="px-4 py-2 text-[13px] font-medium text-neutral-500 hover:text-neutral-800 rounded-lg transition-colors">Cancel</button>
                     <button onClick={handleSave} disabled={isSaving || isUploading} className="flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl shadow-sm disabled:opacity-50 transition-all">
                       {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{isSaving ? "Saving..." : viewMode === "create" ? "Create Document" : "Update Document"}
@@ -750,49 +787,62 @@ export default function SOPsPage() {
                 </div>
               </div>
 
-              {/* Right sidebar: metadata */}
-              <aside className="hidden lg:block w-64 border-l border-neutral-200 shrink-0">
-                <div className="sticky top-30 px-5 py-6 space-y-5">
+              {/* Right: metadata */}
+              <aside className="hidden lg:block w-64 shrink-0">
+                <div className="sticky top-6 bg-white border border-neutral-200 rounded-xl px-5 py-5 space-y-5">
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">Category</label>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Category</label>
                     <select value={formData.category} onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">
-                      {DOC_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      {SPACES.map((space) => (
+                        <optgroup key={space.key} label={space.label}>
+                          {categoriesInSpace(space.key).map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                        </optgroup>
+                      ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">Status</label>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Vertical</label>
+                    <select value={formData.vertical ?? ""} onChange={(e) => setFormData((p) => ({ ...p, vertical: (e.target.value || undefined) as Vertical | undefined }))}
+                      className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">
+                      <option value="">— None —</option>
+                      {VERTICAL_OPTIONS.map((v) => <option key={v} value={v}>{VERTICAL_LABELS[v]}</option>)}
+                    </select>
+                    <p className="text-[10px] text-neutral-500 mt-1">For cohort intake templates (Cyber, Health/Science, Aerospace…)</p>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Status</label>
                     <select value={formData.status} onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value as SOP["status"] }))}
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">
                       {SOP_STATUSES.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1).replace("-", " ")}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">Owner</label>
-                    <input type="text" value={formData.owner} onChange={(e) => setFormData((p) => ({ ...p, owner: e.target.value }))} placeholder="Author name"
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Owner</label>
+                    <input type="text" value={formData.owner} onChange={(e) => setFormData((p) => ({ ...p, owner: e.target.value }))} placeholder="Auto-filled with your name"
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">Department</label>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Department</label>
                     <input type="text" value={formData.department} onChange={(e) => setFormData((p) => ({ ...p, department: e.target.value }))} placeholder="e.g. Creative"
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">Version</label>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Version</label>
                     <input type="text" value={formData.version} onChange={(e) => setFormData((p) => ({ ...p, version: e.target.value }))} placeholder="1.0"
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10" />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">Tags</label>
+                    <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">Tags</label>
                     <input type="text" value={formData.tags?.join(", ") || ""} onChange={(e) => setFormData((p) => ({ ...p, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) }))} placeholder="onboarding, brand..."
                       className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-[13px] text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10" />
-                    <p className="text-[10px] text-neutral-400 mt-1">Comma-separated</p>
+                    <p className="text-[10px] text-neutral-500 mt-1">Comma-separated</p>
                   </div>
                 </div>
               </aside>
             </div>
-          )}
-        </main>
+          </div>
+        )}
       </div>
     </AdminRoleGuard>
   )

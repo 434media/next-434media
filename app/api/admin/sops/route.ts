@@ -77,6 +77,11 @@ export async function POST(request: NextRequest) {
       data.content = ""
     }
 
+    // Auto-attribute to the author when they didn't type an owner.
+    if (!data.owner || !String(data.owner).trim()) {
+      data.owner = authResult.session.name || authResult.session.email
+    }
+
     const created = await createSOPInFirestore(data)
     return NextResponse.json({ created })
   } catch (error) {

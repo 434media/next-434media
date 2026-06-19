@@ -1,6 +1,8 @@
 // Project Management Types
 // Based on 434 Media Project Management Airtable Base (appYlReVbar7qmCRe)
 
+import type { Vertical } from "./crm-types"
+
 // ============================================
 // Event Link Type
 // ============================================
@@ -139,6 +141,7 @@ export interface SOP {
   airtable_id?: string
   title: string
   category: string
+  vertical?: Vertical // optional industry vertical (reuses the CRM enum) — used by cohort intake templates
   department?: string
   description?: string
   content: string // Rich text/markdown content
