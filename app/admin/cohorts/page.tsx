@@ -86,6 +86,9 @@ function CohortsInner() {
   const [drawer, setDrawer] = useState<{ mode: "create" | "edit"; cohort: Cohort | null } | null>(null)
   const [form, setForm] = useState<CohortForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  // Operators (full_admin+) manage cohorts & builders; interns get a read-only
+  // list that links into their cohort board.
+  const [isOperator, setIsOperator] = useState(false)
   // builders for the open cohort
   const [builders, setBuilders] = useState<Builder[]>([])
   const [buildersLoading, setBuildersLoading] = useState(false)
@@ -108,6 +111,15 @@ function CohortsInner() {
 
   useEffect(() => {
     refresh()
+  }, [])
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((d) => {
+        const role = d?.user?.role
+        setIsOperator(role === "full_admin" || role === "crm_super_admin")
+      })
+      .catch(() => {})
   }, [])
   useEffect(() => {
     if (toast) {
@@ -274,14 +286,16 @@ function CohortsInner() {
               {loading ? "Loading…" : `${cohorts.length} ${cohorts.length === 1 ? "cohort" : "cohorts"}`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 text-white text-[12px] font-semibold hover:bg-neutral-800"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New cohort
-          </button>
+          {isOperator && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-neutral-900 text-white text-[12px] font-semibold hover:bg-neutral-800"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New cohort
+            </button>
+          )}
         </div>
 
         {error && (
@@ -298,7 +312,7 @@ function CohortsInner() {
           </div>
         ) : cohorts.length === 0 ? (
           <div className="bg-white border border-neutral-200 rounded-lg px-4 py-12 text-center text-[13px] text-neutral-400">
-            No cohorts yet. Click "New cohort" to create the first one.
+            {isOperator ? 'No cohorts yet. Click "New cohort" to create the first one.' : "No cohorts yet."}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -326,15 +340,17 @@ function CohortsInner() {
                     <div className="mt-2 text-[11px] text-neutral-400">Demo day {c.demoDayDate}</div>
                   )}
                 </Link>
-                <div className="px-4 pb-3">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(c)}
-                    className="text-[11px] font-medium text-neutral-400 hover:text-neutral-700"
-                  >
-                    Edit details &amp; builders
-                  </button>
-                </div>
+                {isOperator && (
+                  <div className="px-4 pb-3">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(c)}
+                      className="text-[11px] font-medium text-neutral-400 hover:text-neutral-700"
+                    >
+                      Edit details &amp; builders
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -587,7 +603,7 @@ function CohortsInner() {
 
 export default function CohortsPage() {
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <CohortsInner />
     </AdminRoleGuard>
   )

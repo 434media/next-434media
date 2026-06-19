@@ -279,3 +279,19 @@ export async function requireFullAdmin(): Promise<
   }
   return { error: 'Forbidden: full admin access required', status: 403 }
 }
+
+/**
+ * Guard for any authenticated admin — INCLUDING interns / crm_only. Use for read
+ * endpoints and intern-authorable surfaces (cohort board tasks, painpoints,
+ * leads). Pair with requireFullAdmin for operator-only mutations.
+ */
+export async function requireAdmin(): Promise<
+  { session: User } | { error: string; status: 401 | 403 }
+> {
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized', status: 401 }
+  if (!isAuthorizedAdmin(session.email)) {
+    return { error: 'Forbidden: Admin access required', status: 403 }
+  }
+  return { session }
+}

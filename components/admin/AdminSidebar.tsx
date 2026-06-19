@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Rocket,
   Inbox,
@@ -27,8 +27,33 @@ import {
   LayoutDashboard,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import type { SquadKey } from "@/components/crm/types"
 
 type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
+
+// Squad signposting — points a cohort intern at the surfaces their squad works
+// in, WITHOUT hiding anything else. Driven by team_member.squad. Labels are
+// page names (not squad names) per the program's "signpost, don't relabel" rule.
+type SignpostLink = { label: string; href: string; icon: LucideIcon }
+const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
+  domain: [{ label: "Problem Library", href: "/admin/painpoints", icon: Target }],
+  gtm: [
+    { label: "Leads", href: "/admin/leads", icon: Flag },
+    { label: "CRM", href: "/admin/crm", icon: Rocket },
+  ],
+  story_media: [
+    { label: "AI Studio", href: "/admin/content/studio", icon: Clapperboard },
+    { label: "Calendar", href: "/admin/content", icon: Calendar },
+  ],
+  analytics: [{ label: "Analytics", href: "/admin/analytics", icon: BarChart3 }],
+  build: [],
+}
+// Appended for every squad — the cohort board (their task home) and SOPs (where
+// every squad documents its work).
+const SIGNPOST_COMMON: SignpostLink[] = [
+  { label: "Cohort board", href: "/admin/cohorts", icon: GraduationCap },
+  { label: "SOPs", href: "/admin/sops", icon: FileText },
+]
 
 // Hardcoded super-admin fallback — kept in sync with lib/auth.ts CRM_SUPER_ADMIN_FALLBACK.
 // Used so the sidebar can render the Settings entry without an async Firestore lookup.
@@ -192,24 +217,6 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     title: "Workspace",
     items: [
       {
-        id: "painpoints",
-        label: "Painpoints",
-        icon: Target,
-        href: "/admin/painpoints",
-        matchPrefix: "/admin/painpoints",
-        description: "Underwriter problems → translated for sales & builders",
-        // Authored by the Underwriter Onboarding squad (interns); operators activate into cohorts.
-        roles: ["full_admin", "intern"],
-      },
-      {
-        id: "cohorts",
-        label: "Cohorts",
-        icon: GraduationCap,
-        href: "/admin/cohorts",
-        matchPrefix: "/admin/cohorts",
-        roles: ["full_admin"],
-      },
-      {
         id: "projects",
         label: "Projects",
         icon: ClipboardList,
@@ -224,6 +231,34 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/sops",
         matchPrefix: "/admin/sops",
         roles: ["full_admin", "intern"],
+      },
+    ],
+  },
+  // Digital Canvas program surfaces — the underwriter intake → cohort pipeline.
+  // Painpoints + Cohorts are program-specific (Projects/SOPs stay company-wide
+  // in Workspace). Mirrors the squads page and the SOP two-space IA.
+  {
+    id: "digital-canvas",
+    title: "Digital Canvas",
+    items: [
+      {
+        id: "painpoints",
+        label: "Problem Library",
+        icon: Target,
+        href: "/admin/painpoints",
+        matchPrefix: "/admin/painpoints",
+        description: "Sourced industry problems → activated into a cohort's problem set",
+        // Authored by the Underwriter Onboarding squad (interns); operators activate into cohorts.
+        roles: ["full_admin", "intern"],
+      },
+      {
+        id: "cohorts",
+        label: "Cohorts",
+        icon: GraduationCap,
+        href: "/admin/cohorts",
+        matchPrefix: "/admin/cohorts",
+        // Interns reach their cohort board here (read-only list + board access).
+        roles: ["full_admin", "crm_only", "intern"],
       },
     ],
   },
@@ -275,6 +310,27 @@ export function AdminSidebar({
   const grantedRoles: AdminRole[] =
     role === "crm_super_admin" ? ["crm_super_admin", "full_admin", "crm_only"] : [role]
   const canSee = (entry: SidebarItemBase) => entry.roles.some((r) => grantedRoles.includes(r))
+
+  // Resolve the user's cohort squad (if any) to drive the "Your workspace"
+  // signpost. Read from the team roster by email — works for any live session.
+  const [squad, setSquad] = useState<SquadKey | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/team-members")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.success) return
+        const me = (d.data as Array<{ email?: string; squad?: SquadKey | null }>).find(
+          (m) => m.email?.toLowerCase() === user.email.toLowerCase(),
+        )
+        setSquad(me?.squad ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user.email])
+  const signpostLinks = squad ? [...(SQUAD_SIGNPOSTS[squad] ?? []), ...SIGNPOST_COMMON] : []
 
   const overviewVisible = canSee(OVERVIEW_ITEM)
   // Filter each section's items by role, then drop any section left empty.
@@ -416,6 +472,37 @@ export function AdminSidebar({
       {/* Items */}
       <nav className="flex-1 overflow-y-auto py-2 px-2">
         {overviewVisible && <div className="space-y-0.5">{renderEntry(OVERVIEW_ITEM)}</div>}
+
+        {/* Squad signpost — where this person works. Additive: every section
+            below still renders in full. */}
+        {showLabels && signpostLinks.length > 0 && (
+          <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-1.5">
+            <p className="px-1.5 pb-1 pt-0.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500">
+              Your workspace
+            </p>
+            <div className="space-y-0.5">
+              {signpostLinks.map((link) => {
+                const Icon = link.icon
+                const active = isActive(pathname, link.href, link.href === "/admin/content")
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={onNavigate}
+                    className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+                      active
+                        ? "bg-neutral-900 text-white"
+                        : "text-neutral-600 hover:text-neutral-900 hover:bg-white"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{link.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {sections.map((section) => (
           <div key={section.id} className={overviewVisible ? "mt-1" : ""}>

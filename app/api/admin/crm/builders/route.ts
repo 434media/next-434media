@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { requireFullAdmin } from "@/lib/auth"
+import { requireFullAdmin, requireAdmin } from "@/lib/auth"
 import {
   getBuildersByCohort,
   createBuilder,
@@ -15,9 +15,10 @@ export const runtime = "nodejs"
 
 const VALID_STATUSES = ["applied", "accepted", "active", "shipped", "demoed", "withdrawn"]
 
-// GET — builders for a cohort (?cohortId=)
+// GET — builders for a cohort (?cohortId=). Intern-readable for the board's
+// builder rollup; builder mutations below stay operator-only.
 export async function GET(request: NextRequest) {
-  const auth = await requireFullAdmin()
+  const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const cohortId = new URL(request.url).searchParams.get("cohortId")

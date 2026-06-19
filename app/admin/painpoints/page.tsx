@@ -289,9 +289,9 @@ function PainpointsInner() {
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-neutral-900">Painpoints</h1>
+            <h1 className="text-lg font-semibold text-neutral-900">Problem Library</h1>
             <p className="text-[12px] text-neutral-500">
-              The program's intake front door — underwriter problems, translated for sales &amp; builders.
+              Sourced industry problems — vetted and activated into a cohort's problem set.
             </p>
           </div>
           <button

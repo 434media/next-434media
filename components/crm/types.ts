@@ -486,10 +486,12 @@ export const TEAM_MEMBERS = [
 // non-cohort staff. Distinct from AdminRole (access) and from a painpoint vertical.
 export type SquadKey = "domain" | "build" | "story_media" | "gtm" | "analytics"
 
+// Display names track the squads-page roster. Keys stay stable (no data
+// migration) — only the labels follow the program's current naming.
 export const SQUAD_LABELS: Record<SquadKey, string> = {
-  domain: "Domain & Painpoints",
-  build: "Build",
-  story_media: "Story & Media",
+  domain: "Underwriter Onboarding",
+  build: "Builders",
+  story_media: "Storytellers",
   gtm: "GTM",
   analytics: "Analytics",
 }

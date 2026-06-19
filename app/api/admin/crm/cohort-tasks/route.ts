@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { requireFullAdmin } from "@/lib/auth"
+import { requireAdmin } from "@/lib/auth"
 import {
   getCohortTasksByCohort,
   createCohortTask,
@@ -10,8 +10,9 @@ import type { CohortTask } from "@/types/crm-types"
 
 export const runtime = "nodejs"
 
-// Squad-grouped cohort board (Section 3). Operator-managed for v1 (full_admin+).
-// Intern self-service (view + status update on own tasks) is a planned follow-up.
+// Squad-grouped cohort board (Section 3). Intern-accessible: the board is the
+// cohort's shared workspace, so any authed admin (incl. interns) can view and
+// manage task cards. Cohort + builder structure stays operator-only.
 
 const VALID_SQUADS = ["domain", "build", "story_media", "gtm", "analytics"]
 const VALID_STATUSES = ["not_started", "in_progress", "completed", "blocked", "deferred"]
@@ -19,7 +20,7 @@ const VALID_PRIORITIES = ["low", "medium", "high", "urgent"]
 
 // GET — tasks for a cohort (?cohortId=)
 export async function GET(request: NextRequest) {
-  const auth = await requireFullAdmin()
+  const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const cohortId = new URL(request.url).searchParams.get("cohortId")
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
 // POST — create a cohort task
 export async function POST(request: NextRequest) {
-  const auth = await requireFullAdmin()
+  const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
 // PATCH — update a cohort task (body.id + changed fields)
 export async function PATCH(request: NextRequest) {
-  const auth = await requireFullAdmin()
+  const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const body = await request.json()
@@ -111,7 +112,7 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE — remove a cohort task (?id=)
 export async function DELETE(request: NextRequest) {
-  const auth = await requireFullAdmin()
+  const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
     const id = new URL(request.url).searchParams.get("id")
