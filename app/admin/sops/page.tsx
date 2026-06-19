@@ -84,17 +84,19 @@ const CATEGORIES: CategoryDef[] = [
     description: "Web standards, CMS guides, deployment, technical docs", heading: "Web & Tech Docs" },
   { key: "Operations", space: "company", label: "Operations", icon: FolderOpen,
     description: "Onboarding, finance, HR, process & general resources", heading: "Operations & Resources" },
-  // Digital Canvas Program — the pipeline, in flow order (mirrors the squads page)
-  { key: "GTM", space: "program", label: "GTM", icon: Crosshair,
-    description: "Finds it · sponsors & target pipeline", heading: "GTM — Find the sponsors" },
-  { key: "Underwriter Onboarding", space: "program", label: "Underwriter Onboarding", icon: ClipboardList,
-    description: "Frames it · the underwriter intake framework", heading: "Underwriter Onboarding — Frame the problem" },
-  { key: "Builders", space: "program", label: "Builders", icon: Hammer,
-    description: "Ships it · the builder process", heading: "Builders — Ship the prototype" },
-  { key: "Storytellers", space: "program", label: "Storytellers", icon: Megaphone,
-    description: "Tells it · story, brand & cohort media", heading: "Storytellers — Tell the story" },
-  { key: "Analytics", space: "program", label: "Analytics", icon: BarChart3,
-    description: "Proves it · cohort health & demo-day metrics", heading: "Analytics — Prove the outcome" },
+  // Digital Canvas Program — the pipeline as VERBS, in flow order (mirrors the
+  // squads page tagline). Verb labels are durable past any squad/team name; the
+  // squad/function lives in the description.
+  { key: "find", space: "program", label: "Find", icon: Crosshair,
+    description: "GTM · sponsors & target pipeline", heading: "Find — sponsors & pipeline" },
+  { key: "frame", space: "program", label: "Frame", icon: ClipboardList,
+    description: "Underwriter onboarding · the intake framework", heading: "Frame — the problem" },
+  { key: "ship", space: "program", label: "Ship", icon: Hammer,
+    description: "Builders · the build process", heading: "Ship — the prototype" },
+  { key: "tell", space: "program", label: "Tell", icon: Megaphone,
+    description: "Storytellers · story, brand & cohort media", heading: "Tell — the story" },
+  { key: "prove", space: "program", label: "Prove", icon: BarChart3,
+    description: "Analytics · cohort health & demo-day metrics", heading: "Prove — the outcome" },
 ]
 
 const CATEGORY_KEYS = CATEGORIES.map((c) => c.key)
@@ -106,6 +108,12 @@ const CATEGORY_ALIASES: Record<string, string> = {
   Web: "Web & Tech",
   Marketing: "Content & Production",
   Other: "Operations",
+  // Program categories were squad-named before the verb switch.
+  GTM: "find",
+  "Underwriter Onboarding": "frame",
+  Builders: "ship",
+  Storytellers: "tell",
+  Analytics: "prove",
 }
 
 function normalizeCategory(raw?: string): string {
@@ -146,6 +154,8 @@ export default function SOPsPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>("Brand & Design")
   const [activeVertical, setActiveVertical] = useState<Vertical | "all">("all")
   const [showWelcome, setShowWelcome] = useState(false)
+  // Collapsible space groups in the rail (both expanded by default).
+  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({})
   const [isDragging, setIsDragging] = useState(false)
   const [linkInput, setLinkInput] = useState("")
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -457,10 +467,19 @@ export default function SOPsPage() {
                     navigation, a tier below the global admin sidebar. */}
                 <aside className="hidden md:block w-56 lg:w-60 shrink-0 border-r border-neutral-200 pr-4">
                   <nav className="sticky top-6 select-none space-y-4">
-                    {SPACES.map((space) => (
+                    {SPACES.map((space) => {
+                      const spaceCollapsed = collapsedSpaces[space.key]
+                      return (
                       <div key={space.key}>
-                        <p className="px-3 pb-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500">{space.label}</p>
-                        {categoriesInSpace(space.key).map((def) => {
+                        <button
+                          type="button"
+                          onClick={() => setCollapsedSpaces((s) => ({ ...s, [space.key]: !s[space.key] }))}
+                          className="w-full flex items-center justify-between gap-2 px-3 pb-1 pt-0.5 group"
+                        >
+                          <span className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-500 group-hover:text-neutral-700">{space.label}</span>
+                          <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform duration-200 ${spaceCollapsed ? "-rotate-90" : ""}`} />
+                        </button>
+                        {!spaceCollapsed && categoriesInSpace(space.key).map((def) => {
                           const Icon = def.icon
                           const docs = sopsByCategory[def.key] || []
                           const isOpen = activeCategory === def.key
@@ -500,7 +519,8 @@ export default function SOPsPage() {
                           )
                         })}
                       </div>
-                    ))}
+                      )
+                    })}
                   </nav>
                 </aside>
 
