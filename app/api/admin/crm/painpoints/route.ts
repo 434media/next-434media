@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
       problemStatement: problemStatement.trim(),
       underwriterName: body.underwriterName?.trim() || undefined,
       underwriterRole: body.underwriterRole?.trim() || undefined,
+      contactEmail: body.contactEmail?.trim() || undefined,
       sponsorClientId: body.sponsorClientId ?? null,
       sponsorName: body.sponsorName?.trim() || undefined,
       salesFraming: body.salesFraming?.trim() || undefined,
@@ -163,6 +164,7 @@ export async function PATCH(request: NextRequest) {
     if (body.problemStatement !== undefined) updates.problemStatement = String(body.problemStatement).trim()
     if (body.underwriterName !== undefined) updates.underwriterName = String(body.underwriterName).trim()
     if (body.underwriterRole !== undefined) updates.underwriterRole = String(body.underwriterRole).trim()
+    if (body.contactEmail !== undefined) updates.contactEmail = String(body.contactEmail).trim()
     if (body.sponsorClientId !== undefined) updates.sponsorClientId = body.sponsorClientId || null
     if (body.sponsorName !== undefined) updates.sponsorName = String(body.sponsorName).trim()
     if (body.salesFraming !== undefined) updates.salesFraming = String(body.salesFraming).trim()

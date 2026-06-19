@@ -690,6 +690,7 @@ export interface Painpoint {
   // reused crm_clients record tagged "underwriter"; name denormalized for display.
   underwriterName?: string
   underwriterRole?: string
+  contactEmail?: string // follow-up address (captured by the public intake form)
   sponsorClientId?: string | null // FK → crm_clients
   sponsorName?: string
 

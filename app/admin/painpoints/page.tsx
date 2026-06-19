@@ -65,6 +65,7 @@ type PainpointForm = {
   source: PainpointSource
   underwriterName: string
   underwriterRole: string
+  contactEmail: string
   sponsorName: string
   problemStatement: string
   salesFraming: string
@@ -84,6 +85,7 @@ const EMPTY_FORM: PainpointForm = {
   source: "manual",
   underwriterName: "",
   underwriterRole: "",
+  contactEmail: "",
   sponsorName: "",
   problemStatement: "",
   salesFraming: "",
@@ -186,6 +188,7 @@ function PainpointsInner() {
       source: p.source,
       underwriterName: p.underwriterName ?? "",
       underwriterRole: p.underwriterRole ?? "",
+      contactEmail: p.contactEmail ?? "",
       sponsorName: p.sponsorName ?? "",
       problemStatement: p.problemStatement,
       salesFraming: p.salesFraming ?? "",
@@ -546,15 +549,27 @@ function PainpointsInner() {
                   />
                 </div>
               </div>
-              <div>
-                <label className={LABEL}>Sponsor org</label>
-                <input
-                  type="text"
-                  value={form.sponsorName}
-                  onChange={(e) => setForm((f) => ({ ...f, sponsorName: e.target.value }))}
-                  placeholder="Acme Security Inc."
-                  className={FIELD}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL}>Sponsor org</label>
+                  <input
+                    type="text"
+                    value={form.sponsorName}
+                    onChange={(e) => setForm((f) => ({ ...f, sponsorName: e.target.value }))}
+                    placeholder="Acme Security Inc."
+                    className={FIELD}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL}>Contact email</label>
+                  <input
+                    type="email"
+                    value={form.contactEmail}
+                    onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))}
+                    placeholder="jane@acme.com"
+                    className={FIELD}
+                  />
+                </div>
               </div>
             </section>
 
