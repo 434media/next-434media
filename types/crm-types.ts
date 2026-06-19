@@ -561,6 +561,7 @@ export type Vertical =
   | "science"
   | "education"
   | "aerospace"
+  | "sales_media"
   | "other"
 
 export const VERTICAL_LABELS: Record<Vertical, string> = {
@@ -571,6 +572,7 @@ export const VERTICAL_LABELS: Record<Vertical, string> = {
   science: "Science",
   education: "Education",
   aerospace: "Aerospace",
+  sales_media: "Sales & Media",
   other: "Other",
 }
 

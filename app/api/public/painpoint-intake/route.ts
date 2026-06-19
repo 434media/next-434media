@@ -28,6 +28,7 @@ const VALID_VERTICALS = [
   "science",
   "education",
   "aerospace",
+  "sales_media",
   "other",
 ]
 

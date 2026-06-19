@@ -22,6 +22,7 @@ const VALID_VERTICALS = [
   "science",
   "education",
   "aerospace",
+  "sales_media",
   "other",
 ]
 const VALID_STATUSES = [
