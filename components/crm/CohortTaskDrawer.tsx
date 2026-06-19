@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Loader2, Star, MessageSquare } from "lucide-react"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
+import { Combobox, type ComboboxOption } from "./Combobox"
 import { SQUAD_LABELS } from "@/components/crm/types"
 import type { CohortTask, TaskStatus } from "@/types/crm-types"
 
@@ -40,6 +41,7 @@ export function CohortTaskDrawer({ task, open, onClose, onChange, onDelete, team
   const [newComment, setNewComment] = useState("")
   const [saving, setSaving] = useState(false)
   const [commenting, setCommenting] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Reset the form whenever a different task opens.
@@ -111,11 +113,40 @@ export function CohortTaskDrawer({ task, open, onClose, onChange, onDelete, team
     }
   }
 
+  const handleArchive = async () => {
+    setArchiving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/crm/cohort-tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: task.id, is_archived: !task.is_archived }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Failed to archive")
+      onChange(body.data as CohortTask)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to archive")
+    } finally {
+      setArchiving(false)
+    }
+  }
+
   const handleDelete = () => {
     if (!confirm(`Delete "${task.title}"?`)) return
     onDelete(task.id)
     onClose()
   }
+
+  const assigneeOptions: ComboboxOption[] = [
+    { value: "", label: "Unassigned" },
+    ...teamMembers.map((m) => ({ value: m.name, label: m.name })),
+    // Preserve a legacy/free-text assignee not in the current roster.
+    ...(assignedTo && !teamMembers.some((m) => m.name === assignedTo)
+      ? [{ value: assignedTo, label: assignedTo }]
+      : []),
+  ]
 
   const fmt = (iso?: string) =>
     iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""
@@ -129,13 +160,24 @@ export function CohortTaskDrawer({ task, open, onClose, onChange, onDelete, team
       width="lg"
       footer={
         <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="text-[12px] font-medium text-neutral-400 hover:text-red-600"
-          >
-            Delete
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="text-[12px] font-medium text-neutral-400 hover:text-red-600"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={handleArchive}
+              disabled={archiving}
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 hover:text-neutral-800 disabled:opacity-50"
+            >
+              {archiving && <Loader2 className="w-3 h-3 animate-spin" />}
+              {task.is_archived ? "Unarchive" : "Archive"}
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -208,18 +250,15 @@ export function CohortTaskDrawer({ task, open, onClose, onChange, onDelete, team
 
         <div>
           <label className={LABEL}>Assignee</label>
-          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className={FIELD}>
-            <option value="">Unassigned</option>
-            {/* Preserve a legacy/free-text assignee not in the current roster. */}
-            {assignedTo && !teamMembers.some((m) => m.name === assignedTo) && (
-              <option value={assignedTo}>{assignedTo}</option>
-            )}
-            {teamMembers.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            value={assignedTo}
+            onChange={(v) => setAssignedTo(v)}
+            options={assigneeOptions}
+            searchable
+            placeholder="Unassigned"
+            searchPlaceholder="Search team…"
+            ariaLabel="Assignee"
+          />
         </div>
 
         <div>
@@ -249,7 +288,7 @@ export function CohortTaskDrawer({ task, open, onClose, onChange, onDelete, team
                   <span className="text-[12px] font-semibold text-neutral-800 truncate">{c.author_name}</span>
                   <span className="text-[10px] text-neutral-400 shrink-0">{fmt(c.created_at)}</span>
                 </div>
-                <p className="text-[13px] text-neutral-700 whitespace-pre-wrap break-words">{c.content}</p>
+                <p className="text-[13px] text-neutral-700 whitespace-pre-wrap wrap-break-word">{c.content}</p>
               </div>
             ))}
             {comments.length === 0 && (

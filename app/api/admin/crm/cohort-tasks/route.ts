@@ -89,6 +89,7 @@ export async function PATCH(request: NextRequest) {
     if (body.due_date !== undefined) updates.due_date = body.due_date || undefined
     if (body.week !== undefined) updates.week = typeof body.week === "number" ? body.week : undefined
     if (body.isDeliverable !== undefined) updates.isDeliverable = body.isDeliverable === true
+    if (body.is_archived !== undefined) updates.is_archived = body.is_archived === true
     if (body.squad !== undefined) {
       if (!VALID_SQUADS.includes(body.squad))
         return NextResponse.json({ success: false, error: `Invalid squad: ${body.squad}` }, { status: 400 })

@@ -321,7 +321,7 @@ function CohortsInner() {
                 key={c.id}
                 className="bg-white border border-neutral-200 rounded-lg hover:border-neutral-300 hover:shadow-sm transition-all"
               >
-                <Link href={`/admin/cohorts/${c.id}`} className="block text-left p-4">
+                <Link href={`/admin/cohorts/${c.slug ?? c.id}`} className="block text-left p-4">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-[14px] font-semibold text-neutral-900 truncate">{c.name}</span>
                     <span

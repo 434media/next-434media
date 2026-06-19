@@ -434,6 +434,18 @@ export async function getCohortById(id: string): Promise<Cohort | null> {
   return getById<Cohort>(CRM_COLLECTIONS.COHORTS, id)
 }
 
+export async function getCohortBySlug(slug: string): Promise<Cohort | null> {
+  try {
+    const db = getDb()
+    const snapshot = await db.collection(CRM_COLLECTIONS.COHORTS).where("slug", "==", slug).limit(1).get()
+    if (snapshot.empty) return null
+    return docToData<Cohort>(snapshot.docs[0])
+  } catch (error) {
+    console.error("Error fetching cohort by slug:", error)
+    return null
+  }
+}
+
 export async function createCohort(
   data: Omit<Cohort, "id" | "created_at" | "updated_at">
 ): Promise<Cohort> {

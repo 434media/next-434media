@@ -591,6 +591,7 @@ export type CohortStatus =
 export interface Cohort {
   id: string
   name: string
+  slug?: string // URL handle derived from name (e.g. "434-media"); doc id stays the FK
   vertical: Vertical
   hostBrand: Brand
   sponsorClientId?: string | null // FK → crm_clients (the underwriter)
@@ -642,6 +643,7 @@ export interface CohortTask {
   squad: SquadKey // which squad owns it
   week?: number // 1–6 cadence bucket
   isDeliverable?: boolean // the "Ship by Friday" items
+  is_archived?: boolean // tucked off the active board once a week wraps; kept for the record + rollup
   title: string
   description?: string
   assigned_to?: string

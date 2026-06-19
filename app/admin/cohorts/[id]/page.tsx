@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Plus, Loader2, Star, AlertTriangle, MessageSquare } from "lucide-react"
+import { ArrowLeft, Plus, Loader2, Star, AlertTriangle, MessageSquare, Archive, ArchiveRestore } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { CohortTaskDrawer } from "@/components/crm/CohortTaskDrawer"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
@@ -37,7 +37,7 @@ const initials = (name: string) =>
     .join("")
     .toUpperCase()
 
-function CohortDetailInner({ cohortId }: { cohortId: string }) {
+function CohortDetailInner({ cohortRef }: { cohortRef: string }) {
   const [cohort, setCohort] = useState<Cohort | null>(null)
   const [tasks, setTasks] = useState<CohortTask[]>([])
   const [builders, setBuilders] = useState<Builder[]>([])
@@ -47,20 +47,25 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
   const [newTask, setNewTask] = useState<Record<string, string>>({})
   const [selectedTask, setSelectedTask] = useState<CohortTask | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
   const { members } = useTeamMembers()
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [cRes, tRes, bRes] = await Promise.all([
-        fetch(`/api/admin/crm/cohorts?id=${cohortId}`),
-        fetch(`/api/admin/crm/cohort-tasks?cohortId=${cohortId}`),
-        fetch(`/api/admin/crm/builders?cohortId=${cohortId}`),
-      ])
-      const [cBody, tBody, bBody] = await Promise.all([cRes.json(), tRes.json(), bRes.json()])
+      // Resolve the cohort by slug-or-id first, then load its tasks/builders by
+      // the real doc id (the URL handle may be a slug).
+      const cRes = await fetch(`/api/admin/crm/cohorts?ref=${encodeURIComponent(cohortRef)}`)
+      const cBody = await cRes.json()
       if (!cRes.ok || !cBody.success) throw new Error(cBody.error ?? "Cohort not found")
-      setCohort(cBody.data as Cohort)
+      const c = cBody.data as Cohort
+      setCohort(c)
+      const [tRes, bRes] = await Promise.all([
+        fetch(`/api/admin/crm/cohort-tasks?cohortId=${c.id}`),
+        fetch(`/api/admin/crm/builders?cohortId=${c.id}`),
+      ])
+      const [tBody, bBody] = await Promise.all([tRes.json(), bRes.json()])
       setTasks(tBody.success ? (tBody.data as CohortTask[]) : [])
       setBuilders(bBody.success ? (bBody.data as Builder[]) : [])
     } catch (err) {
@@ -68,22 +73,25 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
     } finally {
       setLoading(false)
     }
-  }, [cohortId])
+  }, [cohortRef])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const visible = tasks.filter((t) => week === "all" || t.week === week)
+  // Rollup counts all of the week's tasks (incl. archived — archiving shouldn't
+  // change a squad's completion %). The board columns hide archived unless toggled.
+  const weekTasks = tasks.filter((t) => week === "all" || t.week === week)
+  const boardVisible = showArchived ? weekTasks : weekTasks.filter((t) => !t.is_archived)
 
   const addTask = async (squad: SquadKey) => {
     const title = (newTask[squad] ?? "").trim()
-    if (!title) return
+    if (!title || !cohort) return
     try {
       const res = await fetch("/api/admin/crm/cohort-tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cohortId, squad, title, week: week === "all" ? undefined : week }),
+        body: JSON.stringify({ cohortId: cohort.id, squad, title, week: week === "all" ? undefined : week }),
       })
       const body = await res.json()
       if (!res.ok || !body.success) throw new Error(body.error ?? "Failed to add task")
@@ -191,6 +199,18 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium border transition-colors ${
+              showArchived
+                ? "bg-neutral-900 text-white border-neutral-900"
+                : "bg-white text-neutral-500 border-neutral-200 hover:text-neutral-800"
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5" />
+            {showArchived ? "Showing archived" : "Show archived"}
+          </button>
         </div>
       </div>
 
@@ -207,7 +227,7 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
           <div className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">Squad progress</div>
           <div className="space-y-1.5">
             {SQUADS.map((sq) => {
-              const sqTasks = visible.filter((t) => t.squad === sq)
+              const sqTasks = weekTasks.filter((t) => t.squad === sq)
               const done = sqTasks.filter((t) => t.status === "completed").length
               const pct = sqTasks.length ? Math.round((done / sqTasks.length) * 100) : 0
               return (
@@ -250,7 +270,7 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
           click a card to open it. */}
       <div className="space-y-3">
         {SQUADS.map((sq) => {
-          const sqTasks = visible.filter((t) => t.squad === sq)
+          const sqTasks = boardVisible.filter((t) => t.squad === sq)
           return (
             <div key={sq} className="bg-white border border-neutral-200 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
@@ -274,7 +294,7 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
                         const id = e.dataTransfer.getData("taskId")
                         if (id) patchTask(id, { status: col.key })
                       }}
-                      className={`rounded-md p-2 min-h-[60px] transition-colors ${
+                      className={`rounded-md p-2 min-h-15 transition-colors ${
                         dragOver === dropKey ? "bg-neutral-100 ring-1 ring-neutral-300" : "bg-neutral-50"
                       }`}
                     >
@@ -290,15 +310,39 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
                               draggable
                               onDragStart={(e) => e.dataTransfer.setData("taskId", t.id)}
                               onClick={() => setSelectedTask(t)}
-                              className="group bg-white border border-neutral-200 rounded-md p-2 cursor-pointer hover:border-neutral-300 hover:shadow-sm active:cursor-grabbing transition-all"
+                              className={`group bg-white border border-neutral-200 rounded-md p-2 cursor-pointer hover:border-neutral-300 hover:shadow-sm active:cursor-grabbing transition-all ${
+                                t.is_archived ? "opacity-60" : ""
+                              }`}
                             >
                               <div className="flex items-start gap-1.5">
                                 {t.isDeliverable && (
                                   <Star className="w-3 h-3 fill-amber-400 text-amber-500 shrink-0 mt-0.5" />
                                 )}
-                                <span className="flex-1 min-w-0 text-[12px] text-neutral-800 break-words">{t.title}</span>
+                                <span className="flex-1 min-w-0 text-[12px] text-neutral-800 wrap-break-word">{t.title}</span>
+                                {(t.status === "completed" || t.is_archived) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      patchTask(t.id, { is_archived: !t.is_archived })
+                                    }}
+                                    title={t.is_archived ? "Unarchive" : "Archive"}
+                                    className="shrink-0 text-neutral-300 hover:text-neutral-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    {t.is_archived ? (
+                                      <ArchiveRestore className="w-3 h-3" />
+                                    ) : (
+                                      <Archive className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                )}
                               </div>
-                              {(t.status === "blocked" || t.status === "deferred") && (
+                              {t.is_archived && (
+                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-neutral-100 text-neutral-500">
+                                  Archived
+                                </span>
+                              )}
+                              {!t.is_archived && (t.status === "blocked" || t.status === "deferred") && (
                                 <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-red-50 text-red-600">
                                   {t.status}
                                 </span>
@@ -374,7 +418,7 @@ export default function CohortDetailPage() {
   return (
     <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
-        {params?.id ? <CohortDetailInner cohortId={params.id} /> : null}
+        {params?.id ? <CohortDetailInner cohortRef={params.id} /> : null}
       </div>
     </AdminRoleGuard>
   )

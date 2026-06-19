@@ -3,6 +3,7 @@ import { requireFullAdmin, requireAdmin } from "@/lib/auth"
 import {
   getCohorts,
   getCohortById,
+  getCohortBySlug,
   createCohort,
   updateCohort,
   deleteCohort,
@@ -42,15 +43,39 @@ const VALID_BRANDS = [
   "TXMX Boxing",
 ]
 
+// URL handle from a cohort name, e.g. "434 Media" → "434-media".
+function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "cohort"
+  )
+}
+
+// Ensure the slug is unique across cohorts (append -2, -3, … on collision).
+async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
+  const all = await getCohorts({ fresh: true })
+  const taken = new Set(all.filter((c) => c.id !== excludeId).map((c) => c.slug).filter(Boolean))
+  if (!taken.has(base)) return base
+  let i = 2
+  while (taken.has(`${base}-${i}`)) i++
+  return `${base}-${i}`
+}
+
 // GET — list all cohorts, or a single cohort (?id=). Intern-readable so they can
 // reach their cohort board; cohort mutations below stay operator-only.
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin()
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   try {
-    const id = new URL(request.url).searchParams.get("id")
-    if (id) {
-      const cohort = await getCohortById(id)
+    const params = new URL(request.url).searchParams
+    // `ref` resolves a doc id OR a slug (URL handle); `id` kept for back-compat.
+    const ref = params.get("id") || params.get("ref")
+    if (ref) {
+      const cohort = (await getCohortById(ref)) || (await getCohortBySlug(ref))
       if (!cohort) return NextResponse.json({ success: false, error: "Cohort not found" }, { status: 404 })
       return NextResponse.json({ success: true, data: cohort })
     }
@@ -85,6 +110,7 @@ export async function POST(request: NextRequest) {
 
     const cohort = await createCohort({
       name: name.trim(),
+      slug: await uniqueSlug(slugify(name)),
       vertical,
       hostBrand,
       status: status ?? "forming",
