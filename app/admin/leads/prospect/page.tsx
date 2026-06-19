@@ -235,8 +235,10 @@ export default function ProspectPage() {
   ).length
   const selectedCount = selectedIds.size
 
+  // GTM interns prospect here (their core task); searches are protected by the
+  // Apollo budget guard + credit log. Sending stays gated separately.
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
         {/* Header */}
         <header className="bg-white border-b border-neutral-200 sticky top-0 z-30">
