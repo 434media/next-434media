@@ -225,6 +225,148 @@ How 434's web properties and this admin platform are built, deployed, and mainta
 - Incident response
 `,
   },
+
+  // ── Digital Canvas program — one Start Here per pipeline stage (verb) ──
+  {
+    category: "find",
+    title: "Start Here — Find (GTM)",
+    description: "Finding and qualifying the corporate sponsors who underwrite a cohort.",
+    tags: ["start-here", "gtm", "find"],
+    content: `# Find — GTM
+
+The GTM squad finds and pitches the corporate sponsors / underwriters who claim a vertical and own a cohort. This space holds the playbook for sourcing and qualifying them.
+
+## What this squad produces
+- An ICP (ideal sponsor profile) per vertical
+- A saved Apollo query set
+- A scored target list of candidate underwriters
+- An outreach template library
+- The prospecting playbook
+
+## How it connects to the admin
+- Prospect in **Leads → Prospect** (Apollo → score → approve)
+- Work the pipeline in **Leads** and **CRM**
+- **Interns build the engine; staff own the sends** — outreach sending is role-gated
+- Warm sponsors get handed to Underwriter Onboarding to frame their problems
+
+## Hand-off
+Reusable query/template logic gets wired into the platform by the lead dev; Marcos owns the actual sends.
+`,
+  },
+  {
+    category: "frame",
+    title: "Start Here — Frame (Underwriter Onboarding)",
+    description: "The intake framework that pulls venture-credible problems out of underwriters.",
+    tags: ["start-here", "underwriter", "frame"],
+    content: `# Frame — Underwriter Onboarding
+
+This squad architects the **intake framework** — the question architecture that extracts highly specific, venture-credible pain points from corporate and institutional underwriters. You design the templates; the Build team engineers the digital onboarding form.
+
+## What this squad produces
+- Per-vertical question templates (start with **Cybersecurity, Health & Science, Aerospace**)
+- Tailored discovery paths — conditional logic, different questions per vertical
+- A value-space prompt: is the problem an **optimization bottleneck** (saves staff hours) or a **growth gap** (new tech space)?
+
+## Blueprints
+- **PAINstorming** (Praxie / Soren Kaplan) — design questions that surface the *manual workarounds* where employees duct-tape around failing systems.
+- **Monday.com B2B intake forms** — structure from basic profile → heavy technical constraints; conditional logic.
+- **Bundl — Define your value spaces** — separate optimization vs growth problems.
+
+## How it connects to the admin
+- Captured problems live in the **Problem Library** (sourced → vetted → activated into a cohort's problem set)
+- The public **/underwriter-intake** form is the instrument Build engineers from your templates
+
+## Hand-off
+Finalize the text templates per vertical → hand to Build to deploy the official digital onboarding.
+`,
+  },
+  {
+    category: "ship",
+    title: "Start Here — Ship (Builders)",
+    description: "How cohort builders go from a problem to a shipped prototype.",
+    tags: ["start-here", "builders", "ship"],
+    content: `# Ship — Builders
+
+The Build squad ships software in the Digital Canvas repo — **not** the 434 admin codebase. This space documents how builders go from a problem-set entry to a shipped prototype.
+
+## What this squad produces
+- Builder onboarding & environment setup
+- Repo / sandbox-branch / PR-review workflow (\`github.com/434media/next-canvas\`)
+- Build standards and a demo-prep checklist
+- Reviewed tools graduated into the platform via the lead dev
+
+## How it connects to the admin
+- Builder status is tracked on the **cohort board** (applied → accepted → active → shipped → demoed)
+- No intern writes to the 434 admin codebase; the lead dev is the only bridge to production
+
+## Hand-off
+Reviewed output is wired into the admin by the lead dev; builders never push to the 434 platform.
+`,
+  },
+  {
+    category: "tell",
+    title: "Start Here — Tell (Storytellers)",
+    description: "The content system that tells the program's and builders' stories.",
+    tags: ["start-here", "storytellers", "tell"],
+    content: `# Tell — Storytellers
+
+The Storytellers squad tells the story of the program, its partners, and its builders. This space holds the content system.
+
+## What this squad produces
+- A brand & asset kit
+- A documented AI production pipeline
+- A builder-profile content format
+- A seed batch of real pieces (DevSA / partner spotlights)
+
+## How it connects to the admin
+- Make assets in **Content → AI Studio**
+- Plan & schedule in **Content → Calendar**
+- Move posts through the approve → post pipeline (drafts → needs approval → approved → posted)
+
+## Blueprints
+- The 434 Media work page; DevSA and Alamo Angels Instagram for tone & alignment.
+
+## Hand-off
+Templates + a seed batch prove the system; published pieces run through the normal content approval flow.
+`,
+  },
+  {
+    category: "prove",
+    title: "Start Here — Prove (Analytics)",
+    description: "The Cohort Health Framework — how we measure and prove the program.",
+    tags: ["start-here", "analytics", "prove"],
+    content: `# Prove — Analytics
+
+The Analytics squad measures cohort health and proves the program's ROI. Phase 1 is research: design the metrics and the question sets; Build deploys the forms and the dashboard.
+
+## What this squad produces — two instruments
+**1. Mid-cohort builder health check (internal)**
+- Measure momentum and core traction, not vanity metrics.
+- Adapt **Rahul Vohra's PMF engine** (YC): ask how disappointed builders would be if the program's resources disappeared — to gauge how critical the program is mid-session.
+
+**2. Post-cohort investor & underwriter survey (external)**
+- Use **Founder NPS** and program-quality tracking (Techstars).
+- Demonstrate regional ecosystem impact, partner satisfaction, and clear ROI to the entities underwriting the cohort.
+
+## Deliverables
+- Finalized question set for the mid-cohort builder health check
+- Finalized question set for the post-cohort investor / underwriter survey
+- Metric definitions + a demo-day dashboard spec
+
+## Blueprints
+- Y Combinator Startup Library — momentum & traction over vanity metrics
+- Rahul Vohra / Superhuman PMF engine
+- Techstars accelerator KPIs & Founder NPS
+
+## How it connects to the admin
+- Some health signals already exist: **builder status** and **per-squad task completion** on the cohort board — fold these in.
+- The surveys add the sentiment layer those don't capture.
+- NOTE: a cohort-health results store + demo-day dashboard is **net-new** (not built yet) — design the framework + spec; Build deploys it.
+
+## Hand-off
+Finalize the question sets → hand to Build to deploy the forms and generate the demo-day visualizations.
+`,
+  },
 ]
 
 async function main() {

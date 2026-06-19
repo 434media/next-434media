@@ -151,11 +151,14 @@ export default function SOPsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sops, setSOPs] = useState<SOP[]>([])
   const [selectedSOP, setSelectedSOP] = useState<SOP | null>(null)
-  const [activeCategory, setActiveCategory] = useState<string | null>("Brand & Design")
+  // No pre-selected category — with 434 Media collapsed by default, the open
+  // Digital Canvas section is the focus and the intern picks their lane.
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [activeVertical, setActiveVertical] = useState<Vertical | "all">("all")
   const [showWelcome, setShowWelcome] = useState(false)
-  // Collapsible space groups in the rail (both expanded by default).
-  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({})
+  // Collapsible space groups in the rail. 434 Media (company) starts collapsed so
+  // interns focus on the Digital Canvas program section.
+  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({ company: true })
   const [isDragging, setIsDragging] = useState(false)
   const [linkInput, setLinkInput] = useState("")
   const [showLinkInput, setShowLinkInput] = useState(false)
