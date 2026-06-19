@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Plus, Trash2, Loader2, Star, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Plus, Loader2, Star, AlertTriangle, MessageSquare } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { CohortTaskDrawer } from "@/components/crm/CohortTaskDrawer"
+import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { SQUAD_LABELS, type SquadKey } from "@/components/crm/types"
 import { VERTICAL_LABELS } from "@/types/crm-types"
 import type { Cohort, CohortTask, Builder, BuilderStatus, TaskStatus } from "@/types/crm-types"
@@ -15,14 +17,6 @@ const COLUMNS: { key: TaskStatus; label: string }[] = [
   { key: "in_progress", label: "In progress" },
   { key: "completed", label: "Done" },
 ]
-const TASK_STATUSES: TaskStatus[] = ["not_started", "in_progress", "completed", "blocked", "deferred"]
-const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  not_started: "To do",
-  in_progress: "In progress",
-  completed: "Done",
-  blocked: "Blocked",
-  deferred: "Deferred",
-}
 const BUILDER_STATUS_LABELS: Record<BuilderStatus, string> = {
   applied: "Applied",
   accepted: "Accepted",
@@ -35,6 +29,14 @@ const BUILDER_STATUS_LABELS: Record<BuilderStatus, string> = {
 const columnFor = (s: TaskStatus): TaskStatus =>
   s === "in_progress" || s === "completed" ? s : "not_started"
 
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase()
+
 function CohortDetailInner({ cohortId }: { cohortId: string }) {
   const [cohort, setCohort] = useState<Cohort | null>(null)
   const [tasks, setTasks] = useState<CohortTask[]>([])
@@ -43,6 +45,9 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [week, setWeek] = useState<number | "all">("all")
   const [newTask, setNewTask] = useState<Record<string, string>>({})
+  const [selectedTask, setSelectedTask] = useState<CohortTask | null>(null)
+  const [dragOver, setDragOver] = useState<string | null>(null)
+  const { members } = useTeamMembers()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -118,6 +123,10 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
       setError(err instanceof Error ? err.message : "Failed to delete task")
     }
   }
+
+  // Reflect drawer edits / new comments back onto the board.
+  const upsertTask = (updated: CohortTask) =>
+    setTasks((ts) => ts.map((t) => (t.id === updated.id ? updated : t)))
 
   if (loading) {
     return (
@@ -237,7 +246,8 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
         </div>
       </div>
 
-      {/* Board — squad swimlanes × status columns */}
+      {/* Board — squad swimlanes × status columns. Drag cards between columns;
+          click a card to open it. */}
       <div className="space-y-3">
         {SQUADS.map((sq) => {
           const sqTasks = visible.filter((t) => t.squad === sq)
@@ -248,57 +258,75 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
                 <span className="text-[11px] text-neutral-400">{sqTasks.length} tasks</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {COLUMNS.map((col) => (
-                  <div key={col.key} className="bg-neutral-50 rounded-md p-2 min-h-[60px]">
-                    <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5 px-1">
-                      {col.label}
-                    </div>
-                    <div className="space-y-1.5">
-                      {sqTasks
-                        .filter((t) => columnFor(t.status) === col.key)
-                        .map((t) => (
-                          <div key={t.id} className="bg-white border border-neutral-200 rounded-md p-2">
-                            <div className="flex items-start gap-1.5">
-                              {t.isDeliverable && <Star className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />}
-                              <span className="flex-1 min-w-0 text-[12px] text-neutral-800 break-words">{t.title}</span>
-                              <button
-                                type="button"
-                                onClick={() => deleteTask(t.id)}
-                                className="text-neutral-300 hover:text-red-500 shrink-0"
-                                title="Delete task"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
+                {COLUMNS.map((col) => {
+                  const dropKey = `${sq}:${col.key}`
+                  return (
+                    <div
+                      key={col.key}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        if (dragOver !== dropKey) setDragOver(dropKey)
+                      }}
+                      onDragLeave={() => setDragOver((k) => (k === dropKey ? null : k))}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOver(null)
+                        const id = e.dataTransfer.getData("taskId")
+                        if (id) patchTask(id, { status: col.key })
+                      }}
+                      className={`rounded-md p-2 min-h-[60px] transition-colors ${
+                        dragOver === dropKey ? "bg-neutral-100 ring-1 ring-neutral-300" : "bg-neutral-50"
+                      }`}
+                    >
+                      <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5 px-1">
+                        {col.label}
+                      </div>
+                      <div className="space-y-1.5">
+                        {sqTasks
+                          .filter((t) => columnFor(t.status) === col.key)
+                          .map((t) => (
+                            <div
+                              key={t.id}
+                              draggable
+                              onDragStart={(e) => e.dataTransfer.setData("taskId", t.id)}
+                              onClick={() => setSelectedTask(t)}
+                              className="group bg-white border border-neutral-200 rounded-md p-2 cursor-pointer hover:border-neutral-300 hover:shadow-sm active:cursor-grabbing transition-all"
+                            >
+                              <div className="flex items-start gap-1.5">
+                                {t.isDeliverable && (
+                                  <Star className="w-3 h-3 fill-amber-400 text-amber-500 shrink-0 mt-0.5" />
+                                )}
+                                <span className="flex-1 min-w-0 text-[12px] text-neutral-800 break-words">{t.title}</span>
+                              </div>
+                              {(t.status === "blocked" || t.status === "deferred") && (
+                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-red-50 text-red-600">
+                                  {t.status}
+                                </span>
+                              )}
+                              <div className="mt-1.5 flex items-center justify-between gap-2">
+                                {t.assigned_to ? (
+                                  <span
+                                    title={t.assigned_to}
+                                    className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-neutral-200 text-neutral-600 text-[9px] font-semibold"
+                                  >
+                                    {initials(t.assigned_to)}
+                                  </span>
+                                ) : (
+                                  <span />
+                                )}
+                                {t.comments && t.comments.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-neutral-400">
+                                    <MessageSquare className="w-3 h-3" />
+                                    {t.comments.length}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {t.assigned_to && (
-                              <div className="mt-1 text-[10px] text-neutral-400 truncate">{t.assigned_to}</div>
-                            )}
-                            <div className="mt-1.5 flex items-center gap-1">
-                              <select
-                                value={t.status}
-                                onChange={(e) => patchTask(t.id, { status: e.target.value as TaskStatus })}
-                                className="text-[10px] px-1 py-0.5 rounded border border-neutral-200 bg-white"
-                              >
-                                {TASK_STATUSES.map((s) => (
-                                  <option key={s} value={s}>
-                                    {TASK_STATUS_LABELS[s]}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => patchTask(t.id, { isDeliverable: !t.isDeliverable })}
-                                title={t.isDeliverable ? "Unmark deliverable" : "Mark as Friday deliverable"}
-                                className={`text-[10px] ${t.isDeliverable ? "text-amber-500" : "text-neutral-300 hover:text-amber-500"}`}
-                              >
-                                <Star className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <input
@@ -328,6 +356,15 @@ function CohortDetailInner({ cohortId }: { cohortId: string }) {
           )
         })}
       </div>
+
+      <CohortTaskDrawer
+        task={selectedTask}
+        open={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onChange={upsertTask}
+        onDelete={deleteTask}
+        teamMembers={members}
+      />
     </div>
   )
 }

@@ -2,10 +2,13 @@ import { type NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth"
 import {
   getCohortTasksByCohort,
+  getCohortTaskById,
+  getCohortById,
   createCohortTask,
   updateCohortTask,
   deleteCohortTask,
 } from "@/lib/firestore-crm"
+import { notifyCohortDeliverableShipped } from "@/lib/cohort-notification"
 import type { CohortTask } from "@/types/crm-types"
 
 export const runtime = "nodejs"
@@ -102,7 +105,16 @@ export async function PATCH(request: NextRequest) {
       updates.priority = body.priority || undefined
     }
 
+    // Read prior state only when completing, to detect the deliverable transition.
+    const taskBefore = body.status === "completed" ? await getCohortTaskById(id) : null
     const task = await updateCohortTask(id, updates)
+
+    // "Ship & Show" alert — a starred deliverable just moved to Done.
+    if (body.status === "completed" && task.isDeliverable && taskBefore?.status !== "completed") {
+      const cohort = await getCohortById(task.cohortId).catch(() => null)
+      await notifyCohortDeliverableShipped(task, cohort, auth.session)
+    }
+
     return NextResponse.json({ success: true, data: task })
   } catch (error) {
     console.error("Error updating cohort task:", error)

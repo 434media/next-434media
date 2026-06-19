@@ -18,6 +18,7 @@ import type {
   Builder,
   CohortTask,
   Painpoint,
+  TaskComment,
 } from "../types/crm-types"
 import { CRM_COLLECTIONS } from "../types/crm-types"
 
@@ -509,6 +510,19 @@ export async function updateCohortTask(id: string, updates: Partial<CohortTask>)
 
 export async function deleteCohortTask(id: string): Promise<void> {
   return deleteDocument(CRM_COLLECTIONS.COHORT_TASKS, id)
+}
+
+export async function getCohortTaskById(id: string): Promise<CohortTask | null> {
+  return getById<CohortTask>(CRM_COLLECTIONS.COHORT_TASKS, id)
+}
+
+// Append a comment (read-modify-write). Fine at cohort scale; the author +
+// timestamp are stamped server-side by the caller.
+export async function appendCohortTaskComment(id: string, comment: TaskComment): Promise<CohortTask> {
+  const task = await getCohortTaskById(id)
+  if (!task) throw new Error("Cohort task not found")
+  const comments = [...(task.comments ?? []), comment]
+  return updateCohortTask(id, { comments })
 }
 
 // ---- Painpoints (Section 4 — the program's intake front door) ----
