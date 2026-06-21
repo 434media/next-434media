@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  Target,
   Search,
   Loader2,
-  ArrowLeft,
   AlertCircle,
   Lightbulb,
   Filter,
@@ -19,6 +17,8 @@ import {
   UserPlus,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { LeadsTabs } from "@/components/crm/LeadsTabs"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { ScoredPerson } from "@/lib/prospecting/scorer"
 import type { ApolloSearchFilters } from "@/lib/prospecting/apollo"
 
@@ -240,32 +240,22 @@ export default function ProspectPage() {
   return (
     <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
-        {/* Header */}
-        <header className="bg-white border-b border-neutral-200 sticky top-0 z-30">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-14">
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/admin/leads"
-                  className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors"
-                  aria-label="Back to Leads"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Link>
-                <Target className="w-4 h-4 text-neutral-600" />
-                <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">
-                  PROSPECT
-                </h1>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-2 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-                  natural-language ICP search
-                </span>
-              </div>
-              {budget && <BudgetIndicator budget={budget} />}
-            </div>
-          </div>
-        </header>
+        {/* Shared section header — same Leads ⇄ Prospect tabs as the Leads page,
+            with the Apollo budget in the right slot. */}
+        <LeadsTabs active="prospect" right={budget ? <BudgetIndicator budget={budget} /> : undefined} />
 
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+          {/* How it works — frames the prospect→approve→leads loop up front so a
+              first-time rep isn't relying on the approval confirm() to learn it. */}
+          <HowItWorks
+            storageKey="prospectIntroDismissed"
+            steps={[
+              { title: "Describe your ICP", detail: "Write who you're looking for in plain language — we translate it to Apollo filters." },
+              { title: "Review scored candidates", detail: "Each is scored 0–80 for fit; green clears the bar, red is excluded by policy." },
+              { title: "Approve into Leads", detail: "Selected prospects land in your Leads queue as “prospected,” ready to work." },
+            ]}
+          />
+
           {/* Search form */}
           <section className="bg-white rounded-xl border border-neutral-200 p-4 sm:p-5 shadow-sm">
             <label

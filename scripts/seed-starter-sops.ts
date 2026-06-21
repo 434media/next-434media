@@ -1,12 +1,22 @@
 /**
  * Seed a "Start Here" SOP for every 434 Media (company) category in the
  * Knowledge Base (pm_sops). Each one orients the reader and doubles as a backlog
- * of the SOPs that category still needs. Idempotent — any doc whose title
- * already exists is skipped, so re-running only fills gaps.
+ * of the SOPs that category still needs.
+ *
+ * Idempotent reconcile: a missing doc is created; an existing doc is UPDATED
+ * only when it's still seed-authored (owner "434 Media") and its content or
+ * description drifted from this file — so re-running converges the starters
+ * without ever clobbering a doc someone has since hand-edited or re-owned.
  *
  *   npx tsx --env-file=.env.local scripts/seed-starter-sops.ts
  */
-import { getSOPsFromFirestore, createSOPInFirestore } from "../lib/firestore-project-management"
+import {
+  getSOPsFromFirestore,
+  createSOPInFirestore,
+  updateSOPInFirestore,
+} from "../lib/firestore-project-management"
+
+const SEED_OWNER = "434 Media"
 
 interface Starter {
   category: string
@@ -60,6 +70,38 @@ Documents live in two spaces.
 One pipeline, five owners: **GTM** finds it · **Underwriter Onboarding** frames it · **Builders** ship it · **Storytellers** tell it · **Analytics** proves it.
 
 Use the **vertical filter** at the top to cut across the program by industry (Cybersecurity, Health, Aerospace, and more).
+
+## Where we talk
+Day-to-day chat and idea-swapping happen in the **DevSA Discord** (https://discord.gg/cvHHzThrEw) — one channel per squad. This hub and the admin hold the durable work; Discord holds the conversation. See **Operations → How We Communicate**.
+`,
+  },
+  {
+    category: "Operations",
+    title: "Start Here — How We Communicate",
+    description: "Where the cohort talks vs. where work is recorded — Discord + the admin.",
+    tags: ["start-here", "communication", "discord", "cohort"],
+    content: `# How We Communicate
+
+Two places, two jobs. Keep them straight and nothing gets lost.
+
+## Daily chat & idea-swapping → Discord
+Day-to-day conversation runs in the **DevSA Discord**: quick questions, idea-swapping, feedback, standups, "is this any good?", sharing links and screenshots.
+
+**Join:** https://discord.gg/cvHHzThrEw
+
+Each squad has its own channel (GTM, Onboarding, Builders, Storytellers, Analytics) plus a general cohort channel. Talk in your squad channel; cross-post to general when it's for everyone.
+
+## Decisions, work & deliverables → the admin
+The admin platform is the **system of record**. Anything that needs to persist lives here, not in a Discord thread that scrolls away:
+- **Tasks & deliverables** → the cohort board (Cohorts)
+- **Leads, scores, kept/removed decisions** → Leads + Funnel KPIs
+- **Sourced problems** → Problem Library
+- **Playbooks, frameworks & templates** → SOPs (this knowledge base)
+
+## The rule of thumb
+> If it's a **conversation**, it goes in Discord. If it's a **decision, a record, or a deliverable**, it goes in the admin.
+
+When a Discord discussion produces a decision, capture the outcome in the admin so it isn't lost.
 `,
   },
   {
@@ -142,8 +184,9 @@ How revenue moves through 434: from an audience or a prospected lead, to outreac
 - Mailchimp tag taxonomy & audiences
 
 ## How it connects to the admin
-- The pipeline runs **Audiences → Inbox → Leads → CRM**
-- Prospect new leads in **Leads → Prospect** (Apollo)
+- The pipeline runs **Audiences → Inbox → Leads → CRM** (CRM is the staff/operator deal stage)
+- The **Leads** and **Prospect** tabs are one workspace — find in Prospect (Apollo → score → approve), work in Leads
+- Measure lead quality on **Insights → Funnel KPIs**: score, and kept vs removed (set a **removal reason** when you archive — that's the KPI)
 - **Interns build the engine; staff own the sends** — outreach sending is role-gated
 - Sending is consent-gated; hard bounces are blocked
 
@@ -178,7 +221,8 @@ How we turn data into reporting for 434 and its brands — what we track, where 
 - Demo-day dashboard (cross-ref program Analytics)
 
 ## How it connects to the admin
-- **Insights → Analytics** (Portfolio / Web / Instagram)
+- **Insights → Analytics** (Portfolio / Web / Instagram) — 434 marketing analytics, **staff-only**
+- **Insights → Funnel KPIs** — the cohort program's lead-quality + email-benchmark scoreboard (see Digital Canvas → Prove); this is the surface the Analytics squad works in
 - Goals & targets are set in **CRM → Settings** (brand goals)
 - Export CSV or copy a share-link from the analytics header
 
@@ -244,8 +288,8 @@ The GTM squad finds and pitches the corporate sponsors / underwriters who claim 
 - The prospecting playbook
 
 ## How it connects to the admin
-- Prospect in **Leads → Prospect** (Apollo → score → approve)
-- Work the pipeline in **Leads** and **CRM**
+- Find prospects in the **Prospect** tab (Apollo → score → approve); work them in the **Leads** tab — the two are one workspace, switched by the tabs up top
+- Measure your lead quality on **Insights → Funnel KPIs**: score, and kept vs removed — **set a removal reason when you archive a lead**, because *which leads you kept and why you dropped the rest* is the KPI
 - **Interns build the engine; staff own the sends** — outreach sending is role-gated
 - Warm sponsors get handed to Underwriter Onboarding to frame their problems
 
@@ -359,9 +403,10 @@ The Analytics squad measures cohort health and proves the program's ROI. Phase 1
 - Techstars accelerator KPIs & Founder NPS
 
 ## How it connects to the admin
-- Some health signals already exist: **builder status** and **per-squad task completion** on the cohort board — fold these in.
-- The surveys add the sentiment layer those don't capture.
-- NOTE: a cohort-health results store + demo-day dashboard is **net-new** (not built yet) — design the framework + spec; Build deploys it.
+- A **Funnel KPIs** surface is now live at **Insights → Funnel KPIs** (\`/admin/kpis\`) — this is your starting scoreboard. It covers **lead quality** (score distribution, kept vs removed + removal reasons, conversion by score band, per-source performance) and **email benchmarks** (Mailchimp drop-campaign performance + Resend 1:1 outreach). Note: the 434 web/social Analytics page is staff-only and separate — Funnel KPIs is the squad's surface.
+- More health signals already exist: **builder status** and **per-squad task completion** on the cohort board — fold these in.
+- The surveys add the **sentiment** layer the dashboards can't capture.
+- Still **net-new**: a cohort-health *survey* results store + the demo-day visualization — design the framework + spec; Build deploys those.
 
 ## Hand-off
 Finalize the question sets → hand to Build to deploy the forms and generate the demo-day visualizations.
@@ -371,13 +416,30 @@ Finalize the question sets → hand to Build to deploy the forms and generate th
 
 async function main() {
   const existing = await getSOPsFromFirestore()
-  const existingTitles = new Set(existing.map((s) => s.title))
+  const byTitle = new Map(existing.map((s) => [s.title, s]))
   let created = 0
+  let updated = 0
   let skipped = 0
   for (const s of STARTERS) {
-    if (existingTitles.has(s.title)) {
-      console.log(`✓ skip (exists): ${s.title}`)
-      skipped++
+    const match = byTitle.get(s.title)
+    if (match) {
+      // Only reconcile docs the seed still owns — never overwrite a starter
+      // that's been hand-edited (its content drifts intentionally) or re-owned.
+      const seedAuthored = (match.owner || "") === SEED_OWNER
+      const drifted = match.content !== s.content || match.description !== s.description
+      if (seedAuthored && drifted) {
+        await updateSOPInFirestore(match.id, {
+          category: s.category,
+          description: s.description,
+          content: s.content,
+          tags: s.tags,
+        })
+        console.log(`↻ updated [${s.category}] ${s.title}`)
+        updated++
+      } else {
+        console.log(`✓ skip (${seedAuthored ? "unchanged" : "hand-owned"}): ${s.title}`)
+        skipped++
+      }
       continue
     }
     const doc = await createSOPInFirestore({
@@ -387,13 +449,13 @@ async function main() {
       content: s.content,
       status: "active",
       version: "1.0",
-      owner: "434 Media",
+      owner: SEED_OWNER,
       tags: s.tags,
     })
     console.log(`✅ created [${s.category}] ${s.title} — id: ${doc.id}`)
     created++
   }
-  console.log(`\nDone — ${created} created, ${skipped} skipped.`)
+  console.log(`\nDone — ${created} created, ${updated} updated, ${skipped} skipped.`)
 }
 
 main().catch((e) => {

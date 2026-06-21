@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { Toast, LeadsView, LeadDetailDrawer } from "@/components/crm"
+import { LeadsTabs } from "@/components/crm/LeadsTabs"
 import type { Toast as ToastType } from "@/components/crm/types"
 import { useLeadHandlers } from "@/hooks/useLeadHandlers"
 import type { Lead } from "@/types/crm-types"
@@ -165,7 +166,9 @@ export default function LeadsPage() {
       <div className="min-h-full bg-neutral-50 text-neutral-900">
         <Toast toast={toast} />
 
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <LeadsTabs active="leads" />
+
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-3 text-neutral-500">

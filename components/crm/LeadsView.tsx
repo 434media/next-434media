@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Link from "next/link"
 import {
   Plus,
   Search,
@@ -14,7 +13,6 @@ import {
   Inbox,
   AlertCircle,
   Clock,
-  Target,
   X,
   Archive,
   ArrowUpDown,
@@ -183,16 +181,15 @@ export function LeadsView({
 
   return (
     <div>
-      {/* Header */}
+      {/* Header — the section title + nav now live in the shared LeadsTabs bar
+          above; this row keeps just the working context line + page actions.
+          Prospecting moved to the "Prospect" tab (no more "Find prospects"
+          button); approved prospects still flow back into this queue with
+          source="prospected". */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 leading-tight tracking-tight">
-            Leads
-          </h2>
-          <p className="text-[13px] text-neutral-500 mt-1">
-            Sourced, scored, and waiting to be worked. Convert to clients when qualified.
-          </p>
-        </div>
+        <p className="text-[13px] text-neutral-500">
+          Sourced, scored, and waiting to be worked. Convert to clients when qualified.
+        </p>
         <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
@@ -202,17 +199,6 @@ export function LeadsView({
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
-          {/* Stage 4 — discovery entry point for the prospecting feature.
-              Routes to /admin/leads/prospect where reps can run NL ICP queries
-              against Apollo. Approval lands those candidates back into this
-              queue with source="prospected" (Stage 5). */}
-          <Link
-            href="/admin/leads/prospect"
-            className="flex items-center gap-1.5 px-3 py-2 text-neutral-700 bg-white border border-neutral-200 text-[13px] font-medium rounded-lg hover:border-neutral-300 hover:bg-neutral-50 transition-colors"
-          >
-            <Target className="w-3.5 h-3.5" />
-            Find prospects
-          </Link>
           <button
             onClick={onCreateLead}
             className="flex items-center gap-1.5 px-3 py-2 bg-neutral-900 text-white text-[13px] font-medium rounded-lg hover:bg-neutral-800"

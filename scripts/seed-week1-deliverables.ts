@@ -28,7 +28,7 @@ const DELIVERABLES: Record<SquadKey, Array<{ title: string; description: string 
     {
       title: "Learn outbound sales & Apollo basics",
       description:
-        "Read Apollo's outbound-sales guide. In your own words, write up what an ICP (ideal customer profile) is and how prospecting works, then explore Leads → Prospect. See SOPs → Digital Canvas → Find.",
+        "Read Apollo's outbound-sales guide. In your own words, write up what an ICP (ideal customer profile) is and how prospecting works, then explore the Leads and Prospect tabs (they're one workspace) and check lead quality on Insights → Funnel KPIs. See SOPs → Digital Canvas → Find.",
     },
   ],
   domain: [
@@ -66,10 +66,16 @@ const DELIVERABLES: Record<SquadKey, Array<{ title: string; description: string 
     {
       title: "Research how top accelerators measure cohort health",
       description:
-        "Study Y Combinator (momentum & traction; Rahul Vohra's PMF engine) and Techstars (Founder NPS, program quality). Start the Cohort Health Framework doc. See SOPs → Digital Canvas → Prove.",
+        "Study Y Combinator (momentum & traction; Rahul Vohra's PMF engine) and Techstars (Founder NPS, program quality). Start the Cohort Health Framework doc, and explore the live Funnel KPIs surface (Insights → Funnel KPIs) — your scoreboard for lead quality & email benchmarks. See SOPs → Digital Canvas → Prove.",
     },
   ],
 }
+
+// Appended to every seeded deliverable's description so each squad gets the
+// working agreement at its point of work: the board records decisions &
+// deliverables; the DevSA Discord carries daily chat & idea-swapping.
+const COLLAB_FOOTER =
+  "\n\nDaily chat & idea-swapping → DevSA Discord (https://discord.gg/cvHHzThrEw). The board holds decisions & deliverables; Discord holds the conversation."
 
 // Reconcile order = pipeline order (Find → Frame → Ship → Tell → Prove).
 const SQUAD_ORDER: SquadKey[] = ["gtm", "domain", "build", "story_media", "analytics"]
@@ -119,12 +125,15 @@ async function main() {
       }
     }
 
-    // Create / update the desired deliverables.
+    // Create / update the desired deliverables. The shared collaboration footer
+    // is appended to every description so re-running reconciles existing cards
+    // to carry the Discord working agreement too.
     for (const d of desired) {
+      const description = d.description + COLLAB_FOOTER
       const match = seeded.find((t) => t.title === d.title)
       if (match) {
-        if (match.description !== d.description) {
-          await updateCohortTask(match.id, { description: d.description })
+        if (match.description !== description) {
+          await updateCohortTask(match.id, { description })
           console.log(`↻ updated [${SQUAD_LABELS[squad]}] ${d.title}`)
           updated++
         } else {
@@ -136,7 +145,7 @@ async function main() {
         cohortId: cohort.id,
         squad,
         title: d.title,
-        description: d.description,
+        description,
         status: "not_started",
         week: 1,
         isDeliverable: true,
