@@ -28,7 +28,8 @@ import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { Tag } from "@/components/admin/Tag"
 import { MailchimpRecordPanel, type LeadConsent } from "@/components/crm/MailchimpRecordPanel"
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
-import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch } from "@/types/crm-types"
+import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch, LeadDisqualifiedReason } from "@/types/crm-types"
+import { LEAD_DISQUALIFIED_REASON_LABELS } from "@/types/crm-types"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 interface LeadDetailDrawerProps {
@@ -37,7 +38,7 @@ interface LeadDetailDrawerProps {
   isSaving: boolean
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<Lead | null>
-  onArchive?: (id: string) => Promise<void> | void
+  onArchive?: (id: string, reason?: LeadDisqualifiedReason) => Promise<void> | void
   onDelete?: (id: string) => Promise<void> | void
   /** Stubs for PR #7 — wire when handlers ship. */
   onGenerateDraft?: (id: string) => Promise<void> | void
@@ -132,6 +133,7 @@ interface FormState {
   platform: LeadPlatform | ""
   status: LeadStatus
   assigned_to: string
+  disqualified_reason: LeadDisqualifiedReason | ""
   next_followup_date: string
   outreach_draft: string
   notes: string
@@ -151,6 +153,7 @@ const EMPTY_FORM: FormState = {
   platform: "",
   status: "new",
   assigned_to: "",
+  disqualified_reason: "",
   next_followup_date: "",
   outreach_draft: "",
   notes: "",
@@ -172,6 +175,7 @@ function fromLead(lead: Lead | null): FormState {
     platform: lead.platform || "",
     status: lead.status || "new",
     assigned_to: lead.assigned_to || "",
+    disqualified_reason: lead.disqualified_reason || "",
     next_followup_date: formatDateOnly(lead.next_followup_date),
     outreach_draft: lead.outreach_draft || "",
     notes: lead.notes || "",
@@ -207,11 +211,15 @@ export function LeadDetailDrawer({
   const [consent, setConsent] = useState<LeadConsent | null>(null)
   // Tabbed body (edit mode) — keeps the record from becoming one long scroll.
   const [activeTab, setActiveTab] = useState<"details" | "outreach" | "activity">("details")
+  // Two-step archive: first click reveals a removal-reason picker, second confirms.
+  // The reason feeds the kept-vs-removed KPI (see LeadDisqualifiedReason).
+  const [archiving, setArchiving] = useState(false)
 
   useEffect(() => {
     if (open) {
       setForm(fromLead(lead))
       setActiveTab("details")
+      setArchiving(false)
       setSubject("")
       setConsent(null) // re-resolved by the panel for the newly-opened lead
     }
@@ -326,6 +334,9 @@ export function LeadDetailDrawer({
       platform: form.platform || undefined,
       status: form.status,
       assigned_to: form.assigned_to.trim() || undefined,
+      // Only an archived lead carries a removal reason; clear it otherwise.
+      disqualified_reason:
+        form.status === "archived" ? (form.disqualified_reason || undefined) : undefined,
       next_followup_date: form.next_followup_date || undefined,
       outreach_draft: form.outreach_draft || undefined,
       notes: form.notes.trim() || undefined,
@@ -334,10 +345,16 @@ export function LeadDetailDrawer({
     await onSave(patch)
   }
 
+  // First click arms the reason picker; second click archives with the chosen
+  // reason (defaulting to "poor fit, unspecified" if the rep skips it).
   const handleArchive = async () => {
     if (!lead?.id || !onArchive) return
-    if (!confirm(`Archive ${lead.name || lead.email}?`)) return
-    await onArchive(lead.id)
+    if (!archiving) {
+      setArchiving(true)
+      return
+    }
+    await onArchive(lead.id, (form.disqualified_reason || "no_fit_unspecified") as LeadDisqualifiedReason)
+    setArchiving(false)
     onClose()
   }
 
@@ -376,7 +393,7 @@ export function LeadDetailDrawer({
   const footer = (
     <div className="flex items-center justify-between gap-2 px-5 py-3 bg-white">
       <div className="flex items-center gap-1">
-        {isEditing && onArchive && (
+        {isEditing && onArchive && !archiving && (
           <button
             onClick={handleArchive}
             disabled={isSaving}
@@ -385,7 +402,38 @@ export function LeadDetailDrawer({
             Archive
           </button>
         )}
-        {isEditing && onDelete && (
+        {isEditing && onArchive && archiving && (
+          <div className="flex items-center gap-1.5">
+            <select
+              value={form.disqualified_reason}
+              onChange={(e) => update("disqualified_reason", e.target.value as LeadDisqualifiedReason | "")}
+              aria-label="Removal reason"
+              className="px-2 py-1.5 text-[12px] border border-neutral-200 rounded-md bg-white focus:outline-none focus:border-neutral-400"
+            >
+              <option value="">Reason…</option>
+              {Object.entries(LEAD_DISQUALIFIED_REASON_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleArchive}
+              disabled={isSaving}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-md disabled:opacity-50"
+            >
+              Confirm archive
+            </button>
+            <button
+              onClick={() => setArchiving(false)}
+              disabled={isSaving}
+              className="px-2 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-800 rounded-md disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+        {isEditing && onDelete && !archiving && (
           <button
             onClick={handleDelete}
             disabled={isSaving}
@@ -641,6 +689,22 @@ export function LeadDetailDrawer({
               })}
             </div>
           </div>
+          {/* Removal reason — only meaningful for an archived lead. Editable here
+              so a rep can correct it after the fact; feeds the kept-vs-removed KPI. */}
+          {form.status === "archived" && (
+            <Select
+              label="Removal reason"
+              value={form.disqualified_reason}
+              onChange={(v) => update("disqualified_reason", v as LeadDisqualifiedReason | "")}
+              options={[
+                { value: "", label: "—" },
+                ...Object.entries(LEAD_DISQUALIFIED_REASON_LABELS).map(([value, label]) => ({
+                  value,
+                  label,
+                })),
+              ]}
+            />
+          )}
           <Select
             label="Assigned to"
             value={form.assigned_to}

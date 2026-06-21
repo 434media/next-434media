@@ -37,6 +37,18 @@ const VALID_STATUSES = new Set([
   "archived",
 ])
 
+// Mirrors LeadDisqualifiedReason in types/crm-types.ts. Captured when a lead is
+// archived so the Funnel KPI surface can break down WHY leads were removed.
+const VALID_DISQUALIFIED_REASONS = new Set([
+  "out_of_icp",
+  "excluded_geo",
+  "no_email",
+  "duplicate",
+  "wrong_title",
+  "no_fit_unspecified",
+  "other",
+])
+
 async function requireAdmin() {
   const session = await getSession()
   if (!session) return { error: "Unauthorized", status: 401 as const }
@@ -91,6 +103,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
   }
 
+  // Validate disqualified_reason if provided. `null` is allowed — the client
+  // sends it to clear the reason when reactivating a lead.
+  if (
+    body.disqualified_reason !== undefined &&
+    body.disqualified_reason !== null &&
+    (typeof body.disqualified_reason !== "string" ||
+      !VALID_DISQUALIFIED_REASONS.has(body.disqualified_reason))
+  ) {
+    return NextResponse.json(
+      { error: `disqualified_reason must be one of ${[...VALID_DISQUALIFIED_REASONS].join(", ")}` },
+      { status: 400 },
+    )
+  }
+
   // Whitelist updatable fields. Anything not on this list is ignored —
   // protects score, priority, breakdown, engagement counters, conversion
   // metadata, and timestamps from being client-set.
@@ -107,6 +133,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     "platform",
     "status",
     "assigned_to",
+    "disqualified_reason",
     "outreach_draft",
     "draft_generated_at",
     "last_contacted_at",

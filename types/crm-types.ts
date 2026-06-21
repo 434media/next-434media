@@ -773,6 +773,30 @@ export type LeadSource =
 
 export type LeadPriority = "high" | "medium" | "low"
 
+// Why a lead was removed from the active funnel (set when status → "archived").
+// Powers the lead-quality KPI: "score value AND whether kept or removed" — the
+// reason is the interesting half (it's the feedback loop for tuning the ICP /
+// scorer). Optional everywhere: leads archived before this field exists, or
+// archived without a stated reason, simply have none.
+export type LeadDisqualifiedReason =
+  | "out_of_icp" // wrong industry / not a buyer archetype
+  | "excluded_geo" // EU/UK/EEA/Switzerland/Canada — hard compliance exclusion
+  | "no_email" // unreachable; no usable contact email
+  | "duplicate" // same person/company already in the funnel
+  | "wrong_title" // not a decision-maker / no buying authority
+  | "no_fit_unspecified" // judged a poor fit, reason not categorized
+  | "other"
+
+export const LEAD_DISQUALIFIED_REASON_LABELS: Record<LeadDisqualifiedReason, string> = {
+  out_of_icp: "Out of ICP",
+  excluded_geo: "Excluded geography (EU/UK/CA)",
+  no_email: "No usable email",
+  duplicate: "Duplicate",
+  wrong_title: "Not a decision-maker",
+  no_fit_unspecified: "Poor fit (unspecified)",
+  other: "Other",
+}
+
 // Append-only activity log entry on a Lead — powers the drawer timeline so a
 // rep can see what's happened (drafted, sent, status changes, engagement)
 // rather than just the current state. Events accrue from rollout forward.
@@ -857,6 +881,11 @@ export interface Lead extends BaseRecord {
   // Workflow
   status: LeadStatus
   assigned_to?: string
+
+  // Removal reason — set when a lead is archived (status → "archived"). Drives
+  // the kept-vs-removed breakdown on the Funnel KPI surface. See
+  // LeadDisqualifiedReason. Cleared if a lead is ever restored to the funnel.
+  disqualified_reason?: LeadDisqualifiedReason
 
   // Outreach
   outreach_draft?: string

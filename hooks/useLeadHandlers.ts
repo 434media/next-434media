@@ -2,7 +2,7 @@
 
 import { useCallback } from "react"
 import type { Dispatch, SetStateAction } from "react"
-import type { Lead, LeadStatus, LeadUpdateInput } from "@/types/crm-types"
+import type { Lead, LeadStatus, LeadUpdateInput, LeadDisqualifiedReason } from "@/types/crm-types"
 import type { Toast } from "@/components/crm/types"
 
 interface UseLeadHandlersArgs {
@@ -105,16 +105,24 @@ export function useLeadHandlers({
     [leads, selectedLead, setLeads, setSelectedLead, setToast],
   )
 
-  // Quick status change from row (optimistic)
+  // Quick status change from row (optimistic). When archiving, an optional
+  // reason rides along for the kept-vs-removed KPI; on any other status the
+  // server clears a stale reason (we send null to make that explicit).
   const updateLeadStatus = useCallback(
-    async (id: string, status: LeadStatus) => {
+    async (id: string, status: LeadStatus, disqualifiedReason?: LeadDisqualifiedReason) => {
       const prev = leads
       setLeads(leads.map((l) => (l.id === id ? { ...l, status } : l)))
       try {
+        const body: Record<string, unknown> = { status }
+        if (status === "archived") {
+          body.disqualified_reason = disqualifiedReason ?? "no_fit_unspecified"
+        } else {
+          body.disqualified_reason = null
+        }
         const res = await fetch(`/api/admin/leads/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify(body),
         })
         if (!res.ok) throw new Error("Update failed")
         const data = await res.json()
@@ -128,10 +136,11 @@ export function useLeadHandlers({
     [leads, setLeads, setToast],
   )
 
-  // Archive (status flip — does NOT delete the row)
+  // Archive (status flip — does NOT delete the row). Reason defaults inside
+  // updateLeadStatus when omitted (e.g. a quick row archive with no picker).
   const archiveLead = useCallback(
-    async (id: string) => {
-      await updateLeadStatus(id, "archived")
+    async (id: string, reason?: LeadDisqualifiedReason) => {
+      await updateLeadStatus(id, "archived", reason)
       setToast({ message: "Lead archived", type: "success" })
     },
     [updateLeadStatus, setToast],

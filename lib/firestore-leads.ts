@@ -57,6 +57,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     score_breakdown: (raw.score_breakdown || {}) as Lead["score_breakdown"],
     status: (raw.status || "new") as LeadStatus,
     assigned_to: raw.assigned_to || undefined,
+    disqualified_reason: raw.disqualified_reason || undefined,
     outreach_draft: raw.outreach_draft || undefined,
     draft_generated_at: toIsoString(raw.draft_generated_at) || undefined,
     last_contacted_at: toIsoString(raw.last_contacted_at) || undefined,
@@ -232,6 +233,13 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
   // Normalize email casing if it's being changed
   if (typeof patch.email === "string") {
     update.email = patch.email.trim().toLowerCase()
+  }
+
+  // Clear the removal reason whenever a lead leaves the archived state — a
+  // reactivated lead is "kept" again, so a stale reason would skew the
+  // kept-vs-removed KPI. (When archiving, the reason rides in via `patch`.)
+  if (typeof patch.status === "string" && patch.status !== "archived") {
+    update.disqualified_reason = FieldValue.delete()
   }
 
   await ref.update(update)

@@ -37,15 +37,23 @@ type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
 type SignpostLink = { label: string; href: string; icon: LucideIcon }
 const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
   domain: [{ label: "Problem Library", href: "/admin/painpoints", icon: Target }],
+  // GTM works the funnel: browse/score leads + run prospecting. CRM (operator
+  // deal pipeline) is intentionally not here — interns no longer have access.
   gtm: [
     { label: "Leads", href: "/admin/leads", icon: Flag },
-    { label: "CRM", href: "/admin/crm", icon: Rocket },
+    { label: "Prospect", href: "/admin/leads/prospect", icon: Target },
   ],
   story_media: [
     { label: "AI Studio", href: "/admin/content/studio", icon: Clapperboard },
     { label: "Calendar", href: "/admin/content", icon: Calendar },
   ],
-  analytics: [{ label: "Analytics", href: "/admin/analytics", icon: BarChart3 }],
+  // Analytics squad's KPIs are lead quality + email benchmarks — the dedicated
+  // Funnel KPI surface — plus the Leads data those metrics are derived from.
+  // NOT the web/social Analytics page (now full_admin-only).
+  analytics: [
+    { label: "Funnel KPIs", href: "/admin/kpis", icon: Target },
+    { label: "Leads", href: "/admin/leads", icon: Flag },
+  ],
   build: [],
 }
 // Appended for every squad — the cohort board (their task home) and SOPs (where
@@ -146,7 +154,9 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Rocket,
         href: "/admin/crm",
         matchPrefix: "/admin/crm",
-        roles: ["full_admin", "crm_only", "intern"],
+        // Operator deal pipeline (clients, opportunities, revenue) — not intern
+        // scope. Interns do funnel research in Leads; CRM stays operator-only.
+        roles: ["full_admin", "crm_only"],
       },
     ],
   },
@@ -160,7 +170,21 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: BarChart3,
         href: "/admin/analytics",
         matchPrefix: "/admin/analytics",
-        roles: ["full_admin", "intern"],
+        // Web (GA4) + social (Instagram) + portfolio analytics — 434 marketing,
+        // not the intern Analytics squad's domain (they work lead-quality &
+        // email-campaign KPIs out of Leads). Matches the page guard below.
+        roles: ["full_admin"],
+      },
+      {
+        id: "funnel-kpis",
+        label: "Funnel KPIs",
+        icon: Target,
+        href: "/admin/kpis",
+        matchPrefix: "/admin/kpis",
+        // The Analytics squad's home: lead quality (score, kept/removed,
+        // conversion) + email benchmarks (Mailchimp drop + Resend 1:1).
+        // Deliberately visible to interns, unlike web/social Analytics above.
+        roles: ["full_admin", "crm_only", "intern"],
       },
     ],
   },
