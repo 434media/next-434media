@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart3, Target, Mail, Flag, AlertCircle, RefreshCw } from "lucide-react"
+import { BarChart3, CircleGauge, Target, Mail, Flag, AlertCircle, RefreshCw } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { LeadQualityKpis } from "@/lib/kpis/lead-quality"
 import type { MailchimpBenchmark, ResendBenchmark } from "@/lib/kpis/email-benchmarks"
 
@@ -136,7 +137,7 @@ function FunnelKpisInner() {
       <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-neutral-200/70">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-neutral-600" />
+            <CircleGauge className="w-4 h-4 text-neutral-600" />
             <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">Funnel KPIs</h1>
             <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-1 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
               lead quality &amp; email benchmarks
@@ -154,6 +155,15 @@ function FunnelKpisInner() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-10">
+        <HowItWorks
+          storageKey="funnelKpisIntroDismissed"
+          steps={[
+            { title: "Lead quality", detail: "Score distribution, kept vs removed (and why), and which sources convert." },
+            { title: "Email benchmarks", detail: "Mailchimp drop-campaign open/click/bounce + Resend 1:1 engagement." },
+            { title: "Your scoreboard", detail: "Numbers come from Leads + the email tools; read here, act in Leads." },
+          ]}
+        />
+
         {error && (
           <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-600 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />

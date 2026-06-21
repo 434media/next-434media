@@ -11,6 +11,7 @@ import {
   Target,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import {
   VERTICAL_LABELS,
@@ -303,6 +304,15 @@ function PainpointsInner() {
             New painpoint
           </button>
         </div>
+
+        <HowItWorks
+          storageKey="problemLibraryIntroDismissed"
+          steps={[
+            { title: "Capture", detail: "Log a real industry problem sourced from an underwriter or sponsor." },
+            { title: "Vet", detail: "Score it for venture-credibility: who's affected, the workaround, cost, evidence." },
+            { title: "Activate", detail: "Vetted problems get promoted into a cohort's problem set for builders." },
+          ]}
+        />
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">

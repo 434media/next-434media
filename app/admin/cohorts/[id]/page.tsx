@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Plus, Loader2, Star, AlertTriangle, MessageSquare, Archive, ArchiveRestore } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import { CohortTaskDrawer } from "@/components/crm/CohortTaskDrawer"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { SQUAD_LABELS, type SquadKey } from "@/components/crm/types"
@@ -213,6 +214,15 @@ function CohortDetailInner({ cohortRef }: { cohortRef: string }) {
           </button>
         </div>
       </div>
+
+      <HowItWorks
+        storageKey="cohortBoardIntroDismissed"
+        steps={[
+          { title: "Squad swimlanes", detail: "Each row is a squad: GTM, Onboarding, Builders, Storytellers, Analytics." },
+          { title: "Move your tasks", detail: "Drag cards To do → In progress → Done; ⭐ marks a weekly deliverable." },
+          { title: "Toward demo day", detail: "Squad progress rolls up here; it all points at the demo-day goal." },
+        ]}
+      />
 
       {error && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[13px]">

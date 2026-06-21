@@ -7,6 +7,7 @@ import {
   Rocket,
   Inbox,
   BarChart3,
+  CircleGauge,
   Layers,
   ClipboardList,
   FileText,
@@ -51,7 +52,7 @@ const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
   // Funnel KPI surface — plus the Leads data those metrics are derived from.
   // NOT the web/social Analytics page (now full_admin-only).
   analytics: [
-    { label: "Funnel KPIs", href: "/admin/kpis", icon: Target },
+    { label: "Funnel KPIs", href: "/admin/kpis", icon: CircleGauge },
     { label: "Leads", href: "/admin/leads", icon: Flag },
   ],
   build: [],
@@ -178,7 +179,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       {
         id: "funnel-kpis",
         label: "Funnel KPIs",
-        icon: Target,
+        icon: CircleGauge,
         href: "/admin/kpis",
         matchPrefix: "/admin/kpis",
         // The Analytics squad's home: lead quality (score, kept/removed,
