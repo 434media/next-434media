@@ -15,9 +15,16 @@ import {
   Layers,
   ClipboardList,
   FileText,
+  CircleGauge,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { Lead } from "@/types/crm-types"
+import type { FunnelKpis } from "@/lib/kpis/funnel"
+
+// 0–1 fraction → "42%"
+function pct(n: number): string {
+  return `${Math.round(n * 100)}%`
+}
 
 interface SessionUser {
   email?: string
@@ -38,6 +45,7 @@ interface OverviewCounts {
   inboxTotal: number
   leadsActive: number
   leadsPriority: number
+  prospected7d: number
   clientsTotal: number
   clientsActive: number
 }
@@ -63,6 +71,7 @@ export function AdminOverview() {
   // undefined = session not resolved yet; null = resolved, no user.
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined)
   const [counts, setCounts] = useState<OverviewCounts | null>(null)
+  const [funnelKpis, setFunnelKpis] = useState<FunnelKpis | null>(null)
   const [loading, setLoading] = useState(true)
   // The overview has no in-page mutator (it's just the funnel), so there's no
   // sibling to signal. Instead it self-refreshes when you return to the tab —
@@ -101,13 +110,14 @@ export function AdminOverview() {
 
       // 2) Fetch stage counts. Audience/Inbox are full-admin-only surfaces.
       const now = Date.now()
-      const [leadsR, clientsR, nlR, evR, inboxR, plR] = await Promise.allSettled([
+      const [leadsR, clientsR, nlR, evR, inboxR, plR, kpiR] = await Promise.allSettled([
         jget("/api/admin/leads", now),
         jget("/api/admin/crm/clients", now),
         isFull ? jget("/api/admin/email-lists-firestore", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/event-registrations", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/contact-forms/inbox-stats", now) : Promise.resolve(null),
         isFull ? jget("/api/admin/audiences/partner-list-members", now) : Promise.resolve(null),
+        jget("/api/admin/kpis/funnel", now),
       ])
       if (cancelled) return
 
@@ -138,6 +148,15 @@ export function AdminOverview() {
       const leadsPriority = leads.filter(
         (l) => l.priority === "high" && (l.status === "new" || l.status === "ready"),
       ).length
+      // Prospecting throughput this week — leads sourced via outbound prospecting.
+      // The signal behind the Prospect entry node (an action, not a queue).
+      const prospected7d = countRecent(
+        leads.filter((l) => l.source === "prospected").map((l) => l.created_at).filter(Boolean),
+        now,
+      )
+
+      const kpiBody = ok<{ success?: boolean; kpis?: FunnelKpis }>(kpiR)
+      setFunnelKpis(kpiBody?.success ? kpiBody.kpis ?? null : null)
 
       setCounts({
         audiencesTotal: signups.length + registrations.length + members.length,
@@ -149,6 +168,7 @@ export function AdminOverview() {
         inboxTotal: inboxBody?.totalSubmissions ?? 0,
         leadsActive,
         leadsPriority,
+        prospected7d,
         clientsTotal: clients.length,
         clientsActive: clients.filter((c) => c.status === "active").length,
       })
@@ -184,12 +204,15 @@ export function AdminOverview() {
   })()
   const showLoading = !roleResolved || loading
   const firstName = (user?.name || "").trim().split(/\s+/)[0]
+  // Cold start: nothing in the funnel yet. Steer to the active starting action
+  // (Prospect) instead of showing a row of zeros under a passive caption.
+  const funnelEmpty = !!counts && counts.leadsActive === 0 && counts.clientsTotal === 0
 
   return (
     <div className="min-h-full bg-neutral-50 text-neutral-900">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6">
         {/* ── Header ─────────────────────────────────────────────── */}
-        <header className="mb-8 sm:mb-10">
+        <header className="mb-5 sm:mb-6">
           <p className="font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-400">
             434 Admin · Overview
           </p>
@@ -198,30 +221,32 @@ export function AdminOverview() {
           </h1>
           <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-neutral-500">
             {isFullAdmin
-              ? "Everything flows one direction. Contacts arrive through Audiences and the Inbox, get qualified as Leads, then convert into Clients in the CRM. Here's the whole pipeline at a glance."
-              : "Your queue runs one direction: work qualified Leads, then convert them into Clients in the CRM."}
+              ? "Start the funnel two ways — go find companies with Prospect, or work the contacts that arrive through Audiences and the Inbox. Both become Leads, then convert into Clients. Track it all in Funnel KPIs."
+              : "Start the funnel with Prospect to find companies, then work qualified Leads and convert them into Clients."}
           </p>
         </header>
+
+        {/* ── First-run: empty funnel ────────────────────────────── */}
+        {funnelEmpty && <EmptyStartBanner showImport={isFullAdmin} />}
 
         {/* ── Funnel ─────────────────────────────────────────────── */}
         {/* Until the role resolves (~one fast session call), default to the
             full layout so full admins never flash the shorter crm_only view. */}
         {!roleResolved || isFullAdmin ? (
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-2">
-            {/* 01 — Entry points (two sources feed Leads) */}
-            <FunnelZone label="01 · Entry points" className="lg:flex-1">
+            {/* 01 — Start the funnel: outbound (Prospect) + inbound (Inbox).
+                Audiences is a source that feeds inbound — shown subordinately
+                below the two doors, not as a funnel stage. */}
+            <FunnelZone label="01 · Start the funnel" className="lg:flex-1">
               <StageNode
-                href="/admin/audiences"
-                icon={Megaphone}
-                title="Audiences"
-                stat={counts?.audiencesTotal ?? 0}
-                statLabel="contacts"
-                sub={
-                  counts && counts.audiences7d > 0
-                    ? `+${counts.audiences7d} new this week · opt-ins auto-sync to Mailchimp`
-                    : "Newsletter · Events · Lists · opt-ins auto-sync to Mailchimp"
-                }
+                href="/admin/leads/prospect"
+                icon={Target}
+                title="Prospect"
+                stat={counts?.prospected7d ?? 0}
+                statLabel="this week"
+                sub="Find companies → score → approve as leads"
                 loading={showLoading}
+                cta="Start prospecting"
               />
               <StageNode
                 href="/admin/inbox"
@@ -237,6 +262,19 @@ export function AdminOverview() {
                 loading={showLoading}
                 accent={!!counts && counts.inboxAwaiting > 0}
               />
+              <Link
+                href="/admin/audiences"
+                className="group mt-0.5 flex items-center gap-2 rounded-lg border border-dashed border-neutral-300 bg-white/60 px-3 py-2 text-[12px] text-neutral-500 transition-colors hover:border-neutral-400 hover:text-neutral-700"
+              >
+                <Megaphone className="h-3.5 w-3.5 shrink-0" />
+                <span className="flex-1">
+                  <span className="font-medium text-neutral-700">
+                    {(counts?.audiencesTotal ?? 0).toLocaleString()}
+                  </span>{" "}
+                  contacts in <span className="font-medium text-neutral-700">Audiences</span> feed your inbound
+                </span>
+                <ArrowUpRight className="h-3.5 w-3.5 text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
             </FunnelZone>
 
             <Connector label="promote" />
@@ -257,16 +295,6 @@ export function AdminOverview() {
                 loading={showLoading}
                 accent={!!counts && counts.leadsPriority > 0}
               />
-              <Link
-                href="/admin/leads/prospect"
-                className="group mt-0.5 flex items-center gap-2 rounded-lg border border-dashed border-neutral-300 bg-white/60 px-3 py-2 text-[12px] text-neutral-500 transition-colors hover:border-neutral-400 hover:text-neutral-700"
-              >
-                <Target className="h-3.5 w-3.5 shrink-0" />
-                <span className="flex-1">
-                  Also fed by <span className="font-medium text-neutral-700">outbound Prospecting</span>
-                </span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </Link>
             </FunnelZone>
 
             <Connector label="convert" />
@@ -290,7 +318,20 @@ export function AdminOverview() {
           </div>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-2">
-            <FunnelZone label="01 · Qualify" className="sm:flex-1">
+            <FunnelZone label="01 · Start" className="sm:flex-1">
+              <StageNode
+                href="/admin/leads/prospect"
+                icon={Target}
+                title="Prospect"
+                stat={counts?.prospected7d ?? 0}
+                statLabel="this week"
+                sub="Find companies → score → approve as leads"
+                loading={showLoading}
+                cta="Start prospecting"
+              />
+            </FunnelZone>
+            <Connector label="promote" />
+            <FunnelZone label="02 · Qualify" className="sm:flex-1">
               <StageNode
                 href="/admin/leads"
                 icon={Flag}
@@ -307,7 +348,7 @@ export function AdminOverview() {
               />
             </FunnelZone>
             <Connector label="convert" />
-            <FunnelZone label="02 · Client" className="sm:flex-1">
+            <FunnelZone label="03 · Client" className="sm:flex-1">
               <StageNode
                 href="/admin/crm"
                 icon={Rocket}
@@ -325,10 +366,13 @@ export function AdminOverview() {
           </div>
         )}
 
+        {/* ── Scoreboard: the funnel's measurement, linked to Funnel KPIs ── */}
+        {funnelKpis && <FunnelScoreboard kpis={funnelKpis} />}
+
         {/* ── Secondary launchpad (full admins) ───────────────────── */}
         {isFullAdmin && (
-          <section className="mt-10">
-            <p className="mb-3 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-400">
+          <section className="mt-5">
+            <p className="mb-2.5 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-400">
               Also in your workspace
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -386,6 +430,7 @@ function StageNode({
   sub,
   loading,
   accent,
+  cta,
 }: {
   href: string
   icon: LucideIcon
@@ -395,35 +440,114 @@ function StageNode({
   sub: string
   loading: boolean
   accent?: boolean
+  /** Footer call-to-action label. Defaults to "Open {title}". */
+  cta?: string
 }) {
   return (
     <Link
       href={href}
-      className="group flex-1 rounded-xl border border-neutral-200 bg-white p-5 transition-all hover:border-neutral-300 hover:shadow-sm"
+      className="group flex-1 rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 hover:shadow-sm"
     >
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <span className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100 text-neutral-700 transition-colors group-hover:bg-neutral-900 group-hover:text-white">
           <Icon className="h-4 w-4" />
         </span>
         {accent && <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />}
       </div>
       <h3 className="font-ggx88 text-base font-bold tracking-tight text-neutral-900">{title}</h3>
-      <div className="mt-2 flex items-baseline gap-2">
+      <div className="mt-1.5 flex items-baseline gap-2">
         {loading ? (
-          <div className="h-8 w-14 animate-pulse rounded bg-neutral-100" />
+          <div className="h-7 w-14 animate-pulse rounded bg-neutral-100" />
         ) : (
-          <span className="font-ggx88 text-3xl font-black tabular-nums leading-none text-neutral-900">
+          <span className="font-ggx88 text-2xl font-black tabular-nums leading-none text-neutral-900">
             {stat.toLocaleString()}
           </span>
         )}
         <span className="text-[12px] text-neutral-500">{statLabel}</span>
       </div>
-      <p className="mt-2 text-[12px] leading-snug text-neutral-500">{sub}</p>
-      <span className="mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-neutral-700 transition-all group-hover:gap-1.5">
-        Open {title}
+      <p className="mt-1.5 text-[12px] leading-snug text-neutral-500">{sub}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-neutral-700 transition-all group-hover:gap-1.5">
+        {cta ?? `Open ${title}`}
         <ArrowUpRight className="h-3.5 w-3.5" />
       </span>
     </Link>
+  )
+}
+
+// First-run banner — the funnel is empty, so point at the active starting
+// action (Prospect) instead of a row of zeros. Optional secondary route for
+// full admins who'd rather import an existing audience.
+function EmptyStartBanner({ showImport }: { showImport: boolean }) {
+  return (
+    <div className="mb-5 rounded-xl border border-neutral-900 bg-neutral-900 p-4 text-white sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-ggx88 text-lg font-bold tracking-tight">Your funnel is empty — start here.</h2>
+          <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-neutral-300">
+            Find companies that match your ICP, score them, and approve the best as leads. That&apos;s
+            the front door of the sales funnel.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/admin/leads/prospect"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-neutral-100"
+          >
+            <Target className="h-4 w-4" />
+            Start prospecting
+          </Link>
+          {showImport && (
+            <Link
+              href="/admin/audiences"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 px-4 py-2.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-neutral-800"
+            >
+              or import an audience
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Slim scoreboard strip — the funnel's measurement, attached beneath the funnel
+// and linking to the full Funnel KPIs surface. Reads as "the score for
+// everything above," not a stage leads move into.
+function FunnelScoreboard({ kpis }: { kpis: FunnelKpis }) {
+  const leadReached = kpis.stages.find((s) => s.stage === "lead")?.reached ?? 0
+  const wonReached = kpis.stages.find((s) => s.stage === "closed_won")?.reached ?? 0
+  const leadToWon = leadReached > 0 ? wonReached / leadReached : 0
+  const ttw = kpis.velocity.find((v) => v.step === "Time to Closed-Won")
+  const ttwLabel = ttw && ttw.sampleSize > 0 ? `${ttw.medianDays}d` : "—"
+
+  return (
+    <Link
+      href="/admin/kpis"
+      className="group mt-4 flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white px-5 py-3 transition-colors hover:border-neutral-300 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="flex items-center gap-2 text-[12px] font-medium text-neutral-500">
+        <CircleGauge className="h-4 w-4 text-neutral-400" />
+        Funnel health
+      </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <ScoreStat label="ICP match" value={pct(kpis.icpMatchRate)} />
+        <ScoreStat label="Lead → Won" value={pct(leadToWon)} />
+        <ScoreStat label="Time to Won" value={ttwLabel} />
+        <span className="inline-flex items-center gap-1 text-[12px] font-medium text-neutral-700 transition-all group-hover:gap-1.5">
+          Funnel KPIs
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+function ScoreStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span className="font-ggx88 text-lg font-black tabular-nums leading-none text-neutral-900">{value}</span>
+      <span className="text-[11px] text-neutral-500">{label}</span>
+    </span>
   )
 }
 

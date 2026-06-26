@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart3, CircleGauge, Target, Mail, Flag, AlertCircle, RefreshCw } from "lucide-react"
+import { BarChart3, CircleGauge, Target, Mail, Flag, Filter, Timer, AlertCircle, RefreshCw } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { LeadQualityKpis } from "@/lib/kpis/lead-quality"
+import type { FunnelKpis } from "@/lib/kpis/funnel"
 import type { MailchimpBenchmark, ResendBenchmark } from "@/lib/kpis/email-benchmarks"
 
 interface EmailBenchmarksResponse {
@@ -97,6 +98,7 @@ function Card({ children }: { children: React.ReactNode }) {
 }
 
 function FunnelKpisInner() {
+  const [funnel, setFunnel] = useState<FunnelKpis | null>(null)
   const [quality, setQuality] = useState<LeadQualityKpis | null>(null)
   const [email, setEmail] = useState<EmailBenchmarksResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,14 +108,18 @@ function FunnelKpisInner() {
     setLoading(true)
     setError(null)
     try {
-      const [qRes, eRes] = await Promise.all([
+      const [fRes, qRes, eRes] = await Promise.all([
+        fetch("/api/admin/kpis/funnel", { cache: "no-store" }),
         fetch("/api/admin/kpis/lead-quality", { cache: "no-store" }),
         fetch("/api/admin/kpis/email-benchmarks", { cache: "no-store" }),
       ])
+      if (!fRes.ok) throw new Error("Failed to load funnel KPIs")
       if (!qRes.ok) throw new Error("Failed to load lead-quality KPIs")
       if (!eRes.ok) throw new Error("Failed to load email benchmarks")
+      const fData = await fRes.json()
       const qData = await qRes.json()
       const eData = await eRes.json()
+      setFunnel(fData.kpis)
       setQuality(qData.kpis)
       setEmail(eData)
     } catch (err) {
@@ -131,6 +137,11 @@ function FunnelKpisInner() {
   const maxBand = quality ? Math.max(1, ...quality.scoreDistribution.map((b) => b.count)) : 1
   const maxReason = quality ? Math.max(1, ...quality.removedReasons.map((r) => r.count)) : 1
 
+  const leadReached = funnel && funnel.stages.length > 0 ? funnel.stages[0].reached : 0
+  const stageReached = (stage: string) => funnel?.stages.find((s) => s.stage === stage)?.reached ?? 0
+  const oppRate = leadReached > 0 ? stageReached("discovery") / leadReached : 0
+  const wonRate = leadReached > 0 ? stageReached("closed_won") / leadReached : 0
+
   return (
     <div className="min-h-full bg-neutral-50 text-neutral-900">
       {/* Header */}
@@ -140,7 +151,7 @@ function FunnelKpisInner() {
             <CircleGauge className="w-4 h-4 text-neutral-600" />
             <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">Funnel KPIs</h1>
             <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-1 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-              lead quality &amp; email benchmarks
+              funnel · lead quality · email
             </span>
           </div>
           <button
@@ -158,6 +169,7 @@ function FunnelKpisInner() {
         <HowItWorks
           storageKey="funnelKpisIntroDismissed"
           steps={[
+            { title: "Funnel", detail: "Where leads drop off (Lead→MQL→SQL→Discovery→Proposal→Closed-Won), ICP match rate, and how fast they move." },
             { title: "Lead quality", detail: "Score distribution, kept vs removed (and why), and which sources convert." },
             { title: "Email benchmarks", detail: "Mailchimp drop-campaign open/click/bounce + Resend 1:1 engagement." },
             { title: "Your scoreboard", detail: "Numbers come from Leads + the email tools; read here, act in Leads." },
@@ -173,6 +185,117 @@ function FunnelKpisInner() {
 
         {loading && !quality && (
           <div className="text-neutral-500 py-16 text-center">Loading KPIs…</div>
+        )}
+
+        {/* ===== Funnel conversion & velocity ===== */}
+        {funnel && (
+          <Section title="Funnel conversion & velocity" icon={Filter}>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <HeroMetric
+                label="ICP match rate"
+                value={pct(funnel.icpMatchRate)}
+                sub={`score ≥ ${funnel.threshold}`}
+              />
+              <HeroMetric label="Total leads" value={String(funnel.total)} />
+              <HeroMetric label="Reach opportunity" value={pct(oppRate)} sub="lead → discovery" />
+              <HeroMetric label="Closed-won" value={pct(wonRate)} sub="lead → closed-won" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Stage conversion */}
+              <Card>
+                <div className="text-xs font-medium text-neutral-600 mb-3">
+                  Stage conversion
+                  <span className="text-neutral-400"> — % converts into each stage</span>
+                </div>
+                <div className="space-y-2">
+                  {funnel.stages.map((s, i) => {
+                    const conv = i > 0 ? funnel.conversions[i - 1] : null
+                    const width = leadReached > 0 ? (s.reached / leadReached) * 100 : 0
+                    return (
+                      <div key={s.stage} className="flex items-center gap-3">
+                        <div className="w-20 shrink-0 text-xs text-neutral-600">{s.label}</div>
+                        <div className="flex-1 h-5 rounded bg-neutral-100 overflow-hidden">
+                          <div className="h-full bg-neutral-300" style={{ width: `${width}%` }} />
+                        </div>
+                        <div
+                          className="w-28 shrink-0 text-xs text-neutral-700 tabular-nums text-right"
+                          title={s.exited > 0 ? `${s.exited} exited here` : undefined}
+                        >
+                          {s.reached}
+                          {conv && <span className="text-neutral-400"> · {pct(conv.rate)}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+
+              {/* Velocity */}
+              <Card>
+                <div className="flex items-center gap-2 text-xs font-medium text-neutral-600 mb-3">
+                  <Timer className="w-3.5 h-3.5" /> Velocity
+                  <span className="text-neutral-400"> — median days, p90 in parens</span>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-neutral-500 border-b border-neutral-100">
+                      <th className="py-2 pr-4 font-medium">Step</th>
+                      <th className="py-2 px-3 font-medium text-right">Median</th>
+                      <th className="py-2 px-3 font-medium text-right">p90</th>
+                      <th className="py-2 pl-3 font-medium text-right">n</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {funnel.velocity.map((v) => (
+                      <tr key={v.step} className="border-b border-neutral-50 last:border-0">
+                        <td className="py-2 pr-4 text-neutral-700">{v.step}</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-neutral-900 font-medium">
+                          {v.sampleSize > 0 ? `${v.medianDays}d` : "—"}
+                        </td>
+                        <td className="py-2 px-3 text-right tabular-nums text-neutral-500">
+                          {v.sampleSize > 0 ? `${v.p90Days}d` : "—"}
+                        </td>
+                        <td className="py-2 pl-3 text-right tabular-nums text-neutral-400">{v.sampleSize}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </div>
+
+            {/* ICP match by source */}
+            <Card>
+              <div className="text-xs font-medium text-neutral-600 mb-3">
+                ICP match by source
+                <span className="text-neutral-400"> — share of leads scoring ≥ {funnel.threshold}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-neutral-500 border-b border-neutral-100">
+                      <th className="py-2 pr-4 font-medium">Source</th>
+                      <th className="py-2 px-3 font-medium text-right">Leads</th>
+                      <th className="py-2 px-3 font-medium text-right">Matched</th>
+                      <th className="py-2 pl-3 font-medium text-right">Match rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {funnel.icpMatchBySource.map((s) => (
+                      <tr key={s.source} className="border-b border-neutral-50 last:border-0">
+                        <td className="py-2 pr-4 font-medium text-neutral-700 capitalize">{s.source}</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-neutral-600">{s.total}</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-neutral-600">{s.matched}</td>
+                        <td className="py-2 pl-3 text-right tabular-nums text-neutral-900 font-medium">
+                          {pct(s.matchRate)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </Section>
         )}
 
         {/* ===== Lead Quality ===== */}

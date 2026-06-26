@@ -118,20 +118,25 @@ const OVERVIEW_ITEM: SidebarLink = {
 }
 
 // Sections mirror the lifecycle: "Pipeline" runs in funnel order
-// (Audiences → Inbox → Leads → CRM) so the sidebar reads entry-point → outcome
-// top-to-bottom. Insights and Workspace hold the supporting surfaces.
+// (Prospect → Audiences → Inbox → Leads → CRM → Funnel KPIs) so the sidebar
+// reads start → qualify → win → measure, top-to-bottom. Prospect leads as the
+// active starting action; Funnel KPIs closes as the scoreboard. Analytics and
+// Workspace hold the supporting surfaces.
 const SIDEBAR_SECTIONS: SidebarSection[] = [
   {
     id: "pipeline",
     title: "Pipeline",
     items: [
       {
-        id: "audiences",
-        label: "Audiences",
-        icon: Megaphone,
-        href: "/admin/audiences",
-        matchPrefix: "/admin/audiences",
-        roles: ["full_admin"],
+        id: "prospect",
+        label: "Prospect",
+        icon: Target,
+        href: "/admin/leads/prospect",
+        matchPrefix: "/admin/leads/prospect",
+        description: "Find companies to proactively contact — score & approve as leads",
+        // The active start of the sales funnel — leads the section so it's the
+        // first thing a new admin sees. Same reach as Leads.
+        roles: ["full_admin", "crm_only", "intern"],
       },
       {
         id: "inbox",
@@ -147,6 +152,9 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Flag,
         href: "/admin/leads",
         matchPrefix: "/admin/leads",
+        // Exact so Leads doesn't also stay highlighted on the /admin/leads/prospect
+        // child, which is now its own top-level item above.
+        exact: true,
         roles: ["full_admin", "crm_only", "intern"],
       },
       {
@@ -159,33 +167,47 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         // scope. Interns do funnel research in Leads; CRM stays operator-only.
         roles: ["full_admin", "crm_only"],
       },
-    ],
-  },
-  {
-    id: "insights",
-    title: "Insights",
-    items: [
-      {
-        id: "analytics",
-        label: "Analytics",
-        icon: BarChart3,
-        href: "/admin/analytics",
-        matchPrefix: "/admin/analytics",
-        // Web (GA4) + social (Instagram) + portfolio analytics — 434 marketing,
-        // not the intern Analytics squad's domain (they work lead-quality &
-        // email-campaign KPIs out of Leads). Matches the page guard below.
-        roles: ["full_admin"],
-      },
       {
         id: "funnel-kpis",
         label: "Funnel KPIs",
         icon: CircleGauge,
         href: "/admin/kpis",
         matchPrefix: "/admin/kpis",
-        // The Analytics squad's home: lead quality (score, kept/removed,
-        // conversion) + email benchmarks (Mailchimp drop + Resend 1:1).
-        // Deliberately visible to interns, unlike web/social Analytics above.
+        // The funnel's scoreboard — conversion, velocity, ICP match rate +
+        // lead-quality and email benchmarks. Closes Pipeline as the measurement
+        // of everything above it.
         roles: ["full_admin", "crm_only", "intern"],
+      },
+    ],
+  },
+  // Marketing surfaces that feed or surround the funnel without being stages in
+  // it: Audiences (the contact pool you promote leads FROM) + web/social
+  // Analytics (marketing performance). Kept out of Pipeline so that section
+  // reads as a clean single-thread sales funnel.
+  {
+    id: "marketing",
+    title: "Marketing",
+    items: [
+      {
+        id: "audiences",
+        label: "Audiences",
+        icon: Megaphone,
+        href: "/admin/audiences",
+        matchPrefix: "/admin/audiences",
+        // Contact lists, opt-ins (auto-sync to Mailchimp), event/partner rosters.
+        // A source the funnel promotes FROM — not a funnel stage.
+        roles: ["full_admin"],
+      },
+      {
+        id: "analytics",
+        label: "Analytics",
+        icon: BarChart3,
+        href: "/admin/analytics",
+        matchPrefix: "/admin/analytics",
+        // Web (GA4) + social (Instagram) + portfolio analytics — 434 marketing.
+        // Separate from the funnel scoreboard (Funnel KPIs), which lives at the
+        // end of Pipeline. full_admin-only.
+        roles: ["full_admin"],
       },
     ],
   },
