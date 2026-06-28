@@ -631,7 +631,7 @@ function CandidateRow({
   selected: boolean
   onToggleSelect: () => void
 }) {
-  const { person, score, breakdown, reasons, excluded } = candidate
+  const { person, score, grade, breakdown, contactQualifier, reasons, excluded } = candidate
   const isExcluded = score === -1
   const aboveThreshold = !isExcluded && score >= threshold
   // Approvability — excluded candidates can never be approved; candidates
@@ -678,7 +678,10 @@ function CandidateRow({
           {isExcluded ? (
             <Ban className="w-5 h-5" />
           ) : (
-            <span className="text-[16px] font-bold">{score}</span>
+            <div className="flex flex-col items-center leading-none">
+              <span className="text-[15px] font-bold">{score}</span>
+              <span className="text-[9px] font-semibold opacity-70">{grade}</span>
+            </div>
           )}
         </div>
 
@@ -743,16 +746,21 @@ function CandidateRow({
           ) : (
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-neutral-500 tabular-nums">
               <span>
-                Geo <strong className="text-neutral-700">+{breakdown.geography}</strong>
-              </span>
-              <span>
                 Industry <strong className="text-neutral-700">+{breakdown.industry}</strong>
               </span>
               <span>
-                Title <strong className="text-neutral-700">+{breakdown.title}</strong>
+                Location <strong className="text-neutral-700">+{breakdown.location}</strong>
               </span>
               <span>
                 Size <strong className="text-neutral-700">+{breakdown.companySize}</strong>
+              </span>
+              {breakdown.fundingStage !== undefined && (
+                <span>
+                  Funding <strong className="text-neutral-700">+{breakdown.fundingStage}</strong>
+                </span>
+              )}
+              <span className="text-neutral-400" title="Contact seniority — a qualifier, not part of company fit">
+                Contact <strong className="text-neutral-600">+{contactQualifier}</strong>
               </span>
             </div>
           )}

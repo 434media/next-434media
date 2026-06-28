@@ -1,52 +1,37 @@
 import type { ApolloPerson, ApolloSearchFilters } from "./apollo"
+import type { IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
+import { scoreIcpFit } from "@/lib/icp/rubric"
 
 /**
- * Stage 3 — ICP scorer.
+ * Stage 3 — ICP scorer (prospecting path).
  *
- * Pure function: takes an Apollo person result + the filters that produced
- * it, returns a fit-only score 0–80 with per-dimension breakdown. No API
- * calls, no LLM, no I/O — easy to test, deterministic, fast.
+ * Company FIT is delegated to the canonical rubric (lib/icp/rubric.ts), so a
+ * prospect's score is the SAME 0–100 fit + grade the lead carries downstream
+ * (Step 2 — one score everywhere). This file owns the prospecting-only
+ * concerns:
+ *   - hard exclusions (competitor agencies, EU/UK/CA jurisdictions) → score -1
+ *   - the contact qualifier (title) — a person-level signal, NOT company fit,
+ *     so it's surfaced separately rather than folded into the fit score
+ *   - the approve-into-queue threshold
  *
- * Two scoring "modes" the function adapts to automatically:
- *   - Real data available (Basic+ plans, or post-enrichment): score on
- *     actual values (city, industry, employee count).
- *   - Free-plan obfuscated response: fall back to filter-implied attributes
- *     plus org-name pattern matching (the only signal we always have).
- *
- * Score weights sum to 80, matching the icp.md "fit-only score range 0–80
- * before any engagement signal lifts it" specification:
- *
- *     Geography      0–25
- *     Industry       0–25
- *     Title          0–20
- *     Company size   0–10
- *     ─────────────────────
- *     Total          0–80
- *
- * Hard exclusions (agencies, PR firms, etc. — the ICP "always exclude"
- * rules) return score = -1 with an `excluded` reason so the review tray
- * can either filter or display them as "filtered: <reason>".
+ * Free-plan obfuscation is handled by passing the search filters as fallback
+ * hints to the rubric (filter keywords → industry, filter locations → location).
  */
 
 // ─── Configuration ──────────────────────────────────────────────────────
 
 /**
- * Default fit threshold for "approve into queue" decisions. Configurable
- * via PROSPECTING_FIT_THRESHOLD env var. icp.md recommends 50–60.
+ * Default fit threshold for "approve into queue" decisions, on the 0–100 fit
+ * scale (60 = grade C, the prospecting approve bar). Configurable via
+ * PROSPECTING_FIT_THRESHOLD. The funnel's *quality*-match bar is higher (70 / B).
  */
-export const DEFAULT_FIT_THRESHOLD = Number(
-  process.env.PROSPECTING_FIT_THRESHOLD,
-) || 60
+export const DEFAULT_FIT_THRESHOLD = Number(process.env.PROSPECTING_FIT_THRESHOLD) || 60
 
 // ─── Negative ICP patterns (hard exclusions) ────────────────────────────
 
 /**
  * Org-name patterns that match marketing agencies, PR firms, advertising
  * firms, etc. — 434media's competitors per the ICP doc. Hard-exclude.
- *
- * Patterns are intentionally specific (require a "agency/group/firm" word
- * after the marketing-adjacent term) to avoid false positives on real
- * customers like "Acme Foods Brand Department."
  */
 const NEGATIVE_ORG_PATTERNS: RegExp[] = [
   /\b(marketing|advertising|public relations|communications|brand|creative|digital marketing)\s+(agency|group|firm|partners|consultancy|consulting|studio|shop)\b/i,
@@ -60,17 +45,8 @@ const NEGATIVE_ORG_PATTERNS: RegExp[] = [
  * doc, EU member states (incl. UK + EEA + Switzerland) and Canada are
  * hard-excluded due to strict consent laws (GDPR / CASL).
  *
- * Lowercased for case-insensitive matching against Apollo's country fields.
- *
  * Exported so the approval endpoint can apply a defense-in-depth check
  * (single source of truth for the jurisdiction list).
- *
- * Limitation: on Apollo Free plan, country is obfuscated (`has_country: true`
- * only — actual value hidden). The scorer can't enforce this on Free-plan
- * responses; production usage on Basic+ exposes the country field and the
- * exclusion fires cleanly. The translator's geography filter is the
- * complementary defense — restrict `organization_locations` to US/Mexico
- * so EU/CA candidates don't appear in Free-plan results in the first place.
  */
 export const EXCLUDED_COUNTRIES: Set<string> = new Set([
   // EU member states
@@ -113,271 +89,14 @@ export function isExcludedJurisdiction(person: ApolloPerson): {
   return { excluded: false }
 }
 
-// ─── Geography scoring (max 25) ─────────────────────────────────────────
-
-// Exported so the canonical ICP rubric (lib/icp/rubric.ts) reuses the same
-// geography lists rather than duplicating them — single source of truth for
-// 434's location taxonomy. scorer.ts keeps its own 0–80 point mapping for the
-// prospecting UI until that path migrates onto the rubric (Step 2a phase 2).
-export const SOUTH_TEXAS_CITIES = [
-  "san antonio",
-  "brownsville",
-  "laredo",
-  "mcallen",
-  "harlingen",
-  "corpus christi",
-  "edinburg",
-  "rio grande",
-  "rgv",
-]
-
-export const TEXAS_CITIES = [
-  "austin",
-  "houston",
-  "dallas",
-  "fort worth",
-  "el paso",
-  "lubbock",
-  "amarillo",
-  "waco",
-]
-
-export const HISPANIC_TARGETED_METROS = [
-  "miami",
-  "los angeles",
-  "chicago",
-  "phoenix",
-  "albuquerque",
-  "denver",
-]
+// ─── Contact qualifier — title (max 20) ─────────────────────────────────
+// A person-level signal (is this the right contact?), NOT company fit. Kept
+// here and surfaced separately from the rubric's company fit score.
 
 interface DimensionResult {
   score: number
   reason: string
 }
-
-function scoreGeography(
-  person: ApolloPerson,
-  filters: ApolloSearchFilters,
-): DimensionResult {
-  const city = (person.city || "").toLowerCase()
-  const state = (person.state || "").toLowerCase()
-  const orgCity = (person.organization?.city || "").toLowerCase()
-  const orgState = (person.organization?.state || "").toLowerCase()
-
-  // Use real values when available (Basic+ plans).
-  const haveRealLocation = !!(city || state || orgCity || orgState)
-
-  if (haveRealLocation) {
-    const allText = [city, state, orgCity, orgState].join(" ")
-    if (SOUTH_TEXAS_CITIES.some((c) => allText.includes(c))) {
-      return { score: 25, reason: "South Texas — top ICP priority" }
-    }
-    if (state === "texas" || state === "tx" || orgState === "texas" || orgState === "tx") {
-      if (TEXAS_CITIES.some((c) => allText.includes(c))) {
-        return { score: 22, reason: "Greater Texas (Austin/Houston/Dallas/etc.)" }
-      }
-      return { score: 20, reason: "Texas (specific city not surfaced)" }
-    }
-    if (HISPANIC_TARGETED_METROS.some((c) => allText.includes(c))) {
-      return { score: 18, reason: "Hispanic-targeted national metro" }
-    }
-    if (state || orgState) {
-      return { score: 5, reason: "Outside primary ICP geography" }
-    }
-  }
-
-  // Fall back to filter-implied location (Free plan obfuscates city/state).
-  const filterLocations = (filters.organization_locations || []).join(" ").toLowerCase()
-  if (/texas|tx\b/i.test(filterLocations)) {
-    return {
-      score: 20,
-      reason: "Texas (filter-implied — actual city hidden on Free plan)",
-    }
-  }
-  if (/mexico/i.test(filterLocations)) {
-    return {
-      score: 22,
-      reason: "Mexico (filter-implied — strong border-market signal)",
-    }
-  }
-  if (HISPANIC_TARGETED_METROS.some((c) => filterLocations.includes(c))) {
-    return {
-      score: 18,
-      reason: "Hispanic-targeted metro (filter-implied)",
-    }
-  }
-
-  return { score: 0, reason: "no geography signal" }
-}
-
-// ─── Industry scoring (max 25) ──────────────────────────────────────────
-
-export interface IndustrySignal {
-  name: string
-  patterns: RegExp[]
-  score: number
-}
-
-/**
- * Industry recognition patterns. Run against:
- *   1. organization.industry (Basic+ plans return this)
- *   2. organization.name + person.title (always available; coarser)
- *   3. q_keywords in the filters used (intent signal from the prompt)
- */
-export const INDUSTRY_SIGNALS: IndustrySignal[] = [
-  {
-    name: "Healthcare / life sciences",
-    score: 25,
-    patterns: [
-      /\bhealth(care|tech)?\b/i,
-      /\bbio(tech)?\b/i,
-      /\bmedic(al|ine)\b/i,
-      /\bpharma\b/i,
-      /\bhospital\b/i,
-      /\bclinic(al)?\b/i,
-      /\bmilitary[- ]health\b/i,
-      /\blife scien(ce|ces)\b/i,
-      /\bprosthetic/i,
-    ],
-  },
-  {
-    name: "Capital / VC / accelerators",
-    score: 25,
-    patterns: [
-      /\bventure(s)?\b/i,
-      /\bcapital\b/i,
-      /\b(angel|angels)\b/i,
-      /\baccelerator\b/i,
-      /\bincubator\b/i,
-      /\bfamily office\b/i,
-      /\bportfolio (marketing|management)\b/i,
-      /\b(VC|LP|GP) firm\b/i,
-    ],
-  },
-  {
-    name: "Sports / fight / lifestyle (Latino-targeted)",
-    score: 25,
-    patterns: [
-      /\bboxing\b/i,
-      /\bfight (sport|club|gym)\b/i,
-      /\bMMA\b/i,
-      /\bsports? (apparel|gear|nutrition|league)\b/i,
-      /\bathletic(s)?\b/i,
-    ],
-  },
-  {
-    name: "Tech / SaaS / dev",
-    score: 22,
-    patterns: [
-      /\bsoftware\b/i,
-      /\bSaaS\b/i,
-      /\bdeveloper(s)?\b/i,
-      /\bAI (tool|product|platform)\b/i,
-      /\bdev(\.|ops)?\b/i,
-      /\b(edtech|recruit|talent platform)\b/i,
-    ],
-  },
-  {
-    name: "Media / broadcast (bilingual)",
-    score: 25,
-    patterns: [
-      /\bunivision\b/i,
-      /\btelemundo\b/i,
-      /\bbroadcast(er|ing)\b/i,
-      /\bspanish[- ]language\b/i,
-      /\bbilingual media\b/i,
-    ],
-  },
-  {
-    name: "Education / workforce",
-    score: 22,
-    patterns: [
-      /\buniversity\b/i,
-      /\bcollege\b/i,
-      /\binstitute\b/i,
-      /\bacademy\b/i,
-      /\beducation\b/i,
-      /\bworkforce\b/i,
-    ],
-  },
-  {
-    name: "Nonprofit / mission",
-    score: 22,
-    patterns: [
-      /\bfoundation\b/i,
-      /\bministries\b/i,
-      /\bnonprofit\b/i,
-      /\balliance\b/i,
-      /\bcoalition\b/i,
-      /\bsocial impact\b/i,
-      /\bmission(-driven)?\b/i,
-    ],
-  },
-  {
-    name: "CPG (Hispanic focus)",
-    score: 22,
-    patterns: [
-      /\b(foods?|beverage|snack)\b/i,
-      /\bconsumer (brand|goods)\b/i,
-      /\b(hispanic|latino|latinx) brand\b/i,
-    ],
-  },
-  {
-    name: "Civic-tech / economic-development",
-    score: 22,
-    patterns: [
-      /\bcivic(-tech)?\b/i,
-      /\beconomic development\b/i,
-      /\bchamber of commerce\b/i,
-      /\btech bloc\b/i,
-    ],
-  },
-]
-
-function scoreIndustry(
-  person: ApolloPerson,
-  filters: ApolloSearchFilters,
-): DimensionResult {
-  const orgName = person.organization?.name ?? ""
-  const industry = person.organization?.industry ?? ""
-  const title = person.title ?? ""
-  const keywords = filters.q_keywords ?? ""
-
-  // Combined haystack — real industry value is highest signal, but we
-  // also pattern-match against org name + title + filter keywords because
-  // those are always present (even on Free plan).
-  const haystack = [industry, orgName, title, keywords].join(" ").toLowerCase()
-
-  if (!haystack.trim()) {
-    return { score: 0, reason: "no industry signal" }
-  }
-
-  let bestMatch: IndustrySignal | null = null
-  for (const signal of INDUSTRY_SIGNALS) {
-    if (signal.patterns.some((p) => p.test(haystack))) {
-      if (!bestMatch || signal.score > bestMatch.score) {
-        bestMatch = signal
-      }
-    }
-  }
-
-  if (bestMatch) {
-    const source = industry
-      ? "industry field"
-      : orgName
-        ? "org name pattern"
-        : "filter keyword"
-    return {
-      score: bestMatch.score,
-      reason: `${bestMatch.name} (matched via ${source})`,
-    }
-  }
-
-  return { score: 0, reason: "no ICP industry match" }
-}
-
-// ─── Title scoring (max 20) ─────────────────────────────────────────────
 
 interface TitleTier {
   name: string
@@ -462,79 +181,49 @@ function scoreTitle(person: ApolloPerson): DimensionResult {
   if (!title.trim()) {
     return { score: 0, reason: "no title" }
   }
-
   // Walk tiers in order; first match wins so seniority hierarchy is respected.
   for (const tier of TITLE_TIERS) {
     if (tier.patterns.some((p) => p.test(title))) {
       return { score: tier.score, reason: `${tier.name} ("${title}")` }
     }
   }
-
   return { score: 0, reason: `non-decision-maker title ("${title}")` }
-}
-
-// ─── Company size scoring (max 10) ──────────────────────────────────────
-
-function scoreCompanySize(person: ApolloPerson): DimensionResult {
-  const employees = person.organization?.estimated_num_employees
-  const orgName = person.organization?.name ?? ""
-
-  // Institutional clients (nonprofits, broadcasters, healthcare systems,
-  // universities) get full credit regardless of size — different decision-
-  // making, different budgets, ICP says no upper cap when mission-aligned.
-  const isInstitutional = /\b(university|college|institute|foundation|ministries|hospital|broadcast(er)?|government|alliance)\b/i.test(orgName)
-  if (isInstitutional) {
-    return { score: 10, reason: "institutional client (no size cap applies)" }
-  }
-
-  if (employees === undefined) {
-    return {
-      score: 0,
-      reason: "size unknown (Free plan hides employee count)",
-    }
-  }
-
-  if (employees >= 10 && employees <= 500) {
-    return { score: 10, reason: `${employees} employees — ICP sweet spot (10–500)` }
-  }
-  if (employees >= 5 && employees < 10) {
-    return { score: 7, reason: `${employees} employees — early-stage (5–10)` }
-  }
-  if (employees > 500 && employees <= 1000) {
-    return { score: 7, reason: `${employees} employees — above sweet spot but workable` }
-  }
-  if (employees > 1000) {
-    return { score: 3, reason: `${employees} employees — large enterprise (lower fit)` }
-  }
-  return { score: 0, reason: `${employees} employees — too small (no funding signal)` }
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────
 
-export interface ScoreBreakdown {
-  geography: number
-  industry: number
-  title: number
-  companySize: number
-}
-
 export interface ScoredPerson {
   person: ApolloPerson
-  /** 0–80 fit score, or -1 when hard-excluded by negative ICP rule */
+  /** 0–100 canonical ICP fit, or -1 when hard-excluded by a negative ICP rule. */
   score: number
-  breakdown: ScoreBreakdown
-  /** Set when score is -1 — explains why the candidate was excluded */
+  grade: IcpGrade
+  breakdown: IcpFitBreakdown
+  /** Title fit (0–20) — a contact qualifier, NOT part of the company fit score. */
+  contactQualifier: number
+  /** Set when score is -1 — explains why the candidate was excluded. */
   excluded?: string
-  /** Per-dimension explanations, in scoring order. Useful for the review tray. */
+  /** Per-dimension explanations, for the review tray. */
   reasons: string[]
 }
 
+const EXCLUDED_BREAKDOWN: IcpFitBreakdown = { industry: 0, location: 0, companySize: 0 }
+
+function excludedResult(person: ApolloPerson, message: string, reason: string): ScoredPerson {
+  return {
+    person,
+    score: -1,
+    grade: "D",
+    breakdown: EXCLUDED_BREAKDOWN,
+    contactQualifier: 0,
+    excluded: message,
+    reasons: [reason],
+  }
+}
+
 /**
- * Score a single Apollo candidate against the 434media ICP.
- *
- * Returns a -1 score with `excluded` reason for hard-excluded candidates
- * (agencies, PR firms, etc. per icp.md negative filters). The review tray
- * can choose to hide these or show them as "filtered" entries.
+ * Score a single Apollo candidate against the 434media ICP. Company fit comes
+ * from the canonical rubric; title is a separate contact qualifier. Returns a
+ * -1 score with `excluded` reason for hard-excluded candidates.
  */
 export function scoreCandidate(
   person: ApolloPerson,
@@ -545,67 +234,66 @@ export function scoreCandidate(
   // Hard exclusion 1 — competitor agencies / PR firms.
   for (const pattern of NEGATIVE_ORG_PATTERNS) {
     if (pattern.test(orgName)) {
-      return {
+      return excludedResult(
         person,
-        score: -1,
-        breakdown: { geography: 0, industry: 0, title: 0, companySize: 0 },
-        excluded: `Negative ICP filter: "${orgName}" appears to be an agency or PR/marketing firm — explicitly excluded by the ICP doc.`,
-        reasons: [
-          `Excluded: organization "${orgName}" matches a negative ICP pattern (agency / PR / marketing firm).`,
-        ],
-      }
+        `Negative ICP filter: "${orgName}" appears to be an agency or PR/marketing firm — explicitly excluded by the ICP doc.`,
+        `Excluded: organization "${orgName}" matches a negative ICP pattern (agency / PR / marketing firm).`,
+      )
     }
   }
 
-  // Hard exclusion 2 — EU/CA jurisdictions (strict cold-outreach consent
-  // laws; per the ICP doc, 434media does not pursue these regardless of fit).
+  // Hard exclusion 2 — EU/CA jurisdictions (strict cold-outreach consent laws).
   const jurisdiction = isExcludedJurisdiction(person)
   if (jurisdiction.excluded) {
-    return {
+    return excludedResult(
       person,
-      score: -1,
-      breakdown: { geography: 0, industry: 0, title: 0, companySize: 0 },
-      excluded: `Outside reachable geography: ${jurisdiction.country}. 434media does not pursue cold outbound to EU/Canadian contacts due to strict consent laws (GDPR / CASL).`,
-      reasons: [
-        `Excluded: contact in ${jurisdiction.country} — 434media does not reach out to EU/Canadian contacts (GDPR / CASL).`,
-      ],
-    }
+      `Outside reachable geography: ${jurisdiction.country}. 434media does not pursue cold outbound to EU/Canadian contacts due to strict consent laws (GDPR / CASL).`,
+      `Excluded: contact in ${jurisdiction.country} — 434media does not reach out to EU/Canadian contacts (GDPR / CASL).`,
+    )
   }
 
-  const geo = scoreGeography(person, filters)
-  const ind = scoreIndustry(person, filters)
-  const tit = scoreTitle(person)
-  const sz = scoreCompanySize(person)
+  // Company FIT — canonical rubric (same scorer the lead uses), with filter
+  // fallbacks for Free-plan obfuscation.
+  const fit = scoreIcpFit({
+    industry: person.organization?.industry,
+    orgName,
+    city: person.city || person.organization?.city,
+    state: person.state || person.organization?.state,
+    employeeCount: person.organization?.estimated_num_employees,
+    annualRevenue: person.organization?.annual_revenue,
+    keywordHint: filters.q_keywords,
+    locationHint: (filters.organization_locations || []).join(" "),
+  })
+
+  const title = scoreTitle(person)
+
+  const reasons = [
+    `Industry +${fit.breakdown.industry}`,
+    `Location +${fit.breakdown.location}`,
+    `Company size +${fit.breakdown.companySize}`,
+  ]
+  if (fit.breakdown.fundingStage !== undefined) reasons.push(`Funding +${fit.breakdown.fundingStage}`)
+  reasons.push(`Contact +${title.score}: ${title.reason}`, `Fit ${fit.fit}/100 → grade ${fit.grade}`)
 
   return {
     person,
-    score: geo.score + ind.score + tit.score + sz.score,
-    breakdown: {
-      geography: geo.score,
-      industry: ind.score,
-      title: tit.score,
-      companySize: sz.score,
-    },
-    reasons: [
-      `Geography +${geo.score}: ${geo.reason}`,
-      `Industry +${ind.score}: ${ind.reason}`,
-      `Title +${tit.score}: ${tit.reason}`,
-      `Size +${sz.score}: ${sz.reason}`,
-    ],
+    score: fit.fit,
+    grade: fit.grade,
+    breakdown: fit.breakdown,
+    contactQualifier: title.score,
+    reasons,
   }
 }
 
 /**
- * Score an array of candidates and return them sorted highest score first.
- * Hard-excluded candidates (-1) sort to the bottom — caller decides whether
- * to display them.
+ * Score an array of candidates, sorted highest fit first. Hard-excluded
+ * candidates (-1) sort to the bottom.
  */
 export function scoreCandidates(
   people: ApolloPerson[],
   filters: ApolloSearchFilters,
 ): ScoredPerson[] {
   const scored = people.map((p) => scoreCandidate(p, filters))
-  // Excluded (-1) to bottom; otherwise descending by score.
   return scored.sort((a, b) => {
     if (a.score === -1 && b.score !== -1) return 1
     if (b.score === -1 && a.score !== -1) return -1
@@ -615,7 +303,6 @@ export function scoreCandidates(
 
 /**
  * Threshold check — does this candidate qualify to enter the leads queue?
- * Uses DEFAULT_FIT_THRESHOLD (env-configurable) unless overridden.
  */
 export function isAboveThreshold(
   score: number,

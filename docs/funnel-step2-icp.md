@@ -138,12 +138,21 @@ Single source of truth for the Fit score:
 - [x] `lib/kpis/funnel.ts` — `ICP_MATCH_THRESHOLD = 70` (grade B); reads `icp_fit_score` with legacy-`score` fallback.
 - [x] `lib/prospecting/scorer.ts` — exported the shared geo/industry constants (rubric reuses them; no behavior change).
 
-**Step 2a phase 2 — REMAINING:**
-- [ ] `lib/prospecting/scorer.ts` — migrate the prospecting path + prospect UI off the 0–80 scale onto the rubric (today it still shows 0–80; the *lead* it creates already gets canonical Fit).
-- [ ] backfill script — re-score existing leads onto `icp_fit_score` (until then they fall back to legacy `score`; any edit re-scores them).
-- [ ] `lib/prospecting/icp.md` — document the canonical rubric + sign-off.
+**Step 2a phase 2 — BUILT (typechecks clean, math verified) 2026-06-26:**
+- [x] `lib/icp/taxonomy.ts` — extracted the shared geo/industry taxonomy into a neutral module (breaks the scorer↔rubric cycle; single source of truth).
+- [x] `lib/prospecting/scorer.ts` — now **delegates company fit to the rubric** (same 0–100 fit + grade the lead carries); keeps exclusions + title as a separate `contactQualifier`; threshold 60 (grade C). Free-plan obfuscation handled via `keywordHint`/`locationHint` fallbacks on the rubric.
+- [x] `app/admin/leads/prospect/page.tsx` — score badge shows fit **+ grade**; breakdown is now Industry / Location / Size + a muted Contact qualifier.
+- [x] backfill script (`scripts/backfill-icp-fit.ts`) — built + run. Revealed the existing 110 leads were firmographic-less partner imports (all D); led to removing 107 from the funnel (`scripts/remove-partner-leads.ts`, kept in Audiences). Funnel now 3 real rows.
 
-**Step 2b — REMAINING (deferred):** activate Growth + Funding + Event dimensions once a data source is decided (Decision 3).
+**Step 2a phase 2 — COMPLETE:**
+- [x] `lib/prospecting/icp.md` — canonical rubric documented (replaces the stale 0–80 section).
+
+**Step 2b — STARTED (typechecks clean, math verified) 2026-06-26:**
+- [x] All six dimensions now scored in `lib/icp/rubric.ts`. **Hybrid denominator**: core dims (Industry/Location/Size) always counted (unknown = 0); extended dims (Funding/Growth/Event) join the denominator *only when their data is present* — so activating them never craters sparse leads.
+- [x] **Funding Stage — LIVE** from Apollo `annual_revenue` (a maturity proxy; the $2–10M → 9 band matches the Canva Lab Cafe example). Persisted on leads (`annual_revenue`), passed through approve, shown in the prospect breakdown when present. Travels prospect → lead unchanged.
+- [x] **Growth Stage + Event Activity — BUILT but DORMANT.** Scorers + input contract exist (`GrowthStage` enum, `EventActivitySignal`); no structured source (Apollo gives neither), so they stay out of the denominator until populated.
+
+**Step 2b — REMAINING:** a data source for Growth + Event — most naturally the web-grounded lead `research` extraction (overlaps Step 6 / enrichment). Until then they're dormant; the rubric is ready to score them the moment data arrives.
 
 ## Behavior changes shipped in 2a phase 1
 

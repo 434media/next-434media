@@ -187,31 +187,48 @@ NOT generic marketing services, vendor-style work, or commodity media buys.
 
 ---
 
-## Scoring posture (for the prospecting feature)
+## Scoring posture — the canonical ICP rubric (Step 2)
 
-Prompted leads enter the system with **fit-only** scores. They have zero intent
-signals — they don't know 434media exists yet. The scoring breakdown:
+There is **one** ICP fit score (0–100, company-level) — the single source of
+truth in `lib/icp/rubric.ts` (taxonomy in `lib/icp/taxonomy.ts`). The same
+scorer runs on the prospecting path and the lead path, so a prospect's fit +
+grade travel into the lead and the opportunity **unchanged**. Title and intent
+are separate axes, deliberately NOT folded into fit.
 
-- **Fit dimensions** (sum 0–80 before any intent applies):
-  - Geography (Texas / border / Hispanic-targeted national)
-  - Industry match (one of the positive-signal verticals above)
-  - Title match (decision-maker tier)
-  - Size band match (per buyer-type rules)
-  - Growth-signal presence (funding, expansion, new leadership, etc.)
-- **Intent dimensions** (added later as engagement signals arrive):
-  - Email opens / clicks on Mailchimp campaigns
-  - Replies to outreach
-  - Site visits
-  - Content downloads
+### Fit dimensions (canonical, reconciled to the Canva ICP template)
 
-**Approval threshold for entering the leads queue:** ≥ 50–60 fit score
-(configurable). Below that, results stay in the prospecting tray as candidates
-the rep can approve manually but aren't auto-promoted.
+| Dimension | Max | Source | Status |
+|---|---|---|---|
+| Industry | 25 | org industry / name (+ filter keywords on Free plan) | live |
+| **Location** | **20** | city/state (+ filter locations) | live — weighted heavier than Canva's 10 (434's South-Texas thesis) |
+| Company Size | 15 | Apollo `estimated_num_employees`; unknown = 0 | live |
+| Funding Stage | 15 | Apollo `annual_revenue` (a maturity proxy — no round data) | live (revenue-based) |
+| Growth Stage | 20 | expansion / round signals — **needs research/enrichment** | dormant |
+| Event Activity | 15 | hosts conferences / meetups / webinars — **needs research** | dormant |
 
-**Per-source archetype:** scoring weights may eventually differ by buyer
-archetype (sponsor-buyer prompts weight industry-overlap-with-owned-audiences
-heavily; ecosystem-amplifier prompts weight VC/accelerator industry tags
-heavily). Start with one unified scorer; split when feedback warrants.
+**Normalization (hybrid).** Core dimensions (Industry, Location, Size) are
+always in the denominator — unknown scores 0, per the rubric. Extended
+dimensions (Funding, Growth, Event) join the denominator **only when their data
+is present**, so activating them never craters scores for leads that lack the
+data. `fit = round(rawPoints / activeMax × 100)`.
+
+### Grades
+
+`A+ 90–100 · A 80–89 · B 70–79 · C 60–69 · D <60`
+
+- **Approve into the leads queue:** fit ≥ 60 (grade C), env-configurable
+  (`PROSPECTING_FIT_THRESHOLD`).
+- **Quality "ICP-matched" (Funnel KPI):** fit ≥ 70 (grade B), `ICP_MATCH_THRESHOLD`.
+
+### Title & intent (separate axes)
+
+- **Title** is a *contact qualifier* (is this the right person?) — scored 0–20,
+  surfaced beside fit, not part of it.
+- **Intent** (engagement, sponsor tag, event-sourced) lives in `intent_score`.
+  The full intent model (website / hiring / business signals) is Step 6.
+
+**Per-source archetype:** weights may eventually differ by buyer archetype.
+Start with one unified scorer; split when feedback warrants.
 
 ---
 

@@ -39,10 +39,35 @@ const BANNED_PHRASES = [
   "thought leadership",
 ]
 
+/**
+ * Which email in the 3-step sequence to draft. Undefined = a standalone
+ * one-off draft (the original single-send behavior).
+ *  1 — intro: name a relevant challenge, invite to discuss
+ *  2 — value: reinforce the value prop with specifics, encourage a reply
+ *  3 — final follow-up: polite, acknowledge other priorities, leave the door open
+ */
+export type SequenceStep = 1 | 2 | 3
+
 interface BuildPromptOptions {
   lead: Lead
   /** Optional rep name — appears in the closing CTA so the email doesn't look unsigned. */
   repName?: string
+  /** When set, draft this step of the 3-email sequence instead of a one-off. */
+  step?: SequenceStep
+}
+
+// Step-specific guidance appended to the draft rules. Later steps are explicitly
+// framed as follow-ups so they don't re-introduce 434 from scratch.
+const STEP_GUIDANCE: Record<SequenceStep, string> = {
+  1: `This is EMAIL 1 of a 3-email sequence — the first touch.
+- Introduce 434 Media briefly and name a relevant business challenge this prospect likely faces.
+- Invite them to discuss. This is the opener; do not reference prior emails.`,
+  2: `This is EMAIL 2 of a 3-email sequence — a follow-up to a first email they did NOT reply to.
+- Open by lightly acknowledging you reached out before (don't re-introduce from scratch).
+- Reinforce the value with ONE specific benefit or concrete result, and encourage a reply.`,
+  3: `This is EMAIL 3 of a 3-email sequence — the final, polite follow-up.
+- Acknowledge they're busy and have other priorities. Keep it short and gracious.
+- Leave the door open for the future. No pressure, no guilt. This is the last touch.`,
 }
 
 export interface BuildPromptResult {
@@ -52,7 +77,7 @@ export interface BuildPromptResult {
   system: string
 }
 
-export function buildLeadOutreachPrompt({ lead, repName }: BuildPromptOptions): BuildPromptResult {
+export function buildLeadOutreachPrompt({ lead, repName, step }: BuildPromptOptions): BuildPromptResult {
   const scoreSignals = Object.entries(lead.score_breakdown ?? {})
     .filter(([, v]) => typeof v === "number" && v > 0)
     .map(([k, v]) => `${k} (+${v})`)
@@ -79,6 +104,8 @@ export function buildLeadOutreachPrompt({ lead, repName }: BuildPromptOptions): 
     ? `How we got them: promoted from ${lead.origin_ref.collection.replace(/_/g, " ")} on ${lead.origin_ref.promoted_at?.split("T")[0] ?? "(unknown date)"}.`
     : ""
 
+  const stepLine = step ? `\n${STEP_GUIDANCE[step]}\n` : ""
+
   const system = `You are a senior business development writer for 434 Media. You write outbound prospecting emails that read like a real person reached out, not a marketing template. You know the 434 portfolio cold and you tailor every send to which sub-brand actually fits the prospect's world.
 
 ${BRAND_CONTEXT}
@@ -101,7 +128,7 @@ Lead-scoring signals that fired: ${scoreSignals || "(none — be cautious about 
 ${engagementLine}
 ${originLine}
 ${repLine}
-
+${stepLine}
 Rules for this draft:
 - Lead with the audience or sub-brand most relevant to their industry. If multiple fit, pick the strongest one and commit to it.
 - Be specific to their world — reference their industry or location, not generic phrases.

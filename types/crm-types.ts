@@ -861,12 +861,52 @@ export interface LeadScoreBreakdown {
 // ICP fit grade — canonical Canva rubric, A+/A/B/C/D on the 0–100 fit score.
 export type IcpGrade = "A+" | "A" | "B" | "C" | "D"
 
-// Per-dimension raw points behind the ICP fit score. Step 2a scores three
-// dimensions (Growth/Funding/Event activate in Step 2b). See lib/icp/rubric.ts.
+// Per-dimension raw points behind the ICP fit score. Core dims (industry,
+// location, companySize) always present; extended dims (funding/growth/event)
+// present only when their data is. See lib/icp/rubric.ts.
 export interface IcpFitBreakdown {
   industry?: number
   location?: number
   companySize?: number
+  fundingStage?: number
+  growthStage?: number
+  eventActivity?: number
+}
+
+// 3-email outreach sequence (the PDF's Email 1/2/3). Hybrid model: the rep
+// confirms all three drafts upfront, then a cron auto-sends each step on the
+// 0/+4/+5-business-day cadence, re-checking consent + stop conditions before
+// each send. One active sequence per lead. See docs/outreach-sequence.md.
+export interface OutreachSequenceStep {
+  n: 1 | 2 | 3
+  subject: string
+  body: string
+  sent_at?: string
+  resend_email_id?: string
+}
+
+export type OutreachSequenceStatus = "active" | "paused" | "completed" | "stopped"
+
+export type OutreachSequenceStopReason =
+  | "replied"
+  | "engaged"
+  | "converted"
+  | "archived"
+  | "opted_out"
+  | "manual"
+  | "completed"
+
+export interface OutreachSequence {
+  status: OutreachSequenceStatus
+  /** All three steps, rep-approved at enroll time. */
+  steps: OutreachSequenceStep[]
+  /** Next step to send (null once the sequence is done). */
+  next_step: 1 | 2 | 3 | null
+  /** ISO date the cron acts on for the next step. */
+  next_send_at?: string
+  enrolled_at: string
+  enrolled_by: string
+  stopped_reason?: OutreachSequenceStopReason
 }
 
 export interface Lead extends BaseRecord {
@@ -903,6 +943,10 @@ export interface Lead extends BaseRecord {
   // Feeds the Company Size fit dimension; absent on inbound leads (size = 0).
   employee_count?: number
 
+  // Annual revenue in USD (Apollo annual_revenue on prospected leads). Feeds the
+  // Funding Stage fit dimension as a maturity proxy; absent → dimension not scored.
+  annual_revenue?: number
+
   // Workflow
   status: LeadStatus
   assigned_to?: string
@@ -917,6 +961,10 @@ export interface Lead extends BaseRecord {
   draft_generated_at?: string
   last_contacted_at?: string
   next_followup_date?: string
+
+  // 3-email sequence — rep-confirmed drafts, cron auto-sent. Managed by the
+  // sequence route + cron, not the generic PATCH. See docs/outreach-sequence.md.
+  outreach_sequence?: OutreachSequence
 
   // Resend tracking
   resend_email_id?: string
@@ -980,6 +1028,7 @@ export type LeadCreateInput = Omit<
   | "email_clicks"
   | "enriched_at"
   | "resend_email_id"
+  | "outreach_sequence"
   | "converted_to_client_id"
   | "converted_at"
   | "status"
@@ -1006,6 +1055,7 @@ export type LeadUpdateInput = Partial<
     | "intent_score"
     | "intent_breakdown"
     | "enriched_at"
+    | "outreach_sequence"
   >
 >
 

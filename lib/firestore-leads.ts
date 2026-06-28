@@ -67,6 +67,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
         ? (raw.intent_breakdown as Lead["intent_breakdown"])
         : undefined,
     employee_count: typeof raw.employee_count === "number" ? raw.employee_count : undefined,
+    annual_revenue: typeof raw.annual_revenue === "number" ? raw.annual_revenue : undefined,
     status: (raw.status || "new") as LeadStatus,
     assigned_to: raw.assigned_to || undefined,
     disqualified_reason: raw.disqualified_reason || undefined,
@@ -74,6 +75,10 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     draft_generated_at: toIsoString(raw.draft_generated_at) || undefined,
     last_contacted_at: toIsoString(raw.last_contacted_at) || undefined,
     next_followup_date: toIsoString(raw.next_followup_date) || undefined,
+    outreach_sequence:
+      raw.outreach_sequence && typeof raw.outreach_sequence === "object"
+        ? (raw.outreach_sequence as Lead["outreach_sequence"])
+        : undefined,
     resend_email_id: raw.resend_email_id || undefined,
     email_opens: typeof raw.email_opens === "number" ? raw.email_opens : 0,
     email_clicks: typeof raw.email_clicks === "number" ? raw.email_clicks : 0,
@@ -142,6 +147,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     title: input.title,
     company: input.company,
     employee_count: input.employee_count,
+    annual_revenue: input.annual_revenue,
     source: input.source,
     email_opens: 0,
     email_clicks: 0,
@@ -168,6 +174,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     employee_count: input.employee_count ?? null,
+    annual_revenue: input.annual_revenue ?? null,
     status: input.status ?? "new",
     assigned_to: input.assigned_to ?? null,
     outreach_draft: input.outreach_draft ?? null,
@@ -237,6 +244,7 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
     title: merged.title,
     company: merged.company,
     employee_count: merged.employee_count,
+    annual_revenue: merged.annual_revenue,
     source: merged.source,
     email_opens: merged.email_opens,
     email_clicks: merged.email_clicks,
@@ -638,6 +646,8 @@ interface ProspectingCapture {
   industry?: string
   /** Apollo estimated_num_employees — feeds the Company Size fit dimension. */
   employeeCount?: number
+  /** Apollo annual_revenue — feeds the Funding Stage fit dimension. */
+  annualRevenue?: number
   /** The prompt that produced this candidate. Tagged for traceability. */
   prompt: string
   /** Apollo's person ID — useful for re-enrichment later. */
@@ -705,6 +715,7 @@ export async function captureLeadFromProspecting(
       if (!existing.location && location) patch.location = location
       if (!existing.industry && input.industry) patch.industry = input.industry
       if (!existing.employee_count && input.employeeCount) patch.employee_count = input.employeeCount
+      if (!existing.annual_revenue && input.annualRevenue) patch.annual_revenue = input.annualRevenue
       // Don't touch assigned_to — original assignment wins.
       await updateLead(existing.id, patch)
       return { leadId: existing.id, created: false }
@@ -719,6 +730,7 @@ export async function captureLeadFromProspecting(
       industry: input.industry,
       location,
       employee_count: input.employeeCount,
+      annual_revenue: input.annualRevenue,
       source: "prospected",
       assigned_to: input.approvedBy,
       tags: captureTags,
@@ -760,6 +772,7 @@ export async function incrementEngagement(
     title: updated.title,
     company: updated.company,
     employee_count: updated.employee_count,
+    annual_revenue: updated.annual_revenue,
     source: updated.source,
     email_opens: updated.email_opens,
     email_clicks: updated.email_clicks,

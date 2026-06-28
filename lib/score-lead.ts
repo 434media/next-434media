@@ -33,7 +33,7 @@ export interface ScoreResult {
 
 type ScoreInput = Pick<
   Lead,
-  "location" | "industry" | "title" | "company" | "employee_count" | "source" | "email_opens" | "email_clicks" | "tags"
+  "location" | "industry" | "title" | "company" | "employee_count" | "annual_revenue" | "source" | "email_opens" | "email_clicks" | "tags"
 >
 
 export function scoreLead(input: ScoreInput): ScoreResult {
@@ -43,6 +43,7 @@ export function scoreLead(input: ScoreInput): ScoreResult {
     orgName: input.company,
     location: input.location,
     employeeCount: input.employee_count,
+    annualRevenue: input.annual_revenue,
   })
 
   // ── INTENT (relocated out of fit) — likelihood to engage right now ──

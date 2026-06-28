@@ -4,7 +4,7 @@ import {
   SOUTH_TEXAS_CITIES,
   TEXAS_CITIES,
   HISPANIC_TARGETED_METROS,
-} from "@/lib/prospecting/scorer"
+} from "@/lib/icp/taxonomy"
 
 /**
  * Canonical ICP FIT score — the single source of truth (Step 2).
@@ -27,24 +27,38 @@ import {
  */
 
 export interface IcpDimension {
-  key: "industry" | "location" | "companySize" | "growthStage" | "fundingStage" | "eventActivity"
+  key: "industry" | "location" | "companySize" | "fundingStage" | "growthStage" | "eventActivity"
   label: string
   max: number
-  /** false = declared in the rubric but not yet scored (activates in Step 2b). */
-  active: boolean
+  /** Core dims are always in the denominator (unknown = 0). Extended dims join
+   *  the denominator only when their data is present for the company. */
+  core: boolean
 }
 
 export const ICP_DIMENSIONS: IcpDimension[] = [
-  { key: "industry", label: "Industry", max: 25, active: true },
-  { key: "location", label: "Location", max: 20, active: true }, // heavier than Canva's 10
-  { key: "companySize", label: "Company Size", max: 15, active: true },
-  { key: "growthStage", label: "Growth Stage", max: 20, active: false },
-  { key: "fundingStage", label: "Funding Stage", max: 15, active: false },
-  { key: "eventActivity", label: "Event Activity", max: 15, active: false },
+  { key: "industry", label: "Industry", max: 25, core: true },
+  { key: "location", label: "Location", max: 20, core: true }, // heavier than Canva's 10
+  { key: "companySize", label: "Company Size", max: 15, core: true },
+  { key: "fundingStage", label: "Funding Stage", max: 15, core: false }, // from revenue
+  { key: "growthStage", label: "Growth Stage", max: 20, core: false }, // research-sourced
+  { key: "eventActivity", label: "Event Activity", max: 15, core: false }, // research-sourced
 ]
 
-/** Sum of the active dimensions' maxes — the normalization denominator (60 in 2a). */
-export const ICP_ACTIVE_MAX = ICP_DIMENSIONS.filter((d) => d.active).reduce((s, d) => s + d.max, 0)
+/** Sum of the core dimensions' maxes — always in the denominator (60). */
+export const ICP_CORE_MAX = ICP_DIMENSIONS.filter((d) => d.core).reduce((s, d) => s + d.max, 0)
+
+// Growth stage (funding-round / maturity). Sourced from research/enrichment —
+// no structured Apollo field. Dormant until populated.
+export type GrowthStage = "series_b_plus" | "series_a" | "government" | "seed" | "bootstrapped"
+
+// Event-activity signals (does the company host community moments?). Research-
+// sourced. Dormant until populated.
+export interface EventActivitySignal {
+  conferences?: boolean
+  meetups?: boolean
+  webinars?: boolean
+  community?: boolean
+}
 
 export interface IcpCompanyInput {
   industry?: string
@@ -55,17 +69,28 @@ export interface IcpCompanyInput {
   state?: string
   /** Headcount, e.g. Apollo estimated_num_employees. */
   employeeCount?: number
+  /** Annual revenue in USD (Apollo) — Funding Stage proxy. */
+  annualRevenue?: number
+  /** Growth stage — research-sourced; scored only when provided. */
+  growthStage?: GrowthStage
+  /** Event-activity signals — research-sourced; scored only when provided. */
+  eventActivity?: EventActivitySignal
+  // Fallback hints for the prospecting path when real fields are obfuscated
+  // (Apollo Free plan): filter keywords inform industry, filter locations
+  // inform location. Ignored when real data is present.
+  keywordHint?: string
+  locationHint?: string
 }
 
 export interface IcpFitResult {
-  /** 0–100, normalized over the active dimensions. */
+  /** 0–100, normalized over the scored dimensions (core + present extended). */
   fit: number
   grade: IcpGrade
-  /** Raw points per active dimension. */
+  /** Raw points per scored dimension. */
   breakdown: IcpFitBreakdown
-  /** Sum of active raw points (pre-normalization). */
+  /** Sum of scored raw points (pre-normalization). */
   raw: number
-  /** The normalization denominator (sum of active maxes). */
+  /** The normalization denominator (core max + present extended maxes). */
   activeMax: number
 }
 
@@ -84,7 +109,10 @@ export function icpGrade(fit: number): IcpGrade {
 // Industry (max 25) — reuses the prospecting INDUSTRY_SIGNALS taxonomy
 // (434's real verticals). Scores are already 22–25; cap at the dimension max.
 function scoreIndustry(input: IcpCompanyInput): number {
-  const haystack = [input.industry, input.orgName].filter(Boolean).join(" ").toLowerCase()
+  const haystack = [input.industry, input.orgName, input.keywordHint]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
   if (!haystack.trim()) return 0
   let best = 0
   for (const sig of INDUSTRY_SIGNALS) {
@@ -96,7 +124,9 @@ function scoreIndustry(input: IcpCompanyInput): number {
 // Location (max 20) — 434's geography priority, rescaled heavier than Canva's
 // 10. South Texas tops the ladder; any US signal floors at a small credit.
 function scoreLocation(input: IcpCompanyInput): number {
-  const hay = [input.location, input.city, input.state].filter(Boolean).join(" ").toLowerCase()
+  // Real location wins; fall back to the filter-implied hint (Free-plan obfuscation).
+  const primary = [input.location, input.city, input.state].filter(Boolean).join(" ").toLowerCase()
+  const hay = primary || (input.locationHint || "").toLowerCase()
   if (!hay.trim()) return 0
   if (SOUTH_TEXAS_CITIES.some((c) => hay.includes(c))) return 20 // top ICP priority
   if (/\bmexico\b/.test(hay)) return 18 // border market
@@ -126,13 +156,69 @@ function scoreCompanySize(input: IcpCompanyInput): number {
   return 0 // < 5
 }
 
+// ─── Extended dimensions (counted only when data is present) ────────────
+
+// Funding Stage (max 15) — proxied from annual revenue (Apollo gives no round
+// data). Higher revenue → more budget for 434's services. The $2–10M → 9 band
+// matches the Canva worked example (Lab Cafe, <$10M, 9/15).
+function scoreFunding(revenue: number): number {
+  if (revenue >= 50_000_000) return 15
+  if (revenue >= 10_000_000) return 12
+  if (revenue >= 2_000_000) return 9
+  if (revenue >= 500_000) return 6
+  return 3 // defined but small / bootstrapped
+}
+
+// Growth Stage (max 20) — funding-round / maturity, per the original 434 spec.
+function scoreGrowth(stage: GrowthStage): number {
+  switch (stage) {
+    case "series_b_plus": return 20
+    case "series_a": return 15
+    case "government": return 12
+    case "seed": return 10
+    case "bootstrapped": return 5
+  }
+}
+
+// Event Activity (max 15) — does the company host community moments? Scaled
+// from the original spec (conferences weightiest).
+function scoreEvent(signal: EventActivitySignal): number {
+  let s = 0
+  if (signal.conferences) s += 6
+  if (signal.meetups) s += 3
+  if (signal.webinars) s += 3
+  if (signal.community) s += 3
+  return Math.min(s, 15)
+}
+
 export function scoreIcpFit(input: IcpCompanyInput): IcpFitResult {
+  // Core dimensions — always scored, always in the denominator (unknown = 0).
   const breakdown: IcpFitBreakdown = {
     industry: scoreIndustry(input),
     location: scoreLocation(input),
     companySize: scoreCompanySize(input),
   }
-  const raw = (breakdown.industry ?? 0) + (breakdown.location ?? 0) + (breakdown.companySize ?? 0)
-  const fit = ICP_ACTIVE_MAX > 0 ? Math.round((raw / ICP_ACTIVE_MAX) * 100) : 0
-  return { fit, grade: icpGrade(fit), breakdown, raw, activeMax: ICP_ACTIVE_MAX }
+  let raw = (breakdown.industry ?? 0) + (breakdown.location ?? 0) + (breakdown.companySize ?? 0)
+  let denom = ICP_CORE_MAX
+
+  // Extended dimensions — join raw AND denominator only when data is present,
+  // so they sharpen rich-data leads without cratering sparse ones.
+  if (input.annualRevenue !== undefined) {
+    breakdown.fundingStage = scoreFunding(input.annualRevenue)
+    raw += breakdown.fundingStage
+    denom += 15
+  }
+  if (input.growthStage !== undefined) {
+    breakdown.growthStage = scoreGrowth(input.growthStage)
+    raw += breakdown.growthStage
+    denom += 20
+  }
+  if (input.eventActivity !== undefined) {
+    breakdown.eventActivity = scoreEvent(input.eventActivity)
+    raw += breakdown.eventActivity
+    denom += 15
+  }
+
+  const fit = denom > 0 ? Math.round((raw / denom) * 100) : 0
+  return { fit, grade: icpGrade(fit), breakdown, raw, activeMax: denom }
 }
