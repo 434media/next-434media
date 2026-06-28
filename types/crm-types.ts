@@ -1055,7 +1055,6 @@ export type LeadUpdateInput = Partial<
     | "intent_score"
     | "intent_breakdown"
     | "enriched_at"
-    | "outreach_sequence"
   >
 >
 
