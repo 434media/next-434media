@@ -31,10 +31,18 @@ export const STAGE_LABELS: Record<FunnelStage, string> = {
   closed_won: "Closed-Won",
 }
 
-// % of leads whose 0–100 score clears the ICP bar. 65 aligns with the
-// "high priority" cutoff in lib/score-lead.ts, so "ICP-matched" === "high
-// priority" — one mental model. Env-overridable.
-const ICP_MATCH_THRESHOLD = Number(process.env.ICP_MATCH_THRESHOLD ?? 65)
+// % of leads whose canonical ICP fit clears the bar. 70 = grade B (the Canva
+// rubric's "solid fit"); leads below are C/D. Reads `icp_fit_score` (the
+// unified 0–100 fit from lib/icp/rubric.ts), falling back to the legacy `score`
+// for leads not yet re-scored. Env-overridable.
+const ICP_MATCH_THRESHOLD = Number(process.env.ICP_MATCH_THRESHOLD ?? 70)
+
+// Canonical ICP fit for a lead, with a fallback to the legacy score field for
+// leads written before Step 2 (they get re-scored on their next write).
+function icpFitOf(lead: Lead): number {
+  if (typeof lead.icp_fit_score === "number") return lead.icp_fit_score
+  return typeof lead.score === "number" ? lead.score : 0
+}
 
 const LEAD_STATUSES: LeadStatus[] = ["new", "ready", "contacted", "engaged", "converted", "archived"]
 const isLeadStatus = (s?: string): s is LeadStatus =>
@@ -265,12 +273,12 @@ export function computeFunnelKpis(
   })
 
   const total = leads.length
-  const matched = leads.filter((l) => (typeof l.score === "number" ? l.score : 0) >= ICP_MATCH_THRESHOLD)
+  const matched = leads.filter((l) => icpFitOf(l) >= ICP_MATCH_THRESHOLD)
   const icpMatchRate = total > 0 ? round(matched.length / total, 3) : 0
 
   const icpMatchBySource: IcpMatchSourceStat[] = ALL_SOURCES.map((source) => {
     const rows = leads.filter((l) => l.source === source)
-    const m = rows.filter((l) => (typeof l.score === "number" ? l.score : 0) >= ICP_MATCH_THRESHOLD).length
+    const m = rows.filter((l) => icpFitOf(l) >= ICP_MATCH_THRESHOLD).length
     return {
       source,
       total: rows.length,

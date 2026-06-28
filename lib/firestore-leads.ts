@@ -55,6 +55,18 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     score: typeof raw.score === "number" ? raw.score : 0,
     priority: (raw.priority || "low") as Lead["priority"],
     score_breakdown: (raw.score_breakdown || {}) as Lead["score_breakdown"],
+    icp_fit_score: typeof raw.icp_fit_score === "number" ? raw.icp_fit_score : undefined,
+    icp_grade: (raw.icp_grade || undefined) as Lead["icp_grade"],
+    icp_breakdown:
+      raw.icp_breakdown && typeof raw.icp_breakdown === "object"
+        ? (raw.icp_breakdown as Lead["icp_breakdown"])
+        : undefined,
+    intent_score: typeof raw.intent_score === "number" ? raw.intent_score : undefined,
+    intent_breakdown:
+      raw.intent_breakdown && typeof raw.intent_breakdown === "object"
+        ? (raw.intent_breakdown as Lead["intent_breakdown"])
+        : undefined,
+    employee_count: typeof raw.employee_count === "number" ? raw.employee_count : undefined,
     status: (raw.status || "new") as LeadStatus,
     assigned_to: raw.assigned_to || undefined,
     disqualified_reason: raw.disqualified_reason || undefined,
@@ -124,10 +136,12 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
 
   // Score inline on create. The scoring function reads from a partial Lead,
   // so we hand it the input plus zeroed engagement counters.
-  const { score, priority, breakdown } = scoreLead({
+  const scored = scoreLead({
     location: input.location,
     industry: input.industry,
     title: input.title,
+    company: input.company,
+    employee_count: input.employee_count,
     source: input.source,
     email_opens: 0,
     email_clicks: 0,
@@ -145,9 +159,15 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     industry: input.industry ?? null,
     location: input.location ?? null,
     platform: input.platform ?? null,
-    score,
-    priority,
-    score_breakdown: breakdown,
+    score: scored.score,
+    priority: scored.priority,
+    score_breakdown: scored.breakdown,
+    icp_fit_score: scored.icp_fit_score,
+    icp_grade: scored.icp_grade,
+    icp_breakdown: scored.icp_breakdown,
+    intent_score: scored.intent_score,
+    intent_breakdown: scored.intent_breakdown,
+    employee_count: input.employee_count ?? null,
     status: input.status ?? "new",
     assigned_to: input.assigned_to ?? null,
     outreach_draft: input.outreach_draft ?? null,
@@ -211,10 +231,12 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
   // Re-score on every write. We merge patch into current so the scoring fn
   // sees the post-update state.
   const merged = { ...current, ...patch }
-  const { score, priority, breakdown } = scoreLead({
+  const scored = scoreLead({
     location: merged.location,
     industry: merged.industry,
     title: merged.title,
+    company: merged.company,
+    employee_count: merged.employee_count,
     source: merged.source,
     email_opens: merged.email_opens,
     email_clicks: merged.email_clicks,
@@ -223,9 +245,14 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
 
   const update: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
     ...patch,
-    score,
-    priority,
-    score_breakdown: breakdown,
+    score: scored.score,
+    priority: scored.priority,
+    score_breakdown: scored.breakdown,
+    icp_fit_score: scored.icp_fit_score,
+    icp_grade: scored.icp_grade,
+    icp_breakdown: scored.icp_breakdown,
+    intent_score: scored.intent_score,
+    intent_breakdown: scored.intent_breakdown,
     enriched_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -609,6 +636,8 @@ interface ProspectingCapture {
   city?: string
   state?: string
   industry?: string
+  /** Apollo estimated_num_employees — feeds the Company Size fit dimension. */
+  employeeCount?: number
   /** The prompt that produced this candidate. Tagged for traceability. */
   prompt: string
   /** Apollo's person ID — useful for re-enrichment later. */
@@ -675,6 +704,7 @@ export async function captureLeadFromProspecting(
       if (!existing.linkedin && input.linkedin) patch.linkedin = input.linkedin
       if (!existing.location && location) patch.location = location
       if (!existing.industry && input.industry) patch.industry = input.industry
+      if (!existing.employee_count && input.employeeCount) patch.employee_count = input.employeeCount
       // Don't touch assigned_to — original assignment wins.
       await updateLead(existing.id, patch)
       return { leadId: existing.id, created: false }
@@ -688,6 +718,7 @@ export async function captureLeadFromProspecting(
       linkedin: input.linkedin,
       industry: input.industry,
       location,
+      employee_count: input.employeeCount,
       source: "prospected",
       assigned_to: input.approvedBy,
       tags: captureTags,
@@ -723,19 +754,26 @@ export async function incrementEngagement(
   // Re-score after the increment
   const after = await ref.get()
   const updated = normalize(ref.id, after.data() ?? {})
-  const { score, priority, breakdown } = scoreLead({
+  const scored = scoreLead({
     location: updated.location,
     industry: updated.industry,
     title: updated.title,
+    company: updated.company,
+    employee_count: updated.employee_count,
     source: updated.source,
     email_opens: updated.email_opens,
     email_clicks: updated.email_clicks,
     tags: updated.tags,
   })
   await ref.update({
-    score,
-    priority,
-    score_breakdown: breakdown,
+    score: scored.score,
+    priority: scored.priority,
+    score_breakdown: scored.breakdown,
+    icp_fit_score: scored.icp_fit_score,
+    icp_grade: scored.icp_grade,
+    icp_breakdown: scored.icp_breakdown,
+    intent_score: scored.intent_score,
+    intent_breakdown: scored.intent_breakdown,
     enriched_at: new Date().toISOString(),
   })
   invalidate()

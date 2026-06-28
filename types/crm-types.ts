@@ -858,6 +858,17 @@ export interface LeadScoreBreakdown {
   sponsor?: number
 }
 
+// ICP fit grade — canonical Canva rubric, A+/A/B/C/D on the 0–100 fit score.
+export type IcpGrade = "A+" | "A" | "B" | "C" | "D"
+
+// Per-dimension raw points behind the ICP fit score. Step 2a scores three
+// dimensions (Growth/Funding/Event activate in Step 2b). See lib/icp/rubric.ts.
+export interface IcpFitBreakdown {
+  industry?: number
+  location?: number
+  companySize?: number
+}
+
 export interface Lead extends BaseRecord {
   // Contact
   name: string
@@ -877,6 +888,20 @@ export interface Lead extends BaseRecord {
   score: number
   priority: LeadPriority
   score_breakdown: LeadScoreBreakdown
+
+  // ICP fit (canonical rubric) — company-level FIT, 0–100, travels prospect →
+  // lead → opportunity unchanged. The legacy `score` mirrors this during the
+  // transition; `intent_*` holds signals relocated out of fit (engagement,
+  // sponsor, event-source). See lib/icp/rubric.ts + docs/funnel-step2-icp.md.
+  icp_fit_score?: number
+  icp_grade?: IcpGrade
+  icp_breakdown?: IcpFitBreakdown
+  intent_score?: number
+  intent_breakdown?: { engagement?: number; sponsor?: number; event?: number }
+
+  // Company headcount (Apollo estimated_num_employees on prospected leads).
+  // Feeds the Company Size fit dimension; absent on inbound leads (size = 0).
+  employee_count?: number
 
   // Workflow
   status: LeadStatus
@@ -946,6 +971,11 @@ export type LeadCreateInput = Omit<
   | "score"
   | "priority"
   | "score_breakdown"
+  | "icp_fit_score"
+  | "icp_grade"
+  | "icp_breakdown"
+  | "intent_score"
+  | "intent_breakdown"
   | "email_opens"
   | "email_clicks"
   | "enriched_at"
@@ -963,7 +993,20 @@ export type LeadCreateInput = Omit<
  * score on every write so editors can't skew it.
  */
 export type LeadUpdateInput = Partial<
-  Omit<Lead, "id" | "created_at" | "score" | "priority" | "score_breakdown" | "enriched_at">
+  Omit<
+    Lead,
+    | "id"
+    | "created_at"
+    | "score"
+    | "priority"
+    | "score_breakdown"
+    | "icp_fit_score"
+    | "icp_grade"
+    | "icp_breakdown"
+    | "intent_score"
+    | "intent_breakdown"
+    | "enriched_at"
+  >
 >
 
 // Type for CRM Dashboard Stats

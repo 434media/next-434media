@@ -115,7 +115,11 @@ export function isExcludedJurisdiction(person: ApolloPerson): {
 
 // ─── Geography scoring (max 25) ─────────────────────────────────────────
 
-const SOUTH_TEXAS_CITIES = [
+// Exported so the canonical ICP rubric (lib/icp/rubric.ts) reuses the same
+// geography lists rather than duplicating them — single source of truth for
+// 434's location taxonomy. scorer.ts keeps its own 0–80 point mapping for the
+// prospecting UI until that path migrates onto the rubric (Step 2a phase 2).
+export const SOUTH_TEXAS_CITIES = [
   "san antonio",
   "brownsville",
   "laredo",
@@ -127,7 +131,7 @@ const SOUTH_TEXAS_CITIES = [
   "rgv",
 ]
 
-const TEXAS_CITIES = [
+export const TEXAS_CITIES = [
   "austin",
   "houston",
   "dallas",
@@ -138,7 +142,7 @@ const TEXAS_CITIES = [
   "waco",
 ]
 
-const HISPANIC_TARGETED_METROS = [
+export const HISPANIC_TARGETED_METROS = [
   "miami",
   "los angeles",
   "chicago",
@@ -209,7 +213,7 @@ function scoreGeography(
 
 // ─── Industry scoring (max 25) ──────────────────────────────────────────
 
-interface IndustrySignal {
+export interface IndustrySignal {
   name: string
   patterns: RegExp[]
   score: number
@@ -221,7 +225,7 @@ interface IndustrySignal {
  *   2. organization.name + person.title (always available; coarser)
  *   3. q_keywords in the filters used (intent signal from the prompt)
  */
-const INDUSTRY_SIGNALS: IndustrySignal[] = [
+export const INDUSTRY_SIGNALS: IndustrySignal[] = [
   {
     name: "Healthcare / life sciences",
     score: 25,

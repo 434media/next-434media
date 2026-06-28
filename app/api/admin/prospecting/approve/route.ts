@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
       city: person.city || person.organization?.city || undefined,
       state: person.state || person.organization?.state || undefined,
       industry: person.organization?.industry || undefined,
+      employeeCount: person.organization?.estimated_num_employees ?? undefined,
       prompt,
       apolloPersonId: personId || undefined,
       fitScore: candidate.score,
