@@ -214,6 +214,41 @@ export function useLeadHandlers({
     [selectedLead, setLeads, setSelectedLead, setToast],
   )
 
+  // 3-email sequence actions. `draft` returns the 3 step drafts (no state
+  // change); enroll/pause/resume/stop return the updated lead, which we swap in
+  // (same pattern as sendOutreach). Errors surface a toast and { ok: false }.
+  const sequenceAction = useCallback(
+    async (
+      id: string,
+      action: "draft" | "enroll" | "pause" | "resume" | "stop",
+      steps?: Array<{ n: 1 | 2 | 3; subject: string; body: string }>,
+    ) => {
+      try {
+        const res = await fetch(`/api/admin/leads/${id}/sequence`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, steps }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Sequence action failed")
+        }
+        if (data.lead) {
+          setLeads((curr) => curr.map((l) => (l.id === id ? data.lead : l)))
+          if (selectedLead?.id === id) setSelectedLead(data.lead)
+        }
+        if (action === "enroll") setToast({ message: "Sequence enrolled — email 1 sent", type: "success" })
+        else if (action !== "draft") setToast({ message: `Sequence ${action === "stop" ? "stopped" : action + "d"}`, type: "success" })
+        return { ok: true as const, steps: data.steps, lead: data.lead }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Sequence action failed"
+        setToast({ message, type: "error" })
+        return { ok: false as const }
+      }
+    },
+    [selectedLead, setLeads, setSelectedLead, setToast],
+  )
+
   // Convert lead → crm_clients. Server creates the client, stamps the link
   // on both sides, flips lead status to "converted". On 409 (already converted)
   // we surface the existing client id rather than treating as an error.
@@ -361,6 +396,7 @@ export function useLeadHandlers({
     deleteLead,
     generateDraft,
     sendOutreach,
+    sequenceAction,
     convertToClient,
     bulkUpdate,
     researchLead,

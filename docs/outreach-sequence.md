@@ -73,12 +73,15 @@ Runs on business days. For each lead with `outreach_sequence.status === "active"
 
 ## File checklist
 
-**Phase 1:**
-- [ ] `types/crm-types.ts` — `OutreachSequence` / `OutreachSequenceStep` + `outreach_sequence?` on Lead
-- [ ] `lib/lead-prompt.ts` — step-aware drafting (intro / value / final)
-- [ ] `app/api/admin/leads/[id]/sequence/route.ts` — draft the 3 steps + enroll (rep-confirmed)
-- [ ] `lib/outreach-sequence.ts` — shared send-one-step (consent gate + Resend + stamp), business-day math, stop-condition check
-- [ ] `app/api/cron/outreach-sequence/route.ts` + `vercel.json` cron entry
-- [ ] Lead drawer UI — set up / confirm / enroll / pause
-**Phase 2:**
-- [ ] Resend receiving domain + `app/api/webhooks/resend-inbound/route.ts` → auto-stop + forward-to-rep
+**Phase 1 — COMPLETE (typechecks clean, engine verified with a live test send) 2026-06-28:**
+- [x] `types/crm-types.ts` — `OutreachSequence` / `OutreachSequenceStep` + `outreach_sequence?` on Lead
+- [x] `lib/lead-prompt.ts` — step-aware drafting (intro / value / final)
+- [x] `app/api/admin/leads/[id]/sequence/route.ts` — draft the 3 steps + enroll (rep-confirmed) + pause/resume/stop
+- [x] `lib/outreach-sequence.ts` — `runSequenceStep` (consent gate + Resend + stamp), business-day math, stop-condition check
+- [x] `app/api/cron/outreach-sequence/route.ts` + `vercel.json` cron entry
+- [x] Lead drawer UI — `components/crm/OutreachSequencePanel.tsx` (set up → review/edit 3 drafts → enroll → status + pause/resume/stop), wired via `useLeadHandlers.sequenceAction`
+
+**Phase 2 — REMAINING:**
+- [ ] Resend receiving domain + `app/api/webhooks/resend-inbound/route.ts` → auto-stop (`replied`) + forward-to-rep
+
+**Not yet done:** visual verification in the running app (the engine is verified; the UI typechecks but hasn't been clicked through).

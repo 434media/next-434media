@@ -27,6 +27,12 @@ import {
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { Tag } from "@/components/admin/Tag"
 import { MailchimpRecordPanel, type LeadConsent } from "@/components/crm/MailchimpRecordPanel"
+import {
+  OutreachSequencePanel,
+  type SequenceAction,
+  type SequenceStepDraft,
+  type SequenceActionResult,
+} from "@/components/crm/OutreachSequencePanel"
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch, LeadDisqualifiedReason } from "@/types/crm-types"
 import { LEAD_DISQUALIFIED_REASON_LABELS } from "@/types/crm-types"
@@ -51,6 +57,12 @@ interface LeadDetailDrawerProps {
   onConvertToClient?: (id: string) => Promise<void> | void
   /** Web-grounded "Research & qualify" — writes a review-only research record. */
   onResearch?: (id: string) => Promise<boolean> | boolean
+  /** 3-email sequence: draft / enroll / pause / resume / stop. */
+  onSequenceAction?: (
+    id: string,
+    action: SequenceAction,
+    steps?: SequenceStepDraft[],
+  ) => Promise<SequenceActionResult>
 }
 
 const STATUS_OPTIONS: { value: LeadStatus; label: string; dot: string }[] = [
@@ -193,6 +205,7 @@ export function LeadDetailDrawer({
   onDelete,
   onGenerateDraft,
   onSendOutreach,
+  onSequenceAction,
   onConvertToClient,
   onResearch,
 }: LeadDetailDrawerProps) {
@@ -211,6 +224,9 @@ export function LeadDetailDrawer({
   const [consent, setConsent] = useState<LeadConsent | null>(null)
   // Tabbed body (edit mode) — keeps the record from becoming one long scroll.
   const [activeTab, setActiveTab] = useState<"details" | "outreach" | "activity">("details")
+  // Outreach mode — a one-off email vs the 3-email sequence. Two distinct
+  // motions, so the tab shows one at a time behind a segmented toggle.
+  const [outreachMode, setOutreachMode] = useState<"single" | "sequence">("single")
   // Two-step archive: first click reveals a removal-reason picker, second confirms.
   // The reason feeds the kept-vs-removed KPI (see LeadDisqualifiedReason).
   const [archiving, setArchiving] = useState(false)
@@ -222,6 +238,8 @@ export function LeadDetailDrawer({
       setArchiving(false)
       setSubject("")
       setConsent(null) // re-resolved by the panel for the newly-opened lead
+      // Default to the sequence view when one's already running, else one-off.
+      setOutreachMode(lead?.outreach_sequence ? "sequence" : "single")
     }
   }, [open, lead])
 
@@ -776,6 +794,42 @@ export function LeadDetailDrawer({
         <div className={tabClass("outreach")}>
         {/* Outreach section */}
         <Section title="Outreach" icon={PenLine}>
+          {isEditing && onSequenceAction && (
+            <div className="mb-3">
+              <div className="inline-flex rounded-md bg-neutral-100 p-0.5 text-[12px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setOutreachMode("single")}
+                  className={`px-3 py-1 rounded transition-colors ${
+                    outreachMode === "single"
+                      ? "bg-white text-neutral-900 shadow-sm"
+                      : "text-neutral-500 hover:text-neutral-800"
+                  }`}
+                >
+                  Single email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOutreachMode("sequence")}
+                  className={`px-3 py-1 rounded transition-colors ${
+                    outreachMode === "sequence"
+                      ? "bg-white text-neutral-900 shadow-sm"
+                      : "text-neutral-500 hover:text-neutral-800"
+                  }`}
+                >
+                  3-email sequence
+                </button>
+              </div>
+              <p className="mt-1.5 text-[11px] text-neutral-400">
+                {outreachMode === "single"
+                  ? "One personalized email, sent when you click."
+                  : "Three emails on an auto-cadence — set up once, then it sends itself."}
+              </p>
+            </div>
+          )}
+
+          {outreachMode === "single" ? (
+          <>
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium text-neutral-600">Draft email</label>
@@ -864,6 +918,16 @@ export function LeadDetailDrawer({
                 </button>
               </div>
             </div>
+          )}
+          </>
+          ) : onSequenceAction && lead ? (
+            <OutreachSequencePanel
+              lead={lead}
+              isEditing={isEditing}
+              onSequenceAction={onSequenceAction}
+            />
+          ) : (
+            <p className="text-[12px] text-neutral-400">Sequences are available once the lead is saved.</p>
           )}
         </Section>
 

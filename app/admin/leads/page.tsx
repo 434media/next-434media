@@ -44,6 +44,7 @@ export default function LeadsPage() {
     deleteLead,
     generateDraft,
     sendOutreach,
+    sequenceAction,
     convertToClient,
     bulkUpdate,
     researchLead,
@@ -209,6 +210,7 @@ export default function LeadsPage() {
           onDelete={deleteLead}
           onGenerateDraft={generateDraft}
           onSendOutreach={sendOutreach}
+          onSequenceAction={sequenceAction}
           onConvertToClient={convertToClient}
           onResearch={researchLead}
         />
