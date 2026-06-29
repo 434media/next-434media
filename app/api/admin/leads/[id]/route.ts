@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
-import { deleteLead, getLeadById, updateLead } from "@/lib/firestore-leads"
+import { deleteLead, getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 import { markPartnerListMemberPromoted } from "@/lib/firestore-partner-list-members"
 import { markEventRegistrationPromoted } from "@/lib/firestore-event-registrations"
 import { markEmailSignupPromoted } from "@/lib/firestore-email-signups"
@@ -138,6 +138,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     "draft_generated_at",
     "last_contacted_at",
     "next_followup_date",
+    "discovery_call_at",
     "tags",
     "notes",
   ]
@@ -154,7 +155,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
 
   try {
+    // Log a discovery-call event when the date is newly set (drives the
+    // Discovery stage + "Time to Discovery Call" velocity). Fetch prior value
+    // only when the field is in play, so routine saves don't re-log.
+    const priorDiscovery =
+      "discovery_call_at" in patch ? (await getLeadById(id))?.discovery_call_at : undefined
     const lead = await updateLead(id, patch)
+    if (patch.discovery_call_at && patch.discovery_call_at !== priorDiscovery) {
+      await appendLeadActivity(id, {
+        type: "discovery_scheduled",
+        actor: auth.session.email,
+        detail: `Discovery call set for ${patch.discovery_call_at}`,
+      }).catch(() => {})
+    }
     return NextResponse.json({ success: true, lead })
   } catch (err) {
     console.error(`[PATCH /api/admin/leads/${id}]`, err)

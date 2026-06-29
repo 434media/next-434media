@@ -807,6 +807,7 @@ export type LeadActivityType =
   | "outreach_sent"
   | "followup_set"
   | "converted"
+  | "discovery_scheduled"
   | "researched"
   | "email_opened"
   | "email_clicked"
@@ -961,6 +962,11 @@ export interface Lead extends BaseRecord {
   draft_generated_at?: string
   last_contacted_at?: string
   next_followup_date?: string
+
+  // Discovery call booked/held (the Discovery funnel stage). Powers the
+  // "Time to Discovery Call" velocity KPI and the Discovery stage in funnel.ts.
+  // Rep-set (YYYY-MM-DD).
+  discovery_call_at?: string
 
   // 3-email sequence — rep-confirmed drafts, cron auto-sent. Managed by the
   // sequence route + cron, not the generic PATCH. See docs/outreach-sequence.md.

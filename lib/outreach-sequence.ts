@@ -28,6 +28,16 @@ export function addBusinessDays(from: Date, days: number): Date {
 
 const isoDate = (d: Date) => d.toISOString().split("T")[0]
 
+// Reply-to for sequence sends. When a Resend receiving domain is configured
+// (SEQUENCE_INBOUND_DOMAIN), use a per-lead plus-address so an inbound reply is
+// captured by the email.received webhook and auto-stops the sequence (Phase 2).
+// Otherwise fall back to the rep's address (Phase 1 — rep marks the lead engaged
+// to stop). See docs/outreach-sequence.md + app/api/webhooks/resend-inbound.
+export function sequenceReplyTo(leadId: string, repEmail: string): string {
+  const domain = process.env.SEQUENCE_INBOUND_DOMAIN
+  return domain ? `reply+${leadId}@${domain}` : repEmail
+}
+
 // Status-based stop — the rep moved the lead out of the active funnel. In
 // Phase 1 this is also how a reply registers (the rep marks the lead engaged).
 export function sequenceStopByStatus(lead: Lead): OutreachSequenceStopReason | null {
@@ -104,7 +114,7 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
   const { data, error } = await getResend().emails.send({
     from,
     to: lead.email,
-    replyTo: seq.enrolled_by,
+    replyTo: sequenceReplyTo(lead.id, seq.enrolled_by),
     subject: step.subject,
     text: step.body,
   })
@@ -143,4 +153,30 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
   }).catch(() => {})
 
   return { action: nextStep ? "sent" : "completed", step: step.n, emailId }
+}
+
+/**
+ * A lead replied to its sequence (detected via the Resend inbound webhook).
+ * Stop the cadence and advance the lead to `engaged` — a reply is the strongest
+ * SQL signal, and it also satisfies the status-based stop on the next run.
+ * No-ops if there's no running sequence. Returns whether a sequence was stopped.
+ */
+export async function markSequenceReplied(lead: Lead): Promise<boolean> {
+  const seq = lead.outreach_sequence
+  const running = !!seq && (seq.status === "active" || seq.status === "paused")
+  // Don't downgrade a lead that's already moved past engagement.
+  const nextStatus = lead.status === "converted" || lead.status === "archived" ? lead.status : "engaged"
+
+  await updateLead(lead.id, {
+    status: nextStatus,
+    ...(seq
+      ? { outreach_sequence: { ...seq, status: "stopped", stopped_reason: "replied", next_step: null, next_send_at: undefined } }
+      : {}),
+  })
+  await appendLeadActivity(lead.id, {
+    type: "note",
+    actor: "system",
+    detail: running ? "Lead replied — sequence stopped, marked engaged" : "Lead replied",
+  }).catch(() => {})
+  return running
 }

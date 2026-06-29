@@ -107,7 +107,7 @@ Cleanup once the motion exists:
 |---|---|---|---|---|
 | ✅ 1 | Funnel conversion + velocity + ICP-match KPIs | 1·2·3 | — | done |
 | 2 | Unify ICP scoring to one rubric | 1 | M | ✅ unblocked (Canva rubric in hand) → spec'd in `funnel-step2-icp.md` |
-| 3 | Make Discovery a real signal | 2·3 | S | none |
+| ✅ 3 | Make Discovery a real signal | 2·3 | S | done — `discovery_call_at` + "Time to Discovery Call" velocity |
 | 4 | Outreach cadence (3-email sequence) | motion | L | Step 2 |
 | 5 | Vertical-tailored templates | quality | M | Step 4 |
 | 6 | Stage-signal fidelity + intent layer | 2·3 | M | Steps 2–4 |

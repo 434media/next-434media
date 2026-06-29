@@ -85,7 +85,15 @@ Runs on business days. For each lead with `outreach_sequence.status === "active"
 - [x] Drawer: Outreach tab unified under one section with a segmented toggle (Single email | 3-email sequence) so the two motions don't compete.
 - [x] Leads page: "In sequence" filter/tab (with count) + a `Seq n/3` row badge (next-send date on hover). Division of labor — drawer *authors* a lead's sequence, the leads page *monitors* the fleet. No new route.
 
-**Phase 2 — REMAINING:**
-- [ ] Resend receiving domain + `app/api/webhooks/resend-inbound/route.ts` → auto-stop (`replied`) + forward-to-rep
+**Phase 2 — BUILT (typechecks clean) 2026-06-28; needs one-time infra to activate:**
+- [x] `lib/outreach-sequence.ts` — `sequenceReplyTo()` uses a per-lead plus-address (`reply+<leadId>@<SEQUENCE_INBOUND_DOMAIN>`) when the domain is set, else falls back to reply-to = rep (Phase 1). `markSequenceReplied()` stops the cadence + advances the lead to `engaged`.
+- [x] `app/api/webhooks/resend-inbound/route.ts` — svix-verified `email.received` handler: matches the lead from the plus-address, stops + engages, and forwards the reply to the rep (reply-to = the lead, so the rep responds directly).
+
+**Activation (one-time, in Resend + DNS — code is graceful until then):**
+1. Add a receiving domain in Resend (e.g. `inbound.send.434media.com`) with the MX records it provides.
+2. Add a webhook for `email.received` → `/api/webhooks/resend-inbound`; copy its signing secret.
+3. Set env: `SEQUENCE_INBOUND_DOMAIN` + `RESEND_INBOUND_WEBHOOK_SECRET`.
+
+Until both env vars are set, sequences send with reply-to = rep and stop manually (rep marks the lead engaged) — the full Phase 1 behavior, no regression.
 
 **Not yet done:** visual verification in the running app (the engine is verified; the UI typechecks but hasn't been clicked through).

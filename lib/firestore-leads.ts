@@ -75,6 +75,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     draft_generated_at: toIsoString(raw.draft_generated_at) || undefined,
     last_contacted_at: toIsoString(raw.last_contacted_at) || undefined,
     next_followup_date: toIsoString(raw.next_followup_date) || undefined,
+    discovery_call_at: toIsoString(raw.discovery_call_at) || undefined,
     outreach_sequence:
       raw.outreach_sequence && typeof raw.outreach_sequence === "object"
         ? (raw.outreach_sequence as Lead["outreach_sequence"])

@@ -147,6 +147,7 @@ interface FormState {
   assigned_to: string
   disqualified_reason: LeadDisqualifiedReason | ""
   next_followup_date: string
+  discovery_call_at: string
   outreach_draft: string
   notes: string
   tags: string[]
@@ -167,6 +168,7 @@ const EMPTY_FORM: FormState = {
   assigned_to: "",
   disqualified_reason: "",
   next_followup_date: "",
+  discovery_call_at: "",
   outreach_draft: "",
   notes: "",
   tags: [],
@@ -189,6 +191,7 @@ function fromLead(lead: Lead | null): FormState {
     assigned_to: lead.assigned_to || "",
     disqualified_reason: lead.disqualified_reason || "",
     next_followup_date: formatDateOnly(lead.next_followup_date),
+    discovery_call_at: formatDateOnly(lead.discovery_call_at),
     outreach_draft: lead.outreach_draft || "",
     notes: lead.notes || "",
     tags: lead.tags ?? [],
@@ -356,6 +359,7 @@ export function LeadDetailDrawer({
       disqualified_reason:
         form.status === "archived" ? (form.disqualified_reason || undefined) : undefined,
       next_followup_date: form.next_followup_date || undefined,
+      discovery_call_at: form.discovery_call_at || undefined,
       outreach_draft: form.outreach_draft || undefined,
       notes: form.notes.trim() || undefined,
       tags: form.tags,
@@ -775,6 +779,18 @@ export function LeadDetailDrawer({
             {isEditing && form.next_followup_date && form.next_followup_date < todayLocalIso() && (
               <p className="mt-1 text-[11px] text-red-600 font-medium">Overdue</p>
             )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1.5">Discovery call</label>
+            <input
+              type="date"
+              value={form.discovery_call_at}
+              onChange={(e) => update("discovery_call_at", e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400"
+            />
+            <p className="mt-1 text-[10px] text-neutral-400">
+              Set when a discovery call is booked — marks the Discovery stage and powers the Time-to-Discovery-Call KPI.
+            </p>
           </div>
         </Section>
 
@@ -1220,6 +1236,7 @@ const ACTIVITY_META: Record<LeadActivityType, { icon: React.ComponentType<{ clas
   outreach_sent: { icon: Send, label: "Outreach sent" },
   followup_set: { icon: CalendarClock, label: "Follow-up set" },
   converted: { icon: CheckCircle2, label: "Converted" },
+  discovery_scheduled: { icon: CalendarClock, label: "Discovery call" },
   researched: { icon: Globe, label: "AI research" },
   email_opened: { icon: MailOpen, label: "Email opened" },
   email_clicked: { icon: MousePointerClick, label: "Email clicked" },

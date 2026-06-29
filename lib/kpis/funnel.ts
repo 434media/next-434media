@@ -173,6 +173,9 @@ function furthestLeadStage(lead: Lead): FunnelStage {
 
 export function furthestStage(lead: Lead, clientById: Map<string, ClientRecord>): FunnelStage {
   let best = furthestLeadStage(lead)
+  // A booked discovery call is a definitive Discovery-stage signal, even before
+  // formal conversion to an opportunity.
+  if (lead.discovery_call_at && idx("discovery") > idx(best)) best = "discovery"
   const client = lead.converted_to_client_id ? clientById.get(lead.converted_to_client_id) : undefined
   const cs = client ? clientToStage(client) : null
   if (cs && cs !== "exit" && idx(cs) > idx(best)) best = cs
@@ -202,7 +205,7 @@ function stageTimestamps(lead: Lead, client?: ClientRecord) {
     lead: lead.created_at,
     contacted: firstActivityAt(lead, "outreach_sent") ?? lead.last_contacted_at,
     sql: statusChangedAt(lead, "engaged"),
-    discovery: lead.converted_at, // clean
+    discoveryCall: lead.discovery_call_at, // the real signal (rep-logged)
     // No clean closed_won_at — approximate with archived_at, then updated_at.
     closed_won:
       client?.disposition === "closed_won" ? client.archived_at ?? client.updated_at : undefined,
@@ -292,7 +295,7 @@ export function computeFunnelKpis(
   const deltas: Record<string, number[]> = {
     "Time to first contact": [],
     "Time to SQL": [],
-    "Time to Opportunity": [],
+    "Time to Discovery Call": [],
     "Time to Closed-Won": [],
   }
   for (const { lead } of journeys) {
@@ -303,7 +306,7 @@ export function computeFunnelKpis(
     }
     push("Time to first contact", daysBetween(t.lead, t.contacted))
     push("Time to SQL", daysBetween(t.lead, t.sql))
-    push("Time to Opportunity", daysBetween(t.lead, t.discovery))
+    push("Time to Discovery Call", daysBetween(t.lead, t.discoveryCall))
     push("Time to Closed-Won", daysBetween(t.lead, t.closed_won))
   }
   const velocity: VelocityStat[] = Object.entries(deltas).map(([step, xs]) => ({
