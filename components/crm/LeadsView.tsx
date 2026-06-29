@@ -24,7 +24,13 @@ import { useSelection } from "@/components/admin/SubmissionStateUI"
 import { Dropdown } from "@/components/crm/Dropdown"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 
-type LeadView = "priority" | "all" | "followup"
+type LeadView = "priority" | "all" | "followup" | "sequence"
+
+// A lead is "in sequence" when its 3-email cadence is still running.
+function inSequence(l: Lead): boolean {
+  const s = l.outreach_sequence
+  return !!s && (s.status === "active" || s.status === "paused")
+}
 type LeadSort = "score" | "recent" | "contacted" | "company"
 type AssignedFilter = "all" | "mine" | "unassigned"
 
@@ -114,6 +120,7 @@ export function LeadsView({
       overdue: leads.filter(
         (l) => l.status === "contacted" && l.next_followup_date && l.next_followup_date.split("T")[0] < today,
       ).length,
+      sequence: leads.filter(inSequence).length,
       all: leads.filter((l) => l.status !== "archived").length,
     }
   }, [leads])
@@ -135,6 +142,13 @@ export function LeadsView({
             l.next_followup_date.split("T")[0] <= today,
         )
         .sort((a, b) => (a.next_followup_date ?? "").localeCompare(b.next_followup_date ?? ""))
+    } else if (view === "sequence") {
+      // Active cadences, soonest next-send first — the fleet the cron is working.
+      pool = leads
+        .filter(inSequence)
+        .sort((a, b) =>
+          (a.outreach_sequence?.next_send_at ?? "").localeCompare(b.outreach_sequence?.next_send_at ?? ""),
+        )
     } else {
       pool = leads
         .filter((l) => l.status !== "archived")
@@ -216,7 +230,8 @@ export function LeadsView({
         storageKey="leadsIntroDismissed"
         steps={[
           { title: "Leads arrive here", detail: "From Audiences (promoted), the Inbox (converted), and prospecting." },
-          { title: "Scored & prioritized", detail: "A 0–100 fit score ranks each lead — work the Priority queue first." },
+          { title: "Scored & prioritized", detail: "A 0–100 ICP fit score grades each lead — work the Priority queue first." },
+          { title: "Reach out two ways", detail: "Send a 1:1 email (tracked in Manual follow-ups) or enroll in an auto 3-email sequence (In sequence)." },
           { title: "Convert to a Client", detail: "Once qualified, convert the lead into a client in the CRM." },
         ]}
       />
@@ -231,10 +246,17 @@ export function LeadsView({
           count={counts.priority}
         />
         <ViewChip
+          active={view === "sequence"}
+          onClick={() => onViewChange("sequence")}
+          icon={Mail}
+          label="In sequence"
+          count={counts.sequence}
+        />
+        <ViewChip
           active={view === "followup"}
           onClick={() => onViewChange("followup")}
           icon={Clock}
-          label="Follow-ups due"
+          label="Manual follow-ups"
           count={counts.followup}
           urgent={counts.followup > 0}
         />
@@ -434,6 +456,14 @@ function LeadRow({
   const today = todayIso()
   const followupOverdue =
     lead.next_followup_date && lead.next_followup_date.split("T")[0] < today
+  // Sequence badge — step progress + (on hover) next send date.
+  const seq = lead.outreach_sequence
+  const seqBadge =
+    seq && (seq.status === "active" || seq.status === "paused")
+      ? seq.status === "paused"
+        ? { label: "Seq paused", title: "Sequence paused" }
+        : { label: `Seq ${seq.next_step ?? "✓"}/3`, title: seq.next_send_at ? `Next email ${seq.next_send_at}` : "Sequence active" }
+      : null
 
   return (
     <div
@@ -475,7 +505,18 @@ function LeadRow({
 
       {/* Lead identity */}
       <div className="min-w-0 relative pointer-events-none">
-        <div className="font-semibold text-[13px] text-neutral-900 truncate">{lead.name || lead.email}</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-semibold text-[13px] text-neutral-900 truncate">{lead.name || lead.email}</span>
+          {seqBadge && (
+            <span
+              title={seqBadge.title}
+              className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-600"
+            >
+              <Mail className="w-2.5 h-2.5" />
+              {seqBadge.label}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 mt-0.5 truncate">
           <Building2 className="w-3 h-3 shrink-0" />
           <span className="truncate">{lead.company || "(no company)"}</span>
@@ -645,12 +686,17 @@ function EmptyState({
     priority: {
       icon: Flag,
       title: "No high-priority leads right now",
-      hint: "Leads with score ≥ 65 in status New or Ready will appear here.",
+      hint: "High-priority leads (grade A fit, or already engaged) still in New or Ready show here — your best unworked leads.",
     },
     followup: {
       icon: AlertCircle,
-      title: "No follow-ups due",
-      hint: "Contacted leads with a follow-up date on or before today will appear here.",
+      title: "No manual follow-ups due",
+      hint: "1:1 sends with a follow-up date on or before today show here. Automated 3-email sequences live in the In sequence tab.",
+    },
+    sequence: {
+      icon: Mail,
+      title: "No active sequences",
+      hint: "Enroll a lead in a 3-email sequence from its Outreach tab — it'll appear here while it runs.",
     },
     all: {
       icon: Inbox,

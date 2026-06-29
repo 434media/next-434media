@@ -10,9 +10,9 @@ import type { Toast as ToastType } from "@/components/crm/types"
 import { useLeadHandlers } from "@/hooks/useLeadHandlers"
 import type { Lead } from "@/types/crm-types"
 
-type LeadView = "priority" | "all" | "followup"
+type LeadView = "priority" | "all" | "followup" | "sequence"
 
-const VALID_VIEWS = new Set<LeadView>(["priority", "all", "followup"])
+const VALID_VIEWS = new Set<LeadView>(["priority", "all", "followup", "sequence"])
 
 export default function LeadsPage() {
   const searchParams = useSearchParams()

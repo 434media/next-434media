@@ -81,6 +81,10 @@ Runs on business days. For each lead with `outreach_sequence.status === "active"
 - [x] `app/api/cron/outreach-sequence/route.ts` + `vercel.json` cron entry
 - [x] Lead drawer UI — `components/crm/OutreachSequencePanel.tsx` (set up → review/edit 3 drafts → enroll → status + pause/resume/stop), wired via `useLeadHandlers.sequenceAction`
 
+**Drawer/main-page UX (from the placement discussion) — COMPLETE:**
+- [x] Drawer: Outreach tab unified under one section with a segmented toggle (Single email | 3-email sequence) so the two motions don't compete.
+- [x] Leads page: "In sequence" filter/tab (with count) + a `Seq n/3` row badge (next-send date on hover). Division of labor — drawer *authors* a lead's sequence, the leads page *monitors* the fleet. No new route.
+
 **Phase 2 — REMAINING:**
 - [ ] Resend receiving domain + `app/api/webhooks/resend-inbound/route.ts` → auto-stop (`replied`) + forward-to-rep
 
