@@ -6,14 +6,14 @@ import { runSequenceStep } from "@/lib/outreach-sequence"
 export const runtime = "nodejs"
 export const maxDuration = 120
 
-const todayIso = () => new Date().toISOString().split("T")[0]
-
 // GET /api/cron/outreach-sequence — auto-sends the next due step of every active
 // 3-email sequence. Stop conditions + consent are re-checked per lead inside
 // runSequenceStep, so a send never reaches an opted-out or out-of-funnel lead.
+// Compares the full `next_send_at` (works for both business-day dates and the
+// minute-precision timestamps of QA test mode — see SEQUENCE_STEP_GAP_MINUTES).
 export async function GET(req: NextRequest) {
   return runCronJob("outreach-sequence", req, async () => {
-    const today = todayIso()
+    const nowIso = new Date().toISOString()
     const leads = await getLeads()
     const due = leads.filter((l) => {
       const seq = l.outreach_sequence
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         seq.status === "active" &&
         seq.next_step != null &&
         !!seq.next_send_at &&
-        seq.next_send_at.split("T")[0] <= today
+        seq.next_send_at <= nowIso
       )
     })
 

@@ -15,6 +15,12 @@ import type { Lead, OutreachSequence, OutreachSequenceStopReason } from "@/types
 // Cadence: business days from one step to the next (Day 0 → +4 → +5).
 export const STEP_GAP_BIZ_DAYS: Record<1 | 2, number> = { 1: 4, 2: 5 }
 
+// QA test mode: when SEQUENCE_STEP_GAP_MINUTES is set (e.g. "2"), steps are
+// spaced that many MINUTES apart (stored as a full timestamp) instead of the
+// business-day cadence — so an auditor can watch all three emails arrive and
+// test replying mid-campaign. Unset it to restore the normal 0/+4/+5 cadence.
+const TEST_GAP_MINUTES = Number(process.env.SEQUENCE_STEP_GAP_MINUTES) || 0
+
 export function addBusinessDays(from: Date, days: number): Date {
   const d = new Date(from)
   let added = 0
@@ -27,6 +33,15 @@ export function addBusinessDays(from: Date, days: number): Date {
 }
 
 const isoDate = (d: Date) => d.toISOString().split("T")[0]
+
+// The next step's send time after sending `currentStep` (1 or 2). Test mode
+// returns a full timestamp N minutes out; normal mode a business-day date.
+function nextSendAt(from: Date, currentStep: 1 | 2): string {
+  if (TEST_GAP_MINUTES > 0) {
+    return new Date(from.getTime() + TEST_GAP_MINUTES * 60_000).toISOString()
+  }
+  return isoDate(addBusinessDays(from, STEP_GAP_BIZ_DAYS[currentStep]))
+}
 
 // Reply-to for sequence sends. When a Resend receiving domain is configured
 // (SEQUENCE_INBOUND_DOMAIN), use a per-lead plus-address so an inbound reply is
@@ -136,7 +151,7 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
         ...seq,
         steps,
         next_step: nextStep,
-        next_send_at: isoDate(addBusinessDays(now, STEP_GAP_BIZ_DAYS[current as 1 | 2])),
+        next_send_at: nextSendAt(now, current as 1 | 2),
       }
     : { ...seq, steps, status: "completed", next_step: null, next_send_at: undefined, stopped_reason: "completed" }
 

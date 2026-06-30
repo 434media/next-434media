@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/outreach-sequence",
-      "schedule": "0 14 * * 1-5"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/feed-publish",
