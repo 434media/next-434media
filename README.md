@@ -445,5 +445,3 @@ Scheduled jobs (`app/api/cron/*`) are driven by the `crons` array in
 - Consult the team Slack channel
 
 ---
-
-*Last updated: June 2026*
