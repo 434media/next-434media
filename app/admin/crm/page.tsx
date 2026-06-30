@@ -1078,7 +1078,7 @@ function SalesCRMPageInner() {
 // redirected without the page loading any client/opportunity data.
 export default function SalesCRMPage() {
   return (
-    <AdminRoleGuard allowedRoles={["full_admin", "crm_only"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
       <SalesCRMPageInner />
     </AdminRoleGuard>
   )

@@ -82,6 +82,7 @@ export function EventRegistrationsTab({
   initialSearch = "",
   initialEvent = "",
   onChanged,
+  readOnly = false,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
@@ -89,7 +90,16 @@ export function EventRegistrationsTab({
   /** Fired after a mutation (delete / promote) so the Audiences header strip
    *  can re-fetch its per-source counts live. */
   onChanged?: () => void
+  /** QA read-only — blocks destructive actions (delete / bulk-delete / promote / backfill). */
+  readOnly?: boolean
 }) {
+  const blockReadOnly = (): boolean => {
+    if (readOnly) {
+      setToast({ message: "Read-only access — this action is disabled during QA.", type: "error" })
+      return true
+    }
+    return false
+  }
   const leadsByEmail = useLeadsByEmail()
   const subscriberMap = useMailchimpSubscribers()
   const SUBMISSION_SOURCE: SubmissionSource = "event_registrations"
@@ -189,6 +199,7 @@ export function EventRegistrationsTab({
   }
 
   const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteRegistrations>[1]) => {
+    if (blockReadOnly()) return
     setIsBulkPromoting(true)
     try {
       await promoteRegistrations(promoteDrawerIds, overrides)
@@ -207,6 +218,7 @@ export function EventRegistrationsTab({
   }
 
   const handleDelete = async (id: string, email: string) => {
+    if (blockReadOnly()) return
     if (!confirm(`Delete registration for ${email}? This cannot be undone.`)) return
     try {
       setIsDeleting(id)
@@ -315,6 +327,10 @@ export function EventRegistrationsTab({
     field: "firstName" | "lastName" | "company",
     value: string,
   ): Promise<boolean> => {
+    if (readOnly) {
+      setToast({ message: "Read-only access — this action is disabled during QA.", type: "error" })
+      return false
+    }
     try {
       const res = await fetch("/api/admin/event-registrations", {
         method: "PATCH",
@@ -452,6 +468,7 @@ export function EventRegistrationsTab({
   // registration through the existing per-id DELETE, chunked so a large
   // selection doesn't fan out all at once.
   const handleBulkDelete = async () => {
+    if (blockReadOnly()) return
     if (selected.size === 0) return
     const ids = Array.from(selected)
     if (!confirm(`Delete ${ids.length} registration${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return

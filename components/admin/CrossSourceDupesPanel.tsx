@@ -91,6 +91,8 @@ function formatDate(iso: string): string {
 interface CrossSourceDupesPanelProps {
   /** Notify the parent (page) so it can show a toast — keeps toast styling unified. */
   onToast?: (message: string, type: "success" | "error") => void
+  /** QA read-only — blocks the merge-into-Leads action. */
+  readOnly?: boolean
 }
 
 /**
@@ -99,7 +101,7 @@ interface CrossSourceDupesPanelProps {
  * CRM" that fires per-source POSTs to bulk-convert-leads — the helpers dedupe
  * by email, so the lead ends up tagged with every source it appeared in.
  */
-export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
+export function CrossSourceDupesPanel({ onToast, readOnly = false }: CrossSourceDupesPanelProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [data, setData] = useState<DupesResponse | null>(null)
@@ -135,6 +137,10 @@ export function CrossSourceDupesPanel({ onToast }: CrossSourceDupesPanelProps) {
   if (!isLoading && groups.length === 0) return null
 
   async function convertGroup(group: DupeGroup) {
+    if (readOnly) {
+      onToast?.("Read-only access — merging is disabled during QA.", "error")
+      return
+    }
     setConvertingEmail(group.email)
     try {
       // Bucket rows by source; one POST per source. Existing leads get tag-merged.

@@ -52,6 +52,16 @@ export default function FeedFormPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hasDraft, setHasDraft] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
+  // QA: interns get a read-only Feed — they can open the forms and slide-out to
+  // see them, but persistence (publish/update/delete/comment) is blocked.
+  const readOnly = currentUser?.role === "intern"
+  const blockReadOnly = (): boolean => {
+    if (readOnly) {
+      setToast({ message: "Read-only access — changes aren't saved during QA.", type: "error" })
+      return true
+    }
+    return false
+  }
   
   // Auto-save to Firestore state
   const [isAutoSaving, setIsAutoSaving] = useState(false)
@@ -557,6 +567,7 @@ export default function FeedFormPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (blockReadOnly()) return
 
     // Validation
     if (!formData.title || !formData.summary) {
@@ -737,6 +748,7 @@ export default function FeedFormPage() {
 
   // Delete a feed item
   const handleDelete = async (id: string) => {
+    if (blockReadOnly()) return
     if (!confirm("Are you sure you want to delete this feed item? This action cannot be undone.")) {
       return
     }
@@ -792,6 +804,7 @@ export default function FeedFormPage() {
 
   // Add comment to a feed item
   const handleAddComment = async (feedId: string) => {
+    if (blockReadOnly()) return
     if (!newComment.trim() || !currentUser) return
 
     const comment: FeedComment = {
@@ -830,6 +843,7 @@ export default function FeedFormPage() {
 
   // Delete comment from a feed item
   const handleDeleteComment = async (feedId: string, commentId: string) => {
+    if (blockReadOnly()) return
     if (!confirm("Delete this comment?")) return
 
     const feedItem = feedItems.find(f => f.id === feedId)
@@ -856,6 +870,7 @@ export default function FeedFormPage() {
 
   // Edit comment on a feed item
   const handleEditComment = async (feedId: string, commentId: string, newContent: string) => {
+    if (blockReadOnly()) return
     const feedItem = feedItems.find(f => f.id === feedId)
     if (!feedItem) return
 
@@ -901,10 +916,15 @@ export default function FeedFormPage() {
   }
 
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "intern"]}>
     <div className="container mx-auto py-6 px-4 sm:px-6 max-w-7xl overflow-hidden">
       {/* Toast Notification */}
       <Toast toast={toast} />
+      {readOnly && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
+          <span className="font-semibold">Read-only.</span> You can open the editor and the new-post form to see them, but publishing, editing, and deleting are disabled.
+        </div>
+      )}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         {/* Header */}
         <div className="mb-6 flex items-end justify-between gap-3 flex-wrap">
@@ -1582,9 +1602,9 @@ export default function FeedFormPage() {
               <button
                 type="button"
                 onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || readOnly}
                 className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
-                title={`Update (${MOD_KEY_LABEL}S)`}
+                title={readOnly ? "Read-only — publishing is disabled" : `Update (${MOD_KEY_LABEL}S)`}
               >
                 {isSubmitting ? (
                   <>

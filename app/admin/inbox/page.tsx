@@ -32,7 +32,7 @@ export default function InboxPage() {
   }, [toast])
 
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "intern"]}>
       <div className="min-dvh bg-neutral-50 text-neutral-900">
         {/* Toast — pinned to top edge on mobile, top-right on sm+ */}
         {toast && (

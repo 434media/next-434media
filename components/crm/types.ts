@@ -196,6 +196,7 @@ export interface CurrentUser {
   email: string
   name: string
   picture?: string
+  role?: string
 }
 
 export interface Task {

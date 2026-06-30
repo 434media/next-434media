@@ -71,13 +71,23 @@ export function EmailListsTab({
   setToast,
   initialSearch = "",
   onChanged,
+  readOnly = false,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
   /** Fired after a mutation (delete / promote) so the Audiences header strip
    *  can re-fetch its per-source counts live. */
   onChanged?: () => void
+  /** QA read-only — blocks destructive actions (delete / bulk-delete / promote). */
+  readOnly?: boolean
 }) {
+  const blockReadOnly = (): boolean => {
+    if (readOnly) {
+      setToast({ message: "Read-only access — this action is disabled during QA.", type: "error" })
+      return true
+    }
+    return false
+  }
   const leadsByEmail = useLeadsByEmail()
   const subscriberMap = useMailchimpSubscribers()
   const SUBMISSION_SOURCE: SubmissionSource = "email_signups"
@@ -200,6 +210,7 @@ export function EmailListsTab({
   }, [fetchSourcesAndCounts, fetchSignups, fetchCrossCollectionMap])
 
   const handleDeleteEmail = async (id: string, email: string) => {
+    if (blockReadOnly()) return
     if (!confirm(`Delete ${email}? This cannot be undone.`)) return
     try {
       setIsDeleting(id)
@@ -440,6 +451,7 @@ export function EmailListsTab({
   // through the existing per-id DELETE (handles aimsatx: named-DB routing),
   // chunked so a large selection doesn't fan out all at once.
   const handleBulkDelete = async () => {
+    if (blockReadOnly()) return
     if (selected.size === 0) return
     const ids = Array.from(selected)
     if (!confirm(`Delete ${ids.length} signup${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return
@@ -497,6 +509,7 @@ export function EmailListsTab({
   }
 
   const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteSignups>[1]) => {
+    if (blockReadOnly()) return
     setIsBulkPromoting(true)
     try {
       await promoteSignups(promoteDrawerIds, overrides)

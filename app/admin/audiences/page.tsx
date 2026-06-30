@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { Megaphone, CheckCircle2, AlertCircle } from "lucide-react"
-import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { AdminRoleGuard, useAdminAccess } from "@/components/AdminRoleGuard"
 import { CrossSourceDupesPanel } from "@/components/admin/CrossSourceDupesPanel"
 import { AudiencesHeaderStrip } from "@/components/admin/submissions/AudiencesHeaderStrip"
 import { EmailListsTab } from "@/components/admin/submissions/EmailListsTab"
@@ -37,6 +37,10 @@ export default function AudiencesPage() {
 
   const [activeSub, setActiveSub] = useState<SubTab>(initialSub)
   const [toast, setToast] = useState<Toast | null>(null)
+  // QA: interns view Marketing read-only — destructive actions (delete / promote
+  // / backfill) are blocked in the child tabs.
+  const { user } = useAdminAccess(["full_admin", "intern"])
+  const readOnly = user?.role === "intern"
   // Bumped by the active sub-tab after a mutation (delete / promote) so the
   // header strip's per-source counts re-fetch live instead of only on refresh.
   const [stripNonce, setStripNonce] = useState(0)
@@ -69,7 +73,7 @@ export default function AudiencesPage() {
   }, [toast])
 
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "intern"]}>
       <div className="min-dvh bg-neutral-50 text-neutral-900">
         {/* Toast — pinned to top edge on mobile, top-right on sm+ */}
         {toast && (
@@ -134,6 +138,12 @@ export default function AudiencesPage() {
           {/* Source switcher — segmented control with per-source totals, plus
               the active source's secondary KPIs (+this week / subscribed /
               to-push). This is the page's only nav for Newsletter / Events / Lists. */}
+          {readOnly && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
+              <span className="font-semibold">Read-only.</span> You can browse audiences; deleting, promoting, and backfilling are disabled.
+            </div>
+          )}
+
           <AudiencesHeaderStrip activeSub={activeSub} onSelectSub={switchSub} refreshSignal={stripNonce} />
 
           {/* Cross-source dedupe panel — surfaces emails appearing across the
@@ -141,19 +151,21 @@ export default function AudiencesPage() {
               single Lead in one click. Hidden when there are no dupes. */}
           <CrossSourceDupesPanel
             onToast={(message, type) => setToast({ message, type })}
+            readOnly={readOnly}
           />
 
           {activeSub === "newsletter" ? (
-            <EmailListsTab setToast={setToast} initialSearch={initialSearch} onChanged={bumpStrip} />
+            <EmailListsTab setToast={setToast} initialSearch={initialSearch} onChanged={bumpStrip} readOnly={readOnly} />
           ) : activeSub === "events" ? (
             <EventRegistrationsTab
               setToast={setToast}
               initialSearch={initialSearch}
               initialEvent={initialEvent}
               onChanged={bumpStrip}
+              readOnly={readOnly}
             />
           ) : (
-            <ListsTab setToast={setToast} initialSearch={initialSearch} onChanged={bumpStrip} />
+            <ListsTab setToast={setToast} initialSearch={initialSearch} onChanged={bumpStrip} readOnly={readOnly} />
           )}
         </main>
       </div>

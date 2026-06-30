@@ -57,13 +57,23 @@ export function ListsTab({
   setToast,
   initialSearch = "",
   onChanged,
+  readOnly = false,
 }: {
   setToast: (t: Toast | null) => void
   initialSearch?: string
   /** Fired after a mutation (delete / promote) so the Audiences header strip
    *  can re-fetch its per-source counts live. */
   onChanged?: () => void
+  /** QA read-only — blocks destructive actions (delete / bulk-delete / promote). */
+  readOnly?: boolean
 }) {
+  const blockReadOnly = (): boolean => {
+    if (readOnly) {
+      setToast({ message: "Read-only access — this action is disabled during QA.", type: "error" })
+      return true
+    }
+    return false
+  }
   const subscriberMap = useMailchimpSubscribers()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -236,6 +246,7 @@ export function ListsTab({
   }
 
   const handleConfirmBulkPromote = async (overrides: Parameters<typeof promoteMembers>[1]) => {
+    if (blockReadOnly()) return
     setIsBulkPromoting(true)
     try {
       await promoteMembers(promoteDrawerIds, overrides)
@@ -249,6 +260,7 @@ export function ListsTab({
   // via the per-id route, then drops the row from local state.
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const handleDelete = async (id: string, name: string) => {
+    if (blockReadOnly()) return
     if (!confirm(`Delete ${name}? This cannot be undone.`)) return
     try {
       setDeletingId(id)
@@ -266,6 +278,7 @@ export function ListsTab({
 
   // Bulk delete — chunked so a large selection doesn't fan out all at once.
   const handleBulkDelete = async () => {
+    if (blockReadOnly()) return
     if (selected.size === 0) return
     const ids = Array.from(selected)
     if (!confirm(`Delete ${ids.length} contact${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return

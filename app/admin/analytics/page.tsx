@@ -107,7 +107,7 @@ export default function UnifiedAnalyticsPage() {
   }
 
   return (
-    <AdminRoleGuard allowedRoles={["full_admin"]}>
+    <AdminRoleGuard allowedRoles={["full_admin", "intern"]}>
       <div className="min-h-full bg-neutral-50 text-neutral-900">
         {/* Horizontal tab bar — matches the /admin/audiences pattern */}
         <div className="bg-white border-b border-neutral-200">

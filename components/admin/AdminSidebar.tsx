@@ -144,7 +144,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Inbox,
         href: "/admin/inbox",
         matchPrefix: "/admin/inbox",
-        roles: ["full_admin"],
+        // QA: interns get the full Pipeline section to test the funnel end-to-end.
+        roles: ["full_admin", "intern"],
       },
       {
         id: "leads",
@@ -163,9 +164,9 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Rocket,
         href: "/admin/crm",
         matchPrefix: "/admin/crm",
-        // Operator deal pipeline (clients, opportunities, revenue) — not intern
-        // scope. Interns do funnel research in Leads; CRM stays operator-only.
-        roles: ["full_admin", "crm_only"],
+        // Operator deal pipeline (clients, opportunities, revenue). Opened to
+        // interns for the QA period so they can convert + close a test deal.
+        roles: ["full_admin", "crm_only", "intern"],
       },
       {
         id: "funnel-kpis",
@@ -196,7 +197,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         matchPrefix: "/admin/audiences",
         // Contact lists, opt-ins (auto-sync to Mailchimp), event/partner rosters.
         // A source the funnel promotes FROM — not a funnel stage.
-        roles: ["full_admin"],
+        // QA: interns can view (read-only enforced on the page).
+        roles: ["full_admin", "intern"],
       },
       {
         id: "analytics",
@@ -206,8 +208,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         matchPrefix: "/admin/analytics",
         // Web (GA4) + social (Instagram) + portfolio analytics — 434 marketing.
         // Separate from the funnel scoreboard (Funnel KPIs), which lives at the
-        // end of Pipeline. full_admin-only.
-        roles: ["full_admin"],
+        // end of Pipeline. QA: interns can view (dashboards are read-only).
+        roles: ["full_admin", "intern"],
       },
     ],
   },
@@ -246,7 +248,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/feed-form",
         matchPrefix: "/admin/feed-form",
         description: "Publish to the site feed",
-        roles: ["full_admin"],
+        // QA: interns can view the feed + open the edit/new-post forms (read-only).
+        roles: ["full_admin", "intern"],
       },
       {
         id: "blog",
@@ -295,8 +298,9 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/painpoints",
         matchPrefix: "/admin/painpoints",
         description: "Sourced industry problems → activated into a cohort's problem set",
-        // Authored by the Underwriter Onboarding squad (interns); operators activate into cohorts.
-        roles: ["full_admin", "intern"],
+        // Authored by the Underwriter Onboarding squad; operators activate into cohorts.
+        // QA: hidden from interns for now (Digital Canvas section hidden).
+        roles: ["full_admin"],
       },
       {
         id: "cohorts",
@@ -304,8 +308,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: GraduationCap,
         href: "/admin/cohorts",
         matchPrefix: "/admin/cohorts",
-        // Interns reach their cohort board here (read-only list + board access).
-        roles: ["full_admin", "crm_only", "intern"],
+        // QA: hidden from interns for now (Digital Canvas section hidden).
+        roles: ["full_admin", "crm_only"],
       },
     ],
   },
