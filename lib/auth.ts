@@ -227,10 +227,13 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
 
 /**
  * Roles permitted to trigger OUTBOUND sends (Resend) on a user's behalf.
- * `crm_only` — which is every Firebase-auth user today, i.e. the interns —
- * and the future `intern` role are deliberately excluded: they can draft, not send.
+ * `crm_only` can draft, not send.
+ *
+ * QA: `intern` is temporarily included so the QA team can test the outreach
+ * motion (single send + 3-email sequence enroll). Remove `intern` after QA to
+ * restore the draft-only posture for cohort interns.
  */
-export const SEND_CAPABLE_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin']
+export const SEND_CAPABLE_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin', 'intern']
 
 export function canSend(role?: AdminRole | null): boolean {
   return !!role && SEND_CAPABLE_ROLES.includes(role)
