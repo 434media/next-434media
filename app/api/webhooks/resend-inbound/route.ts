@@ -90,7 +90,10 @@ export async function POST(req: NextRequest) {
     const lead = await getLeadById(leadId)
     if (!lead) return NextResponse.json({ received: true, skipped: "lead not found" })
 
-    const stopped = await markSequenceReplied(lead)
+    const stopped = await markSequenceReplied(lead, {
+      text: event.data?.text,
+      subject: event.data?.subject,
+    })
 
     // Forward the reply to the rep so they keep the conversation. Best-effort —
     // the stop + engage above is the critical part. Reply-to is the lead, so the

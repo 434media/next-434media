@@ -1489,7 +1489,31 @@ const ACTIVITY_META: Record<LeadActivityType, { icon: React.ComponentType<{ clas
   researched: { icon: Globe, label: "AI research" },
   email_opened: { icon: MailOpen, label: "Email opened" },
   email_clicked: { icon: MousePointerClick, label: "Email clicked" },
+  reply_received: { icon: MailOpen, label: "Lead replied" },
   note: { icon: AlertCircle, label: "Note" },
+}
+
+// Captured inbound reply — rendered as a quoted block under a timeline event,
+// truncated with a show-more toggle for long replies.
+function ReplyBody({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const LIMIT = 240
+  const long = text.length > LIMIT
+  const shown = expanded || !long ? text : `${text.slice(0, LIMIT).trimEnd()}…`
+  return (
+    <div className="mt-1 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5">
+      <p className="text-[11px] text-neutral-600 leading-snug whitespace-pre-wrap break-words">{shown}</p>
+      {long && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-[10px] font-medium text-neutral-500 hover:text-neutral-800"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  )
 }
 
 function ActivityTimeline({ lead }: { lead: Lead }) {
@@ -1519,6 +1543,7 @@ function ActivityTimeline({ lead }: { lead: Lead }) {
                 <span className="text-[10px] text-neutral-400 shrink-0 tabular-nums">{formatDate(e.at)}</span>
               </div>
               {e.detail && <p className="text-[11px] text-neutral-500 leading-snug">{e.detail}</p>}
+              {e.body && <ReplyBody text={e.body} />}
               {e.actor && <p className="text-[10px] text-neutral-400 mt-0.5">{e.actor}</p>}
             </div>
           </li>

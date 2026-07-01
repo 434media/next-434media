@@ -176,7 +176,10 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
  * SQL signal, and it also satisfies the status-based stop on the next run.
  * No-ops if there's no running sequence. Returns whether a sequence was stopped.
  */
-export async function markSequenceReplied(lead: Lead): Promise<boolean> {
+export async function markSequenceReplied(
+  lead: Lead,
+  reply?: { text?: string; subject?: string },
+): Promise<boolean> {
   const seq = lead.outreach_sequence
   const running = !!seq && (seq.status === "active" || seq.status === "paused")
   // Don't downgrade a lead that's already moved past engagement.
@@ -188,10 +191,45 @@ export async function markSequenceReplied(lead: Lead): Promise<boolean> {
       ? { outreach_sequence: { ...seq, status: "stopped", stopped_reason: "replied", next_step: null, next_send_at: undefined } }
       : {}),
   })
+  const body = extractReplyText(reply?.text)
   await appendLeadActivity(lead.id, {
-    type: "note",
+    type: "reply_received",
     actor: "system",
-    detail: running ? "Lead replied — sequence stopped, marked engaged" : "Lead replied",
+    detail: running ? "Sequence stopped · marked engaged" : "Marked engaged",
+    body,
   }).catch(() => {})
   return running
+}
+
+/**
+ * Reduce a raw inbound reply to just the lead's own words for the timeline:
+ * cut the quoted original (client "On … wrote:" headers, Outlook dividers, our
+ * own forward separator), drop leading-">" quote lines, and cap the length.
+ * Returns undefined when nothing readable remains.
+ */
+function extractReplyText(raw?: string): string | undefined {
+  if (!raw) return undefined
+  let text = raw.replace(/\r\n/g, "\n")
+  const quoteMarkers = [
+    /\nOn .*(?:wrote|schrieb|a écrit):/i, // "On <date>, <name> wrote:"
+    /\n-{2,}\s*Original Message\s*-{2,}/i,
+    /\n_{5,}\n/, // Outlook divider
+    /\n—{3,}\n/, // our own forward separator
+    /\nFrom:\s.*\nSent:\s/i, // Outlook quoted header block
+  ]
+  for (const marker of quoteMarkers) {
+    const idx = text.search(marker)
+    if (idx > 0) {
+      text = text.slice(0, idx)
+      break
+    }
+  }
+  text = text
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith(">"))
+    .join("\n")
+    .trim()
+  if (!text) return undefined
+  const CAP = 1500
+  return text.length > CAP ? `${text.slice(0, CAP).trimEnd()}…` : text
 }

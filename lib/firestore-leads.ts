@@ -326,7 +326,7 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
 // updated_at — it's a side-channel append, not a lead edit.
 export async function appendLeadActivity(
   id: string,
-  event: { type: LeadActivityType; actor?: string; detail?: string },
+  event: { type: LeadActivityType; actor?: string; detail?: string; body?: string },
 ): Promise<void> {
   const db = getDb()
   const entry: LeadActivityEvent = {
@@ -335,6 +335,7 @@ export async function appendLeadActivity(
     at: new Date().toISOString(),
     ...(event.actor ? { actor: event.actor } : {}),
     ...(event.detail ? { detail: event.detail } : {}),
+    ...(event.body ? { body: event.body } : {}),
   }
   await db.collection(COLLECTION).doc(id).update({
     activity: FieldValue.arrayUnion(entry),

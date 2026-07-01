@@ -811,6 +811,7 @@ export type LeadActivityType =
   | "researched"
   | "email_opened"
   | "email_clicked"
+  | "reply_received"
   | "note"
 
 export interface LeadActivityEvent {
@@ -819,6 +820,7 @@ export interface LeadActivityEvent {
   at: string // ISO timestamp
   actor?: string // who/what triggered it (rep email, "system")
   detail?: string // short human-readable detail, e.g. "new → contacted"
+  body?: string // longer captured content, e.g. an inbound reply's text
 }
 
 export type LeadPlatform =
