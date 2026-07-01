@@ -24,10 +24,13 @@ const SECRET_ENV = "RESEND_INBOUND_WEBHOOK_SECRET"
 interface InboundEvent {
   type: string
   data?: {
+    // The received email's id — the ONLY handle to its body. The webhook
+    // payload itself carries metadata only (Resend does not send the body),
+    // so we retrieve the content via GET /emails/receiving/{email_id}.
+    email_id?: string
     from?: string | { email?: string }
     to?: Array<string | { email?: string }> | string
     subject?: string
-    text?: string
     [k: string]: unknown
   }
 }
@@ -46,6 +49,52 @@ function leadIdFromRecipients(rcpts: string[]): string | null {
     if (m) return m[1]
   }
   return null
+}
+
+// Minimal HTML→text for replies that arrive HTML-only (no plain-text part).
+function htmlToText(html: string): string {
+  return html
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/\s*(p|div|li|tr|h[1-6])\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+// Fetch the received email's body. The email.received webhook is metadata-only,
+// so the reply text lives behind the Received Emails API. Best-effort: returns
+// undefined (never throws) so a failed fetch degrades to a body-less timeline
+// note rather than breaking the stop-sequence path. One short retry covers the
+// brief window where the email isn't queryable the instant the webhook fires.
+async function fetchReceivedEmailText(emailId: string): Promise<string | undefined> {
+  const key = process.env.RESEND_API_KEY
+  if (!key) return undefined
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+        headers: { Authorization: `Bearer ${key}` },
+      })
+      if (res.ok) {
+        const body = (await res.json()) as { text?: string | null; html?: string | null }
+        const text = body.text?.trim() || (body.html ? htmlToText(body.html) : "")
+        return text || undefined
+      }
+      if (res.status === 404 && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 1200)) // not yet queryable — retry once
+        continue
+      }
+      return undefined
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
 }
 
 export async function POST(req: NextRequest) {
@@ -90,8 +139,14 @@ export async function POST(req: NextRequest) {
     const lead = await getLeadById(leadId)
     if (!lead) return NextResponse.json({ received: true, skipped: "lead not found" })
 
+    // Pull the actual reply body (webhook is metadata-only) so it lands in the
+    // timeline and the rep's forwarded copy.
+    const replyText = event.data?.email_id
+      ? await fetchReceivedEmailText(event.data.email_id)
+      : undefined
+
     const stopped = await markSequenceReplied(lead, {
-      text: event.data?.text,
+      text: replyText,
       subject: event.data?.subject,
     })
 
@@ -109,7 +164,7 @@ export async function POST(req: NextRequest) {
           to: repEmail,
           replyTo: lead.email,
           subject: `↩ ${who} replied — ${event.data?.subject || "(no subject)"}`,
-          text: `${who} (${lead.email}) replied to the outreach sequence — it's been stopped and the lead marked engaged.\n\nReply directly to this email to respond to them.\n\n———\n${event.data?.text || "(no text body)"}`,
+          text: `${who} (${lead.email}) replied to the outreach sequence — it's been stopped and the lead marked engaged.\n\nReply directly to this email to respond to them.\n\n———\n${replyText || "(reply body unavailable)"}`,
         })
       } catch (err) {
         console.error("[webhooks/resend-inbound] forward failed:", err)
