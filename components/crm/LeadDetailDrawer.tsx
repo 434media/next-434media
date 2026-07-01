@@ -338,12 +338,26 @@ export function LeadDetailDrawer({
   // Qualification fields out of Details.
   const fitContext = lead?.research?.fitRationale || lead?.research?.summary || ""
   const statusMeta = STATUS_OPTIONS.find((s) => s.value === lead?.status)
-  const nextAction: { label: string; onClick: () => void } | null = (() => {
+  const nextAction: { label: string; onClick: () => void; busy?: boolean } | null = (() => {
     if (!isEditing || !lead) return null
     if (seqActive) return { label: "Manage sequence", onClick: () => setActiveTab("outreach") }
     switch (lead.status) {
       case "new":
       case "ready":
+        // Funnel order: qualify before outreach. An un-researched new/ready
+        // lead's first move is "Research & qualify" — kick it off and drop the
+        // user on Details → Qualification to watch it land. Once research
+        // exists (or research is unavailable), the CTA advances to outreach.
+        if (onResearch && !lead.research) {
+          return {
+            label: "Research & qualify",
+            busy: isResearching,
+            onClick: () => {
+              setActiveTab("details")
+              handleResearch()
+            },
+          }
+        }
         return { label: "Start outreach", onClick: () => setActiveTab("outreach") }
       case "contacted":
         return { label: "Follow up", onClick: () => setActiveTab("outreach") }
@@ -671,10 +685,20 @@ export function LeadDetailDrawer({
               <button
                 type="button"
                 onClick={nextAction.onClick}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white text-[12px] font-medium rounded-md hover:bg-neutral-800"
+                disabled={nextAction.busy}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white text-[12px] font-medium rounded-md hover:bg-neutral-800 disabled:opacity-60"
               >
-                {nextAction.label}
-                <ArrowRight className="w-3.5 h-3.5" />
+                {nextAction.busy ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Researching…
+                  </>
+                ) : (
+                  <>
+                    {nextAction.label}
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -682,7 +706,7 @@ export function LeadDetailDrawer({
 
         {/* Score panel — only when editing */}
         {isEditing && (
-          <div className="flex items-stretch gap-4 p-4 mb-4 bg-gradient-to-br from-neutral-50 to-white border border-neutral-200 rounded-xl">
+          <div className="flex items-stretch gap-4 p-4 mb-4 bg-linear-to-br from-neutral-50 to-white border border-neutral-200 rounded-xl">
             <div className="flex flex-col items-center justify-center px-4 border-r border-neutral-200">
               <div className="text-3xl font-bold text-neutral-900 tabular-nums">{score}</div>
               <div className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">Lead score</div>
@@ -812,7 +836,7 @@ export function LeadDetailDrawer({
               <TagIcon className="w-3 h-3 text-neutral-400" />
               Tags
             </label>
-            <div className="flex flex-wrap items-center gap-1 p-2 border border-neutral-200 rounded-md bg-white min-h-[38px]">
+            <div className="flex flex-wrap items-center gap-1 p-2 border border-neutral-200 rounded-md bg-white min-h-9.5">
               {form.tags.map((t) => (
                 <Tag key={t} raw={t} onRemove={() => removeTag(t)} />
               ))}
@@ -827,7 +851,7 @@ export function LeadDetailDrawer({
                 }}
                 onBlur={addTag}
                 placeholder={form.tags.length === 0 ? "intent:sponsor, role:speaker, …" : ""}
-                className="flex-1 min-w-[120px] text-[12px] bg-transparent focus:outline-none"
+                className="flex-1 min-w-30 text-[12px] bg-transparent focus:outline-none"
               />
             </div>
           </div>
