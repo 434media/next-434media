@@ -42,6 +42,8 @@ interface LeadsViewProps {
   onSearchChange: (q: string) => void
   onRefresh: () => void
   onOpenLead: (lead: Lead) => void
+  /** Open a lead straight to its Outreach tab (sequence-badge click). */
+  onOpenLeadOutreach?: (lead: Lead) => void
   onCreateLead: () => void
   /** Bulk-patch selected leads (status / assigned_to / addTags). Returns count saved. */
   onBulkUpdate?: (
@@ -93,6 +95,7 @@ export function LeadsView({
   onSearchChange,
   onRefresh,
   onOpenLead,
+  onOpenLeadOutreach,
   onCreateLead,
   onBulkUpdate,
   currentUserName,
@@ -371,6 +374,7 @@ export function LeadsView({
                 key={lead.id}
                 lead={lead}
                 onClick={() => onOpenLead(lead)}
+                onOpenOutreach={onOpenLeadOutreach ? () => onOpenLeadOutreach(lead) : undefined}
                 selectable={!!onBulkUpdate}
                 selected={selected.has(lead.id)}
                 onToggleSelect={() => toggleSelect(lead.id)}
@@ -441,12 +445,14 @@ function ViewChip({
 function LeadRow({
   lead,
   onClick,
+  onOpenOutreach,
   selectable = false,
   selected = false,
   onToggleSelect,
 }: {
   lead: Lead
   onClick: () => void
+  onOpenOutreach?: () => void
   selectable?: boolean
   selected?: boolean
   onToggleSelect?: () => void
@@ -507,15 +513,31 @@ function LeadRow({
       <div className="min-w-0 relative pointer-events-none">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="font-semibold text-[13px] text-neutral-900 truncate">{lead.name || lead.email}</span>
-          {seqBadge && (
-            <span
-              title={seqBadge.title}
-              className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-600"
-            >
-              <Mail className="w-2.5 h-2.5" />
-              {seqBadge.label}
-            </span>
-          )}
+          {seqBadge &&
+            (onOpenOutreach ? (
+              // Clickable — sits above the whole-row open overlay (relative +
+              // pointer-events-auto) and deep-links to the Outreach tab.
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenOutreach()
+                }}
+                title={`${seqBadge.title} — open Outreach`}
+                className="relative z-10 pointer-events-auto shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
+              >
+                <Mail className="w-2.5 h-2.5" />
+                {seqBadge.label}
+              </button>
+            ) : (
+              <span
+                title={seqBadge.title}
+                className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-600"
+              >
+                <Mail className="w-2.5 h-2.5" />
+                {seqBadge.label}
+              </span>
+            ))}
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 mt-0.5 truncate">
           <Building2 className="w-3 h-3 shrink-0" />

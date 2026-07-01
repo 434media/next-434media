@@ -29,6 +29,9 @@ export default function LeadsPage() {
 
   const [showLeadDrawer, setShowLeadDrawer] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  // Which tab the drawer lands on for the next open. Reset to "details" on a
+  // normal row open; set to "outreach" when a sequence badge is clicked.
+  const [leadInitialTab, setLeadInitialTab] = useState<"details" | "outreach" | "activity">("details")
   const [leadView, setLeadView] = useState<LeadView>(initialView)
   const [leadSearch, setLeadSearch] = useState(initialSearch)
   const [isSavingLead, setIsSavingLead] = useState(false)
@@ -185,7 +188,14 @@ export default function LeadsPage() {
               onViewChange={handleViewChange}
               onSearchChange={setLeadSearch}
               onRefresh={loadLeads}
-              onOpenLead={openLead}
+              onOpenLead={(lead) => {
+                setLeadInitialTab("details")
+                openLead(lead)
+              }}
+              onOpenLeadOutreach={(lead) => {
+                setLeadInitialTab("outreach")
+                openLead(lead)
+              }}
               onCreateLead={openNewLeadForm}
               onBulkUpdate={bulkUpdate}
               currentUserName={currentUserName}
@@ -197,6 +207,7 @@ export default function LeadsPage() {
           open={showLeadDrawer}
           lead={selectedLead}
           isSaving={isSavingLead}
+          initialTab={leadInitialTab}
           onClose={closeLeadDrawer}
           onSave={async (patch) => {
             setIsSavingLead(true)

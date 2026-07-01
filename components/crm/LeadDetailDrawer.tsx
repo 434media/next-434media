@@ -14,6 +14,8 @@ import {
   PenLine,
   Send,
   ArrowRight,
+  ChevronDown,
+  Check,
   Trash2,
   Loader2,
   CircleDot,
@@ -42,6 +44,9 @@ interface LeadDetailDrawerProps {
   open: boolean
   lead: Lead | null
   isSaving: boolean
+  /** Tab to land on when the drawer opens. Defaults to "details"; the leads
+   *  list passes "outreach" when a user clicks a lead's sequence badge. */
+  initialTab?: "details" | "outreach" | "activity"
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<Lead | null>
   onArchive?: (id: string, reason?: LeadDisqualifiedReason) => Promise<void> | void
@@ -202,6 +207,7 @@ export function LeadDetailDrawer({
   open,
   lead,
   isSaving,
+  initialTab,
   onClose,
   onSave,
   onArchive,
@@ -233,18 +239,26 @@ export function LeadDetailDrawer({
   // Two-step archive: first click reveals a removal-reason picker, second confirms.
   // The reason feeds the kept-vs-removed KPI (see LeadDisqualifiedReason).
   const [archiving, setArchiving] = useState(false)
+  // Quick status control lives in the header — a one-click state change that
+  // persists immediately (e.g. "mark Engaged" to stop a running sequence),
+  // without opening Details → Workflow. Menu open + in-flight save state.
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const [statusSaving, setStatusSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
       setForm(fromLead(lead))
-      setActiveTab("details")
+      // Land on the requested tab (sequence-badge deep-link uses "outreach"),
+      // but only in edit mode — the create form is Details-only.
+      setActiveTab(lead?.id ? initialTab ?? "details" : "details")
       setArchiving(false)
+      setStatusMenuOpen(false)
       setSubject("")
       setConsent(null) // re-resolved by the panel for the newly-opened lead
       // Default to the sequence view when one's already running, else one-off.
       setOutreachMode(lead?.outreach_sequence ? "sequence" : "single")
     }
-  }, [open, lead])
+  }, [open, lead, initialTab])
 
   // Reset the generating spinner whenever a new draft lands on the lead
   // (server returns the updated lead, parent re-renders us with new draft).
@@ -312,6 +326,51 @@ export function LeadDetailDrawer({
   const priority = lead?.priority ?? "low"
   const breakdown = lead?.score_breakdown ?? {}
   const breakdownEntries = Object.entries(breakdown).filter(([, v]) => typeof v === "number" && v > 0)
+
+  // Persistent status + next-action (drawer header). Answers a first-timer's
+  // real question — "what do I do with this lead?" — without hunting through
+  // tabs. The CTA routes to the surface where that action lives.
+  const seq = lead?.outreach_sequence
+  const seqActive = !!seq && (seq.status === "active" || seq.status === "paused")
+  const grade = lead?.icp_grade
+  // Read-only fit context, surfaced atop the Outreach tab so the "why reach
+  // out" rationale is at hand while drafting — without moving the editable
+  // Qualification fields out of Details.
+  const fitContext = lead?.research?.fitRationale || lead?.research?.summary || ""
+  const statusMeta = STATUS_OPTIONS.find((s) => s.value === lead?.status)
+  const nextAction: { label: string; onClick: () => void } | null = (() => {
+    if (!isEditing || !lead) return null
+    if (seqActive) return { label: "Manage sequence", onClick: () => setActiveTab("outreach") }
+    switch (lead.status) {
+      case "new":
+      case "ready":
+        return { label: "Start outreach", onClick: () => setActiveTab("outreach") }
+      case "contacted":
+        return { label: "Follow up", onClick: () => setActiveTab("outreach") }
+      case "engaged":
+        return onConvertToClient
+          ? { label: "Convert to client", onClick: () => onConvertToClient(lead.id) }
+          : { label: "Reach out", onClick: () => setActiveTab("outreach") }
+      default:
+        return null // converted / archived — no primary next action
+    }
+  })()
+
+  // Persist a status change from the header pill. Optimistically syncs the
+  // Details form so the two stay aligned, then saves just the status field.
+  // `converted`/`archived` are terminal — reached only via their real actions
+  // (Convert to Client / Archive), so they're excluded from the quick menu.
+  const changeStatus = async (value: LeadStatus) => {
+    setStatusMenuOpen(false)
+    if (!lead?.id || value === lead.status) return
+    setStatusSaving(true)
+    update("status", value)
+    try {
+      await onSave({ status: value })
+    } finally {
+      setStatusSaving(false)
+    }
+  }
 
   // Tab visibility. Tabs only exist in edit mode; the create form shows the
   // Details group only. Hidden tabs stay mounted (display:none) so the
@@ -520,6 +579,107 @@ export function LeadDetailDrawer({
       footer={footer}
     >
       <div className="p-6">
+        {/* Persistent status + next-action header — visible above every tab so a
+            first-time user always sees the lead's state and the one thing to do
+            next, instead of hunting for it inside the Outreach tab. */}
+        {isEditing && lead && (
+          <div className="flex items-center justify-between gap-3 p-3 mb-4 rounded-xl border border-neutral-200 bg-white">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              {grade && (
+                <span
+                  className="inline-flex items-center justify-center min-w-7 px-1.5 h-6 rounded-md bg-neutral-900 text-white text-[12px] font-bold"
+                  title={`ICP grade ${grade}`}
+                >
+                  {grade}
+                </span>
+              )}
+              {statusMeta && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setStatusMenuOpen((o) => !o)}
+                    disabled={statusSaving}
+                    aria-haspopup="listbox"
+                    aria-expanded={statusMenuOpen}
+                    title="Change status"
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium text-neutral-700 capitalize hover:bg-neutral-100 disabled:opacity-60"
+                  >
+                    {statusSaving ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-neutral-400" aria-hidden />
+                    ) : (
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusMeta.dot}`} aria-hidden />
+                    )}
+                    {statusMeta.label}
+                    <ChevronDown className="w-3 h-3 text-neutral-400" aria-hidden />
+                  </button>
+                  {statusMenuOpen && (
+                    <>
+                      {/* click-away catcher */}
+                      <button
+                        type="button"
+                        aria-hidden
+                        tabIndex={-1}
+                        onClick={() => setStatusMenuOpen(false)}
+                        className="fixed inset-0 z-10 cursor-default"
+                      />
+                      <div
+                        role="listbox"
+                        aria-label="Set lead status"
+                        className="absolute left-0 top-full z-20 mt-1 min-w-40 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg"
+                      >
+                        {STATUS_OPTIONS.map((s) => {
+                          const terminal = s.value === "converted" || s.value === "archived"
+                          const isCurrent = s.value === lead.status
+                          return (
+                            <button
+                              key={s.value}
+                              type="button"
+                              role="option"
+                              aria-selected={isCurrent}
+                              disabled={terminal || isCurrent}
+                              onClick={() => changeStatus(s.value)}
+                              title={
+                                terminal
+                                  ? `Set via the ${s.value === "converted" ? "Convert to Client" : "Archive"} action`
+                                  : undefined
+                              }
+                              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] capitalize ${
+                                isCurrent
+                                  ? "bg-neutral-50 font-semibold text-neutral-900"
+                                  : "text-neutral-700 hover:bg-neutral-50"
+                              } ${terminal ? "cursor-not-allowed opacity-40" : ""}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} aria-hidden />
+                              {s.label}
+                              {isCurrent && <Check className="ml-auto w-3 h-3 text-neutral-400" aria-hidden />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {seqActive && seq && (
+                <span className="text-[12px] text-neutral-500">
+                  · in sequence · step {seq.next_step ?? "—"} of 3
+                  {seq.next_send_at ? ` · next ${formatDateOnly(seq.next_send_at)}` : ""}
+                </span>
+              )}
+            </div>
+            {nextAction && (
+              <button
+                type="button"
+                onClick={nextAction.onClick}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 text-white text-[12px] font-medium rounded-md hover:bg-neutral-800"
+              >
+                {nextAction.label}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Score panel — only when editing */}
         {isEditing && (
           <div className="flex items-stretch gap-4 p-4 mb-4 bg-gradient-to-br from-neutral-50 to-white border border-neutral-200 rounded-xl">
@@ -574,18 +734,6 @@ export function LeadDetailDrawer({
         {/* ── Details tab — the editable core (Contact / Qualification /
             Workflow / Notes) plus research + provenance. ── */}
         <div className={tabClass("details")}>
-        {/* AI research & qualify — web-grounded company context. Review-only:
-            nothing here is written to the lead's canonical fields. */}
-        {isEditing && onResearch && (
-          <ResearchCard
-            research={lead.research}
-            busy={isResearching}
-            onRun={handleResearch}
-            currentLocation={form.location}
-            onApplyLocation={(country) => update("location", country)}
-          />
-        )}
-
         {/* Provenance — where this lead came from in the pipeline, with a link
             back to the source audience record. */}
         {isEditing && lead.origin_ref && (
@@ -619,8 +767,21 @@ export function LeadDetailDrawer({
           />
         </Section>
 
-        {/* Qualification section */}
+        {/* Qualification section — leads with web-grounded research (fit
+            rationale + suggested country feed the ICP), then the editable
+            firmographic fields it informs. */}
         <Section title="Qualification" icon={Briefcase}>
+          {/* AI research & qualify — review-only: nothing here is written to the
+              lead's canonical fields except the country the user applies. */}
+          {isEditing && onResearch && (
+            <ResearchCard
+              research={lead.research}
+              busy={isResearching}
+              onRun={handleResearch}
+              currentLocation={form.location}
+              onApplyLocation={(country) => update("location", country)}
+            />
+          )}
           <Select
             label="Source"
             value={form.source}
@@ -808,6 +969,35 @@ export function LeadDetailDrawer({
 
         {/* ── Outreach tab — draft, generate, send + consent cue ── */}
         <div className={tabClass("outreach")}>
+        {/* Fit context — read-only "why they're a fit" pulled from research, so
+            the rationale is visible while drafting. Editable fields stay in
+            Details → Qualification. */}
+        {isEditing && (
+          <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <Globe className="w-3 h-3 text-neutral-400 shrink-0" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                Why they&apos;re a fit
+              </span>
+              {grade && (
+                <span
+                  className="inline-flex items-center justify-center min-w-5 px-1 h-4 rounded bg-neutral-900 text-white text-[10px] font-bold"
+                  title={`ICP grade ${grade}`}
+                >
+                  {grade}
+                </span>
+              )}
+            </div>
+            {fitContext ? (
+              <p className="mt-1 text-[12px] text-neutral-600 leading-relaxed">{fitContext}</p>
+            ) : (
+              <p className="mt-1 text-[11px] text-neutral-400">
+                No research yet — run &ldquo;Research &amp; qualify&rdquo; in Details → Qualification to capture fit
+                context here.
+              </p>
+            )}
+          </div>
+        )}
         {/* Outreach section */}
         <Section title="Outreach" icon={PenLine}>
           {isEditing && onSequenceAction && (
@@ -952,21 +1142,15 @@ export function LeadDetailDrawer({
         {/* ── Activity tab — read-only history + engagement (one home for the
             timeline, Mailchimp campaign activity, and outreach metrics). ── */}
         <div className={tabClass("activity")}>
-        {/* Mailchimp profile — subscription state, tags, and recent campaign activity
-            for the lead's email. Reps can see open/click history before reaching out. */}
-        {isEditing && lead.email && (
-          <MailchimpRecordPanel email={lead.email} onConsentResolved={setConsent} />
-        )}
-
-        {/* Timeline — chronological log of what's happened on this lead */}
+        {/* Timeline — the lead's own history leads this tab (what's happened on
+            this lead, including sequence sends + replies). */}
         {isEditing && (
           <Section title="Timeline" icon={CheckCircle2}>
             <ActivityTimeline lead={lead} />
           </Section>
         )}
 
-        {/* Engagement & metadata — outreach opens/clicks (distinct from the
-            Mailchimp campaign activity above) + record timestamps. */}
+        {/* Engagement & metadata — outreach opens/clicks + record timestamps. */}
         {isEditing && (
           <Section title="Engagement & metadata" icon={AlertCircle}>
             <ActivityRow label="Email opens" value={String(lead.email_opens ?? 0)} />
@@ -978,6 +1162,13 @@ export function LeadDetailDrawer({
               <ActivityRow label="Resend ID" value={lead.resend_email_id} mono />
             )}
           </Section>
+        )}
+
+        {/* Mailchimp profile — subscription state, tags, and recent campaign
+            activity. Moved to the bottom: the lead's own timeline + engagement
+            lead the tab; the external Mailchimp record is supporting context. */}
+        {isEditing && lead.email && (
+          <MailchimpRecordPanel email={lead.email} onConsentResolved={setConsent} />
         )}
         </div>
       </div>
@@ -1136,94 +1327,128 @@ function ResearchCard({
 }) {
   const suggested = research?.suggestedCountry?.trim()
   const alreadyMatches = !!suggested && currentLocation.toLowerCase().includes(suggested.toLowerCase())
+  const [open, setOpen] = useState(false)
 
-  return (
-    <div className="border border-neutral-200 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-neutral-50 border-b border-neutral-200">
-        <div className="flex items-center gap-2">
-          <Globe className="w-3.5 h-3.5 text-neutral-400" />
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">AI research</h3>
+  // No research yet → a single quiet action row, not a full card. Keeps
+  // Qualification reading as fields until the user opts into enrichment.
+  if (!research) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+          <span className="text-[12px] text-neutral-500 truncate">
+            {busy ? "Searching the web and assessing fit…" : "Web-grounded company summary + fit rationale"}
+          </span>
         </div>
         <button
           type="button"
           onClick={onRun}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-300 rounded-md hover:bg-white disabled:opacity-50"
+          className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-300 rounded-md hover:bg-neutral-50 disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
-          {busy ? "Researching…" : research ? "Refresh" : "Research & qualify"}
+          {busy ? "Researching…" : "Research & qualify"}
+        </button>
+      </div>
+    )
+  }
+
+  // Research exists → collapsed one-line summary; expand for the full detail.
+  const needsCountry = !!suggested && !alreadyMatches
+  return (
+    <div className="rounded-lg border border-neutral-200 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-2 min-w-0 flex-1 text-left"
+        >
+          <Globe className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 shrink-0">
+            AI research
+          </span>
+          {!open && (
+            <span className="text-[12px] text-neutral-500 truncate">{research.summary}</span>
+          )}
+          {!open && needsCountry && (
+            <span className="shrink-0 text-[10px] font-medium text-amber-600">· suggests {suggested}</span>
+          )}
+          <ChevronDown
+            className={`ml-auto w-3.5 h-3.5 shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={busy}
+          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 hover:text-neutral-900 disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+          Refresh
         </button>
       </div>
 
-      <div className="p-4">
-        {busy && !research && (
-          <p className="text-xs text-neutral-500">Searching the web and assessing fit — this takes a few seconds.</p>
-        )}
-        {!busy && !research && (
-          <p className="text-xs text-neutral-500">
-            Pull a web-grounded company summary + fit rationale. Results are for review — nothing is saved to the lead automatically.
-          </p>
-        )}
-        {research && (
-          <div className="space-y-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Summary</p>
-              <p className="text-[13px] text-neutral-700 leading-relaxed">{research.summary}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Fit rationale</p>
-              <p className="text-[13px] text-neutral-700 leading-relaxed">{research.fitRationale}</p>
-            </div>
-
-            {/* Suggested country — a suggestion, applied only on explicit click. */}
-            {suggested && (
-              <div className="flex items-center gap-2 flex-wrap text-[12px]">
-                <span className="text-neutral-500">Suggested HQ country:</span>
-                <span className="font-medium text-neutral-800">{suggested}</span>
-                {alreadyMatches ? (
-                  <span className="text-[11px] text-emerald-600">✓ matches location</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onApplyLocation(suggested)}
-                    className="px-2 py-0.5 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-300 rounded-md hover:bg-neutral-50"
-                  >
-                    Apply to location
-                  </button>
-                )}
-              </div>
-            )}
-
-            {research.sources.length > 0 && (
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">
-                  Sources ({research.sources.length})
-                </p>
-                <ul className="space-y-1">
-                  {research.sources.map((s) => (
-                    <li key={s.url}>
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline break-all"
-                      >
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                        {s.title || s.url}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <p className="text-[10px] text-neutral-400">
-              {research.generatedBy ? `${research.generatedBy} · ` : ""}
-              {formatDate(research.generatedAt)} · web-grounded, verify before acting
-            </p>
+      {open && (
+        <div className="px-3 pb-3 pt-3 border-t border-neutral-100 space-y-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Summary</p>
+            <p className="text-[13px] text-neutral-700 leading-relaxed">{research.summary}</p>
           </div>
-        )}
-      </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Fit rationale</p>
+            <p className="text-[13px] text-neutral-700 leading-relaxed">{research.fitRationale}</p>
+          </div>
+
+          {/* Suggested country — a suggestion, applied only on explicit click. */}
+          {suggested && (
+            <div className="flex items-center gap-2 flex-wrap text-[12px]">
+              <span className="text-neutral-500">Suggested HQ country:</span>
+              <span className="font-medium text-neutral-800">{suggested}</span>
+              {alreadyMatches ? (
+                <span className="text-[11px] text-emerald-600">✓ matches location</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onApplyLocation(suggested)}
+                  className="px-2 py-0.5 text-[11px] font-medium text-neutral-700 ring-1 ring-neutral-300 rounded-md hover:bg-neutral-50"
+                >
+                  Apply to location
+                </button>
+              )}
+            </div>
+          )}
+
+          {research.sources.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                Sources ({research.sources.length})
+              </p>
+              <ul className="space-y-1">
+                {research.sources.map((s) => (
+                  <li key={s.url}>
+                    <a
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline break-all"
+                    >
+                      <ExternalLink className="w-3 h-3 shrink-0" />
+                      {s.title || s.url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-[10px] text-neutral-400">
+            {research.generatedBy ? `${research.generatedBy} · ` : ""}
+            {formatDate(research.generatedAt)} · web-grounded, verify before acting
+          </p>
+        </div>
+      )}
     </div>
   )
 }
