@@ -580,7 +580,7 @@ export function OpportunityDetailDrawer({
                                     {contact.email && (
                                       <span className="flex items-center gap-1 text-xs text-neutral-500">
                                         <Mail className="w-3 h-3" />
-                                        <span className="truncate max-w-[120px]">{contact.email}</span>
+                                        <span className="truncate max-w-30">{contact.email}</span>
                                       </span>
                                     )}
                                     {contact.phone && (
@@ -895,7 +895,7 @@ export function OpportunityDetailDrawer({
                 <div className="space-y-2">
                   {formData.web_links.map((link, index) => (
                     <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
-                      <ExternalLink className="w-4 h-4 text-neutral-400 flex-shrink-0" />
+                      <ExternalLink className="w-4 h-4 text-neutral-400 shrink-0" />
                       <a 
                         href={link} 
                         target="_blank" 
@@ -946,7 +946,7 @@ export function OpportunityDetailDrawer({
                   <div className="space-y-2 mb-3">
                     {formData.docs.map((doc, index) => (
                       <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-neutral-50 border border-neutral-200">
-                        <FileText className={`w-4 h-4 flex-shrink-0 ${doc.startsWith("/uploads/") ? "text-emerald-600" : "text-neutral-900"}`} />
+                        <FileText className={`w-4 h-4 shrink-0 ${doc.startsWith("/uploads/") ? "text-emerald-600" : "text-neutral-900"}`} />
                         <a 
                           href={doc} 
                           target="_blank" 
@@ -1002,7 +1002,7 @@ export function OpportunityDetailDrawer({
                 {uploadError && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                      <X className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-red-700">Upload Failed</p>
                         <pre className="text-xs text-red-600 mt-1 whitespace-pre-wrap font-sans">{uploadError}</pre>
@@ -1032,7 +1032,7 @@ export function OpportunityDetailDrawer({
                   value={formData.notes}
                   onChange={(e) => onFormChange({ ...formData, notes: e.target.value })}
                   rows={4}
-                  className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-y min-h-[100px] max-h-[300px]"
+                  className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 resize-y min-h-25 max-h-75"
                   placeholder="Additional notes about this opportunity..."
                 />
               </div>
