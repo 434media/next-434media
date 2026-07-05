@@ -665,40 +665,10 @@ export function TaskDetailDrawer({
               </div>
               )}
 
-              <div className="pt-4 border-t border-neutral-200 space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 border border-neutral-200">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${formData.is_opportunity ? 'bg-sky-100' : 'bg-neutral-200'}`}>
-                      <Target className={`w-4 h-4 ${formData.is_opportunity ? 'text-sky-600' : 'text-neutral-500'}`} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-neutral-900">Track in pipeline</p>
-                      <p className="text-xs text-neutral-500">Show this task as a card in the opportunities pipeline</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onFormChange({ ...formData, is_opportunity: !formData.is_opportunity })}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      formData.is_opportunity ? 'bg-sky-600' : 'bg-neutral-300'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        formData.is_opportunity ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-                
-                {/* Linking to a parent opportunity is done via "Link to" above;
-                    this toggle only controls pipeline visibility. */}
-                {formData.is_opportunity && (
-                  <p className="pl-12 text-xs text-neutral-500">
-                    Appears in the pipeline&apos;s Pitched column by default — drag it in the kanban to set its stage.
-                  </p>
-                )}
-              </div>
+              {/* Phase 2 — a task is a work item, not an opportunity. Opportunities
+                  live as client records; a task attaches to one via "Link to" above
+                  (opportunity_id). The old "Track in pipeline" toggle was removed so
+                  a deal has a single source of truth. */}
 
               {/* Comments Section — detail-only */}
               {!isNew && (

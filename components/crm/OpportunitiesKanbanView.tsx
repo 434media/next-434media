@@ -88,14 +88,12 @@ function matchesBrandGoal(itemBrand: Brand | undefined, goal: BrandGoal): boolea
 }
 
 // Platform Goals Summary Card
-function PlatformGoalsSummary({ 
-  clients, 
-  tasks,
+function PlatformGoalsSummary({
+  clients,
   isExpanded,
-  onToggle 
-}: { 
+  onToggle
+}: {
   clients: Client[]
-  tasks: Task[]
   isExpanded: boolean
   onToggle: () => void
 }) {
@@ -158,8 +156,8 @@ function PlatformGoalsSummary({
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {brandGoals.map((goal) => {
                 const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
-                const brandTasks = tasks.filter(t => matchesBrandGoal(t.brand, goal) && t.is_opportunity)
-                const totalItems = brandClients.length + brandTasks.length
+                // Phase 2 — opportunities are client records only (no task cards).
+                const totalItems = brandClients.length
 
                 const wonRevenue = brandClients
                   .filter(c => c.disposition === "closed_won")
@@ -598,7 +596,10 @@ export function OpportunitiesKanbanView({
   const allOpportunityClients = clients.filter(c => c.is_opportunity)
   const opportunityClients = allOpportunityClients.filter(c => !c.is_archived)
   const archivedOpportunities = allOpportunityClients.filter(c => c.is_archived)
-  const opportunityTasks = tasks.filter(t => t.is_opportunity)
+  // Phase 2 — an opportunity is a ClientRecord ONLY. A task is never an
+  // opportunity card; tasks LINKED to an opportunity (opportunity_id) still
+  // stack under it as work items. A task with no opportunity_id never appears.
+  const opportunityTasks = tasks.filter(t => t.opportunity_id)
   
   // Get unique assignees from opportunities for the filter dropdown
   // Normalize names and filter out short names like TasksView does
@@ -831,7 +832,6 @@ export function OpportunitiesKanbanView({
       <PlatformGoalsSummary 
         key={`goals-${clients.filter(c => c.disposition === "closed_won").length}-${clients.reduce((sum, c) => sum + (c.pitch_value || 0), 0)}`}
         clients={clients}
-        tasks={tasks}
         isExpanded={showGoals}
         onToggle={() => setShowGoals(!showGoals)}
       />
