@@ -87,7 +87,7 @@ export const EMPTY_OPPORTUNITY_FORM: OpportunityFormData = {
   notes: "",
   source: "",
   is_opportunity: true,
-  disposition: "pitched",
+  disposition: "discovery",
   doc: "",
   web_links: [],
   docs: [],
@@ -286,7 +286,7 @@ export function useClientHandlers({
         notes: opportunityForm.notes,
         source: opportunityForm.source || undefined,
         is_opportunity: true,
-        disposition: opportunityForm.disposition || "pitched",
+        disposition: opportunityForm.disposition || "discovery",
         doc: opportunityForm.doc || "25",
         web_links: opportunityForm.web_links.filter(link => link.trim() !== ""),
         docs: opportunityForm.docs.filter(doc => doc.trim() !== ""),
@@ -512,7 +512,7 @@ export function useClientHandlers({
 
     const wasClosedWon = previousClient.disposition === "closed_won"
     const shouldAutoSetDocTo100 = disposition === "closed_won"
-    const shouldAutoSetDocTo25 = wasClosedWon && disposition === "pitched" || disposition === "closed_lost"
+    const shouldAutoSetDocTo25 = wasClosedWon && disposition === "proposal" || disposition === "closed_lost"
 
     let docValue: DOC | undefined = undefined
     if (shouldAutoSetDocTo100) docValue = "100" as DOC
@@ -545,7 +545,7 @@ export function useClientHandlers({
       const successMessage = shouldAutoSetDocTo100
         ? "Opportunity moved to Closed Won (DOC set to 100%)"
         : shouldAutoSetDocTo25
-          ? `Opportunity moved to ${disposition === "pitched" ? "Pitched" : "Closed Lost"} (DOC set to 25%)`
+          ? `Opportunity moved to ${disposition === "proposal" ? "Proposal" : "Closed Lost"} (DOC set to 25%)`
           : "Client moved"
       setToast({ message: successMessage, type: "success" })
     } catch {
@@ -591,7 +591,7 @@ export function useClientHandlers({
       notes: client.notes || "",
       source: client.source || "",
       is_opportunity: true,
-      disposition: client.disposition || "pitched",
+      disposition: client.disposition || "discovery",
       doc: client.doc || "",
       web_links: client.web_links || [],
       docs: client.docs || [],

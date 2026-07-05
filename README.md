@@ -207,6 +207,10 @@ Firestore-based blog with markdown support:
 
 ### Sales Pipeline (Audiences → Inbox → Leads → CRM)
 
+> **📖 Full funnel README:** [`docs/sales-funnel.md`](docs/sales-funnel.md) —
+> the canonical overview of the funnel stages, **lead-scoring drivers** (ICP fit
+> rubric + intent), the outreach/reply engine, and the KPIs.
+
 The admin "Pipeline" section is a funnel of connected surfaces. Each page opens
 with a dismissible "How it works" strip (`components/admin/HowItWorks.tsx`) that
 explains where it sits in the funnel, and status indicators share a single

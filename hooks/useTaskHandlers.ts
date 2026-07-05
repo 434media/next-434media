@@ -696,7 +696,7 @@ export function useTaskHandlers({
 
     const wasClosedWon = task.disposition === "closed_won"
     const shouldAutoSetDocTo100 = disposition === "closed_won" && task.is_opportunity
-    const shouldAutoSetDocTo25 = task.is_opportunity && (wasClosedWon && disposition === "pitched" || disposition === "closed_lost")
+    const shouldAutoSetDocTo25 = task.is_opportunity && (wasClosedWon && disposition === "proposal" || disposition === "closed_lost")
 
     let docValue: DOC | undefined = undefined
     if (shouldAutoSetDocTo100) docValue = "100" as DOC
@@ -730,7 +730,7 @@ export function useTaskHandlers({
       const successMessage = shouldAutoSetDocTo100
         ? "Opportunity moved to Closed Won (DOC set to 100%)"
         : shouldAutoSetDocTo25
-          ? `Opportunity moved to ${disposition === "pitched" ? "Pitched" : "Closed Lost"} (DOC set to 25%)`
+          ? `Opportunity moved to ${disposition === "proposal" ? "Proposal" : "Closed Lost"} (DOC set to 25%)`
           : "Task moved"
       setToast({ message: successMessage, type: "success" })
     } catch {

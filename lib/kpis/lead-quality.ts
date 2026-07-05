@@ -74,18 +74,26 @@ function round(n: number, places = 1): number {
   return Math.round(n * f) / f
 }
 
+// Canonical fit for a lead — the unified ICP fit (0–100), falling back to the
+// legacy `score` for leads not yet re-scored. Mirrors `icpFitOf` in
+// lib/kpis/funnel.ts so both KPI surfaces read the same number.
+function icpFitOf(l: Lead): number {
+  if (typeof l.icp_fit_score === "number") return l.icp_fit_score
+  return typeof l.score === "number" ? l.score : 0
+}
+
 export function computeLeadQualityKpis(leads: Lead[], generatedAt: string): LeadQualityKpis {
   const total = leads.length
   const removed = leads.filter((l) => l.status === "archived").length
   const converted = leads.filter((l) => l.status === "converted").length
   const kept = total - removed
 
-  const scoreSum = leads.reduce((sum, l) => sum + (typeof l.score === "number" ? l.score : 0), 0)
+  const scoreSum = leads.reduce((sum, l) => sum + icpFitOf(l), 0)
   const avgScore = total > 0 ? round(scoreSum / total) : 0
 
   const scoreDistribution: ScoreBand[] = BANDS.map((band) => {
     const inBand = leads.filter((l) => {
-      const s = typeof l.score === "number" ? l.score : 0
+      const s = icpFitOf(l)
       return s >= band.min && s <= band.max
     })
     return {
@@ -115,7 +123,7 @@ export function computeLeadQualityKpis(leads: Lead[], generatedAt: string): Lead
 
   const bySource: SourceStat[] = ALL_SOURCES.map((source) => {
     const rows = leads.filter((l) => l.source === source)
-    const sSum = rows.reduce((sum, l) => sum + (typeof l.score === "number" ? l.score : 0), 0)
+    const sSum = rows.reduce((sum, l) => sum + icpFitOf(l), 0)
     return {
       source,
       total: rows.length,

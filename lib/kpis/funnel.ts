@@ -139,12 +139,12 @@ function clientToStage(c: ClientRecord): FunnelStage | "exit" | null {
   switch (c.disposition) {
     case "closed_won":
       return "closed_won"
-    case "pitched":
+    case "proposal":
       return "proposal"
     case "closed_lost":
       return "exit"
     default:
-      return "discovery" // "open" | undefined
+      return "discovery" // "discovery" | undefined
   }
 }
 

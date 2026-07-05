@@ -642,7 +642,7 @@ function SalesCRMPageInner() {
         notes: "",
         source: "",
         is_opportunity: true,
-        disposition: "pitched",
+        disposition: "discovery",
         doc: "",
         web_links: [],
         docs: [],
@@ -917,7 +917,7 @@ function SalesCRMPageInner() {
                 notes: "",
                 source: "",
                 is_opportunity: true,
-                disposition: "pitched",
+                disposition: "discovery",
                 doc: "",
                 web_links: [],
                 docs: [],
@@ -979,7 +979,7 @@ function SalesCRMPageInner() {
                 .map((c) => ({
                   id: c.id,
                   name: c.title || c.company_name || c.name || "Opportunity",
-                  stage: c.disposition || "pitched",
+                  stage: c.disposition || "discovery",
                   value: c.pitch_value || 0,
                 }))
             : []

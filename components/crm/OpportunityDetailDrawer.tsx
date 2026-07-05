@@ -815,7 +815,7 @@ export function OpportunityDetailDrawer({
                     Disposition <span className="text-neutral-400 font-normal">(Stage)</span>
                   </label>
                   <select
-                    value={formData.disposition || "pitched"}
+                    value={formData.disposition || "discovery"}
                     onChange={(e) => onFormChange({ ...formData, disposition: e.target.value as Disposition })}
                     className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >

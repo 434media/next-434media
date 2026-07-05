@@ -589,14 +589,9 @@ export async function deletePainpoint(id: string): Promise<void> {
 // lead, won/lost pass straight through (only the closed-vs-open split drives the
 // stats; the exact open stage only picks a pipeline column).
 function clientOpportunityToOpportunity(c: ClientRecord): Opportunity {
-  const stage: OpportunityStage =
-    c.disposition === "closed_won"
-      ? "closed_won"
-      : c.disposition === "closed_lost"
-        ? "closed_lost"
-        : c.disposition === "pitched"
-          ? "proposal"
-          : "lead"
+  // disposition IS the funnel stage now — passthrough, defaulting a missing one
+  // to the entry stage (Discovery).
+  const stage: OpportunityStage = c.disposition ?? "discovery"
   return {
     id: c.id,
     created_at: c.created_at,
@@ -1250,10 +1245,8 @@ export async function getSlicesByChartId(chartId: string): Promise<PieSlice[]> {
 // PIPELINE VIEW
 // ============================================
 const PIPELINE_STAGES: { stage: OpportunityStage; label: string; color: string }[] = [
-  { stage: "lead", label: "Lead", color: "#6366f1" },
-  { stage: "qualified", label: "Qualified", color: "#8b5cf6" },
+  { stage: "discovery", label: "Discovery", color: "#14b8a6" },
   { stage: "proposal", label: "Proposal", color: "#0ea5e9" },
-  { stage: "negotiation", label: "Negotiation", color: "#f59e0b" },
   { stage: "closed_won", label: "Closed Won", color: "#22c55e" },
   { stage: "closed_lost", label: "Closed Lost", color: "#ef4444" },
 ]

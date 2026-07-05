@@ -95,7 +95,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     next_followup_date: lead.next_followup_date,
     notes: combinedNotes,
     is_opportunity: isOpp,
-    disposition: isOpp ? "pitched" : undefined,
+    // A newly converted lead enters the opportunity funnel at Discovery — the
+    // first bottom-half stage — not mid-funnel at Proposal.
+    disposition: isOpp ? "discovery" : undefined,
   }
 
   let createdClient: ClientRecord

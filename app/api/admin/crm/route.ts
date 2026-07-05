@@ -25,10 +25,8 @@ async function requireAdmin() {
 
 // Pipeline stages configuration
 const PIPELINE_STAGES: { stage: OpportunityStage; label: string; color: string }[] = [
-  { stage: "lead", label: "Lead", color: "#6366f1" },
-  { stage: "qualified", label: "Qualified", color: "#8b5cf6" },
+  { stage: "discovery", label: "Discovery", color: "#14b8a6" },
   { stage: "proposal", label: "Proposal", color: "#0ea5e9" },
-  { stage: "negotiation", label: "Negotiation", color: "#f59e0b" },
   { stage: "closed_won", label: "Closed Won", color: "#22c55e" },
   { stage: "closed_lost", label: "Closed Lost", color: "#ef4444" },
 ]

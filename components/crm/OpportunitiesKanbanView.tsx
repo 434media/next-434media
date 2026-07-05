@@ -561,7 +561,7 @@ function KanbanColumn({
                 const linkedIds = linkedItems.map(li => li.id)
                 e.dataTransfer.setData("itemId", mainItem.id)
                 e.dataTransfer.setData("itemType", mainItem.type)
-                e.dataTransfer.setData("currentDisposition", mainItem.disposition || "pitched")
+                e.dataTransfer.setData("currentDisposition", mainItem.disposition || "discovery")
                 e.dataTransfer.setData("linkedItemIds", JSON.stringify(linkedIds))
               }}
             />
@@ -636,7 +636,7 @@ export function OpportunitiesKanbanView({
       companyName: client.title ? (client.company_name || client.name) : undefined,  // Show company below if title exists
       brand: client.brand,
       value: client.pitch_value,
-      disposition: client.disposition || "pitched",
+      disposition: client.disposition || "discovery",
       doc: client.doc,
       dueDate: client.next_followup_date,
       assignedTo: client.assigned_to,
@@ -651,7 +651,7 @@ export function OpportunitiesKanbanView({
       companyName: task.client_name,
       brand: task.brand,
       value: undefined,
-      disposition: task.disposition || "pitched",
+      disposition: task.disposition || "discovery",
       doc: task.doc,
       dueDate: task.due_date,
       assignedTo: task.assigned_to,
@@ -668,7 +668,7 @@ export function OpportunitiesKanbanView({
 
   // Group items into stacked items - opportunities with their linked tasks
   const getStackedItemsByDisposition = useCallback((disposition: Disposition): StackedKanbanItem[] => {
-    const itemsInDisposition = allItems.filter(item => (item.disposition || "pitched") === disposition)
+    const itemsInDisposition = allItems.filter(item => (item.disposition || "discovery") === disposition)
     
     // Find all opportunity clients (these are the main cards)
     const opportunityItems = itemsInDisposition.filter(item => item.type === "client")

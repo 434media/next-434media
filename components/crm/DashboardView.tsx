@@ -117,8 +117,9 @@ function OpportunityProgressChart({
 }) {
   const opportunityClients = clients.filter(c => c.is_opportunity)
 
-  // Count by disposition - items without disposition default to "pitched"
-  const pitchedCount = opportunityClients.filter(c => c.disposition === "pitched" || !c.disposition).length
+  // Active (in-progress) opportunities — anything not yet closed. Under the
+  // funnel model that's Discovery + Proposal (or a missing disposition).
+  const pitchedCount = opportunityClients.filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost").length
   const wonCount = opportunityClients.filter(c => c.disposition === "closed_won").length
   const lostCount = opportunityClients.filter(c => c.disposition === "closed_lost").length
 
@@ -382,9 +383,9 @@ function ActiveOpportunitiesList({
         companyName: c.company_name || c.name || "",
         contactName: primaryContact?.name || c.name || "No contact",
         followUpDate: c.next_followup_date,
-        disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.label || "Pitched",
-        dispositionValue: c.disposition || "pitched",
-        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "pitched"))?.color || "#0ea5e9",
+        disposition: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "discovery"))?.label || "Discovery",
+        dispositionValue: c.disposition || "discovery",
+        dispositionColor: DISPOSITION_OPTIONS.find(d => d.value === (c.disposition || "discovery"))?.color || "#14b8a6",
         value: c.pitch_value,
         brand: c.brand,
         original: c,
@@ -744,11 +745,11 @@ export function DashboardView({
     .filter(c => c.disposition === "closed_lost")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
   
-  // Pitched at 90% DOC for Pacing calculation
-  // IMPORTANT: Only "pitched" disposition counts — closed_won/closed_lost are
-  // excluded by the disposition === "pitched" check.
+  // Proposal-stage deals at 90% DOC for Pacing calculation
+  // IMPORTANT: Only "proposal" disposition counts — closed_won/closed_lost are
+  // excluded by the disposition === "proposal" check.
   const pitched90DocValue = opportunityClients
-    .filter(c => c.disposition === "pitched" && c.doc === "90")
+    .filter(c => c.disposition === "proposal" && c.doc === "90")
     .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
   
   // Pipeline value = opportunities that are not closed (pitched or no disposition)

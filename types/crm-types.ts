@@ -19,12 +19,14 @@ export type ClientStatus =
   | "on_hold"
 
 // Opportunity stage enum
-export type OpportunityStage = 
-  | "lead" 
-  | "qualified" 
-  | "proposal" 
-  | "negotiation" 
-  | "closed_won" 
+// Funnel bottom-half stages — aligned to the funnel ladder (lib/kpis/funnel.ts)
+// and the ClientRecord `disposition`. The legacy lead/qualified/negotiation values
+// were retired: opportunities live in Discovery → Proposal → Closed-Won, with
+// Closed-Lost as the exit.
+export type OpportunityStage =
+  | "discovery"
+  | "proposal"
+  | "closed_won"
   | "closed_lost"
 
 // Priority level enum
@@ -115,7 +117,9 @@ export interface ClientRecord extends BaseRecord {
   source?: string
   is_opportunity?: boolean
   client_id?: string  // On an opportunity row: FK to its parent client row (the won/active account)
-  disposition?: "open" | "pitched" | "closed_won" | "closed_lost"
+  // Funnel stage (bottom half). open→discovery, pitched→proposal renamed to match
+  // lib/kpis/funnel.ts. Kept in sync with the Disposition type in components/crm/types.ts.
+  disposition?: "discovery" | "proposal" | "closed_won" | "closed_lost"
   doc?: "25" | "50" | "75" | "90" | "100"
   web_links?: string[]  // Array of URLs for opportunities
   docs?: string[]  // Array of document URLs for opportunities

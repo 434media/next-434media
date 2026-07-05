@@ -119,16 +119,20 @@ export interface Client {
 // Brand type
 export type Brand = "434 Media" | "Vemos Vamos" | "DEVSA" | "Digital Canvas" | "TXMX Boxing" | "AIMSATX"
 
-// Disposition (opportunity stage) type - used in kanban columns
-export type Disposition = "pitched" | "closed_won" | "closed_lost"
+// Disposition (opportunity stage) type — the funnel's bottom half. These are the
+// Opportunities kanban columns and MUST match the funnel stage names in
+// lib/kpis/funnel.ts (Discovery → Proposal → Closed-Won, Closed-Lost = exit).
+// Renamed from the legacy open/pitched vocabulary: open→discovery, pitched→proposal.
+export type Disposition = "discovery" | "proposal" | "closed_won" | "closed_lost"
 
 // DOC (Degree of Confidence) - stage probability values
 export type DOC = "25" | "50" | "75" | "90" | "100"
 
-// Disposition options for UI
-// Colors chosen to NOT conflict with brand colors (no purple, red, orange, or emerald)
+// Disposition options for UI — the funnel-stage kanban columns, in order.
+// Colors chosen to NOT conflict with brand colors (no purple, red, orange, or emerald).
 export const DISPOSITION_OPTIONS: { value: Disposition; label: string; color: string }[] = [
-  { value: "pitched", label: "Pitched", color: "#0ea5e9" },      // Sky blue - active opportunities
+  { value: "discovery", label: "Discovery", color: "#14b8a6" },  // Teal - entry stage
+  { value: "proposal", label: "Proposal", color: "#0ea5e9" },    // Sky blue - active pitch
   { value: "closed_won", label: "Closed Won", color: "#22c55e" }, // Green - success (different from 434 Media emerald)
   { value: "closed_lost", label: "Closed Lost", color: "#64748b" }, // Slate gray - neutral/inactive
 ]
