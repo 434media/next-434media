@@ -306,11 +306,11 @@ export function AdminOverview() {
                 icon={Rocket}
                 title="Clients"
                 stat={counts?.clientsTotal ?? 0}
-                statLabel="in CRM"
+                statLabel="clients"
                 sub={
                   counts
-                    ? `${counts.clientsActive} active · opportunities, tasks & calendar`
-                    : "Managed relationships, pipeline & tasks"
+                    ? `${counts.clientsActive} active · opportunities → clients`
+                    : "Opportunities → clients — the funnel's closing half"
                 }
                 loading={showLoading}
               />
@@ -354,11 +354,11 @@ export function AdminOverview() {
                 icon={Rocket}
                 title="Clients"
                 stat={counts?.clientsTotal ?? 0}
-                statLabel="in CRM"
+                statLabel="clients"
                 sub={
                   counts
-                    ? `${counts.clientsActive} active · opportunities & tasks`
-                    : "Managed relationships, pipeline & tasks"
+                    ? `${counts.clientsActive} active · opportunities → clients`
+                    : "Opportunities → clients — the funnel's closing half"
                 }
                 loading={showLoading}
               />

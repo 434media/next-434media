@@ -118,7 +118,7 @@ const OVERVIEW_ITEM: SidebarLink = {
 }
 
 // Sections mirror the lifecycle: "Pipeline" runs in funnel order
-// (Prospect → Audiences → Inbox → Leads → CRM → Funnel KPIs) so the sidebar
+// (Prospect → Audiences → Inbox → Leads → Opportunities → Funnel KPIs) so the sidebar
 // reads start → qualify → win → measure, top-to-bottom. Prospect leads as the
 // active starting action; Funnel KPIs closes as the scoreboard. Analytics and
 // Workspace hold the supporting surfaces.
@@ -160,7 +160,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       },
       {
         id: "crm",
-        label: "CRM",
+        label: "Opportunities",
         icon: Rocket,
         href: "/admin/crm",
         matchPrefix: "/admin/crm",

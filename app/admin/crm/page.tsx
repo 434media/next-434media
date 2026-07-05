@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { HowItWorks } from "@/components/admin/HowItWorks"
 import {
   BarChart3,
   Target,
@@ -458,6 +459,7 @@ function SalesCRMPageInner() {
     handleDeleteClient,
     handleBulkDeleteClients,
     handleArchiveOpportunity,
+    handleDeleteOpportunity,
     handleRestoreOpportunity,
     handleUpdateClientDisposition,
     handleEditClient,
@@ -809,18 +811,18 @@ function SalesCRMPageInner() {
           {/* Brand row — matches the Audiences/Inbox header idiom. */}
           <div className="flex items-center gap-2 pt-3">
             <Rocket className="w-4 h-4 text-neutral-600" />
-            <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">CRM</h1>
+            <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">Opportunities</h1>
             <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-1 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-              opportunities → clients — the second half of the funnel
+              the funnel&apos;s closing half — deals → won → clients
             </span>
           </div>
           <nav
             className="flex gap-1 -mb-px overflow-x-auto pt-2 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-            aria-label="CRM views"
+            aria-label="Opportunities views"
           >
             {[
               { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
-              { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
+              { id: "pipeline", label: "Pipeline", icon: Target, badge: null },
               { id: "clients", label: "Clients", icon: Users, badge: null },
             ].map(({ id, label, icon: Icon, badge }) => (
               <button
@@ -847,6 +849,17 @@ function SalesCRMPageInner() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        {/* First-run funnel orientation — the second half of the funnel. */}
+        <HowItWorks
+          className="mb-6"
+          storageKey="opportunitiesIntroDismissed"
+          steps={[
+            { title: "Deals land here", detail: "When you convert an engaged lead, it arrives as a Discovery-stage opportunity — the start of the funnel's closing half." },
+            { title: "Advance the stage", detail: "Work each opportunity across the board: Discovery → Proposal → Closed-Won. The Pipeline tab is the kanban; drag a card to move it." },
+            { title: "Won becomes a client", detail: "A Closed-Won opportunity graduates into a Client account. The Dashboard scoreboard mirrors the Funnel KPIs so the numbers always agree." },
+          ]}
+        />
 
         {/* Error State */}
         {error && (
@@ -1001,6 +1014,7 @@ function SalesCRMPageInner() {
         onSave={handleSaveOpportunity}
         onClose={closeOpportunityDrawer}
         onArchive={opportunityForm.existing_company_id ? () => handleArchiveOpportunity(opportunityForm.existing_company_id!) : undefined}
+        onDelete={opportunityForm.existing_company_id ? () => handleDeleteOpportunity(opportunityForm.existing_company_id!) : undefined}
         onViewCustomer360={(clientId) => {
           const client = clients.find((c) => c.id === clientId)
           if (!client) return

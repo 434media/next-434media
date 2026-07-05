@@ -76,7 +76,8 @@ interface OpportunityDetailDrawerProps {
   onFormChange: (data: OpportunityFormData) => void
   onSave: () => void
   onClose: () => void
-  onArchive?: () => void  // Archive the opportunity (only shown for closed won/lost when editing)
+  onArchive?: () => void  // Archive (recoverable) — shelve any opportunity off the board
+  onDelete?: () => void   // Delete permanently — for removing QA/test records
   /** Jump to the parent client's Customer 360 (only when the opp is linked). */
   onViewCustomer360?: (clientId: string) => void
 }
@@ -96,6 +97,7 @@ export function OpportunityDetailDrawer({
   onSave,
   onClose,
   onArchive,
+  onDelete,
   onViewCustomer360,
 }: OpportunityDetailDrawerProps) {
   const [expandedContacts, setExpandedContacts] = useState<Set<string>>(new Set())
@@ -103,6 +105,8 @@ export function OpportunityDetailDrawer({
   // State for web links and file upload
   const [newLink, setNewLink] = useState("")
   const [isUploadingFile, setIsUploadingFile] = useState(false)
+  // Two-step permanent delete (arm → confirm), for removing QA/test records.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   
   // Assignable roster (read-only) — shared with the other drawers. Management
@@ -336,10 +340,11 @@ export function OpportunityDetailDrawer({
   const drawerSubtitle = isEditing
     ? "Get that money and close that business"
     : "Add a new opportunity"
-  const showArchive =
-    isEditing &&
-    !!onArchive &&
-    (formData.disposition === "closed_won" || formData.disposition === "closed_lost")
+  // Archive is available for ANY opportunity when editing (including never-closed
+  // ones that just went dormant) — it's recoverable, so no need to gate it to
+  // closed deals.
+  const showArchive = isEditing && !!onArchive
+  const showDelete = isEditing && !!onDelete
 
   return (
     <DetailDrawer
@@ -350,18 +355,52 @@ export function OpportunityDetailDrawer({
       width="lg"
       footer={
         <div className="flex items-center justify-between gap-2">
-          <div>
+          <div className="flex items-center gap-1">
             {showArchive && (
               <button
                 type="button"
                 onClick={onArchive}
                 disabled={isSaving}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
-                title="Archive this opportunity"
+                title="Archive this opportunity (recoverable — moves it off the board)"
               >
                 <Archive className="w-4 h-4" />
                 Archive
               </button>
+            )}
+            {showDelete && (
+              confirmingDelete ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmingDelete(false); onDelete?.() }}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                    title="Permanently delete this opportunity"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete permanently
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    className="px-2 py-2 text-sm font-medium text-neutral-500 hover:text-neutral-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                  title="Permanently delete this opportunity (for QA/test records)"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              )
             )}
           </div>
           <div className="flex items-center gap-2">

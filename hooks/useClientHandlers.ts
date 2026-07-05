@@ -481,6 +481,28 @@ export function useClientHandlers({
     }
   }
 
+  // Permanent delete of an opportunity — for removing QA/test records. The
+  // drawer does the two-step confirmation, so there's no native confirm here.
+  const handleDeleteOpportunity = async (clientId: string) => {
+    const previous = clients
+    // Optimistic remove + close the drawer.
+    setClients(prev => prev.filter(c => c.id !== clientId))
+    setShowOpportunityForm(false)
+    setIsEditingOpportunity(false)
+    try {
+      const response = await fetch(`/api/admin/crm/clients?id=${clientId}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to delete opportunity")
+      setToast({ message: "Opportunity deleted", type: "success" })
+      loadDashboard()
+    } catch {
+      setClients(previous)
+      setToast({ message: "Failed to delete opportunity — reverted", type: "error" })
+    }
+  }
+
   // Restore archived opportunity — fully optimistic.
   const handleRestoreOpportunity = async (clientId: string) => {
     const previousClient = clients.find(c => c.id === clientId)
@@ -620,6 +642,7 @@ export function useClientHandlers({
     handleDeleteClient,
     handleBulkDeleteClients,
     handleArchiveOpportunity,
+    handleDeleteOpportunity,
     handleRestoreOpportunity,
     handleUpdateClientDisposition,
     handleEditClient,

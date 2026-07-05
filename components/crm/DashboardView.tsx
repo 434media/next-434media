@@ -2,18 +2,14 @@
 
 import { useState, useEffect } from "react"
 import {
-  RocketIcon,
-  TrendingUp,
   Target,
-  AlertCircle,
-  ChevronDown,
   Calendar,
   BarChart3,
   ArrowUpRight,
-  ArrowDownRight,
   Timer,
 } from "lucide-react"
 import type { FunnelKpis } from "@/lib/kpis/funnel"
+import { FollowupsQueue } from "./FollowupsQueue"
 import {
   formatCurrency,
   formatDate,
@@ -52,289 +48,6 @@ function matchesBrandGoal(itemBrand: Brand | undefined, goal: BrandGoal): boolea
     return goal.includedBrands.includes(itemBrand)
   }
   return itemBrand === goal.brand
-}
-
-// KPI Card Component
-function KPICard({
-  label,
-  value,
-  subLabel,
-  icon: Icon,
-  color = "neutral",
-  trend,
-}: {
-  label: string
-  value: string
-  subLabel?: string
-  icon: React.ComponentType<{ className?: string }>
-  color?: "neutral" | "emerald" | "amber" | "blue" | "sky" | "red"
-  trend?: { value: number; isPositive: boolean }
-}) {
-  // Monochrome icon tile + accent dot — Linear/Vercel pattern.
-  // The number is the message; the icon orients you; the small dot encodes intent.
-  const dotClasses: Record<typeof color, string> = {
-    neutral: "bg-neutral-400",
-    emerald: "bg-emerald-500",
-    amber: "bg-amber-500",
-    blue: "bg-blue-500",
-    sky: "bg-sky-500",
-    red: "bg-red-500",
-  }
-
-  return (
-    <div className="p-4 md:p-5 rounded-lg bg-white border border-neutral-200/70 transition-shadow hover:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]">
-      <div className="flex items-start justify-between mb-3">
-        <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-          <Icon className="w-4 h-4" />
-        </div>
-        {trend && trend.value !== 0 && (
-          <div
-            className={`flex items-center gap-1 text-xs font-medium tabular-nums ${
-              trend.isPositive ? "text-emerald-600" : "text-red-500"
-            }`}
-          >
-            {trend.isPositive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-            {trend.value}%
-          </div>
-        )}
-      </div>
-      <p className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 uppercase tracking-[0.18em] mb-1">
-        <span className={`inline-block h-1 w-1 rounded-full ${dotClasses[color]}`} aria-hidden="true" />
-        {label}
-      </p>
-      <p className="text-2xl md:text-3xl font-semibold tracking-tight tabular-nums text-neutral-900">{value}</p>
-      {subLabel && <p className="text-xs text-neutral-400 mt-1">{subLabel}</p>}
-    </div>
-  )
-}
-
-// Opportunity Progress Chart - Visual representation of active opportunities (clients only)
-function OpportunityProgressChart({ 
-  clients,
-}: { 
-  clients: Client[]
-}) {
-  const opportunityClients = clients.filter(c => c.is_opportunity)
-
-  // Active (in-progress) opportunities — anything not yet closed. Under the
-  // funnel model that's Discovery + Proposal (or a missing disposition).
-  const pitchedCount = opportunityClients.filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost").length
-  const wonCount = opportunityClients.filter(c => c.disposition === "closed_won").length
-  const lostCount = opportunityClients.filter(c => c.disposition === "closed_lost").length
-
-  const totalOpportunities = opportunityClients.length
-  const activeOpportunities = pitchedCount
-
-  // Calculate percentages for visualization
-  const wonPercent = totalOpportunities > 0 ? (wonCount / totalOpportunities) * 100 : 0
-  const pitchedPercent = totalOpportunities > 0 ? (pitchedCount / totalOpportunities) * 100 : 0
-  const lostPercent = totalOpportunities > 0 ? (lostCount / totalOpportunities) * 100 : 0
-
-  return (
-    <div className="p-4 md:p-5 rounded-lg bg-white border border-neutral-200/70 col-span-2 lg:col-span-1">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-          <Target className="w-4 h-4" />
-        </div>
-        <div>
-          <h3 className="text-sm font-medium text-neutral-900">Opportunity Flow</h3>
-          <p className="text-[10px] text-neutral-400 tabular-nums">{totalOpportunities} total opportunities</p>
-        </div>
-      </div>
-
-      {/* Stacked horizontal bar */}
-      {totalOpportunities > 0 ? (
-        <>
-          <div className="h-5 rounded-lg bg-neutral-100 overflow-hidden flex mb-3">
-            {wonPercent > 0 && (
-              <div 
-                className="h-full bg-emerald-500 flex items-center justify-center"
-                style={{ width: `${wonPercent}%` }}
-                title={`Won: ${wonCount}`}
-              >
-                {wonPercent >= 12 && <span className="text-[9px] font-semibold tabular-nums text-white">{wonCount}</span>}
-              </div>
-            )}
-            {pitchedPercent > 0 && (
-              <div 
-                className="h-full bg-sky-500 flex items-center justify-center"
-                style={{ width: `${pitchedPercent}%` }}
-                title={`Pitched: ${pitchedCount}`}
-              >
-                {pitchedPercent >= 12 && <span className="text-[9px] font-semibold tabular-nums text-white">{pitchedCount}</span>}
-              </div>
-            )}
-            {lostPercent > 0 && (
-              <div 
-                className="h-full bg-slate-400 flex items-center justify-center"
-                style={{ width: `${lostPercent}%` }}
-                title={`Lost: ${lostCount}`}
-              >
-                {lostPercent >= 12 && <span className="text-[9px] font-semibold tabular-nums text-white">{lostCount}</span>}
-              </div>
-            )}
-          </div>
-
-          {/* Legend - Won first, then Pitched, then Lost */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-emerald-500" />
-              <span className="text-[10px] text-neutral-600">Won ({wonCount})</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-sky-500" />
-              <span className="text-[10px] text-neutral-600">Pitched ({pitchedCount})</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded bg-slate-400" />
-              <span className="text-[10px] text-neutral-600">Lost ({lostCount})</span>
-            </div>
-          </div>
-
-          <div className="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-center gap-1">
-            <span className="text-lg font-semibold tabular-nums text-neutral-900">{activeOpportunities}</span>
-            <span className="text-xs text-neutral-500">active opportunities</span>
-          </div>
-        </>
-      ) : (
-        <div className="text-center py-4">
-          <p className="text-sm text-neutral-400">No opportunities yet</p>
-          <p className="text-xs text-neutral-300 mt-1">Add clients or tasks as opportunities</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Pipeline Confidence - Shows opportunity close likelihood with accordion
-function PipelineConfidence({ 
-  clients, 
-  onClientClick,
-}: { 
-  clients: Client[]
-  onClientClick: (client: Client) => void
-}) {
-  const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
-  
-  const opportunityClients = clients.filter(c => c.is_opportunity && c.disposition !== "closed_won" && c.disposition !== "closed_lost")
-
-  // Group opportunities by DOC
-  const docData: Array<{ 
-    label: string
-    value: string
-    count: number
-    amount: number
-    color: string
-    description: string
-    items: Array<{ data: Client; title: string; companyName: string; value?: number }>
-  }> = [
-    { label: "Low", value: "25", count: 0, amount: 0, color: "#fbbf24", description: "Early stage, needs nurturing", items: [] },
-    { label: "Medium", value: "50", count: 0, amount: 0, color: "#0ea5e9", description: "Engaged, building relationship", items: [] },
-    { label: "High", value: "75", count: 0, amount: 0, color: "#14b8a6", description: "Strong interest, likely to close", items: [] },
-    { label: "Very High", value: "90", count: 0, amount: 0, color: "#22c55e", description: "Ready to close", items: [] },
-  ]
-
-  opportunityClients.forEach(c => {
-    const doc = docData.find(d => d.value === c.doc)
-    if (doc) {
-      doc.count++
-      doc.amount += c.pitch_value || 0
-      doc.items.push({ 
-        data: c, 
-        title: c.title || c.company_name || c.name,
-        companyName: c.company_name || c.name || "",
-        value: c.pitch_value 
-      })
-    }
-  })
-
-  const totalActive = opportunityClients.length
-  const expectedValue = docData.reduce((sum, d) => sum + (d.amount * (parseInt(d.value) / 100)), 0)
-
-  const toggleDoc = (value: string) => {
-    setExpandedDoc(prev => prev === value ? null : value)
-  }
-
-  return (
-    <div className="p-4 md:p-5 rounded-lg bg-white border border-neutral-200/70">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-            <TrendingUp className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-900">Pipeline Confidence</h3>
-            <p className="text-[10px] text-neutral-500">Click to view deals by confidence</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        {docData.map(doc => (
-          <div key={doc.value} className="rounded-lg overflow-hidden border border-neutral-100">
-            {/* Accordion Header */}
-            <button
-              onClick={() => doc.count > 0 && toggleDoc(doc.value)}
-              className={`w-full p-3 flex items-center justify-between transition-colors ${
-                doc.count > 0 ? "hover:bg-neutral-50 cursor-pointer" : "cursor-default opacity-60"
-              } ${expandedDoc === doc.value ? "bg-neutral-50" : ""}`}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: doc.color }} />
-                <span className="text-xs font-medium text-neutral-700">{doc.label} ({doc.value}%)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="text-right">
-                  <span className="text-xs font-medium tabular-nums text-neutral-900">{doc.count} deals</span>
-                  {doc.amount > 0 && (
-                    <span className="text-xs tabular-nums text-neutral-400 ml-1">• {formatCurrency(doc.amount, true)}</span>
-                  )}
-                </div>
-                {doc.count > 0 && (
-                  <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedDoc === doc.value ? "rotate-180" : ""}`} />
-                )}
-              </div>
-            </button>
-
-            {/* Accordion Content - List of deals */}
-            {expandedDoc === doc.value && doc.count > 0 && (
-              <div className="border-t border-neutral-100 divide-y divide-neutral-50 bg-neutral-25">
-                {doc.items.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => onClientClick(item.data)}
-                    className="w-full p-2.5 pl-7 hover:bg-neutral-100 transition-colors text-left flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-xs font-semibold text-neutral-900 truncate">{item.title}</span>
-                      {item.companyName && item.title !== item.companyName && (
-                        <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-medium rounded bg-neutral-100 text-neutral-500">
-                          {item.companyName}
-                        </span>
-                      )}
-                    </div>
-                    {item.value !== undefined && item.value > 0 && (
-                      <span className="shrink-0 text-xs font-medium text-neutral-600">{formatCurrency(item.value, true)}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {totalActive > 0 && (
-        <div className="mt-4 pt-4 border-t border-neutral-100">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-500">Expected Close Value</span>
-            <span className="text-sm font-semibold tabular-nums text-neutral-900">{formatCurrency(expectedValue, true)}</span>
-          </div>
-          <p className="text-[10px] text-neutral-400 mt-1">Based on {totalActive} active opportunities × confidence %</p>
-        </div>
-      )}
-    </div>
-  )
 }
 
 // Active Opportunities List Component - shows client-based opportunities only
@@ -489,8 +202,16 @@ function ActiveOpportunitiesList({
 }
 
 // Platform Goals Progress (uses opportunity clients only for budget tracking)
+// Display order for the Platform Goals list. Brands not listed fall to the end.
+const PLATFORM_GOAL_ORDER = ["434 Media", "Digital Canvas", "TXMX Boxing", "Vemos Vamos", "DEVSA"]
+const platformGoalRank = (brand: string) => {
+  const i = PLATFORM_GOAL_ORDER.indexOf(brand)
+  return i === -1 ? PLATFORM_GOAL_ORDER.length : i
+}
+
 function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
   const { goals: brandGoals } = useBrandGoals()
+  const orderedGoals = [...brandGoals].sort((a, b) => platformGoalRank(a.brand) - platformGoalRank(b.brand))
   return (
     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
@@ -502,7 +223,7 @@ function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
       </div>
 
       <div className="p-4 space-y-4">
-        {brandGoals.map((goal) => {
+        {orderedGoals.map((goal) => {
           const brandClients = clients.filter(c => matchesBrandGoal(c.brand, goal) && c.is_opportunity)
           const wonRevenue = brandClients
             .filter(c => c.disposition === "closed_won")
@@ -623,8 +344,6 @@ export function DashboardView({
   onTaskClick,
   currentUser,
 }: DashboardViewProps) {
-  // Fixed annual budget target
-  const totalBudget = 1500000
   // Funnel scoreboard data — same source as /admin/kpis so numbers align.
   const [funnel, setFunnel] = useState<FunnelKpis | null>(null)
   useEffect(() => {
@@ -645,99 +364,21 @@ export function DashboardView({
     }
   }
   
-  // Use clients with is_opportunity=true - same data source as the Kanban view
-  // This ensures Dashboard KPI calculations match what's shown in the Opportunities Kanban
-  const opportunityClients = clients.filter(c => c.is_opportunity)
-  
-  // Calculate revenue by disposition from opportunity clients
-  // CORRECTED: Closed Won at 100% DOC only counts towards Remaining and Pacing
-  const closedWon100DocRevenue = opportunityClients
-    .filter(c => c.disposition === "closed_won" && c.doc === "100")
-    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-  
-  // All Closed Won revenue (for total pitched calculation)
-  const closedWonRevenue = opportunityClients
-    .filter(c => c.disposition === "closed_won")
-    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-
-  const closedLostRevenue = opportunityClients
-    .filter(c => c.disposition === "closed_lost")
-    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-  
-  // Proposal-stage deals at 90% DOC for Pacing calculation
-  // IMPORTANT: Only "proposal" disposition counts — closed_won/closed_lost are
-  // excluded by the disposition === "proposal" check.
-  const pitched90DocValue = opportunityClients
-    .filter(c => c.disposition === "proposal" && c.doc === "90")
-    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-  
-  // Pipeline value = opportunities that are not closed (pitched or no disposition)
-  const pipelineValue = opportunityClients
-    .filter(c => c.disposition !== "closed_won" && c.disposition !== "closed_lost")
-    .reduce((sum, c) => sum + (c.pitch_value || 0), 0)
-
-  const totalPitched = closedWonRevenue + closedLostRevenue + pipelineValue
-  
-  // CORRECTED: Pacing = Closed Won at 100% DOC + Pitched at 90% DOC
-  const pacing = closedWon100DocRevenue + pitched90DocValue
-  
-  // CORRECTED: Remaining = Total Budget - Closed Won at 100% DOC
-  const remaining = Math.max(0, totalBudget - closedWon100DocRevenue)
-  
-  // Find opportunities in Closed Won that are NOT at 100% DOC (exceptions)
-  const closedWonExceptions = opportunityClients
-    .filter(c => c.disposition === "closed_won" && c.doc !== "100")
-
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Funnel scoreboard — leads the dashboard; same numbers as /admin/kpis. */}
+      {/* Funnel scoreboard — leads the dashboard; same numbers as /admin/kpis.
+          The DOC/confidence forecast lives in the pipeline (a Confidence filter
+          + per-card DOC pill); quota-to-target is tracked per brand in Platform
+          Goals below — so the dashboard stays funnel-consistent. */}
       {funnel && <FunnelScoreboard kpis={funnel} />}
-
-      {/* Exceptions Warning - Show if there are Closed Won without 100% DOC */}
-      {closedWonExceptions.length > 0 && (
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-red-100">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-red-800 mb-1">
-                Exceptions Report: {closedWonExceptions.length} Closed Won {closedWonExceptions.length === 1 ? 'opportunity' : 'opportunities'} not at 100% DOC
-              </h4>
-              <ul className="text-xs text-red-700 space-y-1">
-                {closedWonExceptions.map(c => (
-                  <li key={c.id} className="flex items-center gap-2">
-                    <span className="font-medium">{c.title || c.company_name || c.name}</span>
-                    <span className="px-1.5 py-0.5 bg-red-100 rounded text-red-600">DOC: {c.doc || 'Not set'}%</span>
-                    {c.pitch_value && <span className="text-red-500">{formatCurrency(c.pitch_value, true)}</span>}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-red-600 mt-2">
-                These opportunities are not counted in Remaining or Pacing. Set DOC to 100% to include them.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-        <KPICard label="Budget" value={formatCurrency(totalBudget, true)} subLabel="Annual sales goal" icon={RocketIcon} color="neutral" />
-        <KPICard label="Remaining" value={formatCurrency(remaining, true)} subLabel="Budget - Won (100% DOC)" icon={Target} color="amber" />
-        <KPICard label="Pacing" value={formatCurrency(pacing, true)} subLabel="Won 100% + Pitched 90%" icon={TrendingUp} color="sky" />
-        <KPICard label="Total Pitched" value={formatCurrency(totalPitched, true)} subLabel="All opportunities" icon={BarChart3} color="sky" />
-
-        {/* Opportunity Flow Chart */}
-        <div className="col-span-2 md:col-span-4 xl:col-span-1">
-          <OpportunityProgressChart clients={clients} />
-        </div>
-      </div>
 
       {/* Main Content Grid - 70/30 split on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         {/* Left Column - Primary content (70%) */}
         <div className="space-y-6">
+          {/* Unified follow-up queue — leads + opportunities + sequence sends. */}
+          <FollowupsQueue />
+
           <ActiveOpportunitiesList
             clients={clients}
             tasks={tasks}
@@ -749,11 +390,6 @@ export function DashboardView({
 
         {/* Right Column */}
         <div className="space-y-6">
-          <PipelineConfidence 
-            clients={clients} 
-            onClientClick={handleClientClick}
-          />
-
           <PlatformGoalsProgress clients={clients} />
         </div>
       </div>

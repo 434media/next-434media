@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Plus,
   Layers,
-  Filter
+  Filter,
+  Gauge
 } from "lucide-react"
 import {
   formatCurrency,
@@ -591,6 +592,10 @@ export function OpportunitiesKanbanView({
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: "client" | "task" } | null>(null)
   // Live roster (active Firestore members) for the assignee filter — no seed names.
   const { members: teamMembers } = useTeamMembers()
+  // Confidence (DOC) filter — the exec's forecast data, leveraged as a lens on
+  // the pipeline: focus the board on high-conviction deals. "all" = no filter;
+  // otherwise a minimum DOC threshold. Local view state (not URL-persisted).
+  const [confidenceFilter, setConfidenceFilter] = useState<string>("all")
 
   // Filter only opportunity items - separate active from archived
   const allOpportunityClients = clients.filter(c => c.is_opportunity)
@@ -620,10 +625,14 @@ export function OpportunitiesKanbanView({
     new Set([...uniqueAssignees, ...teamMembers.map(m => m.name)])
   ).sort()
 
-  // Filter opportunities by assignee (compare normalized names)
-  const filteredOpportunityClients = assigneeFilter === "all" 
-    ? opportunityClients 
-    : opportunityClients.filter(c => normalizeAssigneeName(c.assigned_to || "") === assigneeFilter)
+  // Filter opportunities by assignee (normalized names), then by confidence —
+  // a minimum DOC threshold. An opportunity with no DOC set is treated as 0, so
+  // it drops out once any confidence threshold is applied.
+  const passesConfidence = (doc?: DOC) =>
+    confidenceFilter === "all" || (doc ? Number(doc) : 0) >= Number(confidenceFilter)
+  const filteredOpportunityClients = opportunityClients
+    .filter(c => assigneeFilter === "all" || normalizeAssigneeName(c.assigned_to || "") === assigneeFilter)
+    .filter(c => passesConfidence(c.doc))
   const filteredOpportunityTasks = assigneeFilter === "all"
     ? opportunityTasks
     : opportunityTasks.filter(t => normalizeAssigneeName(t.assigned_to || "") === assigneeFilter)
@@ -805,6 +814,19 @@ export function OpportunitiesKanbanView({
               ]}
             />
           )}
+          {/* Confidence Filter — the exec's DOC data as a pipeline lens. */}
+          <Dropdown
+            ariaLabel="Filter opportunities by confidence"
+            icon={<Gauge className="w-3.5 h-3.5 text-neutral-400" />}
+            value={confidenceFilter}
+            onChange={setConfidenceFilter}
+            options={[
+              { value: "all", label: "All confidence" },
+              { value: "90", label: "≥ 90% (committed)" },
+              { value: "75", label: "≥ 75% (likely)" },
+              { value: "50", label: "≥ 50% (possible)" },
+            ]}
+          />
           {/* Add Opportunity Button */}
           {onAddOpportunity && (
             <button
