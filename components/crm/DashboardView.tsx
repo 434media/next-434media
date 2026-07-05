@@ -1,20 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   RocketIcon,
   TrendingUp,
   Target,
-  CheckCircle2,
-  Clock,
   AlertCircle,
-  ChevronRight,
   ChevronDown,
   Calendar,
   BarChart3,
   ArrowUpRight,
   ArrowDownRight,
+  Timer,
 } from "lucide-react"
+import type { FunnelKpis } from "@/lib/kpis/funnel"
 import {
   formatCurrency,
   formatDate,
@@ -549,155 +548,65 @@ function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
   )
 }
 
-// Task Summary Card with expandable sections
-function TaskSummaryCard({
-  tasks,
-  onTaskClick,
-  onViewAll,
-}: {
-  tasks: Task[]
-  onTaskClick: (task: Task) => void
-  onViewAll: () => void
-}) {
-  const [expandedSection, setExpandedSection] = useState<"today" | "overdue" | "inProgress" | null>(null)
-
-  const today = new Date().toISOString().split("T")[0]
-
-  const tasksDueToday = tasks.filter(t => {
-    if (!t.due_date || t.status === "completed") return false
-    return t.due_date.split("T")[0] === today
-  })
-
-  const tasksOverdue = tasks.filter(t => {
-    if (!t.due_date || t.status === "completed") return false
-    return t.due_date.split("T")[0] < today
-  })
-
-  const tasksInProgress = tasks.filter(t => t.status === "in_progress")
-
-  const toggleSection = (section: "today" | "overdue" | "inProgress") => {
-    setExpandedSection(prev => prev === section ? null : section)
+// Funnel scoreboard — the CRM's bottom half (Discovery → Proposal → Closed-Won)
+// read from the SAME FunnelKpis as /admin/kpis, so the two never disagree. Leads
+// the dashboard so a first-timer sees the funnel before the finance detail.
+function FunnelScoreboard({ kpis }: { kpis: FunnelKpis }) {
+  const reachedOf = (s: string) => kpis.stages.find((x) => x.stage === s)?.reached ?? 0
+  const convOf = (from: string) => {
+    const c = kpis.conversions.find((x) => x.from === from)
+    return c ? Math.round(c.rate * 100) : 0
   }
-
-  const renderTaskList = (taskList: Task[]) => (
-    <div className="divide-y divide-neutral-100 border-t border-neutral-100">
-      {taskList.length === 0 ? (
-        <p className="p-3 text-xs text-neutral-400 text-center">No tasks</p>
-      ) : (
-        taskList.slice(0, 5).map(task => (
-          <button
-            key={task.id}
-            onClick={(e) => {
-              e.stopPropagation()
-              onTaskClick(task)
-            }}
-            className="w-full p-3 hover:bg-neutral-50 transition-colors text-left flex items-center gap-3"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-neutral-900 truncate">{task.title}</p>
-                {task.brand && (
-                  <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-neutral-100 text-neutral-600">
-                    {task.brand}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-neutral-500 truncate">
-                {task.assigned_to ? `Assigned to ${task.assigned_to}` : "Unassigned"}
-                {task.due_date && ` • Due ${formatDate(task.due_date)}`}
-              </p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-neutral-300" />
-          </button>
-        ))
-      )}
-    </div>
-  )
-
+  const ttcw = kpis.velocity.find((v) => v.step === "Time to Closed-Won")
+  const stageCells = [
+    { label: "Discovery", value: reachedOf("discovery"), color: "#14b8a6" },
+    { label: "Proposal", value: reachedOf("proposal"), color: "#0ea5e9" },
+    { label: "Closed-Won", value: reachedOf("closed_won"), color: "#22c55e" },
+  ]
   return (
-    <div className="bg-white rounded-lg border border-neutral-200/70 overflow-hidden">
-      <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
+    <div className="rounded-xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-neutral-500" />
-          <h3 className="text-sm font-medium text-neutral-900">Task Summary</h3>
-          <span className="text-xs tabular-nums text-neutral-400">({tasks.filter(t => t.status !== "completed").length} pending)</span>
+          <BarChart3 className="w-4 h-4 text-neutral-500" />
+          <h3 className="text-sm font-medium text-neutral-900">Funnel — this half</h3>
         </div>
-        <button
-          onClick={() => {
-            onViewAll()
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
-          className="text-xs font-medium text-neutral-600 hover:text-neutral-950 flex items-center gap-1 transition-colors"
+        <a
+          href="/admin/kpis"
+          className="text-[11px] text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-1"
         >
-          View all
-          <ArrowUpRight className="w-3 h-3" />
-        </button>
+          Full funnel KPIs <ArrowUpRight className="w-3 h-3" />
+        </a>
       </div>
-
-      <div>
-        {/* Due Today */}
-        <button
-          onClick={() => toggleSection("today")}
-          className="w-full p-3 hover:bg-neutral-50 transition-colors flex items-center justify-between"
-        >
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-              <Calendar className="w-4 h-4" />
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        {stageCells.map((c) => (
+          <div key={c.label} className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }} />
+              <span className="text-[10px] uppercase tracking-wide text-neutral-400">{c.label}</span>
             </div>
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
-              Due Today
-            </span>
+            <div className="text-xl font-semibold tabular-nums text-neutral-900 mt-0.5">{c.value}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold tabular-nums text-neutral-900">{tasksDueToday.length}</span>
-            <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSection === "today" ? "rotate-180" : ""}`} />
+        ))}
+        <div className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2">
+          <span className="text-[10px] uppercase tracking-wide text-neutral-400">Disc → Prop</span>
+          <div className="text-xl font-semibold tabular-nums text-neutral-900 mt-0.5">{convOf("discovery")}%</div>
+        </div>
+        <div className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2">
+          <span className="text-[10px] uppercase tracking-wide text-neutral-400">Prop → Won</span>
+          <div className="text-xl font-semibold tabular-nums text-neutral-900 mt-0.5">{convOf("proposal")}%</div>
+        </div>
+        <div className="rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2">
+          <span className="text-[10px] uppercase tracking-wide text-neutral-400 inline-flex items-center gap-1">
+            <Timer className="w-3 h-3" />Time to Won
+          </span>
+          <div className="text-xl font-semibold tabular-nums text-neutral-900 mt-0.5">
+            {ttcw && ttcw.sampleSize > 0 ? `${ttcw.medianDays}d` : "—"}
           </div>
-        </button>
-        {expandedSection === "today" && renderTaskList(tasksDueToday)}
-
-        {/* Overdue */}
-        <button
-          onClick={() => toggleSection("overdue")}
-          className="w-full p-3 hover:bg-neutral-50 transition-colors flex items-center justify-between border-t border-neutral-100"
-        >
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-              <AlertCircle className="w-4 h-4" />
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500" aria-hidden="true" />
-              Overdue
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-lg font-semibold tabular-nums ${tasksOverdue.length > 0 ? "text-red-600" : "text-neutral-900"}`}>{tasksOverdue.length}</span>
-            <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSection === "overdue" ? "rotate-180" : ""}`} />
-          </div>
-        </button>
-        {expandedSection === "overdue" && renderTaskList(tasksOverdue)}
-
-        {/* In Progress */}
-        <button
-          onClick={() => toggleSection("inProgress")}
-          className="w-full p-3 hover:bg-neutral-50 transition-colors flex items-center justify-between border-t border-neutral-100"
-        >
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-md bg-neutral-100 text-neutral-700">
-              <Clock className="w-4 h-4" />
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
-              In Progress
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold tabular-nums text-neutral-900">{tasksInProgress.length}</span>
-            <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${expandedSection === "inProgress" ? "rotate-180" : ""}`} />
-          </div>
-        </button>
-        {expandedSection === "inProgress" && renderTaskList(tasksInProgress)}
+        </div>
       </div>
+      <p className="text-[10px] text-neutral-400 mt-2">
+        Same figures as the Funnel KPI page — leads + opportunities, this funnel&apos;s bottom half.
+      </p>
     </div>
   )
 }
@@ -716,6 +625,16 @@ export function DashboardView({
 }: DashboardViewProps) {
   // Fixed annual budget target
   const totalBudget = 1500000
+  // Funnel scoreboard data — same source as /admin/kpis so numbers align.
+  const [funnel, setFunnel] = useState<FunnelKpis | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/kpis/funnel", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.kpis) setFunnel(d.kpis) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   
   // Handler that opens opportunity modal for opportunities, contact modal for contacts
   const handleClientClick = (client: Client) => {
@@ -771,6 +690,9 @@ export function DashboardView({
 
   return (
     <div className="space-y-6 md:space-y-8">
+      {/* Funnel scoreboard — leads the dashboard; same numbers as /admin/kpis. */}
+      {funnel && <FunnelScoreboard kpis={funnel} />}
+
       {/* Exceptions Warning - Show if there are Closed Won without 100% DOC */}
       {closedWonExceptions.length > 0 && (
         <div className="p-4 rounded-xl bg-red-50 border border-red-200">
@@ -822,12 +744,6 @@ export function DashboardView({
             onClientClick={handleClientClick}
             onTaskClick={onTaskClick}
             onViewAll={() => onViewChange("pipeline")}
-          />
-
-          <TaskSummaryCard
-            tasks={tasks}
-            onTaskClick={onTaskClick}
-            onViewAll={() => onViewChange("tasks")}
           />
         </div>
 

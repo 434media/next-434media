@@ -7,7 +7,6 @@ import {
   BarChart3,
   Target,
   Users,
-  CheckCircle2,
   AlertCircle,
   Rocket,
 } from "lucide-react"
@@ -586,7 +585,7 @@ function SalesCRMPageInner() {
       )
       return
     }
-    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients", "tasks"]
+    const allowed: ViewMode[] = ["dashboard", "pipeline", "clients"]
     const next: ViewMode = allowed.includes(tabParam as ViewMode) ? (tabParam as ViewMode) : "dashboard"
     if (next !== viewMode) setViewMode(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -812,7 +811,7 @@ function SalesCRMPageInner() {
             <Rocket className="w-4 h-4 text-neutral-600" />
             <h1 className="text-sm font-semibold text-neutral-800 tracking-wide">CRM</h1>
             <span className="hidden sm:inline-flex items-center px-2 py-0.5 ml-1 text-[10px] font-medium text-neutral-500 bg-neutral-100 rounded-full">
-              clients &amp; won revenue — the pipeline&apos;s final stage
+              opportunities → clients — the second half of the funnel
             </span>
           </div>
           <nav
@@ -823,7 +822,6 @@ function SalesCRMPageInner() {
               { id: "dashboard", label: "Dashboard", icon: BarChart3, badge: null },
               { id: "pipeline", label: "Opportunities", icon: Target, badge: null },
               { id: "clients", label: "Clients", icon: Users, badge: null },
-              { id: "tasks", label: "Tasks", icon: CheckCircle2, badge: null },
             ].map(({ id, label, icon: Icon, badge }) => (
               <button
                 key={id}
