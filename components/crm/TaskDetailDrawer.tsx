@@ -358,7 +358,7 @@ export function TaskDetailDrawer({
                       <label className="text-sm font-medium text-neutral-700">Assignment</label>
                     </div>
                     <a
-                      href="/admin/crm/settings?tab=team"
+                      href="/admin/opportunities/settings?tab=team"
                       className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
                     >
                       Manage team →

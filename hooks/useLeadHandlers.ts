@@ -266,7 +266,7 @@ export function useLeadHandlers({
             message: `Lead already converted — opening existing client`,
             type: "success",
           })
-          window.location.href = `/admin/crm?tab=clients&open=${data.clientId}`
+          window.location.href = `/admin/opportunities?tab=clients&open=${data.clientId}`
           return
         }
         if (!res.ok) {
@@ -281,7 +281,7 @@ export function useLeadHandlers({
           type: "success",
         })
         // Hand off to the client drawer so the rep continues from the new record
-        window.location.href = `/admin/crm?tab=clients&open=${data.client.id}`
+        window.location.href = `/admin/opportunities?tab=clients&open=${data.client.id}`
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to convert lead"
         setToast({ message, type: "error" })

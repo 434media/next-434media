@@ -114,7 +114,7 @@ export function NotificationsPopover() {
       } else {
         // Tasks still open on the CRM page via the sessionStorage handoff.
         sessionStorage.setItem("openTaskId", n.task_id)
-        window.location.href = "/admin/crm"
+        window.location.href = "/admin/opportunities"
       }
     }
     markAsRead([n.id])

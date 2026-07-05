@@ -121,7 +121,7 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
     // Create the email content
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://434media.com'
     // Sanitize taskUrl to prevent SSRF/injection; fall back to safe constructed URL
-    const taskLink = taskUrl ? sanitizeUrl(taskUrl) : `${baseUrl}/admin/crm?task=${encodeURIComponent(taskId)}`
+    const taskLink = taskUrl ? sanitizeUrl(taskUrl) : `${baseUrl}/admin/opportunities?task=${encodeURIComponent(taskId)}`
     
     // Escape user-controlled content to prevent HTML injection in email
     const safeTaskTitle = escapeHtml(taskTitle)

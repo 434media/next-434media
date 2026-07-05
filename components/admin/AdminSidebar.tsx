@@ -162,8 +162,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         id: "crm",
         label: "Opportunities",
         icon: Rocket,
-        href: "/admin/crm",
-        matchPrefix: "/admin/crm",
+        href: "/admin/opportunities",
+        matchPrefix: "/admin/opportunities",
         // Operator deal pipeline (clients, opportunities, revenue). Opened to
         // interns for the QA period so they can convert + close a test deal.
         roles: ["full_admin", "crm_only", "intern"],
@@ -322,8 +322,8 @@ const FOOTER_ITEMS: SidebarLink[] = [
     id: "settings",
     label: "Settings",
     icon: Settings,
-    href: "/admin/crm/settings",
-    matchPrefix: "/admin/crm/settings",
+    href: "/admin/opportunities/settings",
+    matchPrefix: "/admin/opportunities/settings",
     roles: ["crm_super_admin"],
   },
 ]

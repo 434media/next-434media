@@ -89,7 +89,7 @@ export async function GET() {
           date: c.next_followup_date.split("T")[0],
           bucket: b,
           detail: `Opportunity · ${c.disposition ?? "discovery"}`,
-          href: `/admin/crm?tab=pipeline`,
+          href: `/admin/opportunities?tab=pipeline`,
         })
     }
 

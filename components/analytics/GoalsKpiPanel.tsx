@@ -100,7 +100,7 @@ export function GoalsKpiPanel({ propertyId }: GoalsKpiPanelProps) {
           {evaluations.length} {evaluations.length === 1 ? "goal" : "goals"}
         </span>
         <Link
-          href="/admin/crm/settings?tab=goals"
+          href="/admin/opportunities/settings?tab=goals"
           className="ml-auto inline-flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-700"
         >
           <Settings className="w-3 h-3" />

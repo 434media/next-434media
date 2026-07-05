@@ -73,7 +73,7 @@ function renderHtml(opps: StaleOpp[], baseUrl: string): string {
   const totalValue = opps.reduce((sum, o) => sum + o.value, 0)
   const rows = opps
     .map((o) => {
-      const url = `${baseUrl}/admin/crm?tab=pipeline&openOpportunity=${encodeURIComponent(o.id)}`
+      const url = `${baseUrl}/admin/opportunities?tab=pipeline&openOpportunity=${encodeURIComponent(o.id)}`
       const overdueColor = o.daysOverdue > 30 ? "#dc2626" : o.daysOverdue > 14 ? "#d97706" : "#737373"
       return `
         <tr>

@@ -57,6 +57,16 @@ const nextConfig: NextConfig = {
       ],
     }
   },
+
+  // The CRM section was renamed to Opportunities and moved to /admin/opportunities.
+  // Keep every old link working — bookmarks, command palette, cron/notification
+  // deep-links — with query strings + sub-paths (e.g. /settings) preserved.
+  async redirects() {
+    return [
+      { source: '/admin/crm', destination: '/admin/opportunities', permanent: false },
+      { source: '/admin/crm/:path*', destination: '/admin/opportunities/:path*', permanent: false },
+    ]
+  },
 };
 
 export default withBotId(nextConfig);

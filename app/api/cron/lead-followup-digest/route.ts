@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
         followUpDate: c.next_followup_date!.split("T")[0],
         daysOverdue: daysBetween(c.next_followup_date!, now),
         assignedTo: c.assigned_to ?? "unassigned",
-        url: `${baseUrl}/admin/crm?tab=${isOpp ? "pipeline&openOpportunity" : "clients&open"}=${encodeURIComponent(c.id)}`,
+        url: `${baseUrl}/admin/opportunities?tab=${isOpp ? "pipeline&openOpportunity" : "clients&open"}=${encodeURIComponent(c.id)}`,
       })
     }
 

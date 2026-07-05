@@ -41,7 +41,7 @@ export const ADMIN_SECTIONS = {
   analyticsInstagram: { path: '/admin/analytics-instagram', roles: ['full_admin', 'intern'] },
   analyticsWeb: { path: '/admin/analytics-web', roles: ['full_admin', 'intern'] },
   blog: { path: '/admin/blog', roles: ['full_admin'] },
-  crm: { path: '/admin/crm', roles: ['full_admin', 'crm_only', 'intern'] },
+  crm: { path: '/admin/opportunities', roles: ['full_admin', 'crm_only', 'intern'] },
   emailLists: { path: '/admin/email-lists', roles: ['full_admin'] },
   events: { path: '/admin/events', roles: ['full_admin'] },
   feedForm: { path: '/admin/feed-form', roles: ['full_admin'] },

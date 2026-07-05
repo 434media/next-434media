@@ -49,7 +49,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Plus,
     section: "Quick actions",
     search: "create new client add company",
-    run: (router) => router.push("/admin/crm?tab=clients&new=client"),
+    run: (router) => router.push("/admin/opportunities?tab=clients&new=client"),
   },
   {
     id: "create-opportunity",
@@ -58,7 +58,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Target,
     section: "Quick actions",
     search: "create new opportunity deal pitch",
-    run: (router) => router.push("/admin/crm?tab=pipeline&new=opportunity"),
+    run: (router) => router.push("/admin/opportunities?tab=pipeline&new=opportunity"),
   },
   {
     id: "create-task",
@@ -67,7 +67,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: CheckCircle2,
     section: "Quick actions",
     search: "create new task todo",
-    run: (router) => router.push("/admin/crm?tab=tasks&new=task"),
+    run: (router) => router.push("/admin/opportunities?tab=tasks&new=task"),
   },
   {
     id: "create-content-post",
@@ -105,7 +105,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Rocket,
     section: "Navigate",
     search: "crm dashboard pipeline clients tasks",
-    run: (router) => router.push("/admin/crm"),
+    run: (router) => router.push("/admin/opportunities"),
   },
   {
     id: "nav-leads",
@@ -271,7 +271,7 @@ const STATIC_ITEMS: CommandItem[] = [
     icon: Settings,
     section: "Navigate",
     search: "settings team members config admin",
-    run: (router) => router.push("/admin/crm/settings"),
+    run: (router) => router.push("/admin/opportunities/settings"),
   },
 ]
 
@@ -391,7 +391,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
         icon: Building2,
         section: "Clients",
         search: `${label} ${brand}`.toLowerCase(),
-        run: (router) => router.push(`/admin/crm?tab=clients&open=${c.id}`),
+        run: (router) => router.push(`/admin/opportunities?tab=clients&open=${c.id}`),
       })
     }
 
@@ -409,7 +409,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
         icon: Target,
         section: "Opportunities",
         search: `${label} ${clientName} ${stage}`.toLowerCase(),
-        run: (router) => router.push(`/admin/crm?tab=pipeline&openOpportunity=${o.id}`),
+        run: (router) => router.push(`/admin/opportunities?tab=pipeline&openOpportunity=${o.id}`),
       })
     }
 
@@ -424,7 +424,7 @@ export function CommandPalette({ disabled }: CommandPaletteProps) {
         icon: CheckCircle2,
         section: "Tasks",
         search: `${label} ${assignee} ${status}`.toLowerCase(),
-        run: (router) => router.push(`/admin/crm?tab=tasks&openTask=${t.id}`),
+        run: (router) => router.push(`/admin/opportunities?tab=tasks&openTask=${t.id}`),
       })
     }
 

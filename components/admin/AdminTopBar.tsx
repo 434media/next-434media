@@ -19,7 +19,7 @@ interface AdminTopBarProps {
 }
 
 const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
-  { match: "/admin/crm", label: "CRM" },
+  { match: "/admin/opportunities", label: "Opportunities" },
   { match: "/admin/leads", label: "Leads" },
   { match: "/admin/inbox", label: "Inbox" },
   { match: "/admin/audiences", label: "Audiences" },

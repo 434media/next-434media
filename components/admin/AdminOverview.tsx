@@ -302,7 +302,7 @@ export function AdminOverview() {
             {/* 03 — Win */}
             <FunnelZone label="03 · Client" className="lg:flex-1">
               <StageNode
-                href="/admin/crm"
+                href="/admin/opportunities"
                 icon={Rocket}
                 title="Clients"
                 stat={counts?.clientsTotal ?? 0}
@@ -350,7 +350,7 @@ export function AdminOverview() {
             <Connector label="convert" />
             <FunnelZone label="03 · Client" className="sm:flex-1">
               <StageNode
-                href="/admin/crm"
+                href="/admin/opportunities"
                 icon={Rocket}
                 title="Clients"
                 stat={counts?.clientsTotal ?? 0}

@@ -1085,9 +1085,9 @@ function SalesCRMPageInner() {
 
 // Operator deal pipeline — clients, opportunities, and won revenue. Gated to
 // operators; interns do funnel research in Leads, not here. Wrapping the inner
-// component (rather than guarding inside it) means the CRM data fetches only
-// fire once access is confirmed, so an intern hitting /admin/crm directly is
-// redirected without the page loading any client/opportunity data.
+// component (rather than guarding inside it) means the data fetches only
+// fire once access is confirmed, so an intern hitting /admin/opportunities directly
+// is redirected without the page loading any client/opportunity data.
 export default function SalesCRMPage() {
   return (
     <AdminRoleGuard allowedRoles={["full_admin", "crm_only", "intern"]}>
