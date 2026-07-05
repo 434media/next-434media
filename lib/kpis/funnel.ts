@@ -148,6 +148,22 @@ function clientToStage(c: ClientRecord): FunnelStage | "exit" | null {
   }
 }
 
+// A standalone opportunity (client-opp with no originating lead) as a funnel
+// journey: it enters at its disposition's stage. A lost deal reached the pitch
+// before dying, so it exits at Proposal.
+function opportunityJourney(c: ClientRecord): { stage: FunnelStage; isExit: boolean } {
+  switch (c.disposition) {
+    case "closed_won":
+      return { stage: "closed_won", isExit: false }
+    case "closed_lost":
+      return { stage: "proposal", isExit: true }
+    case "proposal":
+      return { stage: "proposal", isExit: false }
+    default:
+      return { stage: "discovery", isExit: false } // "discovery" | undefined
+  }
+}
+
 // Every status a lead ever entered — reconstructed from the activity log so an
 // archived lead still counts at the stage it reached. status_changed events
 // carry detail "x → y"; the target is the right-hand side.
@@ -253,13 +269,31 @@ export function computeFunnelKpis(
     return { lead, stage, isExit }
   })
 
-  const reached = (n: number) => journeys.filter((j) => idx(j.stage) >= n).length
+  // Unified pipeline (Decision 1): standalone opportunities — client-opps with
+  // no originating lead — enter the funnel at their current stage, so the funnel
+  // counts every deal, not only lead-sourced ones. An opp reached via a converted
+  // lead is already counted through that lead's journey, so dedupe by client id.
+  const leadLinkedClientIds = new Set(
+    leads.map((l) => l.converted_to_client_id).filter((id): id is string => !!id),
+  )
+  const oppJourneys = clients
+    .filter((c) => c.is_opportunity && !c.is_archived && !leadLinkedClientIds.has(c.id))
+    .map((c) => opportunityJourney(c))
+
+  // Stage counts + conversion span leads AND standalone opportunities. Velocity
+  // (below) stays lead-only — standalone opps have no lead-side timeline.
+  const stageJourneys: { stage: FunnelStage; isExit: boolean }[] = [
+    ...journeys.map((j) => ({ stage: j.stage, isExit: j.isExit })),
+    ...oppJourneys,
+  ]
+
+  const reached = (n: number) => stageJourneys.filter((j) => idx(j.stage) >= n).length
 
   const stages: FunnelStageStat[] = STAGE_ORDER.map((stage, n) => ({
     stage,
     label: STAGE_LABELS[stage],
     reached: reached(n),
-    exited: journeys.filter((j) => j.isExit && j.stage === stage).length,
+    exited: stageJourneys.filter((j) => j.isExit && j.stage === stage).length,
   }))
 
   const conversions: FunnelConversionStat[] = STAGE_ORDER.slice(0, -1).map((from, n) => {

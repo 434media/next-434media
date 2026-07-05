@@ -136,11 +136,20 @@ half — so the two dashboards can never disagree:
 
 Client-opportunities only; drag = change stage (disposition). No task cards.
 
-### 4d. **Tasks** → work items
+### 4d. **Tasks** → RETIRED (decided 2026-07-05)
 
-Table/list; each row shows a chip linking its **lead or opportunity**; no stage
-columns of its own. The "Track in pipeline" toggle and `disposition`/`doc` fields
-are removed (Phase 2).
+Data settled it: the Tasks board is a **pre-funnel general-ops board that's no
+longer used** — 453 tasks, 100% `completed`, 96% unlinked, 0 lead links. The
+funnel already has its execution layer in **Leads** (top half) and
+**Opportunities** (bottom half): you work a deal by advancing its stage and using
+its drawer. A task board would duplicate that and re-fragment follow-ups.
+
+- **Remove the Tasks tab** from the CRM nav → `Dashboard · Opportunities · Clients`.
+  Historically-linked tasks still show in the opportunity drawer's Linked panel.
+- **Add a thin "Due today / Follow-ups" queue** (the one thing tasks half-did,
+  done right): a rollup reading `lead.next_followup_date` +
+  `opportunity.next_followup_date` (+ sequence sends) into one list — finally
+  unifying the three follow-up mechanisms into a single work queue.
 
 ### 4e. CRM `HowItWorks` strip (first-run orientation)
 
