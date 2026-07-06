@@ -313,7 +313,10 @@ export function OpportunityDetailDrawer({
         // Pre-populate contacts if available (but don't share - copy them)
         contacts: existingClient?.contacts?.map(c => ({
           id: generateContactId(), // Generate NEW IDs so contacts are independent
-          name: c.name || "",
+          // ContactFormData splits the name — fall back to the legacy `name`
+          // field if a source contact only has the computed value.
+          first_name: c.first_name || c.name?.split(" ")[0] || "",
+          last_name: c.last_name || c.name?.split(" ").slice(1).join(" ") || "",
           email: c.email || "",
           phone: c.phone || "",
           role: c.role || "",
