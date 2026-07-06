@@ -133,7 +133,7 @@ const filtersSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Loose keyword search across the candidate profile — RESERVED for niche, non-industry terms an ICP industry category can't express (e.g. 'fight gear', 'cannabis', 'prosthetics', 'cumbia'). Do NOT put a broad industry here — use icp_industries for that. Keep it tight (one or two terms). Often left empty.",
+      "Loose keyword search across the candidate profile — RESERVED for niche, non-industry terms an ICP industry category can't express (e.g. 'fight gear', 'cannabis', 'prosthetics', 'cumbia'). WARNING: Apollo AND-s this with every other filter and matches it strictly, so a narrow keyword usually returns ZERO results — when unsure, leave it empty. Industry sub-verticals are NOT niche terms: 'dev tools', 'cloud', 'SaaS', 'AI', 'fintech' → icp_industries: tech_saas; 'biotech', 'medtech', 'digital health' → icp_industries: healthcare_life_sciences; etc. Never put an industry (broad OR sub-vertical) here.",
     ),
   contact_email_status: z
     .array(
@@ -194,6 +194,18 @@ export interface TranslateResult {
   reasoning: string
   /** Set when the prompt was ambiguous; UI should surface a clarification step */
   ambiguityNote?: string
+  /**
+   * The ICP industry categories the LLM selected (pre-resolution). Surfaced so
+   * the editable-filters UI can show/edit industry as readable categories
+   * instead of the resolved tag IDs / keywords.
+   */
+  icpIndustries?: IcpIndustry[]
+  /**
+   * The LLM's niche (non-industry) keyword only — separate from the industry
+   * fallback that gets folded into `filters.q_keywords`. Lets the editable UI
+   * show the true niche term without duplicating the industry category.
+   */
+  nicheKeyword?: string
 }
 
 /**
@@ -245,7 +257,7 @@ TRANSLATION RULES
 
 10. PERSONA TIERS. Each ICP archetype above defines Tier 1 (Economic Buyer), Tier 2 (Champion), Tier 3 (End User). For OUTBOUND, the Champion (Tier 2) is usually the best first-touch, so it should be included — not just the C-suite. When the rep names an archetype ("sponsor-buyers", "event partners") or asks broadly for "decision-makers", pull person_titles / person_seniorities from BOTH that archetype's Tier 1 and Tier 2 rows. When the rep names a specific title, respect it exactly and don't widen.
 
-11. INDUSTRY. Emit icp_industries (the ICP industry-category enum) whenever the prompt or the matched archetype implies an industry — this is the primary industry lever. Reserve q_keywords for niche non-industry terms only (e.g. 'fight gear', 'prosthetics'). Don't duplicate a broad industry across both fields.
+11. INDUSTRY. Emit icp_industries (the ICP industry-category enum) whenever the prompt or the matched archetype implies an industry — this is the primary industry lever. Map industry sub-verticals to their category: 'dev tools / cloud / SaaS / AI / fintech' → tech_saas; 'biotech / medtech / digital health' → healthcare_life_sciences; 'CPG / beverage / apparel' → cpg_consumer; etc. Do NOT route these through q_keywords — a narrow keyword AND-s against every filter and typically returns ZERO. Reserve q_keywords for genuinely orthogonal niche terms only (e.g. 'fight gear', 'prosthetics'), and prefer leaving it empty.
 
 12. EMAIL STATUS. 434media uses Apollo primarily for outbound, so default contact_email_status to ['verified','likely to engage'] to keep results contactable. Only widen to include 'unverified' if the rep explicitly asks for maximum reach. Mention this default in reasoning.
 
@@ -365,5 +377,7 @@ export async function translatePromptToFilters(
     filters,
     reasoning: raw.reasoning?.trim() || "(no reasoning provided)",
     ambiguityNote: raw.ambiguity_note?.trim() || undefined,
+    icpIndustries: industries.length ? industries : undefined,
+    nicheKeyword: nicheKeyword || undefined,
   }
 }

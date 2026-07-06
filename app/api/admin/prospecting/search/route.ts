@@ -5,6 +5,7 @@ import {
   ApolloError,
   getCreditsUsedThisProcess,
 } from "@/lib/prospecting/apollo"
+import type { ApolloSearchFilters } from "@/lib/prospecting/apollo"
 import { translatePromptToFilters } from "@/lib/prospecting/translator"
 import {
   scoreCandidates,
@@ -28,11 +29,17 @@ import {
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-const PER_PAGE_DEFAULT = 25
+const PER_PAGE_DEFAULT = 10 // Lowered from 25 for QA cost control (see prospect page).
 const PER_PAGE_MAX = 50 // Stage 0 cap; controls cost per query.
 
 interface SearchRequestBody {
-  prompt: string
+  prompt?: string
+  /**
+   * Pre-built / rep-edited filters. When present, we skip translation entirely
+   * (no LLM call, no ambiguity gate) and search Apollo with these directly —
+   * this backs the "edit filters before search" + archetype-preset flows.
+   */
+  filters?: ApolloSearchFilters
   perPage?: number
 }
 
@@ -59,8 +66,13 @@ export async function POST(req: NextRequest) {
   }
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : ""
-  if (!prompt) {
-    return NextResponse.json({ error: "prompt is required" }, { status: 400 })
+  const providedFilters =
+    body.filters && typeof body.filters === "object" ? body.filters : null
+  if (!prompt && !providedFilters) {
+    return NextResponse.json(
+      { error: "prompt or filters required" },
+      { status: 400 },
+    )
   }
 
   // Cap per_page — protects against accidentally requesting 1000 results
@@ -68,35 +80,50 @@ export async function POST(req: NextRequest) {
   const requestedPerPage = typeof body.perPage === "number" ? body.perPage : PER_PAGE_DEFAULT
   const perPage = Math.max(1, Math.min(PER_PAGE_MAX, requestedPerPage))
 
-  // ── 1. Translate ──
-  let translation
-  try {
-    translation = await translatePromptToFilters(prompt)
-  } catch (err) {
-    return surfaceError(err, "anthropic")
-  }
-
-  // ── 1a. Bail early on ambiguous prompts (no Apollo credits burned) ──
-  if (translation.ambiguityNote) {
-    return NextResponse.json({
-      success: true,
-      ambiguous: true,
-      prompt,
-      reasoning: translation.reasoning,
-      ambiguityNote: translation.ambiguityNote,
-    })
+  // ── 1. Resolve filters ──
+  // Two paths: rep-edited/preset filters skip translation entirely; a raw
+  // prompt goes through the LLM translator (which may flag ambiguity).
+  let baseFilters: ApolloSearchFilters
+  let reasoning: string
+  if (providedFilters) {
+    // Drop any client-supplied pagination — we set our own capped values below.
+    baseFilters = { ...providedFilters }
+    delete baseFilters.page
+    delete baseFilters.per_page
+    reasoning = prompt
+      ? `Searched with edited filters (from: "${prompt}")`
+      : "Searched with manually set filters"
+  } else {
+    let translation
+    try {
+      translation = await translatePromptToFilters(prompt)
+    } catch (err) {
+      return surfaceError(err, "anthropic")
+    }
+    // Bail early on ambiguous prompts (no Apollo credits burned).
+    if (translation.ambiguityNote) {
+      return NextResponse.json({
+        success: true,
+        ambiguous: true,
+        prompt,
+        reasoning: translation.reasoning,
+        ambiguityNote: translation.ambiguityNote,
+      })
+    }
+    baseFilters = translation.filters
+    reasoning = translation.reasoning
   }
 
   // ── 2. Search Apollo ──
   // Pass context so the wrapper runs the budget check + writes the
   // persistent credit log entry. userEmail is the per-user cap key; prompt
   // is logged for cost-spike debugging.
-  const filters = { ...translation.filters, per_page: perPage, page: 1 }
+  const filters = { ...baseFilters, per_page: perPage, page: 1 }
   let searchResult
   try {
     searchResult = await searchByFilters(filters, {
       userEmail: auth.session.email,
-      prompt,
+      prompt: prompt || "(manual filters)",
     })
   } catch (err) {
     return surfaceError(err, "apollo")
@@ -109,7 +136,7 @@ export async function POST(req: NextRequest) {
     success: true,
     ambiguous: false,
     prompt,
-    reasoning: translation.reasoning,
+    reasoning,
     filters,
     candidates,
     page: searchResult.page,

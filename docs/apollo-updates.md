@@ -43,6 +43,11 @@ The end-to-end prospecting pipeline is built and functional:
   for outbound; emits `contact_email_status` (defaults verified + likely-to-engage). `translator.ts`
 - **11. Email reveal at approve** — `enrichPersonById()` reveals work email by
   Apollo id at approve time; UI makes any non-excluded candidate selectable. `apollo.ts`, `approve/route.ts`, `page.tsx`
+- **11b. Per-row reveal** — Apollo masks ALL search results on every plan (no last
+  name / email / firmographics — confirmed against the Basic key). Per-row
+  "Reveal (1 credit)" button → `/api/admin/prospecting/reveal` enriches one
+  candidate by id, re-scores on real firmographics, swaps the row in place.
+  Reveal promising rows only; approve reveals the rest as it captures (charged once).
 - **12. Industry tag-ID enum scaffold** — `ICP_INDUSTRIES` + `INDUSTRY_MAP` +
   `resolveIndustries()`; translator emits `icp_industries`. Inert (keyword
   fallback) until tag IDs are pasted in. `industry-tags.ts`, `translator.ts`
@@ -95,16 +100,19 @@ timing/expansion/hiring.
 — low priority for audience-access) and funding / new-in-role / headcount-growth
 (NOT in search API — need a per-candidate enrichment/research step).
 
-**17. Saved archetype presets** _(new — UX)_
-Turn the four ICP archetypes into click-to-load preset chips on the prospect
-page (pre-fill titles/seniority/industry per archetype × tier). Makes prospecting
-repeatable and consistent instead of re-deriving from a blank textarea.
-- Acceptance: one click loads a sponsor-buyer / event-partner / amplifier search.
+**17. Saved archetype presets** _(DONE)_
+`lib/prospecting/presets.ts` — the four ICP archetypes as click-to-load presets
+(Tier-1 + Tier-2 titles/seniority/industry per icp.md). Rendered as buttons under
+the prompt box; loading one populates the editable filter panel with no credits.
 
-**18. Editable filters before search** _(new — UX / cost control)_
-Let the rep review + edit the LLM-derived filter chips *before* the
-credit-burning Apollo call (Apollo's own iterate-then-commit model).
-- Acceptance: rep can correct a misread interpretation without wasting a pull.
+**18. Editable filters before search** _(DONE)_
+Two-phase flow: prompt → `/api/admin/prospecting/translate` (no credits) →
+editable `FilterEditor` panel (locations, titles, seniority, industries, size,
+revenue, hiring signal, keyword, email status) → `/api/admin/prospecting/search`
+with the edited filters (search route now accepts pre-built `filters` and skips
+translation). Industry edits as readable ICP categories; `draftToFilters()`
+resolves to Apollo shape at search time. Matches Apollo's iterate-then-commit
+model — reps correct a misread before spending a credit.
 
 **19. Cleanups** _(housekeeping, anytime)_
 - Delete `app/api/admin/prospecting/test/route.ts` (dev endpoint, marked for removal).
