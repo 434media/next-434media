@@ -148,6 +148,25 @@ export interface ApolloSearchFilters {
   }
   /** Apollo internal industry tag IDs (resolve via /industry_tags). */
   industry_tag_ids?: string[]
+  /**
+   * Hiring signal (the WHEN axis — best API-available proxy for buying intent).
+   * Job titles the org is actively hiring for → q_organization_job_titles[].
+   */
+  organization_job_titles?: string[]
+  /** Range of active job-posting count at the org → organization_num_jobs_range. */
+  num_jobs_range?: {
+    min?: number
+    max?: number
+  }
+  /**
+   * Date range (ISO yyyy-mm-dd) for when jobs were posted →
+   * organization_job_posted_at_range. Use `min` for a "posted since" recency
+   * window.
+   */
+  job_posted_at_range?: {
+    min?: string
+    max?: string
+  }
   /** Loose keyword search across the candidate's profile. */
   q_keywords?: string
   /** Filter by email verification status. */
@@ -357,6 +376,22 @@ export async function searchByFilters(
   }
   if (filters.industry_tag_ids?.length) {
     body.organization_industry_tag_ids = filters.industry_tag_ids
+  }
+  // Hiring signal — WHEN-axis params exposed by api_search.
+  if (filters.organization_job_titles?.length) {
+    body.q_organization_job_titles = filters.organization_job_titles
+  }
+  if (filters.num_jobs_range?.min !== undefined) {
+    body["organization_num_jobs_range[min]"] = filters.num_jobs_range.min
+  }
+  if (filters.num_jobs_range?.max !== undefined) {
+    body["organization_num_jobs_range[max]"] = filters.num_jobs_range.max
+  }
+  if (filters.job_posted_at_range?.min !== undefined) {
+    body["organization_job_posted_at_range[min]"] = filters.job_posted_at_range.min
+  }
+  if (filters.job_posted_at_range?.max !== undefined) {
+    body["organization_job_posted_at_range[max]"] = filters.job_posted_at_range.max
   }
   if (filters.contact_email_status?.length) {
     body.contact_email_status = filters.contact_email_status

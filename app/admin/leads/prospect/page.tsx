@@ -88,6 +88,7 @@ const EXAMPLE_PROMPTS = [
   "VPs of Marketing at mid-size CPG brands targeting Hispanic audiences",
   "Heads of Partnerships at VC firms in San Antonio",
   "CMOs at healthcare systems expanding into Texas",
+  "Texas CPG brands hiring a Brand or Partnerships lead in the last 90 days",
 ]
 
 export default function ProspectPage() {
@@ -603,6 +604,17 @@ function FilterChips({ filters }: { filters: ApolloSearchFilters }) {
   }
   if (filters.q_keywords) {
     chips.push(`Keywords: "${filters.q_keywords}"`)
+  }
+  if (filters.organization_job_titles?.length) {
+    chips.push(`💼 Hiring: ${filters.organization_job_titles.join(", ")}`)
+  }
+  if (filters.num_jobs_range?.min !== undefined) {
+    chips.push(
+      `💼 ≥ ${filters.num_jobs_range.min} open role${filters.num_jobs_range.min === 1 ? "" : "s"}`,
+    )
+  }
+  if (filters.job_posted_at_range?.min) {
+    chips.push(`💼 Posted since ${filters.job_posted_at_range.min}`)
   }
   if (filters.contact_email_status?.length) {
     chips.push(`Email: ${filters.contact_email_status.join(", ")}`)

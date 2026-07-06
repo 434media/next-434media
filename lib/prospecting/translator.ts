@@ -145,6 +145,26 @@ const filtersSchema = z.object({
     .describe(
       "Email-deliverability tiers to include. 434media uses Apollo primarily for OUTBOUND, so default to ['verified','likely to engage'] to keep results contactable. Widen to include 'unverified' ONLY if the rep explicitly asks for maximum reach / a wider net. Never include 'unavailable'. (This narrows WHO appears by email quality — it does not itself reveal the email address.)",
     ),
+  hiring_job_titles: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Roles the target company is ACTIVELY HIRING for — a buying-moment / expansion signal (Apollo can't filter buying intent via API, so hiring is the proxy). Use the archetype's Tier-1/Tier-2 role language (e.g. 'Head of Partnerships', 'Brand Manager', 'Director of Events'). Set ONLY when the rep asks for hiring / expansion / 'just hired' / 'scaling' / 'growing' signals. Leave empty for ordinary firmographic searches.",
+    ),
+  min_active_job_postings: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Minimum number of OPEN roles at the company — a generic growth/scaling proxy. Use for 'companies actively hiring' / 'growing teams' when the rep does NOT name a specific role (e.g. 1 = has any open posting). Don't combine with hiring_job_titles.",
+    ),
+  hiring_posted_within_days: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Recency window in days for the hiring signal — 'in the last 90 days' → 90, 'recently' → 90. Set alongside hiring_job_titles or min_active_job_postings when the rep wants RECENT hiring. Typical values 30 / 60 / 90.",
+    ),
   reasoning: z
     .string()
     .describe(
@@ -191,6 +211,9 @@ interface RawTranslatedFilters {
   icp_industries?: string[]
   q_keywords?: string
   contact_email_status?: string[]
+  hiring_job_titles?: string[]
+  min_active_job_postings?: number
+  hiring_posted_within_days?: number
   reasoning?: string
   ambiguity_note?: string
 }
@@ -224,7 +247,9 @@ TRANSLATION RULES
 
 11. INDUSTRY. Emit icp_industries (the ICP industry-category enum) whenever the prompt or the matched archetype implies an industry — this is the primary industry lever. Reserve q_keywords for niche non-industry terms only (e.g. 'fight gear', 'prosthetics'). Don't duplicate a broad industry across both fields.
 
-12. EMAIL STATUS. 434media uses Apollo primarily for outbound, so default contact_email_status to ['verified','likely to engage'] to keep results contactable. Only widen to include 'unverified' if the rep explicitly asks for maximum reach. Mention this default in reasoning.`
+12. EMAIL STATUS. 434media uses Apollo primarily for outbound, so default contact_email_status to ['verified','likely to engage'] to keep results contactable. Only widen to include 'unverified' if the rep explicitly asks for maximum reach. Mention this default in reasoning.
+
+13. HIRING SIGNAL (the WHEN axis). Apollo's API can't filter by buying intent, but it CAN filter on hiring activity — the best available buying-moment proxy. When the rep asks for timing / expansion / growth / "just hired" / "scaling" / "actively hiring" signals: set hiring_job_titles for specific roles being hired (use the archetype's Tier-1/Tier-2 title language), OR min_active_job_postings for a generic "is hiring" (e.g. 1), plus hiring_posted_within_days for recency (default 90 when recency is implied). Leave ALL hiring fields empty for ordinary firmographic searches — never impose a hiring constraint the rep didn't ask for.`
 }
 
 /**
@@ -316,6 +341,24 @@ export async function translatePromptToFilters(
         EMAIL_STATUS_VALUES.includes(s as ApolloEmailStatus),
     )
     if (valid.length) filters.contact_email_status = valid
+  }
+
+  // Hiring signal (WHEN axis) — Apollo's API can't filter buying intent, so
+  // active hiring is the best available buying-moment proxy.
+  if (raw.hiring_job_titles?.length) {
+    filters.organization_job_titles = raw.hiring_job_titles
+  }
+  if (raw.min_active_job_postings !== undefined && raw.min_active_job_postings > 0) {
+    filters.num_jobs_range = { min: raw.min_active_job_postings }
+  }
+  if (
+    raw.hiring_posted_within_days !== undefined &&
+    raw.hiring_posted_within_days > 0
+  ) {
+    // Convert the LLM's relative window to an absolute "posted since" date using
+    // the server clock (the LLM shouldn't do date math). ISO yyyy-mm-dd.
+    const since = new Date(Date.now() - raw.hiring_posted_within_days * 86_400_000)
+    filters.job_posted_at_range = { min: since.toISOString().slice(0, 10) }
   }
 
   return {
