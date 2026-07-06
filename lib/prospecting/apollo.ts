@@ -457,3 +457,65 @@ export async function enrichByEmail(
 
   return data.person
 }
+
+/**
+ * People Enrichment by Apollo person id — the email-reveal step for approved
+ * prospecting candidates.
+ *
+ * The api_search endpoint returns candidates WITHOUT email addresses, so a
+ * prospect can't be turned into a Lead (email is the lead dedup key) until we
+ * reveal it. This matches a person by their Apollo `id` (carried through from
+ * search) and returns the enriched record, which on paid plans (Basic+)
+ * includes the professional email.
+ *
+ * Endpoint: /v1/people/match  (same envelope as enrichByEmail, id-keyed).
+ * Credit cost: 1 per matched person.
+ *
+ * We intentionally do NOT set reveal_personal_emails — outbound uses the work
+ * email only, and personal-email reveal costs more and carries more privacy
+ * weight. Returns null when Apollo has no match.
+ *
+ * Budget enforcement: same context contract as the other calls — pre-flight
+ * cap check + post-call persistent log when `context` is provided.
+ */
+export async function enrichPersonById(
+  apolloPersonId: string,
+  context?: ApolloCallContext,
+): Promise<ApolloPerson | null> {
+  const id = apolloPersonId.trim()
+  if (!id) return null
+
+  if (context) {
+    const budget = await checkBudget(context.userEmail, 1)
+    if (!budget.ok) {
+      throw new ApolloError(
+        budget.reason ?? "Apollo budget exceeded",
+        0,
+        "budget-exceeded",
+      )
+    }
+  }
+
+  interface RawMatchResponse {
+    person?: ApolloPerson
+    matched?: boolean
+  }
+
+  const data = await callApollo<RawMatchResponse>("/people/match", { id })
+
+  if (!data.person) return null
+  _creditsUsedThisProcess += 1
+
+  if (context) {
+    logCreditUsage({
+      userEmail: context.userEmail,
+      endpoint: "enrich",
+      creditsUsed: 1,
+      candidateCount: 1,
+    }).catch((err) => {
+      console.error("[enrichPersonById] credit log write failed:", err)
+    })
+  }
+
+  return data.person
+}

@@ -4,9 +4,15 @@ import { tool } from "ai"
 import { z } from "zod"
 import { generateGatewayToolCall, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
 import type {
+  ApolloEmailStatus,
   ApolloSearchFilters,
   ApolloSeniority,
 } from "./apollo"
+import {
+  ICP_INDUSTRIES,
+  resolveIndustries,
+  type IcpIndustry,
+} from "./industry-tags"
 
 /**
  * Stage 2 — LLM prompt translator.
@@ -57,6 +63,13 @@ const SENIORITY_VALUES: ApolloSeniority[] = [
   "senior",
   "entry",
   "intern",
+]
+
+const EMAIL_STATUS_VALUES: ApolloEmailStatus[] = [
+  "verified",
+  "likely to engage",
+  "unverified",
+  "unavailable",
 ]
 
 const FILTERS_TOOL_NAME = "submit_search_filters"
@@ -110,11 +123,27 @@ const filtersSchema = z.object({
     .describe(
       "Maximum annual revenue in USD integers. Set only if the user specified a revenue ceiling.",
     ),
+  icp_industries: z
+    .array(z.enum(ICP_INDUSTRIES as unknown as [IcpIndustry, ...IcpIndustry[]]))
+    .optional()
+    .describe(
+      "The 434media ICP industry categories the target belongs to. This is the PRIMARY industry lever — emit it (not q_keywords) whenever the prompt or the matched archetype implies an industry. Pick from: healthcare_life_sciences, sports_fitness_lifestyle, tech_saas, capital_vc, media_broadcast, education_workforce, nonprofit_mission, cpg_consumer, civic_econ_dev. Choose all that clearly apply; leave empty if the prompt is industry-agnostic.",
+    ),
   q_keywords: z
     .string()
     .optional()
     .describe(
-      "Loose keyword search across the candidate profile. Use sparingly — Apollo's keyword search is fuzzy. Better to use specific filters when possible. Useful for industry verticals that don't map cleanly to other filters (e.g. 'cannabis', 'fight gear').",
+      "Loose keyword search across the candidate profile — RESERVED for niche, non-industry terms an ICP industry category can't express (e.g. 'fight gear', 'cannabis', 'prosthetics', 'cumbia'). Do NOT put a broad industry here — use icp_industries for that. Keep it tight (one or two terms). Often left empty.",
+    ),
+  contact_email_status: z
+    .array(
+      z.enum(
+        EMAIL_STATUS_VALUES as [ApolloEmailStatus, ...ApolloEmailStatus[]],
+      ),
+    )
+    .optional()
+    .describe(
+      "Email-deliverability tiers to include. 434media uses Apollo primarily for OUTBOUND, so default to ['verified','likely to engage'] to keep results contactable. Widen to include 'unverified' ONLY if the rep explicitly asks for maximum reach / a wider net. Never include 'unavailable'. (This narrows WHO appears by email quality — it does not itself reveal the email address.)",
     ),
   reasoning: z
     .string()
@@ -159,7 +188,9 @@ interface RawTranslatedFilters {
   num_employees_ranges?: string[]
   revenue_range_min?: number
   revenue_range_max?: number
+  icp_industries?: string[]
   q_keywords?: string
+  contact_email_status?: string[]
   reasoning?: string
   ambiguity_note?: string
 }
@@ -187,7 +218,13 @@ TRANSLATION RULES
 6. Set ambiguity_note ONLY when the query is genuinely ambiguous — acronyms with multiple plausible meanings (CBG, CPG vs. CBG), vague terms that could go several ways. Don't invent ambiguity.
 7. Reasoning must be brief (1–2 sentences) and explain ICP defaults you applied.
 8. Don't translate negative filters (the ICP "exclude agencies/PR firms" rule) — that's the scorer's job, not the search filter's.
-9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place.`
+9. NEVER include EU member states, the UK, EEA countries, Switzerland, or Canada in organization_locations. 434media does not pursue cold outbound there (GDPR / CASL). If the user explicitly asks for these regions, set ambiguity_note explaining the constraint and DO NOT include those locations in the filter — let them clarify or pivot. The scorer hard-excludes any EU/CA results that slip through, but the translator should prevent us from burning Apollo credits on them in the first place.
+
+10. PERSONA TIERS. Each ICP archetype above defines Tier 1 (Economic Buyer), Tier 2 (Champion), Tier 3 (End User). For OUTBOUND, the Champion (Tier 2) is usually the best first-touch, so it should be included — not just the C-suite. When the rep names an archetype ("sponsor-buyers", "event partners") or asks broadly for "decision-makers", pull person_titles / person_seniorities from BOTH that archetype's Tier 1 and Tier 2 rows. When the rep names a specific title, respect it exactly and don't widen.
+
+11. INDUSTRY. Emit icp_industries (the ICP industry-category enum) whenever the prompt or the matched archetype implies an industry — this is the primary industry lever. Reserve q_keywords for niche non-industry terms only (e.g. 'fight gear', 'prosthetics'). Don't duplicate a broad industry across both fields.
+
+12. EMAIL STATUS. 434media uses Apollo primarily for outbound, so default contact_email_status to ['verified','likely to engage'] to keep results contactable. Only widen to include 'unverified' if the rep explicitly asks for maximum reach. Mention this default in reasoning.`
 }
 
 /**
@@ -255,8 +292,30 @@ export async function translatePromptToFilters(
       filters.revenue_range.max = raw.revenue_range_max
     }
   }
-  if (raw.q_keywords?.trim()) {
-    filters.q_keywords = raw.q_keywords.trim()
+  // Industry — resolve the ICP industry categories to Apollo's precise
+  // server-side tag-ID filter. While tag IDs aren't configured yet, this
+  // returns fallback keywords instead, preserving keyword-based industry
+  // filtering. A niche q_keywords term (if the LLM set one) takes precedence
+  // over the generic industry fallback to avoid over-narrowing.
+  const industries = (raw.icp_industries ?? []).filter(
+    (i): i is IcpIndustry => ICP_INDUSTRIES.includes(i as IcpIndustry),
+  )
+  const resolved = resolveIndustries(industries)
+  if (resolved.tagIds.length) {
+    filters.industry_tag_ids = resolved.tagIds
+  }
+  const nicheKeyword = raw.q_keywords?.trim()
+  const keyword = nicheKeyword || resolved.keywords.join(" ")
+  if (keyword) {
+    filters.q_keywords = keyword
+  }
+  if (raw.contact_email_status?.length) {
+    // Defensive-clean against enum drift, same posture as person_seniorities.
+    const valid = raw.contact_email_status.filter(
+      (s): s is ApolloEmailStatus =>
+        EMAIL_STATUS_VALUES.includes(s as ApolloEmailStatus),
+    )
+    if (valid.length) filters.contact_email_status = valid
   }
 
   return {

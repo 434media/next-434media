@@ -50,46 +50,141 @@ What we explicitly **do not** sell:
 
 ---
 
-## Buyer archetypes
+## Buyer archetypes (Apollo WHO/WHEN persona model)
 
-We sell to four distinct buyer types. Each has different titles, budgets, and
-timing. The prospecting feature should be able to score against all four.
+We sell to four distinct buyer types. Each is defined on two axes, per the Apollo
+prospecting framework:
+
+- **WHO** — account-level firmographics (industry, size, revenue, location) +
+  persona tiers (who *inside* the account we reach).
+- **WHEN** — the buying signals that make outreach timely. Start each campaign
+  from 1–2 of these, not from firmographics alone.
+
+Persona tiers follow Apollo's model:
+- **Tier 1 · Economic Buyer** — controls the budget, signs the deal.
+- **Tier 2 · Champion** — feels the pain, sells it internally; usually the best
+  first-touch.
+- **Tier 3 · End User / Influencer** — lives with the work; validates fit.
+
+The prospecting feature should be able to score against all four archetypes and,
+where possible, target the Champion (Tier 2) as the opening move.
+
+---
 
 ### 1. Sponsor-buyers
 
-Brands that buy audience access and sponsorship slots in our owned channels.
+Brands that buy audience access and sponsorship slots in our owned channels
+(TXMX Boxing, Univision, Vemos Vamos, AIM Health events).
 
-- **Examples:** brands sponsoring TXMX events, Univision concert partnerships, sponsors at AIM Health Summit
-- **Titles:** CMO, VP Marketing, Brand Director, Sponsorship Manager, Head of Partnerships
-- **Budget source:** marketing / partnerships / brand budget
-- **Timing triggers:** campaign calendar alignment, fiscal year planning, product launches, expansion-into-Texas moments
+**WHO — account**
+- **Industries:** CPG / consumer brands (Hispanic-focus), sports & lifestyle,
+  automotive, beverage, financial services, healthcare systems
+- **Keywords:** "Hispanic marketing," "multicultural marketing," "sponsorship,"
+  "brand activation," "experiential"
+- **Headcount:** 50–1,000+ (brands with a real marketing org)
+- **Revenue:** $20M+ (has a sponsorship line item)
+- **Location:** Texas-HQ, national brands targeting US Hispanic audiences, or
+  companies expanding into Texas
+
+**WHO — persona tiers**
+| Tier | Titles | Management level |
+|---|---|---|
+| 1 · Economic Buyer | CMO, VP Marketing, VP Brand | C-suite / VP |
+| 2 · Champion | Head of Partnerships, Head of Sponsorships, Brand Director, Multicultural/Hispanic Marketing Lead | Director / Head |
+| 3 · End User | Sponsorship Manager, Brand Manager, Field/Experiential Marketing Manager | Manager |
+
+**WHEN — signals (start with 1–2)**
+- Expansion into Texas / new Texas office announced *(highest-value trigger)*
+- New CMO / VP Brand / Head of Partnerships appointment
+- Product launch or brand refresh aligned to a campaign calendar
+- Fiscal-year planning window
+- Buying-intent topics: "sponsorship," "multicultural marketing," "brand activation"
+
+---
 
 ### 2. Storytelling clients
 
-Founders, programs, and institutions that need video, documentary, or brand work.
+Founders, programs, and institutions that need video, documentary, or brand work
+(Alt-Bionics, Vanita Leo, Mission Road Ministries, Methodist Healthcare Ministries).
 
-- **Examples:** Alt-Bionics (prosthetics startup), Vanita Leo (artist), Mission Road Ministries (nonprofit), Methodist Healthcare Ministries
-- **Titles:** Founder/CEO (small orgs), Communications Director (institutional), Marketing Director (mid)
-- **Budget source:** brand budget, founder discretionary spend, institutional comms, grant-funded campaigns
-- **Timing triggers:** funding rounds, product/program milestones, public-moment opportunities, anniversary years
+**WHO — account**
+- **Industries:** healthcare & life sciences, biotech/medtech, nonprofits &
+  mission-driven orgs, education/workforce, founder-led startups
+- **Keywords:** "brand storytelling," "documentary," "content production,"
+  "founder story," "impact campaign"
+- **Headcount:** 5–500 (founder-led up through mid-size institutions; no upper
+  cap for mission-aligned institutions)
+- **Revenue:** $500K+ for-profit; grant/institutional budget for nonprofits
+- **Location:** South Texas / San Antonio priority; Greater Texas; Hispanic angle
+
+**WHO — persona tiers**
+| Tier | Titles | Management level |
+|---|---|---|
+| 1 · Economic Buyer | Founder / CEO (small orgs), Executive Director (institutional) | Founder / C-suite |
+| 2 · Champion | Communications Director, Marketing Director, Head of Brand | Director / Head |
+| 3 · End User | Marketing Manager, Content Manager, Comms Manager | Manager |
+
+**WHEN — signals (start with 1–2)**
+- Recent funding round (Series A+ for startups) *(top trigger)*
+- Program / product milestone or public-moment opportunity (anniversary, launch)
+- New Communications or Marketing Director appointment
+- Grant awarded (nonprofits) → funded campaign window
+- Press-coverage spike or industry award
+
+---
 
 ### 3. Event partners
 
-Organizations running events that need production, promotion, or audience-building support.
+Organizations running events that need production, promotion, or audience-building
+support (AIM Health R&D Summit, The Health Cell, Tech Bloc, VelocityTX).
 
-- **Examples:** AIM Health R&D Summit, The Health Cell convenings, Tech Bloc events, VelocityTX programs
-- **Titles:** Executive Director, Program Director, Director of Events, Founder/CEO
-- **Budget source:** event budget, program budget, sometimes sponsorship-revenue-funded
-- **Timing triggers:** 3–6 months before event date, annual event cycles
+**WHO — account**
+- **Industries:** health/biotech ecosystem orgs, economic-development & civic-tech,
+  accelerators, industry associations
+- **Keywords:** "summit," "conference," "demo day," "convening," "annual event"
+- **Headcount:** any — event/program orgs are often small teams with large events
+- **Revenue:** event budget or sponsorship-revenue-funded; not a for-profit gate
+- **Location:** Texas ecosystem, San Antonio priority
+
+**WHO — persona tiers**
+| Tier | Titles | Management level |
+|---|---|---|
+| 1 · Economic Buyer | Executive Director, Founder / CEO | Founder / C-suite |
+| 2 · Champion | Program Director, Director of Events | Director |
+| 3 · End User | Events Manager, Program Manager, Marketing Coordinator | Manager / senior |
+
+**WHEN — signals (start with 1–2)**
+- 3–6 months before a known annual event date *(the defining trigger)*
+- New program / cohort / initiative launched
+- Hiring for events or program roles (job-posting signal)
+- Expanded event footprint or new event announced
+
+---
 
 ### 4. Ecosystem amplifiers
 
-VCs, accelerators, and angel networks that buy cohort or portfolio storytelling.
+VCs, accelerators, and angel networks that buy cohort or portfolio storytelling
+(Builders VC, Alamo Angels, Nucleate Texas, VelocityTX).
 
-- **Examples:** Builders VC, Alamo Angels, Nucleate Texas, VelocityTX
-- **Titles:** Partner, Portfolio Marketing lead, Director of Storytelling, Program Director, Managing Partner
-- **Budget source:** portfolio support, fund operations, LP-relations budget
-- **Timing triggers:** cohort cycles, fund close events, portfolio-milestone moments
+**WHO — account**
+- **Industries:** venture capital, accelerators, angel networks, family offices
+- **Keywords:** "portfolio," "cohort," "accelerator," "fund," "founder community"
+- **Headcount:** 2–100 (fund/program teams are lean)
+- **Revenue:** n/a — filter on fund/program signals, not company revenue
+- **Location:** Texas-focused funds; national funds with Texas or Hispanic thesis
+
+**WHO — persona tiers**
+| Tier | Titles | Management level |
+|---|---|---|
+| 1 · Economic Buyer | Managing Partner, General Partner, Fund Principal | Partner / C-suite |
+| 2 · Champion | Partner, Director of Storytelling, Head of Platform | Director / Head |
+| 3 · End User | Portfolio Marketing Lead, Platform Manager, Program Manager | Manager / senior |
+
+**WHEN — signals (start with 1–2)**
+- New fund close *(top trigger — fresh platform budget)*
+- New cohort / batch announced
+- Portfolio-company milestone (raise, launch) they'll want to amplify
+- New Head of Platform / Portfolio Marketing appointment
 
 ---
 

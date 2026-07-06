@@ -7,20 +7,23 @@ import { getCreditUsage } from "./credit-log"
  * the team's plan allotment in one afternoon. Both env-configurable so
  * defaults can scale with the active Apollo plan tier.
  *
- * Defaults are sized for the Free plan (900 credits/seat/year ≈ 75/mo):
- *   - Daily 50 — single rep can't burn most of a month in one day
- *   - Monthly 70 — leaves a 5-credit buffer below Free's plan ceiling
+ * Defaults are sized for the Basic plan ($49/seat/mo, 30K credits/seat/year
+ * ≈ 2,500/mo):
+ *   - Daily 200 — a single rep can't burn a whole month in one afternoon
+ *   - Monthly 2,000 — leaves a ~500-credit buffer below the plan ceiling,
+ *     reserved for enrichment/email-reveal at approval time
  *
- * When upgraded to Basic ($49/seat/mo, 30K credits/year ≈ 2,500/mo):
- *   APOLLO_DAILY_CAP=200 APOLLO_MONTHLY_CAP=2000
+ * Override per env if the plan or seat count changes, e.g. to throttle back to
+ * the old Free-plan sizing (900 credits/seat/year ≈ 75/mo):
+ *   APOLLO_DAILY_CAP=50 APOLLO_MONTHLY_CAP=70
  *
  * Caps are PER USER. For 434media at 1 seat (Jesse), this is effectively
  * the team cap. As the team grows, per-user caps prevent one rep from
  * monopolizing the team's monthly allotment.
  */
 
-const DAILY_CAP_DEFAULT = 50
-const MONTHLY_CAP_DEFAULT = 70
+const DAILY_CAP_DEFAULT = 200
+const MONTHLY_CAP_DEFAULT = 2000
 
 export const APOLLO_DAILY_CAP =
   Number(process.env.APOLLO_DAILY_CAP) || DAILY_CAP_DEFAULT

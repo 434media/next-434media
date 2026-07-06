@@ -57,6 +57,7 @@ interface ApprovalResponse {
   updated: number
   skipped: number
   failed: number
+  revealed: number
   results: Array<{
     apolloPersonId: string
     email: string | null
@@ -178,7 +179,7 @@ export default function ProspectPage() {
     )
     if (toApprove.length === 0) return
     const ok = confirm(
-      `Approve ${toApprove.length} prospect${toApprove.length === 1 ? "" : "s"} as leads? They'll appear in /admin/leads with source "prospected". Existing leads (matched by email) are updated, not duplicated.`,
+      `Approve ${toApprove.length} prospect${toApprove.length === 1 ? "" : "s"} as leads?\n\nThis reveals each contact's work email (1 Apollo credit each) and adds them to /admin/leads with source "prospected". Existing leads (matched by email) are updated, not duplicated; contacts Apollo has no email for are skipped.`,
     )
     if (!ok) return
 
@@ -205,6 +206,8 @@ export default function ProspectPage() {
       if (updated > 0) parts.push(`${updated} updated`)
       if (skipped > 0) parts.push(`${skipped} skipped`)
       if (failed > 0) parts.push(`${failed} failed`)
+      // Refresh the budget — reveal spent enrichment credits.
+      void loadBudget()
       setApprovalToast({
         message: `Approved: ${parts.join(", ") || "no changes"}.`,
         type: failed > 0 ? "error" : "success",
@@ -227,12 +230,10 @@ export default function ProspectPage() {
   const aboveThreshold = candidates.filter((c) => c.score >= threshold)
   const belowThreshold = candidates.filter((c) => c.score >= 0 && c.score < threshold)
   const excluded = candidates.filter((c) => c.score === -1)
-  // Selection bookkeeping — only candidates with email + non-excluded score
-  // are approvable. Free-plan obfuscation hides email so most candidates
-  // there are non-approvable.
-  const selectableCount = candidates.filter(
-    (c) => c.score >= 0 && !!c.person.email,
-  ).length
+  // Selection bookkeeping — any non-excluded candidate is approvable. Email is
+  // revealed at approve time (api_search never returns it), so we no longer
+  // gate selection on a present email; only ICP exclusions block approval.
+  const selectableCount = candidates.filter((c) => c.score >= 0).length
   const selectedCount = selectedIds.size
 
   // GTM interns prospect here (their core task); searches are protected by the
@@ -487,24 +488,31 @@ export default function ProspectPage() {
                   </div>
                 )}
 
-                {/* Free-plan banner — when nothing is approvable because
-                    every candidate's email is masked, surface it explicitly
-                    so reps don't try to figure out why selection is broken. */}
+                {/* All-excluded banner — when every candidate was hard-excluded
+                    by ICP policy, nothing is approvable. Surface it so reps
+                    don't wonder why selection is empty. */}
                 {candidates.length > 0 && selectableCount === 0 && (
                   <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-md bg-amber-50/60 border border-amber-200/70 text-[12px] text-amber-800 leading-relaxed">
                     <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
                     <span>
-                      None of these candidates can be approved — emails are
-                      masked on the Apollo Free plan. Upgrade to Basic at{" "}
-                      <a
-                        href="https://app.apollo.io/#/settings/plans"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline font-medium"
-                      >
-                        Apollo plan settings
-                      </a>{" "}
-                      to enable approval.
+                      None of these candidates can be approved — every result was
+                      excluded by ICP policy (competitor agency, or an EU/Canada
+                      jurisdiction we don&apos;t cold-outreach). Try a different
+                      prompt or geography.
+                    </span>
+                  </div>
+                )}
+
+                {/* Reveal-cost note — approval spends one Apollo enrichment
+                    credit per selected candidate to reveal the work email. */}
+                {selectableCount > 0 && (
+                  <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-md bg-neutral-50 border border-neutral-200 text-[12px] text-neutral-600 leading-relaxed">
+                    <Mail className="w-3.5 h-3.5 mt-0.5 shrink-0 text-neutral-400" />
+                    <span>
+                      Approving reveals each contact&apos;s work email — that
+                      spends <strong>1 Apollo credit per selected candidate</strong>.
+                      Contacts Apollo has no email for are skipped (no lead, no
+                      wasted credit on capture).
                     </span>
                   </div>
                 )}
@@ -634,15 +642,13 @@ function CandidateRow({
   const { person, score, grade, breakdown, contactQualifier, reasons, excluded } = candidate
   const isExcluded = score === -1
   const aboveThreshold = !isExcluded && score >= threshold
-  // Approvability — excluded candidates can never be approved; candidates
-  // without an email can't either (Free-plan obfuscation makes dedup
-  // impossible). Both states disable the checkbox with an explanation.
-  const isApprovable = !isExcluded && !!person.email
+  // Approvability — only ICP-excluded candidates are blocked. Email is
+  // revealed at approve time (api_search never returns it), so a missing
+  // email no longer disables selection.
+  const isApprovable = !isExcluded
   const checkboxDisabledReason = isExcluded
     ? "Excluded by ICP filter — not approvable"
-    : !person.email
-      ? "Email masked on Apollo Free plan — upgrade to enable approval"
-      : undefined
+    : undefined
 
   // Score badge tint: green for above threshold, amber for below, red for excluded
   const scoreTint = isExcluded
@@ -715,13 +721,26 @@ function CandidateRow({
               </span>
             )}
           </div>
-          {(person.email || person.linkedin_url) && (
+          {(person.email || person.linkedin_url || (!isExcluded && person.email_status)) && (
             <div className="flex items-center gap-3 text-[11px] text-neutral-500 mt-1">
-              {person.email && (
+              {person.email ? (
                 <span className="inline-flex items-center gap-1">
                   <Mail className="w-3 h-3" />
                   {person.email}
                 </span>
+              ) : (
+                !isExcluded && (
+                  <span
+                    className="inline-flex items-center gap-1 text-neutral-400"
+                    title="Apollo reveals the work email when you approve this candidate (1 credit)"
+                  >
+                    <Mail className="w-3 h-3" />
+                    Email revealed on approve
+                    {person.email_status === "verified" && (
+                      <span className="text-emerald-600"> · verified</span>
+                    )}
+                  </span>
+                )
               )}
               {person.linkedin_url && (
                 <a

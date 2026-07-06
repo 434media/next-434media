@@ -3,6 +3,8 @@ import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { captureLeadFromProspecting } from "@/lib/firestore-leads"
 import type { ScoredPerson } from "@/lib/prospecting/scorer"
 import { isExcludedJurisdiction } from "@/lib/prospecting/scorer"
+import { ApolloError, enrichPersonById } from "@/lib/prospecting/apollo"
+import type { ApolloPerson } from "@/lib/prospecting/apollo"
 
 // POST /api/admin/prospecting/approve
 //
@@ -12,14 +14,18 @@ import { isExcludedJurisdiction } from "@/lib/prospecting/scorer"
 //
 // For each candidate:
 //   - Skip if score === -1 (hard-excluded by ICP — never approvable)
-//   - Skip if no email present (Free-plan obfuscation makes dedup impossible
-//     because the lead model's primary key is email)
+//   - Reveal email if missing: api_search never returns emails, so we spend
+//     one enrichment credit per candidate to reveal the work email by Apollo
+//     id (Basic+ plan). Email is the lead dedup key, so without it we can't
+//     create a lead.
+//   - Skip if still no email after reveal (Apollo had no match)
 //   - Otherwise, capture via captureLeadFromProspecting() — handles dedup,
 //     backfills missing fields on existing leads, tags with the prompt for
 //     traceability
 //
 // Returns per-candidate outcomes so the UI can surface partial successes
-// (e.g. "5 created, 2 updated, 3 skipped: no email").
+// (e.g. "5 created, 2 updated, 1 skipped: no email match"). `revealed` counts
+// how many enrichment credits this approval spent.
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -80,10 +86,12 @@ export async function POST(req: NextRequest) {
   }
 
   const results: ApprovalResult[] = []
+  let revealed = 0
 
   for (const candidate of candidates) {
     const personId = candidate.person?.id ?? ""
-    const email = (candidate.person?.email ?? "").trim().toLowerCase() || null
+    let person: ApolloPerson = candidate.person
+    let email = (person?.email ?? "").trim().toLowerCase() || null
 
     // Hard-excluded → never approvable (ICP rule).
     if (candidate.score === -1) {
@@ -102,7 +110,7 @@ export async function POST(req: NextRequest) {
     // or the request bypassed the UI), block EU/CA contacts at the
     // approval boundary. Single source of truth for the jurisdiction list
     // is `EXCLUDED_COUNTRIES` in `lib/prospecting/scorer.ts`.
-    const jurisdiction = isExcludedJurisdiction(candidate.person)
+    const jurisdiction = isExcludedJurisdiction(person)
     if (jurisdiction.excluded) {
       results.push({
         apolloPersonId: personId,
@@ -114,21 +122,75 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // No email → can't dedupe → can't create. Most common on Free plan
-    // where email is masked. Surface as `skipped` with a clear reason so
-    // reps know to upgrade or run an enrichment pass before approving.
+    // Email reveal — api_search never returns email addresses, so if we don't
+    // have one yet, spend one enrichment credit to reveal the work email by
+    // Apollo person id. Wrapped so a mid-batch budget cap (or Apollo error)
+    // skips just this candidate instead of failing the whole approval.
+    if (!email && personId) {
+      try {
+        const enriched = await enrichPersonById(personId, {
+          userEmail: auth.session.email,
+          prompt,
+        })
+        if (enriched) {
+          revealed++
+          // Prefer revealed fields; keep search fields Apollo omitted on match.
+          person = {
+            ...person,
+            ...enriched,
+            organization: {
+              ...(person.organization ?? {}),
+              ...(enriched.organization ?? {}),
+            },
+          }
+          email = (person.email ?? "").trim().toLowerCase() || null
+
+          // Revealed data may carry a country the search response lacked —
+          // re-run the jurisdiction gate before capture.
+          const post = isExcludedJurisdiction(person)
+          if (post.excluded) {
+            results.push({
+              apolloPersonId: personId,
+              email,
+              leadId: null,
+              status: "skipped",
+              reason: `Excluded: contact in ${post.country} — 434media does not pursue EU/Canadian contacts (GDPR / CASL).`,
+            })
+            continue
+          }
+        }
+      } catch (err) {
+        const reason =
+          err instanceof ApolloError && err.code === "budget-exceeded"
+            ? err.message
+            : "Email reveal failed — see server logs"
+        if (!(err instanceof ApolloError)) {
+          console.error("[approve] email reveal errored:", err)
+        }
+        results.push({
+          apolloPersonId: personId,
+          email: null,
+          leadId: null,
+          status: "skipped",
+          reason,
+        })
+        continue
+      }
+    }
+
+    // Still no email → can't dedupe → can't create. On Basic this means
+    // Apollo simply had no email on file for this person.
     if (!email) {
       results.push({
         apolloPersonId: personId,
         email: null,
         leadId: null,
         status: "skipped",
-        reason: "No email available (Apollo Free plan masks email until upgrade or enrichment)",
+        reason: "No email found for this contact (Apollo returned no match on reveal)",
       })
       continue
     }
 
-    const person = candidate.person
     const result = await captureLeadFromProspecting({
       email,
       firstName: person.first_name || "",
@@ -178,6 +240,7 @@ export async function POST(req: NextRequest) {
     updated,
     skipped,
     failed,
+    revealed,
     results,
   })
 }
