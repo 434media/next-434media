@@ -53,33 +53,76 @@ interface IndustryMapping {
 }
 
 export const INDUSTRY_MAP: Record<IcpIndustry, IndustryMapping> = {
-  // Apollo: "hospital & health care", "biotechnology", "medical devices",
-  // "pharmaceuticals", "mental health care", "health, wellness & fitness"
-  healthcare_life_sciences: { label: "Healthcare & life sciences", tagIds: [], keyword: "healthcare" },
-  // Apollo: "sports", "health, wellness & fitness", "sporting goods",
-  // "apparel & fashion" (lifestyle)
-  sports_fitness_lifestyle: { label: "Sports, fitness & lifestyle", tagIds: [], keyword: "sports" },
-  // Apollo: "computer software", "information technology & services",
-  // "internet", "e-learning" (edtech overlap)
-  tech_saas: { label: "Tech & SaaS", tagIds: [], keyword: "software" },
-  // Apollo: "venture capital & private equity", "financial services",
-  // "investment management"
-  capital_vc: { label: "Capital / VC / accelerators", tagIds: [], keyword: "venture capital" },
-  // Apollo: "broadcast media", "media production", "online media",
-  // "entertainment", "marketing & advertising" (NB: agencies excluded by scorer)
-  media_broadcast: { label: "Media & broadcast", tagIds: [], keyword: "media" },
-  // Apollo: "higher education", "education management", "e-learning",
-  // "professional training & coaching"
-  education_workforce: { label: "Education & workforce", tagIds: [], keyword: "education" },
-  // Apollo: "nonprofit organization management", "civic & social organization",
-  // "philanthropy", "religious institutions"
-  nonprofit_mission: { label: "Nonprofit & mission-driven", tagIds: [], keyword: "nonprofit" },
-  // Apollo: "consumer goods", "food & beverages", "consumer products",
-  // "retail", "apparel & fashion"
-  cpg_consumer: { label: "CPG / consumer brands", tagIds: [], keyword: "consumer goods" },
-  // Apollo: "government administration", "public policy", "think tanks",
-  // "economic development" (often under "government relations")
-  civic_econ_dev: { label: "Civic-tech & economic development", tagIds: [], keyword: "economic development" },
+  // hospital & health care · pharmaceuticals · mental health care
+  // (add later if captured: biotechnology, medical devices)
+  healthcare_life_sciences: {
+    label: "Healthcare & life sciences",
+    tagIds: ["5567cdde73696439812c0000", "5567e0eb73696410e4bd1200", "5567ce2773696454308f0000"],
+    keyword: "healthcare",
+  },
+  // sports · apparel & fashion (add later: health/wellness/fitness, sporting goods)
+  sports_fitness_lifestyle: {
+    label: "Sports, fitness & lifestyle",
+    tagIds: ["5567ce227369644eed290000", "5567cd82736964540d0b0000"],
+    keyword: "sports",
+  },
+  // computer software · information technology & services · internet
+  tech_saas: {
+    label: "Tech & SaaS",
+    tagIds: ["5567cd4e7369643b70010000", "5567cd4773696439b10b0000", "5567cd4d736964397e020000"],
+    keyword: "software",
+  },
+  // venture capital & private equity · financial services · investment management
+  capital_vc: {
+    label: "Capital / VC / accelerators",
+    tagIds: ["5567e1587369641c48370000", "5567cdd67369643e64020000", "5567e0bc7369641d11550200"],
+    keyword: "venture capital",
+  },
+  // broadcast media · media production · online media (add later: entertainment)
+  media_broadcast: {
+    label: "Media & broadcast",
+    tagIds: ["5567e0f973696416d34e0200", "5567e0ea7369640d2ba31600", "5567cdb373696439dd540000"],
+    keyword: "media",
+  },
+  // higher education · education management · e-learning · professional training & coaching
+  education_workforce: {
+    label: "Education & workforce",
+    tagIds: [
+      "5567cd4c73696453e1300000",
+      "5567ce9e736964540d540000",
+      "5567e19c7369641c48e70100",
+      "5567cd49736964541d010000",
+    ],
+    keyword: "education",
+  },
+  // nonprofit organization management · civic & social organization · philanthropy · religious institutions
+  nonprofit_mission: {
+    label: "Nonprofit & mission-driven",
+    tagIds: [
+      "5567cd4773696454303a0000",
+      "5567cdda7369644eed130000",
+      "5567ce9673696453d99f0000",
+      "5567e0f27369640e5aed0c00",
+    ],
+    keyword: "nonprofit",
+  },
+  // consumer goods · food & beverages · retail · apparel & fashion
+  cpg_consumer: {
+    label: "CPG / consumer brands",
+    tagIds: [
+      "5567ce987369643b789e0000",
+      "5567ce1e7369643b806a0000",
+      "5567ced173696450cb580000",
+      "5567cd82736964540d0b0000",
+    ],
+    keyword: "consumer goods",
+  },
+  // government administration · public policy · think tanks
+  civic_econ_dev: {
+    label: "Civic-tech & economic development",
+    tagIds: ["5567cd527369643981050000", "5567e28a7369642ae2500000", "5567e1de7369642069ea0100"],
+    keyword: "economic development",
+  },
 }
 
 export interface ResolvedIndustry {

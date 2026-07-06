@@ -60,12 +60,14 @@ returns the work email and the credit counter ticks. If Apollo needs a
 different reveal shape, it's a one-line change in `enrichPersonById`.
 - Acceptance: an approved prospect lands in `/admin/leads` with a populated email.
 
-**14. Populate industry tag IDs** _(blocker: pull IDs from Apollo)_
-Fill the `tagIds` arrays in `INDUSTRY_MAP` from Apollo (People Search → Industry
-filter → read `organizationIndustryTagIds[]` from the URL, or `GET /industry_tags`).
-Activates precise server-side industry filtering automatically; no code change.
-- Then: render `industry_tag_ids` as readable category chips in `FilterChips` (currently would show raw ObjectIds).
-- Acceptance: a search with an industry sets `industry_tag_ids` and results skew on-industry vs. keyword-only.
+**14. Populate industry tag IDs** _(DONE)_
+`INDUSTRY_MAP` in `industry-tags.ts` now carries real Apollo `tagIds` for all 9
+ICP categories (captured from Apollo's industry typeahead). Precise server-side
+`organization_industry_tag_ids` filtering is live; keyword fallback is retired
+for these categories. Validated against the Basic key — all 9 return on-target
+orgs. Editor shows industry as readable ICP categories (never raw ObjectIds).
+- Add-later (nice-to-have): biotechnology, medical devices, sporting goods,
+  health/wellness/fitness, entertainment — categories already have solid coverage.
 
 **15. Buying-intent topics** _(BLOCKED — not available via API)_
 CONFIRMED against docs.apollo.io/reference/people-api-search: the `api_search`
