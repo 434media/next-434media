@@ -141,7 +141,7 @@ Single source of truth for the Fit score:
 **Step 2a phase 2 — BUILT (typechecks clean, math verified) 2026-06-26:**
 - [x] `lib/icp/taxonomy.ts` — extracted the shared geo/industry taxonomy into a neutral module (breaks the scorer↔rubric cycle; single source of truth).
 - [x] `lib/prospecting/scorer.ts` — now **delegates company fit to the rubric** (same 0–100 fit + grade the lead carries); keeps exclusions + title as a separate `contactQualifier`; threshold 60 (grade C). Free-plan obfuscation handled via `keywordHint`/`locationHint` fallbacks on the rubric.
-- [x] `app/admin/leads/prospect/page.tsx` — score badge shows fit **+ grade**; breakdown is now Industry / Location / Size + a muted Contact qualifier.
+- [x] `app/admin/prospect/page.tsx` — score badge shows fit **+ grade**; breakdown is now Industry / Location / Size + a muted Contact qualifier.
 - [x] backfill script (`scripts/backfill-icp-fit.ts`) — built + run. Revealed the existing 110 leads were firmographic-less partner imports (all D); led to removing 107 from the funnel (`scripts/remove-partner-leads.ts`, kept in Audiences). Funnel now 3 real rows.
 
 **Step 2a phase 2 — COMPLETE:**

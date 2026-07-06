@@ -14,7 +14,7 @@ The proactive starting action — **Prospect** — is the least-visible element 
 
 Evidence:
 - Prospect on Overview is a dashed, muted footnote under Leads ([AdminOverview.tsx:260-269](../components/admin/AdminOverview.tsx#L260)).
-- Prospect in the sidebar isn't top-level — it's the hidden subroute `/admin/leads/prospect`.
+- Prospect in the sidebar isn't top-level — it's the hidden subroute `/admin/leads/prospect`. *(Resolved 2026-07: Prospect is now its own top-level route `/admin/prospect`; the old path 302-redirects.)*
 - Funnel KPIs is absent from Overview; in the sidebar it sits in "Insights" next to unrelated web/social Analytics.
 - First-run = three `0` stages + "contacts arrive" copy + no obvious action.
 
@@ -87,14 +87,14 @@ New entry before/with the entry-point surfaces ([AdminSidebar.tsx:123-163](../co
   id: "prospect",
   label: "Prospect",
   icon: Target,
-  href: "/admin/leads/prospect",
-  matchPrefix: "/admin/leads/prospect",
+  href: "/admin/prospect",
+  matchPrefix: "/admin/prospect",
   description: "Find companies to proactively contact — score & approve as leads",
   roles: [...],
 }
 ```
 
-**Gotcha — prefix collision.** Leads uses `matchPrefix: "/admin/leads"`, which also matches `/admin/leads/prospect`, so both would highlight on the Prospect page. Fix: give **Leads** `exact: true` (or a prefix that excludes the subroute), exactly like Calendar already does to avoid lighting up on its sibling ([:216](../components/admin/AdminSidebar.tsx#L216)). Prospect's own `matchPrefix` is the more specific path, so it highlights correctly.
+**Gotcha — prefix collision (now moot).** When Prospect lived at `/admin/leads/prospect`, Leads' `matchPrefix: "/admin/leads"` also matched it, so both highlighted. This was originally fixed with `exact: true` on Leads. Since Prospect moved to its own top-level route `/admin/prospect` (2026-07), the collision is gone and `exact: true` was removed so Leads can prefix-match its own `/admin/leads/:id` detail pages.
 
 ### B2 · Move Funnel KPIs into Pipeline (end)
 
@@ -134,6 +134,6 @@ The comment at [:120-122](../components/admin/AdminSidebar.tsx#L120) describes t
 - [x] `components/admin/AdminOverview.tsx` — Prospect promoted to a stage-01 node (A1, both full-admin + crm_only layouts), header copy (A2), empty-state banner (A3), scoreboard strip (A4) + vertical-density pass to fit the funnel + scoreboard + workspace above the fold. Typechecks clean 2026-06-26.
 - [x] `components/admin/AdminSidebar.tsx` — Prospect added top-level (first in Pipeline) + Leads set `exact` (B1), Funnel KPIs moved to end of Pipeline (B2), Insights renamed → Analytics (B3), funnel-order comment updated (B4). Typechecks clean 2026-06-26.
 
-**Both parts built.** Remaining: visual verification against the running app (Overview density + funnel layout with the extra node; sidebar active-state on `/admin/leads` vs `/admin/leads/prospect`).
+**Both parts built.** Remaining: visual verification against the running app (Overview density + funnel layout with the extra node; sidebar active-state on `/admin/leads` vs `/admin/prospect`).
 
 No backend, no schema, no new endpoints (A4 reuses `/api/admin/kpis/funnel`).

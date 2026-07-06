@@ -42,7 +42,7 @@ const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
   // deal pipeline) is intentionally not here — interns no longer have access.
   gtm: [
     { label: "Leads", href: "/admin/leads", icon: Flag },
-    { label: "Prospect", href: "/admin/leads/prospect", icon: Target },
+    { label: "Prospect", href: "/admin/prospect", icon: Target },
   ],
   story_media: [
     { label: "AI Studio", href: "/admin/content/studio", icon: Clapperboard },
@@ -131,8 +131,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         id: "prospect",
         label: "Prospect",
         icon: Target,
-        href: "/admin/leads/prospect",
-        matchPrefix: "/admin/leads/prospect",
+        href: "/admin/prospect",
+        matchPrefix: "/admin/prospect",
         description: "Find companies to proactively contact — score & approve as leads",
         // The active start of the sales funnel — leads the section so it's the
         // first thing a new admin sees. Same reach as Leads.
@@ -153,9 +153,9 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: Flag,
         href: "/admin/leads",
         matchPrefix: "/admin/leads",
-        // Exact so Leads doesn't also stay highlighted on the /admin/leads/prospect
-        // child, which is now its own top-level item above.
-        exact: true,
+        // Prospect is now its own top-level route (/admin/prospect), so Leads can
+        // prefix-match its own detail pages (/admin/leads/:id) without also
+        // lighting up on Prospect.
         roles: ["full_admin", "crm_only", "intern"],
       },
       {

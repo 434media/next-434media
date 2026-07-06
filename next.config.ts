@@ -65,6 +65,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/admin/crm', destination: '/admin/opportunities', permanent: false },
       { source: '/admin/crm/:path*', destination: '/admin/opportunities/:path*', permanent: false },
+      // Prospect promoted from a Leads child to a top-level pipeline route.
+      { source: '/admin/leads/prospect', destination: '/admin/prospect', permanent: false },
     ]
   },
 };

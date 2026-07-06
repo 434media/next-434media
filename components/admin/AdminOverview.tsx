@@ -239,7 +239,7 @@ export function AdminOverview() {
                 below the two doors, not as a funnel stage. */}
             <FunnelZone label="01 · Start the funnel" className="lg:flex-1">
               <StageNode
-                href="/admin/leads/prospect"
+                href="/admin/prospect"
                 icon={Target}
                 title="Prospect"
                 stat={counts?.prospected7d ?? 0}
@@ -320,7 +320,7 @@ export function AdminOverview() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-2">
             <FunnelZone label="01 · Start" className="sm:flex-1">
               <StageNode
-                href="/admin/leads/prospect"
+                href="/admin/prospect"
                 icon={Target}
                 title="Prospect"
                 stat={counts?.prospected7d ?? 0}
@@ -490,7 +490,7 @@ function EmptyStartBanner({ showImport }: { showImport: boolean }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link
-            href="/admin/leads/prospect"
+            href="/admin/prospect"
             className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-neutral-100"
           >
             <Target className="h-4 w-4" />

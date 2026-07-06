@@ -4,19 +4,21 @@ import Link from "next/link"
 import { Flag, Target } from "lucide-react"
 import type { ReactNode } from "react"
 
-// Shared sticky header for the Leads section so /admin/leads and
-// /admin/leads/prospect read as one workflow (find prospects → work leads)
-// rather than two separate pages. Symmetric two-way nav replaces the old
-// asymmetric "Find prospects" button ⇄ back-arrow. `right` is a per-page slot
-// (e.g. the Apollo budget indicator on Prospect).
+// Shared sticky header spanning the two peer pipeline routes /admin/prospect
+// and /admin/leads so they read as one workflow (find prospects → work leads),
+// with Prospect first to match the pipeline + sidebar order. Symmetric two-way
+// nav replaces the old asymmetric "Find prospects" button ⇄ back-arrow. `right`
+// is a per-page slot (e.g. the Apollo budget indicator on Prospect).
 interface LeadsTabsProps {
   active: "leads" | "prospect"
   right?: ReactNode
 }
 
 const TABS = [
+  // Ordered to match the pipeline + sidebar: Prospect (find) precedes Leads
+  // (work), so Prospect leads the header.
+  { key: "prospect", label: "Prospect", href: "/admin/prospect", icon: Target },
   { key: "leads", label: "Leads", href: "/admin/leads", icon: Flag },
-  { key: "prospect", label: "Prospect", href: "/admin/leads/prospect", icon: Target },
 ] as const
 
 export function LeadsTabs({ active, right }: LeadsTabsProps) {

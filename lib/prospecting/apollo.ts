@@ -5,7 +5,7 @@ import { logCreditUsage } from "./credit-log"
  * Apollo API wrapper — Stage 1 foundation for the prospecting feature.
  *
  * Two surfaces today:
- *   - searchByFilters()  — for /admin/leads/prospect (NL prompt → ICP search)
+ *   - searchByFilters()  — for /admin/prospect (NL prompt → ICP search)
  *   - enrichByEmail()    — for the inbound engagement-enrichment flow
  *                          (Mailchimp click → fire Apollo to qualify)
  *

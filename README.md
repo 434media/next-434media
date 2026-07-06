@@ -221,7 +221,7 @@ legend popover (`components/admin/LegendPopover.tsx`).
 | **Audiences** | `app/admin/audiences/` | Newsletter / Events / Lists cohorts → sync to Mailchimp → promote to leads |
 | **Inbox** | `app/admin/inbox/` | Contact-form inquiries with a response-time queue (awaiting / oldest waiting / replied today) |
 | **Leads** | `app/admin/leads/`, `components/crm/LeadsView.tsx` | Scored lead queue — priority/follow-up/all views, bulk actions, owner filter + sort, activity timeline |
-| **Prospecting** | `app/admin/leads/prospect/` | NL-prompt outbound prospecting (Apollo + LLM ICP scoring), credit-budgeted |
+| **Prospecting** | `app/admin/prospect/` | NL-prompt outbound prospecting (Apollo + LLM ICP scoring), credit-budgeted |
 | **CRM** | `app/admin/crm/`, `lib/firestore-crm.ts` | Clients, opportunities, tasks |
 
 **Lead lifecycle:** capture (inbound form, audience promotion, or prospecting) →

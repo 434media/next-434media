@@ -25,7 +25,7 @@ The end-to-end prospecting pipeline is built and functional:
 | 1 | Apollo API wrapper | `lib/prospecting/apollo.ts` |
 | 2 | LLM prompt translator | `lib/prospecting/translator.ts` |
 | 3 | ICP scorer (canonical rubric) | `lib/prospecting/scorer.ts`, `lib/icp/rubric.ts` |
-| 4 | Prospect page + search orchestrator | `app/admin/leads/prospect/page.tsx`, `.../prospecting/search` |
+| 4 | Prospect page + search orchestrator | `app/admin/prospect/page.tsx`, `.../prospecting/search` |
 | 5 | Approve → Leads | `app/api/admin/prospecting/approve/route.ts` |
 | 6 | Persistent credit log | `lib/prospecting/credit-log.ts` |
 | 7 | Budget governance | `lib/prospecting/budget.ts`, `.../prospecting/budget` |
