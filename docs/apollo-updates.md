@@ -116,10 +116,11 @@ translation). Industry edits as readable ICP categories; `draftToFilters()`
 resolves to Apollo shape at search time. Matches Apollo's iterate-then-commit
 model — reps correct a misread before spending a credit.
 
-**19. Cleanups** _(housekeeping, anytime)_
-- Delete `app/api/admin/prospecting/test/route.ts` (dev endpoint, marked for removal).
-- Refresh stale "Stage 6 will make this persistent" comments in `apollo.ts`
-  (persistence is already wired via `credit-log.ts`).
+**19. Cleanups** _(DONE)_
+- Deleted `app/api/admin/prospecting/test/route.ts` (dev endpoint).
+- Refreshed the stale "Stage 6 will make this persistent" comments in `apollo.ts`
+  (persistence is wired via `credit-log.ts` + `budget.ts`).
+- Removed the dead `resetCreditCounter()` export.
 
 ---
 

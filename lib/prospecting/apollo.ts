@@ -20,8 +20,9 @@ import { logCreditUsage } from "./credit-log"
  *   server-side based on the active plan. Caller passes whatever per_page
  *   it wants; Apollo returns at most what the plan allows.
  *
- * Credit tracking is process-local (resets on server restart). Stage 6 will
- * persist this to Firestore for proper budget governance across restarts.
+ * Credit tracking: the process-local counter below is dev/telemetry only.
+ * Persistent, cross-restart budget governance is handled by credit-log.ts
+ * (Firestore) + budget.ts, wired via the ApolloCallContext on each call.
  */
 
 const APOLLO_BASE_URL = "https://api.apollo.io/api/v1"
@@ -226,7 +227,7 @@ function getApiKey(): string {
   return key
 }
 
-// ─── Credit tracking (process-local) ────────────────────────────────────
+// ─── Credit tracking (process-local, telemetry only) ────────────────────
 //
 // Apollo doesn't return a `creditsUsed` field in API responses; we infer
 // from result shape. Conventions per Apollo docs:
@@ -234,16 +235,13 @@ function getApiKey(): string {
 //   - Match (enrichment): 1 credit per matched person (0 if no match;
 //     Apollo's billing here may differ — verify in dashboard)
 //
-// Stage 6 makes this persistent. For now, sufficient for dev visibility.
+// This resets on restart; the persistent source of truth is credit-log.ts.
+// Surfaced in the search response as a per-request dev signal.
 
 let _creditsUsedThisProcess = 0
 
 export function getCreditsUsedThisProcess(): number {
   return _creditsUsedThisProcess
-}
-
-export function resetCreditCounter(): void {
-  _creditsUsedThisProcess = 0
 }
 
 // ─── Internal call helper ───────────────────────────────────────────────
