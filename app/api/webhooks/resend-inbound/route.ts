@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Webhook } from "svix"
+import sanitizeHtml from "sanitize-html"
 import { getLeadById } from "@/lib/firestore-leads"
 import { markSequenceReplied } from "@/lib/outreach-sequence"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
@@ -51,20 +52,26 @@ function leadIdFromRecipients(rcpts: string[]): string | null {
   return null
 }
 
-// Minimal HTML→text for replies that arrive HTML-only (no plain-text part).
+// HTML→text for replies that arrive HTML-only (no plain-text part). Uses
+// sanitize-html rather than hand-rolled regex so tag stripping is complete and
+// entity decoding isn't double-applied. Block/break tags become newlines first
+// (via a whitelisted transform), then all tags are dropped.
 function htmlToText(html: string): string {
-  return html
-    .replace(/<\s*br\s*\/?>/gi, "\n")
-    .replace(/<\/\s*(p|div|li|tr|h[1-6])\s*>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&quot;/gi, '"')
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
+  const withBreaks = sanitizeHtml(html, {
+    allowedTags: ["br", "p", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"],
+    allowedAttributes: {},
+    // Insert a newline marker as text where a block/break element sits, then we
+    // strip the tag itself in the second pass below.
+    transformTags: {
+      br: () => ({ tagName: "br", attribs: {}, text: "\n" }),
+      p: () => ({ tagName: "p", attribs: {}, text: "\n" }),
+      div: () => ({ tagName: "div", attribs: {}, text: "\n" }),
+      li: () => ({ tagName: "li", attribs: {}, text: "\n" }),
+      tr: () => ({ tagName: "tr", attribs: {}, text: "\n" }),
+    },
+  })
+  const text = sanitizeHtml(withBreaks, { allowedTags: [], allowedAttributes: {} })
+  return text.replace(/\n{3,}/g, "\n\n").trim()
 }
 
 // Fetch the received email's body. The email.received webhook is metadata-only,

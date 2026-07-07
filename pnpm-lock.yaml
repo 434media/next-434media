@@ -111,6 +111,9 @@ importers:
       svix:
         specifier: ^1.92.2
         version: 1.92.2
+      undici:
+        specifier: ^6.21.3
+        version: 6.26.0
       zod:
         specifier: ^3.25.76
         version: 3.25.76

@@ -47,6 +47,9 @@ const VALID_BRANDS = [
 function slugify(s: string): string {
   return (
     s
+      // Bound length BEFORE the regexes so a pathological input can't drive
+      // super-linear matching (ReDoS). The final handle is 60 chars anyway.
+      .slice(0, 120)
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")

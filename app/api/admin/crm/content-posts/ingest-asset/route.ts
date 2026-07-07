@@ -4,7 +4,9 @@ import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { put } from "@vercel/blob"
 import crypto from "crypto"
 import dns from "node:dns/promises"
+import type { LookupAddress } from "node:dns"
 import net from "node:net"
+import { fetch as pinnedFetch, Agent } from "undici"
 import type { Asset, AssetSource, MediaKind } from "@/components/crm/types"
 
 // POST /api/admin/crm/content-posts/ingest-asset
@@ -72,7 +74,9 @@ function ipInPrivateRange(ip: string): boolean {
 // public CDN/generation outputs. We resolve the host and reject if ANY resolved
 // address is internal — this catches DNS-rebinding hosts, IPv6, and numeric IP
 // encodings that a literal-string allowlist would miss. Async because of DNS.
-async function isSafeRemoteUrl(raw: string): Promise<URL | null> {
+async function isSafeRemoteUrl(
+  raw: string,
+): Promise<{ url: URL; addresses: LookupAddress[] } | null> {
   let u: URL
   try {
     u = new URL(raw)
@@ -82,31 +86,60 @@ async function isSafeRemoteUrl(raw: string): Promise<URL | null> {
   if (u.protocol !== "https:" && u.protocol !== "http:") return null
   const host = u.hostname.replace(/^\[|\]$/g, "").toLowerCase() // strip IPv6 brackets
   if (host === "localhost" || host.endsWith(".local")) return null
-  let addrs: Array<{ address: string }>
+  let addrs: LookupAddress[]
   try {
     addrs = await dns.lookup(host, { all: true })
   } catch {
     return null // unresolvable → refuse
   }
   if (addrs.length === 0 || addrs.some((a) => ipInPrivateRange(a.address))) return null
-  return u
+  return { url: u, addresses: addrs }
 }
 
-// Follow redirects MANUALLY, re-validating every hop against isSafeRemoteUrl.
-// With redirect:"follow", a public URL could 30x-redirect to an internal host
-// (e.g. cloud metadata at 169.254.169.254) and slip past the allowlist above —
-// the redirect target is never checked. This re-runs the guard on each Location
-// and caps the chain length.
-async function fetchAllowingSafeRedirects(start: URL, maxHops = 5): Promise<Response> {
-  let current = start
+// Pin the socket to the exact IP(s) we already validated as public, so fetch
+// can't re-resolve the host to an internal address between our DNS check and the
+// connect (DNS-rebinding / TOCTOU). SNI + TLS cert validation still use the
+// hostname, so HTTPS works normally.
+function pinnedAgent(addresses: LookupAddress[]): Agent {
+  const lookup = (
+    _hostname: string,
+    options: { all?: boolean },
+    callback: (
+      err: NodeJS.ErrnoException | null,
+      address: string | LookupAddress[],
+      family?: number,
+    ) => void,
+  ): void => {
+    if (options?.all) callback(null, addresses)
+    else callback(null, addresses[0].address, addresses[0].family)
+  }
+  return new Agent({ connect: { lookup: lookup as never } })
+}
+
+// Follow redirects MANUALLY, re-validating every hop against isSafeRemoteUrl and
+// re-pinning to the freshly-validated IP. With redirect:"follow", a public URL
+// could 30x-redirect to an internal host (e.g. cloud metadata at
+// 169.254.169.254) and slip past the guard — the redirect target is never
+// checked. This re-runs the guard on each Location and caps the chain length.
+async function fetchAllowingSafeRedirects(
+  startUrl: URL,
+  startAddresses: LookupAddress[],
+  maxHops = 5,
+): Promise<Response> {
+  let current = startUrl
+  let addresses = startAddresses
   for (let hop = 0; hop <= maxHops; hop++) {
-    const res = await fetch(current.toString(), { redirect: "manual" })
+    const res = (await pinnedFetch(current.toString(), {
+      redirect: "manual",
+      dispatcher: pinnedAgent(addresses),
+    })) as unknown as Response
     if (res.status < 300 || res.status >= 400) return res
     const location = res.headers.get("location")
     if (!location) return res
     const next = await isSafeRemoteUrl(new URL(location, current).toString())
     if (!next) throw new Error("unsafe redirect target")
-    current = next
+    current = next.url
+    addresses = next.addresses
   }
   throw new Error("too many redirects")
 }
@@ -127,18 +160,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const safeUrl = await isSafeRemoteUrl((body.url ?? "").trim())
-  if (!safeUrl) {
+  const safe = await isSafeRemoteUrl((body.url ?? "").trim())
+  if (!safe) {
     return NextResponse.json(
       { error: "A valid public http(s) asset URL is required" },
       { status: 400 },
     )
   }
+  const safeUrl = safe.url
 
-  // Fetch the remote asset — redirects are followed manually and re-validated.
+  // Fetch the remote asset — redirects are followed manually and re-validated,
+  // and the socket is pinned to the validated IP (no DNS-rebinding).
   let res: Response
   try {
-    res = await fetchAllowingSafeRedirects(safeUrl)
+    res = await fetchAllowingSafeRedirects(safe.url, safe.addresses)
   } catch (err) {
     console.error("[ingest-asset] fetch failed:", err)
     return NextResponse.json({ error: "Could not fetch the asset URL" }, { status: 502 })
