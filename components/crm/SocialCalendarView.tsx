@@ -491,7 +491,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
           <p className="text-[13px] text-neutral-500 mt-0.5">
             Produce, review, and schedule social content for your brands.{" "}
             <Link
-              href="/admin/content/studio"
+              href="/admin/studio"
               className="inline-flex items-center gap-0.5 font-medium text-neutral-700 hover:text-neutral-900 underline-offset-2 hover:underline"
             >
               <Clapperboard className="w-3.5 h-3.5" />
@@ -655,7 +655,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
               Add post
             </button>
             <Link
-              href="/admin/content/studio"
+              href="/admin/studio"
               className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md ring-1 ring-neutral-300 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
             >
               <Clapperboard className="w-4 h-4" />

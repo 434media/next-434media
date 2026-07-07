@@ -67,6 +67,8 @@ const nextConfig: NextConfig = {
       { source: '/admin/crm/:path*', destination: '/admin/opportunities/:path*', permanent: false },
       // Prospect promoted from a Leads child to a top-level pipeline route.
       { source: '/admin/leads/prospect', destination: '/admin/prospect', permanent: false },
+      // AI Studio promoted from a Content child to its own top-level route.
+      { source: '/admin/content/studio', destination: '/admin/studio', permanent: false },
     ]
   },
 };

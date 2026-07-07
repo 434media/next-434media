@@ -11,7 +11,6 @@ import {
   Layers,
   ClipboardList,
   FileText,
-  GraduationCap,
   Target,
   Flag,
   Megaphone,
@@ -37,7 +36,7 @@ type AdminRole = "crm_super_admin" | "full_admin" | "crm_only" | "intern"
 // page names (not squad names) per the program's "signpost, don't relabel" rule.
 type SignpostLink = { label: string; href: string; icon: LucideIcon }
 const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
-  domain: [{ label: "Problem Library", href: "/admin/painpoints", icon: Target }],
+  domain: [],
   // GTM works the funnel: browse/score leads + run prospecting. CRM (operator
   // deal pipeline) is intentionally not here — interns no longer have access.
   gtm: [
@@ -45,7 +44,7 @@ const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
     { label: "Prospect", href: "/admin/prospect", icon: Target },
   ],
   story_media: [
-    { label: "AI Studio", href: "/admin/content/studio", icon: Clapperboard },
+    { label: "AI Studio", href: "/admin/studio", icon: Clapperboard },
     { label: "Calendar", href: "/admin/content", icon: Calendar },
   ],
   // Analytics squad's KPIs are lead quality + email benchmarks — the dedicated
@@ -57,10 +56,8 @@ const SQUAD_SIGNPOSTS: Record<SquadKey, SignpostLink[]> = {
   ],
   build: [],
 }
-// Appended for every squad — the cohort board (their task home) and SOPs (where
-// every squad documents its work).
+// Appended for every squad — SOPs (where every squad documents its work).
 const SIGNPOST_COMMON: SignpostLink[] = [
-  { label: "Cohort board", href: "/admin/cohorts", icon: GraduationCap },
   { label: "SOPs", href: "/admin/sops", icon: FileText },
 ]
 
@@ -213,31 +210,43 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       },
     ],
   },
+  // Content split into two headspaces: Create (author the artifact) and Publish
+  // (schedule + distribute it). AI Studio leads Create since its assets feed the
+  // rest. The Sales Deck lands in Create when built.
   {
-    id: "content",
-    title: "Content",
+    id: "create",
+    title: "Create",
     items: [
-      // Ordered as the content lifecycle: create (AI Studio) → plan & schedule
-      // (Calendar) → publish (Feed, Blog). AI Studio leads since it's where
-      // assets are made and feeds the rest. crm_only can reach Studio + Calendar
-      // (same as the page guards); Feed/Blog stay full_admin.
       {
         id: "content-studio",
         label: "AI Studio",
         icon: Clapperboard,
-        href: "/admin/content/studio",
-        matchPrefix: "/admin/content/studio",
+        href: "/admin/studio",
+        matchPrefix: "/admin/studio",
         description: "Generate images & video with AI — saved to your library",
         roles: ["full_admin", "crm_only", "intern"],
       },
+      {
+        id: "blog",
+        label: "Blog",
+        icon: Newspaper,
+        href: "/admin/blog",
+        matchPrefix: "/admin/blog",
+        description: "Write & publish blog posts",
+        roles: ["full_admin"],
+      },
+    ],
+  },
+  {
+    id: "publish",
+    title: "Publish",
+    items: [
       {
         id: "content-calendar",
         label: "Calendar",
         icon: Calendar,
         href: "/admin/content",
         matchPrefix: "/admin/content",
-        // Exact so it doesn't stay highlighted on the /admin/content/studio sibling.
-        exact: true,
         description: "Plan, review & schedule social posts",
         roles: ["full_admin", "crm_only", "intern"],
       },
@@ -250,15 +259,6 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         description: "Publish to the site feed",
         // QA: interns can view the feed + open the edit/new-post forms (read-only).
         roles: ["full_admin", "intern"],
-      },
-      {
-        id: "blog",
-        label: "Blog",
-        icon: Newspaper,
-        href: "/admin/blog",
-        matchPrefix: "/admin/blog",
-        description: "Write & publish blog posts",
-        roles: ["full_admin"],
       },
     ],
   },
@@ -281,35 +281,6 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         href: "/admin/sops",
         matchPrefix: "/admin/sops",
         roles: ["full_admin", "intern"],
-      },
-    ],
-  },
-  // Digital Canvas program surfaces — the underwriter intake → cohort pipeline.
-  // Painpoints + Cohorts are program-specific (Projects/SOPs stay company-wide
-  // in Workspace). Mirrors the squads page and the SOP two-space IA.
-  {
-    id: "digital-canvas",
-    title: "Digital Canvas",
-    items: [
-      {
-        id: "painpoints",
-        label: "Problem Library",
-        icon: Target,
-        href: "/admin/painpoints",
-        matchPrefix: "/admin/painpoints",
-        description: "Sourced industry problems → activated into a cohort's problem set",
-        // Authored by the Underwriter Onboarding squad; operators activate into cohorts.
-        // QA: hidden from interns for now (Digital Canvas section hidden).
-        roles: ["full_admin"],
-      },
-      {
-        id: "cohorts",
-        label: "Cohorts",
-        icon: GraduationCap,
-        href: "/admin/cohorts",
-        matchPrefix: "/admin/cohorts",
-        // QA: hidden from interns for now (Digital Canvas section hidden).
-        roles: ["full_admin", "crm_only"],
       },
     ],
   },
