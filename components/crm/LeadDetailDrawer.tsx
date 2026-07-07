@@ -1555,7 +1555,7 @@ function ReplyBody({ text }: { text: string }) {
   const shown = expanded || !long ? text : `${text.slice(0, LIMIT).trimEnd()}…`
   return (
     <div className="mt-1 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5">
-      <p className="text-[11px] text-neutral-600 leading-snug whitespace-pre-wrap break-words">{shown}</p>
+      <p className="text-[11px] text-neutral-600 leading-snug whitespace-pre-wrap wrap-break-word">{shown}</p>
       {long && (
         <button
           type="button"

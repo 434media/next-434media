@@ -77,7 +77,9 @@ export interface BuildPromptResult {
   system: string
 }
 
-export function buildLeadOutreachPrompt({ lead, repName, step }: BuildPromptOptions): BuildPromptResult {
+// The prospect fact-block that steers any draft — shared by the from-scratch
+// writer and the template-fill personalizer so both see the same lead context.
+function leadDataBlock(lead: Lead, repName?: string): string {
   const scoreSignals = Object.entries(lead.score_breakdown ?? {})
     .filter(([, v]) => typeof v === "number" && v > 0)
     .map(([k, v]) => `${k} (+${v})`)
@@ -87,8 +89,7 @@ export function buildLeadOutreachPrompt({ lead, repName, step }: BuildPromptOpti
   const repLine = repName ? `Sender: ${repName} at 434 Media` : ""
 
   // Engagement signal — whether this contact has already shown interest via our
-  // email (Mailchimp opens/clicks). A warm contact gets a different opener than
-  // a cold one, so we surface it to the writer.
+  // email (opens/clicks). A warm contact gets a different opener than a cold one.
   const opens = lead.email_opens ?? 0
   const clicks = lead.email_clicks ?? 0
   const engagementLine =
@@ -98,12 +99,26 @@ export function buildLeadOutreachPrompt({ lead, repName, step }: BuildPromptOpti
         } — this is a WARM contact who already engaged with us.`
       : "Prior email engagement: none yet — treat as a cold first-touch."
 
-  // Provenance — how the lead entered our world (promoted from a partner list,
-  // an event registration, etc.). Gives the writer a legitimate reason for reaching out.
+  // Provenance — how the lead entered our world. Gives a legitimate reason to reach out.
   const originLine = lead.origin_ref
     ? `How we got them: promoted from ${lead.origin_ref.collection.replace(/_/g, " ")} on ${lead.origin_ref.promoted_at?.split("T")[0] ?? "(unknown date)"}.`
     : ""
 
+  return `Name: ${lead.name || "(unknown)"}
+Title: ${lead.title || "(unknown)"}
+Company: ${lead.company || "(unknown)"}
+Industry: ${lead.industry || "(unknown)"}
+Location: ${lead.location || "(unknown)"}
+Capture source: ${lead.source}
+Suggested platform fit: ${lead.platform || "(none yet — pick the best from the portfolio)"}
+Tags: ${tagsLine}
+Lead-scoring signals that fired: ${scoreSignals || "(none — be cautious about assuming fit)"}
+${engagementLine}
+${originLine}
+${repLine}`.trim()
+}
+
+export function buildLeadOutreachPrompt({ lead, repName, step }: BuildPromptOptions): BuildPromptResult {
   const stepLine = step ? `\n${STEP_GUIDANCE[step]}\n` : ""
 
   const system = `You are a senior business development writer for 434 Media. You write outbound prospecting emails that read like a real person reached out, not a marketing template. You know the 434 portfolio cold and you tailor every send to which sub-brand actually fits the prospect's world.
@@ -116,18 +131,7 @@ Banned phrases (do not use): ${BANNED_PHRASES.join("; ")}.`
 
   const prompt = `Write an outbound email to this prospect:
 
-Name: ${lead.name || "(unknown)"}
-Title: ${lead.title || "(unknown)"}
-Company: ${lead.company || "(unknown)"}
-Industry: ${lead.industry || "(unknown)"}
-Location: ${lead.location || "(unknown)"}
-Capture source: ${lead.source}
-Suggested platform fit: ${lead.platform || "(none yet — pick the best from the portfolio)"}
-Tags: ${tagsLine}
-Lead-scoring signals that fired: ${scoreSignals || "(none — be cautious about assuming fit)"}
-${engagementLine}
-${originLine}
-${repLine}
+${leadDataBlock(lead, repName)}
 ${stepLine}
 Rules for this draft:
 - Lead with the audience or sub-brand most relevant to their industry. If multiple fit, pick the strongest one and commit to it.
@@ -136,6 +140,55 @@ Rules for this draft:
 - Make one concrete value claim. Don't list capabilities.
 - End with a low-friction CTA: a 15-minute call, or just a one-line reply.
 - Output the email body only. No subject line. No preamble. No signature.`
+
+  return { prompt, system }
+}
+
+interface TemplateFillOptions {
+  lead: Lead
+  repName?: string
+  step: SequenceStep
+  /** The approved template's subject line (may contain [placeholders]). */
+  subjectTemplate?: string
+  /** The approved template's body copy (contains [placeholders] to fill). */
+  bodyTemplate: string
+}
+
+/**
+ * Hybrid path: personalize one of the GTM squad's APPROVED outreach templates
+ * (from the SOPs) for a specific lead — the AI fills the [placeholders] with real
+ * lead data while keeping the team's structure, sequence intent, and voice.
+ * Output is "Subject: …\n\n<body>" so the caller can split subject from body.
+ */
+export function buildTemplateFillPrompt({
+  lead,
+  repName,
+  step,
+  subjectTemplate,
+  bodyTemplate,
+}: TemplateFillOptions): BuildPromptResult {
+  const system = `You are a senior business development writer for 434 Media. You personalize the GTM team's APPROVED outbound email templates for one specific prospect. Keep the template's structure, sequence intent, length, and voice — replace every [bracketed placeholder] with a real, specific value.
+
+${BRAND_CONTEXT}
+
+Rules:
+- Replace EVERY [placeholder] with a concrete value. Never leave a bracket, and never output a literal "[...]".
+- Use ONLY real prospect data + the 434 portfolio above. Do NOT invent fake metrics, client names, or results. If a placeholder needs data you don't have, rewrite that sentence to make an honest, specific point without fabricating — or drop it.
+- Keep the template's length, structure, and CTA. Match its tone. Lead with the 434 sub-brand most relevant to the prospect's industry.
+Banned phrases (do not use): ${BANNED_PHRASES.join("; ")}.
+Output the subject line first as "Subject: <text>", then a blank line, then the email body only. No commentary.`
+
+  const prompt = `Personalize this approved email ${step} template for the prospect below.
+
+PROSPECT:
+${leadDataBlock(lead, repName)}
+
+${STEP_GUIDANCE[step]}
+
+APPROVED TEMPLATE — keep its shape, fill its placeholders:
+Subject: ${subjectTemplate?.trim() || "(none provided — write a short, specific subject)"}
+
+${bodyTemplate.trim()}`
 
   return { prompt, system }
 }

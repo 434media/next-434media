@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireSendCapable } from "@/lib/auth"
 import { generateGatewayText, GATEWAY_TEXT_MODELS } from "@/lib/ai-gateway-text"
-import { buildLeadOutreachPrompt } from "@/lib/lead-prompt"
+import { buildLeadOutreachPrompt, buildTemplateFillPrompt } from "@/lib/lead-prompt"
+import { getSequenceTemplates } from "@/lib/outreach-templates"
 import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
 import { runSequenceStep } from "@/lib/outreach-sequence"
 import type { Lead, OutreachSequence, OutreachSequenceStep } from "@/types/crm-types"
@@ -18,6 +19,19 @@ function defaultSubject(n: 1 | 2 | 3, lead: Lead): string {
 }
 
 const todayIso = () => new Date().toISOString().split("T")[0]
+
+// Split an AI "Subject: …\n\n<body>" reply (template-fill path) into parts.
+// Falls back to the default subject if the model didn't emit a subject line.
+function parseFilledEmail(text: string, fallbackSubject: string): { subject: string; body: string } {
+  const t = (text || "").trim()
+  const m = t.match(/^\s*\**\s*subject\s*:?\s*\**\s*(.+?)\s*$/im)
+  if (m) {
+    const subject = m[1].replace(/\*+$/, "").trim()
+    const body = t.replace(m[0], "").trim()
+    return { subject: subject || fallbackSubject, body: body || t }
+  }
+  return { subject: fallbackSubject, body: t }
+}
 
 // POST /api/admin/leads/[id]/sequence
 // Body: { action: "draft" | "enroll" | "pause" | "resume" | "stop", steps?: [...] }
@@ -46,9 +60,31 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   // ── draft: generate the 3 step bodies for review (no persist) ──
   if (action === "draft") {
     const repName = auth.session.name || undefined
+    // Hybrid: if the GTM squad has designated an approved template for a step
+    // (a `find` SOP tagged sequence-1/2/3), the AI personalizes THAT per-lead;
+    // otherwise it writes the step from scratch. Never blocks on template fetch.
+    const templates = await getSequenceTemplates()
     try {
       const steps = await Promise.all(
         ([1, 2, 3] as const).map(async (n) => {
+          const tpl = templates[n]
+          if (tpl) {
+            const { prompt, system } = buildTemplateFillPrompt({
+              lead,
+              repName,
+              step: n,
+              subjectTemplate: tpl.subject,
+              bodyTemplate: tpl.body,
+            })
+            const text = await generateGatewayText({
+              model: GATEWAY_TEXT_MODELS.outreachDraft,
+              maxTokens: 600,
+              system,
+              prompt,
+            })
+            const { subject, body } = parseFilledEmail(text || "", defaultSubject(n, lead))
+            return { n, subject, body }
+          }
           const { prompt, system } = buildLeadOutreachPrompt({ lead, repName, step: n })
           const text = await generateGatewayText({
             model: GATEWAY_TEXT_MODELS.outreachDraft,
@@ -59,7 +95,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           return { n, subject: defaultSubject(n, lead), body: (text || "").trim() }
         }),
       )
-      return NextResponse.json({ success: true, steps })
+      return NextResponse.json({
+        success: true,
+        steps,
+        // Which steps used an approved template vs. from-scratch — for a UI hint.
+        templated: { 1: !!templates[1], 2: !!templates[2], 3: !!templates[3] },
+      })
     } catch (err) {
       console.error(`[sequence draft ${id}]`, err)
       return NextResponse.json(
