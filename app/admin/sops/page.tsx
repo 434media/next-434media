@@ -76,8 +76,10 @@ const CATEGORIES: CategoryDef[] = [
     description: "Brand guidelines, identity, voice & tone, and the design system", heading: "Brand & Design System" },
   { key: "Content & Production", space: "company", label: "Content & Production", icon: Clapperboard,
     description: "Content studio, social, video, broadcast & event production", heading: "Content & Production" },
-  { key: "Sales & CRM", space: "company", label: "Sales & CRM", icon: Rocket,
-    description: "Pipeline ops: audiences, leads, outreach, consent & compliance", heading: "Sales & CRM" },
+  // key stays "Sales & CRM" (the stored category on existing SOP docs); only the
+  // display label/heading are renamed to "Sales Pipeline".
+  { key: "Sales & CRM", space: "company", label: "Sales Pipeline", icon: Rocket,
+    description: "Pipeline ops: audiences, leads, outreach, consent & compliance", heading: "Sales Pipeline" },
   { key: "Analytics & Reporting", space: "company", label: "Analytics & Reporting", icon: LineChart,
     description: "GA4, Instagram & portfolio reporting, and brand goals", heading: "Analytics & Reporting" },
   { key: "Web & Tech", space: "company", label: "Web & Tech", icon: Globe,
@@ -151,14 +153,14 @@ export default function SOPsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sops, setSOPs] = useState<SOP[]>([])
   const [selectedSOP, setSelectedSOP] = useState<SOP | null>(null)
-  // No pre-selected category — with 434 Media collapsed by default, the open
-  // Digital Canvas section is the focus and the intern picks their lane.
+  // No pre-selected category — the reader picks their lane from the open
+  // 434 Media knowledge base.
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [activeVertical, setActiveVertical] = useState<Vertical | "all">("all")
   const [showWelcome, setShowWelcome] = useState(false)
-  // Collapsible space groups in the rail. 434 Media (company) starts collapsed so
-  // interns focus on the Digital Canvas program section.
-  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({ company: true })
+  // Collapsible space groups in the rail. 434 Media (company) is open by default;
+  // the Digital Canvas program section starts collapsed.
+  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({ program: true })
   const [isDragging, setIsDragging] = useState(false)
   const [linkInput, setLinkInput] = useState("")
   const [showLinkInput, setShowLinkInput] = useState(false)

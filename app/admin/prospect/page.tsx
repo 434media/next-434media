@@ -10,7 +10,6 @@ import {
   SlidersHorizontal,
   Building2,
   Mail,
-  Linkedin,
   ExternalLink,
   Ban,
   CheckCircle2,
@@ -18,6 +17,7 @@ import {
   Users,
   X,
 } from "lucide-react"
+import { LinkedinIcon } from "@/components/icons/LinkedinIcon"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { LeadsTabs } from "@/components/crm/LeadsTabs"
 import { HowItWorks } from "@/components/admin/HowItWorks"
@@ -1086,7 +1086,9 @@ function CandidateRow({
               </span>
             )}
           </div>
-          {(person.email || person.linkedin_url || (!isExcluded && person.email_status)) && (
+          {/* Render for any non-excluded candidate so the Reveal button shows
+              even when Apollo's masked search returns no email/linkedin/status. */}
+          {(!isExcluded || person.email || person.linkedin_url) && (
             <div className="flex items-center gap-3 text-[11px] text-neutral-500 mt-1">
               {person.email ? (
                 <span className="inline-flex items-center gap-1">
@@ -1116,7 +1118,7 @@ function CandidateRow({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-blue-600 hover:underline"
                 >
-                  <Linkedin className="w-3 h-3" />
+                  <LinkedinIcon className="w-3 h-3" />
                   LinkedIn
                   <ExternalLink className="w-2.5 h-2.5 opacity-60" />
                 </a>

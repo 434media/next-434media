@@ -5,7 +5,6 @@ import {
   Building2,
   Mail,
   Phone,
-  Linkedin,
   MapPin,
   Briefcase,
   Tag as TagIcon,
@@ -39,6 +38,7 @@ import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch, LeadDisqualifiedReason } from "@/types/crm-types"
 import { LEAD_DISQUALIFIED_REASON_LABELS } from "@/types/crm-types"
 import { Combobox, type ComboboxOption } from "@/components/crm/Combobox"
+import { LinkedinIcon } from "@/components/icons/LinkedinIcon"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
 
 // Archive-reason options for the Combobox picker (order = display order).
@@ -828,7 +828,7 @@ export function LeadDetailDrawer({
             value={form.linkedin}
             onChange={(v) => update("linkedin", v)}
             placeholder="https://linkedin.com/in/…"
-            iconLeft={<Linkedin className="w-3.5 h-3.5 text-neutral-400" />}
+            iconLeft={<LinkedinIcon className="w-3.5 h-3.5 text-neutral-400" />}
           />
         </Section>
 

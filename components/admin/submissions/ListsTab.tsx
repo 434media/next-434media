@@ -9,11 +9,11 @@ import {
   Users2,
   Mail,
   Building2,
-  Linkedin,
   Phone,
   ArrowRightCircle,
   Trash2,
 } from "lucide-react"
+import { LinkedinIcon } from "@/components/icons/LinkedinIcon"
 import {
   MailchimpSubscribedPill,
   useMailchimpSubscribers,
@@ -622,7 +622,7 @@ export function ListsTab({
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 shrink-0 text-blue-500 hover:text-blue-700"
                               >
-                                <Linkedin className="w-3 h-3" />
+                                <LinkedinIcon className="w-3 h-3" />
                                 LinkedIn
                               </a>
                             )}
