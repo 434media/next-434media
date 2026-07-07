@@ -542,6 +542,7 @@ export const CRM_COLLECTIONS = {
   // Reusable media library — generated (and later uploaded) assets persisted
   // independently of any content post, browsable + reusable in the Studio.
   ASSETS: "crm_assets",
+  DECKS: "crm_decks",
   LEADS: "leads",
   // Digital Canvas cohort program
   COHORTS: "crm_cohorts",
