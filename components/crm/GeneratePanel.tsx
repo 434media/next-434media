@@ -53,13 +53,16 @@ interface GeneratePanelProps {
   /** Prefill the prompt box (e.g. an example prompt from the empty library).
    *  Bump `nonce` to re-trigger with the same text. */
   seedPrompt?: { text: string; nonce: number } | null
+  /** Restrict generation to a single media kind (hides the Image/Video toggle).
+   *  E.g. the Sales Deck only accepts still images. */
+  lockKind?: "image" | "video"
 }
 
 const MAX_REFS = 4
 
-export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed, seedPrompt }: GeneratePanelProps) {
+export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed, seedPrompt, lockKind }: GeneratePanelProps) {
   const [genModels, setGenModels] = useState<GenModel[]>([])
-  const [genKind, setGenKind] = useState<"image" | "video">("image")
+  const [genKind, setGenKind] = useState<"image" | "video">(lockKind ?? "image")
   const [genModelId, setGenModelId] = useState("")
   const [genPrompt, setGenPrompt] = useState("")
   const [refs, setRefs] = useState<string[]>([]) // reference/input images for edit + remix
@@ -93,6 +96,11 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
       cancelled = true
     }
   }, [open])
+
+  // When locked to one kind, keep the toggle state pinned there.
+  useEffect(() => {
+    if (lockKind && genKind !== lockKind) setGenKind(lockKind)
+  }, [lockKind, genKind])
 
   // Keep the selected model valid when the kind toggle flips.
   const genModelsForKind = genModels.filter((m) => m.kind === genKind)
@@ -297,7 +305,8 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
         </div>
       )}
 
-      {/* Image / Video segmented toggle */}
+      {/* Image / Video segmented toggle — hidden when the host locks the kind. */}
+      {!lockKind && (
       <div className="inline-flex rounded-lg ring-1 ring-neutral-200 overflow-hidden">
         {(["image", "video"] as const).map((k) => {
           const active = genKind === k
@@ -318,6 +327,7 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
           )
         })}
       </div>
+      )}
 
       {/* Model picker — logo + name + price cards (Vercel-style) */}
       <div>

@@ -10,9 +10,15 @@ import {
   ArrowUp,
   ArrowDown,
   Image as ImageIcon,
+  ImagePlus,
+  Images,
+  Upload,
   AlertCircle,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
+import { AssetLibraryPicker } from "@/components/crm/AssetLibraryPicker"
+import { DeckImageGenerateModal } from "@/components/crm/DeckImageGenerateModal"
+import { sanitizeAssetUrl } from "@/lib/asset-url"
 import { buildSlides } from "@/lib/deck/slides"
 import { SLIDE_META } from "@/lib/deck/slide-meta"
 import { buildBlankSlide } from "@/lib/deck/default-deck"
@@ -33,6 +39,13 @@ export default function DeckEditorPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const [addOpen, setAddOpen] = useState(false)
+
+  // Image picking — which slide is being targeted + which surface is open.
+  const [imageTarget, setImageTarget] = useState<string | null>(null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [generateOpen, setGenerateOpen] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   // Debounced autosave bookkeeping.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -141,6 +154,25 @@ export default function DeckEditorPage() {
     [scheduleSave],
   )
 
+  // Upload a file → Vercel Blob → set as the target slide's image.
+  const handleUploadImage = async (file: File, instanceId: string) => {
+    setUploadError(null)
+    setIsUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("folder", "decks")
+      const res = await fetch("/api/upload/crm", { method: "POST", body: fd, credentials: "include" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.url) throw new Error(data.error || "Upload failed")
+      updateImage(instanceId, sanitizeAssetUrl(data.url))
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const addSlide = (type: SlideType) => {
     const blank = buildBlankSlide(type)
     setSlides((prev) => {
@@ -188,7 +220,12 @@ export default function DeckEditorPage() {
       buildSlides(slides, {
         editable: true,
         onTextChange: updateText,
-        onImageEdit: (id) => setSelectedId(id),
+        // Clicking a slide's image opens the library picker for that slide.
+        onImageEdit: (id) => {
+          setSelectedId(id)
+          setImageTarget(id)
+          setLibraryOpen(true)
+        },
       }),
     [slides, updateText],
   )
@@ -376,20 +413,69 @@ export default function DeckEditorPage() {
                 </div>
 
                 {selectedMeta.hasImage && (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <label className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-600">
                       <ImageIcon className="h-3 w-3 text-neutral-400" />
-                      Image URL
+                      Image
                     </label>
-                    <input
-                      value={selectedSlide.image ?? ""}
-                      onChange={(e) => updateImage(selectedSlide.instance_id, e.target.value)}
-                      placeholder="Paste an image URL…"
-                      className="w-full h-8 px-2 ring-1 ring-neutral-200 rounded-md bg-white text-xs text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-neutral-400">
-                      Leave blank to use the template&apos;s stock image. Asset picker + AI generation land in the next phase.
-                    </p>
+                    {/* Current image preview / stock note */}
+                    <div className="aspect-video w-full rounded-md ring-1 ring-neutral-200 overflow-hidden bg-neutral-100 grid place-items-center">
+                      {selectedSlide.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={sanitizeAssetUrl(selectedSlide.image)}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-neutral-400">Template stock image</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        onClick={() => {
+                          setImageTarget(selectedSlide.instance_id)
+                          setLibraryOpen(true)
+                        }}
+                        className="inline-flex flex-col items-center gap-1 py-2 rounded-md ring-1 ring-neutral-200 bg-white text-[10px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                      >
+                        <Images className="h-3.5 w-3.5" />
+                        Library
+                      </button>
+                      <button
+                        onClick={() => {
+                          setImageTarget(selectedSlide.instance_id)
+                          setGenerateOpen(true)
+                        }}
+                        className="inline-flex flex-col items-center gap-1 py-2 rounded-md ring-1 ring-neutral-200 bg-white text-[10px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                      >
+                        <ImagePlus className="h-3.5 w-3.5" />
+                        Generate
+                      </button>
+                      <label className="inline-flex flex-col items-center gap-1 py-2 rounded-md ring-1 ring-neutral-200 bg-white text-[10px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer">
+                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) handleUploadImage(f, selectedSlide.instance_id)
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {uploadError && <p className="text-[10px] text-red-500">{uploadError}</p>}
+                    {selectedSlide.image && (
+                      <button
+                        onClick={() => updateImage(selectedSlide.instance_id, "")}
+                        className="text-[10px] text-neutral-400 hover:text-neutral-700 transition-colors"
+                      >
+                        Use template stock image
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -424,6 +510,26 @@ export default function DeckEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* Image pickers — target the slide captured in imageTarget. */}
+      <AssetLibraryPicker
+        open={libraryOpen}
+        kind="image"
+        title="Choose a slide image"
+        onClose={() => setLibraryOpen(false)}
+        onSelect={(asset) => {
+          if (imageTarget) updateImage(imageTarget, sanitizeAssetUrl(asset.url))
+          setLibraryOpen(false)
+        }}
+      />
+      <DeckImageGenerateModal
+        open={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        onUse={(url) => {
+          if (imageTarget) updateImage(imageTarget, url)
+          setGenerateOpen(false)
+        }}
+      />
     </AdminRoleGuard>
   )
 }
