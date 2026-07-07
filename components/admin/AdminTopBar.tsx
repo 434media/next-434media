@@ -30,6 +30,7 @@ const ROUTE_LABELS: Array<{ match: string | RegExp; label: string }> = [
   { match: "/admin/content", label: "Publish · Calendar" },
   { match: "/admin/feed-form", label: "Publish · Feed" },
   { match: "/admin/blog", label: "Create · Blog" },
+  { match: "/admin/deck", label: "Create · Sales Deck" },
   { match: "/admin/project-management", label: "Project Management" },
   { match: "/admin/sops", label: "SOPs" },
   { match: "/admin/events", label: "Events" },
