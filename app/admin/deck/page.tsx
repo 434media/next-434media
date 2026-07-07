@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { buildDefaultDeckSlides } from "@/lib/deck/default-deck"
@@ -301,6 +302,18 @@ export default function DeckListPage() {
                           >
                             Edit
                           </button>
+                          {deck.status === "published" && deck.share_id && (
+                            <a
+                              href={`/deck/${deck.share_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center h-7 w-7 ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 rounded-md transition-colors"
+                              title="View live"
+                              aria-label="View live"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
                           {deleteConfirmId === deck.id ? (
                             <>
                               <button

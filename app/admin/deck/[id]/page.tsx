@@ -14,6 +14,10 @@ import {
   Images,
   Upload,
   AlertCircle,
+  Globe,
+  Link2,
+  Check,
+  ExternalLink,
 } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { AssetLibraryPicker } from "@/components/crm/AssetLibraryPicker"
@@ -22,7 +26,7 @@ import { sanitizeAssetUrl } from "@/lib/asset-url"
 import { buildSlides } from "@/lib/deck/slides"
 import { SLIDE_META } from "@/lib/deck/slide-meta"
 import { buildBlankSlide } from "@/lib/deck/default-deck"
-import { SLIDE_TYPES, type DeckSlide, type SalesDeck, type SlideType } from "@/types/deck-types"
+import { SLIDE_TYPES, type DeckSlide, type DeckStatus, type SalesDeck, type SlideType } from "@/types/deck-types"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
 
@@ -46,6 +50,10 @@ export default function DeckEditorPage() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Publish / share.
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   // Debounced autosave bookkeeping.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -173,6 +181,41 @@ export default function DeckEditorPage() {
     }
   }
 
+  // Flip published state. Flushes any pending edit first so the published deck
+  // reflects the latest slides.
+  const setPublishState = async (next: DeckStatus) => {
+    setIsPublishing(true)
+    try {
+      if (dirtyRef.current) await save()
+      const res = await fetch(`/api/admin/crm/decks/${deckId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      })
+      if (!res.ok) throw new Error("Failed to update publish state")
+      const data = await res.json()
+      setDeck(data.deck as SalesDeck)
+    } catch (err) {
+      console.error("[deck] publish toggle failed:", err)
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
+  const shareUrl =
+    deck && typeof window !== "undefined" ? `${window.location.origin}/deck/${deck.share_id}` : ""
+
+  const copyShareLink = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      /* clipboard blocked — no-op */
+    }
+  }
+
   const addSlide = (type: SlideType) => {
     const blank = buildBlankSlide(type)
     setSlides((prev) => {
@@ -296,16 +339,62 @@ export default function DeckEditorPage() {
               className="min-w-0 flex-1 text-lg font-semibold tracking-tight text-neutral-900 bg-transparent border-0 outline-none focus:ring-0 placeholder:text-neutral-300"
             />
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {saveLabel && (
               <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700 ring-1 ring-neutral-200 text-[11px] tabular-nums">
                 <span className={`inline-block h-1 w-1 rounded-full ${saveLabel.dot}`} aria-hidden="true" />
                 {saveLabel.text}
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200 text-[11px] capitalize">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ring-1 text-[11px] capitalize ${
+                deck.status === "published"
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-amber-50 text-amber-700 ring-amber-200"
+              }`}
+            >
               {deck.status}
             </span>
+
+            {deck.status === "published" ? (
+              <>
+                <button
+                  onClick={copyShareLink}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                  title={shareUrl}
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Link2 className="h-3.5 w-3.5" />}
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+                <a
+                  href={`/deck/${deck.share_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-md ring-1 ring-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+                  title="View shared deck"
+                  aria-label="View shared deck"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+                <button
+                  onClick={() => setPublishState("draft")}
+                  disabled={isPublishing}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md ring-1 ring-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
+                >
+                  {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Unpublish
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setPublishState("published")}
+                disabled={isPublishing}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+                Publish
+              </button>
+            )}
           </div>
         </div>
 
