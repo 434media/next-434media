@@ -19,6 +19,7 @@ const PROVIDERS: Record<string, { slug: string; label: string; color: string }> 
   bfl: { slug: "flux", label: "Black Forest Labs", color: "#e5484d" },
   klingai: { slug: "kling", label: "Kling", color: "#6e56cf" },
   bytedance: { slug: "bytedance", label: "ByteDance", color: "#0a7cff" },
+  recraft: { slug: "recraft", label: "Recraft", color: "#5b21b6" },
 }
 
 export function providerLabel(provider: string): string {

@@ -41,6 +41,12 @@ interface CuratedModel {
   /** One-line "good for…" hint shown on the picker card to help a first-time
    *  admin choose between unfamiliar models. */
   blurb?: string
+  /** Optional highlight chip on the picker card (e.g. "Best value", "New") to
+   *  feature a recommended model. */
+  badge?: string
+  /** The model's lane in 1–2 words (e.g. "Brand & vector", "Fast edits") — a
+   *  scannable "known for" chip, distinct from the promotional `badge`. */
+  specialty?: string
   /** Video models only: the aspect ratios + durations this model accepts.
    *  Omitted when unverified → the picker uses the global fallback options. */
   video?: VideoConstraints
@@ -49,20 +55,22 @@ interface CuratedModel {
 // Curated roster. Add verified ids here to grow it — confirm a new id exists via
 // /v1/models before adding. Order = display order (first of each kind = default).
 const CURATED: CuratedModel[] = [
-  // Image
-  { id: "openai/gpt-image-2", label: "GPT Image 2", kind: "image", provider: "openai", supportsImageInput: true, blurb: "Versatile all-rounder, great with text in images" },
-  { id: "google/gemini-3-pro-image", label: "Nano Banana Pro", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true, blurb: "Highest quality edits & precise remixes" },
-  { id: "google/gemini-2.5-flash-image", label: "Nano Banana", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true, blurb: "Fast, low-cost edits & remixes" },
-  { id: "bfl/flux-2-flex", label: "Flux 2 Flex", kind: "image", provider: "bfl", supportsImageInput: true, blurb: "Artistic, stylized visuals" },
-  { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true, blurb: "Quick, budget-friendly images" },
-  { id: "google/imagen-4.0-generate-001", label: "Imagen 4", kind: "image", provider: "google", blurb: "Photoreal, true-to-life images" },
+  // Image (first entry of the kind = the picker's default). Nano Banana Lite
+  // leads — the cheapest Gemini Flash Image — and carries a picker badge.
+  // `specialty` = the model's lane (scannable chip); `blurb` = one-line detail.
+  { id: "google/gemini-3.1-flash-lite-image", label: "Nano Banana Lite", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true, badge: "Best value", specialty: "Fast edits", blurb: "Cheapest, fastest edits & remixes — the lightweight Nano Banana" },
+  { id: "openai/gpt-image-2", label: "GPT Image 2", kind: "image", provider: "openai", supportsImageInput: true, specialty: "Text-in-image", blurb: "Versatile all-rounder, great with text in images" },
+  { id: "google/gemini-3-pro-image", label: "Nano Banana Pro", kind: "image", provider: "google", viaLanguage: true, supportsImageInput: true, specialty: "Precise remix", blurb: "Highest quality edits & precise remixes" },
+  { id: "recraft/recraft-v4.1", label: "Recraft v4.1", kind: "image", provider: "recraft", supportsImageInput: true, specialty: "Brand & vector", blurb: "Design-grade typography, brand assets & editable vectors" },
+  { id: "bfl/flux-2-klein-9b", label: "Flux 2 Klein 9B", kind: "image", provider: "bfl", supportsImageInput: true, specialty: "Fast & stylized", blurb: "Sub-second stylized generation & edits — the efficient FLUX.2 tier" },
+  { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true, specialty: "Budget", blurb: "Quick, budget-friendly images" },
   // Video (text-to-video; image-to-video handled per-model in the client)
   // Veo 3.1: Gateway desc = fixed 8-second clips; Google docs = 16:9 / 9:16 only.
-  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google", blurb: "Top-quality video with audio", video: { aspectRatios: ["16:9", "9:16"], durations: [8] } },
-  { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai", blurb: "Smooth, cinematic motion" },
+  { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google", specialty: "Video + audio", blurb: "Top-quality video with audio", video: { aspectRatios: ["16:9", "9:16"], durations: [8] } },
+  { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai", specialty: "Cinematic", blurb: "Smooth, cinematic motion" },
   // Seedance 2.0: 4–15s output, six aspect ratios incl. 21:9 ultrawide.
-  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance", blurb: "Dynamic action & camera moves", video: { aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], durationRange: { min: 4, max: 15, default: 5 } } },
-  { id: "xai/grok-imagine-video", label: "Grok Imagine", kind: "video", provider: "xai", blurb: "Fast, budget-friendly clips" },
+  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance", specialty: "Action", blurb: "Dynamic action & camera moves", video: { aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], durationRange: { min: 4, max: 15, default: 5 } } },
+  { id: "xai/grok-imagine-video", label: "Grok Imagine", kind: "video", provider: "xai", specialty: "Budget", blurb: "Fast, budget-friendly clips" },
 ]
 
 export interface GatewayModel {
@@ -74,6 +82,12 @@ export interface GatewayModel {
   supportsImageInput: boolean
   /** One-line "good for…" hint for the picker card. */
   blurb: string | null
+  /** Optional highlight chip (e.g. "Best value") shown on the picker card. */
+  badge: string | null
+  /** Scannable "known for" lane chip (e.g. "Brand & vector"). */
+  specialty: string | null
+  /** Authoritative model description from the Gateway — the deep-dive tooltip. */
+  description: string | null
   /** Human-readable price hint for the picker, e.g. "$0.04 / image" or
    *  "from $0.10 / sec". Null when the list endpoint exposes only token-based
    *  pricing (e.g. GPT Image) that has no clean per-asset unit price. */
@@ -96,6 +110,7 @@ interface GatewayPricing {
 interface GatewayListEntry {
   id: string
   type?: string
+  description?: string
   pricing?: GatewayPricing
 }
 
@@ -165,6 +180,9 @@ export async function getGatewayModels(): Promise<GatewayModel[]> {
       viaLanguage: !!c.viaLanguage,
       supportsImageInput: !!c.supportsImageInput,
       blurb: c.blurb ?? null,
+      badge: c.badge ?? null,
+      specialty: c.specialty ?? null,
+      description: entry?.description?.trim() || null,
       priceLabel: priceLabelFor(entry, c.kind),
       available: live ? live.has(c.id) : true,
       video: c.video ?? null,

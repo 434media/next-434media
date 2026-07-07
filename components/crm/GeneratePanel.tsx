@@ -20,6 +20,9 @@ export interface GenModel {
   provider: string
   supportsImageInput: boolean
   blurb: string | null
+  badge: string | null
+  specialty: string | null
+  description: string | null
   priceLabel: string | null
   available: boolean
   /** Video models: accepted aspect ratios + durations (null = use global options).
@@ -328,6 +331,8 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
                 type="button"
                 onClick={() => setGenModelId(m.id)}
                 aria-pressed={active}
+                // Full Gateway description on hover — the authoritative deep-dive.
+                title={m.description || m.blurb || m.id}
                 className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
                   active
                     ? "border-neutral-900 ring-1 ring-neutral-900 bg-neutral-50"
@@ -336,9 +341,24 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
               >
                 <ProviderLogo provider={m.provider} size={20} className="mt-0.5" />
                 <span className="min-w-0">
-                  <span className="block text-xs font-medium text-neutral-900 truncate" title={m.id}>{m.id}</span>
+                  <span className="block text-xs font-medium text-neutral-900 truncate">{m.id}</span>
+                  {/* Specialty (lane) + optional promo badge — the scannable spotlight. */}
+                  {(m.specialty || m.badge) && (
+                    <span className="flex flex-wrap items-center gap-1 mt-1">
+                      {m.specialty && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 text-[9px] font-semibold uppercase tracking-wide">
+                          {m.specialty}
+                        </span>
+                      )}
+                      {m.badge && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[9px] font-semibold uppercase tracking-wide">
+                          {m.badge}
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {m.blurb && (
-                    <span className="block text-[10px] text-neutral-600 leading-snug line-clamp-2">{m.blurb}</span>
+                    <span className="block text-[10px] text-neutral-600 leading-snug line-clamp-2 mt-0.5">{m.blurb}</span>
                   )}
                   <span className="block text-[10px] text-neutral-400 truncate mt-0.5">
                     {m.priceLabel ?? "usage-based"}
