@@ -1,7 +1,7 @@
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
 import { isSuppressed } from "@/lib/firestore-suppression"
 import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
-import { updateLead, appendLeadActivity } from "@/lib/firestore-leads"
+import { updateLead, appendLeadActivity, recordResendEmailId } from "@/lib/firestore-leads"
 import type { Lead, OutreachSequence, OutreachSequenceStopReason } from "@/types/crm-types"
 
 /**
@@ -161,6 +161,9 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
     resend_email_id: emailId,
     outreach_sequence: next,
   })
+  // Preserve this step's id in the send history so its opens/clicks still match
+  // after the next step overwrites resend_email_id.
+  await recordResendEmailId(lead.id, emailId)
   await appendLeadActivity(lead.id, {
     type: "outreach_sent",
     actor: seq.enrolled_by,

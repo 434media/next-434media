@@ -1,20 +1,26 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart3, CircleGauge, Target, Mail, Flag, Filter, Timer, AlertCircle, RefreshCw } from "lucide-react"
+import { BarChart3, CircleGauge, Mail, Flag, Filter, Timer, AlertCircle, RefreshCw } from "lucide-react"
 import { AdminRoleGuard } from "@/components/AdminRoleGuard"
 import { HowItWorks } from "@/components/admin/HowItWorks"
 import type { LeadQualityKpis } from "@/lib/kpis/lead-quality"
 import type { FunnelKpis } from "@/lib/kpis/funnel"
-import type { MailchimpBenchmark, ResendBenchmark } from "@/lib/kpis/email-benchmarks"
+import type { ResendBenchmark } from "@/lib/kpis/email-benchmarks"
 
 interface EmailBenchmarksResponse {
-  range: { start: string; end: string }
-  mailchimp: MailchimpBenchmark | null
-  mailchimpError: string | null
+  range: { start: string; end: string } | null
   resend: ResendBenchmark
   generatedAt: string
 }
+
+type EmailWindow = "30" | "90" | "365" | "all"
+const EMAIL_WINDOWS: { value: EmailWindow; label: string }[] = [
+  { value: "30", label: "30d" },
+  { value: "90", label: "90d" },
+  { value: "365", label: "12mo" },
+  { value: "all", label: "All" },
+]
 
 // 0–1 fraction → "42.0%"
 function pct(n: number): string {
@@ -101,27 +107,24 @@ function FunnelKpisInner() {
   const [funnel, setFunnel] = useState<FunnelKpis | null>(null)
   const [quality, setQuality] = useState<LeadQualityKpis | null>(null)
   const [email, setEmail] = useState<EmailBenchmarksResponse | null>(null)
+  const [emailWindow, setEmailWindow] = useState<EmailWindow>("90")
+  const [emailLoading, setEmailLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Funnel + lead-quality are all-time; loaded once (and on Refresh).
   const load = async () => {
     setLoading(true)
     setError(null)
     try {
-      const [fRes, qRes, eRes] = await Promise.all([
+      const [fRes, qRes] = await Promise.all([
         fetch("/api/admin/kpis/funnel", { cache: "no-store" }),
         fetch("/api/admin/kpis/lead-quality", { cache: "no-store" }),
-        fetch("/api/admin/kpis/email-benchmarks", { cache: "no-store" }),
       ])
       if (!fRes.ok) throw new Error("Failed to load funnel KPIs")
       if (!qRes.ok) throw new Error("Failed to load lead-quality KPIs")
-      if (!eRes.ok) throw new Error("Failed to load email benchmarks")
-      const fData = await fRes.json()
-      const qData = await qRes.json()
-      const eData = await eRes.json()
-      setFunnel(fData.kpis)
-      setQuality(qData.kpis)
-      setEmail(eData)
+      setFunnel((await fRes.json()).kpis)
+      setQuality((await qRes.json()).kpis)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load KPIs")
     } finally {
@@ -129,10 +132,29 @@ function FunnelKpisInner() {
     }
   }
 
+  // Email benchmarks refetch on their own when the time window changes, so
+  // changing it doesn't blank the funnel/quality sections.
+  const loadEmail = async (win: EmailWindow) => {
+    setEmailLoading(true)
+    try {
+      const eRes = await fetch(`/api/admin/kpis/email-benchmarks?days=${win}`, { cache: "no-store" })
+      if (eRes.ok) setEmail(await eRes.json())
+    } catch {
+      // Keep the prior email data on a transient failure.
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    loadEmail(emailWindow)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailWindow])
 
   const maxBand = quality ? Math.max(1, ...quality.scoreDistribution.map((b) => b.count)) : 1
   const maxReason = quality ? Math.max(1, ...quality.removedReasons.map((r) => r.count)) : 1
@@ -155,7 +177,10 @@ function FunnelKpisInner() {
             </span>
           </div>
           <button
-            onClick={load}
+            onClick={() => {
+              load()
+              loadEmail(emailWindow)
+            }}
             disabled={loading}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 rounded-md disabled:opacity-50"
           >
@@ -171,7 +196,7 @@ function FunnelKpisInner() {
           steps={[
             { title: "Funnel", detail: "Where leads drop off (Lead→MQL→SQL→Discovery→Proposal→Closed-Won), ICP match rate, and how fast they move." },
             { title: "Lead quality", detail: "Score distribution, kept vs removed (and why), and which sources convert." },
-            { title: "Email benchmarks", detail: "Mailchimp drop-campaign open/click/bounce + Resend 1:1 engagement." },
+            { title: "Email benchmarks", detail: "Resend 1:1 outreach engagement — sent, opens, clicks, rates." },
             { title: "Your scoreboard", detail: "Numbers come from Leads + the email tools; read here, act in Leads." },
           ]}
         />
@@ -402,85 +427,38 @@ function FunnelKpisInner() {
         {/* ===== Email Benchmarks ===== */}
         {email && (
           <Section title="Email benchmarks" icon={Mail}>
-            {/* Mailchimp drop campaign */}
+            {/* Resend 1:1 outreach — our email source of truth (API + webhooks). */}
             <div>
-              <div className="flex items-center gap-2 mb-3 text-xs font-medium text-neutral-600">
-                <Target className="w-3.5 h-3.5" /> Mailchimp — drop campaigns
-                <span className="text-neutral-400">
-                  ({email.range.start} → {email.range.end})
+              <div className="flex flex-wrap items-center gap-2 mb-3 text-xs font-medium text-neutral-600">
+                <Mail className="w-3.5 h-3.5" /> Resend — 1:1 outreach
+                <span className="inline-flex items-center rounded-md border border-neutral-200 overflow-hidden">
+                  {EMAIL_WINDOWS.map((w) => (
+                    <button
+                      key={w.value}
+                      onClick={() => setEmailWindow(w.value)}
+                      className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                        emailWindow === w.value
+                          ? "bg-neutral-900 text-white"
+                          : "text-neutral-600 hover:bg-neutral-100"
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                </span>
+                <span className="text-neutral-400 inline-flex items-center gap-1">
+                  {email.range ? `(${email.range.start} → ${email.range.end})` : "(all time)"}
+                  {emailLoading && <RefreshCw className="w-3 h-3 animate-spin" />}
                 </span>
               </div>
-              {email.mailchimp ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                    <HeroMetric label="Emails sent" value={email.mailchimp.totalSent.toLocaleString()} />
-                    <HeroMetric label="Open rate" value={pct(email.mailchimp.avgOpenRate)} />
-                    <HeroMetric label="Click rate" value={pct(email.mailchimp.avgClickRate)} />
-                    <HeroMetric label="Bounce rate" value={pct(email.mailchimp.bounceRate)} />
-                    <HeroMetric label="Unsub rate" value={pct(email.mailchimp.unsubscribeRate)} />
-                  </div>
-                  <Card>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-[11px] uppercase tracking-wide text-neutral-500 border-b border-neutral-100">
-                            <th className="py-2 pr-4 font-medium">Campaign</th>
-                            <th className="py-2 px-3 font-medium text-right">Sent</th>
-                            <th className="py-2 px-3 font-medium text-right">Open</th>
-                            <th className="py-2 px-3 font-medium text-right">Click</th>
-                            <th className="py-2 px-3 font-medium text-right">Bounce</th>
-                            <th className="py-2 pl-3 font-medium text-right">Unsub</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {email.mailchimp.campaigns.length === 0 ? (
-                            <tr>
-                              <td colSpan={6} className="py-6 text-center text-neutral-400">
-                                No campaigns sent in this window.
-                              </td>
-                            </tr>
-                          ) : (
-                            email.mailchimp.campaigns.map((c) => (
-                              <tr key={c.campaignId} className="border-b border-neutral-50 last:border-0">
-                                <td className="py-2 pr-4 text-neutral-700">
-                                  {c.campaignTitle}
-                                  <span className="text-neutral-400 text-xs"> · {c.date}</span>
-                                </td>
-                                <td className="py-2 px-3 text-right tabular-nums text-neutral-600">
-                                  {c.emailsSent.toLocaleString()}
-                                </td>
-                                <td className="py-2 px-3 text-right tabular-nums text-neutral-900">{pct(c.openRate)}</td>
-                                <td className="py-2 px-3 text-right tabular-nums text-neutral-900">{pct(c.clickRate)}</td>
-                                <td className="py-2 px-3 text-right tabular-nums text-neutral-600">{c.bounces}</td>
-                                <td className="py-2 pl-3 text-right tabular-nums text-neutral-600">{c.unsubscribes}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
-                </div>
-              ) : (
-                <Card>
-                  <div className="text-sm text-neutral-400 py-4 text-center">
-                    Mailchimp data unavailable{email.mailchimpError ? ` — ${email.mailchimpError}` : ""}.
-                  </div>
-                </Card>
-              )}
-            </div>
-
-            {/* Resend 1:1 outreach */}
-            <div>
-              <div className="flex items-center gap-2 mb-3 text-xs font-medium text-neutral-600">
-                <Mail className="w-3.5 h-3.5" /> Resend — 1:1 outreach
-              </div>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4">
                 <HeroMetric label="Sent" value={email.resend.sent.toLocaleString()} />
                 <HeroMetric label="Opens" value={email.resend.opens.toLocaleString()} />
                 <HeroMetric label="Clicks" value={email.resend.clicks.toLocaleString()} />
+                <HeroMetric label="Replies" value={email.resend.replies.toLocaleString()} />
                 <HeroMetric label="Open rate" value={pct(email.resend.openRate)} />
                 <HeroMetric label="Click rate" value={pct(email.resend.clickRate)} />
+                <HeroMetric label="Reply rate" value={pct(email.resend.replyRate)} />
               </div>
             </div>
           </Section>

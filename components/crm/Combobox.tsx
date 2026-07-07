@@ -35,6 +35,7 @@ export function Combobox({
   onCreateNew,
   createNewLabel,
   triggerLabel,
+  dropUp = false,
   className = "",
 }: {
   value: string
@@ -52,6 +53,9 @@ export function Combobox({
   /** Override the trigger text — for pickers whose selection isn't a plain option
    *  (e.g. a free-text value or a freshly "created" entry). */
   triggerLabel?: string
+  /** Open the panel above the trigger — for pickers near the bottom of a
+   *  container (e.g. a drawer footer) where a downward panel would be clipped. */
+  dropUp?: boolean
   className?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -94,11 +98,13 @@ export function Combobox({
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: dropUp ? 8 : -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            exit={{ opacity: 0, y: dropUp ? 8 : -8 }}
             role="listbox"
-            className="absolute z-30 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden"
+            className={`absolute z-30 w-full bg-white border border-neutral-200 rounded-lg shadow-lg overflow-hidden ${
+              dropUp ? "bottom-full mb-1" : "mt-1"
+            }`}
           >
             {searchable && (
               <div className="p-2 border-b border-neutral-100">

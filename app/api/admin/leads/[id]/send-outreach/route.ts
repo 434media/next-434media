@@ -1,7 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { requireSendCapable } from "@/lib/auth"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
-import { getLeadById, updateLead, appendLeadActivity } from "@/lib/firestore-leads"
+import {
+  getLeadById,
+  updateLead,
+  appendLeadActivity,
+  recordResendEmailId,
+} from "@/lib/firestore-leads"
 import { isSuppressed } from "@/lib/firestore-suppression"
 import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
 
@@ -156,6 +161,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       next_followup_date: followUpDate,
       resend_email_id: emailId,
     })
+    // Accumulate the id into the lead's send history so opens/clicks on this
+    // send resolve even after a later send overwrites resend_email_id.
+    await recordResendEmailId(id, emailId)
     // Timeline event — more meaningful than the auto status_changed log.
     // Best-effort; the send + update already succeeded.
     await appendLeadActivity(id, {

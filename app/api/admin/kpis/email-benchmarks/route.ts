@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getLeads } from "@/lib/firestore-leads"
-import { getMailchimpCampaignPerformance } from "@/lib/mailchimp-analytics"
-import { summarizeMailchimpCampaigns, summarizeResendOutreach } from "@/lib/kpis/email-benchmarks"
+import { summarizeResendOutreach } from "@/lib/kpis/email-benchmarks"
 
 export const runtime = "nodejs"
 
@@ -19,46 +18,38 @@ function isoDate(d: Date): string {
   return d.toISOString().split("T")[0]
 }
 
-// GET /api/admin/kpis/email-benchmarks?start=YYYY-MM-DD&end=YYYY-MM-DD
-// Email-campaign benchmarks for the Funnel KPI surface: Mailchimp bulk ("drop
-// campaign") performance + Resend 1:1 outreach engagement. Defaults to the last
-// 90 days. Mailchimp is fetched live; if it fails (no key, API error) we still
-// return Resend so the page degrades gracefully. Read-only; interns can view.
+// GET /api/admin/kpis/email-benchmarks?days=30|90|365|all
+//
+// Resend 1:1 outreach engagement for the Funnel KPI surface. `days` windows by
+// send date (last_contacted_at); "all" (or omitted → default 90) covers the
+// whole history. Read-only; interns can view.
+//
+// Mailchimp is being phased out — Resend (its API + webhooks) is the source of
+// truth for email engagement, so this endpoint no longer fetches Mailchimp.
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin()
   if ("error" in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
-  const url = new URL(req.url)
-  const today = new Date()
-  const ninetyAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000)
-  const start = url.searchParams.get("start") || isoDate(ninetyAgo)
-  const end = url.searchParams.get("end") || isoDate(today)
-  const audienceId = url.searchParams.get("audienceId") || undefined
+  const daysParam = new URL(req.url).searchParams.get("days")
+  // null range = all-time. Otherwise a rolling window of N days back from today.
+  let range: { start: string; end: string } | null = null
+  if (daysParam !== "all") {
+    const days = Number(daysParam) > 0 ? Number(daysParam) : 90
+    const today = new Date()
+    const start = new Date(today.getTime() - days * 24 * 60 * 60 * 1000)
+    range = { start: isoDate(start), end: isoDate(today) }
+  }
 
   try {
     const leads = await getLeads()
-    const resend = summarizeResendOutreach(leads)
-
-    let mailchimp: ReturnType<typeof summarizeMailchimpCampaigns> | null = null
-    let mailchimpError: string | null = null
-    try {
-      const perf = await getMailchimpCampaignPerformance(start, end, audienceId)
-      mailchimp = summarizeMailchimpCampaigns(perf.data)
-    } catch (err) {
-      // Non-fatal: surface the Resend half even if Mailchimp is unavailable.
-      mailchimpError = err instanceof Error ? err.message : "Mailchimp unavailable"
-      console.error("[email-benchmarks] Mailchimp fetch failed:", err)
-    }
-
+    const resend = summarizeResendOutreach(leads, range ?? undefined)
     return NextResponse.json({
       success: true,
-      range: { start, end },
-      mailchimp,
-      mailchimpError,
+      range,
       resend,
-      generatedAt: today.toISOString(),
+      generatedAt: new Date().toISOString(),
     })
   } catch (err) {
     console.error("[GET /api/admin/kpis/email-benchmarks]", err)

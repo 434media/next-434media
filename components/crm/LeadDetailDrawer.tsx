@@ -38,7 +38,13 @@ import {
 import { makeTag, parseTag } from "@/lib/tag-taxonomy"
 import type { Lead, LeadStatus, LeadPlatform, LeadSource, LeadActivityType, LeadResearch, LeadDisqualifiedReason } from "@/types/crm-types"
 import { LEAD_DISQUALIFIED_REASON_LABELS } from "@/types/crm-types"
+import { Combobox, type ComboboxOption } from "@/components/crm/Combobox"
 import { useTeamMembers } from "@/hooks/useTeamMembers"
+
+// Archive-reason options for the Combobox picker (order = display order).
+const DISQUALIFIED_REASON_OPTIONS: ComboboxOption[] = Object.entries(
+  LEAD_DISQUALIFIED_REASON_LABELS,
+).map(([value, label]) => ({ value, label }))
 
 interface LeadDetailDrawerProps {
   open: boolean
@@ -49,7 +55,7 @@ interface LeadDetailDrawerProps {
   initialTab?: "details" | "outreach" | "activity"
   onClose: () => void
   onSave: (patch: Partial<Lead>) => Promise<Lead | null>
-  onArchive?: (id: string, reason?: LeadDisqualifiedReason) => Promise<void> | void
+  onArchive?: (id: string, reason?: LeadDisqualifiedReason, note?: string) => Promise<void> | void
   onDelete?: (id: string) => Promise<void> | void
   /** Stubs for PR #7 — wire when handlers ship. */
   onGenerateDraft?: (id: string) => Promise<void> | void
@@ -151,6 +157,7 @@ interface FormState {
   status: LeadStatus
   assigned_to: string
   disqualified_reason: LeadDisqualifiedReason | ""
+  disqualified_reason_note: string
   next_followup_date: string
   discovery_call_at: string
   outreach_draft: string
@@ -172,6 +179,7 @@ const EMPTY_FORM: FormState = {
   status: "new",
   assigned_to: "",
   disqualified_reason: "",
+  disqualified_reason_note: "",
   next_followup_date: "",
   discovery_call_at: "",
   outreach_draft: "",
@@ -195,6 +203,7 @@ function fromLead(lead: Lead | null): FormState {
     status: lead.status || "new",
     assigned_to: lead.assigned_to || "",
     disqualified_reason: lead.disqualified_reason || "",
+    disqualified_reason_note: lead.disqualified_reason_note || "",
     next_followup_date: formatDateOnly(lead.next_followup_date),
     discovery_call_at: formatDateOnly(lead.discovery_call_at),
     outreach_draft: lead.outreach_draft || "",
@@ -431,6 +440,12 @@ export function LeadDetailDrawer({
       // Only an archived lead carries a removal reason; clear it otherwise.
       disqualified_reason:
         form.status === "archived" ? (form.disqualified_reason || undefined) : undefined,
+      // Free-text detail only for the "other" reason; the server drops a stale
+      // note whenever the reason is anything else.
+      disqualified_reason_note:
+        form.status === "archived" && form.disqualified_reason === "other"
+          ? form.disqualified_reason_note.trim() || undefined
+          : undefined,
       next_followup_date: form.next_followup_date || undefined,
       discovery_call_at: form.discovery_call_at || undefined,
       outreach_draft: form.outreach_draft || undefined,
@@ -448,7 +463,9 @@ export function LeadDetailDrawer({
       setArchiving(true)
       return
     }
-    await onArchive(lead.id, (form.disqualified_reason || "no_fit_unspecified") as LeadDisqualifiedReason)
+    const reason = (form.disqualified_reason || "not_a_fit") as LeadDisqualifiedReason
+    const note = reason === "other" ? form.disqualified_reason_note.trim() : undefined
+    await onArchive(lead.id, reason, note)
     setArchiving(false)
     onClose()
   }
@@ -485,10 +502,65 @@ export function LeadDetailDrawer({
     </div>
   ) : undefined
 
-  const footer = (
+  // Archive is a focused confirmation state: it takes over the whole footer so
+  // the reason picker has room and stays aligned, rather than colliding with the
+  // Save/Convert actions. (Vercel-style confirm bar.)
+  const footer = archiving ? (
+    <div className="flex flex-col gap-3 px-5 py-3 bg-white sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <span className="text-sm font-medium text-neutral-700 shrink-0">Archive reason</span>
+        <Combobox
+          ariaLabel="Removal reason"
+          placeholder="Select…"
+          className="w-44 shrink-0"
+          dropUp
+          value={form.disqualified_reason}
+          options={DISQUALIFIED_REASON_OPTIONS}
+          onChange={(v) => {
+            update("disqualified_reason", v as LeadDisqualifiedReason | "")
+            if (v !== "other") update("disqualified_reason_note", "")
+          }}
+        />
+        {form.disqualified_reason === "other" && (
+          <input
+            type="text"
+            value={form.disqualified_reason_note}
+            onChange={(e) => update("disqualified_reason_note", e.target.value)}
+            placeholder="Say why…"
+            maxLength={200}
+            aria-label="Other reason detail"
+            className="flex-1 min-w-0 px-3 py-2 text-sm border border-neutral-200 rounded-md bg-white focus:outline-none focus:border-neutral-400"
+          />
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => setArchiving(false)}
+          disabled={isSaving}
+          className="px-3 py-1.5 text-sm font-medium text-neutral-700 hover:text-neutral-900 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleArchive}
+          disabled={isSaving}
+          className="flex items-center gap-2 px-4 py-1.5 bg-neutral-900 text-white text-sm font-medium rounded-md hover:bg-neutral-800 transition-colors disabled:opacity-50"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Archiving…
+            </>
+          ) : (
+            "Archive lead"
+          )}
+        </button>
+      </div>
+    </div>
+  ) : (
     <div className="flex items-center justify-between gap-2 px-5 py-3 bg-white">
       <div className="flex items-center gap-1">
-        {isEditing && onArchive && !archiving && (
+        {isEditing && onArchive && (
           <button
             onClick={handleArchive}
             disabled={isSaving}
@@ -497,38 +569,7 @@ export function LeadDetailDrawer({
             Archive
           </button>
         )}
-        {isEditing && onArchive && archiving && (
-          <div className="flex items-center gap-1.5">
-            <select
-              value={form.disqualified_reason}
-              onChange={(e) => update("disqualified_reason", e.target.value as LeadDisqualifiedReason | "")}
-              aria-label="Removal reason"
-              className="px-2 py-1.5 text-[12px] border border-neutral-200 rounded-md bg-white focus:outline-none focus:border-neutral-400"
-            >
-              <option value="">Reason…</option>
-              {Object.entries(LEAD_DISQUALIFIED_REASON_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleArchive}
-              disabled={isSaving}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-neutral-900 hover:bg-neutral-800 rounded-md disabled:opacity-50"
-            >
-              Confirm archive
-            </button>
-            <button
-              onClick={() => setArchiving(false)}
-              disabled={isSaving}
-              className="px-2 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-800 rounded-md disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-        {isEditing && onDelete && !archiving && (
+        {isEditing && onDelete && (
           <button
             onClick={handleDelete}
             disabled={isSaving}
@@ -899,18 +940,30 @@ export function LeadDetailDrawer({
           {/* Removal reason — only meaningful for an archived lead. Editable here
               so a rep can correct it after the fact; feeds the kept-vs-removed KPI. */}
           {form.status === "archived" && (
-            <Select
-              label="Removal reason"
-              value={form.disqualified_reason}
-              onChange={(v) => update("disqualified_reason", v as LeadDisqualifiedReason | "")}
-              options={[
-                { value: "", label: "—" },
-                ...Object.entries(LEAD_DISQUALIFIED_REASON_LABELS).map(([value, label]) => ({
-                  value,
-                  label,
-                })),
-              ]}
-            />
+            <div>
+              <label className="block text-xs font-medium text-neutral-600 mb-1.5">Removal reason</label>
+              <Combobox
+                ariaLabel="Removal reason"
+                placeholder="Select a reason…"
+                value={form.disqualified_reason}
+                options={DISQUALIFIED_REASON_OPTIONS}
+                onChange={(v) => {
+                  update("disqualified_reason", v as LeadDisqualifiedReason | "")
+                  if (v !== "other") update("disqualified_reason_note", "")
+                }}
+              />
+              {form.disqualified_reason === "other" && (
+                <input
+                  type="text"
+                  value={form.disqualified_reason_note}
+                  onChange={(e) => update("disqualified_reason_note", e.target.value)}
+                  placeholder="Say why…"
+                  maxLength={200}
+                  aria-label="Other reason detail"
+                  className="w-full mt-1.5 px-3 py-2 text-sm border border-neutral-200 rounded-md focus:outline-none focus:border-neutral-400"
+                />
+              )}
+            </div>
           )}
           <Select
             label="Assigned to"

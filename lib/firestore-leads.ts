@@ -81,6 +81,7 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
         ? (raw.outreach_sequence as Lead["outreach_sequence"])
         : undefined,
     resend_email_id: raw.resend_email_id || undefined,
+    resend_email_ids: Array.isArray(raw.resend_email_ids) ? raw.resend_email_ids : undefined,
     email_opens: typeof raw.email_opens === "number" ? raw.email_opens : 0,
     email_clicks: typeof raw.email_clicks === "number" ? raw.email_clicks : 0,
     tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : undefined,
@@ -183,6 +184,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     last_contacted_at: null,
     next_followup_date: input.next_followup_date ?? null,
     resend_email_id: null,
+    resend_email_ids: [],
     email_opens: 0,
     email_clicks: 0,
     tags: input.tags ?? [],
@@ -271,11 +273,17 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
     update.email = patch.email.trim().toLowerCase()
   }
 
-  // Clear the removal reason whenever a lead leaves the archived state — a
-  // reactivated lead is "kept" again, so a stale reason would skew the
-  // kept-vs-removed KPI. (When archiving, the reason rides in via `patch`.)
+  // Clear the removal reason (+ its free-text note) whenever a lead leaves the
+  // archived state — a reactivated lead is "kept" again, so a stale reason would
+  // skew the kept-vs-removed KPI. (When archiving, the reason rides in via `patch`.)
   if (typeof patch.status === "string" && patch.status !== "archived") {
     update.disqualified_reason = FieldValue.delete()
+    update.disqualified_reason_note = FieldValue.delete()
+  }
+  // A non-"other" reason has no free-text note — drop any stale one so the note
+  // never lingers after the reason changes.
+  if (patch.disqualified_reason && patch.disqualified_reason !== "other") {
+    update.disqualified_reason_note = FieldValue.delete()
   }
 
   await ref.update(update)
@@ -747,19 +755,49 @@ export async function captureLeadFromProspecting(
 }
 
 /**
+ * Record a Resend email id into the lead's send history — the array-contains
+ * match target for the engagement webhook. `resend_email_id` still holds the
+ * latest id (drives the sent count); this preserves every id so opens/clicks on
+ * an earlier send still resolve. Best-effort; the caller already did the send.
+ */
+export async function recordResendEmailId(leadId: string, emailId: string): Promise<void> {
+  if (!leadId || !emailId) return
+  try {
+    await getDb()
+      .collection(COLLECTION)
+      .doc(leadId)
+      .update({ resend_email_ids: FieldValue.arrayUnion(emailId) })
+    invalidate()
+  } catch (err) {
+    console.error("[recordResendEmailId]", err)
+  }
+}
+
+/**
  * Increment engagement counters from Resend webhook. Re-scores via updateLead
- * so the engagement bonus kicks in once thresholds are crossed.
+ * so the engagement bonus kicks in once thresholds are crossed. Also drops a
+ * one-time activity event on the first open/click so the drawer timeline shows it.
  */
 export async function incrementEngagement(
   resendEmailId: string,
   field: "email_opens" | "email_clicks",
 ): Promise<{ leadId: string; newCount: number } | null> {
   const db = getDb()
-  const snap = await db
+  // Match against the full send history (array-contains) so an open/click on an
+  // earlier send still resolves; fall back to the latest-id field for leads
+  // written before the history array existed.
+  let snap = await db
     .collection(COLLECTION)
-    .where("resend_email_id", "==", resendEmailId)
+    .where("resend_email_ids", "array-contains", resendEmailId)
     .limit(1)
     .get()
+  if (snap.empty) {
+    snap = await db
+      .collection(COLLECTION)
+      .where("resend_email_id", "==", resendEmailId)
+      .limit(1)
+      .get()
+  }
   if (snap.empty) return null
 
   const ref = snap.docs[0].ref
@@ -792,6 +830,17 @@ export async function incrementEngagement(
     enriched_at: new Date().toISOString(),
   })
   invalidate()
+
+  // Surface the first open/click on the activity timeline (once — repeat opens
+  // keep bumping the counter but don't flood the timeline).
+  if (updated[field] === 1) {
+    const type: LeadActivityType = field === "email_opens" ? "email_opened" : "email_clicked"
+    await appendLeadActivity(ref.id, {
+      type,
+      actor: "system",
+      detail: field === "email_opens" ? "Email opened" : "Link clicked",
+    }).catch(() => {})
+  }
 
   return { leadId: ref.id, newCount: updated[field] }
 }

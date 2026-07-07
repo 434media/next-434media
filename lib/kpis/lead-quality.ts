@@ -1,5 +1,20 @@
 import type { Lead, LeadSource, LeadDisqualifiedReason } from "@/types/crm-types"
-import { LEAD_DISQUALIFIED_REASON_LABELS } from "@/types/crm-types"
+import {
+  LEAD_DISQUALIFIED_REASON_LABELS,
+  LEGACY_DISQUALIFIED_REASON_LABELS,
+} from "@/types/crm-types"
+
+// Resolve a stored reason value to a display label. Falls back to the legacy
+// taxonomy (pre-2026-07 archives) and finally a humanized version of the raw
+// value, so an old/unknown reason never renders blank on the KPI card.
+function labelForReason(reason: string): string {
+  if (reason === "unspecified") return "Unspecified"
+  return (
+    LEAD_DISQUALIFIED_REASON_LABELS[reason as LeadDisqualifiedReason] ??
+    LEGACY_DISQUALIFIED_REASON_LABELS[reason] ??
+    reason.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
+  )
+}
 
 // Lead-quality KPIs for the Funnel KPI surface. Answers the founder's two
 // questions: "what's the score value" and "were leads kept or removed" — plus
@@ -116,7 +131,7 @@ export function computeLeadQualityKpis(leads: Lead[], generatedAt: string): Lead
   const removedReasons: RemovedReasonStat[] = [...reasonCounts.entries()]
     .map(([reason, count]) => ({
       reason,
-      label: reason === "unspecified" ? "Unspecified" : LEAD_DISQUALIFIED_REASON_LABELS[reason],
+      label: labelForReason(reason),
       count,
     }))
     .sort((a, b) => b.count - a.count)

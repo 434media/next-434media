@@ -29,10 +29,14 @@ export interface ResendBenchmark {
   sent: number
   opens: number
   clicks: number
+  /** Sent leads with at least one captured reply (reply_received activity). */
+  replies: number
   /** opens / sent, 0–1 (raw open events, can exceed 1 in theory). */
   openRate: number
   /** clicks / sent, 0–1. */
   clickRate: number
+  /** replies / sent, 0–1 — distinct recipients who replied. */
+  replyRate: number
 }
 
 function round(n: number, places = 3): number {
@@ -67,16 +71,39 @@ export function summarizeMailchimpCampaigns(
   }
 }
 
-export function summarizeResendOutreach(leads: Lead[]): ResendBenchmark {
-  const sentLeads = leads.filter((l) => !!l.resend_email_id)
+export function summarizeResendOutreach(
+  leads: Lead[],
+  range?: { start: string; end: string },
+): ResendBenchmark {
+  // A lead's 1:1 outreach send time is last_contacted_at (set alongside
+  // resend_email_id at send). When a range is given, window by that; otherwise
+  // count all-time. A sent lead missing the timestamp can't be placed in a
+  // window, so it's excluded from a windowed count (but included all-time).
+  const startMs = range ? new Date(`${range.start}T00:00:00.000Z`).getTime() : 0
+  const endMs = range ? new Date(`${range.end}T23:59:59.999Z`).getTime() : 0
+  const inWindow = (l: Lead): boolean => {
+    if (!range) return true
+    if (!l.last_contacted_at) return false
+    const t = new Date(l.last_contacted_at).getTime()
+    return t >= startMs && t <= endMs
+  }
+
+  const sentLeads = leads.filter((l) => !!l.resend_email_id && inWindow(l))
   const sent = sentLeads.length
   const opens = sentLeads.reduce((s, l) => s + (l.email_opens || 0), 0)
   const clicks = sentLeads.reduce((s, l) => s + (l.email_clicks || 0), 0)
+  // Replies are captured as reply_received activity events (inbound webhook),
+  // not a counter — count distinct sent leads that got at least one.
+  const replies = sentLeads.filter((l) =>
+    (l.activity ?? []).some((e) => e.type === "reply_received"),
+  ).length
   return {
     sent,
     opens,
     clicks,
+    replies,
     openRate: sent > 0 ? round(opens / sent) : 0,
     clickRate: sent > 0 ? round(clicks / sent) : 0,
+    replyRate: sent > 0 ? round(replies / sent) : 0,
   }
 }

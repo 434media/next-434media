@@ -783,22 +783,27 @@ export type LeadPriority = "high" | "medium" | "low"
 // scorer). Optional everywhere: leads archived before this field exists, or
 // archived without a stated reason, simply have none.
 export type LeadDisqualifiedReason =
-  | "out_of_icp" // wrong industry / not a buyer archetype
-  | "excluded_geo" // EU/UK/EEA/Switzerland/Canada — hard compliance exclusion
-  | "no_email" // unreachable; no usable contact email
-  | "duplicate" // same person/company already in the funnel
-  | "wrong_title" // not a decision-maker / no buying authority
-  | "no_fit_unspecified" // judged a poor fit, reason not categorized
-  | "other"
+  | "low_score" // ICP fit score too low to pursue
+  | "not_a_fit" // wrong industry / archetype / no real fit for what we sell
+  | "bad_info" // unreachable or wrong data (no/invalid email, wrong contact)
+  | "other" // anything else — free text captured in disqualified_reason_note
 
 export const LEAD_DISQUALIFIED_REASON_LABELS: Record<LeadDisqualifiedReason, string> = {
+  low_score: "Low score",
+  not_a_fit: "Not a fit",
+  bad_info: "Bad info",
+  other: "Other",
+}
+
+// Legacy reason values (pre-2026-07 taxonomy) kept for display continuity on
+// leads archived before the taxonomy was simplified. Not offered in the picker.
+export const LEGACY_DISQUALIFIED_REASON_LABELS: Record<string, string> = {
   out_of_icp: "Out of ICP",
   excluded_geo: "Excluded geography (EU/UK/CA)",
   no_email: "No usable email",
   duplicate: "Duplicate",
   wrong_title: "Not a decision-maker",
   no_fit_unspecified: "Poor fit (unspecified)",
-  other: "Other",
 }
 
 // Append-only activity log entry on a Lead — powers the drawer timeline so a
@@ -962,6 +967,8 @@ export interface Lead extends BaseRecord {
   // the kept-vs-removed breakdown on the Funnel KPI surface. See
   // LeadDisqualifiedReason. Cleared if a lead is ever restored to the funnel.
   disqualified_reason?: LeadDisqualifiedReason
+  // Free-text detail when disqualified_reason === "other". Cleared on restore.
+  disqualified_reason_note?: string
 
   // Outreach
   outreach_draft?: string
@@ -980,6 +987,10 @@ export interface Lead extends BaseRecord {
 
   // Resend tracking
   resend_email_id?: string
+  // Every Resend email id ever sent to this lead. `resend_email_id` holds only
+  // the latest (overwritten each send); this array preserves the full history so
+  // opens/clicks on an earlier send still match. Matched via array-contains.
+  resend_email_ids?: string[]
   email_opens: number
   email_clicks: number
 

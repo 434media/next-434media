@@ -109,13 +109,24 @@ export function useLeadHandlers({
   // reason rides along for the kept-vs-removed KPI; on any other status the
   // server clears a stale reason (we send null to make that explicit).
   const updateLeadStatus = useCallback(
-    async (id: string, status: LeadStatus, disqualifiedReason?: LeadDisqualifiedReason) => {
+    async (
+      id: string,
+      status: LeadStatus,
+      disqualifiedReason?: LeadDisqualifiedReason,
+      disqualifiedNote?: string,
+    ) => {
       const prev = leads
       setLeads(leads.map((l) => (l.id === id ? { ...l, status } : l)))
       try {
         const body: Record<string, unknown> = { status }
         if (status === "archived") {
-          body.disqualified_reason = disqualifiedReason ?? "no_fit_unspecified"
+          const reason = disqualifiedReason ?? "not_a_fit"
+          body.disqualified_reason = reason
+          // Free text only rides along for "other"; a non-"other" reason clears
+          // any stale note server-side.
+          if (reason === "other" && disqualifiedNote?.trim()) {
+            body.disqualified_reason_note = disqualifiedNote.trim()
+          }
         } else {
           body.disqualified_reason = null
         }
@@ -139,8 +150,8 @@ export function useLeadHandlers({
   // Archive (status flip — does NOT delete the row). Reason defaults inside
   // updateLeadStatus when omitted (e.g. a quick row archive with no picker).
   const archiveLead = useCallback(
-    async (id: string, reason?: LeadDisqualifiedReason) => {
-      await updateLeadStatus(id, "archived", reason)
+    async (id: string, reason?: LeadDisqualifiedReason, note?: string) => {
+      await updateLeadStatus(id, "archived", reason, note)
       setToast({ message: "Lead archived", type: "success" })
     },
     [updateLeadStatus, setToast],

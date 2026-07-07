@@ -40,14 +40,13 @@ const VALID_STATUSES = new Set([
 // Mirrors LeadDisqualifiedReason in types/crm-types.ts. Captured when a lead is
 // archived so the Funnel KPI surface can break down WHY leads were removed.
 const VALID_DISQUALIFIED_REASONS = new Set([
-  "out_of_icp",
-  "excluded_geo",
-  "no_email",
-  "duplicate",
-  "wrong_title",
-  "no_fit_unspecified",
+  "low_score",
+  "not_a_fit",
+  "bad_info",
   "other",
 ])
+
+const DISQUALIFIED_NOTE_MAX = 200
 
 async function requireAdmin() {
   const session = await getSession()
@@ -117,6 +116,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     )
   }
 
+  // Validate the free-text "other" note. `null`/`""` clear it; otherwise a
+  // trimmed string capped at DISQUALIFIED_NOTE_MAX chars.
+  if (
+    body.disqualified_reason_note !== undefined &&
+    body.disqualified_reason_note !== null &&
+    (typeof body.disqualified_reason_note !== "string" ||
+      body.disqualified_reason_note.length > DISQUALIFIED_NOTE_MAX)
+  ) {
+    return NextResponse.json(
+      { error: `disqualified_reason_note must be a string of at most ${DISQUALIFIED_NOTE_MAX} characters` },
+      { status: 400 },
+    )
+  }
+
   // Whitelist updatable fields. Anything not on this list is ignored —
   // protects score, priority, breakdown, engagement counters, conversion
   // metadata, and timestamps from being client-set.
@@ -134,6 +147,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     "status",
     "assigned_to",
     "disqualified_reason",
+    "disqualified_reason_note",
     "outreach_draft",
     "draft_generated_at",
     "last_contacted_at",
