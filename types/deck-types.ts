@@ -36,6 +36,10 @@ export const SLIDE_TYPES: SlideType[] = [
   "nextsteps",
 ]
 
+// A slide's media can be a still image or a (muted, looping) video — both are
+// Asset URLs (Vercel Blob), never inline data.
+export type SlideMediaKind = "image" | "video"
+
 export interface DeckSlide {
   /** Unique per slide instance — enables add / reorder / remove. */
   instance_id: string
@@ -43,10 +47,16 @@ export interface DeckSlide {
   type: SlideType
   /** Editable text fields, keyed per the layout's schema (SLIDE_META). */
   texts: Record<string, string>
-  /** Slide image — an Asset URL (Vercel Blob), never inline base64. */
+  /** Primary media — an Asset URL (Vercel Blob), never inline base64. */
   image?: string
-  /** Image focal point as percentages, for drag-to-reposition. */
+  /** Primary media kind (defaults to "image" when unset, for back-compat). */
+  imageKind?: SlideMediaKind
+  /** Primary media focal point as percentages. */
   imagePosition?: { x: number; y: number }
+  /** Secondary media — only some layouts (e.g. Customer Flow) render two. */
+  image2?: string
+  image2Kind?: SlideMediaKind
+  image2Position?: { x: number; y: number }
   /** Per-slide font scaling (~0.75–1.5). */
   fontScale?: number
 }

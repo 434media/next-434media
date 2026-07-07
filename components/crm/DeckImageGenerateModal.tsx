@@ -6,15 +6,15 @@ import { GeneratePanel } from "./GeneratePanel"
 import { sanitizeAssetUrl } from "@/lib/asset-url"
 import type { Asset } from "./types"
 
-// "Generate / upload an image with AI" modal for the Sales Deck. Wraps the
-// shared GeneratePanel (locked to still images) — every result is also persisted
-// to the asset library. On "Use image" the picked Asset's URL flows back to the
-// caller, which sets it on the slide.
+// "Generate media with AI" modal for the Sales Deck. Wraps the shared
+// GeneratePanel — image OR video (a web deck can autoplay looping video). Every
+// result is persisted to the asset library. On "Use media" the picked Asset's
+// URL + kind flow back to the caller, which sets it on the slide.
 
 interface DeckImageGenerateModalProps {
   open: boolean
   onClose: () => void
-  onUse: (url: string) => void
+  onUse: (url: string, kind: "image" | "video") => void
 }
 
 export function DeckImageGenerateModal({ open, onClose, onUse }: DeckImageGenerateModalProps) {
@@ -31,7 +31,7 @@ export function DeckImageGenerateModal({ open, onClose, onUse }: DeckImageGenera
 
   const handleUse = (asset: Asset) => {
     const url = sanitizeAssetUrl(asset.url)
-    if (url) onUse(url)
+    if (url) onUse(url, asset.kind === "video" ? "video" : "image")
     onClose()
   }
 
@@ -47,7 +47,7 @@ export function DeckImageGenerateModal({ open, onClose, onUse }: DeckImageGenera
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 shrink-0">
-          <h3 className="text-sm font-medium text-neutral-900">Generate slide image</h3>
+          <h3 className="text-sm font-medium text-neutral-900">Generate slide media</h3>
           <button
             type="button"
             onClick={onClose}
@@ -58,7 +58,7 @@ export function DeckImageGenerateModal({ open, onClose, onUse }: DeckImageGenera
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          <GeneratePanel open onAdd={handleUse} addLabel="Use image" lockKind="image" />
+          <GeneratePanel open onAdd={handleUse} addLabel="Use media" />
         </div>
       </div>
     </div>

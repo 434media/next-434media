@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { upload } from "@vercel/blob/client"
 import {
   ChevronLeft,
   Loader2,
   Plus,
   Trash2,
-  ArrowUp,
-  ArrowDown,
+  GripVertical,
   Image as ImageIcon,
   ImagePlus,
   Images,
@@ -26,9 +26,18 @@ import { sanitizeAssetUrl } from "@/lib/asset-url"
 import { buildSlides } from "@/lib/deck/slides"
 import { SLIDE_META } from "@/lib/deck/slide-meta"
 import { buildBlankSlide } from "@/lib/deck/default-deck"
-import { SLIDE_TYPES, type DeckSlide, type DeckStatus, type SalesDeck, type SlideType } from "@/types/deck-types"
+import {
+  SLIDE_TYPES,
+  type DeckSlide,
+  type DeckStatus,
+  type SalesDeck,
+  type SlideMediaKind,
+  type SlideType,
+} from "@/types/deck-types"
 
 type SaveState = "idle" | "saving" | "saved" | "error"
+type MediaSlot = "image" | "image2"
+type MediaTarget = { id: string; slot: MediaSlot }
 
 export default function DeckEditorPage() {
   const params = useParams<{ id: string }>()
@@ -44,12 +53,16 @@ export default function DeckEditorPage() {
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const [addOpen, setAddOpen] = useState(false)
 
-  // Image picking — which slide is being targeted + which surface is open.
-  const [imageTarget, setImageTarget] = useState<string | null>(null)
+  // Media picking — which slide + slot is targeted, and which surface is open.
+  const [mediaTarget, setMediaTarget] = useState<MediaTarget | null>(null)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
+  const [uploadingSlot, setUploadingSlot] = useState<MediaSlot | null>(null)
+
+  // Drag-to-reorder state (native HTML5 DnD): index of the slide being dragged.
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
 
   // Publish / share.
   const [isPublishing, setIsPublishing] = useState(false)
@@ -152,32 +165,42 @@ export default function DeckEditorPage() {
     [scheduleSave],
   )
 
-  const updateImage = useCallback(
-    (instanceId: string, value: string) => {
+  // Set (or clear, when url is "") a slide's media on the given slot. Clearing
+  // resets both the url and the kind so the slide falls back to its stock image.
+  const updateMedia = useCallback(
+    (instanceId: string, slot: MediaSlot, url: string, kind: SlideMediaKind = "image") => {
+      const urlKey = slot === "image" ? "image" : "image2"
+      const kindKey = slot === "image" ? "imageKind" : "image2Kind"
       setSlides((prev) =>
-        prev.map((s) => (s.instance_id === instanceId ? { ...s, image: value || undefined } : s)),
+        prev.map((s) =>
+          s.instance_id === instanceId
+            ? { ...s, [urlKey]: url || undefined, [kindKey]: url ? kind : undefined }
+            : s,
+        ),
       )
       scheduleSave()
     },
     [scheduleSave],
   )
 
-  // Upload a file → Vercel Blob → set as the target slide's image.
-  const handleUploadImage = async (file: File, instanceId: string) => {
+  // Upload a local file → Vercel Blob → set as the target slide's media. Uses the
+  // client upload flow (browser → Blob direct) so it isn't bound by the ~4.5MB
+  // serverless body limit — local videos up to 50MB work.
+  const handleUploadMedia = async (file: File, instanceId: string, slot: MediaSlot) => {
     setUploadError(null)
-    setIsUploading(true)
+    setUploadingSlot(slot)
     try {
-      const fd = new FormData()
-      fd.append("file", file)
-      fd.append("folder", "decks")
-      const res = await fetch("/api/upload/crm", { method: "POST", body: fd, credentials: "include" })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.url) throw new Error(data.error || "Upload failed")
-      updateImage(instanceId, sanitizeAssetUrl(data.url))
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
+      const blob = await upload(`decks/${Date.now()}-${safeName}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      })
+      const kind: SlideMediaKind = (file.type || "").startsWith("video/") ? "video" : "image"
+      updateMedia(instanceId, slot, sanitizeAssetUrl(blob.url), kind)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed")
     } finally {
-      setIsUploading(false)
+      setUploadingSlot(null)
     }
   }
 
@@ -242,13 +265,14 @@ export default function DeckEditorPage() {
     scheduleSave()
   }
 
-  const moveSlide = (instanceId: string, dir: -1 | 1) => {
+  // Native HTML5 drag-to-reorder: move the slide at `from` to `to`.
+  const reorderSlides = (from: number, to: number) => {
+    if (from === to) return
     setSlides((prev) => {
-      const idx = prev.findIndex((s) => s.instance_id === instanceId)
-      const target = idx + dir
-      if (idx === -1 || target < 0 || target >= prev.length) return prev
+      if (from < 0 || from >= prev.length || to < 0 || to >= prev.length) return prev
       const next = [...prev]
-      ;[next[idx], next[target]] = [next[target], next[idx]]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
       return next
     })
     scheduleSave()
@@ -263,10 +287,10 @@ export default function DeckEditorPage() {
       buildSlides(slides, {
         editable: true,
         onTextChange: updateText,
-        // Clicking a slide's image opens the library picker for that slide.
-        onImageEdit: (id) => {
+        // Clicking a slide's media opens the library picker for that slide + slot.
+        onImageEdit: (id, slot) => {
           setSelectedId(id)
-          setImageTarget(id)
+          setMediaTarget({ id, slot })
           setLibraryOpen(true)
         },
       }),
@@ -405,52 +429,69 @@ export default function DeckEditorPage() {
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
               {thumbs.map((t, i) => {
                 const active = t.instance_id === selectedId
+                const isDragging = dragIndex === i
+                const isDropTarget = dropIndex === i && dragIndex !== null && dragIndex !== i
                 return (
-                  <div key={t.instance_id} className="group">
-                    <button
-                      onClick={() => setSelectedId(t.instance_id)}
-                      className={`w-full block rounded-md overflow-hidden ring-1 transition-all ${
-                        active ? "ring-2 ring-neutral-900" : "ring-neutral-200 hover:ring-neutral-300"
-                      }`}
-                      title={SLIDE_META[t.type].label}
-                    >
-                      <div className="@container aspect-video w-full bg-white overflow-hidden pointer-events-none">
-                        {t.node}
-                      </div>
-                    </button>
-                    <div className="flex items-center justify-between mt-0.5 px-0.5">
-                      <span className="text-[10px] text-neutral-400 tabular-nums truncate">
+                  <div
+                    key={t.instance_id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragIndex(i)
+                      e.dataTransfer.effectAllowed = "move"
+                      e.dataTransfer.setData("text/plain", String(i))
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = "move"
+                      if (dropIndex !== i) setDropIndex(i)
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (dragIndex !== null) reorderSlides(dragIndex, i)
+                      setDragIndex(null)
+                      setDropIndex(null)
+                    }}
+                    onDragEnd={() => {
+                      setDragIndex(null)
+                      setDropIndex(null)
+                    }}
+                    className={`group rounded-md transition-opacity ${isDragging ? "opacity-40" : ""} ${
+                      isDropTarget ? "ring-2 ring-neutral-900 ring-offset-1" : ""
+                    }`}
+                  >
+                    <div className="relative">
+                      <button
+                        onClick={() => setSelectedId(t.instance_id)}
+                        className={`block w-full overflow-hidden rounded-md ring-1 transition-all ${
+                          active ? "ring-2 ring-neutral-900" : "ring-neutral-200 hover:ring-neutral-300"
+                        }`}
+                        title={SLIDE_META[t.type].label}
+                      >
+                        <div className="@container aspect-video w-full overflow-hidden bg-white pointer-events-none">
+                          {t.node}
+                        </div>
+                      </button>
+                      <span
+                        className="absolute left-1 top-1 grid h-5 w-5 cursor-grab place-items-center rounded bg-white/80 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+                        title="Drag to reorder"
+                        aria-hidden
+                      >
+                        <GripVertical className="h-3 w-3" />
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between px-0.5">
+                      <span className="truncate text-[10px] tabular-nums text-neutral-400">
                         {String(i + 1).padStart(2, "0")} · {SLIDE_META[t.type].label}
                       </span>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => moveSlide(t.instance_id, -1)}
-                          disabled={i === 0}
-                          className="p-0.5 rounded text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-30"
-                          title="Move up"
-                          aria-label="Move up"
-                        >
-                          <ArrowUp className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => moveSlide(t.instance_id, 1)}
-                          disabled={i === thumbs.length - 1}
-                          className="p-0.5 rounded text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-30"
-                          title="Move down"
-                          aria-label="Move down"
-                        >
-                          <ArrowDown className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => removeSlide(t.instance_id)}
-                          disabled={thumbs.length <= 1}
-                          className="p-0.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-30"
-                          title="Remove slide"
-                          aria-label="Remove slide"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => removeSlide(t.instance_id)}
+                        disabled={thumbs.length <= 1}
+                        className="rounded p-0.5 text-neutral-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 disabled:opacity-30 group-hover:opacity-100"
+                        title="Remove slide"
+                        aria-label="Remove slide"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </div>
                   </div>
                 )
@@ -501,72 +542,91 @@ export default function DeckEditorPage() {
                   <p className="text-sm font-medium text-neutral-900">{selectedMeta.label}</p>
                 </div>
 
-                {selectedMeta.hasImage && (
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-600">
-                      <ImageIcon className="h-3 w-3 text-neutral-400" />
-                      Image
-                    </label>
-                    {/* Current image preview / stock note */}
-                    <div className="aspect-video w-full rounded-md ring-1 ring-neutral-200 overflow-hidden bg-neutral-100 grid place-items-center">
-                      {selectedSlide.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={sanitizeAssetUrl(selectedSlide.image)}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-[10px] text-neutral-400">Template stock image</span>
+                {selectedMeta.hasImage &&
+                  (
+                    [
+                      {
+                        slot: "image" as MediaSlot,
+                        label: selectedMeta.imageLabel ?? "Image",
+                        url: selectedSlide.image,
+                        kind: selectedSlide.imageKind ?? "image",
+                      },
+                      ...(selectedMeta.hasImage2
+                        ? [
+                            {
+                              slot: "image2" as MediaSlot,
+                              label: selectedMeta.image2Label ?? "Second image",
+                              url: selectedSlide.image2,
+                              kind: selectedSlide.image2Kind ?? "image",
+                            },
+                          ]
+                        : []),
+                    ] as { slot: MediaSlot; label: string; url?: string; kind: SlideMediaKind }[]
+                  ).map(({ slot, label, url, kind }) => (
+                    <div key={slot} className="space-y-2">
+                      <label className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-600">
+                        <ImageIcon className="h-3 w-3 text-neutral-400" />
+                        {label}
+                      </label>
+                      <div className="grid aspect-video w-full place-items-center overflow-hidden rounded-md bg-neutral-100 ring-1 ring-neutral-200">
+                        {url ? (
+                          kind === "video" ? (
+                            <video src={sanitizeAssetUrl(url)} muted loop autoPlay playsInline className="h-full w-full object-cover" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={sanitizeAssetUrl(url)} alt="" className="h-full w-full object-cover" />
+                          )
+                        ) : (
+                          <span className="text-[10px] text-neutral-400">Template stock image</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          onClick={() => {
+                            setMediaTarget({ id: selectedSlide.instance_id, slot })
+                            setLibraryOpen(true)
+                          }}
+                          className="inline-flex flex-col items-center gap-1 rounded-md bg-white py-2 text-[10px] font-medium text-neutral-700 ring-1 ring-neutral-200 transition-colors hover:bg-neutral-50"
+                        >
+                          <Images className="h-3.5 w-3.5" />
+                          Library
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMediaTarget({ id: selectedSlide.instance_id, slot })
+                            setGenerateOpen(true)
+                          }}
+                          className="inline-flex flex-col items-center gap-1 rounded-md bg-white py-2 text-[10px] font-medium text-neutral-700 ring-1 ring-neutral-200 transition-colors hover:bg-neutral-50"
+                        >
+                          <ImagePlus className="h-3.5 w-3.5" />
+                          Generate
+                        </button>
+                        <label className="inline-flex cursor-pointer flex-col items-center gap-1 rounded-md bg-white py-2 text-[10px] font-medium text-neutral-700 ring-1 ring-neutral-200 transition-colors hover:bg-neutral-50">
+                          {uploadingSlot === slot ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0]
+                              if (f) handleUploadMedia(f, selectedSlide.instance_id, slot)
+                              e.target.value = ""
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {url && (
+                        <button
+                          onClick={() => updateMedia(selectedSlide.instance_id, slot, "")}
+                          className="text-[10px] text-neutral-400 transition-colors hover:text-neutral-700"
+                        >
+                          Use template stock image
+                        </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button
-                        onClick={() => {
-                          setImageTarget(selectedSlide.instance_id)
-                          setLibraryOpen(true)
-                        }}
-                        className="inline-flex flex-col items-center gap-1 py-2 rounded-md ring-1 ring-neutral-200 bg-white text-[10px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-                      >
-                        <Images className="h-3.5 w-3.5" />
-                        Library
-                      </button>
-                      <button
-                        onClick={() => {
-                          setImageTarget(selectedSlide.instance_id)
-                          setGenerateOpen(true)
-                        }}
-                        className="inline-flex flex-col items-center gap-1 py-2 rounded-md ring-1 ring-neutral-200 bg-white text-[10px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-                      >
-                        <ImagePlus className="h-3.5 w-3.5" />
-                        Generate
-                      </button>
-                      <label className="inline-flex flex-col items-center gap-1 py-2 rounded-md ring-1 ring-neutral-200 bg-white text-[10px] font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer">
-                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0]
-                            if (f) handleUploadImage(f, selectedSlide.instance_id)
-                            e.target.value = ""
-                          }}
-                        />
-                      </label>
-                    </div>
-                    {uploadError && <p className="text-[10px] text-red-500">{uploadError}</p>}
-                    {selectedSlide.image && (
-                      <button
-                        onClick={() => updateImage(selectedSlide.instance_id, "")}
-                        className="text-[10px] text-neutral-400 hover:text-neutral-700 transition-colors"
-                      >
-                        Use template stock image
-                      </button>
-                    )}
-                  </div>
-                )}
+                  ))}
+                {uploadError && <p className="text-[10px] text-red-500">{uploadError}</p>}
 
                 {selectedMeta.fields.map((field) => (
                   <div key={field.key} className="space-y-1">
@@ -600,22 +660,25 @@ export default function DeckEditorPage() {
         </div>
       </div>
 
-      {/* Image pickers — target the slide captured in imageTarget. */}
+      {/* Media pickers — target the slide + slot captured in mediaTarget. Images
+          and videos are both selectable (a web deck can autoplay looping video). */}
       <AssetLibraryPicker
         open={libraryOpen}
-        kind="image"
-        title="Choose a slide image"
+        title="Choose slide media"
         onClose={() => setLibraryOpen(false)}
         onSelect={(asset) => {
-          if (imageTarget) updateImage(imageTarget, sanitizeAssetUrl(asset.url))
+          if (mediaTarget) {
+            const kind: SlideMediaKind = asset.kind === "video" ? "video" : "image"
+            updateMedia(mediaTarget.id, mediaTarget.slot, sanitizeAssetUrl(asset.url), kind)
+          }
           setLibraryOpen(false)
         }}
       />
       <DeckImageGenerateModal
         open={generateOpen}
         onClose={() => setGenerateOpen(false)}
-        onUse={(url) => {
-          if (imageTarget) updateImage(imageTarget, url)
+        onUse={(url, kind) => {
+          if (mediaTarget) updateMedia(mediaTarget.id, mediaTarget.slot, url, kind)
           setGenerateOpen(false)
         }}
       />

@@ -14,7 +14,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async (pathname) => {
+      onBeforeGenerateToken: async () => {
         // Check for valid session before allowing upload
         const session = await getSession()
 
@@ -25,6 +25,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return {
           allowedContentTypes: [
             "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+            // Video — deck media slots accept looping video for web-hosted decks.
+            "video/mp4", "video/quicktime", "video/webm",
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

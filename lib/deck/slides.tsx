@@ -51,20 +51,38 @@ export const defaultImages = {
 /*  Shared primitives                                                   */
 /* ================================================================== */
 
-/** Grayscale photo panel with stripe fallback when the image fails or is absent. */
+/**
+ * Grayscale media panel — renders a still image or a muted, looping video (for
+ * web-hosted decks), with a stripe fallback when the source fails or is absent.
+ * Grayscale is applied to both to keep the deck's monochrome design language.
+ */
 export function Photo({
   src,
   className = "",
   position,
+  kind = "image",
 }: {
   src?: string
   className?: string
   position?: { x: number; y: number }
+  kind?: "image" | "video"
 }) {
   const [errored, setErrored] = useState(false)
+  const objectPosition = `${position?.x ?? 50}% ${position?.y ?? 50}%`
   return (
     <div className={`relative overflow-hidden bg-neutral-300 ${className}`}>
-      {src && !errored ? (
+      {src && !errored && kind === "video" ? (
+        <video
+          src={src}
+          autoPlay
+          muted
+          loop
+          playsInline
+          onError={() => setErrored(true)}
+          className="absolute inset-0 h-full w-full object-cover grayscale"
+          style={{ objectPosition }}
+        />
+      ) : src && !errored ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
@@ -72,7 +90,7 @@ export function Photo({
           referrerPolicy="no-referrer"
           onError={() => setErrored(true)}
           className="absolute inset-0 h-full w-full object-cover grayscale"
-          style={{ objectPosition: `${position?.x ?? 50}% ${position?.y ?? 50}%` }}
+          style={{ objectPosition }}
         />
       ) : (
         <div
@@ -92,14 +110,16 @@ export function Photo({
 function CustomImageBackground({
   src,
   position,
+  kind = "image",
 }: {
   src?: string
   position?: { x: number; y: number }
+  kind?: "image" | "video"
 }) {
   if (!src) return null
   return (
     <div className="pointer-events-none absolute inset-0 z-0 opacity-30">
-      <Photo src={src} position={position} className="h-full w-full" />
+      <Photo src={src} position={position} className="h-full w-full" kind={kind} />
     </div>
   )
 }
@@ -116,14 +136,16 @@ export function SlideImage({
   className = "",
   editable = false,
   onEdit,
+  kind = "image",
 }: {
   src?: string
   position?: { x: number; y: number }
   className?: string
   editable?: boolean
   onEdit?: () => void
+  kind?: "image" | "video"
 }) {
-  if (!editable) return <Photo src={src} position={position} className={className} />
+  if (!editable) return <Photo src={src} position={position} className={className} kind={kind} />
   return (
     <div
       className={`group relative cursor-pointer ${className}`}
@@ -137,10 +159,10 @@ export function SlideImage({
         }
       }}
     >
-      <Photo src={src} position={position} className="h-full w-full" />
+      <Photo src={src} position={position} className="h-full w-full" kind={kind} />
       <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
         <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-medium text-white">
-          Change image
+          Change media
         </span>
       </div>
     </div>
@@ -250,6 +272,54 @@ export function Waveform() {
   )
 }
 
+/** Split a newline list into trimmed items, stripping any leading bullet glyphs. */
+function listItems(text: string): string[] {
+  return text
+    .split("\n")
+    .map((s) => s.replace(/^[•\-–—]\s*/, "").trim())
+    .filter(Boolean)
+}
+
+/**
+ * A multiline list field. Read-only → a bulleted <ul>; editable → a textarea
+ * (via EditableText) so the author edits raw newline-separated text.
+ */
+function BulletList({
+  value,
+  onChange,
+  editable,
+  scale = 1,
+  ulClassName = "",
+}: {
+  value: string
+  onChange: (v: string) => void
+  editable: boolean
+  scale?: number
+  ulClassName?: string
+}) {
+  if (editable) {
+    return (
+      <EditableText
+        value={value}
+        onChange={onChange}
+        as="p"
+        className="whitespace-pre-wrap"
+        scale={scale}
+        editable
+      />
+    )
+  }
+  const items = listItems(value)
+  if (items.length === 0) return null
+  return (
+    <ul className={`list-disc ${ulClassName}`}>
+      {items.map((it, i) => (
+        <li key={i}>{it}</li>
+      ))}
+    </ul>
+  )
+}
+
 /* ================================================================== */
 /*  Per-type slide renderers                                            */
 /* ================================================================== */
@@ -259,8 +329,10 @@ interface SlideCtx {
   editable: boolean
   /** Update one text field on this slide. */
   updateText: (key: string, val: string) => void
-  /** Open the image picker for this slide (editor-provided). */
+  /** Open the media picker for this slide's primary image (editor-provided). */
   editImage: () => void
+  /** Open the media picker for this slide's secondary image (layouts with two). */
+  editImage2: () => void
 }
 
 // Fallback image key used by each type's photo panel / background.
@@ -291,6 +363,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="flex h-full min-h-full w-full flex-col md:flex-row">
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -327,7 +400,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
     const fs = slide.fontScale ?? 1
     return (
       <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-[#F8F9FA] px-6 py-12 md:px-[5cqw] md:py-0">
-        <CustomImageBackground src={slide.image} position={slide.imagePosition} />
+        <CustomImageBackground src={slide.image} position={slide.imagePosition} kind={slide.imageKind} />
         <Waveform />
         <h2 className={`${HEAD} relative z-10 w-full text-center text-4xl md:text-[7cqw]`}>
           WHAT WE HEARD
@@ -343,13 +416,12 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
                 {col.h}
               </h3>
               <div className="space-y-2 text-sm text-neutral-800 md:space-y-[0.8cqw] md:text-[1.3cqw]">
-                <EditableText
+                <BulletList
                   value={slide.texts[col.key] || ""}
                   onChange={(v) => updateText(col.key, v)}
-                  as="p"
-                  className="whitespace-pre-wrap"
-                  scale={fs}
                   editable={editable}
+                  scale={fs}
+                  ulClassName="space-y-1 pl-5 marker:text-neutral-900 md:space-y-[0.4cqw] md:pl-[1.2cqw]"
                 />
               </div>
             </div>
@@ -377,18 +449,18 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
             />
           </div>
           <div className="text-xs font-bold uppercase leading-relaxed tracking-wider text-neutral-800 md:text-[1.1cqw]">
-            <EditableText
+            <BulletList
               value={slide.texts.bullets || ""}
               onChange={(v) => updateText("bullets", v)}
-              as="p"
-              className="whitespace-pre-wrap"
-              scale={fs}
               editable={editable}
+              scale={fs}
+              ulClassName="space-y-2 pl-5 md:space-y-[0.9cqw] md:pl-[1.4cqw]"
             />
           </div>
         </div>
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -403,7 +475,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
     const fs = slide.fontScale ?? 1
     return (
       <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-12 md:flex-row md:px-[4cqw] md:py-0">
-        <CustomImageBackground src={slide.image} position={slide.imagePosition} />
+        <CustomImageBackground src={slide.image} position={slide.imagePosition} kind={slide.imageKind} />
         <div className="relative z-10 flex w-full flex-col justify-center text-center md:w-3/5 md:pr-[3cqw] md:text-left">
           <h2 className={`${HEAD} mb-4 text-4xl md:mb-[2.5cqw] md:text-[5.5cqw]`}>
             STRATEGIC
@@ -416,6 +488,36 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
           </div>
         </div>
         <div className="relative z-10 my-12 flex aspect-square w-[75vw] max-w-[320px] shrink-0 items-center justify-center md:my-0 md:w-[26cqw] md:max-w-none">
+          {/* Acquire → Educate → Retain → Refer cycle, drawn as four clockwise arrows. */}
+          <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden>
+            <defs>
+              <marker id="deckStrategyArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+                <path d="M 0 1 L 9 5 L 0 9 z" fill="#b8b8b8" />
+              </marker>
+            </defs>
+            {(() => {
+              const R = 36
+              const pt = (deg: number): [number, number] => {
+                const r = ((deg - 90) * Math.PI) / 180
+                return [50 + R * Math.cos(r), 50 + R * Math.sin(r)]
+              }
+              return [0, 90, 180, 270].map((start) => {
+                const [x1, y1] = pt(start + 10)
+                const [x2, y2] = pt(start + 78)
+                return (
+                  <path
+                    key={start}
+                    d={`M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}`}
+                    fill="none"
+                    stroke="#c9c9c9"
+                    strokeWidth={7}
+                    strokeLinecap="round"
+                    markerEnd="url(#deckStrategyArrow)"
+                  />
+                )
+              })
+            })()}
+          </svg>
           {(
             [
               ["Acquire", "top-0 left-1/2 -translate-x-1/2"],
@@ -431,74 +533,73 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
               {label}
             </div>
           ))}
-          <div className="h-[50vw] w-[50vw] max-h-[220px] max-w-[220px] animate-[spin_22s_linear_infinite] rounded-full border-[0.5cqw] border-dashed border-neutral-300 md:h-[16cqw] md:w-[16cqw] md:max-h-none md:max-w-none" />
         </div>
       </div>
     )
   },
 
   /* ────────────── 05 · MARKETING PLAN ────────────── */
-  plan: ({ slide, editable, updateText }) => {
+  plan: ({ slide, editable, updateText, editImage }) => {
     const fs = slide.fontScale ?? 1
-    const channels = (slide.texts.channels || "").split(/[,\n]/).map((c) => c.trim()).filter(Boolean)
-    const budget = slide.texts.budget || ""
-    const geography = slide.texts.geography || ""
-    const audience = slide.texts.audience || ""
+    const phases = [
+      { n: "Phase 1", labelKey: "phase1_label", itemsKey: "phase1_items" },
+      { n: "Phase 2", labelKey: "phase2_label", itemsKey: "phase2_items" },
+      { n: "Phase 3", labelKey: "phase3_label", itemsKey: "phase3_items" },
+    ]
+    // Increasing left indent per phase echoes the source deck's diagonal cascade.
+    const stagger = ["md:ml-0", "md:ml-[6%]", "md:ml-[12%]"]
     return (
-      <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-white py-12 md:flex-row md:py-0">
-        <CustomImageBackground src={slide.image} position={slide.imagePosition} />
-        <div className="relative z-10 mb-8 flex w-full flex-col justify-center px-6 text-center md:mb-0 md:h-full md:w-[44%] md:px-[4cqw] md:text-left">
-          <h2 className={`${HEAD} text-4xl md:text-[5.5cqw]`}>
-            RECOMMENDED
-            <br className="hidden md:block" /> MARKETING
-            <br className="hidden md:block" /> PLAN
-          </h2>
-          <div className="mt-2 space-y-1 text-sm text-neutral-600 md:mt-[1cqw] md:text-[1.3cqw]">
-            {budget && (
-              <p>
-                Budget:{" "}
-                <EditableText value={budget} onChange={(v) => updateText("budget", v)} as="span" className="inline font-bold text-neutral-900" scale={fs} editable={editable} />
-              </p>
-            )}
-            {geography && (
-              <p>
-                Geography:{" "}
-                <EditableText value={geography} onChange={(v) => updateText("geography", v)} as="span" className="inline font-bold text-neutral-900" scale={fs} editable={editable} />
-              </p>
-            )}
+      <div className="flex h-full min-h-full w-full flex-col bg-white md:flex-row">
+        {/* Left: title over the "road" image */}
+        <div className="flex w-full flex-col md:w-[40%] md:shrink-0">
+          <div className="flex flex-1 flex-col justify-center px-6 pt-10 md:px-[4cqw] md:pt-0">
+            <h2 className={`${HEAD} text-4xl md:text-[5cqw]`}>
+              RECOMMENDED
+              <br className="hidden md:block" /> MARKETING
+              <br className="hidden md:block" /> PLAN
+            </h2>
           </div>
+          <SlideImage
+            src={imageFor(slide)}
+            kind={slide.imageKind}
+            position={slide.imagePosition}
+            editable={editable}
+            onEdit={editImage}
+            className="h-[26vh] min-h-[26vh] w-full shrink-0 md:h-[42%] md:min-h-0"
+          />
         </div>
-        <div className="relative z-10 flex w-full flex-col justify-center gap-6 px-6 md:w-[56%] md:gap-[2cqw] md:px-[4cqw]">
-          {channels.length > 0 ? (
-            <div>
-              <h3 className="text-xl font-black text-neutral-900 md:text-[1.7cqw]">Media Channels</h3>
-              <ul className="mt-1 grid grid-cols-1 gap-y-1 pl-4 text-sm text-neutral-800 md:mt-[0.4cqw] md:gap-y-[0.3cqw] md:pl-[1.2cqw] md:text-[1.25cqw]">
-                {channels.map((c, i) => (
-                  <li key={i} className="list-disc">
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div>
-              <h3 className="text-xl font-black text-neutral-900 md:text-[1.7cqw]">Media Mix</h3>
-              <EditableText value={slide.texts.channels || ""} onChange={(v) => updateText("channels", v)} as="p" className="mt-1 text-sm text-neutral-700 md:text-[1.25cqw]" scale={fs} editable={editable} />
-            </div>
-          )}
-          {audience && (
-            <div>
-              <h3 className="text-xl font-black text-neutral-900 md:text-[1.7cqw]">Target Audience</h3>
-              <EditableText
-                value={audience}
-                onChange={(v) => updateText("audience", v)}
-                as="p"
-                className="mt-1 text-sm text-neutral-700 md:text-[1.25cqw]"
-                scale={fs}
+        {/* Right: cascading phases */}
+        <div className="flex w-full flex-1 flex-col justify-center gap-6 px-6 py-10 md:gap-[1.8cqw] md:px-[4cqw] md:py-0">
+          {phases.map((p, i) => (
+            <div key={p.n} className={`relative ${stagger[i] ?? ""}`}>
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <h3 className="text-lg font-black text-neutral-900 md:text-[1.7cqw]">{p.n}</h3>
+                <EditableText
+                  value={slide.texts[p.labelKey] || ""}
+                  onChange={(v) => updateText(p.labelKey, v)}
+                  as="span"
+                  className="font-bold text-neutral-500 md:text-[1.3cqw]"
+                  scale={fs}
+                  editable={editable}
+                />
+              </div>
+              <BulletList
+                value={slide.texts[p.itemsKey] || ""}
+                onChange={(v) => updateText(p.itemsKey, v)}
                 editable={editable}
+                scale={fs}
+                ulClassName="mt-1 space-y-0.5 pl-5 text-sm text-neutral-800 md:mt-[0.3cqw] md:space-y-[0.2cqw] md:pl-[1.4cqw] md:text-[1.2cqw]"
               />
+              {i < phases.length - 1 && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -bottom-3 left-6 text-neutral-300 md:-bottom-[0.9cqw] md:left-[10%] md:text-[1.6cqw]"
+                >
+                  ↘
+                </span>
+              )}
             </div>
-          )}
+          ))}
         </div>
       </div>
     )
@@ -528,6 +629,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
         </div>
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -544,6 +646,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="flex h-full min-h-full w-full flex-col items-center bg-[#F8F9FA] md:flex-row">
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -554,11 +657,12 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
             AUDIENCE
             <br className="hidden md:block" /> PRIORITIZATION
           </h2>
-          <div className="space-y-4 md:space-y-[1.4cqw]">
+          <div className="space-y-4 md:space-y-[1.2cqw]">
             {[
               { label: "Primary Audience", key: "primary" },
-              { label: "Geography", key: "geography" },
-              { label: "Additional Notes", key: "notes" },
+              { label: "Secondary Audience", key: "secondary" },
+              { label: "Behavioral Audience", key: "behavioral" },
+              { label: "Growth Audience", key: "growth" },
             ].map(({ label, key }) =>
               (slide.texts[key] || "").trim() || editable ? (
                 <div key={key}>
@@ -583,13 +687,22 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
   },
 
   /* ────────────── 08 · CUSTOMER FLOW JOURNEY ────────────── */
-  flow: ({ slide, editable, updateText, editImage }) => {
+  flow: ({ slide, editable, updateText, editImage, editImage2 }) => {
     const fs = slide.fontScale ?? 1
     const rawSteps = (slide.texts.steps || "").split("\n").map((s) => s.trim()).filter(Boolean)
     return (
       <div className="flex h-full min-h-full w-full flex-col bg-neutral-900 md:flex-row">
-        <div className="z-10 flex min-h-0 w-full flex-1 flex-col justify-center bg-[#F8F9FA] px-6 py-12 shadow-2xl md:w-1/2 md:px-[4cqw] md:py-[2cqw]">
-          <h2 className={`${HEAD} mb-8 text-center text-4xl md:mb-[1.5cqw] md:text-left md:text-[4.5cqw]`}>
+        {/* Secondary media — left image, equal width to the right (source framing). */}
+        <SlideImage
+          src={slide.image2 || defaultImages.flowRight}
+          kind={slide.image2 ? slide.image2Kind : "image"}
+          position={slide.image2Position}
+          editable={editable}
+          onEdit={editImage2}
+          className="hidden shrink-0 md:block md:w-[22%]"
+        />
+        <div className="z-10 flex min-h-0 w-full flex-1 flex-col justify-center bg-[#F8F9FA] px-6 py-12 text-center shadow-2xl md:px-[4cqw] md:py-[2cqw]">
+          <h2 className={`${HEAD} mb-8 text-4xl md:mb-[1.5cqw] md:text-[4.5cqw]`}>
             CUSTOMER
             <br />
             FLOW
@@ -597,7 +710,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
             JOURNEY
           </h2>
           {rawSteps.length > 0 && !editable ? (
-            <div className="space-y-4 text-center text-base md:space-y-[0.65cqw] md:text-left md:text-[1.15cqw] md:leading-tight">
+            <div className="space-y-4 text-base md:space-y-[0.7cqw] md:text-[1.2cqw] md:leading-tight">
               {rawSteps.map((step, i) => (
                 <div key={i}>
                   <span className="font-bold text-neutral-900">Step {i + 1}</span>
@@ -607,7 +720,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
               ))}
             </div>
           ) : (
-            <div className="space-y-4 text-center text-base md:space-y-[0.65cqw] md:text-left md:text-[1.15cqw] md:leading-tight">
+            <div className="space-y-4 text-base md:space-y-[0.7cqw] md:text-[1.2cqw] md:leading-tight">
               <EditableText
                 value={slide.texts.steps || ""}
                 onChange={(v) => updateText("steps", v)}
@@ -621,10 +734,11 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
         </div>
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
-          className="h-[40vh] min-h-[40vh] w-full shrink-0 md:h-full md:min-h-0 md:w-1/2"
+          className="h-[40vh] min-h-[40vh] w-full shrink-0 md:h-full md:min-h-0 md:w-[22%]"
         />
       </div>
     )
@@ -637,6 +751,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="flex h-full min-h-full w-full flex-col bg-[#F8F9FA] md:flex-row">
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -659,6 +774,13 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
             />
           </div>
           <ul className="list-disc space-y-2 pl-5 text-sm text-neutral-800 md:space-y-[0.8cqw] md:pl-[1.4cqw] md:text-[1.25cqw]">
+            {(["stat1", "stat2", "stat3"] as const).map((key) =>
+              (slide.texts[key] || "").trim() || editable ? (
+                <li key={key} className="font-bold text-neutral-900">
+                  <EditableText value={slide.texts[key] || ""} onChange={(v) => updateText(key, v)} as="span" className="inline-block" scale={fs} editable={editable} />
+                </li>
+              ) : null,
+            )}
             <li>
               <span className="font-bold">Challenge:</span>{" "}
               <EditableText value={slide.texts.challenge || ""} onChange={(v) => updateText("challenge", v)} as="span" className="inline-block" scale={fs} editable={editable} />
@@ -690,44 +812,30 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
             <br />
             LOOKS LIKE
           </h2>
-          <div className="grid grid-cols-1 gap-6 text-sm text-neutral-800 sm:grid-cols-2 md:gap-[2cqw] md:text-[1.3cqw]">
-            <div>
-              <h3 className="mb-2 inline-block border-b-2 border-neutral-900 pb-1 font-bold text-neutral-900 md:mb-[0.6cqw] md:pb-[0.2cqw]">
-                Performance KPIs
-              </h3>
-              <ul className="list-disc space-y-1 pl-5 md:space-y-[0.3cqw] md:pl-[1.4cqw]">
-                {["kpi1", "kpi2", "kpi3"].map((key) =>
-                  (slide.texts[key] || "").trim() || editable ? (
-                    <li key={key}>
-                      <EditableText value={slide.texts[key] || ""} onChange={(v) => updateText(key, v)} as="span" className="inline" scale={fs} editable={editable} />
-                    </li>
-                  ) : null,
-                )}
-              </ul>
-            </div>
-            <div>
-              <h3 className="mb-2 inline-block border-b-2 border-neutral-900 pb-1 font-bold text-neutral-900 md:mb-[0.6cqw] md:pb-[0.2cqw]">
-                Investment Summary
-              </h3>
-              <ul className="list-disc space-y-1 pl-5 md:space-y-[0.3cqw] md:pl-[1.4cqw]">
-                {((slide.texts.budget || "").trim() || editable) && (
-                  <li>
-                    Budget:{" "}
-                    <EditableText value={slide.texts.budget || ""} onChange={(v) => updateText("budget", v)} as="span" className="inline font-bold" scale={fs} editable={editable} />
-                  </li>
-                )}
-                {((slide.texts.channels || "").trim() || editable) && (
-                  <li>
-                    Channels:{" "}
-                    <EditableText value={slide.texts.channels || ""} onChange={(v) => updateText("channels", v)} as="span" className="inline font-bold" scale={fs} editable={editable} />
-                  </li>
-                )}
-              </ul>
-            </div>
+          <div className="grid grid-cols-1 gap-6 text-sm text-neutral-800 sm:grid-cols-2 md:gap-x-[2cqw] md:gap-y-[1.6cqw] md:text-[1.3cqw]">
+            {[
+              { label: "Marketing Metrics", key: "marketing" },
+              { label: "Business Metrics", key: "business" },
+              { label: "Executive Metrics", key: "executive" },
+            ].map(({ label, key }) => (
+              <div key={key}>
+                <h3 className="mb-2 inline-block border-b-2 border-neutral-900 pb-1 font-bold text-neutral-900 md:mb-[0.6cqw] md:pb-[0.2cqw]">
+                  {label}
+                </h3>
+                <BulletList
+                  value={slide.texts[key] || ""}
+                  onChange={(v) => updateText(key, v)}
+                  editable={editable}
+                  scale={fs}
+                  ulClassName="space-y-1 pl-5 md:space-y-[0.3cqw] md:pl-[1.4cqw]"
+                />
+              </div>
+            ))}
           </div>
         </div>
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -746,6 +854,7 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="flex h-full min-h-full w-full flex-col bg-[#F8F9FA] md:flex-row">
         <SlideImage
           src={imageFor(slide)}
+          kind={slide.imageKind}
           position={slide.imagePosition}
           editable={editable}
           onEdit={editImage}
@@ -790,47 +899,64 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
   /* ────────────── 12 · NEXT STEPS ────────────── */
   nextsteps: ({ slide, editable, updateText }) => {
     const fs = slide.fontScale ?? 1
-    const steps = editable
-      ? [slide.texts.step1 ?? "", slide.texts.step2 ?? "", slide.texts.step3 ?? ""]
-      : [slide.texts.step1 || "", slide.texts.step2 || "", slide.texts.step3 || ""].filter(Boolean)
+    const steps = [
+      { titleKey: "step1_title", subKey: "step1_sub" },
+      { titleKey: "step2_title", subKey: "step2_sub" },
+      { titleKey: "step3_title", subKey: "step3_sub" },
+      { titleKey: "step4_title", subKey: "step4_sub" },
+    ]
+    const shownSteps = editable
+      ? steps
+      : steps.filter((s) => (slide.texts[s.titleKey] || "").trim() || (slide.texts[s.subKey] || "").trim())
     return (
       <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-12 md:flex-row md:px-[4cqw] md:py-0">
-        <CustomImageBackground src={slide.image} position={slide.imagePosition} />
+        <CustomImageBackground src={slide.image} position={slide.imagePosition} kind={slide.imageKind} />
         <div className="relative z-10 flex w-full flex-col justify-center md:w-2/5 md:pr-[2cqw]">
           <h2 className={`${HEAD} mb-8 text-center text-4xl md:mb-[2.5cqw] md:text-left md:text-[6cqw]`}>
             NEXT STEPS
           </h2>
-          <div className="flex aspect-[4/3] w-full max-w-[300px] self-center items-end justify-center rounded-2xl bg-neutral-50 shadow-inner md:max-w-none md:rounded-[2cqw]">
-            <div className="flex h-full items-end justify-center gap-2 pb-6 md:gap-[1cqw] md:pb-[3cqw]">
-              {["h-[18%]", "h-[34%]", "h-[52%]", "h-[70%]", "h-[88%]"].map((h, i) => (
-                <div key={i} className={`w-3 md:w-[3cqw] ${h} shadow-md`} style={{ background: `hsl(0 0% ${60 - i * 12}%)` }} />
+          {/* Ascending staircase — contiguous blocks rising to the right. */}
+          <div className="flex aspect-[4/3] w-full max-w-[300px] self-center items-end justify-center overflow-hidden rounded-2xl bg-neutral-50 shadow-inner md:max-w-none md:rounded-[2cqw]">
+            <div className="flex h-full w-full items-end">
+              {["h-[20%]", "h-[40%]", "h-[60%]", "h-[80%]", "h-full"].map((h, i) => (
+                <div key={i} className={`w-1/5 ${h}`} style={{ background: `hsl(0 0% ${74 - i * 12}%)` }} />
               ))}
             </div>
           </div>
         </div>
         <div className="relative z-10 mt-12 flex w-full flex-col items-center justify-center text-center md:mt-0 md:w-3/5">
-          <div className="flex w-full flex-col items-center space-y-4 md:space-y-[0.6cqw]">
-            {steps.map((stepText, i) => (
-              <div key={i} className="flex flex-col items-center">
+          <div className="flex w-full flex-col items-center space-y-4 md:space-y-[0.5cqw]">
+            {shownSteps.map((step, i) => (
+              <div key={step.titleKey} className="flex flex-col items-center">
                 <EditableText
-                  value={stepText}
-                  onChange={(v) => updateText(`step${i + 1}`, v)}
+                  value={slide.texts[step.titleKey] || ""}
+                  onChange={(v) => updateText(step.titleKey, v)}
                   as="h3"
                   className="text-lg font-bold text-neutral-900 md:text-[1.6cqw]"
                   scale={fs}
                   editable={editable}
                 />
-                {i < steps.length - 1 && (
-                  <span className="my-2 text-xl font-bold text-neutral-400 md:my-[0.3cqw] md:text-[1.5cqw]">↓</span>
+                <div className="text-sm text-neutral-600 md:text-[1.2cqw]">
+                  <EditableText
+                    value={slide.texts[step.subKey] || ""}
+                    onChange={(v) => updateText(step.subKey, v)}
+                    as="p"
+                    className="text-inherit"
+                    scale={fs}
+                    editable={editable}
+                  />
+                </div>
+                {i < shownSteps.length - 1 && (
+                  <span className="my-1 text-xl font-bold text-neutral-400 md:my-[0.2cqw] md:text-[1.4cqw]">↓</span>
                 )}
               </div>
             ))}
           </div>
-          <div className="mt-8 flex w-full max-w-[80vw] flex-col items-center border-t-2 border-neutral-900 pt-6 md:mt-[2.5cqw] md:max-w-[50cqw] md:pt-[1.6cqw]">
-            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-neutral-500 md:mb-[0.5cqw] md:text-[1.1cqw]">
+          <div className="mt-8 flex w-full max-w-[80vw] flex-col items-center border-t-2 border-neutral-900 pt-6 md:mt-[2cqw] md:max-w-[50cqw] md:pt-[1.4cqw]">
+            <p className="mb-2 text-xs font-bold uppercase tracking-widest text-neutral-500 md:mb-[0.4cqw] md:text-[1.1cqw]">
               Closing Statement
             </p>
-            <div className="mt-2 text-base font-medium leading-relaxed text-neutral-900 md:mt-[0.5cqw] md:text-[1.4cqw]">
+            <div className="mt-2 text-base font-medium leading-relaxed text-neutral-900 md:mt-[0.4cqw] md:text-[1.4cqw]">
               <EditableText
                 value={slide.texts.closing || ""}
                 onChange={(v) => updateText("closing", v)}
@@ -862,8 +988,8 @@ export interface BuildSlidesOptions {
   editable?: boolean
   /** Fired when a text field changes (editable only). */
   onTextChange?: (instanceId: string, key: string, value: string) => void
-  /** Fired when a slide's image is clicked (editable only) — editor opens the Asset picker. */
-  onImageEdit?: (instanceId: string) => void
+  /** Fired when a slide's media is clicked (editable only) — editor opens the Asset picker. */
+  onImageEdit?: (instanceId: string, slot: "image" | "image2") => void
 }
 
 /**
@@ -882,7 +1008,8 @@ export function buildSlides(
       slide,
       editable,
       updateText: (key, val) => opts.onTextChange?.(slide.instance_id, key, val),
-      editImage: () => opts.onImageEdit?.(slide.instance_id),
+      editImage: () => opts.onImageEdit?.(slide.instance_id, "image"),
+      editImage2: () => opts.onImageEdit?.(slide.instance_id, "image2"),
     }),
   }))
 }

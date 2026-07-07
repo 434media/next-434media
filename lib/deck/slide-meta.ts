@@ -16,8 +16,13 @@ export interface SlideMeta {
   type: SlideType
   /** Human label for the type picker / slide list. */
   label: string
-  /** Whether this layout renders a swappable image panel. */
+  /** Whether this layout renders a swappable media panel. */
   hasImage: boolean
+  /** Whether this layout renders a SECOND media panel (e.g. Customer Flow). */
+  hasImage2?: boolean
+  /** Editor labels for the media slots when a layout has two. */
+  imageLabel?: string
+  image2Label?: string
   fields: SlideField[]
 }
 
@@ -63,12 +68,14 @@ export const SLIDE_META: Record<SlideType, SlideMeta> = {
   plan: {
     type: "plan",
     label: "Marketing Plan",
-    hasImage: false,
+    hasImage: true,
     fields: [
-      { key: "budget", label: "Budget" },
-      { key: "geography", label: "Geography" },
-      { key: "channels", label: "Media channels", multiline: true },
-      { key: "audience", label: "Target audience" },
+      { key: "phase1_label", label: "Phase 1 — heading", placeholder: "Demand Capture" },
+      { key: "phase1_items", label: "Phase 1 — items", multiline: true },
+      { key: "phase2_label", label: "Phase 2 — heading", placeholder: "Demand Expansion" },
+      { key: "phase2_items", label: "Phase 2 — items", multiline: true },
+      { key: "phase3_label", label: "Phase 3 — heading", placeholder: "Brand Development" },
+      { key: "phase3_items", label: "Phase 3 — items", multiline: true },
     ],
   },
   why: {
@@ -87,14 +94,18 @@ export const SLIDE_META: Record<SlideType, SlideMeta> = {
     hasImage: true,
     fields: [
       { key: "primary", label: "Primary audience" },
-      { key: "geography", label: "Geography" },
-      { key: "notes", label: "Additional notes" },
+      { key: "secondary", label: "Secondary audience" },
+      { key: "behavioral", label: "Behavioral audience" },
+      { key: "growth", label: "Growth audience" },
     ],
   },
   flow: {
     type: "flow",
     label: "Customer Flow Journey",
     hasImage: true,
+    hasImage2: true,
+    imageLabel: "Right image",
+    image2Label: "Left image",
     fields: [{ key: "steps", label: "Steps (one per line)", multiline: true }],
   },
   success: {
@@ -103,6 +114,9 @@ export const SLIDE_META: Record<SlideType, SlideMeta> = {
     hasImage: true,
     fields: [
       { key: "title", label: "Client / project" },
+      { key: "stat1", label: "Headline stat 1" },
+      { key: "stat2", label: "Headline stat 2" },
+      { key: "stat3", label: "Headline stat 3" },
       { key: "challenge", label: "Challenge" },
       { key: "solution", label: "Solution" },
       { key: "outcome", label: "Outcome" },
@@ -113,11 +127,9 @@ export const SLIDE_META: Record<SlideType, SlideMeta> = {
     label: "What Success Looks Like",
     hasImage: true,
     fields: [
-      { key: "kpi1", label: "KPI 1" },
-      { key: "kpi2", label: "KPI 2" },
-      { key: "kpi3", label: "KPI 3" },
-      { key: "budget", label: "Budget" },
-      { key: "channels", label: "Channels" },
+      { key: "marketing", label: "Marketing metrics", multiline: true },
+      { key: "business", label: "Business metrics", multiline: true },
+      { key: "executive", label: "Executive metrics", multiline: true },
     ],
   },
   engagement: {
@@ -135,9 +147,14 @@ export const SLIDE_META: Record<SlideType, SlideMeta> = {
     label: "Next Steps",
     hasImage: false,
     fields: [
-      { key: "step1", label: "Step 1" },
-      { key: "step2", label: "Step 2" },
-      { key: "step3", label: "Step 3" },
+      { key: "step1_title", label: "Step 1 — title" },
+      { key: "step1_sub", label: "Step 1 — detail" },
+      { key: "step2_title", label: "Step 2 — title" },
+      { key: "step2_sub", label: "Step 2 — detail" },
+      { key: "step3_title", label: "Step 3 — title" },
+      { key: "step3_sub", label: "Step 3 — detail" },
+      { key: "step4_title", label: "Step 4 — title" },
+      { key: "step4_sub", label: "Step 4 — detail" },
       { key: "closing", label: "Closing statement" },
     ],
   },

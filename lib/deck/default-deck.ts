@@ -1,7 +1,7 @@
 import type { DeckSlide, SlideType } from "@/types/deck-types"
 
-// The default 12-slide template, seeded with the "Lab Cafe — health" content
-// carried over from the original 434 Media pitch deck. `buildDefaultDeckSlides()`
+// The default 12-slide template, seeded with the "Lab Cafe — health" content and
+// slide ORDER from the original 434 Media Canva pitch deck. `buildDefaultDeckSlides()`
 // stamps a fresh instance_id per slide so a new deck's slides are individually
 // addressable (add / reorder / remove / duplicate). Images are left empty here —
 // the renderer falls back to its per-type stock imagery until an Asset is set.
@@ -28,6 +28,13 @@ const DEFAULT_TEXTS: Record<SlideType, Record<string, string>> = {
     outcome:
       "Increase booked appointments\nReduce customer acquisition cost\nBuild sustainable brand awareness\nCreate repeatable growth systems",
   },
+  why: {
+    point1: "Nearly 50% of STI cases occur among individuals aged 15–24.",
+    point2:
+      "Millions of consumers seek health information online before engaging healthcare providers.",
+    point3:
+      "Convenience, speed, privacy, and direct access continue to influence healthcare purchasing decisions.",
+  },
   opportunity: {
     headline:
       "THE LAB CAFE IS NOT COMPETING IN THE TESTING INDUSTRY. IT IS CREATING A CONSUMER HEALTHCARE ACCESS PLATFORM.",
@@ -41,24 +48,18 @@ const DEFAULT_TEXTS: Record<SlideType, Record<string, string>> = {
       "Curate repeat customers through ongoing health engagement in order to retain established trust.",
   },
   plan: {
-    budget: "Phased investment",
-    geography: "San Antonio · South Texas",
-    channels:
-      "Search, Local SEO, Landing Pages, Paid Social, YouTube, Influencer Partnerships, Content Marketing, Public Relations, Community Partnerships",
-    audience: "Adults 18–34 seeking convenient, private, direct-access healthcare",
-  },
-  why: {
-    point1: "Nearly 50% of STI cases occur among individuals aged 15–24.",
-    point2:
-      "Millions of consumers seek health information online before engaging healthcare providers.",
-    point3:
-      "Convenience, speed, privacy, and direct access continue to influence healthcare purchasing decisions.",
+    phase1_label: "Demand Capture",
+    phase1_items: "Paid Search\nLocal SEO\nHigh-Intent Landing Pages\nConversion Rate Optimization",
+    phase2_label: "Demand Expansion",
+    phase2_items: "Paid Social\nYouTube & Video\nCreator & Influencer Partnerships\nRetargeting",
+    phase3_label: "Brand Development",
+    phase3_items: "Content & Storytelling\nPR & Earned Media\nStrategic Partnerships\nCommunity Building",
   },
   audience: {
     primary: "Young Adults (18–34) — largest volume opportunity.",
-    geography: "San Antonio · South Texas, expanding into additional Texas markets.",
-    notes:
-      "Women (20–34): family planning, fertility, routine health. Dating app users: high intent. LGBTQ+ community: routine screening and proactive health management.",
+    secondary: "Women (20–34) — family planning, fertility, routine health.",
+    behavioral: "Dating App Users — high intent and active decision-making.",
+    growth: "LGBTQ+ Community — routine screening and proactive health management.",
   },
   flow: {
     steps:
@@ -66,19 +67,21 @@ const DEFAULT_TEXTS: Record<SlideType, Record<string, string>> = {
   },
   success: {
     title: "Methodist Healthcare Ministries + VelocityTX",
+    stat1: "969K+ Views",
+    stat2: "403K+ Accounts Reached",
+    stat3: "1,600+ Participants Engaged",
     challenge:
       "Increase awareness and engagement around Social Determinants of Health across South Texas.",
     solution:
       "Community-focused awareness campaign combining content, events, education, and storytelling.",
     outcome:
-      "969K+ views, 403K+ accounts reached, 1,600+ participants engaged — awareness transformed into action.",
+      "Measurable reach and ecosystem participation that transformed awareness into action.",
   },
   metrics: {
-    kpi1: "Website traffic & lead volume",
-    kpi2: "Cost per lead & cost per appointment",
-    kpi3: "Customer acquisition cost (CAC) & lifetime value (LTV)",
-    budget: "Phased investment",
-    channels: "Search · Paid Social · Content · PR",
+    marketing: "Website Traffic\nLead Volume\nCost Per Lead\nCost Per Appointment",
+    business:
+      "Customer Acquisition Cost (CAC)\nRevenue Per Customer\nLifetime Value (LTV)\nRepeat Visit Rate",
+    executive: "Market Expansion Readiness\nChannel ROI\nGrowth Efficiency",
   },
   engagement: {
     strategy: "Market Research\nAudience Development\nGrowth Planning",
@@ -86,22 +89,30 @@ const DEFAULT_TEXTS: Record<SlideType, Record<string, string>> = {
     optimization: "Analytics\nTesting\nConversion Improvements",
   },
   nextsteps: {
-    step1: "Discovery Alignment — finalize goals and KPIs",
-    step2: "Launch Phase 1 — demand capture campaigns",
-    step3: "Measure & Optimize — validate CAC and conversion rates",
+    step1_title: "Discovery Alignment",
+    step1_sub: "Finalize goals and KPIs",
+    step2_title: "Launch Phase 1",
+    step2_sub: "Demand Capture Campaigns",
+    step3_title: "Measure & Optimize",
+    step3_sub: "Validate CAC and Conversion Rates",
+    step4_title: "Scale Into New Markets",
+    step4_sub: "Florida · Additional Texas Markets · National Expansion",
     closing:
       "The objective is not simply to generate tests. It is to build a scalable consumer healthcare brand powered by information, trust, and access.",
   },
 }
 
-// The canonical slide order for the default template.
+// The canonical slide order for the default template — matches the source Canva:
+// Title → What We Heard → Why This Matters → Opportunity → Strategic → Marketing
+// Plan → Audience → Customer Flow → Success → What Success Looks Like →
+// Recommended Engagement → Next Steps.
 const DEFAULT_ORDER: SlideType[] = [
   "title",
   "heard",
+  "why",
   "opportunity",
   "strategy",
   "plan",
-  "why",
   "audience",
   "flow",
   "success",
