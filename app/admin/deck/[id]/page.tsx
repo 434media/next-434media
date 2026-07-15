@@ -24,7 +24,7 @@ import { AssetLibraryPicker } from "@/components/crm/AssetLibraryPicker"
 import { DeckImageGenerateModal } from "@/components/crm/DeckImageGenerateModal"
 import { sanitizeAssetUrl } from "@/lib/asset-url"
 import { buildSlides } from "@/lib/deck/slides"
-import { SLIDE_META } from "@/lib/deck/slide-meta"
+import { SLIDE_META, DEFAULT_HEADINGS } from "@/lib/deck/slide-meta"
 import { buildBlankSlide } from "@/lib/deck/default-deck"
 import {
   SLIDE_TYPES,
@@ -541,6 +541,41 @@ export default function DeckEditorPage() {
                   <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-400">Slide</p>
                   <p className="text-sm font-medium text-neutral-900">{selectedMeta.label}</p>
                 </div>
+
+                {/* Slide title — the big headline. Defaults to the template preset;
+                    edit it freely, or clear it to remove the headline entirely. The
+                    "title" slide headlines with its Company field instead, so skip it. */}
+                {selectedSlide.type !== "title" &&
+                  (() => {
+                    const preset = DEFAULT_HEADINGS[selectedSlide.type]
+                    const heading = selectedSlide.texts.heading ?? preset
+                    const isCustom = selectedSlide.texts.heading !== undefined && heading !== preset
+                    return (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-medium text-neutral-600">Slide title</label>
+                          {isCustom && (
+                            <button
+                              onClick={() => updateText(selectedSlide.instance_id, "heading", preset)}
+                              className="text-[10px] text-neutral-400 transition-colors hover:text-neutral-700"
+                            >
+                              Reset to default
+                            </button>
+                          )}
+                        </div>
+                        <textarea
+                          value={heading}
+                          onChange={(e) => updateText(selectedSlide.instance_id, "heading", e.target.value)}
+                          placeholder={preset}
+                          rows={2}
+                          className="w-full px-2 py-1.5 ring-1 ring-neutral-200 rounded-md bg-white text-xs text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-neutral-900 focus:outline-none resize-y"
+                        />
+                        <p className="text-[10px] text-neutral-400">
+                          New line = stacked line. Leave blank to hide the title.
+                        </p>
+                      </div>
+                    )
+                  })()}
 
                 {selectedMeta.hasImage &&
                   (

@@ -17,6 +17,12 @@
 
 import { useState, useRef, useEffect, type ReactNode } from "react"
 import type { DeckSlide, SlideType } from "@/types/deck-types"
+import { DEFAULT_HEADINGS } from "@/lib/deck/slide-meta"
+
+/** The slide's headline: a custom `texts.heading` if set (even ""→hidden), else the preset. */
+function headingFor(slide: DeckSlide): string {
+  return slide.texts.heading ?? DEFAULT_HEADINGS[slide.type]
+}
 
 /* ================================================================== */
 /*  Design tokens                                                       */
@@ -402,9 +408,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-[#F8F9FA] px-6 py-12 md:px-[5cqw] md:py-0">
         <CustomImageBackground src={slide.image} position={slide.imagePosition} kind={slide.imageKind} />
         <Waveform />
-        <h2 className={`${HEAD} relative z-10 w-full text-center text-4xl md:text-[7cqw]`}>
-          WHAT WE HEARD
-        </h2>
+        <EditableText
+          value={headingFor(slide)}
+          onChange={(v) => updateText("heading", v)}
+          as="h2"
+          className={`${HEAD} relative z-10 w-full whitespace-pre-line text-center text-4xl md:text-[7cqw]`}
+          scale={fs}
+          editable={editable}
+        />
         <div className="relative z-10 mt-8 grid w-full grid-cols-1 gap-8 md:mt-[3cqw] md:grid-cols-3 md:gap-[3cqw]">
           {[
             { h: "Current Challenges", key: "challenge" },
@@ -437,7 +448,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
     return (
       <div className="flex h-full min-h-full w-full flex-col-reverse bg-white md:flex-row">
         <div className="flex w-full flex-1 flex-col justify-center px-6 py-12 md:w-1/2 md:px-[4cqw] md:py-0">
-          <h2 className={`${HEAD} mb-4 text-4xl md:mb-[2.5cqw] md:text-[5.5cqw]`}>OPPORTUNITY</h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-4 whitespace-pre-line text-4xl md:mb-[2.5cqw] md:text-[5.5cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="mb-4 text-lg font-bold leading-snug text-neutral-900 md:mb-[2cqw] md:text-[1.6cqw]">
             <EditableText
               value={slide.texts.headline || ""}
@@ -477,10 +495,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-12 md:flex-row md:px-[4cqw] md:py-0">
         <CustomImageBackground src={slide.image} position={slide.imagePosition} kind={slide.imageKind} />
         <div className="relative z-10 flex w-full flex-col justify-center text-center md:w-3/5 md:pr-[3cqw] md:text-left">
-          <h2 className={`${HEAD} mb-4 text-4xl md:mb-[2.5cqw] md:text-[5.5cqw]`}>
-            STRATEGIC
-            <br className="hidden md:block" /> RECOMMENDATION
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-4 whitespace-pre-line text-4xl md:mb-[2.5cqw] md:text-[5.5cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="space-y-4 text-base font-medium text-neutral-800 md:space-y-[1.6cqw] md:text-[1.5cqw]">
             <EditableText value={slide.texts.line1 || ""} onChange={(v) => updateText("line1", v)} as="p" className="text-inherit" scale={fs} editable={editable} />
             <EditableText value={slide.texts.line2 || ""} onChange={(v) => updateText("line2", v)} as="p" className="text-inherit" scale={fs} editable={editable} />
@@ -553,11 +575,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
         {/* Left: title over the "road" image */}
         <div className="flex w-full flex-col md:w-[40%] md:shrink-0">
           <div className="flex flex-1 flex-col justify-center px-6 pt-10 md:px-[4cqw] md:pt-0">
-            <h2 className={`${HEAD} text-4xl md:text-[5cqw]`}>
-              RECOMMENDED
-              <br className="hidden md:block" /> MARKETING
-              <br className="hidden md:block" /> PLAN
-            </h2>
+            <EditableText
+              value={headingFor(slide)}
+              onChange={(v) => updateText("heading", v)}
+              as="h2"
+              className={`${HEAD} whitespace-pre-line text-4xl md:text-[5cqw]`}
+              scale={fs}
+              editable={editable}
+            />
           </div>
           <SlideImage
             src={imageFor(slide)}
@@ -611,7 +636,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
     return (
       <div className="flex h-full min-h-full w-full flex-col">
         <div className="flex flex-1 flex-col items-center justify-center gap-8 bg-[#F8F9FA] px-6 py-12 md:gap-[2.5cqw] md:px-[5cqw] md:py-0">
-          <h2 className={`${HEAD} w-full text-center text-4xl md:text-[7cqw]`}>WHY THIS MATTERS</h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} w-full whitespace-pre-line text-center text-4xl md:text-[7cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="grid w-full grid-cols-1 gap-6 text-center md:grid-cols-3 md:gap-[3cqw]">
             {["point1", "point2", "point3"].map((key) => (
               <div key={key} className="px-2 text-base font-bold text-neutral-900 md:px-[1.5cqw] md:text-[1.4cqw]">
@@ -653,10 +685,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
           className="h-[35vh] min-h-[35vh] w-full shrink-0 shadow-xl md:h-[84%] md:min-h-0 md:w-1/2 md:rounded-r-[3cqw]"
         />
         <div className="flex w-full flex-1 flex-col justify-center gap-6 px-6 py-12 md:w-1/2 md:gap-[2cqw] md:px-[4cqw] md:py-0">
-          <h2 className={`${HEAD} text-center text-3xl md:text-left md:text-[4.8cqw]`}>
-            AUDIENCE
-            <br className="hidden md:block" /> PRIORITIZATION
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} whitespace-pre-line text-center text-3xl md:text-left md:text-[4.8cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="space-y-4 md:space-y-[1.2cqw]">
             {[
               { label: "Primary Audience", key: "primary" },
@@ -702,13 +738,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
           className="hidden shrink-0 md:block md:w-[22%]"
         />
         <div className="z-10 flex min-h-0 w-full flex-1 flex-col justify-center bg-[#F8F9FA] px-6 py-12 text-center shadow-2xl md:px-[4cqw] md:py-[2cqw]">
-          <h2 className={`${HEAD} mb-8 text-4xl md:mb-[1.5cqw] md:text-[4.5cqw]`}>
-            CUSTOMER
-            <br />
-            FLOW
-            <br />
-            JOURNEY
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-8 whitespace-pre-line text-4xl md:mb-[1.5cqw] md:text-[4.5cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           {rawSteps.length > 0 && !editable ? (
             <div className="space-y-4 text-base md:space-y-[0.7cqw] md:text-[1.2cqw] md:leading-tight">
               {rawSteps.map((step, i) => (
@@ -758,11 +795,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
           className="h-[40vh] min-h-[40vh] w-full shrink-0 md:h-full md:min-h-0 md:w-1/2"
         />
         <div className="flex w-full flex-1 flex-col justify-center px-6 py-12 md:w-1/2 md:px-[4cqw] md:py-0">
-          <h2 className={`${HEAD} mb-4 text-4xl md:mb-[1.4cqw] md:text-[6.5cqw]`}>
-            SUCCESS
-            <br />
-            STORIES
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-4 whitespace-pre-line text-4xl md:mb-[1.4cqw] md:text-[6.5cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="mb-4 inline-block self-start border-b-2 border-neutral-900 pb-1 text-base font-bold text-neutral-800 md:mb-[1.6cqw] md:pb-[0.3cqw] md:text-[1.5cqw]">
             <EditableText
               value={slide.texts.title || ""}
@@ -805,13 +845,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
     return (
       <div className="flex h-full min-h-full w-full flex-col-reverse items-center bg-[#F8F9FA] md:flex-row">
         <div className="flex w-full flex-1 flex-col justify-center px-6 py-12 md:w-3/5 md:px-[4cqw] md:pr-[3cqw] md:py-0">
-          <h2 className={`${HEAD} mb-6 text-center text-4xl md:mb-[2.5cqw] md:text-left md:text-[5.5cqw]`}>
-            WHAT
-            <br />
-            SUCCESS
-            <br />
-            LOOKS LIKE
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-6 whitespace-pre-line text-center text-4xl md:mb-[2.5cqw] md:text-left md:text-[5.5cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="grid grid-cols-1 gap-6 text-sm text-neutral-800 sm:grid-cols-2 md:gap-x-[2cqw] md:gap-y-[1.6cqw] md:text-[1.3cqw]">
             {[
               { label: "Marketing Metrics", key: "marketing" },
@@ -861,11 +902,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
           className="h-[40vh] min-h-[40vh] w-full shrink-0 md:h-full md:min-h-0 md:w-1/2"
         />
         <div className="flex w-full flex-1 flex-col justify-center px-6 py-12 md:w-1/2 md:px-[4cqw] md:py-0">
-          <h2 className={`${HEAD} mb-6 text-4xl md:mb-[2.5cqw] md:text-[5cqw]`}>
-            RECOMMENDED
-            <br />
-            ENGAGEMENT
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-6 whitespace-pre-line text-4xl md:mb-[2.5cqw] md:text-[5cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 md:gap-x-[2.5cqw] md:gap-y-[2cqw]">
             {[
               { label: "Strategy", key: "strategy" },
@@ -912,9 +956,14 @@ const RENDERERS: Record<SlideType, (ctx: SlideCtx) => ReactNode> = {
       <div className="relative flex h-full min-h-full w-full flex-col items-center justify-center overflow-hidden bg-white px-6 py-12 md:flex-row md:px-[4cqw] md:py-0">
         <CustomImageBackground src={slide.image} position={slide.imagePosition} kind={slide.imageKind} />
         <div className="relative z-10 flex w-full flex-col justify-center md:w-2/5 md:pr-[2cqw]">
-          <h2 className={`${HEAD} mb-8 text-center text-4xl md:mb-[2.5cqw] md:text-left md:text-[6cqw]`}>
-            NEXT STEPS
-          </h2>
+          <EditableText
+            value={headingFor(slide)}
+            onChange={(v) => updateText("heading", v)}
+            as="h2"
+            className={`${HEAD} mb-8 whitespace-pre-line text-center text-4xl md:mb-[2.5cqw] md:text-left md:text-[6cqw]`}
+            scale={fs}
+            editable={editable}
+          />
           {/* Ascending staircase — contiguous blocks rising to the right. */}
           <div className="flex aspect-[4/3] w-full max-w-[300px] self-center items-end justify-center overflow-hidden rounded-2xl bg-neutral-50 shadow-inner md:max-w-none md:rounded-[2cqw]">
             <div className="flex h-full w-full items-end">

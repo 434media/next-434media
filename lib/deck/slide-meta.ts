@@ -26,6 +26,27 @@ export interface SlideMeta {
   fields: SlideField[]
 }
 
+// The preset headline each slide type shows when the author hasn't set a custom
+// `texts.heading`. Newlines are honoured as line breaks (whitespace-pre-line), so
+// these match the source deck's stacked titles. `title` uses its `company` field
+// as its headline instead, so it has no preset here. Referenced by both the
+// renderer (fallback when `heading` is undefined) and the editor's title field.
+// Clearing the field to "" hides the headline; leaving it undefined shows this.
+export const DEFAULT_HEADINGS: Record<SlideType, string> = {
+  title: "",
+  heard: "WHAT WE HEARD",
+  opportunity: "OPPORTUNITY",
+  strategy: "STRATEGIC\nRECOMMENDATION",
+  plan: "RECOMMENDED\nMARKETING\nPLAN",
+  why: "WHY THIS MATTERS",
+  audience: "AUDIENCE\nPRIORITIZATION",
+  flow: "CUSTOMER\nFLOW\nJOURNEY",
+  success: "SUCCESS\nSTORIES",
+  metrics: "WHAT\nSUCCESS\nLOOKS LIKE",
+  engagement: "RECOMMENDED\nENGAGEMENT",
+  nextsteps: "NEXT STEPS",
+}
+
 export const SLIDE_META: Record<SlideType, SlideMeta> = {
   title: {
     type: "title",
