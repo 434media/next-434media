@@ -1,7 +1,47 @@
 import { cookies } from 'next/headers'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export type AuthProvider = 'google' | 'firebase'
 export type AdminRole = 'crm_super_admin' | 'full_admin' | 'crm_only' | 'intern'
+
+const SESSION_COOKIE = 'admin-auth-session'
+const ADMIN_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin', 'crm_only', 'intern']
+
+/**
+ * HMAC key for the session cookie.
+ *
+ * The cookie used to be plain base64 JSON with no signature, which meant anyone
+ * could craft `{"email":"...","role":"crm_super_admin"}`, base64 it, set the
+ * cookie and be a super admin — no Firebase account required. Signing closes
+ * that. Rotating this value invalidates every outstanding session, which is the
+ * correct response to a suspected compromise.
+ *
+ * Missing/short secret is fatal rather than a silent downgrade: setSession
+ * throws (login fails loudly) and getSession returns null (everyone is logged
+ * out). Both fail closed.
+ */
+function getSessionSecret(): string {
+  const secret = process.env.ADMIN_SESSION_SECRET
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'ADMIN_SESSION_SECRET is missing or shorter than 32 chars. Admin sessions cannot be signed. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"',
+    )
+  }
+  return secret
+}
+
+function signPayload(payload: string): string {
+  return createHmac('sha256', getSessionSecret()).update(payload).digest('base64url')
+}
+
+/** Constant-time compare that can't throw on length mismatch. */
+function signatureMatches(expected: string, received: string): boolean {
+  const a = Buffer.from(expected)
+  const b = Buffer.from(received)
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
 
 /**
  * Hardcoded fallback list of CRM super admins. Used when the Firestore
@@ -122,25 +162,115 @@ export async function resolveRole(email: string, provider: AuthProvider): Promis
   return getRoleForProvider(provider)
 }
 
+/**
+ * Read + verify the session cookie.
+ *
+ * Cookie format is `<base64url(payload)>.<base64url(hmac)>`. Anything that
+ * doesn't carry a valid signature is rejected — including every legacy
+ * unsigned cookie, which has no `.` separator at all. That is deliberate: the
+ * unsigned format was forgeable, so existing sessions must not survive.
+ */
+/**
+ * Decide whether an authenticated identity may be issued an admin session.
+ *
+ * This is THE authorization gate. It exists because Firebase Auth is shared
+ * across every 434 web project in the GCP project — a user created for one site
+ * holds a perfectly valid token for this admin. "Has a Firebase account" was
+ * never the same thing as "may administer 434 Media", and treating them as
+ * equivalent is how a partner account read data from every named database.
+ *
+ * Allowed:
+ *  - @434media.com workspace addresses (Google OAuth, domain-verified)
+ *  - the hardcoded owner fallback
+ *  - an ACTIVE `crm_team_members` record, which is managed in admin settings
+ *
+ * Everything else is refused a session. Adding someone to Firebase Auth no
+ * longer grants admin access on its own — they must also be on the roster.
+ *
+ * Fails CLOSED: if the Firestore lookup throws, non-workspace users are denied
+ * rather than waved through on a provider default.
+ */
+export async function authorizeAdminSignIn(
+  email: string,
+  provider: AuthProvider,
+): Promise<{ authorized: true; role: AdminRole; name?: string } | { authorized: false; reason: string }> {
+  const lower = email.toLowerCase()
+
+  if (isCrmSuperAdminFromFallback(lower)) {
+    return { authorized: true, role: 'crm_super_admin' }
+  }
+
+  // Verified staff on the workspace domain. The Google callback already refuses
+  // anything else, so this only ever passes real @434media.com accounts.
+  if (provider === 'google' && isWorkspaceEmail(lower)) {
+    const role = await resolveRole(lower, 'google')
+    return { authorized: true, role }
+  }
+
+  try {
+    const { getDb } = await import('./firebase-admin')
+    const snap = await getDb()
+      .collection('crm_team_members')
+      .where('email', '==', lower)
+      .limit(1)
+      .get()
+
+    if (snap.empty) {
+      return {
+        authorized: false,
+        reason: 'not_on_roster',
+      }
+    }
+
+    const data = snap.docs[0].data()
+    if (data.isActive === false) {
+      return { authorized: false, reason: 'deactivated' }
+    }
+
+    const stored = data.role
+    const role: AdminRole = ADMIN_ROLES.includes(stored) ? stored : 'intern'
+    return { authorized: true, role, name: data.name || undefined }
+  } catch (error) {
+    console.error('[auth] authorizeAdminSignIn lookup failed; denying:', error)
+    return { authorized: false, reason: 'lookup_failed' }
+  }
+}
+
 export async function getSession(): Promise<User | null> {
   const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('admin-auth-session')
-  
+  const sessionCookie = cookieStore.get(SESSION_COOKIE)
+
   if (!sessionCookie) {
     return null
   }
 
   try {
-    const session = JSON.parse(
-      Buffer.from(sessionCookie.value, 'base64').toString('utf-8')
-    )
-    
+    const [encodedPayload, signature] = sessionCookie.value.split('.')
+    if (!encodedPayload || !signature) {
+      // Unsigned legacy cookie (or malformed) — never trust it.
+      return null
+    }
+
+    if (!signatureMatches(signPayload(encodedPayload), signature)) {
+      console.warn('[auth] rejected session cookie with an invalid signature')
+      return null
+    }
+
+    const session = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf-8'))
+
     // Verify session is not expired
     if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
       return null
     }
-    
-    return session.user
+
+    // A signed cookie proves we issued it; this guards against a session minted
+    // by older code with a role we no longer recognize.
+    const user: User | undefined = session.user
+    if (!user?.email || !user.role || !ADMIN_ROLES.includes(user.role)) {
+      return null
+    }
+
+    return user
   } catch (error) {
     console.error('Failed to parse session:', error)
     return null
@@ -149,7 +279,7 @@ export async function getSession(): Promise<User | null> {
 
 export async function setSession(user: User): Promise<void> {
   const cookieStore = await cookies()
-  
+
   const sessionData = {
     user: {
       email: user.email,
@@ -160,10 +290,13 @@ export async function setSession(user: User): Promise<void> {
     },
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
   }
-  
-  const sessionValue = Buffer.from(JSON.stringify(sessionData)).toString('base64')
-  
-  cookieStore.set('admin-auth-session', sessionValue, {
+
+  // Throws if the secret is missing — a login that can't be signed must fail,
+  // not fall back to an unsigned cookie.
+  const encodedPayload = Buffer.from(JSON.stringify(sessionData)).toString('base64url')
+  const sessionValue = `${encodedPayload}.${signPayload(encodedPayload)}`
+
+  cookieStore.set(SESSION_COOKIE, sessionValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -174,7 +307,7 @@ export async function setSession(user: User): Promise<void> {
 
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies()
-  cookieStore.delete('admin-auth-session')
+  cookieStore.delete(SESSION_COOKIE)
 }
 
 export function isWorkspaceEmail(email: string): boolean {
@@ -183,19 +316,21 @@ export function isWorkspaceEmail(email: string): boolean {
 }
 
 /**
- * Check if a user is authorized to access admin areas.
- * Returns true for any authenticated session because:
- * - Google OAuth only allows @434media.com emails (enforced by isWorkspaceEmail in callback)
- * - Firebase Auth users are managed in Firebase Console (only approved users can log in)
- * 
- * This function should be used for API route protection instead of isWorkspaceEmail
- * to support both Google Workspace and Firebase email/password authentication.
+ * Cheap per-request sanity check on an already-verified session.
+ *
+ * This is NOT the authorization decision — `authorizeAdminSignIn` is, and it
+ * runs once at login. By the time a route calls this, two things already hold:
+ * the cookie carried a valid HMAC (so we minted it), and we only mint sessions
+ * for identities on the roster or the workspace domain.
+ *
+ * It previously read `return !!email` while its docstring claimed Firebase
+ * Console membership was an effective allowlist. It wasn't — the Console is
+ * shared across every 434 web project — so this was the check that let a
+ * partner-site account through. The real gate now lives at issuance; this
+ * remains as a defensive non-null guard for the ~63 routes that call it.
  */
 export function isAuthorizedAdmin(email: string): boolean {
-  // Any authenticated user is authorized
-  // Google Workspace: restricted at OAuth callback level to @434media.com
-  // Firebase: restricted by who is added in Firebase Console
-  return !!email
+  return !!email && email.includes('@')
 }
 
 /**
