@@ -24,20 +24,42 @@ What we offer prospects:
 What we are NOT: a generic marketing agency, an ad network, or a content shop.`.trim()
 
 /**
- * Words/phrases that flag corporate-speak. We tell Claude to avoid them
- * explicitly because it will reach for them by default.
+ * Voice exemplars.
+ *
+ * These replaced a list of banned phrases ("elevate your brand", "synergy",
+ * "leverage", …). A prohibition list only rules out the exact strings on it and
+ * says nothing about what good looks like — newer models follow it literally
+ * and route around it into different corporate-speak. Showing the target voice
+ * generalizes instead, and it stays useful as models change.
+ *
+ * Both examples are cold first-touches. Note what they do: name one sub-brand
+ * and commit to it, reference the prospect's actual world, make exactly one
+ * concrete claim, admit uncertainty rather than overclaiming fit, and close
+ * with something cheap to say yes to.
+ *
+ * Edit these when the voice drifts — they steer output more than any rule.
  */
-const BANNED_PHRASES = [
-  "elevate your brand",
-  "cutting-edge",
-  "synergy",
-  "best-in-class",
-  "next-level",
-  "leverage",
-  "unlock",
-  "ecosystem of solutions",
-  "thought leadership",
-]
+const VOICE_EXEMPLARS = `<example industry="regional healthcare system">
+Jesse here at 434 Media, based in San Antonio. We run VemosVamos, a bicultural
+lifestyle brand whose audience is mostly Spanish-dominant and bilingual
+households across the South and West sides — the households that tend to tune
+out a translated version of an English campaign. Ours opt in for content built
+for them in the first place, which is why our health placements move appointment
+intent instead of impressions nobody can trace. I don't know enough about how
+you're approaching patient acquisition right now to tell you this is a fit, but
+if bicultural reach is on the list this year it's worth a conversation. Worth 15
+minutes, or just reply and tell me it's not where your priorities sit.
+</example>
+
+<example industry="regional bank sponsoring youth sports">
+Jesse at 434 Media. You're already putting money into youth sports around San
+Antonio, so you know the hard part isn't the sponsorship — it's having anything
+to show for it after the banner comes down. TXMX Boxing covers the fight scene
+here year-round, and the audience treats it as their sport rather than a
+marketing channel, so a partner shows up in the coverage instead of beside it.
+We'd own the content, not just the signage. Open to a 15-minute call to see
+whether the calendar lines up with yours?
+</example>`
 
 /**
  * Which email in the 3-step sequence to draft. Undefined = a standalone
@@ -127,7 +149,11 @@ ${BRAND_CONTEXT}
 
 Tone: direct, specific, conversational. American business email register — not casual, not stiff.
 Length: 4–6 sentences. No preamble, no signature, no subject line. Output only the email body.
-Banned phrases (do not use): ${BANNED_PHRASES.join("; ")}.`
+
+Here are two emails in the voice we want. Match their register and their level of
+concreteness — don't reuse their wording or their sub-brand:
+
+${VOICE_EXEMPLARS}`
 
   const prompt = `Write an outbound email to this prospect:
 
@@ -175,7 +201,12 @@ Rules:
 - Replace EVERY [placeholder] with a concrete value. Never leave a bracket, and never output a literal "[...]".
 - Use ONLY real prospect data + the 434 portfolio above. Do NOT invent fake metrics, client names, or results. If a placeholder needs data you don't have, rewrite that sentence to make an honest, specific point without fabricating — or drop it.
 - Keep the template's length, structure, and CTA. Match its tone. Lead with the 434 sub-brand most relevant to the prospect's industry.
-Banned phrases (do not use): ${BANNED_PHRASES.join("; ")}.
+
+The approved template's voice wins wherever the two differ, but these show the
+house register to aim for when a placeholder leaves you room to choose:
+
+${VOICE_EXEMPLARS}
+
 Output the subject line first as "Subject: <text>", then a blank line, then the email body only. No commentary.`
 
   const prompt = `Personalize this approved email ${step} template for the prospect below.

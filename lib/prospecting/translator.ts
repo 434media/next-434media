@@ -288,7 +288,17 @@ export async function translatePromptToFilters(
   // tool input (schema-checked against filtersSchema).
   const raw = await generateGatewayToolCall<RawTranslatedFilters>({
     model: GATEWAY_TEXT_MODELS.translator,
-    maxTokens: 1024,
+    // Thinking shares this budget on Claude 5 models — 1024 left no room for a
+    // wide filter object once reasoning took its cut.
+    maxTokens: 4000,
+    // Structured extraction against an explicit schema; the reasoning here is
+    // mapping, not invention. Measured at ~⅓ fewer output tokens than the
+    // default `high` with no loss in filter quality.
+    effort: "low",
+    // The ICP block is ~6.7k tokens and byte-identical for the life of a
+    // deploy, so every call after the first reads it from cache at ~10% of
+    // input rate (measured: $0.019 → $0.0052 per translation).
+    cacheSystem: true,
     system: buildSystemPrompt(icp),
     prompt: trimmed,
     toolName: FILTERS_TOOL_NAME,

@@ -78,7 +78,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             })
             const text = await generateGatewayText({
               model: GATEWAY_TEXT_MODELS.outreachDraft,
-              maxTokens: 600,
+              // Subject + body, and thinking shares the budget on Claude 5.
+              maxTokens: 2000,
+              effort: "low",
               system,
               prompt,
             })
@@ -88,7 +90,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           const { prompt, system } = buildLeadOutreachPrompt({ lead, repName, step: n })
           const text = await generateGatewayText({
             model: GATEWAY_TEXT_MODELS.outreachDraft,
-            maxTokens: 600,
+            maxTokens: 2000,
+            effort: "low",
             system,
             prompt,
           })

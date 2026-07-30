@@ -1,6 +1,6 @@
 # CRM ↔ Sales Funnel — Alignment Plan
 
-Decisions locked 2026-07-05. Turns the [reconciliation notes](crm-funnel-reconciliation.md)
+Decisions locked 2026-07-05. Turns the [reconciliation notes](archive/crm-funnel-reconciliation.md)
 into a build plan. Grounds in the Three Key Points: **ICP Match Rate** (lead
 quality), **stage-by-stage Funnel Conversion** (`Lead → MQL → SQL → Discovery →
 Proposal → Closed-Won`), and **Velocity** (Time to Discovery Call, Time to

@@ -16,22 +16,47 @@ import { z } from "zod"
 // https://ai-gateway.vercel.sh/v1/models. Env overrides preserve the prior
 // behavior (TRANSLATOR_MODEL / ANTHROPIC_MODEL), now pointing at gateway slugs.
 export const GATEWAY_TEXT_MODELS = {
-  // Outbound lead-outreach drafts — Opus for copy quality (was claude-opus-4-7).
-  outreachDraft: process.env.ANTHROPIC_MODEL || "anthropic/claude-opus-4.8",
+  // Outbound lead-outreach drafts — Opus for copy quality. Opus 5 is a drop-in
+  // at Opus 4.8's pricing ($5/$25 per MTok).
+  outreachDraft: process.env.ANTHROPIC_MODEL || "anthropic/claude-opus-5",
   // Prospecting prompt→filters — Sonnet, a structured extraction task that
-  // doesn't need Opus (was claude-sonnet-4-6).
-  translator: process.env.TRANSLATOR_MODEL || "anthropic/claude-sonnet-4.6",
+  // doesn't need Opus.
+  translator: process.env.TRANSLATOR_MODEL || "anthropic/claude-sonnet-5",
   // Lead research — OpenAI's web-search-grounded model. Returns live cited
   // company context. Verified to support structured Output + a `sources[]`
   // array through the gateway. `web_search` priced per call — guard usage.
   research: process.env.RESEARCH_MODEL || "openai/gpt-4o-mini-search-preview",
 } as const
 
+/**
+ * Reasoning depth. Lower = fewer thinking tokens, less latency, less spend.
+ *
+ * THE TOKEN TRAP: on Claude 5 models thinking is ON BY DEFAULT, and maxTokens
+ * caps thinking + visible text TOGETHER. A budget sized for the visible answer
+ * alone gets eaten by thinking and the response truncates mid-sentence with
+ * finishReason "length" — no error, just a cut-off email. Measured on Opus 5
+ * with maxTokens 600: 499 tokens went to thinking, 101 to text, truncated.
+ *
+ * So: always leave headroom above the expected visible answer, and prefer a
+ * low effort level over disabling thinking. (Disabling it is a documented
+ * footgun on Opus 5 — it can emit tool calls as plain text that silently never
+ * run, which would break the translator's forced-tool contract outright.)
+ */
+export type GatewayEffort = "low" | "medium" | "high" | "xhigh" | "max"
+
+// Anthropic-specific knobs, passed through the Gateway verbatim. Non-Anthropic
+// models (e.g. the OpenAI research model) ignore an unknown `anthropic` key.
+function effortOptions(effort?: GatewayEffort) {
+  return effort ? { anthropic: { output_config: { effort } } } : undefined
+}
+
 export interface GatewayTextParams {
   model: string
   system?: string
   prompt: string
   maxTokens?: number
+  /** Reasoning depth. Omit for the provider default (`high`). */
+  effort?: GatewayEffort
 }
 
 // Plain text generation. Throws on failure (the route maps it to a 502) so the
@@ -42,7 +67,20 @@ export async function generateGatewayText(params: GatewayTextParams): Promise<st
     ...(params.system ? { system: params.system } : {}),
     prompt: params.prompt,
     ...(params.maxTokens ? { maxOutputTokens: params.maxTokens } : {}),
+    ...(effortOptions(params.effort) ? { providerOptions: effortOptions(params.effort)! } : {}),
   })
+
+  // Thinking can consume the whole budget and leave the visible answer cut off
+  // mid-sentence. Fail loudly instead of persisting half an email — the caller
+  // maps a throw to a 502 the rep can retry.
+  if (result.finishReason === "length") {
+    throw new Error(
+      `Gateway text: output truncated at the ${params.maxTokens ?? "default"}-token cap ` +
+        `(${result.usage?.reasoningTokens ?? 0} tokens went to reasoning). ` +
+        `Raise maxTokens or lower effort.`,
+    )
+  }
+
   return result.text.trim()
 }
 
@@ -51,6 +89,17 @@ export interface GatewayToolCallParams {
   system?: string
   prompt: string
   maxTokens?: number
+  /** Reasoning depth. Omit for the provider default (`high`). */
+  effort?: GatewayEffort
+  /**
+   * Mark the system prompt as a cacheable prefix. Set this when `system` is a
+   * large, byte-stable block reused across calls (e.g. the ICP doc) — cache
+   * reads bill at ~10% of input rate. Needs ≥1024 tokens on Sonnet, ≥512 on
+   * Opus 5; shorter prefixes silently don't cache. Never set it when `system`
+   * interpolates per-request values — that changes the prefix every call and
+   * you pay the write premium forever with no reads.
+   */
+  cacheSystem?: boolean
   /** The single tool the model is forced to call. */
   toolName: string
   tool: Tool
@@ -64,11 +113,33 @@ export interface GatewayToolCallParams {
 export async function generateGatewayToolCall<TInput = unknown>(
   params: GatewayToolCallParams,
 ): Promise<TInput> {
+  // Attaching cacheControl requires the system prompt to be a message block
+  // rather than the plain `system` string, so the two paths differ in shape only.
+  // `allowSystemInMessages` silences the SDK's prompt-injection warning: this
+  // system text is a build-time constant from the repo, never user input.
+  const promptShape =
+    params.cacheSystem && params.system
+      ? {
+          allowSystemInMessages: true as const,
+          messages: [
+            {
+              role: "system" as const,
+              content: params.system,
+              providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } },
+            },
+            { role: "user" as const, content: params.prompt },
+          ],
+        }
+      : {
+          ...(params.system ? { system: params.system } : {}),
+          prompt: params.prompt,
+        }
+
   const result = await generateText({
     model: params.model,
-    ...(params.system ? { system: params.system } : {}),
-    prompt: params.prompt,
+    ...promptShape,
     ...(params.maxTokens ? { maxOutputTokens: params.maxTokens } : {}),
+    ...(effortOptions(params.effort) ? { providerOptions: effortOptions(params.effort)! } : {}),
     tools: { [params.toolName]: params.tool },
     toolChoice: { type: "tool", toolName: params.toolName },
   })
