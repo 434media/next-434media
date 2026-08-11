@@ -64,15 +64,18 @@ const CURATED: CuratedModel[] = [
   { id: "recraft/recraft-v4.1", label: "Recraft v4.1", kind: "image", provider: "recraft", supportsImageInput: true, specialty: "Brand & vector", blurb: "Design-grade typography, brand assets & editable vectors" },
   { id: "bfl/flux-2-klein-9b", label: "Flux 2 Klein 9B", kind: "image", provider: "bfl", supportsImageInput: true, specialty: "Fast & stylized", blurb: "Sub-second stylized generation & edits — the efficient FLUX.2 tier" },
   { id: "xai/grok-imagine-image", label: "Grok Imagine", kind: "image", provider: "xai", supportsImageInput: true, specialty: "Budget", blurb: "Quick, budget-friendly images" },
-  // Video (first entry of the kind = the picker's default). Grok Imagine 1.5
-  // leads — the latest model — and carries a "New" badge. (No `video` block →
-  // uses the global aspect-ratio/duration options; constraints unverified.)
-  { id: "xai/grok-imagine-video-1.5", label: "Grok Imagine 1.5", kind: "video", provider: "xai", badge: "New", specialty: "Fast + audio", blurb: "Fast image-to-video with native synced audio, real-world physics & 6–15s clips" },
+  // Video (first entry of the kind = the picker's default). Seedance 2.5 leads —
+  // the newest video model on the Gateway — and carries the "New" badge.
+  // 4–30s output, six aspect ratios incl. 21:9 ultrawide. (The Gateway also
+  // lists "adaptive" — omitted; it isn't a fixed ratio the picker or the route's
+  // ALLOWED_ASPECTS can validate.)
+  { id: "bytedance/seedance-2.5", label: "Seedance 2.5", kind: "video", provider: "bytedance", badge: "New", specialty: "Action", blurb: "Dynamic action & camera moves, up to 30s", video: { aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], durationRange: { min: 4, max: 30, default: 5 } } },
+  // (No `video` block → uses the global aspect-ratio/duration options;
+  // constraints unverified.)
+  { id: "xai/grok-imagine-video-1.5", label: "Grok Imagine 1.5", kind: "video", provider: "xai", specialty: "Fast + audio", blurb: "Fast image-to-video with native synced audio, real-world physics & 6–15s clips" },
   // Veo 3.1: Gateway desc = fixed 8-second clips; Google docs = 16:9 / 9:16 only.
   { id: "google/veo-3.1-generate-001", label: "Veo 3.1", kind: "video", provider: "google", specialty: "Video + audio", blurb: "Top-quality video with audio", video: { aspectRatios: ["16:9", "9:16"], durations: [8] } },
   { id: "klingai/kling-v3.0-t2v", label: "Kling 3.0", kind: "video", provider: "klingai", specialty: "Cinematic", blurb: "Smooth, cinematic motion" },
-  // Seedance 2.0: 4–15s output, six aspect ratios incl. 21:9 ultrawide.
-  { id: "bytedance/seedance-2.0", label: "Seedance 2.0", kind: "video", provider: "bytedance", specialty: "Action", blurb: "Dynamic action & camera moves", video: { aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"], durationRange: { min: 4, max: 15, default: 5 } } },
 ]
 
 export interface GatewayModel {

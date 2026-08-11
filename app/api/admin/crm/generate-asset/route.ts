@@ -20,7 +20,13 @@ import { createAsset } from "@/lib/firestore-assets"
 // GET   ?jobId=<id> → { status, asset?, error? }
 
 export const runtime = "nodejs"
-export const maxDuration = 300
+// Video generation runs in the after() callback below, which is bounded by this
+// ceiling. It must stay above VIDEO_TIMEOUT_MS in lib/ai-generate.ts (10 min) so
+// that abort fires *first* and the catch can mark the job failed — if the
+// platform kills the function first, nothing writes the failure and the job is
+// stranded pending (backstopped by STALE_PENDING_MS in
+// lib/firestore-generation-jobs.ts). A 30s Seedance clip can run for minutes.
+export const maxDuration = 800
 
 // Superset of every aspect any curated model accepts (used to validate the
 // incoming value before per-model coercion). 21:9 is Seedance-only.
@@ -121,6 +127,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!duration || duration < min || duration > max) {
         if (duration) console.warn(`[generate-asset] ${modelId}: duration "${duration}" out of ${min}–${max}s → ${def}`)
         duration = def
+      } else {
+        // A range is expressed continuously but every model in it accepts whole
+        // seconds only, so an in-range 7.5 would pass this gate and then be
+        // silently dropped upstream. Round instead.
+        duration = Math.round(duration)
       }
     }
   }

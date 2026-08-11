@@ -55,11 +55,20 @@ Prices are per-image where the gateway exposes a clean unit price; "usage-based"
 
 ## Video models
 
-### Grok Imagine 1.5 — `xai/grok-imagine-video-1.5` · xAI · _default_
-- **Specialty:** Fast + audio · **Badge:** New · **per-second** (480p $0.08 / 720p $0.14 / 1080p $0.25)
-- xAI's latest image-to-video model, and the video default. Native **synced audio
-  in one pass** (SFX, ambience, dialogue), better **motion & real-world physics**,
-  faster generation (~25s for 6s/720p), and longer **6–15s** clips (up to 1080p).
+### Seedance 2.5 — `bytedance/seedance-2.5` · ByteDance · _default_
+- **Specialty:** Action · **Badge:** New · **usage-based**
+- The newest video model on the Gateway, and the video default. Dynamic action &
+  camera moves; unified audio-video generation built for **30-second
+  storytelling** with reference control and video editing. Six aspect ratios
+  incl. 21:9 ultrawide, **4–30s**. 480p/720p only — 2.0 reached 4k but capped at
+  15s, so this trades resolution ceiling for length.
+- Homepage: https://seed.bytedance.com/
+
+### Grok Imagine 1.5 — `xai/grok-imagine-video-1.5` · xAI
+- **Specialty:** Fast + audio · **per-second** (480p $0.08 / 720p $0.14 / 1080p $0.25)
+- xAI's fast image-to-video model. Native **synced audio in one pass** (SFX,
+  ambience, dialogue), better **motion & real-world physics**, faster generation
+  (~25s for 6s/720p), and **6–15s** clips (up to 1080p).
 - Homepage: https://x.ai/news/grok-imagine-video-1-5
 
 ### Veo 3.1 — `google/veo-3.1-generate-001` · Google
@@ -72,12 +81,6 @@ Prices are per-image where the gateway exposes a clean unit price; "usage-based"
 - **Specialty:** Cinematic · **per-second**
 - Smooth, cinematic motion; full multimodal (text/image/audio/video) framework.
 - Homepage: https://klingai.com/
-
-### Seedance 2.0 — `bytedance/seedance-2.0` · ByteDance
-- **Specialty:** Action · **usage-based**
-- Dynamic action & camera moves; unified audio-video generation. Six aspect
-  ratios incl. 21:9 ultrawide, 4–15s.
-- Homepage: https://seed.bytedance.com/
 
 ---
 

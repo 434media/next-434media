@@ -191,7 +191,10 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
   }
 
   const pollVideoJob = async (jobId: string) => {
-    for (let i = 0; i < 144; i++) {
+    // 180 × 5s = 15 min. Deliberately outlives the server's stale-job sweep
+    // (14 min) so an abandoned generation surfaces as a real error here rather
+    // than as the soft "taking longer than expected" fallback below.
+    for (let i = 0; i < 180; i++) {
       await new Promise((r) => setTimeout(r, 5000))
       try {
         const res = await fetch(`/api/admin/crm/generate-asset?jobId=${encodeURIComponent(jobId)}`, {
@@ -503,9 +506,13 @@ export function GeneratePanel({ open, onAdd, addLabel = "Add", onGenerated, seed
                     type="number"
                     min={durRange.min}
                     max={durRange.max}
+                    step={1}
                     value={genDuration}
                     onChange={(e) => {
-                      const n = Number(e.target.value)
+                      // Round: a "range" model still takes whole seconds, and a
+                      // typed 7.5 would otherwise clamp cleanly and be dropped
+                      // silently by the provider.
+                      const n = Math.round(Number(e.target.value))
                       if (Number.isFinite(n)) setGenDuration(Math.min(durRange.max, Math.max(durRange.min, n)))
                     }}
                     className="w-9 bg-transparent text-xs text-neutral-900 focus:outline-none"
