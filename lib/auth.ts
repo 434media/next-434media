@@ -362,13 +362,14 @@ export async function isCrmSuperAdmin(email?: string | null): Promise<boolean> {
 
 /**
  * Roles permitted to trigger OUTBOUND sends (Resend) on a user's behalf.
- * `crm_only` can draft, not send.
+ * `crm_only` and `intern` can draft, not send.
  *
- * QA: `intern` is temporarily included so the QA team can test the outreach
- * motion (single send + 3-email sequence enroll). Remove `intern` after QA to
- * restore the draft-only posture for cohort interns.
+ * `intern` was temporarily included for the outreach-motion QA period (single
+ * send + 3-email sequence enroll). That period is over and it has been removed,
+ * restoring the draft-only posture — which also re-closes `requireFullAdmin`
+ * below, since that guard is expressed in terms of this list.
  */
-export const SEND_CAPABLE_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin', 'intern']
+export const SEND_CAPABLE_ROLES: AdminRole[] = ['crm_super_admin', 'full_admin']
 
 export function canSend(role?: AdminRole | null): boolean {
   return !!role && SEND_CAPABLE_ROLES.includes(role)
@@ -378,7 +379,7 @@ export function canSend(role?: AdminRole | null): boolean {
  * Guard for outbound-send API routes (anything that calls Resend for a user).
  * Returns the session when the caller may send, otherwise an error to 4xx on.
  *
- * Blocks `crm_only` sessions (the interns) from firing 1:1 sends. Staff send via
+ * Blocks `crm_only` and `intern` sessions from firing 1:1 sends. Staff send via
  * Google (`full_admin`). A super admin always passes via the Firestore-backed
  * check — even on a stale session role — so the two owners are never locked out.
  */

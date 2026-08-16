@@ -49,3 +49,6 @@ _aim2026_import.xlsx
 # Single package manager: pnpm only (see packageManager field)
 package-lock.json
 yarn.lock
+
+# Local snapshots written by offboarding/migration scripts — contain roster PII
+/backups/

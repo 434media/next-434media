@@ -205,7 +205,8 @@ integration — no manual `vercel --prod`.
 (GDPR/CASL). Single source of truth: `EXCLUDED_COUNTRIES` in
 [`lib/prospecting/scorer.ts`](../lib/prospecting/scorer.ts).
 
-**QA period toggles to revert when testing ends:** remove `intern` from
-`SEND_CAPABLE_ROLES` ([`lib/auth.ts`](../lib/auth.ts)), drop
-`SEQUENCE_STEP_GAP_MINUTES`, and restore the `vercel.json` outreach cron from the
-every-minute test schedule back to the weekday schedule.
+**QA period toggles to revert when testing ends:** ~~remove `intern` from
+`SEND_CAPABLE_ROLES` ([`lib/auth.ts`](../lib/auth.ts))~~ (done — reverted at
+cohort offboarding), drop `SEQUENCE_STEP_GAP_MINUTES`, and restore the
+`vercel.json` outreach cron from the every-minute test schedule back to the
+weekday schedule.
