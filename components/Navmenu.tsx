@@ -19,41 +19,29 @@ interface NavigationItem {
   delay: number
 }
 
+// This IS the navbar on mobile, so it carries the same roster and the same
+// wording as the desktop links + footer: "Our work" and "Start a project".
 const navigationItems: NavigationItem[] = [
   {
     id: "work",
-    title: "Work",
+    title: "Our work",
     subtitle: "See our portfolio",
     href: "/work",
     delay: 0.1,
-  },
-  {
-    id: "feed",
-    title: "The Feed",
-    subtitle: "Insights & Stories",
-    href: "https://www.digitalcanvas.community/thefeed",
-    delay: 0.15,
-  },
-  {
-    id: "shop",
-    title: "Shop",
-    subtitle: "Founders Tee Available Now",
-    href: "/shop",
-    delay: 0.2,
   },
   {
     id: "events",
     title: "Events",
     subtitle: "Where Networks Meet Action",
     href: "https://www.devsa.community/events",
-    delay: 0.25,
+    delay: 0.15,
   },
   {
     id: "contact",
-    title: "Contact",
+    title: "Start a project",
     subtitle: "Take the next step",
     href: "/contact",
-    delay: 0.3,
+    delay: 0.2,
   },
 ]
 

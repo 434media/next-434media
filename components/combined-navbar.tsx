@@ -16,12 +16,13 @@ type CombinedNavbarProps = {
   menu?: Menu[]
 }
 
+// Labels mirror the footer's "Build with us" column — "Our work" and "Start a
+// project" name the same two destinations in both places, so the site says one
+// thing about what it wants a visitor to do.
 // Internal links lead — they keep visitors on the application.
 // External destinations follow and are visually marked with ↗.
 const desktopLinks = [
-  { href: "/work", label: "Work" },
-  { href: "/shop", label: "Shop" },
-  { href: "https://www.digitalcanvas.community/thefeed", label: "The Feed" },
+  { href: "/work", label: "Our work" },
 ]
 
 // Custom hook to check if component has mounted
@@ -115,7 +116,7 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                         key={link.href}
                         href={link.href}
                         {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                        className={`group inline-flex items-center gap-1 font-geist-sans text-[13px] font-medium leading-none px-3 py-1.5 rounded-md transition-all duration-200 ${
+                        className={`group inline-flex items-center gap-1 font-geist-mono text-[11px] font-medium uppercase tracking-[0.16em] leading-none px-3 py-1.5 rounded-md transition-all duration-200 ${
                           isActive
                             ? "text-white bg-white/10"
                             : "text-white/60 hover:text-white hover:bg-white/5"
@@ -133,17 +134,18 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                   })}
                 </nav>
 
-                {/* Contact CTA — visually distinct, treated as the closing prompt */}
+                {/* Contact CTA — plain text like the other links; the arrow is
+                    what marks it as the closing prompt. */}
                 <Link
                   href="/contact"
-                  className={`group ml-1 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 font-geist-sans text-[13px] font-medium leading-none transition-all duration-200 ${
+                  className={`group ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-geist-mono text-[11px] font-medium uppercase tracking-[0.16em] leading-none transition-all duration-200 ${
                     pathname === "/contact"
-                      ? "bg-white text-neutral-950"
-                      : "bg-white text-neutral-950 hover:bg-neutral-200 hover:gap-2"
+                      ? "text-white bg-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
                   }`}
-                  aria-label="Contact 434 MEDIA"
+                  aria-label="Start a project with 434 MEDIA"
                 >
-                  Contact
+                  Start a project
                   <ArrowUpRight
                     className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12"
                     aria-hidden="true"

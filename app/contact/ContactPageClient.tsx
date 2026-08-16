@@ -3,15 +3,9 @@
 import { motion } from "motion/react"
 import { useEffect, useState, useRef, useCallback } from "react"
 import { ContactForm } from "@/components/ContactForm"
+import { Eyebrow } from "@/components/ui/Eyebrow"
 
 // Single-purpose contact page. Conversion is the only job.
-// Removes the black-box feeling after submitting a contact form.
-const NEXT_STEPS = [
-  { label: "01", title: "Reply within one business day", body: "We read every inbound personally." },
-  { label: "02", title: "30-min discovery call", body: "Goals, scope, timing, and fit. No pitch deck." },
-  { label: "03", title: "Scoped proposal", body: "Concrete deliverables, milestones, and pricing within a week." },
-]
-
 const trustedByLogos = [
   {
     name: "Builders VC",
@@ -134,11 +128,11 @@ export function ContactPageClient() {
   }, [drawDots])
 
   return (
-    <div className="min-h-dvh bg-white text-gray-900 overflow-hidden pt-10">
+    <div className="min-h-dvh bg-white text-neutral-900 overflow-hidden pt-10">
       <div className="relative min-h-dvh flex items-center py-4 lg:py-6">
         {/* Dot Distortion Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute inset-0 bg-linear-to-br from-gray-50 via-white to-gray-50" />
+          <div className="absolute inset-0 bg-linear-to-br from-neutral-50 via-white to-neutral-50" />
         </div>
         <canvas
           ref={canvasRef}
@@ -162,7 +156,7 @@ export function ContactPageClient() {
                 className="space-y-4 lg:space-y-5"
               >
                 <motion.h1
-                  className="font-ggx88 font-black text-5xl lg:text-6xl xl:text-7xl text-gray-900 leading-[0.9] tracking-tighter"
+                  className="font-ggx88 font-black text-5xl lg:text-6xl xl:text-7xl text-neutral-900 leading-[0.9] tracking-tighter"
                   transition={{ duration: 0.3 }}
                 >
                   <motion.span
@@ -187,7 +181,7 @@ export function ContactPageClient() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.7 }}
-                  className="font-geist-sans text-base text-gray-500 leading-relaxed font-normal max-w-md"
+                  className="font-geist-sans text-base text-neutral-500 leading-relaxed font-normal max-w-md"
                 >
                   From brand campaigns, to event production, we help the world&apos;s most innovative firms find their voice and amplify their impact through bold storytelling and experiences.
                 </motion.p>
@@ -198,11 +192,11 @@ export function ContactPageClient() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 1.5 }}
-                className="pt-4 border-t border-gray-100"
+                className="pt-4 border-t border-neutral-100"
               >
-                <p className="font-geist-mono text-[11px] text-gray-500 font-semibold uppercase tracking-[0.22em] mb-3.5">
-                  Producing with <span className="text-gray-900">enterprise &amp; civic brands</span>
-                </p>
+                <Eyebrow className="mb-3.5">
+                  Producing with <span className="text-neutral-900">enterprise &amp; civic brands</span>
+                </Eyebrow>
 
                 {/* Mobile: scrolling marquee */}
                 <div className="relative overflow-hidden lg:hidden">
@@ -239,7 +233,7 @@ export function ContactPageClient() {
                 </div>
 
                 {/* Desktop: logo grid */}
-                <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden">
+                <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-px bg-neutral-100 border border-neutral-100 rounded-lg overflow-hidden">
                   {trustedByLogos.map((company) => (
                     <div
                       key={company.name}
@@ -269,43 +263,6 @@ export function ContactPageClient() {
                 />
               </div>
 
-              {/* What happens next — kills the black-box anxiety post-submit */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className="mt-6 rounded-lg bg-gray-50 p-5 ring-1 ring-gray-200"
-              >
-                <div className="flex items-baseline justify-between gap-3 mb-3">
-                  <p className="font-geist-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
-                    What happens next
-                  </p>
-                  <a
-                    href="mailto:build@434media.com"
-                    className="font-geist-mono text-[10px] font-medium tracking-wide text-gray-400 hover:text-gray-900 transition-colors"
-                  >
-                    build@434media.com
-                  </a>
-                </div>
-                <ol className="space-y-2.5">
-                  {NEXT_STEPS.map((step) => (
-                    <li key={step.label} className="flex gap-3">
-                      <span className="font-geist-mono text-[11px] font-semibold tabular-nums text-gray-400 pt-0.5 shrink-0">
-                        {step.label}
-                      </span>
-                      <div>
-                        <p className="font-geist-sans text-[13px] font-semibold text-gray-900 leading-tight">
-                          {step.title}
-                        </p>
-                        <p className="font-geist-sans text-[12px] text-gray-500 leading-snug mt-0.5">
-                          {step.body}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </motion.div>
             </motion.div>
           </div>
         </div>

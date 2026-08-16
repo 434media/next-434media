@@ -4,6 +4,8 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { Check, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/Button"
+import { Eyebrow } from "@/components/ui/Eyebrow"
 
 interface ContactFormProps {
   className?: string
@@ -135,7 +137,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
 
   return (
     <div
-      className={`bg-white rounded-2xl lg:rounded-3xl p-5 lg:p-6 overflow-hidden border border-gray-200 shadow-sm ${className}`}
+      className={`bg-white rounded-2xl lg:rounded-3xl p-5 lg:p-6 overflow-hidden border border-neutral-200 shadow-sm ${className}`}
     >
       <AnimatePresence mode="wait">
         {hasSubmitted ? (
@@ -150,11 +152,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             role="status"
           >
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 text-gray-900 flex items-center justify-center rounded-full bg-gray-100">
+              <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center rounded-full bg-neutral-100">
                 <Check className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900 tracking-tight leading-tight">Thanks for Connecting!</h3>
-              <p className="mt-1.5 text-sm text-gray-500 font-normal leading-tight">We&apos;ll be in touch soon.</p>
+              <h3 className="mt-4 text-lg font-semibold text-neutral-900 tracking-tight leading-tight">Thanks for Connecting!</h3>
+              <p className="mt-1.5 text-sm text-neutral-500 font-normal leading-tight">We&apos;ll be in touch soon.</p>
             </div>
           </motion.div>
         ) : (
@@ -167,15 +169,19 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
             aria-live="polite"
           >
             <div className="mb-4 lg:mb-5">
-              <h2 className="font-ggx88 font-black text-xl text-gray-900 tracking-tight leading-none">Get in Touch</h2>
-              <p className="mt-1.5 text-xs text-gray-400 font-normal leading-tight">Fields marked with * are required</p>
+              {/* Geist, not the ggx88 display face. This is a card heading at
+                  20px; the display face only carries its personality at page-
+                  headline sizes (48px+) and below that just reads as an odd
+                  sans. Display type is reserved for page-level headlines. */}
+              <h2 className="font-geist-sans text-xl font-semibold text-neutral-900 tracking-tight leading-none">Get in Touch</h2>
+              <p className="mt-1.5 text-xs text-neutral-400 font-normal leading-tight">Fields marked with * are required</p>
             </div>
             <form className="space-y-3.5" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
               <div className="grid grid-cols-1 gap-x-4 lg:gap-x-5 gap-y-3.5 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <Eyebrow as="label" htmlFor="firstName" className="block">
                     First Name <span aria-hidden="true">*</span>
-                  </label>
+                  </Eyebrow>
                   <input
                     type="text"
                     name="firstName"
@@ -185,11 +191,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-required="true"
                     aria-invalid={!!fieldErrors.firstName}
                     aria-describedby={fieldErrors.firstName ? "firstName-error" : undefined}
-                    className={`mt-1.5 block w-full rounded-lg bg-gray-50 border ${
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
                       fieldErrors.firstName
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
-                    } text-gray-900 placeholder-gray-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
+                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.firstName && (
                     <p className="mt-1 text-sm text-red-600" id="firstName-error">
@@ -198,9 +204,9 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div>
-                  <label htmlFor="lastName" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <Eyebrow as="label" htmlFor="lastName" className="block">
                     Last Name <span aria-hidden="true">*</span>
-                  </label>
+                  </Eyebrow>
                   <input
                     type="text"
                     name="lastName"
@@ -209,11 +215,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-required="true"
                     aria-invalid={!!fieldErrors.lastName}
                     aria-describedby={fieldErrors.lastName ? "lastName-error" : undefined}
-                    className={`mt-1.5 block w-full rounded-lg bg-gray-50 border ${
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
                       fieldErrors.lastName
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
-                    } text-gray-900 placeholder-gray-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
+                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.lastName && (
                     <p className="mt-1 text-sm text-red-600" id="lastName-error">
@@ -222,9 +228,9 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="company" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <Eyebrow as="label" htmlFor="company" className="block">
                     Company <span aria-hidden="true">*</span>
-                  </label>
+                  </Eyebrow>
                   <input
                     type="text"
                     name="company"
@@ -234,11 +240,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-invalid={!!fieldErrors.company}
                     aria-describedby={fieldErrors.company ? "company-error" : undefined}
                     placeholder="Enter your company name"
-                    className={`mt-1.5 block w-full rounded-lg bg-gray-50 border ${
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
                       fieldErrors.company
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
-                    } text-gray-900 placeholder-gray-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
+                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.company && (
                     <p className="mt-1 text-sm text-red-600" id="company-error">
@@ -247,9 +253,9 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="email" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <Eyebrow as="label" htmlFor="email" className="block">
                     Work Email <span aria-hidden="true">*</span>
-                  </label>
+                  </Eyebrow>
                   <input
                     type="email"
                     name="email"
@@ -259,11 +265,11 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-invalid={!!fieldErrors.email}
                     aria-describedby={fieldErrors.email ? "email-error" : undefined}
                     placeholder="Enter your email"
-                    className={`mt-1.5 block w-full rounded-lg bg-gray-50 border ${
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
                       fieldErrors.email
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-gray-200 focus:ring-gray-900 focus:border-gray-900"
-                    } text-gray-900 placeholder-gray-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
+                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.email && (
                     <p className="mt-1 text-sm text-red-600" id="email-error">
@@ -272,27 +278,27 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="phoneNumber" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <Eyebrow as="label" htmlFor="phoneNumber" className="block">
                     Phone Number
-                  </label>
+                  </Eyebrow>
                   <input
                     type="tel"
                     name="phoneNumber"
                     id="phoneNumber"
                     placeholder="(123) 456-7890"
-                    className="mt-1.5 block w-full rounded-lg bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:ring-gray-900 focus:border-gray-900 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
+                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="message" className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <Eyebrow as="label" htmlFor="message" className="block">
                     Message
-                  </label>
+                  </Eyebrow>
                   <textarea
                     name="message"
                     id="message"
                     rows={2}
                     placeholder="How can we help you?"
-                    className="mt-1.5 block w-full rounded-lg bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:ring-gray-900 focus:border-gray-900 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
+                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
                   ></textarea>
                 </div>
               </div>
@@ -307,22 +313,16 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               )}
 
               <div className="pt-1">
-                <motion.button
-                  type="submit"
-                  className="w-full rounded-lg bg-gray-900 py-2.5 px-6 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  disabled={isLoading}
-                >
+                <Button type="submit" size="lg" fullWidth disabled={isLoading}>
                   {isLoading ? (
-                    <span className="flex items-center justify-center">
-                      <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                      Submitting...
-                    </span>
+                    <>
+                      <Loader2 className="animate-spin h-4 w-4" aria-hidden="true" />
+                      Submitting…
+                    </>
                   ) : (
                     "Submit"
                   )}
-                </motion.button>
+                </Button>
               </div>
             </form>
           </motion.div>

@@ -11,6 +11,7 @@ import {
 } from "motion/react"
 import Link from "next/link"
 import { XIcon, PlayIcon, ArrowUpRightIcon } from "lucide-react"
+import { Button, ButtonArrow } from "@/components/ui/Button"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -483,24 +484,21 @@ function VideoModal({
             {/* Actions */}
             <div className="mt-1 flex flex-wrap items-center gap-2.5 pt-1">
               {item.href && (
-                <Link
+                <Button
                   href={item.href}
-                  className="group inline-flex items-center gap-2 rounded-full bg-neutral-950 px-4 py-2 font-geist-sans text-xs font-medium text-white transition-all duration-200 hover:gap-2.5 hover:bg-neutral-800"
+                  size="sm"
+                  icon={<ButtonArrow className="h-3 w-3" />}
                   {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 >
                   Visit project
-                  <ArrowUpRightIcon className="h-3 w-3 transition-transform duration-200 group-hover:rotate-12" />
-                </Link>
+                </Button>
               )}
-              <button
-                onClick={onClose}
-                className="inline-flex items-center gap-2 rounded-full px-4 py-2 font-geist-sans text-xs font-medium text-neutral-700 ring-1 ring-neutral-300 transition-all duration-200 hover:bg-neutral-100 hover:text-neutral-950"
-              >
+              <Button onClick={onClose} variant="secondary" size="sm">
                 Close
                 <kbd className="rounded bg-neutral-100 px-1.5 py-px font-geist-mono text-[9px] font-medium tracking-wider text-neutral-500">
                   Esc
                 </kbd>
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -806,22 +804,15 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
               className="mt-10 flex flex-wrap items-center gap-3"
             >
-              <Link
-                href="/contact"
-                className="group inline-flex items-center gap-2 rounded-full bg-neutral-950 px-5 py-2.5 font-geist-sans text-sm font-medium text-white transition-all duration-200 hover:gap-3 hover:bg-neutral-800"
-              >
+              <Button href="/contact" size="md" icon={<ButtonArrow />}>
                 Start a project
-                <ArrowUpRightIcon className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12" />
-              </Link>
-              <a
-                href="#work"
-                className="group inline-flex items-center gap-2 rounded-full px-5 py-2.5 font-geist-sans text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 transition-all duration-200 hover:bg-neutral-100 hover:text-neutral-950"
-              >
+              </Button>
+              <Button href="#work" variant="secondary" size="md">
                 Browse the portfolio
                 <span aria-hidden className="transition-transform duration-200 group-hover:translate-y-px">
                   ↓
                 </span>
-              </a>
+              </Button>
             </motion.div>
           </motion.div>
         </section>
@@ -949,19 +940,12 @@ export default function WorkClient() {
               </div>
               <div className="md:col-span-5 md:justify-self-end">
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row md:flex-col md:items-end">
-                  <Link
-                    href="/contact"
-                    className="group inline-flex items-center justify-center gap-2 rounded-full bg-neutral-950 px-6 py-3 font-geist-sans text-sm font-medium text-white transition-all duration-200 hover:gap-3 hover:bg-neutral-800"
-                  >
+                  <Button href="/contact" size="lg" icon={<ButtonArrow />}>
                     Start a project
-                    <ArrowUpRightIcon className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12" />
-                  </Link>
-                  <a
-                    href="mailto:build@434media.com"
-                    className="group inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-geist-sans text-sm font-medium text-neutral-700 ring-1 ring-neutral-300 transition-all duration-200 hover:bg-white hover:text-neutral-950"
-                  >
+                  </Button>
+                  <Button href="mailto:build@434media.com" variant="secondary" size="lg">
                     build@434media.com
-                  </a>
+                  </Button>
                 </div>
               </div>
             </motion.div>

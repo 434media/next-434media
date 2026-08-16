@@ -4,8 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ArrowUpRight, Mail, MapPin } from "lucide-react"
-import { InstagramIcon } from "@/components/icons/InstagramIcon"
 import { ScrambleText } from "./ScrambleText"
 import { Newsletter } from "./Newsletter"
 import { BRAND } from "@/lib/seo/brand"
@@ -21,28 +19,16 @@ export default function Footer() {
     return null
   }
 
-  // "Build with us" — close the loop on this page.
+  // "Build with us" — close the loop on this page. Mirrored by the navbar, so
+  // the same two words name the same destination in both places.
   const buildLinks = [
     { label: "Start a project", href: "/contact", emphasis: true },
     { label: "Our work", href: "/work" },
-    { label: "Shop TXMX", href: "/shop" },
   ]
 
   const legalLinks = [
     { label: "Privacy", href: "/privacy-policy" },
     { label: "Terms", href: "/terms-of-service" },
-  ]
-
-  // Sub-brands and partners we operate or co-produce with.
-  const subBrands = [
-    { label: "TXMX Boxing", href: "https://www.txmxboxing.com/", external: true },
-    { label: "Vemos Vamos", href: "https://www.vemosvamos.com/", external: true },
-    { label: "Digital Canvas", href: "https://www.digitalcanvas.community", external: true },
-    { label: "AMPD Project", href: "https://www.ampdproject.com/", external: true },
-    { label: "Salute to Troops", href: "https://www.salutetotroops.com/", external: true },
-    { label: "AIM R&D Summit", href: "https://www.aimsatx.com/", external: true },
-    { label: "SDOH", href: "/sdoh" },
-    { label: "DEVSA", href: "https://devsa.community", external: true },
   ]
 
   useEffect(() => {
@@ -96,11 +82,12 @@ export default function Footer() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6 }}
             >
-              {/* Main footer grid — Brand / Build / Sub-brands / Newsletter */}
+              {/* Main footer grid — Brand / Build / Newsletter */}
               <div className="py-12 md:py-16 border-b border-white/10">
                 <div className="grid grid-cols-2 md:grid-cols-12 gap-y-10 gap-x-6 md:gap-x-8">
-                  {/* Brand column — elevator pitch + social */}
-                  <div className="col-span-2 md:col-span-3">
+                  {/* Brand column — elevator pitch + social. Width tracks the
+                      max-w-xs copy; a wider column just opens a gap. */}
+                  <div className="col-span-2 md:col-span-4">
                     <h2 id="footer-heading" className="font-menda-black text-white text-2xl leading-none mb-4">
                       <Link href="/" aria-label="434 Media — Home">
                         <ScrambleText
@@ -137,24 +124,16 @@ export default function Footer() {
                           <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
                         </svg>
                       </a>
-                      <a
-                        href="https://www.instagram.com/digitalcanvashq/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-neutral-500 hover:text-white transition-colors duration-200"
-                        aria-label="Follow 434 MEDIA on Instagram"
-                      >
-                        <InstagramIcon className="w-4.5 h-4.5" />
-                      </a>
                     </div>
                   </div>
 
-                  {/* Build with us — internal CTAs + NAP */}
-                  <nav className="md:col-span-3" aria-label="Footer site links">
+                  {/* Build with us — internal CTAs. The contact route is the one
+                      way in; there is no email/address echo here anymore. */}
+                  <nav className="col-span-2 md:col-span-3" aria-label="Footer site links">
                     <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
                       Build with us
                     </p>
-                    <ul className="space-y-2.5 mb-6">
+                    <ul className="space-y-2.5">
                       {buildLinks.map((link) => (
                         <li key={link.label}>
                           <Link
@@ -170,61 +149,11 @@ export default function Footer() {
                         </li>
                       ))}
                     </ul>
-                    <div className="space-y-2 pt-5 border-t border-white/5">
-                      <a
-                        href="mailto:build@434media.com"
-                        className="group flex items-start gap-2 font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200"
-                      >
-                        <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-                        <span>build@434media.com</span>
-                      </a>
-                      <p className="flex items-start gap-2 font-geist-sans text-sm text-neutral-500 leading-snug">
-                        <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-                        <span>
-                          816 Camaron St., Suite 1.11
-                          <br />
-                          San Antonio, TX 78212
-                        </span>
-                      </p>
-                    </div>
                   </nav>
 
-                  {/* Sub-brands */}
-                  <div className="md:col-span-3">
-                    <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
-                      Sub-brands
-                    </p>
-                    <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                      {subBrands.map((link) => (
-                        <li key={link.label}>
-                          {link.external ? (
-                            <a
-                              href={link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="group inline-flex items-center gap-1 font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200 leading-tight"
-                            >
-                              <span>{link.label}</span>
-                              <ArrowUpRight
-                                className="h-3 w-3 text-neutral-600 transition-all duration-200 group-hover:text-white group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                                aria-hidden="true"
-                              />
-                            </a>
-                          ) : (
-                            <Link
-                              href={link.href}
-                              className="font-geist-sans text-sm text-neutral-400 hover:text-white transition-colors duration-200 leading-tight"
-                            >
-                              {link.label}
-                            </Link>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Newsletter — value-prop-led copy */}
-                  <div className="col-span-2 md:col-span-3">
+                  {/* Newsletter — value-prop-led copy. Takes the spare column
+                      since it's the only one with a form control to fit. */}
+                  <div className="col-span-2 md:col-span-5">
                     <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
                       The Feed · Newsletter
                     </p>
@@ -240,7 +169,9 @@ export default function Footer() {
                 </div>
               </div>
 
-              {/* Bottom strip — copyright, legal, contact echo */}
+              {/* Bottom strip — copyright, legal, contact echo. The echo is the
+                  only place the address appears now; the Build with us column
+                  routes to /contact instead. */}
               <div className="py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="font-geist-sans text-xs text-neutral-600 leading-none">
                   &copy; {currentYear} 434 MEDIA · {BRAND.shortTagline}
