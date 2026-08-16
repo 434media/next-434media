@@ -28,13 +28,8 @@ import {
   Target,
   Palette,
   Globe,
-  Megaphone,
   FolderOpen,
-  Crosshair,
-  ClipboardList,
-  Hammer,
   Clapperboard,
-  BarChart3,
   Rocket,
   LineChart,
 } from "lucide-react"
@@ -49,12 +44,15 @@ import { VERTICAL_LABELS, type Vertical } from "@/types/crm-types"
 const VERTICAL_OPTIONS = Object.keys(VERTICAL_LABELS) as Vertical[]
 
 // ── Spaces & categories ──
-// SOPs serve two audiences: 434's evergreen company knowledge base, and the
-// Digital Canvas program's playbook/template home. Each gets its own "space".
-// Program categories mirror the squads page — "one pipeline, five owners" — in
-// flow order; the verb leads the description so the squad name stays the
-// scannable label.
-type SpaceKey = "company" | "program"
+// SOPs are 434's evergreen company knowledge base, grouped into one "space"
+// whose categories mirror the admin's modules + service lines.
+//
+// There used to be a second space — "Digital Canvas Program", five verb
+// categories (Find/Frame/Ship/Tell/Prove) that were the intern cohort's
+// playbook home. The cohort ended and the space was removed along with its
+// docs. The space scaffolding is kept because it costs nothing and is what a
+// future program would slot back into.
+type SpaceKey = "company"
 
 interface CategoryDef {
   key: string
@@ -67,7 +65,6 @@ interface CategoryDef {
 
 const SPACES: { key: SpaceKey; label: string }[] = [
   { key: "company", label: "434 Media" },
-  { key: "program", label: "Digital Canvas Program" },
 ]
 
 const CATEGORIES: CategoryDef[] = [
@@ -86,36 +83,21 @@ const CATEGORIES: CategoryDef[] = [
     description: "Web standards, CMS guides, deployment, technical docs", heading: "Web & Tech Docs" },
   { key: "Operations", space: "company", label: "Operations", icon: FolderOpen,
     description: "Onboarding, finance, HR, process & general resources", heading: "Operations & Resources" },
-  // Digital Canvas Program — the pipeline as VERBS, in flow order (mirrors the
-  // squads page tagline). Verb labels are durable past any squad/team name; the
-  // squad/function lives in the description.
-  { key: "find", space: "program", label: "Find", icon: Crosshair,
-    description: "GTM · sponsors & target pipeline", heading: "Find — sponsors & pipeline" },
-  { key: "frame", space: "program", label: "Frame", icon: ClipboardList,
-    description: "Underwriter onboarding · the intake framework", heading: "Frame — the problem" },
-  { key: "ship", space: "program", label: "Ship", icon: Hammer,
-    description: "Builders · the build process", heading: "Ship — the prototype" },
-  { key: "tell", space: "program", label: "Tell", icon: Megaphone,
-    description: "Storytellers · story, brand & cohort media", heading: "Tell — the story" },
-  { key: "prove", space: "program", label: "Prove", icon: BarChart3,
-    description: "Analytics · cohort health & demo-day metrics", heading: "Prove — the outcome" },
 ]
 
 const CATEGORY_KEYS = CATEGORIES.map((c) => c.key)
 
 // Legacy categories (pre-spaces) → current keys, so existing docs never orphan.
+// The retired Digital Canvas keys (find/frame/ship/tell/prove and their older
+// squad-named forms) are deliberately absent — their docs were deleted with the
+// space, and anything that resurfaces falls through to Operations below rather
+// than resurrecting a category with no home in the rail.
 const CATEGORY_ALIASES: Record<string, string> = {
   Brands: "Brand & Design",
   Design: "Brand & Design",
   Web: "Web & Tech",
   Marketing: "Content & Production",
   Other: "Operations",
-  // Program categories were squad-named before the verb switch.
-  GTM: "find",
-  "Underwriter Onboarding": "frame",
-  Builders: "ship",
-  Storytellers: "tell",
-  Analytics: "prove",
 }
 
 function normalizeCategory(raw?: string): string {
@@ -158,9 +140,8 @@ export default function SOPsPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [activeVertical, setActiveVertical] = useState<Vertical | "all">("all")
   const [showWelcome, setShowWelcome] = useState(false)
-  // Collapsible space groups in the rail. 434 Media (company) is open by default;
-  // the Digital Canvas program section starts collapsed.
-  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({ program: true })
+  // Collapsible space groups in the rail. 434 Media (company) is open by default.
+  const [collapsedSpaces, setCollapsedSpaces] = useState<Record<string, boolean>>({})
   const [isDragging, setIsDragging] = useState(false)
   const [linkInput, setLinkInput] = useState("")
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -547,7 +528,7 @@ export default function SOPsPage() {
                   {activeCategory ? (
                     <>
                       <div className="mb-6">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-1">{catDef(activeCategory).space === "program" ? "Digital Canvas Program" : "434 Media"}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-neutral-500 mb-1">{SPACES.find((s) => s.key === catDef(activeCategory).space)?.label ?? "434 Media"}</p>
                         <h2 className="text-[22px] font-bold text-neutral-900 tracking-tight leading-tight mb-2">{catDef(activeCategory).heading}</h2>
                         <p className="text-[14px] text-neutral-500 leading-relaxed">{catDef(activeCategory).description}</p>
                       </div>
