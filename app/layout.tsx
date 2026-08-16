@@ -13,6 +13,9 @@ import { CartProvider } from "@/components/shopify/cart/cart-context"
 import { PageTransition } from "@/components/shopify/page-transition"
 import { Suspense } from "react"
 import Script from "next/script"
+import { headers } from "next/headers"
+import { MetaPixel } from "@/components/MetaPixel"
+import { EXCLUDED_COUNTRY_CODES } from "@/lib/prospecting/scorer"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -140,6 +143,17 @@ export default async function RootLayout({
   const cart = getCart()
   const menu = await getMenu("next-js-frontend-header-menu")
 
+  // Meta Pixel jurisdiction gate. The pixel sets cookies before any consent is
+  // given, so it does not run for visitors in the GDPR/CASL jurisdictions 434
+  // already excludes from outbound (EXCLUDED_COUNTRY_CODES, lib/prospecting/
+  // scorer.ts). Country comes from the edge geo header, which only exists on
+  // Vercel — locally it's absent and the pixel runs, matching production for
+  // US traffic. Missing header fails OPEN because the alternative would be no
+  // pixel anywhere in dev; the jurisdictions that matter are behind the CDN.
+  const visitorCountry = (await headers()).get("x-vercel-ip-country")?.toUpperCase()
+  const pixelAllowed = !visitorCountry || !EXCLUDED_COUNTRY_CODES.has(visitorCountry)
+  const metaPixelId = pixelAllowed ? process.env.META_PIXEL_ID || "" : ""
+
   return (
     <html lang="en" className="scroll-smooth">
       <head>
@@ -173,33 +187,8 @@ export default async function RootLayout({
         `}
         </Script>
 
-        {/* Meta Pixel Code */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              !function(f,b,e,v,n,t,s)
-              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-              n.queue=[];t=b.createElement(e);t.async=!0;
-              t.src=v;s=b.getElementsByTagName(e)[0];
-              s.parentNode.insertBefore(t,s)}(window, document,'script',
-              'https://connect.facebook.net/en_US/fbevents.js');
-              fbq('init', '2997115723796668');
-              fbq('track', 'PageView');
-            `,
-          }}
-        />
-        <noscript>
-          <img
-            height="1"
-            width="1"
-            style={{ display: "none" }}
-            src="https://www.facebook.com/tr?id=2997115723796668&ev=PageView&noscript=1"
-            alt=""
-          />
-        </noscript>
-        {/* End Meta Pixel Code */}
+        {/* Meta Pixel — gated by route and jurisdiction; see components/MetaPixel.tsx */}
+        <MetaPixel pixelId={metaPixelId} />
 
         {/* LinkedIn Pixel */}
         <Script id="linkedin-pixel-init" strategy="afterInteractive">

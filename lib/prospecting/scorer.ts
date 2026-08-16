@@ -69,6 +69,31 @@ export const EXCLUDED_COUNTRIES: Set<string> = new Set([
 ])
 
 /**
+ * The same jurisdictions as ISO 3166-1 alpha-2 codes.
+ *
+ * `EXCLUDED_COUNTRIES` above is keyed on human-readable names because that is
+ * what Apollo returns. Edge/CDN geo headers (Vercel's `x-vercel-ip-country`)
+ * speak ISO codes instead, so surfaces that gate on visitor geography — the
+ * Meta Pixel, for one — need this projection of the same policy. Keep the two
+ * lists in step: this file remains the single source of truth for where 434
+ * does not track or cold-outreach.
+ */
+export const EXCLUDED_COUNTRY_CODES: Set<string> = new Set([
+  // EU member states
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+  "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
+  "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+  // EEA non-EU
+  "IS", "LI", "NO",
+  // Switzerland (Swiss-equivalent of GDPR)
+  "CH",
+  // UK (retains GDPR-equivalent law) + Crown dependencies
+  "GB", "UK", "GG", "JE", "IM",
+  // Canada (CASL / PIPEDA)
+  "CA",
+])
+
+/**
  * Returns whether a candidate is in an excluded jurisdiction. Checks both
  * the person's country and their organization's country — Apollo populates
  * one or the other depending on the data source.
