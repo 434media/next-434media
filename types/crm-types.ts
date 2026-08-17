@@ -131,6 +131,11 @@ export interface ClientRecord extends BaseRecord {
   // Linked records
   opportunity_ids?: string[]
   pm_record_ids?: string[]
+
+  // Free-form labels. normalizeClientRecord in lib/firestore-crm.ts has always
+  // read and written this field; it just was not declared here, so populating
+  // it was a type error at the one place that does it.
+  tags?: string[]
 }
 
 // ============================================
@@ -374,6 +379,21 @@ export interface Task extends BaseRecord {
   attachments?: TaskAttachment[]
   comments?: TaskComment[]
   tagged_users?: string[] // Array of user emails
+
+  // Opportunity fields. A task can be promoted onto the opportunities kanban,
+  // where it sits in the same columns as a ClientRecord — so it carries the
+  // same three fields, with the same unions (see ClientRecord above).
+  //
+  // These read as dead if you only grep the task surfaces: nothing on the task
+  // table or drawer touches them. They are load-bearing in the kanban
+  // (OpportunitiesKanbanView reads task.disposition for the column and
+  // task.doc for the confidence filter) and CLAUDE.md calls them out as
+  // not-to-be-pruned. They were being read in lib/firestore-crm.ts without
+  // being declared here, which is why `rawItem.disposition as Task["disposition"]`
+  // was a type error rather than a cast.
+  is_opportunity?: boolean
+  disposition?: "discovery" | "proposal" | "closed_won" | "closed_lost"
+  doc?: "25" | "50" | "75" | "90" | "100"
 }
 
 // Specific task lists extend the base Task interface

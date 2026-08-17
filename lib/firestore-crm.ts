@@ -1034,61 +1034,34 @@ function mapMasterListStatusToTaskStatus(status: string): string {
   
   const normalizedStatus = status.toLowerCase().trim().replace(/[_-]/g, " ")
   
-  const statusMap: Record<string, string> = {
-    // Airtable statuses
-    "to do": "not_started",
-    "todo": "not_started",
-    "complete": "completed",
-    "completed": "completed",
-    "ready for review": "in_progress",
-    "in progress": "in_progress",
-    "inprogress": "in_progress",
-    
-    // Active/In Progress
-    "active": "in_progress",
-    "in_progress": "in_progress",
-    "working": "in_progress",
-    "started": "in_progress",
-    "ongoing": "in_progress",
-    
-    // Not Started/Pending
-    "pending": "not_started",
-    "not started": "not_started",
-    "notstarted": "not_started",
-    "not_started": "not_started",
-    "new": "not_started",
-    "open": "not_started",
-    
-    // Completed/Done
-    "done": "completed",
-    "finished": "completed",
-    "closed": "completed",
-    
-    // To Do
-    "to do": "to_do",
-    "to_do": "to_do",
-    "todo": "to_do",
-    
-    // Ready for Review
-    "ready for review": "ready_for_review",
-    "ready_for_review": "ready_for_review",
-    "review": "ready_for_review",
-    "pending review": "ready_for_review",
-    "pending_review": "ready_for_review",
-    
-    // Legacy mappings - convert to new statuses
-    "blocked": "not_started",
-    "stuck": "not_started",
-    "waiting": "not_started",
-    "on hold": "not_started",
-    "on_hold": "not_started",
-    "onhold": "not_started",
-    "deferred": "not_started",
-    "postponed": "not_started",
-    "paused": "not_started",
+  // Keyed on the NORMALIZED form above, which lower-cases and rewrites every
+  // `_`/`-` to a space. A key containing an underscore can therefore never be
+  // matched — the map used to carry six of those ("to_do", "in_progress",
+  // "not_started", "ready_for_review", "pending_review", "on_hold"), all dead.
+  //
+  // It also declared "to do", "todo" and "ready for review" twice each, in two
+  // blocks written at different times. JS keeps the last, so the earlier
+  // Airtable-era values (not_started / in_progress) were already being
+  // discarded at runtime. This is the same map with the unreachable and
+  // overwritten entries removed and the rest grouped by target status —
+  // every input resolves exactly as it did before.
+  const statusMap: Record<string, string[]> = {
+    to_do: ["to do", "todo"],
+    in_progress: ["in progress", "inprogress", "active", "working", "started", "ongoing"],
+    ready_for_review: ["ready for review", "review", "pending review"],
+    completed: ["complete", "completed", "done", "finished", "closed"],
+    // Blocked/held states have no column of their own — they land in not_started.
+    not_started: [
+      "pending", "not started", "notstarted", "new", "open",
+      "blocked", "stuck", "waiting", "on hold", "onhold",
+      "deferred", "postponed", "paused",
+    ],
   }
+  const lookup: Record<string, string> = Object.fromEntries(
+    Object.entries(statusMap).flatMap(([target, aliases]) => aliases.map((a) => [a, target])),
+  )
   
-  return statusMap[normalizedStatus] || "not_started"
+  return lookup[normalizedStatus] || "not_started"
 }
 
 // Move task to completed

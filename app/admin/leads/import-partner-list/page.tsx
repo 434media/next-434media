@@ -345,8 +345,13 @@ interface ImportResultShape {
 }
 
 export default function ImportPartnerListPage() {
+  // `allowedRoles` was omitted here, which is a required prop. At runtime that
+  // made `allowedRoles.includes(...)` throw for anyone who wasn't a super admin
+  // (super admin short-circuits the check), and the guard's catch redirected
+  // them to /admin — so the page failed closed, but by accident, and only super
+  // admins could ever open it. Matches the parent /admin/leads guard.
   return (
-    <AdminRoleGuard>
+    <AdminRoleGuard allowedRoles={["full_admin", "crm_only"]}>
       <ImportFlow />
     </AdminRoleGuard>
   )
