@@ -8,9 +8,6 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/aut
 import { auth } from "@/lib/firebase"
 import { AdminShell } from "@/components/admin/AdminShell"
 
-// Default password that requires reset on first use
-const DEFAULT_PASSWORD = "434Media2026"
-
 export default function AdminLayout({
   children,
 }: {
@@ -27,10 +24,9 @@ export default function AdminLayout({
   const [password, setPassword] = useState("")
   const [isEmailLoading, setIsEmailLoading] = useState(false)
   
-  // Password reset state
-  const [showPasswordResetPrompt, setShowPasswordResetPrompt] = useState(false)
+  // Self-serve password reset. Firebase owns credentials; the app only asks it
+  // to send the mail and never learns whether the address exists.
   const [passwordResetSent, setPasswordResetSent] = useState(false)
-  const [pendingUser, setPendingUser] = useState<{ email: string; idToken: string } | null>(null)
 
   useEffect(() => {
     // Check for existing session
@@ -100,14 +96,6 @@ export default function AdminLayout({
       // Get the ID token
       const idToken = await userCredential.user.getIdToken()
       
-      // Check if user is using the default password - prompt them to change it
-      if (password === DEFAULT_PASSWORD) {
-        setPendingUser({ email, idToken })
-        setShowPasswordResetPrompt(true)
-        setIsEmailLoading(false)
-        return
-      }
-      
       // Send to our API to verify and create session
       const response = await fetch('/api/auth/signin/firebase', {
         method: 'POST',
@@ -144,48 +132,37 @@ export default function AdminLayout({
     }
   }
 
-  const handleSendPasswordReset = async () => {
-    if (!pendingUser) return
+  /**
+   * Self-serve password reset. This used to be reachable only after signing in
+   * with a hardcoded default password, which meant anyone who genuinely forgot
+   * their password had no route at all and had to ask an admin.
+   *
+   * Deliberately reports success even when Firebase says the address has no
+   * account: the login screen is public, so a truthful "no such user" would
+   * turn this into an account-enumeration oracle for the shared Firebase
+   * tenant. Real delivery failures still surface.
+   */
+  const handleForgotPassword = async () => {
+    const target = email.trim()
+    if (!target) {
+      setError("Enter your email address first, then choose Forgot password.")
+      return
+    }
     setIsEmailLoading(true)
     setError(null)
-    
+
     try {
-      await sendPasswordResetEmail(auth, pendingUser.email)
+      await sendPasswordResetEmail(auth, target)
       setPasswordResetSent(true)
     } catch (err) {
-      console.error('Password reset error:', err)
-      setError('Failed to send password reset email. Please try again.')
-    } finally {
-      setIsEmailLoading(false)
-    }
-  }
-
-  const handleContinueWithDefaultPassword = async () => {
-    if (!pendingUser) return
-    setIsEmailLoading(true)
-    
-    try {
-      // Complete the login with the stored token
-      const response = await fetch('/api/auth/signin/firebase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: pendingUser.idToken }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(getErrorMessage(data.error || 'authentication_failed'))
-        return
+      const code = (err as { code?: string }).code
+      if (code === "auth/user-not-found" || code === "auth/invalid-email") {
+        // Same outcome as success — see above.
+        setPasswordResetSent(true)
+      } else {
+        console.error("Password reset error:", err)
+        setError("Could not send the reset email. Please try again.")
       }
-
-      setIsAuthenticated(true)
-      setUser(data.user)
-      setShowPasswordResetPrompt(false)
-      setPendingUser(null)
-    } catch (err) {
-      console.error('Continue login error:', err)
-      setError('Failed to complete login. Please try again.')
     } finally {
       setIsEmailLoading(false)
     }
@@ -223,92 +200,7 @@ export default function AdminLayout({
               </div>
             )}
 
-            {/* Password Reset Prompt - shown when user logs in with default password */}
-            {showPasswordResetPrompt ? (
-              <div className="space-y-4">
-                {!passwordResetSent ? (
-                  <>
-                    <div className="p-4 bg-amber-500/20 border border-amber-500/50 rounded-lg">
-                      <p className="text-sm text-amber-200 mb-2">
-                        <strong>Welcome!</strong> You&apos;re using the default password.
-                      </p>
-                      <p className="text-sm text-amber-200">
-                        For security, we recommend setting your own password. We&apos;ll send a reset link to <strong>{pendingUser?.email}</strong>.
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={handleSendPasswordReset}
-                      disabled={isEmailLoading}
-                      className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50"
-                    >
-                      {isEmailLoading ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span>Sending...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="w-5 h-5" />
-                          <span>Send Password Reset Email</span>
-                        </>
-                      )}
-                    </button>
-                    
-                    <button
-                      onClick={handleContinueWithDefaultPassword}
-                      disabled={isEmailLoading}
-                      className="w-full bg-transparent hover:bg-white/10 text-gray-300 font-semibold py-3 px-6 rounded-lg transition-all duration-200 border border-white/20 disabled:opacity-50"
-                    >
-                      Continue with current password
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
-                      <p className="text-sm text-green-200 mb-2">
-                        <strong>Check your email!</strong>
-                      </p>
-                      <p className="text-sm text-green-200">
-                        We&apos;ve sent a password reset link to <strong>{pendingUser?.email}</strong>. 
-                        Click the link in the email to set your new password.
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={handleContinueWithDefaultPassword}
-                      disabled={isEmailLoading}
-                      className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50"
-                    >
-                      {isEmailLoading ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span>Signing in...</span>
-                        </>
-                      ) : (
-                        <span>Continue to Dashboard</span>
-                      )}
-                    </button>
-                    
-                    <p className="text-xs text-gray-400 text-center">
-                      You can reset your password anytime from the email we sent.
-                    </p>
-                  </>
-                )}
-                
-                <button
-                  onClick={() => {
-                    setShowPasswordResetPrompt(false)
-                    setPasswordResetSent(false)
-                    setPendingUser(null)
-                    setPassword("")
-                  }}
-                  className="w-full mt-2 bg-transparent hover:bg-white/10 text-gray-400 text-sm py-2 px-4 rounded-lg transition-all duration-200"
-                >
-                  ← Back to sign in
-                </button>
-              </div>
-            ) : !showEmailForm ? (
+            {!showEmailForm ? (
               <>
                 {/* Google Sign In Button */}
                 <button
@@ -422,6 +314,24 @@ export default function AdminLayout({
                       <span>Sign In</span>
                     )}
                   </button>
+
+                  {passwordResetSent ? (
+                    <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg">
+                      <p className="text-sm text-green-200">
+                        If an account exists for that address, a password reset link is on its
+                        way. Follow it to set a new password, then sign in.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={isEmailLoading}
+                      className="w-full text-sm text-gray-400 hover:text-white transition-colors duration-200 disabled:opacity-50"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                 </form>
 
                 {/* Back to options */}
@@ -431,15 +341,18 @@ export default function AdminLayout({
                     setError(null)
                     setEmail("")
                     setPassword("")
+                    setPasswordResetSent(false)
                   }}
                   className="w-full mt-4 bg-transparent hover:bg-white/10 text-gray-300 font-semibold py-3 px-6 rounded-lg transition-all duration-200 border border-white/20"
                 >
                   Back to sign in options
                 </button>
 
-                {/* Info */}
+                {/* Info. Deliberately does not promise a 434-issued password:
+                    434 Media grants the account, but the password is the
+                    person's own from their first reset onward. */}
                 <p className="text-xs text-gray-400 text-center mt-6">
-                  Use the email and password provided by 434 Media
+                  Access is granted by 434 Media. Use Forgot password to set or reset yours.
                 </p>
               </>
             )}
