@@ -129,6 +129,7 @@ const workItems: WorkItem[] = [
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/rise.png",
     bgColor: "bg-neutral-900",
     logoDark: true,
+    href: "https://www.txmxboxing.com/icon-talks/rise-of-a-champion",
   },
   {
     id: "ampd-project",
