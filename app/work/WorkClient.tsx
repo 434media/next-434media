@@ -770,9 +770,9 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
               className="font-ggx88 text-[clamp(2.5rem,9vw,7.5rem)] md:text-[clamp(3rem,9vw,7.5rem)] font-black leading-[0.92] tracking-[-0.04em] text-neutral-950"
             >
-              Brand Stories
+              Owned Properties.
               <br />
-              Aren&apos;t Accidental
+              Client Productions.
             </motion.h1>
 
             <motion.p
@@ -781,10 +781,9 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="mt-8 max-w-2xl text-balance font-geist-sans text-lg leading-relaxed tracking-tight text-neutral-600 md:text-xl"
             >
-              Brand campaigns, event production,
-              broadcast partnerships, and original IP produced alongside the firms, founders,
-              and institutions shaping their categories. This is what bold stories look like
-              in production.
+              434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands. Everything
+              below is organized by commercial model: what we own, the platforms we build for
+              clients, and the productions we deliver for them.
             </motion.p>
 
             <motion.div
@@ -794,7 +793,7 @@ export default function WorkClient() {
               className="mt-10 flex flex-wrap items-center gap-3"
             >
               <Button href="/contact" size="md" icon={<ButtonArrow />}>
-                Start a project
+                Start a production
               </Button>
               <Button href="#work" variant="secondary" size="md">
                 Browse the portfolio
@@ -916,21 +915,21 @@ export default function WorkClient() {
             >
               <div className="md:col-span-7">
                 <p className="mb-4 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500">
-                  Let&apos;s build yours
+                  Next step
                 </p>
                 <h2 className="font-ggx88 text-4xl font-black leading-[0.95] tracking-[-0.03em] text-neutral-950 md:text-6xl">
-                  Bold stories aren&apos;t accidental.
+                  Tell us what you&apos;re producing.
                 </h2>
                 <p className="mt-6 max-w-xl font-geist-sans text-base leading-relaxed text-neutral-600 md:text-lg">
-                  We help the world&apos;s most innovative firms find their voice and amplify their
-                  impact through brand campaigns, event production, and storytelling that earns
-                  attention.
+                  We can lead the full production or own a defined part of it within a larger
+                  team. Send the objective, the audience, and the target date, and we&apos;ll come
+                  back with the structure that fits.
                 </p>
               </div>
               <div className="md:col-span-5 md:justify-self-end">
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row md:flex-col md:items-end">
                   <Button href="/contact" size="lg" icon={<ButtonArrow />}>
-                    Start a project
+                    Start a production
                   </Button>
                   <Button href="mailto:build@434media.com" variant="secondary" size="lg">
                     build@434media.com
