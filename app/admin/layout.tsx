@@ -183,13 +183,23 @@ export default function AdminLayout({
           <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-8 shadow-2xl">
             {/* Header */}
             <div className="text-center mb-8">
-              {/* The navbar/footer wordmark, stacked. font-menda-black is the
-                  wordmark face everywhere else on the site; leading-[0.85]
-                  closes the gap so the two lines read as one lockup rather
-                  than two words. */}
-              <div className="mb-5 font-menda-black text-4xl leading-[0.85] tracking-tight text-white">
-                <span className="block">434</span>
-                <span className="block">MEDIA</span>
+              {/* The 434 MEDIA stacked lockup, matching the brand asset:
+                  both lines flush to the same width, first 4 over the M and
+                  last 4 over the A.
+
+                  The width is matched by SIZE, not letter-spacing — in
+                  font-menda-black "MEDIA" is 1.7034x the width of "434" at the
+                  same font-size, so 434 is set at that multiple and the two
+                  lines come out identical. Spacing the numerals apart instead
+                  would leave a trailing gap after the final 4 and break the
+                  right edge. The multiple is in em, so changing the wrapper's
+                  font-size rescales the whole lockup without distorting it. */}
+              <div className="mb-5 inline-block font-menda-black text-3xl text-white">
+                <span className="sr-only">434 Media</span>
+                <span aria-hidden="true" className="block text-[1.7034em] leading-[0.8]">
+                  434
+                </span>
+                <span aria-hidden="true" className="block leading-[0.95]">MEDIA</span>
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Admin Access</h2>
               <p className="text-gray-300 text-sm">
