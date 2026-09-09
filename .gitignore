@@ -52,3 +52,6 @@ yarn.lock
 
 # Local snapshots written by offboarding/migration scripts — contain roster PII
 /backups/
+
+# Local context docs — not for the repo
+docs/context/
