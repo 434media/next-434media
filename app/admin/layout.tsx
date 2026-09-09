@@ -3,7 +3,6 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { AlertCircle, Mail, Lock, Loader2 } from "lucide-react"
-import Image from "next/image"
 import { NotificationProvider } from "@/context/notification-context"
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { auth } from "@/lib/firebase"
@@ -184,18 +183,14 @@ export default function AdminLayout({
           <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-8 shadow-2xl">
             {/* Header */}
             <div className="text-center mb-8">
-              {/* The mark is a finely-lined circular emblem: it needs the room.
-                  At 32px inside the old dark badge the linework collapsed into
-                  a smudge, and a circle inside a circle read as a mistake. It
-                  is white-on-transparent, so it stands on the card unaided. */}
-              <Image
-                src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONWHITE.png"
-                alt="434 Media"
-                width={72}
-                height={72}
-                className="mx-auto mb-4 h-[72px] w-[72px] object-contain"
-                priority
-              />
+              {/* The navbar/footer wordmark, stacked. font-menda-black is the
+                  wordmark face everywhere else on the site; leading-[0.85]
+                  closes the gap so the two lines read as one lockup rather
+                  than two words. */}
+              <div className="mb-5 font-menda-black text-4xl leading-[0.85] tracking-tight text-white">
+                <span className="block">434</span>
+                <span className="block">MEDIA</span>
+              </div>
               <h2 className="text-2xl font-bold text-white mb-2">Admin Access</h2>
               <p className="text-gray-300 text-sm">
                 Sign in to access the admin dashboard
