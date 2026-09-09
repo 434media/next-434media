@@ -15,18 +15,27 @@ import { Button, ButtonArrow } from "@/components/ui/Button"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Category =
-  | "Brand & Culture"
-  | "Health & Bio Innovation"
-  | "Capital & Founders"
-  | "Tech & Community"
-  | "Media & Storytelling"
+// The three commercial models defined in the Master Contextual Document,
+// Section 4.3. The Work page is organized by these and only these (Section 4.12).
+type Category = "Original IP" | "Platforms for Brands" | "Productions for Brands"
 
 interface WorkItem {
   id: string
+  /** Official or approved descriptive title (Section 4.5). */
   title: string
+  /** Approved public description — cleared language, taken verbatim from the record. */
   description: string
   category: Category
+  /** Contracting client and relevant partners. Absent on owned IP. */
+  client?: string
+  /** Company-level responsibility (434 MEDIA role). */
+  role: string
+  /** Marcos Resendez's individual credit, using the controlled vocabulary in Section 4.6. */
+  credit: string
+  /** Operating status using the approved terminology in Section 4.5. */
+  status: string
+  /** Year or operating period. */
+  years?: string
   image?: string
   imagePosition?: string
   logo?: string
@@ -35,7 +44,6 @@ interface WorkItem {
   videoUrl?: string
   videoAspectRatio?: "16:9" | "4:5"
   href?: string
-  tags?: string[]
   priority?: boolean
 }
 
@@ -50,264 +58,231 @@ interface CategoryMeta {
 
 const CATEGORIES: CategoryMeta[] = [
   {
-    id: "Brand & Culture",
-    eyebrow: "01 — Brand & Culture",
-    headline: "Original IP and creator-led brands.",
+    id: "Original IP",
+    eyebrow: "01 — Original IP",
+    headline: "Properties we own and produce.",
     subline:
-      "Lifestyle, music, and identity work where we build brands from the ground up — not just market them.",
+      "Media properties and original productions owned by 434. Sponsorship, licensing, distribution, and partnership terms are negotiated by project.",
   },
   {
-    id: "Health & Bio Innovation",
-    eyebrow: "02 — Health & Bio Innovation",
-    headline: "Vertical depth in healthcare and life sciences.",
+    id: "Platforms for Brands",
+    eyebrow: "02 — Platforms for Brands",
+    headline: "Integrated programs built for a client.",
     subline:
-      "Storytelling and media for the institutions, programs, and founders shaping the future of human health.",
+      "Multi-part platforms combining content, experiences, identity, and the digital infrastructure required to operate them.",
   },
   {
-    id: "Capital & Founders",
-    eyebrow: "03 — Capital & Founders",
-    headline: "Built for the people who back bold ideas.",
-    subline: "Content, brand, and event work for venture firms and angel networks across South Texas.",
-  },
-  {
-    id: "Tech & Community",
-    eyebrow: "04 — Tech & Community",
-    headline: "Connecting technology, talent, and place.",
+    id: "Productions for Brands",
+    eyebrow: "03 — Productions for Brands",
+    headline: "Defined content and live-experience engagements.",
     subline:
-      "Conferences, communities, and tools that grow the regional tech ecosystem and the people inside it.",
-  },
-  {
-    id: "Media & Storytelling",
-    eyebrow: "05 — Media & Storytelling",
-    headline: "Cross-cultural, cross-platform storytelling.",
-    subline:
-      "Bilingual, broadcast, and mission-driven media reaching audiences that legacy outlets miss.",
+      "Standalone or episodic productions created for a client, from a single film to a full event and the media around it.",
   },
 ]
 
 // ─── Data ────────────────────────────────────────────────────────────────────
+//
+// Canonical source: 434 MEDIA Master Contextual Document v2.0 (LOCKED),
+// Sections 4.8, 4.9, and 4.10. Titles, clients, roles, credits, statuses, and
+// public descriptions are taken from the portfolio record. Section 4.13 governs
+// exclusions. Do not add a project here that does not have a record in Section 4.
 
 const workItems: WorkItem[] = [
-  // 01 — Brand & Culture
+  // ── 4.8 Original IP ────────────────────────────────────────────────────────
   {
-    id: "vanita-leo",
-    title: "Vanita Leo",
+    id: "salute-to-troops",
+    title: "Salute to Troops",
     description:
-      "Texas Cumbia artist — media, partnerships, and content amplifying a singular voice.",
-    category: "Brand & Culture",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/vanita.png",
-    imagePosition: "left",
-    priority: true,
-    href: "https://www.instagram.com/p/DRK7SlZj4wP/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA%3D%3D",
-    bgColor: "bg-amber-50",
-    tags: ["Music", "Brand"],
+      "A live entertainment and storytelling property connecting the military community with culture, workforce, innovation, and commercial partners.",
+    category: "Original IP",
+    role: "Owned and produced by 434 MEDIA",
+    credit: "Marcos Resendez — Creator, Executive Producer & Creative Director",
+    status: "Active owned property",
+    years: "Est. 2022",
+    bgColor: "bg-neutral-50",
   },
   {
     id: "txmx-boxing",
     title: "TXMX Boxing",
     description:
-      "Original fight-culture brand spanning content, events, and gear — Texas and Mexico.",
-    category: "Brand & Culture",
+      "A fight-culture media property spanning original content, live experiences, talent, partnerships, and commerce across Texas and Mexico.",
+    category: "Original IP",
+    role: "Owned and produced by 434 MEDIA",
+    credit: "Marcos Resendez — Creator, Executive Producer & Director",
+    status: "Active",
+    years: "Est. 2025",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/txmx.png",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20DROP%20TEASER%20V2.mp4",
     href: "/shop",
     priority: true,
-    tags: ["Brand", "E-Commerce"],
   },
   {
     id: "rise-of-a-champion",
     title: "Rise of a Champion",
     description:
-      "Curated room of athletes, entertainers, and leaders. Built with Icontalks x TXMX.",
-    category: "Brand & Culture",
+      "A TXMX Boxing live production honoring championship fighters and figures connected to San Antonio boxing, supported by original content and a purpose-built digital experience.",
+    category: "Original IP",
+    client: "Co-presented with Icontalks",
+    role: "A TXMX Boxing production owned and produced by 434 MEDIA",
+    credit: "Marcos Resendez — Creator, Executive Producer & Director",
+    status: "Completed",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/rise.png",
     bgColor: "bg-neutral-900",
     logoDark: true,
-    href: "https://www.digitalcanvas.community/thefeed/loud-about-legacy",
-    tags: ["Documentary", "Sports"],
   },
   {
-    id: "adornthebay",
-    title: "Adorn the Bay",
+    id: "ampd-project",
+    title: "AMPD Project",
     description:
-      "Murals revitalizing Tampa Bay businesses and community spaces hit by recent hurricanes.",
-    category: "Brand & Culture",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/adornbay.png",
-    bgColor: "bg-sky-50",
-    href: "https://adornmurals.com/home",
+      "An established eight-week workforce-development program now operated as a 434-owned property. AMPD Project continues annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways.",
+    category: "Original IP",
+    role: "Owned by 434 MEDIA; co-produced by 434 MEDIA and DEVSA",
+    credit: "Marcos Resendez — Creator & Executive Producer",
+    status: "Annual",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/ampd.mp4",
-    tags: ["Public Art", "Impact"],
+    bgColor: "bg-neutral-50",
+  },
+  {
+    id: "mil-city-usa",
+    title: "Mil City USA",
+    description:
+      "An always-on military and defense-community media property that complements Salute to Troops.",
+    category: "Original IP",
+    role: "Owned and produced by 434 MEDIA",
+    credit: "Marcos Resendez — Creator & Executive Producer",
+    status: "Active",
+    years: "Est. 2022",
+    bgColor: "bg-neutral-50",
+  },
+  {
+    id: "vemos-vamos",
+    title: "Vemos Vamos",
+    description:
+      "A cross-cultural media property rooted in Hispanic culture, media, entertainment, and community connection.",
+    category: "Original IP",
+    role: "Owned and produced by 434 MEDIA",
+    credit: "Marcos Resendez — Creator, Executive Producer & Creative Director",
+    status: "Selectively activated",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/vemos-vamos/vemosinsights.jpg",
+  },
+  {
+    id: "overdrive",
+    title: "OVERDRIVE",
+    description:
+      "A 2:58 original short film commissioned by 434 MEDIA as a demonstration of its Human Plus production philosophy.",
+    category: "Original IP",
+    role: "Owned, commissioned, and produced by 434 MEDIA",
+    credit: "Marcos Resendez — Executive Producer · A.J. Garces — Creator, Writer, Director, Editor, AI Visuals & Post-Production",
+    status: "Completed",
+    years: "2026",
+    bgColor: "bg-neutral-900",
+    logoDark: true,
   },
 
-  // 02 — Health & Bio Innovation
+  // ── 4.9 Platforms for Brands ───────────────────────────────────────────────
   {
-    id: "mhm",
-    title: "Methodist Healthcare Ministries",
-    description:
-      "Broadening healthcare beyond clinical care — addressing systemic inequities at scale.",
-    category: "Health & Bio Innovation",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-accelerator.jpg",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/mhm.png",
-    bgColor: "bg-white",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Demo-Day-V3.mov",
-    href: "https://www.mhm.org/",
-    tags: ["Healthcare", "Nonprofit"],
-  },
-  {
-    id: "sdoh",
+    id: "que-es-sdoh",
     title: "¿Qué es SDOH?",
     description:
-      "Bilingual multimedia campaigns turning social-determinants awareness into action.",
-    category: "Health & Bio Innovation",
+      "434 developed the ¿Qué es SDOH? bilingual brand and public-facing platform and produced the full Community Health Accelerator experience. Work included program infrastructure, content strategy and production, panel production and moderation, speaker and mentor curation, a hero film, Univision broadcast segments, demo day, digital infrastructure, communications, and impact-report development.",
+    category: "Platforms for Brands",
+    client: "VelocityTX, funded through Methodist Healthcare Ministries",
+    role: "Brand and platform development; full program production",
+    credit: "Marcos Resendez — Executive Producer, Program Lead & Moderator",
+    status: "Completed",
+    years: "2024–2025",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/sdoh2.png",
     videoUrl:
       "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/SDOH%20ACCELERATOR%20PROGRAM%20RECAP_2025.mp4",
     href: "/en/sdoh",
-    tags: ["Health", "Bilingual"],
+    priority: true,
   },
   {
-    id: "health-cell",
-    title: "The Health Cell",
-    description:
-      "San Antonio's biotech, medical, and military health sector — collaboration at the table.",
-    category: "Health & Bio Innovation",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/healthcell.png",
-    bgColor: "bg-neutral-50",
-    href: "https://www.434media.com/blog/44b-and-counting-the-health-cell-2025",
-    tags: ["Health", "Innovation"],
-  },
-  {
-    id: "velocity-tx",
-    title: "VelocityTX",
-    description:
-      "Innovation hub fueling biotech and life-science startups in South Texas.",
-    category: "Health & Bio Innovation",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/vtx.png",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20MAIN%20RGB%20(1).png",
-    bgColor: "bg-white",
-    href: "https://www.digitalcanvas.community/thefeed/434-crashes-sasw-10th-year",
-    tags: ["Biotech", "Startups"],
-  },
-  {
-    id: "nucleate-texas",
-    title: "Nucleate Texas",
-    description: "Brand storytelling for the next generation of biotech student founders.",
-    category: "Health & Bio Innovation",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/nucleate.png",
-    bgColor: "bg-indigo-950",
-    logoDark: true,
-    href: "https://luma.com/nucleate-sxsw-2026",
-    tags: ["Biotech", "Students"],
-  },
-  {
-    id: "aimsatx",
+    id: "aim-health-rd-summit",
     title: "AIM Health R&D Summit",
     description:
-      "Where military, civilian, and research leaders converge on the future of military health.",
-    category: "Health & Bio Innovation",
+      "434 created the AIM Health R&D Summit brand and operating platform and produced the conference over four years. The engagement included brand development, conference production, project management, digital infrastructure, vendor coordination, operating systems, impact reporting, and strategic marketing guidance.",
+    category: "Platforms for Brands",
+    client: "VelocityTX",
+    role: "Brand and platform development; full conference production and digital infrastructure",
+    credit: "Marcos Resendez — Creator, Executive Producer, Conference Producer & Project Lead",
+    status: "Completed and handed off",
+    years: "2023–2026",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/posters.jpg",
     bgColor: "bg-neutral-900",
     logoDark: true,
     href: "https://aimsatx.com/",
-    tags: ["Military", "Innovation"],
   },
   {
-    id: "altbionics",
-    title: "Alt-Bionics",
-    description:
-      "Affordable bionic hands — transforming prosthetics and humanoid robotics.",
-    category: "Health & Bio Innovation",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/altbionics.png",
-    bgColor: "bg-neutral-900",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/AltBionics%20.mov",
-    videoAspectRatio: "4:5",
-    href: "https://www.altbionics.com/",
-    tags: ["Robotics", "Prosthetics"],
-  },
-
-  // 03 — Capital & Founders
-  {
-    id: "builders-vc",
-    title: "Builders VC",
-    description:
-      "Venture firm backing bold founders. Content and storytelling for portfolio amplification.",
-    category: "Capital & Founders",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/builders-dark.svg",
-    bgColor: "bg-neutral-50",
-    href: "https://www.builders.vc/",
-    tags: ["VC", "Startups"],
-  },
-  {
-    id: "alamo-angels",
+    id: "alamo-angels-platform",
     title: "Alamo Angels",
     description:
-      "South Texas angel network — pitch coverage, events, and founder storytelling.",
-    category: "Capital & Founders",
+      "For three years, 434 has advised Alamo Angels on its marketing strategy and translated that strategy into an interconnected system of events, content, messaging, and digital infrastructure, including the organization's member portal.",
+    category: "Platforms for Brands",
+    client: "Alamo Angels",
+    role: "Ongoing strategic marketing adviser, platform-development partner, and production partner",
+    credit: "Marcos Resendez — Strategic Marketing Adviser & Executive Producer",
+    status: "Ongoing client engagement",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/angels3.png",
     bgColor: "bg-neutral-50",
-    href: "https://www.digitalcanvas.community/thefeed/built-for-the-triangle",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alamo%20Angles.mp4",
-    tags: ["Angel", "Startups"],
-  },
-
-  // 04 — Tech & Community
-  {
-    id: "digital-canvas",
-    title: "Digital Canvas",
-    description:
-      "Conferences, workshops, and AI-driven experiences. Built with 434 MEDIA × DEVSA.",
-    category: "Tech & Community",
-    image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Fmhth-cover.JPG?alt=media",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digital-canvas-ymas.svg",
-    logoDark: true,
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digitalcanvas.mov",
-    bgColor: "bg-neutral-900",
-    href: "https://www.digitalcanvas.community/",
-    tags: ["Conferences", "AI"],
   },
   {
-    id: "devsa",
-    title: "DEVSA",
+    id: "techbloc-tech-day",
+    title: "TechBloc Tech Day",
     description:
-      "San Antonio's developer community — events, workshops, and pipeline building.",
-    category: "Tech & Community",
-    image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Fdevsa-cover.jpg?alt=media",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/DEVSA%20Web%20Banner.mp4",
-    href: "https://www.devsa.community",
-    tags: ["Developers", "Community"],
-  },
-  {
-    id: "tech-bloc",
-    title: "Tech Bloc",
-    description:
-      "Economic development and advocacy growing the San Antonio tech ecosystem.",
-    category: "Tech & Community",
+      "434 served as Tech Day's lead production and platform partner during an organizational transition, translating the incoming CEO's vision into an updated event identity, operating model, programming, content, and audience experience.",
+    category: "Platforms for Brands",
+    client: "TechBloc",
+    role: "Event architecture, visual identity, platform development, and lead production",
+    credit: "Marcos Resendez — Executive Producer, Creative Director & Event Director",
+    status: "Completed",
+    years: "November 2025 and April 2026",
     image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Ftechday-cover.jpeg?alt=media",
     bgColor: "bg-neutral-50",
     href: "https://www.sanantoniotechday.com/",
-    tags: ["Advocacy", "Tech"],
-  },
-  {
-    id: "learn2ai",
-    title: "Learn2AI",
-    description:
-      "AI literacy for everyone — practical learning, hands-on projects, real-world results.",
-    category: "Tech & Community",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/ai2.png",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Learn2ai.svg",
-    bgColor: "bg-neutral-50",
-    href: "https://www.learn2ai.co/",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Learn2AI%20-%20081825%20G.mp4",
-    tags: ["AI", "Education"],
   },
 
-  // 05 — Media & Storytelling
+  // ── 4.10 Productions for Brands ────────────────────────────────────────────
   {
-    id: "univision",
-    title: "Univision",
+    id: "mission-road-soar-film",
+    title: "Mission Road Ministries — Fundraising Film Featuring SOAR",
     description:
-      "Spanish-language broadcast partnerships reaching millions of Hispanic audiences.",
-    category: "Media & Storytelling",
+      "434 produced a primary fundraising film for Mission Road Ministries featuring its SOAR program. The film premiered at the organization's Annual Grand Western Shindig and was created for continued fundraising use throughout the year.",
+    category: "Productions for Brands",
+    client: "Mission Road Ministries",
+    role: "Commissioned fundraising-film production",
+    credit: "Marcos Resendez — Co-Executive Producer, Co-Producer & Co-Director",
+    status: "Completed",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/missionroad.png",
+    bgColor: "bg-neutral-50",
+    href: "https://www.missionroadministries.org/",
+  },
+  {
+    id: "health-cell-state-of-the-industry",
+    title: "The Health Cell — State of the Industry",
+    description:
+      "434 delivered full event production for The Health Cell's flagship annual fundraising event after the client established the program. Work included venue and catering management, project management, front-of-house and back-of-house operations, technical direction, show and stage direction, content capture, editing, and two speaker assets created for year-round organizational promotion.",
+    category: "Productions for Brands",
+    client: "The Health Cell",
+    role: "Full event production, technical direction, show direction, and post-event content production",
+    credit:
+      "Marcos Resendez — Executive Producer, Event Producer, Show Director, Stage Director & Technical Director",
+    status: "Completed",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/healthcell.png",
+    bgColor: "bg-neutral-50",
+    href: "https://www.434media.com/blog/44b-and-counting-the-health-cell-2025",
+  },
+  {
+    id: "univision-70th-anniversary",
+    title: "Univision San Antonio 70th Anniversary Concert — Event and Sponsor Content",
+    description:
+      "434 produced a social event recap for Univision San Antonio and individual video deliverables for three participating advertisers in support of the station's private 70th-anniversary concert featuring Alex Fernández.",
+    category: "Productions for Brands",
+    client: "Univision San Antonio — advertiser deliverables for Jeff Davis Law Firm, Cavender Boot City, and Cavender Toyota",
+    role: "Event and sponsor content production",
+    credit: "Marcos Resendez — Co-Executive Producer, Producer & Director",
+    status: "Completed",
+    years: "2025",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/univision.png",
     logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/univision-logo.svg",
     bgColor: "bg-purple-950",
@@ -315,41 +290,36 @@ const workItems: WorkItem[] = [
     videoUrl:
       "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alejandro%20Ferna%CC%81ndez%20Concert%20.mov",
     videoAspectRatio: "4:5",
-    href: "https://www.digitalcanvas.community/thefeed/capturing-a-milestone",
-    tags: ["Broadcast", "Hispanic"],
   },
   {
-    id: "wifttx",
-    title: "WIFT TX",
+    id: "nucleate-global-summit",
+    title: "Nucleate Global Summit",
     description:
-      "Women in Film & Television Texas — amplifying women's voices through media partnerships.",
-    category: "Media & Storytelling",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/wifttx.avif",
-    bgColor: "bg-rose-950",
+      "434 supported the Nucleate Global Summit through production-vendor sourcing, on-site logistical and technical support, content capture, and media co-production.",
+    category: "Productions for Brands",
+    client: "Nucleate",
+    role: "Production partner responsible for vendor sourcing, on-site production support, content capture, and co-production and post-production of the final media deliverable",
+    credit: "Marcos Resendez — Co-Producer & Technical Director",
+    status: "Event-production scope completed",
+    years: "2026",
+    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/nucleate.png",
+    bgColor: "bg-indigo-950",
     logoDark: true,
-    href: "https://www.digitalcanvas.community/thefeed/1.5B-Reasons-to-Film-in-Texas",
-    tags: ["Film", "Advocacy"],
   },
   {
-    id: "vemos-vamos",
-    title: "Vemos Vamos",
+    id: "alamo-angels-productions",
+    title: "Alamo Angels — Standalone Content Productions",
     description:
-      "Bilingual storytelling initiative connecting communities through shared vision.",
-    category: "Media & Storytelling",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/vemos-vamos/vemosinsights.jpg",
-    href: "https://www.vemosvamos.com/about",
-    tags: ["Bilingual", "Agency"],
-  },
-  {
-    id: "mission-road",
-    title: "Mission Road Ministries",
-    description:
-      "Mission-driven media for a nonprofit serving individuals with disabilities.",
-    category: "Media & Storytelling",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/missionroad.png",
+      "Alongside its broader platform work, 434 produces individual video and event-content units for Alamo Angels. These assets support member, organization, event, and program marketing and contribute to the organization's larger content library.",
+    category: "Productions for Brands",
+    client: "Alamo Angels",
+    role: "Content and event-production partner",
+    // Section 4.10 credit rule: Producer and Director credits are recorded at the
+    // individual production level and cannot be applied to all Alamo Angels work.
+    credit: "Marcos Resendez — Executive Producer",
+    status: "Ongoing client engagement",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alamo%20Angles.mp4",
     bgColor: "bg-neutral-50",
-    href: "https://www.missionroadministries.org/",
-    tags: ["Nonprofit", "Impact"],
   },
 ]
 
@@ -462,24 +432,46 @@ function VideoModal({
               {item.title}
             </h2>
 
-            {/* Tags as pills */}
-            {item.tags && item.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {item.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-700"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Status and operating period as pills (Section 4.5) */}
+            <div className="flex flex-wrap gap-1.5">
+              {[item.status, item.years].filter(Boolean).map((meta) => (
+                <span
+                  key={meta}
+                  className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-700"
+                >
+                  {meta}
+                </span>
+              ))}
+            </div>
 
-            {/* Description */}
+            {/* Approved public description */}
             <p className="text-balance font-geist-sans text-sm leading-relaxed text-neutral-600 md:text-[15px]">
               {item.description}
             </p>
+
+            {/* Portfolio record: client, company role, founder credit */}
+            <dl className="flex flex-col gap-2 border-t border-neutral-200/80 pt-4">
+              {item.client && (
+                <div className="flex flex-col gap-0.5">
+                  <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                    Client
+                  </dt>
+                  <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.client}</dd>
+                </div>
+              )}
+              <div className="flex flex-col gap-0.5">
+                <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                  434 MEDIA role
+                </dt>
+                <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.role}</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                  Credit
+                </dt>
+                <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.credit}</dd>
+              </div>
+            </dl>
 
             {/* Actions */}
             <div className="mt-1 flex flex-wrap items-center gap-2.5 pt-1">
@@ -607,15 +599,13 @@ function WorkCard({
 
       {/* Persistent bottom info */}
       <div className="absolute inset-x-0 bottom-0 z-2 p-4">
-        {item.tags && item.tags.length > 0 && (
-          <p
-            className={`mb-1.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
-              isMediaCard ? "text-white/55 group-hover:text-white/80" : "text-neutral-400 group-hover:text-neutral-600"
-            }`}
-          >
-            {item.tags.join(" · ")}
-          </p>
-        )}
+        <p
+          className={`mb-1.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
+            isMediaCard ? "text-white/55 group-hover:text-white/80" : "text-neutral-400 group-hover:text-neutral-600"
+          }`}
+        >
+          {item.client ?? "Owned by 434 MEDIA"}
+        </p>
 
         <h3
           className={`text-balance font-geist-sans text-sm font-semibold leading-tight tracking-tight transition-colors duration-300 ${
@@ -672,11 +662,9 @@ export default function WorkClient() {
 
   const heroRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Record<Category, HTMLElement | null>>({
-    "Brand & Culture": null,
-    "Health & Bio Innovation": null,
-    "Capital & Founders": null,
-    "Tech & Community": null,
-    "Media & Storytelling": null,
+    "Original IP": null,
+    "Platforms for Brands": null,
+    "Productions for Brands": null,
   })
 
   // Hero scroll parallax
