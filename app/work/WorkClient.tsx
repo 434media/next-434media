@@ -145,7 +145,7 @@ const workItems: WorkItem[] = [
   },
   {
     id: "mil-city-usa",
-    title: "Mil City USA",
+    title: "MilCityUSA",
     description:
       "An always-on military and defense-community media property that complements Salute to Troops.",
     category: "Original IP",
@@ -157,7 +157,7 @@ const workItems: WorkItem[] = [
   },
   {
     id: "vemos-vamos",
-    title: "Vemos Vamos",
+    title: "VemosVamos",
     description:
       "A cross-cultural media property rooted in Hispanic culture, media, entertainment, and community connection.",
     category: "Original IP",
