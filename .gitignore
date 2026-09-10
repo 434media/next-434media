@@ -52,3 +52,8 @@ yarn.lock
 
 # Local snapshots written by offboarding/migration scripts — contain roster PII
 /backups/
+
+# Canonical context store: symlink to the Google shared drive, plus local
+# pre-symlink backups. Never committed — see the context rules in CLAUDE.md.
+docs/context
+docs/context-backup-*/
