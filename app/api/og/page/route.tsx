@@ -38,7 +38,7 @@ const pageConfig: Record<
   work: {
     title: "OUR WORK",
     subtitle:
-      "From brand campaigns to event production — helping the world's most innovative firms find their voice and amplify their impact.",
+      "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands.",
     accent: "#f97316",
     gradient: "linear-gradient(135deg, #0c0a09, #1c1917, #0c0a09)",
     icon: "🎬",
