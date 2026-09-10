@@ -174,10 +174,10 @@ export function ArchivedOpportunitiesSection({
                     options={[{ value: "all", label: "All years" }, ...uniqueYears.map((y) => ({ value: y, label: y }))]}
                   />
                   <Dropdown
-                    ariaLabel="Filter by brand"
+                    ariaLabel="Filter by property"
                     value={brandFilter}
                     onChange={setBrandFilter}
-                    options={[{ value: "all", label: "All brands" }, ...BRAND_GOALS.map((g) => ({ value: g.brand, label: g.brand }))]}
+                    options={[{ value: "all", label: "All properties" }, ...BRAND_GOALS.map((g) => ({ value: g.brand, label: g.brand }))]}
                   />
                   <Dropdown
                     ariaLabel="Filter by outcome"

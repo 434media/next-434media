@@ -867,7 +867,7 @@ export function LeadDetailDrawer({
             iconLeft={<MapPin className="w-3.5 h-3.5 text-neutral-400" />}
           />
           <Select
-            label="Platform fit"
+            label="Property fit"
             value={form.platform}
             onChange={(v) => update("platform", v as LeadPlatform | "")}
             options={[{ value: "", label: "(none)" }, ...PLATFORM_OPTIONS.map((p) => ({ value: p, label: p }))]}

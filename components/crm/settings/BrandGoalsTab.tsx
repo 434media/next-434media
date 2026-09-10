@@ -26,7 +26,7 @@ export function BrandGoalsTab() {
     try {
       const res = await fetch("/api/admin/crm/brand-goals")
       const body = await res.json()
-      if (!res.ok || !body.success) throw new Error(body.error ?? "Failed to load brand goals")
+      if (!res.ok || !body.success) throw new Error(body.error ?? "Failed to load property goals")
       const gs = body.goals as BrandGoal[]
       setGoals(gs)
       setDrafts(Object.fromEntries(gs.map((g) => [g.brand, String(g.annualGoal)])))
