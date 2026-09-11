@@ -42,6 +42,8 @@ outside that module.
 
 **"Platforms" means CRM brands.** When the ask says platforms, it means the
 brand roster (TXMX Boxing, VemosVamos, MilCityUSA, DEVSA, Digital Canvas).
+This roster is the internal platform taxonomy, not public display text, and is
+intentionally separate from the master's Section 4 names.
 Brands are defined in code; their targets are runtime-editable in settings.
 
 **Firestore is the source of truth.** The CRM reads from single canonical
@@ -94,3 +96,45 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
 `npx tsc --noEmit` currently reports pre-existing errors in the Instagram,
 Shopify, and framer-motion code plus stale `.next` validator types. Check that
 your files are clean rather than expecting a zero exit.
+
+## Context files — canonical source and read rules
+
+`docs/context/` is a **symlink to the canonical Google shared drive** ("434 MEDIA — Master Operations_434MediaMGR" → "434 MEDIA — Master Context"). Files read through it are live and authoritative. It is gitignored and never committed.
+
+### Paths
+
+| What | Path |
+|---|---|
+| Master Contextual Document | `docs/context/00 Governing/434_MEDIA_Master_Contextual_Document_v2_0_Locked.md` |
+| Implementation Decisions Register | `docs/context/00 Governing/434_MEDIA_Master_Document_Implementation_Decisions_Register.md` |
+| Pricing Architecture | `docs/context/00 Governing/434_Pricing_Architecture.md` |
+| Process Log & SOP | `docs/context/00 Governing/434_Process_Log_and_SOP.md` |
+| Display and Design Standard | `docs/context/00 Governing/434_Display_and_Design_Standard.md` |
+| Engagement Handoff (historical) | `docs/context/00 Governing/HANDOFF.md` |
+| Voice router | `docs/context/01 Voice System/00-VOICE-ROUTER.md` |
+| Brand voice | `docs/context/01 Voice System/01-434-MEDIA-BRAND-VOICE.md` |
+| Founder voice | `docs/context/01 Voice System/02-MARCOS-RESENDEZ-FOUNDER-VOICE.md` |
+| Build-inbox overlay | `docs/context/01 Voice System/03-BUILD-INBOX-VOICE-OVERLAY.md` |
+| Outbound overlay | `docs/context/01 Voice System/04-OUTBOUND-VOICE-OVERLAY.md` |
+| Founder bios | `docs/context/02 Founder/` |
+| Build brief, generated ICP, sync script | `docs/context/04 Build/` |
+
+Paths contain spaces. Quote them.
+
+### Rules
+
+**Read-only. Never write to `docs/context/`.** It is the canonical governing store and is single-writer by policy — changes go through the founder, not through this repo. Do not create, edit, move, or delete anything under that path, including generated artifacts. Write generated output into the repo (`lib/`, `scripts/`) instead.
+
+**Report the version before relying on the master.** Read its header and state the version you are working from. If it is not the version you were told to expect, **stop and say so.** Do not search the filesystem for another copy, do not check Downloads or backup folders, and do not proceed against an older one. There is exactly one canonical source and it is reached through this symlink.
+
+**If `docs/context/` is missing or empty**, the drive is not mounted. Stop and report it. Never fall back to a local copy.
+
+**Section 1 definitions and Section 4 brand names are verbatim.** Never reword, shorten, or split them. Correct spellings, one word: **MilCityUSA**, **VemosVamos**, **TXMX Boxing**, **Salute to Troops**, **AMPD Project**, **¿Qué es SDOH?**, **AIM Health R&D Summit**, **OVERDRIVE**. **This governs display text only** — see the identifier rule below before renaming anything. `"Vemos Vamos"` two-word is a TypeScript union member and a stored Firestore value in 22 files; renaming those breaks live CRM data.
+
+**The brand motto is verbatim, in two forms (Section 1.4).** Neither may be reworded, recapitalized, or re-spaced. Plain **`Actions Speak Louder`** wherever the motto is parsed rather than seen — structured data, `slogan` fields, metadata, alt text. Styled **`Actions.Speak.Louder`** for visual display. The motto is not a definition and never substitutes for the Section 1.1 canonical company definition; it may appear alongside it. It is not a claim of results and must not be extended into one.
+
+**The master governs display names, not identifiers.** Slugs, database keys, TypeScript union members, storage paths, and analytics labels are separate from public display text and are not renamed to match the master. If changing a display string would force a change to a type member or a stored value, stop and report rather than cascading.
+
+**Never resolve a master/codebase conflict by changing the master.** Report it.
+
+**Never position 434 MEDIA as an AI consultant, technical agency, or white-label provider** (master Section 2). Never quote gates, rates, target ranges, or internal pricing to anything client-facing.
