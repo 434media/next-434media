@@ -44,9 +44,16 @@ function recipientEmails(to: InboundTo): string[] {
   return arr.map((r) => (typeof r === "string" ? r : r?.email || "")).filter(Boolean)
 }
 
+// Match the plus-address only at a local-part boundary. `to` may arrive bare
+// ("reply+abc@host") or display-name wrapped ("Name <reply+abc@host>"), so we
+// anchor on start-of-string or a delimiter rather than `^` alone. Without the
+// boundary, `noreply+xyz@` also matched and yielded "xyz" — a bogus lead id
+// that then failed the lookup and logged as "lead not found", which is the
+// wrong diagnosis. sequenceReplyTo() only ever emits `reply+<leadId>@<domain>`,
+// so nothing legitimate has characters immediately before "reply+".
 function leadIdFromRecipients(rcpts: string[]): string | null {
   for (const r of rcpts) {
-    const m = r.match(/reply\+([^@]+)@/i)
+    const m = r.match(/(?:^|[\s<,;:])reply\+([^@]+)@/i)
     if (m) return m[1]
   }
   return null
@@ -132,19 +139,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
   }
 
+  // Every path below returns 200 so Resend does not retry, which means an
+  // unmatched message leaves no trace unless we log it here. Recipients and the
+  // parsed lead id are enough to diagnose a miss; message bodies and subjects
+  // are deliberately never logged.
   if (event.type !== "email.received") {
+    console.log(`[webhooks/resend-inbound] ignoring event type: ${event.type}`)
     return NextResponse.json({ received: true, skipped: event.type })
   }
 
   const rcpts = recipientEmails(event.data?.to)
   const leadId = leadIdFromRecipients(rcpts)
   if (!leadId) {
+    console.warn(
+      `[webhooks/resend-inbound] unmatched mail — no reply+<leadId> recipient. type=${event.type} recipients=${JSON.stringify(rcpts)}`,
+    )
     return NextResponse.json({ received: true, skipped: "no reply+<leadId> recipient" })
   }
 
   try {
     const lead = await getLeadById(leadId)
-    if (!lead) return NextResponse.json({ received: true, skipped: "lead not found" })
+    if (!lead) {
+      console.warn(
+        `[webhooks/resend-inbound] unmatched mail — no lead for parsed id. leadId=${leadId} recipients=${JSON.stringify(rcpts)}`,
+      )
+      return NextResponse.json({ received: true, skipped: "lead not found" })
+    }
 
     // Pull the actual reply body (webhook is metadata-only) so it lands in the
     // timeline and the rep's forwarded copy.

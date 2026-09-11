@@ -48,8 +48,24 @@ function nextSendAt(from: Date, currentStep: 1 | 2): string {
 // captured by the email.received webhook and auto-stops the sequence (Phase 2).
 // Otherwise fall back to the rep's address (Phase 1 — rep marks the lead engaged
 // to stop). See docs/outreach-sequence.md + app/api/webhooks/resend-inbound.
+// Warn once per process when the inbound domain is missing. The fallback below
+// is a silent downgrade: sequences still send, but replies go to the rep's own
+// inbox and never reach the webhook, so the platform never sees them and the
+// cadence is only stopped if a human marks the lead engaged. Nothing about that
+// looks like a failure from the outside, hence the warning. Warn-only by
+// design — a throw here would take down sending over a degraded-but-working
+// path. Once per process rather than per send so a cron batch cannot flood the
+// logs; serverless cold starts still surface it regularly.
+let warnedMissingInboundDomain = false
+
 export function sequenceReplyTo(leadId: string, repEmail: string): string {
   const domain = process.env.SEQUENCE_INBOUND_DOMAIN
+  if (!domain && !warnedMissingInboundDomain) {
+    warnedMissingInboundDomain = true
+    console.warn(
+      "[outreach-sequence] SEQUENCE_INBOUND_DOMAIN is unset — reply-to falls back to the rep. Inbound replies will not reach /api/webhooks/resend-inbound and sequences will not auto-stop.",
+    )
+  }
   return domain ? `reply+${leadId}@${domain}` : repEmail
 }
 
