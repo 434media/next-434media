@@ -625,7 +625,7 @@ export function SocialCalendarView({ contentPosts, onOpenPost, onAddPost, onMove
               </div>
               <div className="p-3 space-y-4 max-h-[60vh] overflow-y-auto">
                 <FilterSection title="User" options={userOptions} selectedValues={selectedUsers} onToggle={toggleUser} />
-                <FilterSection title="Brand" options={brandOptions} selectedValues={selectedBrands} onToggle={toggleBrand} />
+                <FilterSection title="Property" options={brandOptions} selectedValues={selectedBrands} onToggle={toggleBrand} />
                 <FilterSection title="Platform" options={socialOptions} selectedValues={selectedSocials} onToggle={toggleSocial} />
               </div>
             </div>

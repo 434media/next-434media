@@ -217,7 +217,7 @@ function PlatformGoalsProgress({ clients }: { clients: Client[] }) {
       <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-neutral-500" />
-          <h3 className="text-sm font-semibold text-neutral-900">Platform Goals</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">Property Goals</h3>
         </div>
         <span className="text-xs text-neutral-500">Annual Targets</span>
       </div>

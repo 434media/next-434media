@@ -110,8 +110,8 @@ function PlatformGoalsSummary({
             <TrendingUp className="w-4 h-4" />
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-neutral-900">Platform Goals & Progress</h3>
-            <p className="text-xs text-neutral-500">Annual targets by brand</p>
+            <h3 className="text-sm font-medium text-neutral-900">Property Goals & Progress</h3>
+            <p className="text-xs text-neutral-500">Annual targets by property</p>
           </div>
         </div>
         <div className="flex items-center gap-4">

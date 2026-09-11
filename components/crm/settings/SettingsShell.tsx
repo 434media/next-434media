@@ -16,7 +16,7 @@ const VALID_TABS = new Set<TabKey>(["team", "brand-goals"])
 
 const TABS: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { key: "team", label: "Team members", icon: Users },
-  { key: "brand-goals", label: "Brand goals", icon: Target },
+  { key: "brand-goals", label: "Property goals", icon: Target },
 ]
 
 export function SettingsShell({ currentUser }: SettingsShellProps) {

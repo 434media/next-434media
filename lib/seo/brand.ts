@@ -10,6 +10,6 @@ export const BRAND = {
   headline: "Bold Stories.",
   headline2: "Proven Impact.",
   description:
-    "From brand campaigns, to event production, we help the world's most innovative firms find their voice and amplify their impact through bold storytelling and experiences.",
+    "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands.",
   shortTagline: "Bold Stories. Proven Impact.",
 } as const

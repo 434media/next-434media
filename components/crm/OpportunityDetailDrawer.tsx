@@ -780,13 +780,13 @@ export function OpportunityDetailDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Platform *</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1.5">Property *</label>
                   <select
                     value={formData.brand}
                     onChange={(e) => onFormChange({ ...formData, brand: e.target.value as Brand | "" })}
                     className="w-full px-3 py-2 rounded-md bg-white border border-neutral-200/70 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400"
                   >
-                    <option value="">Select platform...</option>
+                    <option value="">Select property...</option>
                     {BRANDS.map((brand) => {
                       const brandGoal = BRAND_GOALS.find(b => b.brand === brand)
                       return (
