@@ -70,6 +70,14 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
   `docs/archive/` describes finished work, not current intent.
 - [lib/prospecting/icp.md](lib/prospecting/icp.md) — the ICP the prospecting
   translator is prompted with. Editing it changes live filter behavior.
+- [docs/standards/](docs/standards/) — governing documents mirrored from the 434
+  context store because they govern code. Currently the Display and Design
+  Standard, which governs the Work page and any surface rendering portfolio
+  records. Mirrors are byte-identical and never edited here; check the version
+  line against the source before relying on one. Commercially sensitive
+  documents — pricing, the ICP source, qualification — are deliberately absent,
+  because this repository is public. See
+  [docs/standards/README.md](docs/standards/README.md).
 
 ## Verifying
 
