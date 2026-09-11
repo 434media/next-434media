@@ -32,6 +32,13 @@ interface WorkItem {
   role: string
   /** Marcos Resendez's individual credit, using the controlled vocabulary in Section 4.6. */
   credit: string
+  /**
+   * Material creative, production, or presenting partner credit — the Section 4.5
+   * "Collaborator credits" field. Kept separate from `credit`: Section 4.5 treats
+   * founder credit and collaborator credits as distinct fields, and Section 4.6
+   * requires company and individual credits to be recorded separately.
+   */
+  collaboratorCredit?: string
   /** Operating status using the approved terminology in Section 4.5. */
   status: string
   /** Year or operating period. */
@@ -135,7 +142,7 @@ const workItems: WorkItem[] = [
     id: "ampd-project",
     title: "AMPD Project",
     description:
-      "An established eight-week workforce-development program now operated as a 434-owned property. AMPD Project continues annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways.",
+      "AMPD Project is an established eight-week workforce-development program now operated as a 434-owned property. After two years as a program, its parent nonprofit entity is being dissolved and the program, history, assets, and public presence are being consolidated under 434 MEDIA. Digital Canvas assets are also being incorporated into the program. AMPD Project will continue annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways. A cohort may work within 434’s environment and owned properties or on an underwriter-supported project.",
     category: "Original IP",
     role: "Owned by 434 MEDIA; co-produced by 434 MEDIA and DEVSA",
     credit: "Marcos Resendez — Creator & Executive Producer",
@@ -173,7 +180,10 @@ const workItems: WorkItem[] = [
       "A 2:58 original short film commissioned by 434 MEDIA as a demonstration of its Human Plus production philosophy.",
     category: "Original IP",
     role: "Owned, commissioned, and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Executive Producer · A.J. Garces — Creator, Writer, Director, Editor, AI Visuals & Post-Production",
+    credit: "Marcos Resendez — Executive Producer",
+    // Section 4.10 records this separately as "Creative credit". The specialized
+    // terms are the record's own language, permitted by Section 4.6.
+    collaboratorCredit: "A.J. Garces — Creator, Writer, Director, Editor, Visual Effects & Post-Production",
     status: "Completed",
     years: "2026",
     bgColor: "bg-neutral-900",
@@ -218,7 +228,7 @@ const workItems: WorkItem[] = [
     id: "alamo-angels-platform",
     title: "Alamo Angels",
     description:
-      "For three years, 434 has advised Alamo Angels on its marketing strategy and translated that strategy into an interconnected system of events, content, messaging, and digital infrastructure, including the organization's member portal.",
+      "For three years, 434 has advised Alamo Angels on its marketing strategy and translated that strategy into an interconnected system of events, content, messaging, and digital infrastructure, including the organization’s member portal.",
     category: "Platforms for Brands",
     client: "Alamo Angels",
     role: "Ongoing strategic marketing adviser, platform-development partner, and production partner",
@@ -231,7 +241,7 @@ const workItems: WorkItem[] = [
     id: "techbloc-tech-day",
     title: "TechBloc Tech Day",
     description:
-      "434 served as Tech Day's lead production and platform partner during an organizational transition, translating the incoming CEO's vision into an updated event identity, operating model, programming, content, and audience experience.",
+      "434 served as Tech Day’s lead production and platform partner during an organizational transition, translating the incoming CEO’s vision into an updated event identity, operating model, programming, content, and audience experience.",
     category: "Platforms for Brands",
     client: "TechBloc",
     role: "Event architecture, visual identity, platform development, and lead production",
@@ -248,7 +258,7 @@ const workItems: WorkItem[] = [
     id: "mission-road-soar-film",
     title: "Mission Road Ministries — Fundraising Film Featuring SOAR",
     description:
-      "434 produced a primary fundraising film for Mission Road Ministries featuring its SOAR program. The film premiered at the organization's Annual Grand Western Shindig and was created for continued fundraising use throughout the year.",
+      "434 produced a primary fundraising film for Mission Road Ministries featuring its SOAR program. The film premiered at the organization’s Annual Grand Western Shindig and was created for continued fundraising use throughout the year.",
     category: "Productions for Brands",
     client: "Mission Road Ministries",
     role: "Commissioned fundraising-film production",
@@ -259,27 +269,12 @@ const workItems: WorkItem[] = [
     href: "https://www.missionroadministries.org/",
   },
   {
-    id: "health-cell-state-of-the-industry",
-    title: "The Health Cell — State of the Industry",
-    description:
-      "434 delivered full event production for The Health Cell's flagship annual fundraising event after the client established the program. Work included venue and catering management, project management, front-of-house and back-of-house operations, technical direction, show and stage direction, content capture, editing, and two speaker assets created for year-round organizational promotion.",
-    category: "Productions for Brands",
-    client: "The Health Cell",
-    role: "Full event production, technical direction, show direction, and post-event content production",
-    credit:
-      "Marcos Resendez — Executive Producer, Event Producer, Show Director, Stage Director & Technical Director",
-    status: "Completed",
-    image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/healthcell.png",
-    bgColor: "bg-neutral-50",
-    href: "https://www.434media.com/blog/44b-and-counting-the-health-cell-2025",
-  },
-  {
     id: "univision-70th-anniversary",
     title: "Univision San Antonio 70th Anniversary Concert — Event and Sponsor Content",
     description:
-      "434 produced a social event recap for Univision San Antonio and individual video deliverables for three participating advertisers in support of the station's private 70th-anniversary concert featuring Alex Fernández.",
+      "434 produced a social event recap for Univision San Antonio and individual video deliverables for three participating advertisers — Jeff Davis Law Firm, Cavender Boot City, and Cavender Toyota — in support of the station’s private 70th-anniversary concert featuring Alex Fernández, presented by Miller Lite.",
     category: "Productions for Brands",
-    client: "Univision San Antonio — advertiser deliverables for Jeff Davis Law Firm, Cavender Boot City, and Cavender Toyota",
+    client: "Univision San Antonio",
     role: "Event and sponsor content production",
     credit: "Marcos Resendez — Co-Executive Producer, Producer & Director",
     status: "Completed",
@@ -308,18 +303,21 @@ const workItems: WorkItem[] = [
     logoDark: true,
   },
   {
-    id: "alamo-angels-productions",
-    title: "Alamo Angels — Standalone Content Productions",
+    id: "velocitytx-sdoh-demo-day",
+    title: "VelocityTX — SDOH Community Health Accelerator Demo Day",
     description:
-      "Alongside its broader platform work, 434 produces individual video and event-content units for Alamo Angels. These assets support member, organization, event, and program marketing and contribute to the organization's larger content library.",
+      "434 produced the SDOH Community Health Accelerator Demo Day, the culminating event of the program's inaugural year. Our work included event and stage design, run-of-show development, show direction, room production, videography, and a complete content package.",
     category: "Productions for Brands",
-    client: "Alamo Angels",
-    role: "Content and event-production partner",
-    // Section 4.10 credit rule: Producer and Director credits are recorded at the
-    // individual production level and cannot be applied to all Alamo Angels work.
-    credit: "Marcos Resendez — Executive Producer",
-    status: "Ongoing client engagement",
-    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alamo%20Angles.mp4",
+    client: "VelocityTX, funded through Methodist Healthcare Ministries",
+    role: "Executive Producer and Technical Director",
+    credit: "Marcos Resendez — Executive Producer & Technical Director",
+    status: "Completed",
+    years: "2024",
+    // Section 4.10 records "Public destination: None" — the video asset is the
+    // demonstration of the work. No href, so the card renders no link
+    // affordance at all. Proof is one still and one event video; neither is in
+    // the bucket yet, so this carries no image/video and renders as a
+    // title card, matching Salute to Troops and MilCityUSA.
     bgColor: "bg-neutral-50",
   },
 ]
@@ -450,7 +448,7 @@ function VideoModal({
               {item.description}
             </p>
 
-            {/* Portfolio record: client, company role, founder credit */}
+            {/* Portfolio record: client, company role, founder and collaborator credits */}
             <dl className="flex flex-col gap-2 border-t border-neutral-200/80 pt-4">
               {item.client && (
                 <div className="flex flex-col gap-0.5">
@@ -472,6 +470,16 @@ function VideoModal({
                 </dt>
                 <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.credit}</dd>
               </div>
+              {item.collaboratorCredit && (
+                <div className="flex flex-col gap-0.5">
+                  <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                    Collaborator credit
+                  </dt>
+                  <dd className="font-geist-sans text-xs leading-snug text-neutral-600">
+                    {item.collaboratorCredit}
+                  </dd>
+                </div>
+              )}
             </dl>
 
             {/* Actions */}
