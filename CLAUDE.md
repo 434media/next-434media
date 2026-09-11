@@ -40,9 +40,24 @@ Any new outbound surface must gate on it rather than re-listing countries.
 hand-tagging in the Mailchimp UI shows up as drift. Never invent a tag string
 outside that module.
 
-**"Platforms" means CRM brands.** When the ask says platforms, it means the
-brand roster (TXMX Boxing, VemosVamos, MilCityUSA, DEVSA, Digital Canvas).
-This roster is the internal platform taxonomy, not public display text, and is
+**"Properties" — and still "platforms" — means the CRM brand roster.** TXMX
+Boxing, VemosVamos, MilCityUSA, DEVSA, Digital Canvas. The admin UI says
+**Property** ("Property Goals", "Property fit", "All properties"); the code
+still says `brand` and `platform` — field names, the `Brand` type, `BRANDS`,
+`PLATFORM_OPTIONS`, the `brand-goals` tab key. That mismatch is deliberate:
+renaming identifiers would break stored Firestore values for no user benefit.
+So expect either word in a request, and never rename the identifiers to match.
+
+It was renamed away from "platforms" because that collided with **"Platforms
+for Brands"**, which in Section 4.3 is a commercial model for *client* work —
+close to the opposite of 434-owned IP.
+
+**Not to be confused with a GA4 property.** `propertyId` and `?property=` in
+`analytics-web` and `analytics-portfolio` are Google Analytics properties, an
+unrelated sense of the word. `components/analytics/BrandPeekDrawerWeb.tsx`
+already renders "Property" in that sense.
+
+This roster is the internal taxonomy, not public display text, and is
 intentionally separate from the master's Section 4 names.
 Brands are defined in code; their targets are runtime-editable in settings.
 
