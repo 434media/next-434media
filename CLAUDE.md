@@ -109,7 +109,7 @@ your files are clean rather than expecting a zero exit.
 | Implementation Decisions Register | `docs/context/00 Governing/434_MEDIA_Master_Document_Implementation_Decisions_Register.md` |
 | Pricing Architecture | `docs/context/00 Governing/434_Pricing_Architecture.md` |
 | Process Log & SOP | `docs/context/00 Governing/434_Process_Log_and_SOP.md` |
-| Display and Design Standard | `docs/context/00 Governing/434_Display_and_Design_Standard.md` |
+| Display and Design Standard | **`docs/standards/display-and-design-standard.md`** — mirrored into the repo so it is readable in every clone. Source: `docs/context/00 Governing/434_Display_and_Design_Standard.md` |
 | Engagement Handoff (historical) | `docs/context/00 Governing/HANDOFF.md` |
 | Voice router | `docs/context/01 Voice System/00-VOICE-ROUTER.md` |
 | Brand voice | `docs/context/01 Voice System/01-434-MEDIA-BRAND-VOICE.md` |
