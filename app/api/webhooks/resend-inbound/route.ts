@@ -44,17 +44,44 @@ function recipientEmails(to: InboundTo): string[] {
   return arr.map((r) => (typeof r === "string" ? r : r?.email || "")).filter(Boolean)
 }
 
-// Match the plus-address only at a local-part boundary. `to` may arrive bare
-// ("reply+abc@host") or display-name wrapped ("Name <reply+abc@host>"), so we
-// anchor on start-of-string or a delimiter rather than `^` alone. Without the
-// boundary, `noreply+xyz@` also matched and yielded "xyz" — a bogus lead id
-// that then failed the lookup and logged as "lead not found", which is the
-// wrong diagnosis. sequenceReplyTo() only ever emits `reply+<leadId>@<domain>`,
-// so nothing legitimate has characters immediately before "reply+".
+// Pull the leadId out of our own plus-address, or return null.
+//
+// Deliberately not a pattern match. The question is not "does this string
+// contain something shaped like reply+X@" — it is "is this recipient OUR
+// address, and if so what is the leadId". Both checks that decide it are
+// string equality: the local part must begin with exactly `reply+`, and the
+// domain must be exactly SEQUENCE_INBOUND_DOMAIN. Substring search is what
+// let `noreply+xyz@vendor.com` yield "xyz", and anchoring on a delimiter only
+// closed that one class — `reply+<id>@attacker.com` still matched, because
+// the domain was never checked at all, and a quoted bare address stopped
+// matching because `"` was not in the delimiter set.
+//
+// That mattered: mail reaching the receiving domain whose `to` also carried
+// `reply+<someLeadId>@anywhere.com` would stop that lead's sequence, mark it
+// engaged and forward content to the rep. The svix signature does not help —
+// the webhook is genuine, the header content is not ours.
+//
+// The one regex left is unwrapping a display name, which is a real pattern.
 function leadIdFromRecipients(rcpts: string[]): string | null {
+  const domain = process.env.SEQUENCE_INBOUND_DOMAIN?.trim().toLowerCase()
+  // No configured domain means nothing can be verified as ours. Matching on
+  // the prefix alone here would accept any sender's reply+ address.
+  if (!domain) return null
+
   for (const r of rcpts) {
-    const m = r.match(/(?:^|[\s<,;:])reply\+([^@]+)@/i)
-    if (m) return m[1]
+    const angle = r.match(/<([^>]*)>/)
+    // A bare value may still be a comma/semicolon-separated list.
+    const candidates = angle ? [angle[1]] : r.split(/[,;]/)
+    for (const candidate of candidates) {
+      const addr = candidate.trim().replace(/^["']|["']$/g, "").toLowerCase()
+      const at = addr.lastIndexOf("@")
+      if (at < 0) continue
+      if (addr.slice(at + 1) !== domain) continue
+      const local = addr.slice(0, at)
+      if (!local.startsWith("reply+")) continue
+      const leadId = local.slice("reply+".length)
+      if (leadId) return leadId
+    }
   }
   return null
 }
