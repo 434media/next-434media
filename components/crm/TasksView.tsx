@@ -327,10 +327,10 @@ export function TasksView({
           <select
             value={brandFilter}
             onChange={(e) => onBrandFilterChange(e.target.value)}
-            aria-label="Filter by platform"
+            aria-label="Filter by property"
             className="h-9 px-3 rounded-md bg-white ring-1 ring-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-neutral-400 min-w-35"
           >
-            <option value="all">All platforms</option>
+            <option value="all">All properties</option>
             {BRANDS.map((brand) => (
               <option key={brand} value={brand}>{brand}</option>
             ))}
@@ -416,7 +416,7 @@ export function TasksView({
                     Status
                   </th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em] hidden md:table-cell">
-                    Platform
+                    Property
                   </th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-medium text-neutral-500 uppercase tracking-[0.18em] hidden sm:table-cell">
                     Assignee
