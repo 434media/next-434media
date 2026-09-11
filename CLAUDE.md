@@ -33,7 +33,7 @@ outside that module.
 **"Platforms" means CRM brands.** When the ask says platforms, it means the
 brand roster (TXMX Boxing, VemosVamos, MilCityUSA, DEVSA, Digital Canvas).
 This roster is the internal platform taxonomy, not public display text, and is
-intentionally separate from the master's §4 names.
+intentionally separate from the master's Section 4 names.
 Brands are defined in code; their targets are runtime-editable in settings.
 
 **Firestore is the source of truth.** The CRM reads from single canonical
@@ -91,6 +91,7 @@ your files are clean rather than expecting a zero exit.
 | Implementation Decisions Register | `docs/context/00 Governing/434_MEDIA_Master_Document_Implementation_Decisions_Register.md` |
 | Pricing Architecture | `docs/context/00 Governing/434_Pricing_Architecture.md` |
 | Process Log & SOP | `docs/context/00 Governing/434_Process_Log_and_SOP.md` |
+| Display and Design Standard | `docs/context/00 Governing/434_Display_and_Design_Standard.md` |
 | Engagement Handoff (historical) | `docs/context/00 Governing/HANDOFF.md` |
 | Voice router | `docs/context/01 Voice System/00-VOICE-ROUTER.md` |
 | Brand voice | `docs/context/01 Voice System/01-434-MEDIA-BRAND-VOICE.md` |
@@ -110,10 +111,12 @@ Paths contain spaces. Quote them.
 
 **If `docs/context/` is missing or empty**, the drive is not mounted. Stop and report it. Never fall back to a local copy.
 
-**§1 definitions and §4 brand names are verbatim.** Never reword, shorten, or split them. Correct spellings, one word: **MilCityUSA**, **VemosVamos**, **TXMX Boxing**, **Salute to Troops**, **AMPD Project**, **¿Qué es SDOH?**, **AIM Health R&D Summit**, **OVERDRIVE**.
+**Section 1 definitions and Section 4 brand names are verbatim.** Never reword, shorten, or split them. Correct spellings, one word: **MilCityUSA**, **VemosVamos**, **TXMX Boxing**, **Salute to Troops**, **AMPD Project**, **¿Qué es SDOH?**, **AIM Health R&D Summit**, **OVERDRIVE**. **This governs display text only** — see the identifier rule below before renaming anything. `"Vemos Vamos"` two-word is a TypeScript union member and a stored Firestore value in 22 files; renaming those breaks live CRM data.
+
+**The brand motto is verbatim, in two forms (Section 1.4).** Neither may be reworded, recapitalized, or re-spaced. Plain **`Actions Speak Louder`** wherever the motto is parsed rather than seen — structured data, `slogan` fields, metadata, alt text. Styled **`Actions.Speak.Louder`** for visual display. The motto is not a definition and never substitutes for the Section 1.1 canonical company definition; it may appear alongside it. It is not a claim of results and must not be extended into one.
 
 **The master governs display names, not identifiers.** Slugs, database keys, TypeScript union members, storage paths, and analytics labels are separate from public display text and are not renamed to match the master. If changing a display string would force a change to a type member or a stored value, stop and report rather than cascading.
 
 **Never resolve a master/codebase conflict by changing the master.** Report it.
 
-**Never position 434 MEDIA as an AI consultant, technical agency, or white-label provider** (master §2). Never quote gates, rates, target ranges, or internal pricing to anything client-facing.
+**Never position 434 MEDIA as an AI consultant, technical agency, or white-label provider** (master Section 2). Never quote gates, rates, target ranges, or internal pricing to anything client-facing.
