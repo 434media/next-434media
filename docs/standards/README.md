@@ -27,6 +27,28 @@ Excluded on those grounds, and reachable only through the context store:
 That list is a judgement, not a rule. Re-check it before mirroring anything new,
 and when in doubt leave it in the context store.
 
+## Verified against, not just read
+
+[portfolio-records.json](portfolio-records.json) is the **public half** of the
+Section 4 portfolio record — the fields the Work page renders, which are public
+by definition because they are on the website. Client, 434 MEDIA role, founder
+and creative credits, year, status, public description. Nothing else: internal
+context, proof assets, categories and credit rules stay in the context store,
+and records marked `Work page: Not published` are excluded entirely.
+
+It exists so CI can check the Work page without the context document. The
+document cannot live in a public repository; this subset already does, on the
+site itself.
+
+    scripts/extract-portfolio-records.ts   run locally with MASTER_CONTEXT_PATH
+                                           set; regenerates the JSON
+    scripts/verify-portfolio-records.ts    runs in CI; fails on any deviation
+
+When the context store changes, re-run the extract and commit the JSON with the
+page change. The workflow catches an abridged description, a swapped apostrophe,
+a concatenated field, or a held-back record being published — all of which
+reading missed during the Work page rebuild.
+
 ## Mirrors, not sources
 
 | Document | Mirrored version | Canonical source |
