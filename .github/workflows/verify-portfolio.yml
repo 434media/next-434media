@@ -10,18 +10,15 @@
 # locally with MASTER_CONTEXT_PATH set and commit the updated JSON.
 name: Verify portfolio records
 
+# Deliberately NOT path-filtered. This is a required status check, and a
+# path-filtered workflow simply does not run on a PR that misses its paths — so
+# GitHub never receives a result and the check hangs on "Expected" forever,
+# blocking the merge. The job reads two files and needs no install beyond tsx,
+# so running it on every PR costs seconds and always reports.
 on:
   pull_request:
-    paths:
-      - "app/work/WorkClient.tsx"
-      - "docs/standards/portfolio-records.json"
-      - "scripts/verify-portfolio-records.ts"
-      - ".github/workflows/verify-portfolio.yml"
   push:
     branches: [main]
-    paths:
-      - "app/work/WorkClient.tsx"
-      - "docs/standards/portfolio-records.json"
 
 jobs:
   verify:
