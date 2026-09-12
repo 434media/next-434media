@@ -589,7 +589,13 @@ function WorkCard({
         </div>
       )}
 
-      {/* Top-right action chip */}
+      {/* Top-right action chip — rendered only where there is an action.
+          The ring used to render unconditionally with only the icon inside
+          guarded, so a card with neither media nor a destination showed an
+          empty circle on hover: a control that appears and does nothing.
+          Latent until the Section 4 reconciliation introduced cards with
+          neither — 0 such cards before it, 7 of 15 after. */}
+      {(item.videoUrl || item.href) && (
       <div className="absolute top-3 right-3 z-10">
         <div
           className={`grid h-7 w-7 place-items-center rounded-full ring-1 backdrop-blur-md transition-all duration-300 ${
@@ -605,6 +611,7 @@ function WorkCard({
           ) : null}
         </div>
       </div>
+      )}
 
       {/* Persistent bottom info */}
       <div className="absolute inset-x-0 bottom-0 z-2 p-4">
