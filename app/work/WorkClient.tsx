@@ -142,7 +142,7 @@ const workItems: WorkItem[] = [
     id: "ampd-project",
     title: "AMPD Project",
     description:
-      "AMPD Project is an established eight-week workforce-development program now operated as a 434-owned property. After two years as a program, its parent nonprofit entity is being dissolved and the program, history, assets, and public presence are being consolidated under 434 MEDIA. Digital Canvas assets are also being incorporated into the program. AMPD Project will continue annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways. A cohort may work within 434’s environment and owned properties or on an underwriter-supported project.",
+      "AMPD Project is an established eight-week workforce-development program now operated as a 434-owned property. After two years as a program, its parent nonprofit entity is being dissolved and the program, history, assets, and public presence are being consolidated under 434 MEDIA. Digital Canvas assets are also being incorporated into the program. AMPD Project will continue annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways. A cohort may work within 434's environment and owned properties or on an underwriter-supported project.",
     category: "Original IP",
     role: "Owned by 434 MEDIA; co-produced by 434 MEDIA and DEVSA",
     credit: "Marcos Resendez — Creator & Executive Producer",
