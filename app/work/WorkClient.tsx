@@ -12,6 +12,7 @@ import {
 import Link from "next/link"
 import { XIcon, PlayIcon, ArrowUpRightIcon } from "lucide-react"
 import { Button, ButtonArrow } from "@/components/ui/Button"
+import { WORK_RECORDS, type WorkRecord } from "@/lib/work-records"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,30 +20,14 @@ import { Button, ButtonArrow } from "@/components/ui/Button"
 // Section 4.3. The Work page is organized by these and only these (Section 4.12).
 type Category = "Original IP" | "Platforms for Brands" | "Productions for Brands"
 
-interface WorkItem {
+/**
+ * Presentation-only fields. The master records carry no media, colour, or slug,
+ * so these live here, keyed by the record title — the master's stable identity
+ * for a record. Anything the master does carry comes from WORK_RECORDS and is
+ * never restated here.
+ */
+interface Presentation {
   id: string
-  /** Official or approved descriptive title (Section 4.5). */
-  title: string
-  /** Approved public description — cleared language, taken verbatim from the record. */
-  description: string
-  category: Category
-  /** Contracting client and relevant partners. Absent on owned IP. */
-  client?: string
-  /** Company-level responsibility (434 MEDIA role). */
-  role: string
-  /** Marcos Resendez's individual credit, using the controlled vocabulary in Section 4.6. */
-  credit: string
-  /**
-   * Material creative, production, or presenting partner credit — the Section 4.5
-   * "Collaborator credits" field. Kept separate from `credit`: Section 4.5 treats
-   * founder credit and collaborator credits as distinct fields, and Section 4.6
-   * requires company and individual credits to be recorded separately.
-   */
-  collaboratorCredit?: string
-  /** Operating status using the approved terminology in Section 4.5. */
-  status: string
-  /** Year or operating period. */
-  years?: string
   image?: string
   imagePosition?: string
   logo?: string
@@ -50,8 +35,31 @@ interface WorkItem {
   bgColor?: string
   videoUrl?: string
   videoAspectRatio?: "16:9" | "4:5"
-  href?: string
   priority?: boolean
+}
+
+type WorkItem = WorkRecord & Presentation
+
+// ─── Link destination ─────────────────────────────────────────────────────────
+
+// A record carries one click destination, `publicUrl`, and no notion of
+// internal versus external — that distinction is presentation, so it is
+// inferred from the domain here. A URL on this site's own origin renders as an
+// internal route: client-side navigation, same tab, no new-window affordance.
+// Anything else opens in a new tab. Owned-brand domains such as txmxboxing.com
+// are separate origins and so are external by this rule, even though 434 owns
+// the property.
+const SITE_HOSTS = new Set(["434media.com", "www.434media.com"])
+
+/** Same-origin URL → the path next/link should route to. Otherwise null. */
+function internalPath(url: string): string | null {
+  if (url.startsWith("/")) return url
+  try {
+    const u = new URL(url)
+    return SITE_HOSTS.has(u.hostname) ? `${u.pathname}${u.search}${u.hash}` : null
+  } catch {
+    return null
+  }
 }
 
 // ─── Category metadata ────────────────────────────────────────────────────────
@@ -94,233 +102,96 @@ const CATEGORIES: CategoryMeta[] = [
 // public descriptions are taken from the portfolio record. Section 4.13 governs
 // exclusions. Do not add a project here that does not have a record in Section 4.
 
-const workItems: WorkItem[] = [
-  // ── 4.8 Original IP ────────────────────────────────────────────────────────
-  {
+const PRESENTATION: Record<string, Presentation> = {
+  "Salute to Troops": {
     id: "salute-to-troops",
-    title: "Salute to Troops",
-    description:
-      "A live entertainment and storytelling property connecting the military community with culture, workforce, innovation, and commercial partners.",
-    category: "Original IP",
-    role: "Owned and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Creator, Executive Producer & Creative Director",
-    status: "Active owned property",
-    years: "Est. 2022",
     bgColor: "bg-neutral-50",
   },
-  {
+  "TXMX Boxing": {
     id: "txmx-boxing",
-    title: "TXMX Boxing",
-    description:
-      "A fight-culture media property spanning original content, live experiences, talent, partnerships, and commerce across Texas and Mexico.",
-    category: "Original IP",
-    role: "Owned and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Creator, Executive Producer & Director",
-    status: "Active",
-    years: "Est. 2025",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/txmx.png",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMX%20DROP%20TEASER%20V2.mp4",
-    href: "/shop",
     priority: true,
   },
-  {
+  "Rise of a Champion": {
     id: "rise-of-a-champion",
-    title: "Rise of a Champion",
-    description:
-      "A TXMX Boxing live production honoring championship fighters and figures connected to San Antonio boxing, supported by original content and a purpose-built digital experience.",
-    category: "Original IP",
-    client: "Co-presented with Icontalks",
-    role: "A TXMX Boxing production owned and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Creator, Executive Producer & Director",
-    status: "Completed",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/rise.png",
-    bgColor: "bg-neutral-900",
     logoDark: true,
-    href: "https://www.txmxboxing.com/icon-talks/rise-of-a-champion",
+    bgColor: "bg-neutral-900",
   },
-  {
+  "AMPD Project": {
     id: "ampd-project",
-    title: "AMPD Project",
-    description:
-      "AMPD Project is an established eight-week workforce-development program now operated as a 434-owned property. After two years as a program, its parent nonprofit entity is being dissolved and the program, history, assets, and public presence are being consolidated under 434 MEDIA. Digital Canvas assets are also being incorporated into the program. AMPD Project will continue annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways. A cohort may work within 434’s environment and owned properties or on an underwriter-supported project.",
-    category: "Original IP",
-    role: "Owned by 434 MEDIA; co-produced by 434 MEDIA and DEVSA",
-    credit: "Marcos Resendez — Creator & Executive Producer",
-    status: "Annual",
+    bgColor: "bg-neutral-50",
     videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/ampd.mp4",
-    bgColor: "bg-neutral-50",
   },
-  {
+  "MilCityUSA": {
     id: "mil-city-usa",
-    title: "MilCityUSA",
-    description:
-      "An always-on military and defense-community media property that complements Salute to Troops.",
-    category: "Original IP",
-    role: "Owned and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Creator & Executive Producer",
-    status: "Active",
-    years: "Est. 2022",
     bgColor: "bg-neutral-50",
   },
-  {
+  "VemosVamos": {
     id: "vemos-vamos",
-    title: "VemosVamos",
-    description:
-      "A cross-cultural media property rooted in Hispanic culture, media, entertainment, and community connection.",
-    category: "Original IP",
-    role: "Owned and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Creator, Executive Producer & Creative Director",
-    status: "Selectively activated",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/vemos-vamos/vemosinsights.jpg",
   },
-  {
+  "OVERDRIVE": {
     id: "overdrive",
-    title: "OVERDRIVE",
-    description:
-      "A 2:58 original short film commissioned by 434 MEDIA as a demonstration of its Human Plus production philosophy.",
-    category: "Original IP",
-    role: "Owned, commissioned, and produced by 434 MEDIA",
-    credit: "Marcos Resendez — Executive Producer",
-    // Section 4.10 records this separately as "Creative credit". The specialized
-    // terms are the record's own language, permitted by Section 4.6.
-    collaboratorCredit: "A.J. Garces — Creator, Writer, Director, Editor, Visual Effects & Post-Production",
-    status: "Completed",
-    years: "2026",
-    bgColor: "bg-neutral-900",
     logoDark: true,
+    bgColor: "bg-neutral-900",
   },
-
-  // ── 4.9 Platforms for Brands ───────────────────────────────────────────────
-  {
+  "¿Qué es SDOH?": {
     id: "que-es-sdoh",
-    title: "¿Qué es SDOH?",
-    description:
-      "434 developed the ¿Qué es SDOH? bilingual brand and public-facing platform and produced the full Community Health Accelerator experience. Work included program infrastructure, content strategy and production, panel production and moderation, speaker and mentor curation, a hero film, Univision broadcast segments, demo day, digital infrastructure, communications, and impact-report development.",
-    category: "Platforms for Brands",
-    client: "VelocityTX, funded through Methodist Healthcare Ministries",
-    role: "Brand and platform development; full program production",
-    credit: "Marcos Resendez — Executive Producer, Program Lead & Moderator",
-    status: "Completed",
-    years: "2024–2025",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/sdoh2.png",
-    videoUrl:
-      "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/SDOH%20ACCELERATOR%20PROGRAM%20RECAP_2025.mp4",
-    href: "/en/sdoh",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/SDOH%20ACCELERATOR%20PROGRAM%20RECAP_2025.mp4",
     priority: true,
   },
-  {
+  "AIM Health R&D Summit": {
     id: "aim-health-rd-summit",
-    title: "AIM Health R&D Summit",
-    description:
-      "434 created the AIM Health R&D Summit brand and operating platform and produced the conference over four years. The engagement included brand development, conference production, project management, digital infrastructure, vendor coordination, operating systems, impact reporting, and strategic marketing guidance.",
-    category: "Platforms for Brands",
-    client: "VelocityTX",
-    role: "Brand and platform development; full conference production and digital infrastructure",
-    credit: "Marcos Resendez — Creator, Executive Producer, Conference Producer & Project Lead",
-    status: "Completed and handed off",
-    years: "2023–2026",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/posters.jpg",
-    bgColor: "bg-neutral-900",
     logoDark: true,
-    href: "https://aimsatx.com/",
+    bgColor: "bg-neutral-900",
   },
-  {
+  "Alamo Angels": {
     id: "alamo-angels-platform",
-    title: "Alamo Angels",
-    description:
-      "For three years, 434 has advised Alamo Angels on its marketing strategy and translated that strategy into an interconnected system of events, content, messaging, and digital infrastructure, including the organization’s member portal.",
-    category: "Platforms for Brands",
-    client: "Alamo Angels",
-    role: "Ongoing strategic marketing adviser, platform-development partner, and production partner",
-    credit: "Marcos Resendez — Strategic Marketing Adviser & Executive Producer",
-    status: "Ongoing client engagement",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/angels3.png",
     bgColor: "bg-neutral-50",
   },
-  {
+  "TechBloc Tech Day": {
     id: "techbloc-tech-day",
-    title: "TechBloc Tech Day",
-    description:
-      "434 served as Tech Day’s lead production and platform partner during an organizational transition, translating the incoming CEO’s vision into an updated event identity, operating model, programming, content, and audience experience.",
-    category: "Platforms for Brands",
-    client: "TechBloc",
-    role: "Event architecture, visual identity, platform development, and lead production",
-    credit: "Marcos Resendez — Executive Producer, Creative Director & Event Director",
-    status: "Completed",
-    years: "November 2025 and April 2026",
     image: "https://firebasestorage.googleapis.com/v0/b/groovy-ego-462522-v2.firebasestorage.app/o/434media%2Ftechday-cover.jpeg?alt=media",
     bgColor: "bg-neutral-50",
-    href: "https://www.sanantoniotechday.com/",
   },
-
-  // ── 4.10 Productions for Brands ────────────────────────────────────────────
-  {
+  "Mission Road Ministries — Fundraising Film Featuring SOAR": {
     id: "mission-road-soar-film",
-    title: "Mission Road Ministries — Fundraising Film Featuring SOAR",
-    description:
-      "434 produced a primary fundraising film for Mission Road Ministries featuring its SOAR program. The film premiered at the organization’s Annual Grand Western Shindig and was created for continued fundraising use throughout the year.",
-    category: "Productions for Brands",
-    client: "Mission Road Ministries",
-    role: "Commissioned fundraising-film production",
-    credit: "Marcos Resendez — Co-Executive Producer, Co-Producer & Co-Director",
-    status: "Completed",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/missionroad.png",
     bgColor: "bg-neutral-50",
-    href: "https://www.missionroadministries.org/",
   },
-  {
+  "Univision San Antonio 70th Anniversary Concert — Event and Sponsor Content": {
     id: "univision-70th-anniversary",
-    title: "Univision San Antonio 70th Anniversary Concert — Event and Sponsor Content",
-    description:
-      "434 produced a social event recap for Univision San Antonio and individual video deliverables for three participating advertisers — Jeff Davis Law Firm, Cavender Boot City, and Cavender Toyota — in support of the station’s private 70th-anniversary concert featuring Alex Fernández, presented by Miller Lite.",
-    category: "Productions for Brands",
-    client: "Univision San Antonio",
-    role: "Event and sponsor content production",
-    credit: "Marcos Resendez — Co-Executive Producer, Producer & Director",
-    status: "Completed",
-    years: "2025",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/univision.png",
     logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/univision-logo.svg",
-    bgColor: "bg-purple-950",
     logoDark: true,
-    videoUrl:
-      "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alejandro%20Ferna%CC%81ndez%20Concert%20.mov",
+    bgColor: "bg-purple-950",
+    videoUrl: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Alejandro%20Ferna%CC%81ndez%20Concert%20.mov",
     videoAspectRatio: "4:5",
   },
-  {
+  "Nucleate Global Summit": {
     id: "nucleate-global-summit",
-    title: "Nucleate Global Summit",
-    description:
-      "434 supported the Nucleate Global Summit through production-vendor sourcing, on-site logistical and technical support, content capture, and media co-production.",
-    category: "Productions for Brands",
-    client: "Nucleate",
-    role: "Production partner responsible for vendor sourcing, on-site production support, content capture, and co-production and post-production of the final media deliverable",
-    credit: "Marcos Resendez — Co-Producer & Technical Director",
-    status: "Event-production scope completed",
-    years: "2026",
     image: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work/nucleate.png",
-    bgColor: "bg-indigo-950",
     logoDark: true,
+    bgColor: "bg-indigo-950",
   },
-  {
+  "VelocityTX — SDOH Community Health Accelerator Demo Day": {
     id: "velocitytx-sdoh-demo-day",
-    title: "VelocityTX — SDOH Community Health Accelerator Demo Day",
-    description:
-      "434 produced the SDOH Community Health Accelerator Demo Day, the culminating event of the program's inaugural year. Our work included event and stage design, run-of-show development, show direction, room production, videography, and a complete content package.",
-    category: "Productions for Brands",
-    client: "VelocityTX, funded through Methodist Healthcare Ministries",
-    role: "Executive Producer and Technical Director",
-    credit: "Marcos Resendez — Executive Producer & Technical Director",
-    status: "Completed",
-    years: "2024",
-    // Section 4.10 records "Public destination: None" — the video asset is the
-    // demonstration of the work. No href, so the card renders no link
-    // affordance at all. Proof is one still and one event video; neither is in
-    // the bucket yet, so this carries no image/video and renders as a
-    // title card, matching Salute to Troops and MilCityUSA.
     bgColor: "bg-neutral-50",
   },
-]
+}
+
+// Records come from the generated extract; presentation is merged in by title.
+// A record with no presentation entry still renders — as a title card, per the
+// Display and Design Standard 2.2.
+const workItems: WorkItem[] = WORK_RECORDS.map((record) => ({
+  ...record,
+  ...(PRESENTATION[record.title] ?? { id: record.title }),
+}))
 
 // ─── Video Modal ──────────────────────────────────────────────────────────────
 
@@ -333,7 +204,8 @@ function VideoModal({
 }) {
   const isPortrait = item.videoAspectRatio === "4:5"
   const overlayRef = useRef<HTMLDivElement>(null)
-  const isExternal = item.href?.startsWith("http")
+  const internal = item.publicUrl ? internalPath(item.publicUrl) : null
+  const isExternal = Boolean(item.publicUrl) && internal === null
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -423,7 +295,7 @@ function VideoModal({
                 transition={{ delay: 0.15, type: "spring", stiffness: 400, damping: 20 }}
                 className="grid h-1.5 w-1.5 place-items-center rounded-full bg-emerald-500"
               />
-              <span className="font-geist-mono">Now playing · {item.category}</span>
+              <span className="font-geist-mono">Now playing · {item.model}</span>
             </div>
 
             {/* Title */}
@@ -468,7 +340,7 @@ function VideoModal({
                 <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
                   Credit
                 </dt>
-                <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.credit}</dd>
+                <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.founderCredit}</dd>
               </div>
               {item.collaboratorCredit && (
                 <div className="flex flex-col gap-0.5">
@@ -484,9 +356,9 @@ function VideoModal({
 
             {/* Actions */}
             <div className="mt-1 flex flex-wrap items-center gap-2.5 pt-1">
-              {item.href && (
+              {item.publicUrl && (
                 <Button
-                  href={item.href}
+                  href={internal ?? item.publicUrl}
                   size="sm"
                   icon={<ButtonArrow className="h-3 w-3" />}
                   {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
@@ -595,7 +467,7 @@ function WorkCard({
           empty circle on hover: a control that appears and does nothing.
           Latent until the Section 4 reconciliation introduced cards with
           neither — 0 such cards before it, 7 of 15 after. */}
-      {(item.videoUrl || item.href) && (
+      {(item.videoUrl || item.publicUrl) && (
       <div className="absolute top-3 right-3 z-10">
         <div
           className={`grid h-7 w-7 place-items-center rounded-full ring-1 backdrop-blur-md transition-all duration-300 ${
@@ -606,7 +478,7 @@ function WorkCard({
         >
           {item.videoUrl ? (
             <PlayIcon className="h-3 w-3 fill-current" />
-          ) : item.href ? (
+          ) : item.publicUrl ? (
             <ArrowUpRightIcon className="h-3.5 w-3.5" />
           ) : null}
         </div>
@@ -654,13 +526,13 @@ function WorkCard({
     )
   }
 
-  if (item.href) {
-    const isExternal = item.href.startsWith("http")
+  if (item.publicUrl) {
+    const internal = internalPath(item.publicUrl)
     return (
       <Link
-        href={item.href}
+        href={internal ?? item.publicUrl}
         className="block w-full"
-        {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        {...(internal ? {} : { target: "_blank", rel: "noopener noreferrer" })}
       >
         {inner}
       </Link>
@@ -726,7 +598,7 @@ export default function WorkClient() {
   const grouped = useMemo(() => {
     return CATEGORIES.map((cat) => ({
       ...cat,
-      items: workItems.filter((i) => i.category === cat.id),
+      items: workItems.filter((i) => i.model === cat.id),
     }))
   }, [])
 

@@ -10,6 +10,11 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Generated from the canonical master by scripts/master_extract.py. Excluded
+  // so `eslint --fix` cannot rewrite them: lib/master-manifest.json records a
+  // sha256 of work-records.ts, and any reformat changes that hash and trips
+  // scripts/check_drift.py. Regenerate rather than reformat.
+  { ignores: ["lib/work-records.ts", "lib/master-manifest.json"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 
