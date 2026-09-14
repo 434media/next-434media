@@ -65,6 +65,11 @@ def version(lines):
     raise MasterError("no version line found in the first 8 lines")
 
 
+def file_digest(path):
+    """sha256 prefix of a file's bytes."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
 def parse(path=MASTER):
     """Return (version, date, [record]) for sections 4.8 through 4.10."""
     if not path.exists():
@@ -228,6 +233,9 @@ def main():
         manifest.write_text(json.dumps({
             "masterVersion": ver,
             "masterDate": vdate,
+            # The master has been edited in place without a version bump, so the
+            # version alone cannot answer "is this current?". Hash it too.
+            "masterSha256": file_digest(MASTER),
             "generated": date.today().isoformat(),
             "artifacts": {Path(args.emit_web).name: digest},
         }, indent=2) + "\n", encoding="utf-8")

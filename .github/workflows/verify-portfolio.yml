@@ -1,13 +1,16 @@
-# Verifies the Work page still reproduces the Section 4 portfolio record.
+# Verifies the Work page still renders every published Section 4 record.
 #
 # Runs entirely on files in this repository — no secrets, no network, no access
 # to the context store. That is the point: the context document cannot live in
-# a public repo, but the fields the Work page renders are public by definition,
-# so docs/standards/portfolio-records.json carries just those and CI compares
-# against it.
+# a public repo. The page is generated from it (lib/work-records.ts, written by
+# scripts/master_extract.py), so what CI can usefully check is not whether the
+# records are correct — the generator settles that — but whether the page still
+# shows all of them.
 #
-# When the context store changes, re-run scripts/extract-portfolio-records.ts
-# locally with MASTER_CONTEXT_PATH set and commit the updated JSON.
+# scripts/check_drift.py deliberately does NOT run here. It compares the
+# manifest against the master, and docs/context is a symlink to the shared
+# drive that no clone has, so it exits zero without reaching the master. In CI
+# it would be a check that always passes. It is a local tool.
 name: Verify portfolio records
 
 # Deliberately NOT path-filtered. This is a required status check, and a
@@ -35,4 +38,4 @@ jobs:
       # The verifier reads two files and uses no runtime dependencies beyond
       # tsx, so a full install is unnecessary.
       - run: pnpm add -g tsx
-      - run: tsx scripts/verify-portfolio-records.ts
+      - run: tsx scripts/verify-work-page.ts

@@ -21,10 +21,10 @@ contributor without Drive — simply cannot answer question 1. It says so and
 exits 0 rather than failing a build over a missing mount. Question 2 needs no
 master and still runs.
 
-Known limitation: the manifest records the master's *version*, not a hash of
-it. The master has twice been edited in place without a version bump, and this
-check cannot see that. A version match means "not obviously stale", not
-"provably current".
+The manifest records both the master's version and a sha256 prefix of the
+master file, because the master has been edited in place without a version bump
+more than once. A version match alone would mean "not obviously stale"; the
+hash is what makes it "provably current".
 
 Written for Python 3.9 (the machine's interpreter). Do not use PEP 604
 annotations here.
@@ -55,6 +55,16 @@ REGENERATE = "python3 scripts/master_extract.py --emit-web lib/work-records.ts"
 OK = "ok"
 STALE = "stale"
 UNKNOWN = "unknown"
+
+
+def master_digest() -> Optional[str]:
+    """sha256 prefix of the master file, or None if unreachable."""
+    if not MASTER.exists():
+        return None
+    try:
+        return hashlib.sha256(MASTER.read_bytes()).hexdigest()[:16]
+    except OSError:
+        return None
 
 
 def master_version() -> Optional[Tuple[str, str]]:
@@ -90,6 +100,7 @@ def main() -> int:
         return 1
 
     generated_from = manifest.get("masterVersion")
+    generated_hash = manifest.get("masterSha256")
     generated_on = manifest.get("generated")
     recorded_hash = (manifest.get("artifacts") or {}).get("work-records.ts")
 
@@ -99,12 +110,22 @@ def main() -> int:
 
     # ── 1. Staleness check. Needs the master. ────────────────────────────────
     found = master_version()
+    current_hash = master_digest()
+    edited_in_place = False
     if found is None:
         version_state = UNKNOWN
         current_version, current_date = None, None
     else:
         current_version, current_date = found
-        version_state = OK if current_version == generated_from else STALE
+        if current_version != generated_from:
+            version_state = STALE
+        elif generated_hash is not None and current_hash != generated_hash:
+            # Same version, different bytes. This is the case a version check
+            # alone cannot see, and it has happened.
+            version_state = STALE
+            edited_in_place = True
+        else:
+            version_state = OK
 
     print(f"artifacts generated from master v{generated_from} on {generated_on}")
 
@@ -112,9 +133,15 @@ def main() -> int:
         print("master       not reachable — docs/context is not mounted")
         print("             cannot tell whether the master has moved")
     elif version_state == OK:
-        print(f"master       v{current_version} ({current_date}) — matches")
+        print(f"master       v{current_version} ({current_date}) {current_hash} — matches")
+    elif edited_in_place:
+        print(f"master       v{current_version} ({current_date}) — EDITED IN PLACE")
+        print(f"             manifest {generated_hash}, file {current_hash}")
     else:
         print(f"master       v{current_version} ({current_date}) — MOVED")
+
+    if generated_hash is None:
+        print("             manifest predates masterSha256 — version check only")
 
     if recorded_hash is None:
         print("work-records no hash recorded in the manifest — cannot verify")
@@ -129,6 +156,13 @@ def main() -> int:
         print("FAIL  lib/work-records.ts does not match its manifest hash.")
         print("      It is generated output. Either it was hand-edited, or a")
         print("      formatter rewrote it. Do not fix it by hand — regenerate:")
+        print(f"        {REGENERATE}")
+        return 1
+
+    if version_state == STALE and edited_in_place:
+        print(f"FAIL  the master is still v{current_version} but its contents have")
+        print("      changed since the artifacts were written — an in-place edit")
+        print("      with no version bump. Regenerate before relying on them:")
         print(f"        {REGENERATE}")
         return 1
 

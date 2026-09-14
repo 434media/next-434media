@@ -132,8 +132,11 @@ python3 scripts/check_drift.py
 It reports whether the master has moved since the artifacts were written and
 re-hashes the extract to catch a hand edit. It exits 0 when the master is not
 reachable — `docs/context` is a symlink to the shared drive, and a clone
-without the mount cannot answer the question — so a green run in CI does not
-prove the artifacts are current.
+without the mount cannot answer the question. That is why it is a local tool
+and **not** a CI check: in CI it would pass unconditionally. What CI checks
+instead is that the page still renders every published record
+([scripts/verify-work-page.ts](scripts/verify-work-page.ts)) — the failure a
+hash cannot catch.
 
 **After any Section 4 change, regenerate:**
 
@@ -150,10 +153,9 @@ the run, as does a repeated field, so a record that invents a field breaks the
 build rather than silently not rendering. Records marked `Work page: Not
 published` are parsed and reported but excluded from the emitted file.
 
-One limitation worth knowing: the manifest records the master's *version*, not
-a hash of it. The master has been edited in place without a version bump more
-than once, and `check_drift.py` cannot see that. A version match means "not
-obviously stale", not "provably current".
+The manifest records both the master's version and a sha256 of the master file,
+so an in-place edit with no version bump is caught too — that has happened more
+than once.
 
 ## Context files — canonical source and read rules
 
