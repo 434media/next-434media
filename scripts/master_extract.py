@@ -22,13 +22,46 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from datetime import date
 from pathlib import Path
 
+MASTER_FILENAME = "434_MEDIA_Master_Contextual_Document_v2_0_Locked.md"
+
+# Where the master is looked for, in order. The default was a single hardcoded
+# path under ~/434, which meant only a machine laid out that way could
+# regenerate — and that is not even the repo's own documented docs/context
+# symlink. Anyone else got "master not found" with no way to point it elsewhere,
+# so the ability to update the Work page from the record sat on one machine.
+#
+# MASTER_CONTEXT_PATH is the convention already used by the ICP tooling; it may
+# name the document itself or the directory holding it.
+def default_master_candidates() -> list[Path]:
+    return [
+        Path(__file__).resolve().parent.parent / "docs" / "context" / "00 Governing" / MASTER_FILENAME,
+        Path.home() / "434" / "docs" / "context" / "00 Governing" / MASTER_FILENAME,
+    ]
+
+
+def resolve_master(explicit: str | None) -> Path:
+    """--master wins, then MASTER_CONTEXT_PATH, then the known locations."""
+    for raw in (explicit, os.environ.get("MASTER_CONTEXT_PATH")):
+        if raw:
+            p = Path(raw).expanduser()
+            # Accept either the file or the directory containing it.
+            if p.is_dir():
+                p = p / MASTER_FILENAME
+            return p
+    for candidate in default_master_candidates():
+        if candidate.exists():
+            return candidate
+    return default_master_candidates()[0]
+
+
 GOV = Path.home() / "434" / "docs" / "context" / "00 Governing"
-MASTER = GOV / "434_MEDIA_Master_Contextual_Document_v2_0_Locked.md"
+MASTER = GOV / MASTER_FILENAME
 
 # The 4.5 vocabulary. Anything else is an error.
 FIELDS = [
@@ -200,10 +233,27 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--emit-web", metavar="PATH")
+    ap.add_argument(
+        "--master",
+        metavar="PATH",
+        help="the master document, or the directory holding it. "
+        "Falls back to MASTER_CONTEXT_PATH, then the repo's docs/context symlink, "
+        "then ~/434/docs/context.",
+    )
     args = ap.parse_args()
 
+    master = resolve_master(args.master)
+    if not master.exists():
+        print(
+            f"MASTER ERROR\nmaster not found: {master}\n\n"
+            "Point at it with --master, or set MASTER_CONTEXT_PATH. It may name the\n"
+            "document itself or the directory containing it.",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
-        ver, vdate, records = parse()
+        ver, vdate, records = parse(master)
     except MasterError as e:
         print(f"MASTER ERROR\n{e}", file=sys.stderr)
         return 1
@@ -235,7 +285,7 @@ def main():
             "masterDate": vdate,
             # The master has been edited in place without a version bump, so the
             # version alone cannot answer "is this current?". Hash it too.
-            "masterSha256": file_digest(MASTER),
+            "masterSha256": file_digest(master),
             "generated": date.today().isoformat(),
             "artifacts": {Path(args.emit_web).name: digest},
         }, indent=2) + "\n", encoding="utf-8")

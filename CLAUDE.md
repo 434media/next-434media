@@ -144,6 +144,11 @@ hash cannot catch.
 python3 scripts/master_extract.py --emit-web lib/work-records.ts
 ```
 
+The generator finds the master via `--master`, then `MASTER_CONTEXT_PATH`, then
+the repo's own `docs/context` symlink, then `~/434/docs/context`. Either of the
+first two may name the document itself or the directory holding it — so a clone
+without the symlink can still regenerate by pointing at a local copy.
+
 **A master edit and its regeneration are one motion, not two.** A Section 4
 change that is not regenerated leaves the site rendering the previous version
 of the record, and nothing in the page will look wrong.
