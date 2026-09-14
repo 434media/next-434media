@@ -112,6 +112,49 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
 Shopify, and framer-motion code plus stale `.next` validator types. Check that
 your files are clean rather than expecting a zero exit.
 
+## Generated from the master — never hand-edited
+
+[lib/work-records.ts](lib/work-records.ts) and
+[lib/master-manifest.json](lib/master-manifest.json) are build output, written
+by [scripts/master_extract.py](scripts/master_extract.py) from Section 4 of the
+canonical master. **Do not hand-edit either file, and do not let a formatter
+touch them.** The manifest records a sha256 prefix of `work-records.ts`, so any
+rewrite — a stray edit, a Prettier run, `eslint --fix` — changes the hash and
+trips the drift check. Both paths are excluded in `.prettierignore` and
+`eslint.config.mjs` for that reason.
+
+**Before any work touching Section 4 content or those files, check for drift:**
+
+```
+python3 scripts/check_drift.py
+```
+
+It reports whether the master has moved since the artifacts were written and
+re-hashes the extract to catch a hand edit. It exits 0 when the master is not
+reachable — `docs/context` is a symlink to the shared drive, and a clone
+without the mount cannot answer the question — so a green run in CI does not
+prove the artifacts are current.
+
+**After any Section 4 change, regenerate:**
+
+```
+python3 scripts/master_extract.py --emit-web lib/work-records.ts
+```
+
+**A master edit and its regeneration are one motion, not two.** A Section 4
+change that is not regenerated leaves the site rendering the previous version
+of the record, and nothing in the page will look wrong.
+
+The generator is strict: a field key outside the Section 4.5 vocabulary stops
+the run, as does a repeated field, so a record that invents a field breaks the
+build rather than silently not rendering. Records marked `Work page: Not
+published` are parsed and reported but excluded from the emitted file.
+
+One limitation worth knowing: the manifest records the master's *version*, not
+a hash of it. The master has been edited in place without a version bump more
+than once, and `check_drift.py` cannot see that. A version match means "not
+obviously stale", not "provably current".
+
 ## Context files — canonical source and read rules
 
 `docs/context/` is a **symlink to the canonical Google shared drive** ("434 MEDIA — Master Operations_434MediaMGR" → "434 MEDIA — Master Context"). Files read through it are live and authoritative. It is gitignored and never committed.
