@@ -29,12 +29,17 @@ export const metadata: Metadata = {
       `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
     url: `${siteUrl}/work`,
     siteName: "434 MEDIA",
+    // The site-level card from app/opengraph-image.tsx — the wordmark, the
+    // motto in its styled form, and the canonical definition. Named explicitly
+    // rather than omitted: declaring an `openGraph` object without `images`
+    // suppresses the file-based image instead of inheriting it, and /work then
+    // resolves with no og:image at all. Verified in the rendered head.
     images: [
       {
-        url: `${siteUrl}/api/og/page?page=work`,
+        url: `${siteUrl}/opengraph-image`,
         width: 1200,
         height: 630,
-        alt: `434 MEDIA — ${BRAND_RECORDS.shortDescriptor}`,
+        alt: BRAND_RECORDS.mottoPlain,
       },
     ],
     locale: "en_US",
@@ -45,7 +50,8 @@ export const metadata: Metadata = {
     title: "Our Work | 434 MEDIA",
     description:
       `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
-    images: [`${siteUrl}/api/og/page?page=work`],
+    // Same reasoning: the site-level card, named explicitly.
+    images: [`${siteUrl}/twitter-image`],
     creator: "@434media",
     site: "@434media",
   },
