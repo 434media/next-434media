@@ -1,13 +1,14 @@
 import type { Metadata } from "next"
 import WorkClient from "./WorkClient"
 import { buildServicesItemListLd } from "@/lib/seo/services"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
 export const metadata: Metadata = {
   title: "Our Work | Original IP, Platforms, and Productions",
   description:
-    "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands. Selected work by commercial model.",
+    `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
   keywords: [
     "434 MEDIA portfolio",
     "production studio",
@@ -25,15 +26,20 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Our Work | 434 MEDIA",
     description:
-      "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands. Selected work by commercial model.",
+      `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
     url: `${siteUrl}/work`,
     siteName: "434 MEDIA",
+    // The site-level card from app/opengraph-image.tsx — the wordmark, the
+    // motto in its styled form, and the canonical definition. Named explicitly
+    // rather than omitted: declaring an `openGraph` object without `images`
+    // suppresses the file-based image instead of inheriting it, and /work then
+    // resolves with no og:image at all. Verified in the rendered head.
     images: [
       {
-        url: `${siteUrl}/api/og/page?page=work`,
+        url: `${siteUrl}/opengraph-image`,
         width: 1200,
         height: 630,
-        alt: "434 MEDIA — Production studio for original IP, content, experiences, and platforms.",
+        alt: BRAND_RECORDS.mottoPlain,
       },
     ],
     locale: "en_US",
@@ -43,8 +49,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Our Work | 434 MEDIA",
     description:
-      "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands. Selected work by commercial model.",
-    images: [`${siteUrl}/api/og/page?page=work`],
+      `${BRAND_RECORDS.canonicalDefinition} Selected work by commercial model.`,
+    // Same reasoning: the site-level card, named explicitly.
+    images: [`${siteUrl}/twitter-image`],
     creator: "@434media",
     site: "@434media",
   },

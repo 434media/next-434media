@@ -13,6 +13,7 @@ import Link from "next/link"
 import { XIcon, PlayIcon, ArrowUpRightIcon } from "lucide-react"
 import { Button, ButtonArrow } from "@/components/ui/Button"
 import { WORK_RECORDS, type WorkRecord } from "@/lib/work-records"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -668,7 +669,7 @@ export default function WorkClient() {
               transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="mt-8 max-w-2xl text-balance font-geist-sans text-lg leading-relaxed tracking-tight text-neutral-600 md:text-xl"
             >
-              434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands. Everything
+              {BRAND_RECORDS.canonicalDefinition} Everything
               below is organized by commercial model: what we own, the platforms we build for
               clients, and the productions we deliver for them.
             </motion.p>

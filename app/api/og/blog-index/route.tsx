@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export const runtime = "nodejs"
 
@@ -124,11 +125,10 @@ export async function GET() {
             fontWeight: 700,
             letterSpacing: "3px",
             color: "#a78bfa",
-            textTransform: "uppercase",
             marginBottom: "32px",
           }}
         >
-          {BRAND.shortTagline}
+          {BRAND_RECORDS.mottoStyled}
         </div>
 
         {/* Gradient line */}

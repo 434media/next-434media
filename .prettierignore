@@ -1,6 +1,7 @@
 # Generated from the canonical master by scripts/master_extract.py.
 # Never formatted: lib/master-manifest.json records a sha256 of
-# work-records.ts, and reformatting changes that hash, which trips the drift
-# check in scripts/check_drift.py. Regenerate rather than reformat.
+# each generated artifact, and reformatting changes that hash, which trips the
+# drift check in scripts/check_drift.py. Regenerate rather than reformat.
 lib/work-records.ts
+lib/brand-records.ts
 lib/master-manifest.json

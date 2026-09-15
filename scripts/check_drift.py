@@ -7,8 +7,8 @@ Two questions, both cheap:
   1. Has the master moved since the artifacts were written? The manifest
      records the master version it was generated from; compare it with the
      version line in the master itself.
-  2. Has anything hand-edited the extract? The manifest records a sha256
-     prefix of work-records.ts; re-hash and compare.
+  2. Has anything hand-edited an extract? The manifest records a sha256
+     prefix of each generated artifact; re-hash and compare.
 
   python3 scripts/check_drift.py
 
@@ -41,7 +41,11 @@ from typing import Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "lib" / "master-manifest.json"
-RECORDS = ROOT / "lib" / "work-records.ts"
+# Every generated artifact, by the name the manifest records it under.
+ARTIFACTS = {
+    "work-records.ts": ROOT / "lib" / "work-records.ts",
+    "brand-records.ts": ROOT / "lib" / "brand-records.ts",
+}
 MASTER = (
     ROOT
     / "docs"
@@ -50,7 +54,11 @@ MASTER = (
     / "434_MEDIA_Master_Contextual_Document_v2_0_Locked.md"
 )
 
-REGENERATE = "python3 scripts/master_extract.py --emit-web lib/work-records.ts"
+REGENERATE = (
+    "python3 scripts/master_extract.py \\\n"
+    "          --emit-web lib/work-records.ts \\\n"
+    "          --emit-brand lib/brand-records.ts"
+)
 
 OK = "ok"
 STALE = "stale"
@@ -88,10 +96,11 @@ def main() -> int:
         print(f"MISSING  {MANIFEST.relative_to(ROOT)} not found.")
         print(f"         Generate the artifacts first: {REGENERATE}")
         return 1
-    if not RECORDS.exists():
-        print(f"MISSING  {RECORDS.relative_to(ROOT)} not found.")
-        print(f"         Generate it: {REGENERATE}")
-        return 1
+    for name, path in ARTIFACTS.items():
+        if not path.exists():
+            print(f"MISSING  {path.relative_to(ROOT)} not found.")
+            print(f"         Generate it:\n        {REGENERATE}")
+            return 1
 
     try:
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -102,11 +111,16 @@ def main() -> int:
     generated_from = manifest.get("masterVersion")
     generated_hash = manifest.get("masterSha256")
     generated_on = manifest.get("generated")
-    recorded_hash = (manifest.get("artifacts") or {}).get("work-records.ts")
+    recorded = manifest.get("artifacts") or {}
 
     # ── 2. Hand-edit check. Needs no master, so it always runs. ──────────────
-    actual_hash = hashlib.sha256(RECORDS.read_bytes()).hexdigest()[:16]
-    edited = recorded_hash is not None and actual_hash != recorded_hash
+    # Reported per artifact: which file drifted is the first thing you need.
+    checked = []
+    for name, path in ARTIFACTS.items():
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        expected = recorded.get(name)
+        checked.append((name, expected, actual, expected is not None and actual != expected))
+    edited = any(c[3] for c in checked)
 
     # ── 1. Staleness check. Needs the master. ────────────────────────────────
     found = master_version()
@@ -130,32 +144,35 @@ def main() -> int:
     print(f"artifacts generated from master v{generated_from} on {generated_on}")
 
     if version_state is UNKNOWN:
-        print("master       not reachable — docs/context is not mounted")
-        print("             cannot tell whether the master has moved")
+        print("master         not reachable — docs/context is not mounted")
+        print("               cannot tell whether the master has moved")
     elif version_state == OK:
-        print(f"master       v{current_version} ({current_date}) {current_hash} — matches")
+        print(f"master         v{current_version} ({current_date}) {current_hash} — matches")
     elif edited_in_place:
-        print(f"master       v{current_version} ({current_date}) — EDITED IN PLACE")
-        print(f"             manifest {generated_hash}, file {current_hash}")
+        print(f"master         v{current_version} ({current_date}) — EDITED IN PLACE")
+        print(f"               manifest {generated_hash}, file {current_hash}")
     else:
-        print(f"master       v{current_version} ({current_date}) — MOVED")
+        print(f"master         v{current_version} ({current_date}) — MOVED")
 
     if generated_hash is None:
-        print("             manifest predates masterSha256 — version check only")
+        print("               manifest predates masterSha256 — version check only")
 
-    if recorded_hash is None:
-        print("work-records no hash recorded in the manifest — cannot verify")
-    elif edited:
-        print(f"work-records EDITED — manifest {recorded_hash}, file {actual_hash}")
-    else:
-        print(f"work-records {actual_hash} — matches the manifest")
+    for name, expected, actual, drifted in checked:
+        label = name[:-3]
+        if expected is None:
+            print(f"{label:14} no hash recorded in the manifest — cannot verify")
+        elif drifted:
+            print(f"{label:14} EDITED — manifest {expected}, file {actual}")
+        else:
+            print(f"{label:14} {actual} — matches the manifest")
 
     print()
 
     if edited:
-        print("FAIL  lib/work-records.ts does not match its manifest hash.")
-        print("      It is generated output. Either it was hand-edited, or a")
-        print("      formatter rewrote it. Do not fix it by hand — regenerate:")
+        drifted = [c[0] for c in checked if c[3]]
+        print(f"FAIL  {', '.join(drifted)} does not match its manifest hash.")
+        print("      Generated output. Either it was hand-edited, or a formatter")
+        print("      rewrote it. Do not fix it by hand — regenerate:")
         print(f"        {REGENERATE}")
         return 1
 

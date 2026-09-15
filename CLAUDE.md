@@ -114,16 +114,24 @@ your files are clean rather than expecting a zero exit.
 
 ## Generated from the master — never hand-edited
 
-[lib/work-records.ts](lib/work-records.ts) and
+[lib/work-records.ts](lib/work-records.ts),
+[lib/brand-records.ts](lib/brand-records.ts) and
 [lib/master-manifest.json](lib/master-manifest.json) are build output, written
-by [scripts/master_extract.py](scripts/master_extract.py) from Section 4 of the
-canonical master. **Do not hand-edit either file, and do not let a formatter
-touch them.** The manifest records a sha256 prefix of `work-records.ts`, so any
-rewrite — a stray edit, a Prettier run, `eslint --fix` — changes the hash and
-trips the drift check. Both paths are excluded in `.prettierignore` and
+by [scripts/master_extract.py](scripts/master_extract.py) from the canonical
+master — Section 4 for the work records, Sections 1.1, 1.3 and 1.4 for the
+brand strings. **Do not hand-edit any of them, and do not let a formatter touch
+them.** The manifest records a sha256 prefix of each artifact, so any rewrite —
+a stray edit, a Prettier run, `eslint --fix` — changes the hash and trips the
+drift check. All three paths are excluded in `.prettierignore` and
 `eslint.config.mjs` for that reason.
 
-**Before any work touching Section 4 content or those files, check for drift:**
+`BRAND_RECORDS` carries the canonical definition, the approved short descriptor
+and spoken introduction, and both motto forms. **`mottoPlain` is for
+machine-read fields** — JSON-LD `slogan`, image `alt`, metadata. **`mottoStyled`
+is for visual display**, including text drawn into an image. Never let one form
+leak into the other, and never concatenate the motto with anything.
+
+**Before any work touching Section 1 or Section 4 content or those files, check for drift:**
 
 ```
 python3 scripts/check_drift.py
@@ -138,10 +146,12 @@ instead is that the page still renders every published record
 ([scripts/verify-work-page.ts](scripts/verify-work-page.ts)) — the failure a
 hash cannot catch.
 
-**After any Section 4 change, regenerate:**
+**After any Section 1 or Section 4 change, regenerate:**
 
 ```
-python3 scripts/master_extract.py --emit-web lib/work-records.ts
+python3 scripts/master_extract.py \
+  --emit-web lib/work-records.ts \
+  --emit-brand lib/brand-records.ts
 ```
 
 The generator finds the master via `--master`, then `MASTER_CONTEXT_PATH`, then

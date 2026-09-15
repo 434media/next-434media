@@ -5,6 +5,7 @@ import localFont from "next/font/local"
 import "./globals.css"
 import { CombinedNavbar } from "@/components/combined-navbar"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 import Footer from "@/components/Footer"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
@@ -44,7 +45,7 @@ const ggx88Font = localFont({
 // Define the base URL for the site
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
-const defaultTitle = `${BRAND.name} — ${BRAND.shortTagline}`
+const defaultTitle = `${BRAND.name} — ${BRAND_RECORDS.shortDescriptor}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -55,8 +56,6 @@ export const metadata: Metadata = {
   description: BRAND.description,
   keywords: [
     BRAND.name,
-    "Bold Stories",
-    "Proven Impact",
     "brand campaigns",
     "event production",
     "creative media agency",
@@ -240,7 +239,7 @@ export default async function RootLayout({
               '@type': 'Organization',
               name: BRAND.name,
               alternateName: '434 Media',
-              slogan: BRAND.shortTagline,
+              slogan: BRAND_RECORDS.mottoPlain,
               description: BRAND.description,
               url: siteUrl,
               logo: `${siteUrl}/api/og`,
@@ -284,7 +283,7 @@ export default async function RootLayout({
               '@id': `${siteUrl}/#localbusiness`,
               name: BRAND.name,
               alternateName: '434 Media',
-              slogan: BRAND.shortTagline,
+              slogan: BRAND_RECORDS.mottoPlain,
               url: siteUrl,
               image: `${siteUrl}/api/og`,
               logo: `${siteUrl}/api/og`,

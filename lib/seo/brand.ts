@@ -1,15 +1,18 @@
 /**
- * Canonical brand messaging used across every OG/Twitter card.
- * Keep these in one place so every social preview stays in sync.
+ * Brand identity used across every OG/Twitter card.
+ *
+ * Governed strings are not restated here — `description` reads the Section 1.1
+ * canonical definition from the generated extract, and the motto is read from
+ * BRAND_RECORDS at each use so the right form reaches the right field.
+ *
+ * `headline`, `headline2` and `shortTagline` were the retired positioning
+ * ("Bold Stories. / Proven Impact.") and are deleted rather than repointed.
  */
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export const BRAND = {
   name: "434 MEDIA",
   domain: "www.434media.com",
   location: "SAN ANTONIO, TX",
-  headline: "Bold Stories.",
-  headline2: "Proven Impact.",
-  description:
-    "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands.",
-  shortTagline: "Bold Stories. Proven Impact.",
+  description: BRAND_RECORDS.canonicalDefinition,
 } as const
