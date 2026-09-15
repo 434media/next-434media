@@ -7,6 +7,7 @@ import Link from "next/link"
 import { ScrambleText } from "./ScrambleText"
 import { Newsletter } from "./Newsletter"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export default function Footer() {
   const pathname = usePathname()
@@ -99,7 +100,7 @@ export default function Footer() {
                       </Link>
                     </h2>
                     <p className="font-geist-sans text-sm text-white font-medium leading-snug max-w-xs mb-2">
-                      {BRAND.shortTagline}
+                      {BRAND_RECORDS.mottoStyled}
                     </p>
                     <p className="font-geist-sans text-sm text-neutral-400 leading-relaxed max-w-xs mb-5">
                       {BRAND.description}
@@ -174,7 +175,7 @@ export default function Footer() {
                   routes to /contact instead. */}
               <div className="py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="font-geist-sans text-xs text-neutral-600 leading-none">
-                  &copy; {currentYear} 434 MEDIA · {BRAND.shortTagline}
+                  &copy; {currentYear} 434 MEDIA · {BRAND_RECORDS.mottoStyled}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {legalLinks.map((link) => (

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export const runtime = "nodejs"
 
@@ -38,7 +39,7 @@ const pageConfig: Record<
   work: {
     title: "OUR WORK",
     subtitle:
-      "434 MEDIA is a production studio that develops original IP and produces content, experiences, and platforms for brands.",
+      BRAND_RECORDS.canonicalDefinition,
     accent: "#f97316",
     gradient: "linear-gradient(135deg, #0c0a09, #1c1917, #0c0a09)",
     icon: "🎬",
@@ -206,11 +207,10 @@ export async function GET(req: NextRequest) {
               color: config.accent,
               fontWeight: 700,
               letterSpacing: 3,
-              textTransform: "uppercase",
               display: "flex",
             }}
           >
-            {BRAND.shortTagline}
+            {BRAND_RECORDS.mottoStyled}
           </div>
         </div>
 

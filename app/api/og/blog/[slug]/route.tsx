@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export const runtime = "nodejs"
 
@@ -191,10 +192,9 @@ export async function GET(
               fontWeight: 700,
               letterSpacing: "3px",
               color: "#a78bfa",
-              textTransform: "uppercase",
             }}
           >
-            {BRAND.shortTagline}
+            {BRAND_RECORDS.mottoStyled}
           </div>
         </div>
 
@@ -326,10 +326,9 @@ export async function GET(
             fontWeight: "700",
             opacity: 0.95,
             letterSpacing: 2,
-            textTransform: "uppercase",
           }}
         >
-          {BRAND.shortTagline}
+          {BRAND_RECORDS.mottoStyled}
         </div>
         <div
           style={{

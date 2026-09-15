@@ -3,10 +3,11 @@ import type { NextRequest } from "next/server"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export const runtime = "nodejs"
 
-export const alt = `${BRAND.name} — ${BRAND.shortTagline}`
+export const alt = BRAND_RECORDS.mottoPlain
 export const size = {
   width: 1200,
   height: 630,
@@ -18,8 +19,8 @@ export async function GET(req: NextRequest) {
 
     // Per-page customization. When no title is provided we fall back to the
     // canonical brand headline so the image still feels on-brand.
-    const title = searchParams.get("title") || BRAND.headline
-    const subtitle = searchParams.get("subtitle") || BRAND.headline2
+    const title = searchParams.get("title") || BRAND_RECORDS.mottoStyled
+    const subtitle = searchParams.get("subtitle") || BRAND_RECORDS.shortDescriptor
     const path = searchParams.get("path") || ""
     const locale = searchParams.get("locale") || "en"
 
