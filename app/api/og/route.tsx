@@ -19,8 +19,16 @@ export async function GET(req: NextRequest) {
 
     // Per-page customization. When no title is provided we fall back to the
     // canonical brand headline so the image still feels on-brand.
-    const title = searchParams.get("title") || BRAND_RECORDS.mottoStyled
-    const subtitle = searchParams.get("subtitle") || BRAND_RECORDS.shortDescriptor
+    // The two headline slots are sized for short per-page titles. With no
+    // params this is the bare brand card — the one the JSON-LD logo fields
+    // point at — and it falls back to the motto alone. `mottoStyled` has no
+    // spaces, so it cannot wrap and overflows at the per-page size; it gets a
+    // smaller size rather than a reworded or re-spaced string, which 1.4
+    // forbids. The subtitle has no governed short form and is simply omitted.
+    const customTitle = searchParams.get("title")
+    const title = customTitle || BRAND_RECORDS.mottoStyled
+    const subtitle = searchParams.get("subtitle") || ""
+    const titleSize = customTitle ? 80 : 56
     const path = searchParams.get("path") || ""
     const locale = searchParams.get("locale") || "en"
 
@@ -76,7 +84,7 @@ export async function GET(req: NextRequest) {
           <div
             style={{
               color: "white",
-              fontSize: 80,
+              fontSize: titleSize,
               fontWeight: 900,
               lineHeight: 1.05,
               letterSpacing: -2,
@@ -85,18 +93,20 @@ export async function GET(req: NextRequest) {
           >
             {title}
           </div>
-          <div
-            style={{
-              color: "rgba(255,255,255,0.92)",
-              fontSize: 80,
-              fontWeight: 900,
-              lineHeight: 1.05,
-              letterSpacing: -2,
-              maxWidth: 1050,
-            }}
-          >
-            {subtitle}
-          </div>
+          {subtitle ? (
+            <div
+              style={{
+                color: "rgba(255,255,255,0.92)",
+                fontSize: 80,
+                fontWeight: 900,
+                lineHeight: 1.05,
+                letterSpacing: -2,
+                maxWidth: 1050,
+              }}
+            >
+              {subtitle}
+            </div>
+          ) : null}
           <div
             style={{
               marginTop: 24,
@@ -121,9 +131,14 @@ export async function GET(req: NextRequest) {
             paddingTop: 22,
           }}
         >
+          {/* One expression, not two. Satori requires an explicit `display` on
+              any element with more than one child, and this div had two — the
+              domain and a path fragment that is "" when no path is given. That
+              threw on every request, including the bare /api/og the JSON-LD
+              logo fields point at, and the error surfaced as a torn response
+              rather than a clean 500. */}
           <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 22, fontWeight: 700 }}>
-            {BRAND.domain}
-            {path ? `/${locale === "en" ? "" : `${locale}/`}${path}` : ""}
+            {`${BRAND.domain}${path ? `/${locale === "en" ? "" : `${locale}/`}${path}` : ""}`}
           </div>
           <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 20, letterSpacing: 2 }}>
             {BRAND.location}
