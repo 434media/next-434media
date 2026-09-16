@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
 // Written by scripts/master_extract.py from the canonical master.
-// Master version 2.0.13 (September 14, 2026). Regenerate after any section 1 change.
+// Master version 2.0.14 (September 16, 2026). Regenerate after any section 1 change.
 //
 // mottoPlain is for machine-read fields: JSON-LD slogan, image alt text,
 // meta. mottoStyled is for visual display. Both are verbatim per 1.4 and
