@@ -3,7 +3,10 @@ import { getBlogPostsFromFirestore } from "@/lib/firestore-blog"
 import BlogClientPage from "./BlogClientPage"
 
 export const metadata: Metadata = {
-  title: "Blog | 434 MEDIA - Creative Media & Smart Marketing Insights",
+  // "%s | 434 MEDIA" comes from the title template in app/layout.tsx. The
+  // previous absolute title also carried "Creative Media & Smart Marketing",
+  // which the master retires from titles and metadata.
+  title: "Blog",
   description:
     "Discover the latest insights, trends, and strategies in creative media, digital marketing, and business growth from the 434 MEDIA team.",
   keywords: ["blog", "marketing", "creative media", "digital strategy", "business insights", "434 media"],

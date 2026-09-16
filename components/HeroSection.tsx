@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence, useScroll, useTransform } from "motion/react"
 import Image from "next/image"
 import { useMobile } from "../hooks/use-mobile"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 function ScrollIndicator() {
   const { scrollY } = useScroll()
@@ -151,12 +152,15 @@ export function HeroSection() {
     <section className="relative h-dvh w-full overflow-hidden bg-neutral-950" aria-labelledby="hero-heading">
       <div className="absolute inset-0 flex items-center justify-center">
         {/* Visually hidden text for screen readers and SEO */}
+        {/* The homepage's only h1. It carried "Creative Media & Smart
+            Marketing" over a paragraph about leveraging networks — both
+            superseded agency positioning the master retires. Section 1.3
+            requires the full Section 1.1 statement on the main company
+            introduction, which this is, so the definition is the heading and
+            the approved short descriptor follows it. */}
         <div className="sr-only">
-          <h1 id="hero-heading">Creative Media & Smart Marketing</h1>
-          <p>
-            Connecting enterprises in San Antonio and South Texas by leveraging networks to connect people, places, and
-            things.
-          </p>
+          <h1 id="hero-heading">{BRAND_RECORDS.canonicalDefinition}</h1>
+          <p>{BRAND_RECORDS.shortDescriptor}</p>
         </div>
 
         {/* Poster Image (shown until video loads or as fallback) */}
