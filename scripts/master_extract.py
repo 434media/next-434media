@@ -229,10 +229,135 @@ def emit_web(ver, vdate, records, out_path):
     return len(pub), hashlib.sha256(src.encode()).hexdigest()[:16]
 
 
+SEC1_RE = re.compile(r"^###\s+1\.(\d+)\s+(.*)$")
+BOLD_RE = re.compile(r"^\*\*(.+?)\*\*\s*$")
+TICK_RE = re.compile(r"`([^`]+)`")
+
+
+def _sec1_lines(path):
+    """The lines of section 1, as a list."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    tops = [i for i, l in enumerate(lines) if l.startswith("## ")]
+    if len(tops) < 2:
+        raise MasterError("could not locate section boundaries")
+    return lines[tops[0]:tops[1]]
+
+
+def _first_bold_under(lines, num):
+    """First standalone bold line under subsection 1.<num>."""
+    start = None
+    for i, l in enumerate(lines):
+        m = SEC1_RE.match(l)
+        if m and m.group(1) == str(num):
+            start = i
+            continue
+        if start is not None and SEC1_RE.match(l):
+            break
+        if start is not None:
+            b = BOLD_RE.match(l.strip())
+            if b:
+                return b.group(1).strip()
+    return None
+
+
+def _bold_after_label(lines, label):
+    """First standalone bold line following a line containing label."""
+    seen = False
+    for l in lines:
+        if not seen and label in l:
+            seen = True
+            continue
+        if seen:
+            b = BOLD_RE.match(l.strip())
+            if b:
+                return b.group(1).strip()
+    return None
+
+
+def _ticked_in_bullet(lines, label):
+    """The backticked value in a bullet whose key is label."""
+    for l in lines:
+        if l.lstrip().startswith("-") and label in l:
+            m = TICK_RE.search(l)
+            if m:
+                return m.group(1).strip()
+    return None
+
+
+def parse_brand(path=MASTER):
+    """Return the governed section 1 strings, or raise."""
+    lines = _sec1_lines(path)
+    brand = {
+        "canonicalDefinition": _first_bold_under(lines, 1),
+        "shortDescriptor": _bold_after_label(lines, "Approved short descriptor:"),
+        "spokenIntroduction": _bold_after_label(lines, "Approved spoken introduction:"),
+        "mottoPlain": _ticked_in_bullet(lines, "Plain form:"),
+        "mottoStyled": _ticked_in_bullet(lines, "Styled form:"),
+    }
+    missing = [k for k, v in brand.items() if not v]
+    if missing:
+        raise MasterError(
+            "section 1 strings not found: " + ", ".join(missing) +
+            ". The emitter anchors on the heading and label wording in 1.1, "
+            "1.3 and 1.4; if that wording changed, the emitter changes with it "
+            "rather than emitting an empty field.")
+    return brand
+
+
+def emit_brand(ver, vdate, brand, out_path):
+    src = (
+        "// GENERATED FILE - DO NOT EDIT BY HAND.\n"
+        "// Written by scripts/master_extract.py from the canonical master.\n"
+        f"// Master version {ver} ({vdate}). Regenerate after any section 1 change.\n"
+        "//\n"
+        "// mottoPlain is for machine-read fields: JSON-LD slogan, image alt text,\n"
+        "// meta. mottoStyled is for visual display. Both are verbatim per 1.4 and\n"
+        "// neither may be reworded, recapitalized, or re-spaced. The motto is not a\n"
+        "// definition and never substitutes for canonicalDefinition on primary\n"
+        "// company materials, and must never be extended with an outcome claim.\n\n"
+        "export const BRAND_RECORDS = {\n"
+        + "".join(f"  {k}: {json.dumps(v, ensure_ascii=False)},\n"
+                 for k, v in brand.items())
+        + "} as const\n"
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(src, encoding="utf-8")
+    return hashlib.sha256(src.encode()).hexdigest()[:16]
+
+
+def update_manifest(out_path, ver, vdate, master, name, digest):
+    """Merge one artifact hash into the manifest beside it, keeping the others.
+
+    Each emitter writes its own artifact, so the manifest is merged rather than
+    replaced — running --emit-brand alone must not drop the work-records hash,
+    and vice versa.
+    """
+    manifest = Path(out_path).parent / "master-manifest.json"
+    existing = {}
+    if manifest.exists():
+        try:
+            existing = json.loads(manifest.read_text(encoding="utf-8"))
+        except ValueError:
+            existing = {}
+    artifacts = dict(existing.get("artifacts") or {})
+    artifacts[name] = digest
+    manifest.write_text(json.dumps({
+        "masterVersion": ver,
+        "masterDate": vdate,
+        # The master has been edited in place without a version bump, so the
+        # version alone cannot answer "is this current?". Hash it too.
+        "masterSha256": file_digest(master),
+        "generated": date.today().isoformat(),
+        "artifacts": artifacts,
+    }, indent=2) + "\n", encoding="utf-8")
+    return manifest
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--emit-web", metavar="PATH")
+    ap.add_argument("--emit-brand", metavar="PATH")
     ap.add_argument(
         "--master",
         metavar="PATH",
@@ -279,19 +404,27 @@ def main():
         count, digest = emit_web(ver, vdate, records, Path(args.emit_web))
         print(f"\nwrote {count} record(s) -> {args.emit_web}")
         print(f"  master v{ver} | sha256 {digest}")
-        manifest = Path(args.emit_web).parent / "master-manifest.json"
-        manifest.write_text(json.dumps({
-            "masterVersion": ver,
-            "masterDate": vdate,
-            # The master has been edited in place without a version bump, so the
-            # version alone cannot answer "is this current?". Hash it too.
-            "masterSha256": file_digest(master),
-            "generated": date.today().isoformat(),
-            "artifacts": {Path(args.emit_web).name: digest},
-        }, indent=2) + "\n", encoding="utf-8")
+        manifest = update_manifest(
+            args.emit_web, ver, vdate, master, Path(args.emit_web).name, digest)
         print(f"  manifest -> {manifest}")
-    else:
-        print("\nParse only. Pass --emit-web PATH to write the record file.")
+
+    if args.emit_brand:
+        try:
+            brand = parse_brand(master)
+        except MasterError as e:
+            print(f"BRAND ERROR\n{e}", file=sys.stderr)
+            return 1
+        digest = emit_brand(ver, vdate, brand, Path(args.emit_brand))
+        print(f"\nwrote {len(brand)} brand string(s) -> {args.emit_brand}")
+        print(f"  master v{ver} | sha256 {digest}")
+        for k, v in brand.items():
+            print(f"      {k}: {v}")
+        manifest = update_manifest(
+            args.emit_brand, ver, vdate, master, Path(args.emit_brand).name, digest)
+        print(f"  manifest -> {manifest}")
+
+    if not args.emit_web and not args.emit_brand:
+        print("\nParse only. Pass --emit-web PATH or --emit-brand PATH to write.")
     return 0
 
 

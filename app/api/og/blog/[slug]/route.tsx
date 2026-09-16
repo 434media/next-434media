@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og"
 import type { NextRequest } from "next/server"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 export const runtime = "nodejs"
 
@@ -14,7 +15,11 @@ async function loadGoogleFont(font: string, text: string) {
     },
   }).then((res) => res.text())
 
-  const resource = css.match(/src: url$$(.+)$$ format$$'(opentype|truetype)'$$/)
+  // The parentheses are literal characters in the Google Fonts CSS and must be
+  // escaped. They had been replaced with `$$`, which matches nothing, so this
+  // returned null on every call and the route handed Satori an empty `fonts`
+  // array.
+  const resource = css.match(/src: url\((.+)\) format\('(opentype|truetype)'\)/)
 
   if (resource) {
     const response = await fetch(resource[1])
@@ -191,10 +196,9 @@ export async function GET(
               fontWeight: 700,
               letterSpacing: "3px",
               color: "#a78bfa",
-              textTransform: "uppercase",
             }}
           >
-            {BRAND.shortTagline}
+            {BRAND_RECORDS.mottoStyled}
           </div>
         </div>
 
@@ -239,6 +243,9 @@ export async function GET(
             <span>{date}</span>
           </div>
 
+          {/* One expression, not a text node plus an expression. Satori needs an
+              explicit `display` on any element with more than one child, and
+              "434media.com/blog/" followed by {slug} is two. */}
           <div
             style={{
               fontSize: "16px",
@@ -246,7 +253,7 @@ export async function GET(
               fontWeight: "500",
             }}
           >
-            434media.com/blog/{slug}
+            {`434media.com/blog/${slug}`}
           </div>
         </div>
 
@@ -279,16 +286,22 @@ export async function GET(
       {
         width: 1200,
         height: 630,
-        fonts: fontData
-          ? [
-              {
-                name: "Inter",
-                data: fontData,
-                style: "normal",
-                weight: 400,
-              },
-            ]
-          : [],
+        // Omit `fonts` entirely when the remote fetch fails rather than passing
+        // []. An empty array overrides the font next/og bundles, and Satori
+        // then throws "No fonts are loaded" — turning a slow or blocked network
+        // into a broken card. Omitting it falls back to the bundled font.
+        ...(fontData
+          ? {
+              fonts: [
+                {
+                  name: "Inter",
+                  data: fontData,
+                  style: "normal",
+                  weight: 400,
+                },
+              ],
+            }
+          : {}),
       },
     )
   } catch (error) {
@@ -326,10 +339,9 @@ export async function GET(
             fontWeight: "700",
             opacity: 0.95,
             letterSpacing: 2,
-            textTransform: "uppercase",
           }}
         >
-          {BRAND.shortTagline}
+          {BRAND_RECORDS.mottoStyled}
         </div>
         <div
           style={{

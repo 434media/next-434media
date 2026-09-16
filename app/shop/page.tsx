@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     siteName: "434 MEDIA",
     images: [
       {
-        url: `${siteUrl}/api/og/page?page=shop`,
+        url: `${siteUrl}/opengraph-image`,
         width: 1200,
         height: 630,
         alt: "TXMX Boxing — Premium Boxing Merchandise",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     title: "TXMX Boxing | Premium Boxing Merchandise",
     description:
       "Premium boxing-inspired apparel rooted in Texas-Mexico culture. Shop founder's tees and limited drops.",
-    images: [`${siteUrl}/api/og/page?page=shop`],
+    images: [`${siteUrl}/twitter-image`],
     creator: "@434media",
     site: "@434media",
   },

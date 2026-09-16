@@ -14,7 +14,7 @@ const eslintConfig = [
   // so `eslint --fix` cannot rewrite them: lib/master-manifest.json records a
   // sha256 of work-records.ts, and any reformat changes that hash and trips
   // scripts/check_drift.py. Regenerate rather than reformat.
-  { ignores: ["lib/work-records.ts", "lib/master-manifest.json"] },
+  { ignores: ["lib/work-records.ts", "lib/brand-records.ts", "lib/master-manifest.json"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

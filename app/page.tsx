@@ -3,17 +3,16 @@ import HomeClient from "./HomeClient"
 import { buildServicesItemListLd } from "@/lib/seo/services"
 import { buildFaqPageLd } from "@/lib/seo/faq"
 import { BRAND } from "@/lib/seo/brand"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
-const homeTitle = `${BRAND.name} — ${BRAND.shortTagline}`
+const homeTitle = `${BRAND.name} — ${BRAND_RECORDS.shortDescriptor}`
 
 export const metadata: Metadata = {
   title: homeTitle,
   description: BRAND.description,
   keywords: [
     BRAND.name,
-    "Bold Stories",
-    "Proven Impact",
     "brand campaigns",
     "event production",
     "creative media agency",

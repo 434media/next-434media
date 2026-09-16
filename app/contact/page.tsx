@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     url: `${siteUrl}/contact`,
     images: [
       {
-        url: `${siteUrl}/api/og/page?page=contact`,
+        url: `${siteUrl}/opengraph-image`,
         width: 1200,
         height: 630,
         alt: "Contact 434 MEDIA — Get Started Today",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     title: "Contact 434 MEDIA | Get Started Today",
     description:
       "Ready to create bold, strategic content that delivers results? Contact 434 MEDIA for ROI-driven media strategies, brand storytelling, and video production services.",
-    images: [`${siteUrl}/api/og/page?page=contact`],
+    images: [`${siteUrl}/twitter-image`],
     creator: "@434media",
     site: "@434media",
   },
