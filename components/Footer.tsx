@@ -20,11 +20,9 @@ export default function Footer() {
     return null
   }
 
-  // "Build with us" — close the loop on this page. Mirrored by the navbar, so
-  // the same two words name the same destination in both places.
+  // "Build with us" — close the loop on this page.
   const buildLinks = [
     { label: "Start a project", href: "/contact", emphasis: true },
-    { label: "Our work", href: "/work" },
   ]
 
   const legalLinks = [
