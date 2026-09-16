@@ -63,6 +63,10 @@ const nextConfig: NextConfig = {
   // deep-links — with query strings + sub-paths (e.g. /settings) preserved.
   async redirects() {
     return [
+      // The Work page is offline. Temporary: app/work/page.tsx, the generated
+      // records, and the CI check are untouched, so deleting this rule
+      // restores the page.
+      { source: '/work', destination: '/', permanent: false },
       { source: '/admin/crm', destination: '/admin/opportunities', permanent: false },
       { source: '/admin/crm/:path*', destination: '/admin/opportunities/:path*', permanent: false },
       // Prospect promoted from a Leads child to a top-level pipeline route.

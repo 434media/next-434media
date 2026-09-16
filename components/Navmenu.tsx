@@ -20,15 +20,8 @@ interface NavigationItem {
 }
 
 // This IS the navbar on mobile, so it carries the same roster and the same
-// wording as the desktop links + footer: "Our work" and "Start a project".
+// wording as the desktop links + footer.
 const navigationItems: NavigationItem[] = [
-  {
-    id: "work",
-    title: "Our work",
-    subtitle: "See our portfolio",
-    href: "/work",
-    delay: 0.1,
-  },
   {
     id: "events",
     title: "Events",

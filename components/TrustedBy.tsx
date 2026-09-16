@@ -124,12 +124,6 @@ const TrustedBy = () => {
             className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8 md:mt-10"
           >
             <Link
-              href="/work"
-              className="font-geist-sans text-sm font-medium px-6 py-3 rounded-lg bg-neutral-950 text-white hover:bg-neutral-800 transition-colors duration-200"
-            >
-              View Our Work
-            </Link>
-            <Link
               href="/contact"
               className="font-geist-sans text-sm font-medium px-6 py-3 rounded-lg border border-neutral-300 text-neutral-950 hover:bg-neutral-100 transition-colors duration-200"
             >

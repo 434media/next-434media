@@ -16,14 +16,10 @@ type CombinedNavbarProps = {
   menu?: Menu[]
 }
 
-// Labels mirror the footer's "Build with us" column — "Our work" and "Start a
-// project" name the same two destinations in both places, so the site says one
-// thing about what it wants a visitor to do.
 // Internal links lead — they keep visitors on the application.
 // External destinations follow and are visually marked with ↗.
-const desktopLinks = [
-  { href: "/work", label: "Our work" },
-]
+// Empty while the Work page is offline; the /work entry returns with it.
+const desktopLinks: { href: string; label: string }[] = []
 
 // Custom hook to check if component has mounted
 function useHasMounted() {
