@@ -23,6 +23,13 @@ on:
   push:
     branches: [main]
 
+# The job only reads two files out of the checkout. Without an explicit block
+# the GITHUB_TOKEN carries the repository default, which is wider than this
+# needs — and a workflow that runs on every pull_request is exactly where a
+# broad default token matters.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest

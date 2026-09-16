@@ -81,7 +81,11 @@ export async function getGenerationJob(id: string): Promise<GenerationJob | null
       .collection(COLLECTION)
       .doc(id)
       .update({ status: "failed", error: STALE_PENDING_ERROR, updated_at: FieldValue.serverTimestamp() })
-      .catch((err) => console.error(`[generation-jobs] stale sweep failed for ${id}:`, err))
+      // `id` is the caller-supplied ?jobId=, so it must not land in the first
+      // argument: console.error treats that as a format string, and an id
+      // containing %s would swallow `err` and hide the real failure. Passed
+      // as an argument instead.
+      .catch((err) => console.error("[generation-jobs] stale sweep failed for", id, err))
     return { ...job, status: "failed", error: STALE_PENDING_ERROR }
   }
 
