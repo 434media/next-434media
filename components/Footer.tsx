@@ -61,18 +61,6 @@ export default function Footer() {
       className="bg-neutral-950 mt-auto relative overflow-hidden"
       aria-labelledby="footer-heading"
     >
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" aria-hidden="true">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONWHITE.png')`,
-            backgroundSize: "80px",
-            backgroundRepeat: "repeat",
-          }}
-        />
-      </div>
-
       <div className="max-w-7xl mx-auto px-6 lg:px-8 relative">
         <AnimatePresence>
           {isVisible && (
