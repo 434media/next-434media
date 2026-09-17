@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { BookOpen, ChevronDown } from "lucide-react"
 import BlogCard from "@/components/blog/BlogCard"
-import ScrollSpinLogo from "@/components/blog/ScrollSpinLogo"
 import type { BlogPost, BlogCategory } from "@/types/blog-types"
 
 interface BlogContentProps {
@@ -62,45 +61,12 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
 
   return (
     <div className="min-h-[100dvh] bg-white">
-      <section className="relative bg-gradient-to-br from-neutral-950 via-neutral-900 to-black pt-32 md:pt-36 md:pb-28 pb-24 overflow-hidden">
-        {/* Sophisticated 434 Media Logo Pattern */}
-        <div className="absolute inset-0 opacity-[0.08] sm:opacity-[0.12] pointer-events-none" aria-hidden="true">
-          <div
-            className="absolute inset-0 sm:bg-[length:140px_140px]"
-            style={{
-              backgroundImage: `url('https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434MediaICONWHITE.png')`,
-              backgroundSize: "80px 80px",
-              backgroundRepeat: "repeat",
-              backgroundPosition: "0 0",
-              animation: "float 25s ease-in-out infinite",
-              filter: "brightness(0.5) contrast(0.7)",
-            }}
-          />
-        </div>
+      <h1 className="sr-only">News & Insights</h1>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6">
-            <div className="space-y-3 sm:space-y-4 max-w-4xl">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight">
-                <span className="bg-gradient-to-r from-white via-gray-100 to-gray-200 bg-clip-text text-transparent">
-                  News & Insights
-                </span>
-              </h1>
-
-              <p className="mb-8 md:mb-0 text-base sm:text-lg md:text-xl text-gray-300 leading-relaxed max-w-xs sm:max-w-lg md:max-w-2xl mx-auto font-normal">
-                Your destination for insights from the <span className="text-white font-semibold">434 MEDIA</span> team,
-                our local partners, and our diverse ecosystem.
-              </p>
-            </div>
-
-            <div className="py-4">
-              <ScrollSpinLogo />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-12 sm:py-16 lg:py-20 bg-white">
+      {/* The hero used to clear the fixed navbar. This section is now first, so its
+          top padding does: navbar height (64px mobile, 58px desktop, unscrolled)
+          plus the spacing this section already had below the hero. */}
+      <section className="pt-28 sm:pt-32 lg:pt-36 pb-12 sm:pb-16 lg:pb-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="mb-12">
             {/* Mobile Dropdown */}
