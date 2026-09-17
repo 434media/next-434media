@@ -1,5 +1,5 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
-// Written by scripts/master_extract.py from the canonical master.
+// Written by 434media/434-context: 04 Build/master_extract.py from the canonical master.
 // Master version 2.0.15 (September 17, 2026). Regenerate after any section 4 change.
 // Internal context, proof assets and restrictions are deliberately
 // excluded - they are not for public display.

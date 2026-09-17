@@ -31,12 +31,13 @@ and when in doubt leave it in the context store.
 
 The Work page is generated from Section 4 rather than transcribed from it.
 [lib/work-records.ts](../../lib/work-records.ts) is written by
-[scripts/master_extract.py](../../scripts/master_extract.py) from the canonical
+`docs/context/"04 Build"/master_extract.py` from the canonical
 master, and the page renders those records directly — there is no second copy of
 the fields to drift out of step.
 
-    python3 scripts/master_extract.py --check   parse and report, write nothing
-    python3 scripts/master_extract.py --emit-web lib/work-records.ts
+    python3 docs/context/"04 Build"/master_extract.py --check
+        parse and report, write nothing
+    python3 docs/context/"04 Build"/master_extract.py --emit-web lib/work-records.ts
     python3 scripts/check_drift.py              has the master moved since?
 
 `check_drift.py` is a local tool, not a CI check: it compares the manifest
