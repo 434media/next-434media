@@ -117,7 +117,7 @@ your files are clean rather than expecting a zero exit.
 [lib/work-records.ts](lib/work-records.ts),
 [lib/brand-records.ts](lib/brand-records.ts) and
 [lib/master-manifest.json](lib/master-manifest.json) are build output, written
-by [scripts/master_extract.py](scripts/master_extract.py) from the canonical
+by `docs/context/"04 Build"/master_extract.py` from the canonical
 master — Section 4 for the work records, Sections 1.1, 1.3 and 1.4 for the
 brand strings. **Do not hand-edit any of them, and do not let a formatter touch
 them.** The manifest records a sha256 prefix of each artifact, so any rewrite —
@@ -149,7 +149,7 @@ hash cannot catch.
 **After any Section 1 or Section 4 change, regenerate:**
 
 ```
-python3 scripts/master_extract.py \
+python3 docs/context/"04 Build"/master_extract.py \
   --emit-web lib/work-records.ts \
   --emit-brand lib/brand-records.ts
 ```

@@ -55,7 +55,7 @@ MASTER = (
 )
 
 REGENERATE = (
-    "python3 scripts/master_extract.py \\\n"
+    'python3 docs/context/"04 Build"/master_extract.py \\\n'
     "          --emit-web lib/work-records.ts \\\n"
     "          --emit-brand lib/brand-records.ts"
 )

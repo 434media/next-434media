@@ -1,4 +1,4 @@
-# Generated from the canonical master by scripts/master_extract.py.
+# Generated from the canonical master by docs/context/"04 Build"/master_extract.py.
 # Never formatted: lib/master-manifest.json records a sha256 of
 # each generated artifact, and reformatting changes that hash, which trips the
 # drift check in scripts/check_drift.py. Regenerate rather than reformat.

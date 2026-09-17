@@ -3,7 +3,8 @@
 # Runs entirely on files in this repository — no secrets, no network, no access
 # to the context store. That is the point: the context document cannot live in
 # a public repo. The page is generated from it (lib/work-records.ts, written by
-# scripts/master_extract.py), so what CI can usefully check is not whether the
+# docs/context/"04 Build"/master_extract.py in the context repo), so what CI can
+# usefully check is not whether the
 # records are correct — the generator settles that — but whether the page still
 # shows all of them.
 #
