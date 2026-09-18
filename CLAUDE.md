@@ -139,9 +139,9 @@ python3 scripts/check_drift.py
 
 It reports whether the master has moved since the artifacts were written and
 re-hashes the extract to catch a hand edit. It exits 0 when the master is not
-reachable — `docs/context` is a symlink to the shared drive, and a clone
-without the mount cannot answer the question. That is why it is a local tool
-and **not** a CI check: in CI it would pass unconditionally. What CI checks
+reachable — `docs/context` is a symlink to a local clone of the private
+context repo, and a clone without it cannot answer the question. That is why
+it is a local tool and **not** a CI check: in CI it would pass unconditionally. What CI checks
 instead is that the page still renders every published record
 ([scripts/verify-work-page.ts](scripts/verify-work-page.ts)) — the failure a
 hash cannot catch.
@@ -174,7 +174,7 @@ than once.
 
 ## Context files — canonical source and read rules
 
-`docs/context/` is a **symlink to the canonical Google shared drive** ("434 MEDIA — Master Operations_434MediaMGR" → "434 MEDIA — Master Context"). Files read through it are live and authoritative. It is gitignored and never committed.
+`docs/context/` is a **symlink to a local clone of `434media/434-context`**, the private repository that is the canonical governing store. Files read through it are live and authoritative — they are the clone's working tree, so pull it before relying on the master. It is gitignored and never committed. (The Google shared drive this content came from is a frozen archive as of September 17, 2026, and is not a source.)
 
 ### Paths
 
@@ -202,7 +202,7 @@ Paths contain spaces. Quote them.
 
 **Report the version before relying on the master.** Read its header and state the version you are working from. If it is not the version you were told to expect, **stop and say so.** Do not search the filesystem for another copy, do not check Downloads or backup folders, and do not proceed against an older one. There is exactly one canonical source and it is reached through this symlink.
 
-**If `docs/context/` is missing or empty**, the drive is not mounted. Stop and report it. Never fall back to a local copy.
+**If `docs/context/` is missing or empty**, the context repo is not cloned or the symlink is broken. Stop and report it. Never fall back to another copy.
 
 **Section 1 definitions and Section 4 brand names are verbatim.** Never reword, shorten, or split them. Correct spellings, one word: **MilCityUSA**, **VemosVamos**, **TXMX Boxing**, **Salute to Troops**, **AMPD Project**, **¿Qué es SDOH?**, **AIM Health R&D Summit**, **OVERDRIVE**. **This governs display text only** — see the identifier rule below before renaming anything. `"Vemos Vamos"` two-word is a TypeScript union member and a stored Firestore value in 22 files; renaming those breaks live CRM data.
 
