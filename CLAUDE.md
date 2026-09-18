@@ -97,14 +97,13 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
   `docs/archive/` describes finished work, not current intent.
 - [lib/prospecting/icp.md](lib/prospecting/icp.md) — the ICP the prospecting
   translator is prompted with. Editing it changes live filter behavior.
-- [docs/standards/](docs/standards/) — governing documents mirrored from the 434
-  context store because they govern code. Currently the Display and Design
+- [docs/standards/](docs/standards/) — where to find the governing documents
+  that govern code. Nothing governing is copied here: the Display and Design
   Standard, which governs the Work page and any surface rendering portfolio
-  records. Mirrors are byte-identical and never edited here; check the version
-  line against the source before relying on one. Commercially sensitive
-  documents — pricing, the ICP source, qualification — are deliberately absent,
-  because this repository is public. See
-  [docs/standards/README.md](docs/standards/README.md).
+  records, is read through `docs/context`. Read its version line and work from
+  the version you read. Commercially sensitive documents — pricing, the ICP
+  source, qualification — are not readable from this repository at all, because
+  it is public. See [docs/standards/README.md](docs/standards/README.md).
 
 ## Verifying
 
@@ -184,7 +183,7 @@ than once.
 | Implementation Decisions Register | `docs/context/00 Governing/434_MEDIA_Master_Document_Implementation_Decisions_Register.md` |
 | Pricing Architecture | `docs/context/00 Governing/434_Pricing_Architecture.md` |
 | Process Log & SOP | `docs/context/00 Governing/434_Process_Log_and_SOP.md` |
-| Display and Design Standard | **`docs/standards/display-and-design-standard.md`** — mirrored into the repo so it is readable in every clone. Source: `docs/context/00 Governing/434_Display_and_Design_Standard.md` |
+| Display and Design Standard | `docs/context/00 Governing/434_Display_and_Design_Standard.md` — the only source; not copied into this repo. See [docs/standards/README.md](docs/standards/README.md) |
 | Engagement Handoff (historical) | `docs/context/00 Governing/HANDOFF.md` |
 | Voice router | `docs/context/01 Voice System/00-VOICE-ROUTER.md` |
 | Brand voice | `docs/context/01 Voice System/01-434-MEDIA-BRAND-VOICE.md` |
