@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
 // Written by 434media/434-context: 04 Build/master_extract.py from the canonical master.
-// Master version 2.0.17 (September 19, 2026). Regenerate after any section 4 change.
+// Master version 2.0.18 (September 19, 2026). Regenerate after any section 4 change.
 // Internal context, proof assets and restrictions are deliberately
 // excluded - they are not for public display.
 
@@ -16,8 +16,9 @@ export interface WorkRecord {
   status: string | null
   publicUrl: string | null
   recordKey: string | null
-  cardStill: string | null
-  cardVideo: string | null
+  rightsDefaults: string | null
+  registeredIdentifier: string | null
+  video: string | null
   description: string | null
 }
 
@@ -34,8 +35,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Active owned property",
     publicUrl: null,
     recordKey: "salute-to-troops",
-    cardStill: null,
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "A live entertainment and storytelling property connecting the military community with culture, workforce, innovation, and commercial partners.",
   },
   {
@@ -50,8 +52,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Active",
     publicUrl: "https://txmxboxing.com",
     recordKey: "txmx-boxing",
-    cardStill: "work/txmx.png",
-    cardVideo: "TXMX DROP TEASER V2.mp4",
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: "TXMX DROP TEASER V2.mp4",
     description: "A fight-culture media property spanning original content, live experiences, talent, partnerships, and commerce across Texas and Mexico.",
   },
   {
@@ -66,8 +69,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: "https://txmxboxing.com/icon-talks/rise-of-a-champion",
     recordKey: "rise-of-a-champion",
-    cardStill: "work/rise.png",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "A TXMX Boxing live production honoring championship fighters and figures connected to San Antonio boxing, supported by original content and a purpose-built digital experience.",
   },
   {
@@ -82,8 +86,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Annual",
     publicUrl: null,
     recordKey: "ampd-project",
-    cardStill: null,
-    cardVideo: "ampd.mp4",
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: "ampd.mp4",
     description: "AMPD Project is an established eight-week workforce-development program now operated as a 434-owned property. After two years as a program, its parent nonprofit entity is being dissolved and the program, history, assets, and public presence are being consolidated under 434 MEDIA. Digital Canvas assets are also being incorporated into the program. AMPD Project will continue annually, using emerging technical, web, creative, and production talent to complete defined projects that build portfolios and employment pathways. A cohort may work within 434’s environment and owned properties or on an underwriter-supported project.",
   },
   {
@@ -98,8 +103,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Active",
     publicUrl: null,
     recordKey: "milcityusa",
-    cardStill: null,
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "An always-on military and defense-community media property that complements Salute to Troops.",
   },
   {
@@ -114,8 +120,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Selectively activated",
     publicUrl: null,
     recordKey: "vemosvamos",
-    cardStill: "vemos-vamos/vemosinsights.jpg",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "A cross-cultural media property rooted in Hispanic culture, media, entertainment, and community connection.",
   },
   {
@@ -130,8 +137,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: null,
     recordKey: "overdrive",
-    cardStill: null,
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "A 2:58 original short film commissioned by 434 MEDIA as a demonstration of its Human Plus production philosophy.",
   },
   {
@@ -146,8 +154,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: "https://434media.com/en/sdoh",
     recordKey: "que-es-sdoh",
-    cardStill: "work/sdoh2.png",
-    cardVideo: "SDOH ACCELERATOR PROGRAM RECAP_2025.mp4",
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: "SDOH ACCELERATOR PROGRAM RECAP_2025.mp4",
     description: "434 developed the ¿Qué es SDOH? bilingual brand and public-facing platform and produced the full Community Health Accelerator experience. Work included program infrastructure, content strategy and production, panel production and moderation, speaker and mentor curation, a hero film, Univision broadcast segments, demo day, digital infrastructure, communications, and impact-report development.",
   },
   {
@@ -162,8 +171,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed and handed off",
     publicUrl: "https://aimsatx.com",
     recordKey: "aim-health-summit",
-    cardStill: "posters.jpg",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "434 created the AIM Health R&D Summit brand and operating platform and produced the conference over four years. The engagement included brand development, conference production, project management, digital infrastructure, vendor coordination, operating systems, impact reporting, and strategic marketing guidance.",
   },
   {
@@ -178,8 +188,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Ongoing client engagement",
     publicUrl: null,
     recordKey: "alamo-angels",
-    cardStill: "work/angels3.png",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "For three years, 434 has advised Alamo Angels on its marketing strategy and translated that strategy into an interconnected system of events, content, messaging, and digital infrastructure, including the organization’s member portal.",
   },
   {
@@ -194,8 +205,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: "https://sanantoniotechday.com",
     recordKey: "techbloc-tech-day",
-    cardStill: "434media/techday-cover.jpeg",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "434 served as Tech Day’s lead production and platform partner during an organizational transition, translating the incoming CEO’s vision into an updated event identity, operating model, programming, content, and audience experience.",
   },
   {
@@ -210,8 +222,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: "https://missionroadministries.org",
     recordKey: "mission-road-soar",
-    cardStill: "work/missionroad.png",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "434 produced a primary fundraising film for Mission Road Ministries featuring its SOAR program. The film premiered at the organization’s Annual Grand Western Shindig and was created for continued fundraising use throughout the year.",
   },
   {
@@ -226,8 +239,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: null,
     recordKey: "univision-70th",
-    cardStill: "work/univision.png",
-    cardVideo: "Alejandro Fernández Concert .mov",
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: "Alejandro Fernández Concert .mov",
     description: "434 produced a social event recap for Univision San Antonio and individual video deliverables for three participating advertisers — Jeff Davis Law Firm, Cavender Boot City, and Cavender Toyota — in support of the station’s private 70th-anniversary concert featuring Alex Fernández, presented by Miller Lite.",
   },
   {
@@ -242,8 +256,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Event-production scope completed",
     publicUrl: null,
     recordKey: "nucleate-global-summit",
-    cardStill: "work/nucleate.png",
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "434 supported the Nucleate Global Summit through production-vendor sourcing, on-site logistical and technical support, content capture, and media co-production.",
   },
   {
@@ -258,8 +273,9 @@ export const WORK_RECORDS: WorkRecord[] = [
     status: "Completed",
     publicUrl: null,
     recordKey: "velocitytx-demo-day",
-    cardStill: null,
-    cardVideo: null,
+    rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
+    registeredIdentifier: null,
+    video: null,
     description: "434 produced the SDOH Community Health Accelerator Demo Day, the culminating event of the program's inaugural year. Our work included event and stage design, run-of-show development, show direction, room production, videography, and a complete content package.",
   }
 ]
