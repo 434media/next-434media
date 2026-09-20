@@ -1,10 +1,10 @@
 {
-  "masterVersion": "2.0.18",
-  "masterDate": "September 19, 2026",
-  "masterSha256": "5a3729d0bd21a962",
-  "generated": "2026-09-19",
+  "masterVersion": "2.0.19",
+  "masterDate": "September 20, 2026",
+  "masterSha256": "21f10878c6d69356",
+  "generated": "2026-09-20",
   "artifacts": {
-    "work-records.ts": "28a1aaf9ae758a66",
-    "brand-records.ts": "7a6c0b1ff9aca4a3"
+    "work-records.ts": "cb9a46b1f2dad636",
+    "brand-records.ts": "67f9cc5e5fcfad8f"
   }
 }
