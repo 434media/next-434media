@@ -27,7 +27,10 @@ tree — use `pnpm install` / `pnpm add`. Transitive CVE pins live in
 **Never run `vercel --prod`.** The GitHub integration auto-deploys `main` to
 production. A manual deploy creates a duplicate. Push and let it fire.
 
-**Don't commit to `main` unprompted.** Present the diff and wait for a call.
+**Don't write to `main`.** Application changes take a dedicated branch, the `verify` check, and a
+pull request; a direct commit to `main` needs explicit founder approval (master 7.6 and 11.4;
+register IMP-31). Present the diff and wait for a call. One designated writer per task: if another
+agent already holds a task or branch, report the conflict rather than writing alongside it.
 
 **Jurisdiction policy is one constant.** 434 Media does not cold-outreach the
 EU/UK/EEA/Switzerland/Canada (GDPR/CASL). The single source of truth is
