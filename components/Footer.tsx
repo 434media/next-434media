@@ -15,11 +15,6 @@ export default function Footer() {
   const footerRef = useRef<HTMLElement>(null)
   const currentYear = new Date().getFullYear()
 
-  // Hide the public footer on admin routes and the full-screen squads deck
-  if (pathname?.startsWith("/admin") || pathname?.startsWith("/squads")) {
-    return null
-  }
-
   // "Build with us" — close the loop on this page.
   const buildLinks = [
     { label: "Start a project", href: "/contact", emphasis: true },
@@ -54,6 +49,15 @@ export default function Footer() {
       }
     }
   }, [])
+
+  // Hide the public footer on application surfaces that provide their own shell.
+  if (
+    pathname?.startsWith("/admin") ||
+    pathname?.startsWith("/squads") ||
+    pathname?.startsWith("/travel")
+  ) {
+    return null
+  }
 
   return (
     <footer
@@ -189,4 +193,3 @@ export default function Footer() {
     </footer>
   )
 }
-

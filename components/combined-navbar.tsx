@@ -33,6 +33,7 @@ function useHasMounted() {
 }
 
 export function CombinedNavbar(_props: CombinedNavbarProps) {
+  void _props
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const pathname = usePathname()
@@ -42,12 +43,6 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
 
   // Check if cart has items - only after component has mounted
   const hasCartItems = hasMounted && typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
-
-  // Hide the public navbar entirely on admin routes — admin has its own shell.
-  // Also hide on the full-screen squads deck (/squads).
-  if (pathname?.startsWith("/admin") || pathname?.startsWith("/squads")) {
-    return null
-  }
 
   // Check if we're in the shop section
   const isInShop = pathname?.startsWith("/shop") || pathname?.startsWith("/product") || pathname?.startsWith("/search")
@@ -69,6 +64,15 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  // Hide the public navbar on application surfaces that provide their own shell.
+  if (
+    pathname?.startsWith("/admin") ||
+    pathname?.startsWith("/squads") ||
+    pathname?.startsWith("/travel")
+  ) {
+    return null
+  }
 
   const toggleActionMenu = () => {
     setIsActionMenuOpen(!isActionMenuOpen)
