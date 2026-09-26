@@ -101,9 +101,12 @@
 .datebox span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .datebox strong { display: block; font-size: 28px; font-weight: 900; line-height: 1.05; }
 .dayContent { min-width: 0; }
-.dayTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+/* On a phone the badge took 123px of a 293px row and wrapped the day title.
+   The title takes the line; the badge drops beneath it until there is room. */
+.dayTop { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 11px; }
+.dayTop h3 { flex: 1 1 100%; }
 .dayTop h3 { margin: 0; font-size: 19px; font-weight: 900; letter-spacing: -.02em; }
-.badge { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.badge { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .03em; text-transform: uppercase; }
 .badgeTravel { background: #e8efff; color: #143e9f; }
 .badgeShoot { background: #e4f7ec; color: #075b36; }
 .badgeBoth { background: #fff0ce; color: #744000; }
@@ -135,12 +138,12 @@
 .actions a, .infoRow a, .interviewHead a { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 9px 12px; border-radius: 12px; background: var(--soft); color: var(--ink); font-size: 14px; font-weight: 850; text-decoration: none; }
 .actions svg, .infoRow a svg, .interviewHead a svg { width: 16px; height: 16px; }
 .shootMeta { display: grid; gap: 10px; }
-.infoRow { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fafafa; }
+.infoRow { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fafafa; }
 .infoRow > div { min-width: 0; }
 .infoRow strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
-.infoRow a { flex: 0 0 auto; width: 100%; border: 1px solid var(--line); background: #fff; }
+.infoRow a { flex: 0 0 auto; align-self: flex-start; border: 1px solid var(--line); background: #fff; }
 .interview { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
-.interviewHead { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.interviewHead { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .interviewHead strong { display: block; margin-top: 2px; font-size: 18px; font-weight: 900; letter-spacing: -.02em; }
 .interviewHead a { background: #eef3ff; color: #174ea6; }
 .interview h4 { margin: 16px 0 0; font-size: 13px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
@@ -180,7 +183,9 @@
 @media (min-width: 480px) {
   .detailGrid { grid-template-columns: 1fr 1fr; }
   .infoRow, .interviewHead { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
-  .infoRow a, .interviewHead a { width: auto; }
+  .dayTop { flex-wrap: nowrap; justify-content: space-between; }
+  .dayTop h3 { flex: 0 1 auto; }
+  .badge { padding: 5px 8px; font-size: 11px; letter-spacing: .04em; }
 }
 
 @media (min-width: 680px) {
