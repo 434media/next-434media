@@ -7,10 +7,22 @@ import TravelItinerary from "@/components/travel/TravelItinerary"
 
 export const dynamic = "force-dynamic"
 
+/**
+ * A link preview is rendered by services the recipient does not control, and is
+ * often cached past the page's own access rules. So the card names the purpose
+ * and nothing else: no client, no traveller, no dates. Defining openGraph and
+ * twitter here also replaces the site-wide brand card, since metadata merges
+ * shallowly and a nested segment overwrites what an ancestor defined.
+ */
+const CARD_TITLE = "Production travel itinerary"
+const CARD_DESCRIPTION = "Access required. Sign in to view."
+
 export const metadata: Metadata = {
-  title: "AJ — BVC AGM Travel",
-  description: "Protected production travel itinerary.",
+  title: CARD_TITLE,
+  description: CARD_DESCRIPTION,
   robots: { index: false, follow: false, nocache: true },
+  openGraph: { type: "website", title: CARD_TITLE, description: CARD_DESCRIPTION },
+  twitter: { card: "summary_large_image", title: CARD_TITLE, description: CARD_DESCRIPTION },
 }
 
 export default async function TravelPage({

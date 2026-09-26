@@ -6,7 +6,11 @@ import TravelSignIn from "./travel-sign-in"
 
 export const metadata: Metadata = {
   title: "Travel access",
+  description: "Access required. Sign in to view.",
   robots: { index: false, follow: false },
+  // A link that redirects here must not fall back to the brand card either.
+  openGraph: { type: "website", title: "Production travel itinerary", description: "Access required. Sign in to view." },
+  twitter: { card: "summary_large_image", title: "Production travel itinerary", description: "Access required. Sign in to view." },
 }
 
 export default async function TravelSignInPage({
