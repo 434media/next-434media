@@ -1,4 +1,5 @@
 import "server-only"
+import { pegWallClock, zoneFor } from "./zones"
 import type {
   EditorNote,
   FlightEvent,
@@ -159,14 +160,18 @@ function hotelFrom(record: AirtableRecord): HotelEvent {
 function shootFrom(record: AirtableRecord, notes: EditorNote[]): ShootEvent {
   const values = record.fields
   const intervieweeName = textValue(values[FIELDS.intake.intervieweeName])
+  const shootLocation = textValue(values[FIELDS.intake.location])
+  const shootZone = zoneFor(shootLocation)
   return {
     id: record.id,
     intakeId: record.id,
     kind: "shoot",
     company: textValue(values[FIELDS.intake.company]) || "Filming",
-    startAt: textValue(values[FIELDS.intake.startAt]),
-    endAt: textValue(values[FIELDS.intake.endAt]),
-    location: textValue(values[FIELDS.intake.location]),
+    // A shoot time is the call time at the filming location, not an instant.
+    // See lib/travel/zones.ts for why Airtable cannot store it that way.
+    startAt: pegWallClock(textValue(values[FIELDS.intake.startAt]), shootZone),
+    endAt: pegWallClock(textValue(values[FIELDS.intake.endAt]), shootZone),
+    location: shootLocation,
     mapUrl: textValue(values[FIELDS.intake.mapUrl]),
     contactName: textValue(values[FIELDS.intake.contactName]),
     contactPhone: textValue(values[FIELDS.intake.contactPhone]),
