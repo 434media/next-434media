@@ -238,7 +238,15 @@ export default function TravelItinerary({
   const nextEventDay = nextEvent
     ? itinerary.days.find((day) => day.events.some((event) => event.id === nextEvent.id))
     : undefined
-  const visibleDays = itinerary.days.filter((day) => {
+  // A day with nothing in it is only worth showing when the emptiness is the
+  // point — a home break or a buffer day is a plan. A travel day carrying no
+  // flight, no hotel and no shoot is an unfilled row in Airtable, and printing
+  // "This day remains open" for it tells the traveller nothing they can act on.
+  const plannedDays = itinerary.days.filter(
+    (day) => day.events.length > 0 || /off|home|rest|buffer/i.test(day.dayType),
+  )
+
+  const visibleDays = plannedDays.filter((day) => {
     if (filter === "all") return true
     if (filter === "open") return day.events.length === 0
     return day.events.some((event) => event.kind === filter)
