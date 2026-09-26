@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { TRAVEL_PROJECTS } from "@/lib/travel/projects"
+import { TRAVEL_PROJECTS, type TravelProjectSlug } from "@/lib/travel/projects"
 
 /**
  * The link card for every /travel/<project> page.
@@ -15,10 +15,16 @@ import { TRAVEL_PROJECTS } from "@/lib/travel/projects"
  * project it belongs to. The first two never change, which is the point — this
  * is the card every itinerary gets, not one written per trip.
  *
- * The third line is the project slug, and it is **validated against the roster
- * before it is drawn**. This segment is dynamic, so without that check any URL
+ * The third line is drawn from the project record — client, purpose, year — not
+ * from the URL. A slug is an identifier and the card is display text; welding
+ * them means a slug renamed for routing reasons changes what a client reads.
+ * A new project sets its own line by filling in its record, which is what makes
+ * this a standard rather than a convention someone has to remember.
+ *
+ * The lookup **is** the guard. This segment is dynamic, so without it any URL
  * would render its own text onto a 434-branded image served from 434media.com,
- * which is a phishing asset with extra steps. An unknown slug renders nothing.
+ * which is a phishing asset with extra steps. A slug with no record draws two
+ * lines instead of three.
  *
  * The traveller is never named, and neither are dates. A link preview is
  * rendered by services the recipient does not control and is cached beyond the
@@ -39,7 +45,8 @@ export default async function TravelOpengraphImage({
 }) {
   const { project } = await params
   const known = Object.prototype.hasOwnProperty.call(TRAVEL_PROJECTS, project)
-  const projectLine = known ? project : ""
+  const record = known ? TRAVEL_PROJECTS[project as TravelProjectSlug] : null
+  const projectLine = record ? `${record.client} \u00b7 ${record.purpose} ${record.year}` : ""
 
   const [geist600, geist800] = await Promise.all([
     readFile(fontPath("Geist-SemiBold.otf")),
