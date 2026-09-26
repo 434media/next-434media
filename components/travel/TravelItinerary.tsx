@@ -140,7 +140,6 @@ function FlightDetails({ event }: { event: FlightEvent }) {
         {(event.amexBooking || event.bookingReference) && <div><span>Amex booking</span><strong>{event.amexBooking || event.bookingReference}</strong></div>}
         {event.checkedBag && <div><span>Checked bag</span><strong>{event.checkedBag}</strong></div>}
       </div>
-      {event.notes && <p className={styles.detailNotes}>{event.notes}</p>}
       {event.origin && <div className={styles.actions}><a href={mapHref(`${event.origin} airport`)} target="_blank" rel="noreferrer"><Navigation /> Directions to {event.origin}</a></div>}
     </>
   )
@@ -158,7 +157,6 @@ function HotelDetails({ event, traveler }: { event: HotelEvent; traveler: { name
         {event.authorizedGuest && <div><span>Guest status</span><strong>{guestLabel(event.authorizedGuest, traveler)} authorized</strong></div>}
         {event.bookingReference && <div><span>Amex booking</span><strong>{event.bookingReference}</strong></div>}
       </div>
-      {event.notes && <p className={styles.detailNotes}>{event.notes}</p>}
       {event.address && <div className={styles.actions}><a href={mapHref(event.address)} target="_blank" rel="noreferrer"><Navigation /> Directions</a></div>}
     </>
   )
