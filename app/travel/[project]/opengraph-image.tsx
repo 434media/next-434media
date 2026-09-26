@@ -1,20 +1,28 @@
 import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
+import { TRAVEL_PROJECTS } from "@/lib/travel/projects"
 
 /**
- * The link card for /travel routes that carry no project — the sign-in page.
- * A project page draws its own card from app/travel/[project]/opengraph-image.tsx.
+ * The link card for every /travel/<project> page.
  *
  * The site-wide card is a brand statement — the motto, the company definition,
  * the address. It is the right card for 434media.com and the wrong one here: a
  * travel link is sent to one named person about one trip, and it arrives in a
  * text thread or an inbox where the brand pitch reads as a mismatch.
  *
- * This is deliberately one line. It says what the link is and nothing else. No
- * client, no traveller, no dates — a link preview is rendered by services the
- * recipient does not control and is often cached beyond the page's own access
- * rules, so the card says less than the page does on purpose.
+ * Three lines, fixed in that order: the company, what the link is, and which
+ * project it belongs to. The first two never change, which is the point — this
+ * is the card every itinerary gets, not one written per trip.
+ *
+ * The third line is the project slug, and it is **validated against the roster
+ * before it is drawn**. This segment is dynamic, so without that check any URL
+ * would render its own text onto a 434-branded image served from 434media.com,
+ * which is a phishing asset with extra steps. An unknown slug renders nothing.
+ *
+ * The traveller is never named, and neither are dates. A link preview is
+ * rendered by services the recipient does not control and is cached beyond the
+ * page's own access rules, so the card says less than the page does.
  */
 
 export const runtime = "nodejs"
@@ -24,7 +32,15 @@ export const contentType = "image/png"
 
 const fontPath = (file: string) => path.join(process.cwd(), "fonts", file)
 
-export default async function TravelOpengraphImage() {
+export default async function TravelOpengraphImage({
+  params,
+}: {
+  params: Promise<{ project: string }>
+}) {
+  const { project } = await params
+  const known = Object.prototype.hasOwnProperty.call(TRAVEL_PROJECTS, project)
+  const projectLine = known ? project : ""
+
   const [geist600, geist800] = await Promise.all([
     readFile(fontPath("Geist-SemiBold.otf")),
     readFile(fontPath("Geist-ExtraBold.otf")),
@@ -70,17 +86,20 @@ export default async function TravelOpengraphImage() {
         >
           Production travel itinerary
         </div>
-        <div
-          style={{
-            fontFamily: "Geist",
-            fontWeight: 600,
-            fontSize: 30,
-            color: "#8a8a92",
-            marginTop: 26,
-          }}
-        >
-          Access required
-        </div>
+        {projectLine ? (
+          <div
+            style={{
+              fontFamily: "Geist",
+              fontWeight: 600,
+              fontSize: 32,
+              color: "#8a8a92",
+              marginTop: 26,
+              letterSpacing: "0.01em",
+            }}
+          >
+            {projectLine}
+          </div>
+        ) : null}
       </div>
     ),
     {
