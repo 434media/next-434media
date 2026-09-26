@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createEditorNote } from "@/lib/travel/airtable"
-import { getTravelAccess } from "@/lib/travel/auth"
+import { canReadEditorNotes, getTravelAccess } from "@/lib/travel/auth"
 import { getTravelProject } from "@/lib/travel/projects"
 
 export async function POST(
@@ -12,6 +12,9 @@ export async function POST(
   if (!config) return NextResponse.json({ error: "not_found" }, { status: 404 })
   const viewer = await getTravelAccess(projectSlug, travelerSlug)
   if (!viewer) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  // Hiding the form is presentation; this is the rule. A client provisioned
+  // against this page can reach the endpoint directly, and must not.
+  if (!canReadEditorNotes(viewer)) return NextResponse.json({ error: "forbidden" }, { status: 403 })
 
   const origin = request.headers.get("origin")
   if (origin && origin !== request.nextUrl.origin) {

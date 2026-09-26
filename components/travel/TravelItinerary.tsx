@@ -21,7 +21,7 @@ import type {
   TravelEventKind,
   TravelItineraryPayload,
 } from "@/lib/travel/types"
-import { zoneFor, zoneSource } from "@/lib/travel/zones"
+import { cityFor, zoneFor, zoneSource } from "@/lib/travel/zones"
 import styles from "./travel-itinerary.module.css"
 
 type Filter = "all" | TravelEventKind | "open"
@@ -74,7 +74,12 @@ function eventStart(event: TravelEvent) {
 }
 
 function eventTitle(event: TravelEvent) {
-  if (event.kind === "flight") return `${event.origin || "Airport"} → ${event.destination || "Destination"}`
+  if (event.kind === "flight") {
+    // The card is where the routing belongs: MCW → ORD → EWR.
+    const via = event.connection.split("·")[0].trim()
+    const hops = [event.origin || "Airport", via, event.destination || "Destination"].filter(Boolean)
+    return hops.join(" → ")
+  }
   if (event.kind === "hotel") return event.name || "Hotel"
   return event.company
 }
@@ -99,7 +104,8 @@ function phoneHref(phone: string) {
 
 function dayPlace(events: TravelEvent[], dayType: string) {
   const flight = events.find((event): event is FlightEvent => event.kind === "flight")
-  if (flight) return `${flight.origin || "Travel"} → ${flight.destination || "Next stop"}`
+  // The day is named by where the traveller wakes and sleeps — cities, not codes.
+  if (flight) return `${cityFor(flight.origin) || "Travel"} → ${cityFor(flight.destination) || "Next stop"}`
   const shoot = events.find((event): event is ShootEvent => event.kind === "shoot")
   if (shoot) return shoot.location.split(",").slice(-2, -1)[0]?.trim() || shoot.company
   const hotel = events.find((event): event is HotelEvent => event.kind === "hotel")
@@ -158,7 +164,7 @@ function HotelDetails({ event, traveler }: { event: HotelEvent; traveler: { name
   )
 }
 
-function ShootDetails({ event, onAddNote }: { event: ShootEvent; onAddNote: (event: ShootEvent) => void }) {
+function ShootDetails({ event, onAddNote, showNotes }: { event: ShootEvent; onAddNote: (event: ShootEvent) => void; showNotes: boolean }) {
   const directions = event.mapUrl || (event.location ? mapHref(event.location) : "")
   return (
     <>
@@ -181,7 +187,7 @@ function ShootDetails({ event, onAddNote }: { event: ShootEvent; onAddNote: (eve
           <><h4>Interview questions</h4><ol>{event.questions.map((question) => <li key={question}>{question}</li>)}</ol></>
         ) : <p>Interview questions have not been added yet.</p>}
       </section>
-      <section className={styles.editorNotes}>
+      {showNotes && <section className={styles.editorNotes}>
         <div className={styles.editorNotesHead}>
           <strong>Editor notes{event.editorNotes.length ? ` (${event.editorNotes.length})` : ""}</strong>
           <button type="button" onClick={() => onAddNote(event)}>+ Editor note</button>
@@ -191,7 +197,7 @@ function ShootDetails({ event, onAddNote }: { event: ShootEvent; onAddNote: (eve
             <article key={note.id}><span>{note.author} · {shortDate(note.createdAt)}</span><p>{note.body}</p></article>
           ))}</div>
         ) : <p className={styles.emptyNote}>No notes captured yet.</p>}
-      </section>
+      </section>}
     </>
   )
 }
@@ -200,9 +206,11 @@ export default function TravelItinerary({
   initialItinerary,
   project,
   traveler,
+  canReadEditorNotes = false,
 }: {
   initialItinerary: TravelItineraryPayload
   project: { client: string; purpose: string; year: number; startDate: string; endDate: string }
+  canReadEditorNotes?: boolean
   traveler: { name: string; displayName: string; routeStops: Array<{ code: string; city: string; dates: string; home?: boolean }> }
 }) {
   const [itinerary, setItinerary] = useState(initialItinerary)
@@ -232,7 +240,34 @@ export default function TravelItinerary({
   const nextEventDay = nextEvent
     ? itinerary.days.find((day) => day.events.some((event) => event.id === nextEvent.id))
     : undefined
-  const visibleDays = itinerary.days.filter((day) => {
+  // A day with nothing in it is only worth showing when the emptiness is the
+  // point — a home break or a buffer day is a plan. A travel day carrying no
+  // flight, no hotel and no shoot is an unfilled row in Airtable, and printing
+  // "This day remains open" for it tells the traveller nothing they can act on.
+  const plannedDays = itinerary.days.filter(
+    (day) => day.events.length > 0 || /off|home|rest|buffer/i.test(day.dayType),
+  )
+
+  // Four identical "rest and reset" cards say one thing four times. A run of
+  // empty home days reads as a single block, the way the itinerary is spoken:
+  // "October 1 to 4, home."
+  const groupedDays = plannedDays.reduce<Array<{ day: (typeof plannedDays)[number]; through?: string }>>(
+    (out, day) => {
+      const last = out[out.length - 1]
+      const restful = day.events.length === 0 && /off|home|rest|buffer/i.test(day.dayType)
+      const lastRestful =
+        last && last.day.events.length === 0 && /off|home|rest|buffer/i.test(last.day.dayType)
+      if (restful && lastRestful) {
+        last.through = day.date
+        return out
+      }
+      out.push({ day })
+      return out
+    },
+    [],
+  )
+
+  const visibleDays = groupedDays.filter(({ day }) => {
     if (filter === "all") return true
     if (filter === "open") return day.events.length === 0
     return day.events.some((event) => event.kind === filter)
@@ -310,12 +345,13 @@ export default function TravelItinerary({
         </nav>
 
         <section className={styles.timeline} aria-label="Full itinerary">
-          {visibleDays.map((day) => {
-            const parts = dayParts(day.date)
+            {visibleDays.map(({ day, through }) => {
+              const parts = dayParts(day.date)
+              const lastParts = through ? dayParts(through) : null
             const dayBadge = badge(day.dayType, day.events)
             const events = filter === "all" || filter === "open" ? day.events : day.events.filter((event) => event.kind === filter)
             return <article className={styles.day} id={`day-${day.date}`} key={day.id}>
-              <div className={styles.datebox}><span>{parts.dow}</span><strong>{parts.day}</strong><span>{parts.month}</span></div>
+                <div className={styles.datebox}><span>{lastParts ? `${parts.dow}–${lastParts.dow}` : parts.dow}</span><strong>{lastParts ? `${parts.day}–${lastParts.day}` : parts.day}</strong><span>{lastParts && lastParts.month !== parts.month ? `${parts.month}–${lastParts.month}` : parts.month}</span></div>
               <div className={styles.dayContent}>
                 <div className={styles.dayTop}><h3>{dayPlace(day.events, day.dayType)}</h3><span className={`${styles.badge} ${dayBadge.className}`}>{dayBadge.label}</span></div>
                 {events.length ? events.sort((a, b) => eventStart(a).localeCompare(eventStart(b))).map((event) => (
@@ -325,7 +361,7 @@ export default function TravelItinerary({
                       <div className={styles.eventTime}>{event.kind === "hotel" ? `Check-in ${time(event.checkInAt, event.address)}` : time(eventStart(event), zoneSource(event))}</div>
                       <h4>{eventTitle(event)}</h4>
                       <p>{eventSubtitle(event)}</p>
-                      <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<ChevronRight /></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} traveler={traveler} /> : <ShootDetails event={event} onAddNote={setActiveNote} />}</div></details>
+                      <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<ChevronRight /></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} traveler={traveler} /> : <ShootDetails event={event} onAddNote={setActiveNote} showNotes={canReadEditorNotes} />}</div></details>
                     </div>
                   </article>
                 )) : <p className={styles.offCopy}>{/off/i.test(day.dayType) ? "Rest and reset at home." : "This day remains open."}</p>}

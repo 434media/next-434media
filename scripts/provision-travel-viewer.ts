@@ -10,6 +10,7 @@ const email = value("--email")?.toLowerCase()
 const name = value("--name")
 const projectSlug = value("--project")
 const travelerSlug = value("--traveler")
+const role = value("--role") === "traveler" ? "traveler" : "viewer"
 
 if (!email || !name || !projectSlug || !travelerSlug) {
   console.error(
@@ -40,6 +41,7 @@ async function main() {
       name: viewerName,
       projectSlug: viewerProject,
       travelerSlug: viewerTraveler,
+      role,
       isActive: true,
       updatedAt: new Date().toISOString(),
     },
@@ -47,7 +49,10 @@ async function main() {
   )
 
   const resetLink = await auth.generatePasswordResetLink(viewerEmail)
-  console.log(`Travel access granted to ${viewerEmail} for ${viewerProject}/${viewerTraveler}.`)
+  console.log(`Travel access granted to ${viewerEmail} for ${viewerProject}/${viewerTraveler} as ${role}.`)
+  console.log(role === "traveler"
+    ? "This person sees and writes editor notes."
+    : "Schedule only: editor notes stay hidden from this person.")
   console.log("Send this one-time password setup link directly to the viewer:")
   console.log(resetLink)
 }

@@ -1,5 +1,5 @@
 import "server-only"
-import { pegWallClock, zoneFor } from "./zones"
+import { airportCodes, pegWallClock, zoneFor } from "./zones"
 import {
   amexBookingFrom,
   authorizedGuestFrom,
@@ -127,20 +127,34 @@ function flightFrom(record: AirtableRecord): FlightEvent {
   const notes = textValue(values[FIELDS.flight.notes]) || extracted
   const route = routeFromNotes(notes)
   const flightNumbers = [...new Set(notes.match(/\b[A-Z]{2}\d{3,4}\b/g) || [])].join(" + ")
+  const originText = textValue(values[FIELDS.flight.origin])
+  const destinationText = textValue(values[FIELDS.flight.destination])
+  // Prefer codes named in the city fields; when a record writes cities instead
+  // ("Los Angeles" / "Mason City (serving Osage, IA)"), the booking note spells
+  // the routing out, so read the codes from there rather than guessing.
+  const fieldCodes = [...airportCodes(originText), ...airportCodes(destinationText)]
+  const legCodes = fieldCodes.length > 1 ? fieldCodes : airportCodes(notes)
+  const originCode = legCodes[0] ?? ""
+  const destinationCode = legCodes.length > 1 ? legCodes[legCodes.length - 1] : ""
+  // A code appearing between the ends is where the traveler changes planes.
+  const viaCode = legCodes.slice(1, -1).find((code) => code !== originCode && code !== destinationCode) ?? ""
   return {
     id: record.id,
     kind: "flight",
     departureAt: textValue(values[FIELDS.flight.departureAt]),
     arrivalAt: textValue(values[FIELDS.flight.arrivalAt]),
-    origin: textValue(values[FIELDS.flight.origin]) || route.origin,
-    destination: textValue(values[FIELDS.flight.destination]) || route.destination,
+    // One record holds a whole routing string where a city belongs
+    // ("MCW 7:00 PM CT → ORD 8:32 PM CT."). Read the codes out of whatever
+    // arrives: the first is where the leg starts, the last is where it ends.
+    origin: originCode || textValue(values[FIELDS.flight.origin]) || route.origin,
+    destination: destinationCode || textValue(values[FIELDS.flight.destination]) || route.destination,
     carrier: textValue(values[FIELDS.flight.carrier]) || match(notes, /Traveler:[^.]+\.\s*([^.,]+?)\s+[A-Z]{2}\d/),
     flightNumbers: textValue(values[FIELDS.flight.number]) || flightNumbers,
     confirmation:
       textValue(values[FIELDS.flight.confirmation]) ||
       match(notes, /(?:Airline\s+)?confirmation:\s*([A-Z0-9]+)/i),
     bookingReference: match(notes, /Amex Travel booking:\s*([^.;]+)/i),
-    connection: connectionFrom(extracted),
+    connection: connectionFrom(extracted) || viaCode,
     amexBooking: amexBookingFrom(notes),
     checkedBag: checkedBagFrom(notes),
     notes,
