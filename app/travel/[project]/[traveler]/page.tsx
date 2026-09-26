@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 import { getTravelItinerary } from "@/lib/travel/airtable"
-import { getTravelAccess } from "@/lib/travel/auth"
+import { canReadEditorNotes, getTravelAccess } from "@/lib/travel/auth"
 import { getTravelProject } from "@/lib/travel/projects"
 import TravelItinerary from "@/components/travel/TravelItinerary"
 
@@ -35,6 +35,7 @@ export default async function TravelPage({
   return (
     <TravelItinerary
       initialItinerary={itinerary}
+      canReadEditorNotes={canReadEditorNotes(viewer)}
       project={{
         client: config.project.client,
         purpose: config.project.purpose,

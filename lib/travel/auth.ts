@@ -13,6 +13,18 @@ export interface TravelViewer {
   projectSlug: string
   travelerSlug: string
   source: "staff" | "viewer"
+  /**
+   * "traveler" is the person the itinerary belongs to. Everyone else provisioned
+   * against the same page — the client, a partner — is a "viewer" and reads the
+   * schedule only. Editor notes are the traveller's working notepad, not part of
+   * what the page publishes, so the role is what gates them.
+   */
+  role: "traveler" | "viewer"
+}
+
+/** Editor notes belong to the traveller and to 434. Nobody else sees them. */
+export function canReadEditorNotes(viewer: TravelViewer) {
+  return viewer.source === "staff" || viewer.role === "traveler"
 }
 
 function sessionSecret() {
@@ -52,6 +64,9 @@ export async function authorizeTravelViewer(
     name: String(data.name || normalizedEmail.split("@")[0]),
     projectSlug,
     travelerSlug,
+    // Anyone provisioned without an explicit role reads the schedule only.
+    // A wrong guess here would publish the traveller's notes to the client.
+    role: data.role === "traveler" ? "traveler" : "viewer",
   }
 }
 
@@ -98,6 +113,7 @@ export async function getTravelAccess(projectSlug: string, travelerSlug: string)
       projectSlug,
       travelerSlug,
       source: "staff" as const,
+      role: "traveler" as const,
     }
   }
 
