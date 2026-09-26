@@ -21,25 +21,10 @@ import type {
   TravelEventKind,
   TravelItineraryPayload,
 } from "@/lib/travel/types"
+import { zoneFor, zoneSource } from "@/lib/travel/zones"
 import styles from "./travel-itinerary.module.css"
 
 type Filter = "all" | TravelEventKind | "open"
-
-function zoneFor(value = "") {
-  if (/MCW|ORD|Osage|Iowa|Mason City/i.test(value)) return "America/Chicago"
-  if (/EWR|JFK|LGA|NYC|New York|PHL|Philadelphia/i.test(value)) return "America/New_York"
-  return "America/Los_Angeles"
-}
-
-// The string a zone is read from must name a place. A flight's subtitle is its
-// carrier and flight numbers ("United · UA1946 + UA5029"), which matches no city
-// and silently falls through to Pacific — so a Central departure printed as PDT.
-// Every caller takes the event's own place instead.
-function zoneSource(event: TravelEvent) {
-  if (event.kind === "flight") return event.origin
-  if (event.kind === "hotel") return event.address
-  return event.location
-}
 
 function time(value: string, location = "") {
   if (!value) return "Time pending"
