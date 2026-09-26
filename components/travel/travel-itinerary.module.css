@@ -95,8 +95,8 @@
 .filters button { flex: 0 0 auto; padding: 9px 15px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
 .filters button.activeFilter { border-color: var(--ink); background: var(--ink); color: #fff; }
 
-.timeline { padding: 4px 20px 0; }
-.day { display: grid; grid-template-columns: 58px 1fr; gap: 12px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.timeline { padding: 4px 14px 0; }
+.day { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 22px 0; border-bottom: 1px solid var(--line); }
 .datebox { padding-top: 2px; text-align: center; }
 .datebox span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .datebox strong { display: block; font-size: 28px; font-weight: 900; line-height: 1.05; }
@@ -109,9 +109,9 @@
 .badgeBoth { background: #fff0ce; color: #744000; }
 .badgeOff { background: #ececef; color: #5e5e64; }
 
-.event { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 0 5px 16px rgb(0 0 0 / 4.5%); }
+.event { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 0 5px 16px rgb(0 0 0 / 4.5%); }
 .event + .event { margin-top: 10px; }
-.eventIcon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--soft); }
+.eventIcon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: var(--soft); }
 .eventIcon svg { width: 19px; height: 19px; }
 .eventMain { min-width: 0; }
 .eventTime { color: var(--red-dark); font-size: 15px; font-weight: 900; }
@@ -123,7 +123,10 @@
 .event summary svg { width: 18px; transition: transform .18s ease; }
 .event details[open] summary svg { transform: rotate(90deg); }
 .detailsBody { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: #333338; font-size: 14px; }
-.detailGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* One column on a phone: two columns of label-and-value inside a card that
+   has already given room to the date rail and the icon leaves about 200px,
+   which wraps an address to one word a line. Two columns return at 680px. */
+.detailGrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .detailGrid div { min-width: 0; }
 .detailGrid span, .infoRow span, .interviewHead span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .detailGrid strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
@@ -132,12 +135,12 @@
 .actions a, .infoRow a, .interviewHead a { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 9px 12px; border-radius: 12px; background: var(--soft); color: var(--ink); font-size: 14px; font-weight: 850; text-decoration: none; }
 .actions svg, .infoRow a svg, .interviewHead a svg { width: 16px; height: 16px; }
 .shootMeta { display: grid; gap: 10px; }
-.infoRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fafafa; }
+.infoRow { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fafafa; }
 .infoRow > div { min-width: 0; }
 .infoRow strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
-.infoRow a { flex: 0 0 auto; border: 1px solid var(--line); background: #fff; }
+.infoRow a { flex: 0 0 auto; width: 100%; border: 1px solid var(--line); background: #fff; }
 .interview { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
-.interviewHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.interviewHead { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
 .interviewHead strong { display: block; margin-top: 2px; font-size: 18px; font-weight: 900; letter-spacing: -.02em; }
 .interviewHead a { background: #eef3ff; color: #174ea6; }
 .interview h4 { margin: 16px 0 0; font-size: 13px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
@@ -174,11 +177,19 @@
 .modalActions button.save { border-color: var(--red); background: var(--red); color: #fff; }
 .modalActions button:disabled { opacity: .55; cursor: wait; }
 
+@media (min-width: 480px) {
+  .detailGrid { grid-template-columns: 1fr 1fr; }
+  .infoRow, .interviewHead { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+  .infoRow a, .interviewHead a { width: auto; }
+}
+
 @media (min-width: 680px) {
   .hero { grid-template-columns: .9fr 1.1fr; align-items: end; padding: 36px 34px 32px; }
   .routeSection, .timeline { padding-inline: 34px; }
   .filters { padding-inline: 34px; }
   .day { grid-template-columns: 74px 1fr; gap: 18px; }
+  .event { grid-template-columns: 44px 1fr; gap: 12px; padding: 14px; }
+  .eventIcon { width: 40px; height: 40px; border-radius: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
