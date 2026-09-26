@@ -30,9 +30,48 @@ import type { TravelEvent } from "./types"
 
 export const ENTRY_ZONE = "America/Chicago"
 
+/**
+ * The airports this trip touches, each with the city a traveler would name and
+ * the zone its clock runs on. A code is the reliable token: booking text is
+ * written by people and arrives as "Los Angeles", "LAX", or a whole routing
+ * string, but the code inside it is stable.
+ */
+export const AIRPORTS: Record<string, { city: string; zone: string }> = {
+  LAX: { city: "Los Angeles", zone: "America/Los_Angeles" },
+  SFO: { city: "San Francisco", zone: "America/Los_Angeles" },
+  MCW: { city: "Osage", zone: "America/Chicago" },
+  ORD: { city: "Chicago", zone: "America/Chicago" },
+  MSP: { city: "Minneapolis", zone: "America/Chicago" },
+  EWR: { city: "New York", zone: "America/New_York" },
+  JFK: { city: "New York", zone: "America/New_York" },
+  LGA: { city: "New York", zone: "America/New_York" },
+  PHL: { city: "Philadelphia", zone: "America/New_York" },
+}
+
+/** Every airport code in a string, in order. "MCW 7:00 PM → ORD" → ["MCW","ORD"]. */
+export function airportCodes(value = ""): string[] {
+  return (value.toUpperCase().match(/\b[A-Z]{3}\b/g) || []).filter((code) => code in AIRPORTS)
+}
+
+/**
+ * The city a traveler would say. A code wins; otherwise the text is read.
+ * "Mason City (serving Osage, IA)" is the airport's town, not the destination —
+ * the parenthetical names where the traveler is actually going, so it wins over
+ * the airport's own city.
+ */
+export function cityFor(value = ""): string {
+  const serving = value.match(/serving\s+([^,)]+)/i)
+  if (serving) return serving[1].trim()
+  const code = airportCodes(value)[0]
+  if (code) return AIRPORTS[code].city
+  return value.replace(/\([^)]*\)/g, "").split(",")[0].trim()
+}
+
 export function zoneFor(value = "") {
-  if (/MCW|ORD|Osage|Iowa|Mason City/i.test(value)) return "America/Chicago"
-  if (/EWR|JFK|LGA|NYC|New York|PHL|Philadelphia/i.test(value)) return "America/New_York"
+  const code = airportCodes(value)[0]
+  if (code) return AIRPORTS[code].zone
+  if (/Osage|Iowa|Mason City|Chicago|Minneapolis/i.test(value)) return "America/Chicago"
+  if (/New York|Newark|Philadelphia|NYC/i.test(value)) return "America/New_York"
   return "America/Los_Angeles"
 }
 

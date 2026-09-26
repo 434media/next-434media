@@ -21,7 +21,7 @@ import type {
   TravelEventKind,
   TravelItineraryPayload,
 } from "@/lib/travel/types"
-import { zoneFor, zoneSource } from "@/lib/travel/zones"
+import { cityFor, zoneFor, zoneSource } from "@/lib/travel/zones"
 import styles from "./travel-itinerary.module.css"
 
 type Filter = "all" | TravelEventKind | "open"
@@ -74,7 +74,12 @@ function eventStart(event: TravelEvent) {
 }
 
 function eventTitle(event: TravelEvent) {
-  if (event.kind === "flight") return `${event.origin || "Airport"} → ${event.destination || "Destination"}`
+  if (event.kind === "flight") {
+    // The card is where the routing belongs: MCW → ORD → EWR.
+    const via = event.connection.split("·")[0].trim()
+    const hops = [event.origin || "Airport", via, event.destination || "Destination"].filter(Boolean)
+    return hops.join(" → ")
+  }
   if (event.kind === "hotel") return event.name || "Hotel"
   return event.company
 }
@@ -99,7 +104,8 @@ function phoneHref(phone: string) {
 
 function dayPlace(events: TravelEvent[], dayType: string) {
   const flight = events.find((event): event is FlightEvent => event.kind === "flight")
-  if (flight) return `${flight.origin || "Travel"} → ${flight.destination || "Next stop"}`
+  // The day is named by where the traveller wakes and sleeps — cities, not codes.
+  if (flight) return `${cityFor(flight.origin) || "Travel"} → ${cityFor(flight.destination) || "Next stop"}`
   const shoot = events.find((event): event is ShootEvent => event.kind === "shoot")
   if (shoot) return shoot.location.split(",").slice(-2, -1)[0]?.trim() || shoot.company
   const hotel = events.find((event): event is HotelEvent => event.kind === "hotel")
