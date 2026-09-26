@@ -31,6 +31,16 @@ function zoneFor(value = "") {
   return "America/Los_Angeles"
 }
 
+// The string a zone is read from must name a place. A flight's subtitle is its
+// carrier and flight numbers ("United · UA1946 + UA5029"), which matches no city
+// and silently falls through to Pacific — so a Central departure printed as PDT.
+// Every caller takes the event's own place instead.
+function zoneSource(event: TravelEvent) {
+  if (event.kind === "flight") return event.origin
+  if (event.kind === "hotel") return event.address
+  return event.location
+}
+
 function time(value: string, location = "") {
   if (!value) return "Time pending"
   return new Intl.DateTimeFormat("en-US", {
@@ -269,8 +279,8 @@ export default function TravelItinerary({
           <div className={styles.nextCard}>
             <div className={styles.nextLabel}><i />Next up</div>
             {nextEvent ? <>
-              <div className={styles.nextTime}>{time(eventStart(nextEvent), eventSubtitle(nextEvent))}</div>
-              <div className={styles.nextDate}>{new Date(eventStart(nextEvent)).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: zoneFor(eventSubtitle(nextEvent)) })}</div>
+              <div className={styles.nextTime}>{time(eventStart(nextEvent), zoneSource(nextEvent))}</div>
+              <div className={styles.nextDate}>{new Date(eventStart(nextEvent)).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: zoneFor(zoneSource(nextEvent)) })}</div>
               <div className={styles.nextTitle}>{eventTitle(nextEvent)}</div>
               <div className={styles.nextRoute}>{eventSubtitle(nextEvent)}</div>
               <div className={styles.quickRow}>
@@ -311,7 +321,7 @@ export default function TravelItinerary({
                   <article className={styles.event} key={`${day.id}-${event.kind}-${event.id}`}>
                     <div className={styles.eventIcon}><EventIcon kind={event.kind} /></div>
                     <div className={styles.eventMain}>
-                      <div className={styles.eventTime}>{event.kind === "hotel" ? `Check-in ${time(event.checkInAt, event.address)}` : time(eventStart(event), eventSubtitle(event))}</div>
+                      <div className={styles.eventTime}>{event.kind === "hotel" ? `Check-in ${time(event.checkInAt, event.address)}` : time(eventStart(event), zoneSource(event))}</div>
                       <h4>{eventTitle(event)}</h4>
                       <p>{eventSubtitle(event)}</p>
                       <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<ChevronRight /></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} /> : <ShootDetails event={event} onAddNote={setActiveNote} />}</div></details>
