@@ -1,5 +1,13 @@
 import "server-only"
 import { pegWallClock, zoneFor } from "./zones"
+import {
+  amexBookingFrom,
+  authorizedGuestFrom,
+  checkedBagFrom,
+  connectionFrom,
+  reservationUnderFrom,
+  roomTypeFrom,
+} from "./extracted"
 import type {
   EditorNote,
   FlightEvent,
@@ -115,7 +123,8 @@ function routeFromNotes(notes: string) {
 
 function flightFrom(record: AirtableRecord): FlightEvent {
   const values = record.fields
-  const notes = textValue(values[FIELDS.flight.notes]) || textValue(values[FIELDS.flight.extracted])
+  const extracted = textValue(values[FIELDS.flight.extracted])
+  const notes = textValue(values[FIELDS.flight.notes]) || extracted
   const route = routeFromNotes(notes)
   const flightNumbers = [...new Set(notes.match(/\b[A-Z]{2}\d{3,4}\b/g) || [])].join(" + ")
   return {
@@ -131,13 +140,17 @@ function flightFrom(record: AirtableRecord): FlightEvent {
       textValue(values[FIELDS.flight.confirmation]) ||
       match(notes, /(?:Airline\s+)?confirmation:\s*([A-Z0-9]+)/i),
     bookingReference: match(notes, /Amex Travel booking:\s*([^.;]+)/i),
+    connection: connectionFrom(extracted),
+    amexBooking: amexBookingFrom(notes),
+    checkedBag: checkedBagFrom(notes),
     notes,
   }
 }
 
 function hotelFrom(record: AirtableRecord): HotelEvent {
   const values = record.fields
-  const notes = textValue(values[FIELDS.hotel.notes]) || textValue(values[FIELDS.hotel.extracted])
+  const extracted = textValue(values[FIELDS.hotel.extracted])
+  const notes = textValue(values[FIELDS.hotel.notes]) || extracted
   const lead = notes.replace(/^(?:BOOKED(?:\/PAID)?\.?\s*)/i, "")
   const chunks = lead.split(",").map((item) => item.trim())
   const name = textValue(values[FIELDS.hotel.name]) || chunks[0] || "Hotel"
@@ -153,6 +166,9 @@ function hotelFrom(record: AirtableRecord): HotelEvent {
       textValue(values[FIELDS.hotel.confirmation]) ||
       match(notes, /(?:Hotel confirmation|Hotels\.com itinerary):\s*([A-Z0-9-]+)/i),
     bookingReference: match(notes, /Amex Travel booking:\s*([^.;]+)/i),
+    roomType: roomTypeFrom(extracted),
+    reservationUnder: reservationUnderFrom(extracted),
+    authorizedGuest: authorizedGuestFrom(extracted),
     notes,
   }
 }
