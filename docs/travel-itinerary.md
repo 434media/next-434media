@@ -16,17 +16,48 @@ For the current project: `/travel/bvc-agm-2026/aj`.
 
 ## Provision a viewer
 
-With the Vercel environment pulled locally, run:
+Pull the production environment first:
 
 ```bash
-pnpm exec tsx scripts/provision-travel-viewer.ts \
+pnpm dlx vercel env pull .env.local --environment=production
+```
+
+Then run the script. Three details that are easy to get wrong:
+
+- **`npx`, not `pnpm exec`** — `tsx` is not a project dependency, so `pnpm exec` cannot find it.
+- **The service-account key must be unwrapped.** `vercel env pull` writes `GOOGLE_SERVICE_ACCOUNT_KEY="{"type":…}"` — raw JSON inside quotes, inner quotes unescaped — so every dotenv parser stops at the second quote and the key arrives as `{`. Production never sees this, because Vercel injects the value with no file parsing in between.
+- **Delete `.env.local` when finished.** It holds a real Firebase service-account key.
+
+```bash
+GOOGLE_SERVICE_ACCOUNT_KEY="$(sed -n 's/^GOOGLE_SERVICE_ACCOUNT_KEY=//p' .env.local | sed 's/^"//; s/"$//')" \
+  npx --yes tsx scripts/provision-travel-viewer.ts \
   --email viewer@example.com \
   --name "Viewer Name" \
   --project bvc-agm-2026 \
-  --traveler aj
+  --traveler aj \
+  --firestore-only
 ```
 
-The command creates or reuses the Firebase user, writes the scoped Firestore access record, and prints a one-time password setup link. Share that link only with the named viewer.
+### Roles
+
+- `--role traveler` — the person the itinerary belongs to, plus anyone at 434 who needs their working notes. Sees and writes editor notes.
+- `--role viewer` (default) — the client and anyone else provisioned against the page. Schedule only; editor notes never render and the notes endpoint returns 403.
+
+Anything unset reads as `viewer`, so a mistake fails closed.
+
+### Why `--firestore-only`
+
+Creating a Firebase user and minting a password link requires the **Firebase Authentication Admin** role. The credential that publishes media and writes Firestore does not hold it, and granting it would turn a media key into one that can create identities in the project.
+
+The narrow path instead:
+
+1. Create the user by hand: Firebase Console → Authentication → **Add user**, email only.
+2. Run the command above with `--firestore-only`. It writes the scoped access record and nothing else.
+3. Send them the page link. They set their own password through **"Forgot password?"** on `/travel/sign-in`.
+
+Nothing that grants account access travels by email.
+
+Without the flag the script creates the user and prints a one-time setup link, which requires the Authentication Admin role and fails with `auth/insufficient-permission` otherwise.
 
 ## Runtime behavior
 
