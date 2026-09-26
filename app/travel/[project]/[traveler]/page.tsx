@@ -43,6 +43,7 @@ export default async function TravelPage({
         endDate: config.project.endDate,
       }}
       traveler={{
+        name: config.traveler.name,
         displayName: config.traveler.displayName,
         routeStops: [...config.traveler.routeStops],
       }}

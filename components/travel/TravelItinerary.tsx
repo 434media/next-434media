@@ -56,6 +56,17 @@ function dayParts(date: string) {
   }
 }
 
+/**
+ * The hotel names the guest in full; the itinerary calls him what he goes by.
+ * Initials would read "AG" for Augusto Garces, which is nobody — so the roster's
+ * display name wins when the names match, and an unrecognised guest is shown as
+ * the hotel wrote them rather than quietly renamed.
+ */
+function guestLabel(authorizedGuest: string, traveler: { name: string; displayName: string }) {
+  const same = authorizedGuest.trim().toLowerCase() === traveler.name.trim().toLowerCase()
+  return same ? traveler.displayName : authorizedGuest
+}
+
 function eventStart(event: TravelEvent) {
   if (event.kind === "flight") return event.departureAt
   if (event.kind === "hotel") return event.checkInAt
@@ -117,24 +128,29 @@ function FlightDetails({ event }: { event: FlightEvent }) {
       <div className={styles.detailGrid}>
         <div><span>Departs</span><strong>{event.origin || "Airport pending"} · {time(event.departureAt, event.origin)}</strong></div>
         <div><span>Arrives</span><strong>{event.destination || "Airport pending"} · {time(event.arrivalAt, event.destination)}</strong></div>
-        {event.flightNumbers && <div><span>Flight</span><strong>{event.flightNumbers}</strong></div>}
+        {/* The flight numbers already read in the card's subtitle; the connection does not. */}
+        {event.connection && <div><span>Connection</span><strong>{event.connection}</strong></div>}
         {event.confirmation && <div><span>Confirmation</span><strong>{event.confirmation}</strong></div>}
-        {event.bookingReference && <div><span>Booking</span><strong>{event.bookingReference}</strong></div>}
+        {(event.amexBooking || event.bookingReference) && <div><span>Amex booking</span><strong>{event.amexBooking || event.bookingReference}</strong></div>}
+        {event.checkedBag && <div><span>Checked bag</span><strong>{event.checkedBag}</strong></div>}
       </div>
       {event.notes && <p className={styles.detailNotes}>{event.notes}</p>}
-      {event.origin && <div className={styles.actions}><a href={mapHref(`${event.origin} airport`)} target="_blank" rel="noreferrer"><Navigation /> Directions to airport</a></div>}
+      {event.origin && <div className={styles.actions}><a href={mapHref(`${event.origin} airport`)} target="_blank" rel="noreferrer"><Navigation /> Directions to {event.origin}</a></div>}
     </>
   )
 }
 
-function HotelDetails({ event }: { event: HotelEvent }) {
+function HotelDetails({ event, traveler }: { event: HotelEvent; traveler: { name: string; displayName: string } }) {
   return (
     <>
       <div className={styles.detailGrid}>
         <div><span>Check-in</span><strong>{shortDate(event.checkInAt, event.address)} · {time(event.checkInAt, event.address)}</strong></div>
         <div><span>Check-out</span><strong>{shortDate(event.checkOutAt, event.address)} · {time(event.checkOutAt, event.address)}</strong></div>
         {event.confirmation && <div><span>Confirmation</span><strong>{event.confirmation}</strong></div>}
-        {event.bookingReference && <div><span>Booking</span><strong>{event.bookingReference}</strong></div>}
+        {event.roomType && <div><span>Room</span><strong>{event.roomType}</strong></div>}
+        {event.reservationUnder && <div><span>Reservation</span><strong>{event.reservationUnder}</strong></div>}
+        {event.authorizedGuest && <div><span>Guest status</span><strong>{guestLabel(event.authorizedGuest, traveler)} authorized</strong></div>}
+        {event.bookingReference && <div><span>Amex booking</span><strong>{event.bookingReference}</strong></div>}
       </div>
       {event.notes && <p className={styles.detailNotes}>{event.notes}</p>}
       {event.address && <div className={styles.actions}><a href={mapHref(event.address)} target="_blank" rel="noreferrer"><Navigation /> Directions</a></div>}
@@ -187,7 +203,7 @@ export default function TravelItinerary({
 }: {
   initialItinerary: TravelItineraryPayload
   project: { client: string; purpose: string; year: number; startDate: string; endDate: string }
-  traveler: { displayName: string; routeStops: Array<{ code: string; city: string; dates: string; home?: boolean }> }
+  traveler: { name: string; displayName: string; routeStops: Array<{ code: string; city: string; dates: string; home?: boolean }> }
 }) {
   const [itinerary, setItinerary] = useState(initialItinerary)
   const [filter, setFilter] = useState<Filter>("all")
@@ -309,7 +325,7 @@ export default function TravelItinerary({
                       <div className={styles.eventTime}>{event.kind === "hotel" ? `Check-in ${time(event.checkInAt, event.address)}` : time(eventStart(event), zoneSource(event))}</div>
                       <h4>{eventTitle(event)}</h4>
                       <p>{eventSubtitle(event)}</p>
-                      <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<ChevronRight /></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} /> : <ShootDetails event={event} onAddNote={setActiveNote} />}</div></details>
+                      <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<ChevronRight /></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} traveler={traveler} /> : <ShootDetails event={event} onAddNote={setActiveNote} />}</div></details>
                     </div>
                   </article>
                 )) : <p className={styles.offCopy}>{/off/i.test(day.dayType) ? "Rest and reset at home." : "This day remains open."}</p>}
