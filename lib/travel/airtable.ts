@@ -141,8 +141,13 @@ function flightFrom(record: AirtableRecord): FlightEvent {
   return {
     id: record.id,
     kind: "flight",
-    departureAt: textValue(values[FIELDS.flight.departureAt]),
-    arrivalAt: textValue(values[FIELDS.flight.arrivalAt]),
+    // A flight time is the clock at the airport, the same kind of fact as a call
+    // time — the Airtable field is even named "(Local Timezone)". It is stored as
+    // an instant read in the editor's zone, so 8:15 typed for LAX became 13:15Z
+    // and rendered as 6:15 AM PDT. Hotel times are NOT pegged: those records
+    // already hold correct instants, and re-pegging them would break them.
+    departureAt: pegWallClock(textValue(values[FIELDS.flight.departureAt]), zoneFor(originCode || originText)),
+    arrivalAt: pegWallClock(textValue(values[FIELDS.flight.arrivalAt]), zoneFor(destinationCode || destinationText)),
     // One record holds a whole routing string where a city belongs
     // ("MCW 7:00 PM CT → ORD 8:32 PM CT."). Read the codes out of whatever
     // arrives: the first is where the leg starts, the last is where it ends.
