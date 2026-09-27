@@ -338,7 +338,7 @@ export default function TravelItinerary({
             <span>{project.year}</span>
           </p>
           <div className={styles.routeLine}>{traveler.routeStops.slice(0, -1).map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
-          <h1>Your route, at a glance.</h1>
+          <h1>Your route, at a glance. Every time shows the clock at its airport.</h1>
         </section>
 
         <section className={styles.nextCard} aria-label="Next up">
