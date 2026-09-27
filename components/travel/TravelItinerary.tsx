@@ -1,18 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
-import {
-  BedDouble,
-  ChevronRight,
-  CircleAlert,
-  Film,
-  Linkedin,
-  MapPin,
-  Navigation,
-  Phone,
-  Plane,
-  X,
-} from "lucide-react"
+import { X } from "lucide-react"
 import type {
   FlightEvent,
   HotelEvent,
@@ -136,12 +125,6 @@ function badge(dayType: string, events: TravelEvent[]) {
   return { label: "Travel", className: styles.badgeTravel }
 }
 
-function EventIcon({ kind }: { kind: TravelEventKind }) {
-  if (kind === "flight") return <Plane aria-hidden />
-  if (kind === "hotel") return <BedDouble aria-hidden />
-  return <Film aria-hidden />
-}
-
 function FlightDetails({ event }: { event: FlightEvent }) {
   return (
     <>
@@ -154,7 +137,7 @@ function FlightDetails({ event }: { event: FlightEvent }) {
         {(event.amexBooking || event.bookingReference) && <div><span>Amex booking</span><strong>{event.amexBooking || event.bookingReference}</strong></div>}
         {event.checkedBag && <div><span>Checked bag</span><strong>{event.checkedBag}</strong></div>}
       </div>
-      {event.origin && <div className={styles.actions}><a href={mapHref(`${event.origin} airport`)} target="_blank" rel="noreferrer"><Navigation /> Directions to {event.origin}</a></div>}
+      {event.origin && <div className={styles.actions}><a href={mapHref(`${event.origin} airport`)} target="_blank" rel="noreferrer">Directions to {event.origin}</a></div>}
     </>
   )
 }
@@ -171,7 +154,7 @@ function HotelDetails({ event, traveler }: { event: HotelEvent; traveler: { name
         {event.authorizedGuest && <div><span>Guest status</span><strong>{guestLabel(event.authorizedGuest, traveler)} authorized</strong></div>}
         {event.bookingReference && <div><span>Amex booking</span><strong>{event.bookingReference}</strong></div>}
       </div>
-      {event.address && <div className={styles.actions}><a href={mapHref(event.address)} target="_blank" rel="noreferrer"><Navigation /> Directions</a></div>}
+      {event.address && <div className={styles.actions}><a href={mapHref(event.address)} target="_blank" rel="noreferrer">Directions</a></div>}
     </>
   )
 }
@@ -183,17 +166,17 @@ function ShootDetails({ event, onAddNote, showNotes }: { event: ShootEvent; onAd
       <div className={styles.shootMeta}>
         <div className={styles.infoRow}>
           <div><span>Filming location</span><strong>{event.location || "Not confirmed"}</strong></div>
-          {directions && <a href={directions} target="_blank" rel="noreferrer"><MapPin /> Directions</a>}
+          {directions && <a href={directions} target="_blank" rel="noreferrer">Directions</a>}
         </div>
         <div className={styles.infoRow}>
           <div><span>POC</span><strong>{event.contactName || "Not confirmed"}</strong></div>
-          {event.contactPhone && <a href={phoneHref(event.contactPhone)}><Phone /> Call</a>}
+          {event.contactPhone && <a href={phoneHref(event.contactPhone)}>Call</a>}
         </div>
       </div>
       <section className={styles.interview}>
         <div className={styles.interviewHead}>
           <div><span>Interview with</span><strong>{event.intervieweeName || "Not confirmed"}</strong></div>
-          {event.intervieweeLinkedIn && <a href={event.intervieweeLinkedIn} target="_blank" rel="noreferrer"><Linkedin /> LinkedIn</a>}
+          {event.intervieweeLinkedIn && <a href={event.intervieweeLinkedIn} target="_blank" rel="noreferrer">LinkedIn</a>}
         </div>
         {event.questions.length ? (
           <><h4>Interview questions</h4><ol>{event.questions.map((question) => <li key={question}>{question}</li>)}</ol></>
@@ -326,46 +309,67 @@ export default function TravelItinerary({
     <div className={styles.shell}>
       <header className={styles.topbar}>
         <div className={styles.brand}>
-          <div className={styles.lockup} aria-label="434 Media"><span>434</span><span>MEDIA</span></div>
-          <div><strong>{traveler.displayName} Travel</strong><span>{project.client} {project.purpose}</span></div>
+          <span className={styles.badgeMark} aria-label="434 MEDIA">434</span>
+          <div>
+            <strong>{traveler.displayName} Travel</strong>
+            <span className={styles.label}>{project.client} · {project.purpose}</span>
+          </div>
         </div>
         <div className={`${styles.updated} ${sync === "live" ? "" : styles.updatedStale}`}>
           {sync === "signedOut" ? (
-            <>Session expired<br /><a href={`/travel/sign-in?next=${encodeURIComponent(`/travel/${itinerary.projectSlug}/${itinerary.travelerSlug}`)}`}><strong>Sign in again</strong></a></>
+            <>
+              <span className={styles.label}>Session expired</span>
+              <a href={`/travel/sign-in?next=${encodeURIComponent(`/travel/${itinerary.projectSlug}/${itinerary.travelerSlug}`)}`}><strong>Sign in again</strong></a>
+            </>
           ) : (
-            <><i />{sync === "live" ? "Updated" : "Last updated"}<br /><strong>{syncedLabel(itinerary.syncedAt)}</strong></>
+            <>
+              <span className={styles.label}>{sync === "live" ? "Updated" : "Last updated"}</span>
+              <strong>{syncedLabel(itinerary.syncedAt)}</strong>
+            </>
           )}
         </div>
       </header>
 
       <main>
         <section className={styles.hero}>
-          <div>
-            <p>{shortDate(project.startDate)}–{shortDate(project.endDate)} · {project.year}</p>
-            <h1>Your route,<br />at a glance.</h1>
-            <div className={styles.routeLine}>{traveler.routeStops.slice(0, -1).map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
-          </div>
-          <div className={styles.nextCard}>
-            <div className={styles.nextLabel}><i />Next up</div>
-            {nextEvent ? <>
-              <div className={styles.nextTime}>{time(eventStart(nextEvent), zoneSource(nextEvent))}</div>
-              <div className={styles.nextDate}>{new Date(eventStart(nextEvent)).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: zoneFor(zoneSource(nextEvent)) })}</div>
-              <div className={styles.nextTitle}>{eventTitle(nextEvent)}</div>
-              <div className={styles.nextRoute}>{eventSubtitle(nextEvent)}</div>
-              <div className={styles.quickRow}>
-                <a href={`#day-${nextEventDay?.date || eventStart(nextEvent).slice(0, 10)}`}>View day</a>
-                <a className={styles.secondary} href={mapHref(nextEvent.kind === "shoot" ? nextEvent.location : nextEvent.kind === "hotel" ? nextEvent.address : `${nextEvent.origin} airport`)} target="_blank" rel="noreferrer">Open map</a>
-              </div>
-            </> : <><div className={styles.nextTime}>Pending</div><div className={styles.nextTitle}>Final outbound routing</div></>}
-          </div>
+          <p className={`${styles.heroStrip} ${styles.label}`}>
+            <span>Production travel</span>
+            <span>{shortDate(project.startDate)} – {shortDate(project.endDate)}</span>
+            <span>{project.year}</span>
+          </p>
+          <div className={styles.routeLine}>{traveler.routeStops.slice(0, -1).map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
+          <h1>Your route, at a glance. Every time shows the clock at its airport.</h1>
         </section>
 
-        <aside className={styles.alert}><CircleAlert /><div><strong>Return from SFO is not booked.</strong><span>ATOMS and the final outbound plan remain open for October 9–10.</span></div></aside>
+        <section className={styles.nextCard} aria-label="Next up">
+          <span className={`${styles.nextLabel} ${styles.label}`}>Next up</span>
+          {nextEvent ? <>
+            <div className={styles.nextTime}>{(() => {
+              // The zone abbreviation sets smaller than the clock it belongs to.
+              const stamp = time(eventStart(nextEvent), zoneSource(nextEvent))
+              const cut = stamp.lastIndexOf(" ")
+              return cut > 0 ? <>{stamp.slice(0, cut)} <em>{stamp.slice(cut + 1)}</em></> : stamp
+            })()}</div>
+            <div className={styles.nextDate}>{new Date(eventStart(nextEvent)).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: zoneFor(zoneSource(nextEvent)) })}</div>
+            <div className={styles.nextTitle}>{eventTitle(nextEvent)}</div>
+            <div className={styles.nextRoute}>{eventSubtitle(nextEvent)}</div>
+            <div className={styles.quickRow}>
+              <a href={`#day-${nextEventDay?.date || eventStart(nextEvent).slice(0, 10)}`}>View day</a>
+              <a className={styles.secondary} href={mapHref(nextEvent.kind === "shoot" ? nextEvent.location : nextEvent.kind === "hotel" ? nextEvent.address : `${nextEvent.origin} airport`)} target="_blank" rel="noreferrer">Open map</a>
+            </div>
+          </> : <><div className={styles.nextTime}>Pending</div><div className={styles.nextTitle}>Final outbound routing</div></>}
+        </section>
+
+        <aside className={styles.alert}><span className={styles.label}>Open item</span><div><strong>Return from SFO is not booked.</strong><span>ATOMS and the final outbound plan remain open for October 9–10.</span></div></aside>
 
         <section className={styles.routeSection}>
-          <div className={styles.sectionHead}><h2>Trip route</h2><p>Swipe to scan</p></div>
+          <div className={styles.sectionHead}><h2 className={styles.label}>Trip route</h2><p className={styles.label}>Swipe to scan</p></div>
           <div className={styles.routeMap}>{traveler.routeStops.map((stop, index) => (
-            <div className={styles.stop} key={`${stop.code}-${index}`}><div className={stop.home ? styles.homeDot : styles.stopDot}>{stop.code}</div><strong>{stop.city}</strong><span>{stop.dates}</span></div>
+            <div className={styles.stop} key={`${stop.code}-${index}`}>
+              <span className={`${styles.stopCode} ${styles.label} ${stop.home ? styles.home : ""}`}>{stop.code}</span>
+              <strong>{stop.city}</strong>
+              <span>{stop.dates}</span>
+            </div>
           ))}</div>
         </section>
 
@@ -384,17 +388,21 @@ export default function TravelItinerary({
             const dayBadge = badge(day.dayType, day.events)
             const events = filter === "all" || filter === "open" ? day.events : day.events.filter((event) => event.kind === filter)
             return <article className={styles.day} id={`day-${day.date}`} key={day.id}>
-                <div className={styles.datebox}><span>{lastParts ? `${parts.dow}–${lastParts.dow}` : parts.dow}</span><strong>{lastParts ? `${parts.day}–${lastParts.day}` : parts.day}</strong><span>{lastParts && lastParts.month !== parts.month ? `${parts.month}–${lastParts.month}` : parts.month}</span></div>
+                <div className={styles.datebox}>
+                  <span className={styles.label}>{lastParts ? `${parts.dow}–${lastParts.dow}` : parts.dow}</span>
+                  <strong className={lastParts ? styles.range : ""}>{lastParts ? `${parts.day}–${lastParts.day}` : parts.day}</strong>
+                  <span className={styles.label}>{lastParts && lastParts.month !== parts.month ? `${parts.month}–${lastParts.month}` : parts.month}</span>
+                </div>
               <div className={styles.dayContent}>
-                <div className={styles.dayTop}><h3>{dayPlace(day.events, day.dayType)}</h3><span className={`${styles.badge} ${dayBadge.className}`}>{dayBadge.label}</span></div>
+                <div className={styles.dayTop}><h3>{dayPlace(day.events, day.dayType)}</h3><span className={`${styles.badge} ${styles.label}`}>{dayBadge.label}</span></div>
                 {events.length ? events.sort((a, b) => eventStart(a).localeCompare(eventStart(b))).map((event) => (
                   <article className={styles.event} key={`${day.id}-${event.kind}-${event.id}`}>
-                    <div className={styles.eventIcon}><EventIcon kind={event.kind} /></div>
                     <div className={styles.eventMain}>
+                      <span className={`${styles.eventKind} ${styles.label}`}>{event.kind === "flight" ? "Flight" : event.kind === "hotel" ? "Hotel" : "Filming"}</span>
                       <div className={styles.eventTime}>{event.kind === "hotel" ? `Check-in ${time(event.checkInAt, event.address)}` : time(eventStart(event), zoneSource(event))}</div>
                       <h4>{eventTitle(event)}</h4>
                       <p>{eventSubtitle(event)}</p>
-                      <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<ChevronRight /></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} traveler={traveler} /> : <ShootDetails event={event} onAddNote={setActiveNote} showNotes={canReadEditorNotes} />}</div></details>
+                      <details><summary>{event.kind === "shoot" ? "Filming details & questions" : event.kind === "flight" ? "Flight details" : "Hotel details"}<span className={styles.caret} aria-hidden>▸</span></summary><div className={styles.detailsBody}>{event.kind === "flight" ? <FlightDetails event={event} /> : event.kind === "hotel" ? <HotelDetails event={event} traveler={traveler} /> : <ShootDetails event={event} onAddNote={setActiveNote} showNotes={canReadEditorNotes} />}</div></details>
                     </div>
                   </article>
                 )) : <p className={styles.offCopy}>{/off/i.test(day.dayType) ? "Rest and reset at home." : "This day remains open."}</p>}
@@ -404,7 +412,7 @@ export default function TravelItinerary({
         </section>
       </main>
 
-      <footer className={styles.footer}><div className={styles.footerLockup}><span>434</span><span>MEDIA</span></div><p>Protected production itinerary · Updates sync from Airtable</p></footer>
+      <footer className={styles.footer}><span className={`${styles.wordmark} ${styles.footerLockup}`} aria-label="434 MEDIA">434 MEDIA</span><p className={styles.label}>Protected production itinerary · Updates sync from Airtable</p></footer>
 
       {activeNote && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveNote(null) }}>
         <form className={styles.noteModal} onSubmit={saveNote}>
