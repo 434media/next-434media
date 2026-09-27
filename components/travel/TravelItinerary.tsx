@@ -309,7 +309,7 @@ export default function TravelItinerary({
     <div className={styles.shell}>
       <header className={styles.topbar}>
         <div className={styles.brand}>
-          <span className={`${styles.wordmark} ${styles.brandMark}`} aria-label="434 MEDIA">434 MEDIA</span>
+          <span className={styles.badgeMark} aria-label="434 MEDIA">434</span>
           <div>
             <strong>{traveler.displayName} Travel</strong>
             <span className={styles.label}>{project.client} · {project.purpose}</span>

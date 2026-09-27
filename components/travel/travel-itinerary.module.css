@@ -70,7 +70,19 @@
 }
 
 .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.brandMark { flex: 0 0 auto; font-size: 15.5px; }
+.badgeMark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  font-family: var(--font-menda-black), sans-serif;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: -.01em;
+}
 .brand > div:last-child { min-width: 0; }
 .brand strong, .brand > div:last-child span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .brand strong { display: block; font-size: 15px; font-weight: 600; line-height: 1.2; }
@@ -271,7 +283,7 @@
    only gains breathing room with width. */
 @media (max-width: 479px) {
   .brand { gap: 10px; }
-  .brandMark { font-size: 14px; }
+  .badgeMark { width: 32px; height: 32px; font-size: 10px; }
   .brand > div:last-child span { font-size: 10px; letter-spacing: .08em; }
 }
 
