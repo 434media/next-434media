@@ -1,29 +1,30 @@
 /**
  * Time zones for the travel surface.
  *
- * Two kinds of time live in this itinerary and they are not the same kind of fact:
+ * One rule: **a stored time is the clock at the place the record names.** When a
+ * producer writes "10:00 AM" for NeuroFlow they mean ten in the morning in
+ * Philadelphia; "8:15" against a LAX departure means quarter past eight in Los
+ * Angeles. The airport, the hotel, the filming location — the place is already
+ * in the record, so the time is read against it.
  *
- *   A flight or hotel time is an *instant*. "LAX 8:15 AM PT" is a moment that
- *   exists independently of where anyone reads it, and Airtable stores it
- *   correctly as one.
+ * It took three rounds to arrive here. The readers first pegged shoots only,
+ * then flights, while hotels held true instants and had to be left alone — three
+ * rules for one base, each correct only because every record had been checked by
+ * hand. The fix was in the base, not the code.
  *
- *   A shoot time is a *wall clock at the filming location*. When a producer
- *   writes "10:00 AM" for NeuroFlow they mean ten in the morning in
- *   Philadelphia, not an instant that happens to be ten somewhere else.
- *
- * Airtable stores both as instants. A date field without "use the same time
- * zone for all collaborators" reads what is typed in the *editor's* browser
- * zone, so a producer in Central typing 10:00 for a Philadelphia shoot stores
- * 15:00Z, which renders as 11:00 AM Eastern. The shoot then reads an hour late
- * on the page and nothing about the record looks wrong.
+ * Airtable stores an instant either way. A date field set to "client" reads what
+ * is typed in the *editor's* browser zone, so the same keystrokes meant
+ * different moments depending on who opened the base — and nothing about the
+ * record looked wrong. Every date field in this base is now locked to
+ * America/Chicago, which is what makes the typed wall clock recoverable.
  *
  * `pegWallClock` converts the second kind to the first: it reads the wall clock
  * the producer typed and rebuilds the instant that shows that same wall clock at
  * the filming location.
  *
- * ENTRY_ZONE is the zone the typed value is interpreted in. Lock the Airtable
- * field to this zone ("use the same time zone for all collaborators") so the
- * meaning does not change with whoever opens the base.
+ * ENTRY_ZONE is the zone every date field in the base is locked to. If a new
+ * field is added, lock it to the same zone — an unlocked field reintroduces the
+ * whole class of defect silently.
  */
 
 import type { TravelEvent } from "./types"
