@@ -36,6 +36,20 @@ function time(value: string, location = "") {
   }).format(new Date(value))
 }
 
+/**
+ * The sync stamp belongs to the reader, not to a place on the itinerary.
+ * shortDate defaults its location to "", which zoneFor resolves to Pacific — so
+ * a reader in Central saw yesterday's date between midnight and 2 AM. This
+ * formats in whatever zone the browser is in, and carries the time, because
+ * "Sep 26" cannot tell you whether the page went stale an hour ago.
+ */
+function syncedLabel(value: string) {
+  if (!value) return ""
+  const when = new Date(value)
+  if (Number.isNaN(when.getTime())) return ""
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(when)
+}
+
 function shortDate(value: string, location = "") {
   if (!value) return "Date pending"
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -212,6 +226,7 @@ export default function TravelItinerary({
   traveler: { name: string; displayName: string; routeStops: Array<{ code: string; city: string; dates: string; home?: boolean }> }
 }) {
   const [itinerary, setItinerary] = useState(initialItinerary)
+  const [sync, setSync] = useState<"live" | "stale" | "signedOut">("live")
   const [filter, setFilter] = useState<Filter>("all")
   const [activeNote, setActiveNote] = useState<ShootEvent | null>(null)
   const [note, setNote] = useState("")
@@ -220,9 +235,23 @@ export default function TravelItinerary({
 
   const endpoint = `/api/travel/${itinerary.projectSlug}/${itinerary.travelerSlug}`
 
+  /**
+   * A refresh that fails used to be swallowed: the header kept its green dot and
+   * its old timestamp, so a page whose session expired overnight looked live and
+   * was hours stale. Failure is now visible, and an expired session says so.
+   */
   const refresh = useCallback(async () => {
-    const response = await fetch(endpoint, { cache: "no-store" })
-    if (response.ok) setItinerary(await response.json())
+    try {
+      const response = await fetch(endpoint, { cache: "no-store" })
+      if (response.ok) {
+        setItinerary(await response.json())
+        setSync("live")
+        return
+      }
+      setSync(response.status === 401 || response.status === 403 ? "signedOut" : "stale")
+    } catch {
+      setSync("stale")
+    }
   }, [endpoint])
 
   useEffect(() => {
@@ -300,7 +329,13 @@ export default function TravelItinerary({
           <div className={styles.lockup} aria-label="434 Media"><span>434</span><span>MEDIA</span></div>
           <div><strong>{traveler.displayName} Travel</strong><span>{project.client} {project.purpose}</span></div>
         </div>
-        <div className={styles.updated}><i />Live from Airtable<br /><strong>{shortDate(itinerary.syncedAt)}</strong></div>
+        <div className={`${styles.updated} ${sync === "live" ? "" : styles.updatedStale}`}>
+          {sync === "signedOut" ? (
+            <>Session expired<br /><a href={`/travel/sign-in?next=${encodeURIComponent(`/travel/${itinerary.projectSlug}/${itinerary.travelerSlug}`)}`}><strong>Sign in again</strong></a></>
+          ) : (
+            <><i />{sync === "live" ? "Updated" : "Last updated"}<br /><strong>{syncedLabel(itinerary.syncedAt)}</strong></>
+          )}
+        </div>
       </header>
 
       <main>
