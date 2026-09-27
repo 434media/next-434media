@@ -6,6 +6,16 @@ The `/travel/` route family is the protected delivery surface for project travel
 
 For the current project: `/travel/bvc-agm-2026/aj`.
 
+## Times
+
+**A stored time is the clock at the place the record names** — the airport for a flight, the hotel for a stay, the filming location for a shoot. Enter the local time; the page resolves the zone from the place.
+
+Every date field in the base is locked to **America/Chicago** ("use the same time zone for all collaborators"). That is what makes the typed wall clock recoverable: a field set to "client" reads what is typed in the *editor's* browser zone, so the same keystrokes mean different moments depending on who opened the base, and nothing about the record looks wrong.
+
+**A new date field is locked to the same zone when it is created.** An unlocked one reintroduces the defect silently — four of five call times and every flight departure were wrong this way, and the page rendered them faithfully.
+
+`lib/travel/zones.ts` holds the airports, their cities and their zones, and `pegWallClock` does the conversion.
+
 ## Source and access
 
 - Airtable is the live operational source for the 2026 Builders VC AGM itinerary.

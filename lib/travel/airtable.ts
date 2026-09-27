@@ -141,11 +141,11 @@ function flightFrom(record: AirtableRecord): FlightEvent {
   return {
     id: record.id,
     kind: "flight",
-    // A flight time is the clock at the airport, the same kind of fact as a call
-    // time — the Airtable field is even named "(Local Timezone)". It is stored as
-    // an instant read in the editor's zone, so 8:15 typed for LAX became 13:15Z
-    // and rendered as 6:15 AM PDT. Hotel times are NOT pegged: those records
-    // already hold correct instants, and re-pegging them would break them.
+    // One rule, everywhere: a stored time is the clock at the place the record
+    // names — the airport for a flight, the hotel for a stay, the location for a
+    // shoot. Every date field in the base is locked to America/Chicago, so what
+    // was typed is recoverable regardless of who opened it, and pegging moves it
+    // to where it happens. See lib/travel/zones.ts.
     departureAt: pegWallClock(textValue(values[FIELDS.flight.departureAt]), zoneFor(originCode || originText)),
     arrivalAt: pegWallClock(textValue(values[FIELDS.flight.arrivalAt]), zoneFor(destinationCode || destinationText)),
     // One record holds a whole routing string where a city belongs
@@ -174,11 +174,13 @@ function hotelFrom(record: AirtableRecord): HotelEvent {
   const chunks = lead.split(",").map((item) => item.trim())
   const name = textValue(values[FIELDS.hotel.name]) || chunks[0] || "Hotel"
   const address = textValue(values[FIELDS.hotel.address]) || chunks.slice(1, 5).join(", ").split(".")[0]
+  const hotelZone = zoneFor(address || name)
   return {
     id: record.id,
     kind: "hotel",
-    checkInAt: textValue(values[FIELDS.hotel.checkInAt]),
-    checkOutAt: textValue(values[FIELDS.hotel.checkOutAt]),
+    // Local at the hotel, by the same rule as flights and shoots.
+    checkInAt: pegWallClock(textValue(values[FIELDS.hotel.checkInAt]), hotelZone),
+    checkOutAt: pegWallClock(textValue(values[FIELDS.hotel.checkOutAt]), hotelZone),
     name,
     address,
     confirmation:
