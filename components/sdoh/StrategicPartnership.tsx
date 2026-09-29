@@ -58,7 +58,7 @@ export function StrategicPartnership({ locale, dict }: StrategicPartnershipProps
 
             {/* Title */}
             <motion.h2 
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-8 sm:mb-10 text-neutral-900 leading-tight text-center"
+              className="text-2xl sm:text-3xl type:text-4xl lg:text-5xl font-bold mb-8 sm:mb-10 text-neutral-900 leading-tight text-center"
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ duration: 0.6, delay: 0.3 }}
@@ -121,7 +121,7 @@ export function StrategicPartnership({ locale, dict }: StrategicPartnershipProps
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ duration: 0.6, delay: 0.5 }}
             >
-              <p className="text-base sm:text-lg md:text-xl leading-relaxed text-neutral-700 mb-4 sm:mb-6">
+              <p className="text-base sm:text-lg type:text-xl leading-relaxed text-neutral-700 mb-4 sm:mb-6">
                 {locale === "es" ? (
                   <>
                     En asociación con VelocityTX y Methodist Healthcare Ministries, el programa Community Health

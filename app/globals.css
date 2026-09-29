@@ -45,6 +45,12 @@
 }
 
 @theme {
+  /* The type scale steps at 680px, not at Tailwind's md (768px). Typography is
+     the visual system's to set, so `type:` is the breakpoint type size steps at
+     and `md:` keeps governing layout. A heading that changed size at 768 was
+     changing it at the wrong width. */
+  --breakpoint-type: 680px;
+
   --font-menda-black: "Menda Black", sans-serif;
   --font-geist-sans: "Geist Sans", sans-serif;
   --font-geist-mono: "Geist Mono", monospace;

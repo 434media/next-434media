@@ -77,7 +77,7 @@ export default function AcceleratorWinner({ locale }: AcceleratorWinnerProps) {
             </div>
 
             {/* Title */}
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-8">
+            <h2 className="text-3xl sm:text-4xl type:text-5xl font-black text-white mb-8">
               {content.title}
             </h2>
 

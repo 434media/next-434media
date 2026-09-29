@@ -167,7 +167,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
 
               {/* Tagline */}
               <motion.p
-                className="font-geist-sans text-white/80 font-medium text-lg md:text-xl leading-[1.35] tracking-tight mb-8"
+                className="font-geist-sans text-white/80 font-medium text-lg type:text-xl leading-[1.35] tracking-tight mb-8"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.15 }}

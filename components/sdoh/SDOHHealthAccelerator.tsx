@@ -67,7 +67,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
             <p className="text-[#FF6B35] font-medium text-sm uppercase tracking-wider mb-4">
               {locale === "es" ? "Donde la Innovación Encuentra Propósito" : "Where Innovation Meets Purpose"}
             </p>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
+            <h2 className="text-3xl sm:text-4xl type:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {getStringValue(d.title)}
             </h2>
           </div>
@@ -93,7 +93,7 @@ export default function SDOHHealthAccelerator({ locale, dict }: SDOHHealthAccele
                   {getStringValue(d.description1)}
                 </p>
 
-                <p className="text-lg md:text-xl text-neutral-700 leading-relaxed pl-4 mb-8">
+                <p className="text-lg type:text-xl text-neutral-700 leading-relaxed pl-4 mb-8">
                   {getStringValue(d.description2)}
                 </p>
 

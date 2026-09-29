@@ -308,7 +308,7 @@ function VideoModal({
             </div>
 
             {/* Title */}
-            <h2 className="font-ggx88 text-2xl font-black leading-[0.98] tracking-[-0.02em] text-neutral-950 md:text-3xl">
+            <h2 className="font-ggx88 text-2xl font-black leading-[0.98] tracking-[-0.02em] text-neutral-950 type:text-3xl">
               {item.title}
             </h2>
 
@@ -464,7 +464,7 @@ function WorkCard({
 
       {!item.logo && !item.image && (
         <div className="absolute inset-0 flex items-center justify-center p-6">
-          <h3 className="text-center font-ggx88 text-xl font-black leading-none tracking-tighter text-neutral-900 md:text-2xl">
+          <h3 className="text-center font-ggx88 text-xl font-black leading-none tracking-tighter text-neutral-900 type:text-2xl">
             {item.title}
           </h3>
         </div>
@@ -677,7 +677,7 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-8 max-w-2xl text-balance t-body-l text-neutral-600 md:text-xl"
+              className="mt-8 max-w-2xl text-balance t-body-l text-neutral-600 type:text-xl"
             >
               {BRAND_RECORDS.canonicalDefinition} Everything
               below is organized by commercial model: what we own, the platforms we build for
@@ -818,7 +818,7 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
                 <h2 className="font-ggx88 t-display-m font-black tracking-[-0.03em] text-neutral-950">
                   Tell us what you&apos;re producing.
                 </h2>
-                <p className="mt-6 max-w-xl t-body text-neutral-600 md:text-lg">
+                <p className="mt-6 max-w-xl t-body text-neutral-600 type:text-lg">
                   We can lead the full production or own a defined part of it within a larger
                   team. Send the objective, the audience, and the target date, and we&apos;ll come
                   back with the structure that fits.

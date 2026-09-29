@@ -18,7 +18,7 @@ function QuantitySelector({ quantity, onQuantityChange }: QuantitySelectorProps)
   return (
     <div className="mb-8">
       <dt className="mb-4">
-        <span className="text-xl md:text-2xl uppercase tracking-wider font-black text-white">Quantity</span>
+        <span className="text-xl type:text-2xl uppercase tracking-wider font-black text-white">Quantity</span>
       </dt>
       <div className="flex items-center gap-4">
         <button
@@ -264,7 +264,7 @@ export function ProductDescription({ product, isDesktop = false }: ProductDescri
       {/* Product Title Only - TXMX Style (Price Removed) */}
       <div className="mb-6 pb-4 border-b-2 border-white">
         <motion.h1
-          className="text-2xl md:text-3xl lg:text-4xl font-black tracking-wider text-white uppercase leading-tight"
+          className="text-2xl type:text-3xl lg:text-4xl font-black tracking-wider text-white uppercase leading-tight"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}

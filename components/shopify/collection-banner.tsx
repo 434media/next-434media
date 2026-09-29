@@ -397,8 +397,8 @@ export function CollectionBanner({
             transition={{ duration: 0.5, delay: 0.3 }}
             className="max-w-2xl mx-auto md:mx-0"
           >
-            <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">{title}</h1>
-            {description && <p className="mb-6 text-base md:text-lg opacity-90">{description}</p>}
+            <h1 className="mb-4 text-3xl font-bold type:text-4xl lg:text-5xl">{title}</h1>
+            {description && <p className="mb-6 text-base type:text-lg opacity-90">{description}</p>}
           </motion.div>
         )}
 
