@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* The 434 palette and role tokens, generated from the visual-system handoff in
+   434-context. Do not add a brand colour here — add it to the handoff, or it is
+   a colour with no provenance, which is what the system exists to prevent. */
+@import "../lib/visual/tokens.generated.css";
 
 /* Define neutral colors for Tailwind v4 */
 :root {
