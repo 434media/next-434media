@@ -56,7 +56,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
           className="group flex items-center gap-4 py-4 border-b border-white/6 transition-colors duration-200 hover:bg-white/3 -mx-2 px-2 rounded-lg"
         >
           <div className="flex-1 min-w-0">
-            <span className="font-geist-sans t-body font-medium text-white tracking-tight block mb-1">
+            <span className="font-geist-sans t-control-emphasis text-white tracking-tight block mb-1">
               {item.title}
             </span>
             <span className="font-geist-sans t-body-s text-white/40 tracking-tight block">
