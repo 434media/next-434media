@@ -4,7 +4,7 @@
 // email clients being the reason this file exists. Outlook renders
 // `var(--434-signal)` as no colour at all.
 //
-// Source: 07 Visual System/source, package 1.0 (2026-09-29).
+// Source: 07 Visual System/source, package 1.1 (2026-09-29).
 
 export const COLOR = {
   /** Light atmospheric field / soft brand surface */
@@ -46,3 +46,38 @@ export const PROHIBITIONS = [
   "Colour 01, 04 and 05 are not normal-size text on white. Colour 03 is not normal-size text on black.",
   "Never override a client or owned-IP identity to force work into a 434 colour treatment.",
 ] as const
+
+/** Global type scale. `compact` below 680 px, `wide` at and above. */
+export const TYPE_BREAKPOINT_PX = 680
+
+export const TYPE = {
+  "display-xl": { compactPx: 56, widePx: 96, lineHeight: 0.9, family: ["GGX88", "Menda Black"] },
+  "display-l": { compactPx: 44, widePx: 72, lineHeight: 0.92, family: ["GGX88", "Menda Black"] },
+  "display-m": { compactPx: 36, widePx: 56, lineHeight: 0.95, family: ["GGX88", "Menda Black"] },
+  "heading-xl": { compactPx: 32, widePx: 40, lineHeight: 1.05, weight: 600, family: ["Geist"] },
+  "heading-l": { compactPx: 28, widePx: 32, lineHeight: 1.1, weight: 600, family: ["Geist"] },
+  "heading-m": { compactPx: 22, widePx: 24, lineHeight: 1.15, weight: 600, family: ["Geist"] },
+  "heading-s": { compactPx: 18, widePx: 20, lineHeight: 1.2, weight: 600, family: ["Geist"] },
+  "body-l": { compactPx: 18, widePx: 18, lineHeight: 1.55, weight: 400, family: ["Geist"] },
+  "body": { compactPx: 16, widePx: 16, lineHeight: 1.6, weight: 400, family: ["Geist"] },
+  "body-s": { compactPx: 14, widePx: 14, lineHeight: 1.5, weight: 400, family: ["Geist"] },
+  "label": { compactPx: 11, widePx: 11, lineHeight: 1.2, weight: 600, letterSpacing: "0.12em", family: ["Geist"] },
+  "metadata-l": { compactPx: 16, widePx: 16, lineHeight: 1.3, weight: 500, family: ["Geist Mono"] },
+  "metadata": { compactPx: 14, widePx: 14, lineHeight: 1.35, weight: 500, family: ["Geist Mono"] },
+  "caption": { compactPx: 12, widePx: 12, lineHeight: 1.4, weight: 400, family: ["Geist"] },
+} as const
+
+export const LOGO = {
+  "clear-space-horizontal-print": { value: 0.25, unit: "in" },
+  "clear-space-horizontal-digital": { value: 24, unit: "px" },
+  "clear-space-stacked-print": { value: 0.25, unit: "in" },
+  "clear-space-stacked-digital": { value: 24, unit: "px" },
+  "clear-space-mark-print": { value: 0.25, unit: "in" },
+  "clear-space-mark-digital": { value: 24, unit: "px" },
+  "min-width-horizontal-print": { value: 0.75, unit: "in" },
+  "min-width-horizontal-digital": { value: 72, unit: "px" },
+  "min-width-stacked-print": { value: 0.5, unit: "in" },
+  "min-width-stacked-digital": { value: 48, unit: "px" },
+  "min-width-mark-print": { value: 0.25, unit: "in" },
+  "min-width-mark-digital": { value: 24, unit: "px" },
+} as const
