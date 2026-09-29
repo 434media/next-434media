@@ -318,7 +318,7 @@ export default function EnhancedSearch() {
                         {isLoading ? "Searching..." : `Results for "${query}"`}
                       </h3>
                       {searchResults.length > 0 && (
-                        <span className="text-xs text-neutral-400">
+                        <span className="t-caption text-neutral-400">
                           {searchResults.length} {searchResults.length === 1 ? "result" : "results"}
                         </span>
                       )}
@@ -368,17 +368,17 @@ export default function EnhancedSearch() {
                               <div className="flex-1">
                                 <h4 className="font-medium">{highlightMatch(product.title, query)}</h4>
                                 {product.description && (
-                                  <p className="mt-1 text-sm text-neutral-400 line-clamp-1">
+                                  <p className="mt-1 t-body-s text-neutral-400 line-clamp-1">
                                     {highlightMatch(product.description, query)}
                                   </p>
                                 )}
                                 <div className="mt-1 flex items-center justify-between">
-                                  <span className="text-sm font-medium text-emerald-400">
+                                  <span className="t-body-s font-medium text-emerald-400">
                                     {getProductPrice(product)}
                                   </span>
                                   {/* Use vendor or tags instead of collections */}
                                   {getProductMetadata(product) && (
-                                    <span className="text-xs text-neutral-500">{getProductMetadata(product)}</span>
+                                    <span className="t-caption text-neutral-500">{getProductMetadata(product)}</span>
                                   )}
                                 </div>
                               </div>
@@ -394,8 +394,8 @@ export default function EnhancedSearch() {
                         <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-neutral-800/50 mb-3">
                           <SearchIcon className="h-6 w-6 text-neutral-400" aria-hidden="true" />
                         </div>
-                        <h4 className="text-lg font-medium text-white">No results found</h4>
-                        <p className="mt-1 text-sm text-neutral-400">
+                        <h4 className="t-heading-s font-medium text-white">No results found</h4>
+                        <p className="mt-1 t-body-s text-neutral-400">
                           Try different keywords or browse our collections
                         </p>
                       </div>
