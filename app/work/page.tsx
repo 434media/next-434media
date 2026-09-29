@@ -1,5 +1,8 @@
 import type { Metadata } from "next"
-import WorkClient from "./WorkClient"
+// Approved design Revision 12. WorkClient is kept in the tree: this branch is
+// for review, not a replacement decision, and the seven questions in
+// 434-context 08 Work Page/COMPLIANCE.md are unanswered.
+import WorkRedesign from "./redesign/WorkRedesign"
 import { getWorkPageRecords } from "@/lib/sor/work-page-data"
 import { buildServicesItemListLd } from "@/lib/seo/services"
 import { BRAND_RECORDS } from "@/lib/brand-records"
@@ -95,7 +98,7 @@ export default async function WorkPage() {
           }),
         }}
       />
-      <WorkClient records={records} />
+      <WorkRedesign records={records} />
     </>
   )
 }
