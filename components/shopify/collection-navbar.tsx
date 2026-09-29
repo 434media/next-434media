@@ -147,7 +147,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                 aria-label={searchOpen ? "Close search" : "Search products"}
               >
                 {searchOpen ? <X className="w-4 h-4 mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-                <span className="text-sm font-medium">{searchOpen ? "Close" : "Search"}</span>
+                <span className="t-control-emphasis">{searchOpen ? "Close" : "Search"}</span>
                 {!searchOpen && (
                   <motion.div
                     initial={{ scale: 0 }}
@@ -179,7 +179,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                     setSortOpen(false)
                     setSearchOpen(false)
                   }}
-                  className="flex items-center justify-between w-full sm:w-auto gap-2 px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
+                  className="flex items-center justify-between w-full sm:w-auto gap-2 t-control-emphasis px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
                   aria-expanded={collectionsOpen}
                   aria-haspopup="true"
                 >
@@ -214,7 +214,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                             <Link
                               key={collection.handle}
                               href={collection.path}
-                              className={`block px-4 py-2 text-sm hover:bg-neutral-700 transition-colors ${
+                              className={`block px-4 py-2 t-control hover:bg-neutral-700 transition-colors ${
                                 collection.handle === currentCollection ? "bg-emerald-600 text-white" : "text-white"
                               }`}
                               onClick={() => setCollectionsOpen(false)}
@@ -243,7 +243,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                     setCollectionsOpen(false)
                     setSearchOpen(false)
                   }}
-                  className="flex items-center justify-between w-full sm:w-auto gap-2 px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
+                  className="flex items-center justify-between w-full sm:w-auto gap-2 t-control-emphasis px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
                   aria-expanded={sortOpen}
                   aria-haspopup="true"
                 >
@@ -289,7 +289,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                               <Link
                                 key={option.slug || "default"}
                                 href={href}
-                                className={`block px-4 py-2 text-sm hover:bg-neutral-700 transition-colors ${
+                                className={`block px-4 py-2 t-control hover:bg-neutral-700 transition-colors ${
                                   currentSort === option.slug ? "bg-emerald-600 text-white" : "text-white"
                                 }`}
                                 onClick={() => setSortOpen(false)}
@@ -365,7 +365,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                 transition={{ delay: 0.3 }}
                 className="mt-6 pt-4 border-t border-neutral-800"
               >
-                <h3 className="text-sm font-medium text-neutral-400 mb-3">Quick Links</h3>
+                <h3 className="t-heading-xs text-neutral-400 mb-3">Quick Links</h3>
                 <div className="flex flex-wrap gap-2">
                   {collections.slice(0, 6).map((collection, index) => (
                     <motion.div
