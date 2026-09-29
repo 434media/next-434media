@@ -82,7 +82,9 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
     <>
       <motion.header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
-          isScrolled ? "bg-black/95 shadow-lg py-2" : "bg-black/85 py-3 md:py-4"
+          isScrolled
+            ? "bg-[color-mix(in_srgb,var(--color-chrome-bg)_95%,transparent)] shadow-lg py-2"
+            : "bg-[color-mix(in_srgb,var(--color-chrome-bg)_85%,transparent)] py-3 md:py-4"
         }`}
         initial={{ y: -100 }}
         animate={{ y: 0 }}

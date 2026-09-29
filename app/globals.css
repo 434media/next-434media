@@ -37,6 +37,28 @@
      use Tailwind's green (#22C55E, 8 uses today); it is left alone rather than
      forced to red or invented, and it is raised for a founder decision. */
   --color-fn-error: var(--434-signal);
+
+  /* Chrome roles — the header and footer, which are the site's dark surfaces.
+
+     One role per purpose, each resolving to a palette token. They exist
+     because the chrome was reaching for six steps of the neutral scale to
+     express four intentions, and a grey chosen by number drifts. A grey
+     chosen by purpose does not.
+
+     The three text roles are a deliberate ramp on black:
+       primary    #FFFFFF   21:1
+       secondary  #CAD9D6   15:1
+       label      #A2B7B2   10:1
+
+     The footer previously put its legal row on the 600 and 700 steps, which
+     resolve to #49625E — about 3.2:1 on black, under the 4.5:1 floor. Moving
+     it onto the label role is a visible change and an intended one. */
+  --color-chrome-bg: var(--434-color-02-black);
+  --color-chrome-text: var(--434-white);
+  --color-chrome-text-secondary: var(--434-color-01);
+  --color-chrome-label: var(--434-color-05);
+  --color-chrome-divider: color-mix(in srgb, var(--434-white) 12%, transparent);
+  --color-chrome-icon: var(--434-color-05);
   
   --font-geist-sans: var(--font-geist-sans, sans-serif);
   --font-geist-mono: var(--font-geist-mono, monospace);

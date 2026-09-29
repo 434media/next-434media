@@ -62,7 +62,7 @@ export default function Footer() {
   return (
     <footer
       ref={footerRef}
-      className="bg-neutral-950 mt-auto relative overflow-hidden"
+      className="bg-[var(--color-chrome-bg)] mt-auto relative overflow-hidden"
       aria-labelledby="footer-heading"
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-8 relative">
@@ -74,7 +74,7 @@ export default function Footer() {
               transition={{ duration: 0.6 }}
             >
               {/* Main footer grid — Brand / Build / Newsletter */}
-              <div className="py-12 md:py-16 border-b border-white/10">
+              <div className="py-12 md:py-16 border-b border-[var(--color-chrome-divider)]">
                 <div className="grid grid-cols-2 md:grid-cols-12 gap-y-10 gap-x-6 md:gap-x-8">
                   {/* Brand column — elevator pitch + social. Width tracks the
                       max-w-xs copy; a wider column just opens a gap. */}
@@ -90,10 +90,10 @@ export default function Footer() {
                         />
                       </Link>
                     </h2>
-                    <p className="font-geist-sans t-body-s text-white font-medium max-w-xs mb-2">
+                    <p className="font-geist-sans t-body-s text-[var(--color-chrome-text)] font-medium max-w-xs mb-2">
                       {BRAND_RECORDS.mottoStyled}
                     </p>
-                    <p className="font-geist-sans t-body-s text-neutral-400 max-w-xs mb-5">
+                    <p className="font-geist-sans t-body-s text-[var(--color-chrome-text-secondary)] max-w-xs mb-5">
                       {BRAND.description}
                     </p>
                     {/* Social */}
@@ -102,7 +102,7 @@ export default function Footer() {
                         href="https://www.linkedin.com/company/434media"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-neutral-500 hover:text-white transition-colors duration-200"
+                        className="text-[var(--color-chrome-icon)] hover:text-[var(--color-chrome-text)] transition-colors duration-200"
                         aria-label="Follow 434 MEDIA on LinkedIn"
                       >
                         <svg
@@ -122,7 +122,7 @@ export default function Footer() {
                   {/* Build with us — internal CTAs. The contact route is the one
                       way in; there is no email/address echo here anymore. */}
                   <nav className="col-span-2 md:col-span-3" aria-label="Footer site links">
-                    <p className="font-geist-mono t-label text-neutral-500 mb-4">
+                    <p className="font-geist-mono t-label text-[var(--color-chrome-label)] mb-4">
                       Build with us
                     </p>
                     <ul className="space-y-2.5">
@@ -132,8 +132,8 @@ export default function Footer() {
                             href={link.href}
                             className={`font-geist-sans text-sm transition-colors duration-200 leading-tight ${
                               link.emphasis
-                                ? "text-white font-medium hover:text-neutral-300"
-                                : "text-neutral-400 hover:text-white"
+                                ? "text-[var(--color-chrome-text)] font-medium hover:text-[var(--color-chrome-text-secondary)]"
+                                : "text-[var(--color-chrome-text-secondary)] hover:text-[var(--color-chrome-text)]"
                             }`}
                           >
                             {link.label}
@@ -146,15 +146,15 @@ export default function Footer() {
                   {/* Newsletter — value-prop-led copy. Takes the spare column
                       since it's the only one with a form control to fit. */}
                   <div className="col-span-2 md:col-span-5">
-                    <p className="font-geist-mono t-label text-neutral-500 mb-4">
+                    <p className="font-geist-mono t-label text-[var(--color-chrome-label)] mb-4">
                       The Feed · Newsletter
                     </p>
-                    <p className="font-geist-sans t-body-s text-neutral-400 mb-4 max-w-sm">
+                    <p className="font-geist-sans t-body-s text-[var(--color-chrome-text-secondary)] mb-4 max-w-sm">
                       Field notes from the studio — what we&apos;re producing, what&apos;s launching,
                       who&apos;s working on it.
                     </p>
                     <Newsletter />
-                    <p className="mt-3 font-geist-mono t-label text-neutral-600">
+                    <p className="mt-3 font-geist-mono t-label text-[var(--color-chrome-label)]">
                       No spam · 1 send/month
                     </p>
                   </div>
@@ -165,7 +165,7 @@ export default function Footer() {
                   only place the address appears now; the Build with us column
                   routes to /contact instead. */}
               <div className="py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="font-geist-sans t-caption text-neutral-600">
+                <p className="font-geist-sans t-caption text-[var(--color-chrome-label)]">
                   &copy; {currentYear} 434 MEDIA · {BRAND_RECORDS.mottoStyled}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -173,15 +173,15 @@ export default function Footer() {
                     <Link
                       key={link.label}
                       href={link.href}
-                      className="font-geist-sans t-caption text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
+                      className="font-geist-sans t-caption text-[var(--color-chrome-label)] hover:text-[var(--color-chrome-text-secondary)] transition-colors duration-200"
                     >
                       {link.label}
                     </Link>
                   ))}
-                  <span className="font-geist-sans t-caption text-neutral-700" aria-hidden="true">·</span>
+                  <span className="font-geist-sans t-caption text-[var(--color-chrome-label)]" aria-hidden="true">·</span>
                   <a
                     href="mailto:build@434media.com"
-                    className="font-geist-sans t-caption text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
+                    className="font-geist-sans t-caption text-[var(--color-chrome-label)] hover:text-[var(--color-chrome-text-secondary)] transition-colors duration-200"
                   >
                     build@434media.com
                   </a>
