@@ -128,7 +128,7 @@ export default function ShopClient() {
                 </motion.div>
 
                 {/* Tooltip */}
-                <div className="absolute top-full right-0 mt-2 px-3 py-1 bg-black text-white text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 pointer-events-none border border-white/20">
+                <div className="absolute top-full right-0 mt-2 px-3 py-1 bg-black text-white t-body-s whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 pointer-events-none border border-white/20">
                   {isMuted ? "Unmute" : "Mute"}
                 </div>
               </motion.button>
