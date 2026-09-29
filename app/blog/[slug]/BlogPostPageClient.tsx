@@ -195,7 +195,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors duration-200 mb-10 group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span className="text-sm font-medium tracking-wide">Back to Blog</span>
+              <span className="t-control tracking-wide">Back to Blog</span>
             </Link>
 
             {/* Category Badge */}
@@ -214,7 +214,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className="t-body-l sm:text-xl text-gray-600 mb-10 max-w-2xl">
+              <p className="t-body-xl text-gray-600 mb-10 max-w-2xl">
                 {post.excerpt}
               </p>
             )}
@@ -236,7 +236,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               </div>
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 t-control"
               >
                 <Share2 className="w-4 h-4" />
                 Share
@@ -306,7 +306,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
                       {post.tags.map((tag: string, index: number) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+                          className="inline-flex items-center px-3.5 py-1.5 rounded-full t-control bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
                         >
                           {tag}
                         </span>
@@ -325,7 +325,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
             <div className="max-w-6xl mx-auto px-6">
               <div className="mb-14">
                 <h2 className="t-heading-l font-bold text-gray-900 mb-3 tracking-tight">Related Articles</h2>
-                <p className="text-gray-500 t-body sm:text-lg">Continue exploring our insights</p>
+                <p className="text-gray-500 t-body-l">Continue exploring our insights</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -357,7 +357,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               <div className="space-y-3">
                 <button
                   onClick={() => handleShare("twitter")}
-                  className="w-full flex items-center gap-3 p-3 bg-black hover:bg-gray-800 text-white rounded-lg transition-colors text-sm font-medium"
+                  className="w-full flex items-center gap-3 p-3 bg-black hover:bg-gray-800 text-white rounded-lg transition-colors t-control-emphasis"
                 >
                   <TwitterIcon />
                   Share on X (Twitter)
@@ -365,7 +365,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
                 <button
                   onClick={() => handleShare("linkedin")}
-                  className="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  className="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors t-control-emphasis"
                 >
                   <LinkedInIcon />
                   Share on LinkedIn
