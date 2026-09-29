@@ -26,7 +26,10 @@ import addFormats from "ajv-formats"
 /** Seed file -> collection and schema. Order is the load order. */
 const TABLES = [
   { seed: "portfolio_records.json", collection: "portfolio_records", schema: "portfolio_record" },
-  { seed: "cohorts.json", collection: "cohorts", schema: "cohort" },
+  // Seed file and collection differ deliberately: the CRM already has
+  // `crm_cohorts` for Digital Canvas program cohorts, which are a different
+  // thing entirely. These are ICP buyer segments A-E.
+  { seed: "cohorts.json", collection: "icp_cohorts", schema: "cohort" },
   { seed: "qualification_thresholds.json", collection: "qualification_thresholds", schema: "qualification_threshold" },
   { seed: "partner_services.json", collection: "partner_services", schema: "partner_service" },
   { seed: "rate_card.json", collection: "rate_card_lines", schema: "rate_card_line", optional: true },
