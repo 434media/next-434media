@@ -31,9 +31,12 @@ const BASE =
   "disabled:pointer-events-none disabled:opacity-50"
 
 const SIZES: Record<Size, string> = {
-  sm: "px-4 py-2 text-xs hover:gap-2.5",
-  md: "px-5 py-2.5 text-sm hover:gap-3",
-  lg: "px-6 py-3 text-sm hover:gap-3",
+  // Control, not body. v1.2 gives buttons the role's emphasis weight; the
+  // three sizes now differ in padding only, which is what a size prop on a
+  // button was ever really doing.
+  sm: "px-4 py-2 t-control-emphasis hover:gap-2.5",
+  md: "px-5 py-2.5 t-control-emphasis hover:gap-3",
+  lg: "px-6 py-3 t-control-emphasis hover:gap-3",
 }
 
 const VARIANTS: Record<Variant, string> = {
