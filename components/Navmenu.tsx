@@ -152,11 +152,11 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   className="opacity-30"
                 >
                   <Image
-                    src="/brand/434-primary-light.svg"
+                    src="/brand/434-mark-light.svg"
                     alt="434 MEDIA"
-                    width={112}
-                    height={24}
-                    className="h-auto w-[72px]"
+                    width={176}
+                    height={44}
+                    className="h-auto w-[44px]"
                   />
                 </motion.span>
                 <motion.button
