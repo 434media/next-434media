@@ -16,6 +16,14 @@
  * a record with an unmatched model is dropped with no error and no empty state.
  * A stray `.filter()` on the derivation would do the same.
  *
+ * The page now receives its records as a prop from the server component, which
+ * reads them from `portfolio_records`. CI cannot reach Firestore, so what is
+ * checked here is the shape of the path the records travel: the page maps over
+ * everything it is given, the server component actually passes them, and the
+ * fallback is the full generated extract rather than a subset. Whether the
+ * store's content matches the extract is settled by
+ * scripts/sor/compare-work-records.ts, which needs no credentials either.
+ *
  * Exits non-zero on any record that would not render.
  */
 import { readFileSync } from "node:fs"
@@ -23,6 +31,7 @@ import { readFileSync } from "node:fs"
 import { WORK_RECORDS } from "../lib/work-records"
 
 const PAGE = "app/work/WorkClient.tsx"
+const SERVER = "app/work/page.tsx"
 
 function fail(lines: string[]): never {
   console.error(lines.join("\n"))
@@ -42,25 +51,49 @@ function main(): void {
     fail([`Could not read CATEGORIES ids from ${PAGE}.`])
   }
 
-  // The page must derive its items from every record, unfiltered.
-  if (!/WORK_RECORDS\.map\(/.test(src)) {
+  // The page must derive its items from every record it is given, unfiltered.
+  const start = src.indexOf("function buildItems(")
+  if (start === -1) {
     fail([
-      `${PAGE} no longer derives its items from WORK_RECORDS.map().`,
-      "Every published record must reach the page; a filter or a hand-written",
+      `${PAGE} no longer derives its items in buildItems().`,
+      "Every record the page receives must reach it; a filter or a hand-written",
       "list will drop records silently.",
     ])
   }
-  const derivation = src.slice(
-    src.indexOf("const workItems"),
-    src.indexOf("\n\n", src.indexOf("const workItems")),
-  )
+  const derivation = src.slice(start, src.indexOf("\n}", start))
+  if (!/records\.map\(/.test(derivation)) {
+    fail([`${PAGE} buildItems() does not map over its records argument.`, derivation])
+  }
   if (/\.filter\(/.test(derivation)) {
     fail([
       `${PAGE} filters records while deriving workItems.`,
-      "Publication is decided by the generator (Section 4.5 `Work page`), not",
-      "by the page. A filter here hides a published record with no error.",
+      "Publication is decided upstream (Section 4.5 `Work page`), not by the",
+      "page. A filter here hides a published record with no error.",
       derivation,
     ])
+  }
+
+  // The fallback must be the whole extract. A narrower default would render a
+  // subset whenever the record store is unreachable, and look like a full page.
+  if (!/records\s*=\s*WORK_RECORDS\b/.test(src)) {
+    fail([
+      `${PAGE} does not default its records prop to WORK_RECORDS.`,
+      "The generated extract is the fallback when portfolio_records cannot be",
+      "read. Defaulting to anything else serves a partial page on failure.",
+    ])
+  }
+
+  // The server component must actually pass records. Without this, the prop is
+  // ignored, the default is used forever, and nothing anywhere reports it.
+  const server = readFileSync(SERVER, "utf8")
+  if (!/<WorkClient\s+records=\{/.test(server)) {
+    fail([
+      `${SERVER} does not pass records to <WorkClient>.`,
+      "The page would silently render the fallback on every request.",
+    ])
+  }
+  if (!/getWorkPageRecords\(/.test(server)) {
+    fail([`${SERVER} does not call getWorkPageRecords().`])
   }
 
   // Every record must land in exactly one section.

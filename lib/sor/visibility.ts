@@ -26,8 +26,20 @@ const INTERNAL_FIELDS = new Set([
   "quotable",
   "notes",
   "internal_context",
+  "proof_assets_as_written",
+  "restrictions_as_written",
   "updated_by",
 ])
+
+/**
+ * Master §4.5 records publication as `work_page: { published, reason }`. Anything
+ * other than an explicit `true` is treated as unpublished, so a malformed or
+ * missing block fails closed rather than exposing a record by accident.
+ */
+export function isPublished(row: Record<string, unknown>): boolean {
+  const wp = row.work_page
+  return typeof wp === "object" && wp !== null && (wp as { published?: unknown }).published === true
+}
 
 /** Collections a `public` caller may not read at all. */
 const INTERNAL_COLLECTIONS = new Set([
@@ -46,9 +58,10 @@ export function isReadable(collection: string, scope: Scope): boolean {
  * description from internal context; only the former leaves the building.
  */
 const PORTFOLIO_PUBLIC_FIELDS = [
-  "key", "name", "commercial_model", "production_categories", "approved_public_description",
-  "client_or_partner", "years", "public_url", "operating_status", "collaborator_credits",
-  "published", "source",
+  "key", "title", "commercial_model", "production_categories", "approved_public_description",
+  "client_or_partner_as_written", "role_434", "founder_credit", "collaborator_credits_as_written",
+  "years", "years_as_written", "operating_status", "public_url", "rights_defaults",
+  "registered_identifier_as_written", "video", "work_page", "source",
 ] as const
 
 type Row = Record<string, unknown>
@@ -60,8 +73,14 @@ export function project(collection: string, row: Row, scope: Scope): Row | null 
 
   if (collection === "portfolio_records") {
     // An unpublished record does not exist to a public caller. The master holds
-    // records it has decided not to publish; that decision is not advisory.
-    if (row.published === false) return null
+    // records it has decided not to publish, and that decision is not advisory.
+    //
+    // The flag is nested at `work_page.published`, not top-level. An earlier
+    // version of this check read `row.published`, which is never present — so it
+    // never fired, and all seventeen records would have gone out including the
+    // two the master holds back. The tests missed it because they were written
+    // from the same assumed shape as the code. They now use a real seed row.
+    if (isPublished(row) !== true) return null
     const out: Row = {}
     for (const f of PORTFOLIO_PUBLIC_FIELDS) if (f in row) out[f] = row[f]
     return out
