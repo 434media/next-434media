@@ -47,3 +47,14 @@ jobs:
       # tsx, so a full install is unnecessary.
       - run: pnpm add -g tsx
       - run: tsx scripts/verify-work-page.ts
+
+      # The system-of-record JSON Schemas are canonical in the private context
+      # repository and are deliberately not copied here: they carry no figures,
+      # but they describe the shape of qualification and rate-card data, and this
+      # repository is public. So CI cannot regenerate the types to compare them.
+      #
+      # What it can do without the schemas is confirm the committed generated file
+      # still matches the hash recorded beside it — which catches the failure this
+      # repo is actually exposed to, someone editing a generated file by hand.
+      # "Are the types current with the schemas" is checked where the schemas are.
+      - run: tsx scripts/sor/verify-types.ts

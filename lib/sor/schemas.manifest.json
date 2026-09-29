@@ -1,0 +1,12 @@
+{
+  "generated": "2026-09-29",
+  "schemas": {
+    "cohort.schema.json": "1c4efc42708514b3",
+    "contractor.schema.json": "0e30b1e384417bfe",
+    "partner_service.schema.json": "27d5fa1bf7ad7543",
+    "portfolio_record.schema.json": "65c1a6f335b83027",
+    "qualification_threshold.schema.json": "4b346713da931afd",
+    "rate_card_line.schema.json": "099711957961ffe2"
+  },
+  "typesBody": "d8de3869aa1c33ae"
+}
