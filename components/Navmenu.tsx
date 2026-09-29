@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
+import Image from "next/image"
 import { useCallback, useEffect, useRef } from "react"
 import { XIcon } from "lucide-react"
 
@@ -55,10 +56,10 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
           className="group flex items-center gap-4 py-4 border-b border-white/6 transition-colors duration-200 hover:bg-white/3 -mx-2 px-2 rounded-lg"
         >
           <div className="flex-1 min-w-0">
-            <span className="font-geist-sans text-[15px] font-medium text-white leading-none tracking-tight block mb-1">
+            <span className="font-geist-sans t-body font-medium text-white tracking-tight block mb-1">
               {item.title}
             </span>
-            <span className="font-geist-sans text-[13px] font-normal text-white/40 leading-none tracking-tight block">
+            <span className="font-geist-sans t-body-s text-white/40 tracking-tight block">
               {item.subtitle}
             </span>
           </div>
@@ -148,9 +149,15 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="font-menda-black text-[11px] font-medium text-white/30 uppercase tracking-widest leading-none"
+                  className="opacity-30"
                 >
-                  434 MEDIA
+                  <Image
+                    src="/brand/434-mark-light.svg"
+                    alt="434 MEDIA"
+                    width={176}
+                    height={44}
+                    className="h-auto w-[44px]"
+                  />
                 </motion.span>
                 <motion.button
                   onClick={onClose}
@@ -167,7 +174,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
 
               {/* Tagline */}
               <motion.p
-                className="font-geist-sans text-white/80 font-medium text-lg type:text-xl leading-[1.35] tracking-tight mb-8"
+                className="font-geist-sans t-body-l text-white/80 font-medium type:text-xl tracking-tight mb-8"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.15 }}
@@ -187,7 +194,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                <p className="font-geist-sans text-[11px] text-white/20 leading-relaxed tracking-tight">
+                <p className="font-geist-sans t-caption text-white/20 tracking-tight">
                   &copy; {new Date().getFullYear()} 434 Media. All rights reserved.
                 </p>
               </motion.div>

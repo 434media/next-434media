@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "motion/react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ScrambleText } from "./ScrambleText"
+import Image from "next/image"
 import { Newsletter } from "./Newsletter"
 import { BRAND } from "@/lib/seo/brand"
 import { BRAND_RECORDS } from "@/lib/brand-records"
@@ -79,20 +79,21 @@ export default function Footer() {
                   {/* Brand column — elevator pitch + social. Width tracks the
                       max-w-xs copy; a wider column just opens a gap. */}
                   <div className="col-span-2 md:col-span-4">
-                    <h2 id="footer-heading" className="font-menda-black text-white text-2xl leading-none mb-4">
-                      <Link href="/" aria-label="434 Media — Home">
-                        <ScrambleText
-                          text="434 MEDIA"
-                          className="inline-block cursor-pointer"
-                          scrambleOnMount={false}
-                          scrambleOnHover={true}
+                    <h2 id="footer-heading" className="mb-4">
+                      <Link href="/" className="inline-block" aria-label="434 Media — Home">
+                        <Image
+                          src="/brand/434-primary-light.svg"
+                          alt="434 MEDIA"
+                          width={168}
+                          height={36}
+                          className="h-auto w-[120px]"
                         />
                       </Link>
                     </h2>
-                    <p className="font-geist-sans text-sm text-white font-medium leading-snug max-w-xs mb-2">
+                    <p className="font-geist-sans t-body-s text-white font-medium max-w-xs mb-2">
                       {BRAND_RECORDS.mottoStyled}
                     </p>
-                    <p className="font-geist-sans text-sm text-neutral-400 leading-relaxed max-w-xs mb-5">
+                    <p className="font-geist-sans t-body-s text-neutral-400 max-w-xs mb-5">
                       {BRAND.description}
                     </p>
                     {/* Social */}
@@ -121,7 +122,7 @@ export default function Footer() {
                   {/* Build with us — internal CTAs. The contact route is the one
                       way in; there is no email/address echo here anymore. */}
                   <nav className="col-span-2 md:col-span-3" aria-label="Footer site links">
-                    <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
+                    <p className="font-geist-mono t-label text-neutral-500 mb-4">
                       Build with us
                     </p>
                     <ul className="space-y-2.5">
@@ -145,15 +146,15 @@ export default function Footer() {
                   {/* Newsletter — value-prop-led copy. Takes the spare column
                       since it's the only one with a form control to fit. */}
                   <div className="col-span-2 md:col-span-5">
-                    <p className="font-geist-mono text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em] mb-4 leading-none">
+                    <p className="font-geist-mono t-label text-neutral-500 mb-4">
                       The Feed · Newsletter
                     </p>
-                    <p className="font-geist-sans text-sm text-neutral-400 leading-relaxed mb-4 max-w-sm">
+                    <p className="font-geist-sans t-body-s text-neutral-400 mb-4 max-w-sm">
                       Field notes from the studio — what we&apos;re producing, what&apos;s launching,
                       who&apos;s working on it.
                     </p>
                     <Newsletter />
-                    <p className="mt-3 font-geist-mono text-[10px] uppercase tracking-[0.18em] text-neutral-600">
+                    <p className="mt-3 font-geist-mono t-label text-neutral-600">
                       No spam · 1 send/month
                     </p>
                   </div>
@@ -164,7 +165,7 @@ export default function Footer() {
                   only place the address appears now; the Build with us column
                   routes to /contact instead. */}
               <div className="py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="font-geist-sans text-xs text-neutral-600 leading-none">
+                <p className="font-geist-sans t-caption text-neutral-600">
                   &copy; {currentYear} 434 MEDIA · {BRAND_RECORDS.mottoStyled}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -172,15 +173,15 @@ export default function Footer() {
                     <Link
                       key={link.label}
                       href={link.href}
-                      className="font-geist-sans text-xs text-neutral-600 hover:text-neutral-300 transition-colors duration-200 leading-none"
+                      className="font-geist-sans t-caption text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
                     >
                       {link.label}
                     </Link>
                   ))}
-                  <span className="font-geist-sans text-xs text-neutral-700 leading-none" aria-hidden="true">·</span>
+                  <span className="font-geist-sans t-caption text-neutral-700" aria-hidden="true">·</span>
                   <a
                     href="mailto:build@434media.com"
-                    className="font-geist-sans text-xs text-neutral-600 hover:text-neutral-300 transition-colors duration-200 leading-none"
+                    className="font-geist-sans t-caption text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
                   >
                     build@434media.com
                   </a>
