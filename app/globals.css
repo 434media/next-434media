@@ -109,25 +109,27 @@
   --font-ggx88: "GGX88", sans-serif;
 }
 
-body {
-  font-family: var(--font-geist-sans);
-  overflow-x: hidden;
-  max-width: 100vw;
-  line-height: 1.6;
-  font-weight: 400;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
+@layer base {
+  body {
+    font-family: var(--font-geist-sans);
+    overflow-x: hidden;
+    max-width: 100vw;
+    line-height: 1.6;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
 
-/* Prevent horizontal overflow on all pages */
-html, body {
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100%;
-  /* Non-static so Framer Motion's useScroll({ target }) can measure scroll
-     offset against the document scroll root without warning. */
-  position: relative;
+  /* Prevent horizontal overflow on all pages */
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    /* Non-static so Framer Motion's useScroll({ target }) can measure scroll
+       offset against the document scroll root without warning. */
+    position: relative;
+  }
 }
 
 /* ==========================================================================
@@ -149,39 +151,58 @@ html, body {
    utility wins over the role. An element with neither still gets these
    defaults, which is what a base rule is for.
 
-   The same defect remains in the four rules below — they are unlayered too, and
-   `p { line-height: 1.6 }` overrides every body role's line height. Left alone
-   here deliberately: that is a separate visible change across every paragraph
-   on the site and wants its own preview. */
+   Every other rule in this block moved with it, for the same reason. */
 @layer base {
   h1, h2, h3, h4, h5, h6 {
     line-height: 1.1;
     font-weight: 700;
     text-wrap: balance;
   }
+
+  /* Display headings (font-ggx88) — tightest line-height.
+     A class rather than an element, but it competes with the display roles on
+     line height, so it belongs at the same level as the rest. */
+  .font-ggx88 {
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+  }
+
+  /* Body copy — comfortable reading line-height.
+     This is the one with the widest reach: unlayered it overrode every body
+     role's line height AND every font-weight utility on a paragraph, so a
+     `<p class="font-medium">` rendered at 400. */
+  p {
+    line-height: 1.6;
+    font-weight: 400;
+  }
+
+  /* Small / auxiliary text — slightly tighter */
+  small, .text-xs, .text-sm {
+    line-height: 1.4;
+  }
+
+  /* Ensure brand font headings override generic heading line-height */
+  h1.font-ggx88, h2.font-ggx88, h3.font-ggx88 {
+    line-height: 0.92;
+  }
 }
 
-/* Display headings (font-ggx88) — tightest line-height */
-.font-ggx88 {
-  line-height: 0.92;
-  letter-spacing: -0.02em;
-}
+/* ── Deliberately NOT in a layer, and why ──────────────────────────────────
+   Everything below declares behaviour, position or decoration. None of it
+   declares type, so none of it can compete with a type role, and moving it
+   would change which utilities can override it for no benefit.
 
-/* Body copy — comfortable reading line-height */
-p {
-  line-height: 1.6;
-  font-weight: 400;
-}
+   `:root` above is the important one to leave alone. It maps Tailwind's
+   neutral scale onto the palette, and `lib/visual/tokens.generated.css`
+   declares its own unlayered `:root`. Put this one in a layer and that file's
+   `:root` would win, and the neutral scale would silently stop being the
+   palette.
 
-/* Small / auxiliary text — slightly tighter */
-small, .text-xs, .text-sm {
-  line-height: 1.4;
-}
+   `#language-toggle` also carries `!important`, which no layer changes.
 
-/* Ensure brand font headings override generic heading line-height */
-h1.font-ggx88, h2.font-ggx88, h3.font-ggx88 {
-  line-height: 0.92;
-}
+   There are no `ul`, `ol`, `li`, `blockquote`, `table` or bare `a` rules in
+   this file — checked, not assumed. The only link rule is `.blog-content a`,
+   which moved. */
 
 /* Language toggle animation */
 @keyframes pulse-subtle {
@@ -268,8 +289,15 @@ h1.font-ggx88, h2.font-ggx88, h3.font-ggx88 {
   opacity: 1;
 }
 
-/* Blog content link styles */
-.blog-content a {
+/* Blog content link styles. In base like the rest: these style markup that
+   arrives from Firestore, so a utility will rarely be present to override
+   them, but font-weight: 600 is a type declaration and belongs where the other
+   type declarations are.
+
+   The colours here are off-palette — #111827 and #d1d5db are Tailwind greys.
+   Left as they are: recording that is this PR's job, changing it is not. */
+@layer base {
+  .blog-content a {
   color: #111827; /* gray-900 */
   font-weight: 600;
   text-decoration: underline;
@@ -280,8 +308,9 @@ h1.font-ggx88, h2.font-ggx88, h3.font-ggx88 {
   position: relative;
 }
 
-.blog-content a:hover {
-  text-decoration-color: #111827;
+  .blog-content a:hover {
+    text-decoration-color: #111827;
+  }
 }
 
 /* Hide scrollbar but keep functionality */
