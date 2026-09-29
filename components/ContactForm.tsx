@@ -195,7 +195,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                       fieldErrors.firstName
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
                         : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.firstName && (
                     <p className="mt-1 t-body-s text-red-600" id="firstName-error">
@@ -219,7 +219,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                       fieldErrors.lastName
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
                         : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.lastName && (
                     <p className="mt-1 t-body-s text-red-600" id="lastName-error">
@@ -244,7 +244,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                       fieldErrors.company
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
                         : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.company && (
                     <p className="mt-1 t-body-s text-red-600" id="company-error">
@@ -269,7 +269,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                       fieldErrors.email
                         ? "border-red-400 focus:ring-red-500 focus:border-red-500"
                         : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.email && (
                     <p className="mt-1 t-body-s text-red-600" id="email-error">
@@ -286,7 +286,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     name="phoneNumber"
                     id="phoneNumber"
                     placeholder="(123) 456-7890"
-                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
+                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -298,7 +298,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     id="message"
                     rows={2}
                     placeholder="How can we help you?"
-                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
+                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
                   ></textarea>
                 </div>
               </div>
