@@ -99,7 +99,7 @@ const TrustedBy = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
             viewport={{ once: true }}
-            className="font-ggx88 font-black text-neutral-950 t-display-xl mb-6 md:mb-8 lg:mb-10"
+            className="font-ggx88 text-neutral-950 t-display-xl mb-6 md:mb-8 lg:mb-10"
             id="portfolio-heading"
           >
             Bold Stories.
