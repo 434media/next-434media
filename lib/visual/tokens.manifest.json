@@ -4,6 +4,12 @@
   "sourceVersion": "1.1",
   "files": {
     "lib/visual/tokens.generated.css": "8cf775a1932f8bb8",
-    "lib/visual/tokens.generated.ts": "f73a2ac79c65a6be"
+    "lib/visual/tokens.generated.ts": "f73a2ac79c65a6be",
+    "public/brand/434-mark-dark.svg": "706b95e9997ec489",
+    "public/brand/434-mark-light.svg": "8ba7844a1cf026bb",
+    "public/brand/434-primary-dark.svg": "5fea00243dd3eb83",
+    "public/brand/434-primary-light.svg": "484bbc9a1da86248",
+    "public/brand/434-stacked-dark.svg": "29eb4233b0e75e54",
+    "public/brand/434-stacked-light.svg": "2267a4edb7a59a75"
   }
 }
