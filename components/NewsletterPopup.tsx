@@ -188,7 +188,7 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="ENTER YOUR EMAIL"
-                        className="w-full px-6 py-4 border-2 border-white bg-transparent text-white placeholder-white/70 focus:outline-none focus:border-white transition-all duration-500 text-lg font-bold tracking-wider uppercase rounded-lg"
+                        className="w-full px-6 py-4 border-2 border-white bg-transparent text-white placeholder-white/70 focus:outline-none focus:border-white transition-all duration-500 t-control tracking-wider uppercase rounded-lg"
                         aria-describedby={error ? "newsletter-error" : undefined}
                         disabled={isSubmitting}
                         autoComplete="email"
@@ -199,7 +199,7 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="relative w-full bg-transparent border-2 border-white text-white py-4 px-8 font-black text-xl tracking-wider uppercase transition-colors duration-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black active:scale-[0.98] transform rounded-lg"
+                        className="relative w-full bg-transparent border-2 border-white text-white py-4 px-8 t-control-emphasis tracking-wider uppercase transition-colors duration-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black active:scale-[0.98] transform rounded-lg"
                         aria-label="Subscribe to 434 Media newsletter"
                       >
                         <motion.div
