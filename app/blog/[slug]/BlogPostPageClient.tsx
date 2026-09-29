@@ -1,16 +1,27 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, Share2, Copy, X, ExternalLink } from "lucide-react"
-import { getBlogPostBySlugAction, getBlogPostsAction } from "@/actions/blog"
+import { getBlogPostsAction } from "@/actions/blog"
 import BlogCard from "@/components/blog/BlogCard"
 import type { BlogPost } from "@/types/blog-types"
 
+/**
+ * The post arrives as a prop, already fetched.
+ *
+ * It used to arrive as a slug, and this component fetched the post again in
+ * the browser. The server had already fetched it for `generateMetadata` and the
+ * Article JSON-LD and then dropped it, so every view read the same document
+ * twice and the article existed only in the second read — which meant a blog
+ * post server-rendered no `<h1>` and no body at all. See #110.
+ *
+ * Related posts stay client-side. They are not the article, and fetching them
+ * on the server would add a query to first byte for a strip nobody reads first.
+ */
 interface BlogPostPageProps {
-  params: { slug: string }
+  post: BlogPost
 }
 
 // Custom SVG Icons based on Simple Icons
@@ -26,59 +37,40 @@ const LinkedInIcon = () => (
   </svg>
 )
 
-const LoadingSpinner = () => (
-  <div className="min-h-screen bg-white flex items-center justify-center">
-    <div className="relative">
-      <div className="w-12 h-12 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin"></div>
-      <div className="absolute top-16 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-        <div className="text-gray-900 font-medium t-body-s">Loading article...</div>
-      </div>
-    </div>
-  </div>
-)
 
-export default function BlogPostPageClient({ params }: BlogPostPageProps) {
-  const { slug } = params
-
-  const [post, setPost] = useState<BlogPost | null>(null)
+export default function BlogPostPageClient({ post }: BlogPostPageProps) {
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([])
-  const [loading, setLoading] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
 
+  // Related posts only. A failure here costs the strip at the bottom of the
+  // page and nothing else, so it is logged rather than escalated to notFound -
+  // which is what the old combined load did, taking the whole article down with
+  // it when the related query failed.
   useEffect(() => {
-    const loadData = async () => {
+    let cancelled = false
+
+    const loadRelated = async () => {
       try {
-        setLoading(true)
-        const [postResult, relatedResult] = await Promise.all([
-          getBlogPostBySlugAction(slug),
-          getBlogPostsAction({ status: "published" }),
-        ])
-
-        if (!postResult.success || !postResult.post) {
-          notFound()
-        }
-
-        setPost(postResult.post)
-
-        const posts = relatedResult.success && relatedResult.posts ? relatedResult.posts : []
-        const filtered = posts
-          .filter((p) => p.id !== postResult.post!.id && p.category === postResult.post!.category)
-          .slice(0, 3)
-
-        setRelatedPosts(filtered)
+        const result = await getBlogPostsAction({ status: "published" })
+        if (cancelled || !result.success || !result.posts) return
+        setRelatedPosts(
+          result.posts
+            .filter((p) => p.id !== post.id && p.category === post.category)
+            .slice(0, 3),
+        )
       } catch (error) {
-        console.error("Error loading blog post:", error)
-        notFound()
-      } finally {
-        setLoading(false)
+        console.error("Error loading related posts:", error)
       }
     }
 
-    loadData()
-  }, [slug])
+    loadRelated()
+    return () => {
+      cancelled = true
+    }
+  }, [post.id, post.category])
 
   // Reading progress tracker
   useEffect(() => {
@@ -167,14 +159,6 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
     }
 
     setShowShareModal(false)
-  }
-
-  if (loading) {
-    return <LoadingSpinner />
-  }
-
-  if (!post) {
-    notFound()
   }
 
   return (
