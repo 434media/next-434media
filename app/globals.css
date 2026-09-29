@@ -4,19 +4,39 @@
    a colour with no provenance, which is what the system exists to prevent. */
 @import "../lib/visual/tokens.generated.css";
 
-/* Define neutral colors for Tailwind v4 */
+/* Tailwind's neutral scale, mapped onto the 434 palette.
+   
+   Four steps land on real palette colours, and land close: 200 was #e5e5e5 and
+   is now #E5EBEB; 400 was #a3a3a3 and is now #A2B7B2. The remaining steps have
+   no palette equivalent, so they are derived by mixing a palette colour toward
+   white or black rather than invented. Nothing here is a new brand colour.
+   
+   The visible consequence is real and intended: neutral surfaces pick up the
+   palette's blue-green cast instead of being flat grey. That is what it means
+   for the site to be on the system. */
 :root {
-  --color-neutral-50: #fafafa;
-  --color-neutral-100: #f5f5f5;
-  --color-neutral-200: #e5e5e5;
-  --color-neutral-300: #d4d4d4;
-  --color-neutral-400: #a3a3a3;
-  --color-neutral-500: #737373;
-  --color-neutral-600: #525252;
-  --color-neutral-700: #404040;
-  --color-neutral-800: #262626;
-  --color-neutral-900: #171717;
-  --color-neutral-950: #0a0a0a;
+  --color-neutral-50: color-mix(in srgb, var(--434-white) 60%, var(--434-color-04));
+  --color-neutral-100: color-mix(in srgb, var(--434-white) 30%, var(--434-color-04));
+  --color-neutral-200: var(--434-color-04);
+  --color-neutral-300: var(--434-color-01);
+  --color-neutral-400: var(--434-color-05);
+  --color-neutral-500: color-mix(in srgb, var(--434-color-05) 50%, var(--434-color-03));
+  --color-neutral-600: var(--434-color-03);
+  --color-neutral-700: color-mix(in srgb, var(--434-color-03) 70%, var(--434-color-02-black));
+  --color-neutral-800: color-mix(in srgb, var(--434-color-03) 45%, var(--434-color-02-black));
+  --color-neutral-900: color-mix(in srgb, var(--434-color-03) 25%, var(--434-color-02-black));
+  --color-neutral-950: color-mix(in srgb, var(--434-color-03) 12%, var(--434-color-02-black));
+
+  /* Functional colour is kept out of the brand greys deliberately.
+     
+     Error is the palette's signal, which the spec reserves for exactly this and
+     forbids as decoration.
+     
+     There is NO success colour in the 434 system. The spec defines one
+     functional colour and it is red. Surfaces that need a success state still
+     use Tailwind's green (#22C55E, 8 uses today); it is left alone rather than
+     forced to red or invented, and it is raised for a founder decision. */
+  --color-fn-error: var(--434-signal);
   
   --font-geist-sans: var(--font-geist-sans, sans-serif);
   --font-geist-mono: var(--font-geist-mono, monospace);
