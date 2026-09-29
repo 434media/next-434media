@@ -47,8 +47,21 @@ export function HeroSection() {
   const [error, setError] = useState<string | null>(null)
   const [loadAttempts, setLoadAttempts] = useState(0)
 
-  const videoUrl = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434%20Media.mp4"
-  const posterUrl = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/434-poster.png"
+  /**
+   * The hero video, re-encoded and served from this repository.
+   *
+   * It was a single 42.6 MB 1080p file on Cloud Storage, 17.97 Mbps with an
+   * audio track nobody could hear because the element is muted. Now two
+   * encodes without audio, both with faststart so playback can begin before
+   * the file finishes arriving:
+   *
+   *   1080p  4.49 MB   desktop and tablet
+   *    720p  2.36 MB   phones, via useMobile
+   *
+   * The originals are untouched on Cloud Storage. Nothing here deletes them.
+   */
+  const videoUrl = isMobile ? "/hero/hero-720p.mp4" : "/hero/hero-1080p.mp4"
+  const posterUrl = "/hero/hero-poster.webp"
 
   // Intersection Observer to play/pause video based on visibility
   useEffect(() => {
@@ -173,8 +186,8 @@ export function HeroSection() {
               transition={{ duration: 0.5 }}
             >
               <Image
-                src={posterUrl || "/placeholder.svg"}
-                alt="434 Media promotional video showing creative media and marketing services"
+                src={posterUrl}
+                alt={BRAND_RECORDS.shortDescriptor}
                 fill
                 priority
                 sizes="100vw"
@@ -192,11 +205,11 @@ export function HeroSection() {
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           poster={posterUrl}
           onLoadedData={handleVideoLoad}
           onError={handleVideoError}
-          aria-label="434 Media promotional video showcasing creative media and marketing services"
+          aria-label={BRAND_RECORDS.canonicalDefinition}
           className={`absolute w-full h-full object-cover transition-opacity duration-500 ${
             isVideoLoaded && !error ? "opacity-100" : "opacity-0"
           }`}
