@@ -84,3 +84,20 @@
     --434-type-heading-s-size: 20px;
   }
 }
+
+
+/* One class per scale role. Use the role, not a pixel value. */
+.t-display-xl { font-size: var(--434-type-display-xl-size); line-height: var(--434-type-display-xl-line); }
+.t-display-l { font-size: var(--434-type-display-l-size); line-height: var(--434-type-display-l-line); }
+.t-display-m { font-size: var(--434-type-display-m-size); line-height: var(--434-type-display-m-line); }
+.t-heading-xl { font-size: var(--434-type-heading-xl-size); line-height: var(--434-type-heading-xl-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
+.t-heading-l { font-size: var(--434-type-heading-l-size); line-height: var(--434-type-heading-l-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
+.t-heading-m { font-size: var(--434-type-heading-m-size); line-height: var(--434-type-heading-m-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
+.t-heading-s { font-size: var(--434-type-heading-s-size); line-height: var(--434-type-heading-s-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
+.t-body-l { font-size: var(--434-type-body-l-size); line-height: var(--434-type-body-l-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 400; }
+.t-body { font-size: var(--434-type-body-size); line-height: var(--434-type-body-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 400; }
+.t-body-s { font-size: var(--434-type-body-s-size); line-height: var(--434-type-body-s-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 400; }
+.t-label { font-size: var(--434-type-label-size); line-height: var(--434-type-label-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; letter-spacing: var(--434-type-label-tracking); text-transform: uppercase; }
+.t-metadata-l { font-size: var(--434-type-metadata-l-size); line-height: var(--434-type-metadata-l-line); font-family: var(--font-geist-mono), monospace; font-weight: 500; }
+.t-metadata { font-size: var(--434-type-metadata-size); line-height: var(--434-type-metadata-line); font-family: var(--font-geist-mono), monospace; font-weight: 500; }
+.t-caption { font-size: var(--434-type-caption-size); line-height: var(--434-type-caption-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 400; }
