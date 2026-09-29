@@ -114,7 +114,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="text-xl font-bold text-white flex items-center"
+                className="t-heading-s font-bold text-white flex items-center"
               >
                 <ShoppingBag className="mr-2 h-5 w-5 text-emerald-400" />
                 Products
