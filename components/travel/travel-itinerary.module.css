@@ -1,15 +1,28 @@
-/* 434 travel surface — visual system V1.
+/* 434 travel surface — visual system v1.1.
    White page, black text, square corners, one signal colour reserved for state.
    Menda for the wordmark, the route line and day numbers; Geist for prose;
-   Geist Mono for clock times and route dates. */
+   Geist Mono for clock times and route dates.
+
+   Colour comes from the design tokens (Display and Design Standard 3.0). The
+   surface keeps its own short names — --ink, --paper — because they read better
+   in the rules below, but each resolves to a token rather than a literal.
+
+   It binds to the PALETTE, not to --434-text / --434-background. Those are role
+   tokens and they invert under dark mode, which would flip a deliberately white
+   itinerary to black on a traveller's phone at night. This page is paper. Giving
+   it a dark mode is a design decision, not a consequence of sourcing its colour
+   properly, so it is not taken here.
+
+   The three alpha derivations stay local: a rule at 15% of ink is not a palette
+   colour, it is this surface's own weight. */
 
 .shell {
-  --ink: #000;
-  --paper: #fff;
-  --muted: rgb(0 0 0 / 60%);
-  --line: rgb(0 0 0 / 15%);
-  --line-strong: rgb(0 0 0 / 30%);
-  --signal: #D0271D;
+  --ink: var(--434-color-02-black);
+  --paper: var(--434-white);
+  --muted: color-mix(in srgb, var(--434-color-02-black) 60%, transparent);
+  --line: color-mix(in srgb, var(--434-color-02-black) 15%, transparent);
+  --line-strong: color-mix(in srgb, var(--434-color-02-black) 30%, transparent);
+  --signal: var(--434-signal);
   width: min(100%, 760px);
   container-type: inline-size;
   min-height: 100vh;
