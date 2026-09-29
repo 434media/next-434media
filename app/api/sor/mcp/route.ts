@@ -26,6 +26,21 @@
  *
  * The public scope is not a filter applied per tool — every row leaves through
  * `project()` in lib/sor/visibility.ts, so a tool added later cannot forget it.
+ *
+ * Known limitation: `tools/list` returns every tool to every caller. No data
+ * leaks — each internal tool refuses at call time — but the names and
+ * descriptions of internal collections are visible to a public token.
+ *
+ * The SDK supports fixing this: its `McpServerFactory` receives an
+ * `McpRequestContext` carrying `authInfo`, so internal tools could simply not be
+ * registered for a public caller. `mcp-handler` 2.1.1, the version Vercel's
+ * documentation pins, does not pass it through — it calls
+ * `initializeServer(server)` with one argument. Casting to the wider SDK type
+ * compiles and then silently hands every caller `undefined`, which would drop
+ * the internal tools for the internal token too.
+ *
+ * So this waits for a version of the wrapper that forwards the context, or for
+ * dropping the wrapper. Recorded rather than forced.
  */
 import type { AuthInfo } from "@modelcontextprotocol/server"
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
