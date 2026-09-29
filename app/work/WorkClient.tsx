@@ -308,7 +308,7 @@ function VideoModal({
             </div>
 
             {/* Title */}
-            <h2 className="font-ggx88 text-2xl font-black leading-[0.98] tracking-[-0.02em] text-neutral-950 type:text-3xl">
+            <h2 className="font-ggx88 t-display-s font-black tracking-[-0.02em] text-neutral-950">
               {item.title}
             </h2>
 
@@ -464,7 +464,7 @@ function WorkCard({
 
       {!item.logo && !item.image && (
         <div className="absolute inset-0 flex items-center justify-center p-6">
-          <h3 className="text-center font-ggx88 text-xl font-black leading-none tracking-tighter text-neutral-900 type:text-2xl">
+          <h3 className="text-center font-ggx88 t-display-s font-black tracking-tighter text-neutral-900">
             {item.title}
           </h3>
         </div>
