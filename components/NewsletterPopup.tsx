@@ -133,11 +133,13 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                   className="mb-6"
                 >
                   <div className="flex justify-center">
-                    <div className="relative">
-                      <div className="text-4xl font-black text-white tracking-wider uppercase transition-colors duration-500 font-menda-black">
-                        434 MEDIA
-                      </div>
-                    </div>
+                    <Image
+                      src="/brand/434-primary-light.svg"
+                      alt="434 MEDIA"
+                      width={224}
+                      height={48}
+                      className="h-auto w-[160px] sm:w-[200px]"
+                    />
                   </div>
                 </motion.div>
 
@@ -147,14 +149,14 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                   transition={{ delay: 0.2 }}
                   className="mb-6"
                 >
-                  <h2 className="text-2xl font-black text-white tracking-wider uppercase transition-colors duration-500">
+                  <h2 className="t-heading-m font-black text-white tracking-wider uppercase transition-colors duration-500">
                     JOIN OUR MONTHLY NEWSLETTER
                   </h2>
                 </motion.div>
 
                 {/* Value Proposition */}
                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
-                  <p className="text-lg text-white leading-relaxed font-semibold tracking-wide transition-colors duration-500">
+                  <p className="t-body-l text-white font-semibold tracking-wide transition-colors duration-500">
                     Explore how we blend creativity with community impact through innovative storytelling and design.
                   </p>
                 </motion.div>
@@ -215,7 +217,7 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         id="newsletter-error"
-                        className="text-red-400 text-sm text-center font-bold bg-red-900/20 border border-red-400 p-3 tracking-wide uppercase"
+                        className="text-red-400 t-body-s text-center font-bold bg-red-900/20 border border-red-400 p-3 tracking-wide uppercase"
                         role="alert"
                       >
                         {error}
@@ -242,10 +244,10 @@ export default function NewsletterPopup({ showModal, onClose }: NewsletterPopupP
                           <CheckIcon className="h-10 w-10 text-white transition-colors duration-500" />
                         </motion.div>
                       </div>
-                      <h3 className="text-2xl lg:text-3xl font-black text-white mb-4 tracking-wider uppercase transition-colors duration-500">
+                      <h3 className="t-heading-m lg:text-3xl font-black text-white mb-4 tracking-wider uppercase transition-colors duration-500">
                         Subscription Confirmed!
                       </h3>
-                      <p className="text-white text-lg leading-relaxed font-semibold tracking-wide transition-colors duration-500">
+                      <p className="text-white t-body-l font-semibold tracking-wide transition-colors duration-500">
                         Our next issue will be in your inbox soon.
                       </p>
                     </div>
