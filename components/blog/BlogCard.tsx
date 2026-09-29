@@ -43,7 +43,7 @@ export default function BlogCard({ post }: BlogCardProps) {
 
           {/* Category Badge */}
           <div className="absolute top-3 left-3">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-white/95 text-gray-900 backdrop-blur-sm shadow-sm">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-md t-caption font-semibold bg-white/95 text-gray-900 backdrop-blur-sm shadow-sm">
               {post.category}
             </span>
           </div>
@@ -51,18 +51,18 @@ export default function BlogCard({ post }: BlogCardProps) {
 
         {/* Content */}
         <div className="flex flex-col flex-grow p-5">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 leading-snug group-hover:text-gray-700 transition-colors tracking-tight">
+          <h3 className="t-heading-s font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-gray-700 transition-colors tracking-tight">
             {post.title}
           </h3>
 
           {post.excerpt && (
-            <p className="text-sm text-gray-600 line-clamp-2 mb-4 leading-relaxed font-normal flex-grow">
+            <p className="t-body-s text-gray-600 line-clamp-2 mb-4 flex-grow">
               {post.excerpt}
             </p>
           )}
 
           {/* Author and Date Row at Bottom */}
-          <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-100 mt-auto">
+          <div className="flex items-center justify-between t-caption text-gray-500 pt-4 border-t border-gray-100 mt-auto">
             <div className="flex items-center gap-1.5">
               <User className="w-3.5 h-3.5" />
               <span className="font-medium text-gray-700">{post.author}</span>
