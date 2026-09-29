@@ -112,7 +112,7 @@ const TrustedBy = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.15, ease: "easeOut" }}
             viewport={{ once: true }}
-            className="font-geist-sans text-neutral-500 t-body-l type:text-xl lg:text-2xl tracking-tight max-w-3xl mx-auto"
+            className="font-geist-sans text-neutral-500 t-body-xl tracking-tight max-w-3xl mx-auto"
           >
             From brand campaigns to community impact, we help the world's most innovative firms find their voice. We partner with visionaries to turn bold ideas into market-leading stories.
           </motion.p>
@@ -125,7 +125,7 @@ const TrustedBy = () => {
           >
             <Link
               href="/contact"
-              className="font-geist-sans text-sm font-medium px-6 py-3 rounded-lg border border-neutral-300 text-neutral-950 hover:bg-neutral-100 transition-colors duration-200"
+              className="font-geist-sans t-control-emphasis px-6 py-3 rounded-lg border border-neutral-300 text-neutral-950 hover:bg-neutral-100 transition-colors duration-200"
             >
               Get in Touch
             </Link>
