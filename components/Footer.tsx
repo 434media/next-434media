@@ -109,7 +109,7 @@ export default function Footer() {
                         />
                       </Link>
                     </h2>
-                    <p className="font-geist-sans t-body-s text-[var(--color-chrome-text)] font-medium max-w-xs mb-2">
+                    <p className="font-geist-sans t-body-s text-[var(--color-chrome-text)] max-w-xs mb-2">
                       {BRAND_RECORDS.mottoStyled}
                     </p>
                     <p className="font-geist-sans t-body-s text-[var(--color-chrome-text-secondary)] max-w-xs mb-5">

@@ -156,7 +156,7 @@ export function ContactPageClient() {
                 className="space-y-4 lg:space-y-5"
               >
                 <motion.h1
-                  className="font-ggx88 font-black t-display-l text-neutral-900 tracking-tighter"
+                  className="font-ggx88 font-black t-display-l text-neutral-900"
                   transition={{ duration: 0.3 }}
                 >
                   <motion.span

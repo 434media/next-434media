@@ -43,7 +43,7 @@ export default function BlogCard({ post }: BlogCardProps) {
 
           {/* Category Badge */}
           <div className="absolute top-3 left-3">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-md t-caption font-semibold bg-white/95 text-gray-900 backdrop-blur-sm shadow-sm">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-md t-caption bg-white/95 text-gray-900 backdrop-blur-sm shadow-sm">
               {post.category}
             </span>
           </div>
@@ -51,7 +51,7 @@ export default function BlogCard({ post }: BlogCardProps) {
 
         {/* Content */}
         <div className="flex flex-col flex-grow p-5">
-          <h3 className="t-heading-s font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-gray-700 transition-colors tracking-tight">
+          <h3 className="t-heading-s text-gray-900 mb-2 line-clamp-2 group-hover:text-gray-700 transition-colors tracking-tight">
             {post.title}
           </h3>
 

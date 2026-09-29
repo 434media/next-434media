@@ -192,7 +192,7 @@ export default function BlogPostPageClient({ post }: BlogPostPageProps) {
             </div>
 
             {/* Title */}
-            <h1 className="t-heading-xl font-extrabold text-gray-900 mb-6 tracking-tight">
+            <h1 className="t-heading-xl text-gray-900 mb-6 tracking-tight">
               {post.title}
             </h1>
 
@@ -308,7 +308,7 @@ export default function BlogPostPageClient({ post }: BlogPostPageProps) {
           <section className="py-20 bg-gray-50 border-t border-gray-100">
             <div className="max-w-6xl mx-auto px-6">
               <div className="mb-14">
-                <h2 className="t-heading-l font-bold text-gray-900 mb-3 tracking-tight">Related Articles</h2>
+                <h2 className="t-heading-l text-gray-900 mb-3 tracking-tight">Related Articles</h2>
                 <p className="text-gray-500 t-body-l">Continue exploring our insights</p>
               </div>
 
@@ -326,7 +326,7 @@ export default function BlogPostPageClient({ post }: BlogPostPageProps) {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="t-heading-s font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="t-heading-s text-gray-900 flex items-center gap-2">
                   <Share2 className="w-5 h-5" />
                   Share Article
                 </h3>

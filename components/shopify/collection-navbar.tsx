@@ -114,7 +114,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="t-heading-s font-bold text-white flex items-center"
+                className="t-heading-s text-white flex items-center"
               >
                 <ShoppingBag className="mr-2 h-5 w-5 text-emerald-400" />
                 Products
@@ -179,7 +179,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                     setSortOpen(false)
                     setSearchOpen(false)
                   }}
-                  className="flex items-center justify-between w-full sm:w-auto gap-2 t-control-emphasis px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
+                  className="flex items-center justify-between w-full sm:w-auto gap-2 t-control-emphasis px-4 py-2 text-sm bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
                   aria-expanded={collectionsOpen}
                   aria-haspopup="true"
                 >
@@ -214,9 +214,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                             <Link
                               key={collection.handle}
                               href={collection.path}
-                              className={`block px-4 py-2 t-control hover:bg-neutral-700 transition-colors ${
-                                collection.handle === currentCollection ? "bg-emerald-600 text-white" : "text-white"
-                              }`}
+                              className={`block px-4 py-2 t-control hover:bg-neutral-700 transition-colors ${ collection.handle === currentCollection ? "bg-emerald-600 text-white" : "text-white" }`}
                               onClick={() => setCollectionsOpen(false)}
                             >
                               {collection.title}
@@ -243,7 +241,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                     setCollectionsOpen(false)
                     setSearchOpen(false)
                   }}
-                  className="flex items-center justify-between w-full sm:w-auto gap-2 t-control-emphasis px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
+                  className="flex items-center justify-between w-full sm:w-auto gap-2 t-control-emphasis px-4 py-2 text-sm bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
                   aria-expanded={sortOpen}
                   aria-haspopup="true"
                 >
@@ -289,9 +287,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                               <Link
                                 key={option.slug || "default"}
                                 href={href}
-                                className={`block px-4 py-2 t-control hover:bg-neutral-700 transition-colors ${
-                                  currentSort === option.slug ? "bg-emerald-600 text-white" : "text-white"
-                                }`}
+                                className={`block px-4 py-2 t-control hover:bg-neutral-700 transition-colors ${ currentSort === option.slug ? "bg-emerald-600 text-white" : "text-white" }`}
                                 onClick={() => setSortOpen(false)}
                               >
                                 {option.title}

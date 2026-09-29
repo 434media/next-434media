@@ -151,7 +151,7 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
           {/* Posts Grid */}
           {allPosts && allPosts.length > 0 && (
             <div>
-              <h2 className="t-heading-m font-bold text-gray-900 mb-8 tracking-tight">Latest Articles</h2>
+              <h2 className="t-heading-m text-gray-900 mb-8 tracking-tight">Latest Articles</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 {allPosts.map((post) => (
                   <BlogCard key={post.id} post={post} />
@@ -166,7 +166,7 @@ export default function BlogContent({ initialPosts }: BlogContentProps) {
               <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto flex items-center justify-center mb-4">
                 <BookOpen className="w-8 h-8 text-gray-400" />
               </div>
-              <h3 className="t-heading-s font-semibold text-gray-900 mb-2">
+              <h3 className="t-heading-s text-gray-900 mb-2">
                 {selectedCategory ? "No posts in this category" : "No posts yet"}
               </h3>
               <p className="t-body-s text-gray-600 max-w-md mx-auto mb-6">

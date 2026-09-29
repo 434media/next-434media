@@ -24,7 +24,7 @@ const Label = ({
         className,
       )}
     >
-      <div className="flex items-center rounded-full border border-neutral-700 bg-black/90 p-1 t-body-s font-semibold text-white backdrop-blur-md">
+      <div className="flex items-center rounded-full border border-neutral-700 bg-black/90 p-1 t-body-s text-white backdrop-blur-md">
         <h3 className="mr-4 line-clamp-2 grow pl-2 leading-none tracking-tight">{title}</h3>
         <Price
           className="flex-none rounded-full bg-emerald-600 p-2 text-white"

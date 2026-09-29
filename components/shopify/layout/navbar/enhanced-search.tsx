@@ -373,7 +373,7 @@ export default function EnhancedSearch() {
                                   </p>
                                 )}
                                 <div className="mt-1 flex items-center justify-between">
-                                  <span className="t-body-s font-medium text-emerald-400">
+                                  <span className="t-body-s text-emerald-400">
                                     {getProductPrice(product)}
                                   </span>
                                   {/* Use vendor or tags instead of collections */}
@@ -394,7 +394,7 @@ export default function EnhancedSearch() {
                         <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-neutral-800/50 mb-3">
                           <SearchIcon className="h-6 w-6 text-[var(--color-on-dark-text-secondary)]" aria-hidden="true" />
                         </div>
-                        <h4 className="t-heading-s font-medium text-white">No results found</h4>
+                        <h4 className="t-heading-s text-white">No results found</h4>
                         <p className="mt-1 t-body-s text-[var(--color-on-dark-text-secondary)]">
                           Try different keywords or browse our collections
                         </p>
