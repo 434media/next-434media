@@ -32,7 +32,7 @@ export function EmptyCollectionState({ collectionName }: EmptyCollectionStatePro
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-3xl md:text-4xl font-bold mb-4"
+          className="text-3xl type:text-4xl font-bold mb-4"
         >
           Coming Soon to {collectionName}
         </motion.h2>

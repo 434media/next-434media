@@ -99,7 +99,7 @@ const TrustedBy = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
             viewport={{ once: true }}
-            className="font-ggx88 font-black text-neutral-950 text-5xl md:text-6xl lg:text-7xl xl:text-8xl tracking-tighter leading-[0.92] mb-6 md:mb-8 lg:mb-10"
+            className="font-ggx88 font-black text-neutral-950 text-5xl type:text-6xl lg:text-7xl xl:text-8xl tracking-tighter leading-[0.92] mb-6 md:mb-8 lg:mb-10"
             id="portfolio-heading"
           >
             Bold Stories.
@@ -112,7 +112,7 @@ const TrustedBy = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.15, ease: "easeOut" }}
             viewport={{ once: true }}
-            className="font-geist-sans text-neutral-500 text-lg md:text-xl lg:text-2xl font-normal leading-[1.55] tracking-tight max-w-3xl mx-auto"
+            className="font-geist-sans text-neutral-500 text-lg type:text-xl lg:text-2xl font-normal leading-[1.55] tracking-tight max-w-3xl mx-auto"
           >
             From brand campaigns to community impact, we help the world's most innovative firms find their voice. We partner with visionaries to turn bold ideas into market-leading stories.
           </motion.p>

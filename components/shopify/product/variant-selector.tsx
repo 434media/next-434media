@@ -93,7 +93,7 @@ export function VariantSelector({
       <form key={option.id}>
         <dl className="mb-8">
           <dt className="mb-6 flex items-center gap-3">
-            <span className="text-xl md:text-2xl uppercase tracking-wider font-black text-white">{option.name}</span>
+            <span className="text-xl type:text-2xl uppercase tracking-wider font-black text-white">{option.name}</span>
             {!isSelected && (
               <span className="border-2 border-white bg-black px-3 py-1 text-sm font-black tracking-wide uppercase text-white">
                 Required
