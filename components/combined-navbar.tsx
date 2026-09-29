@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { motion } from "motion/react"
 import { usePathname } from "next/navigation"
 import { ArrowUpRight } from "lucide-react"
 import CartModal from "./shopify/cart/modal"
 import { useCart } from "./shopify/cart/cart-context"
-import { ScrambleText } from "./ScrambleText"
 import NavMenu from "./Navmenu"
 import { useMobile } from "../hooks/use-mobile"
 import type { Menu } from "../lib/shopify/types"
@@ -90,17 +90,32 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            {/* Logo */}
+            {/* The logo is artwork, not type.
+
+                It used to be the string "434 MEDIA" set in Menda Black and
+                scrambled on hover. The visual system prohibits that outright —
+                "never retype the logo; use the SVG artwork" — so the wordmark is
+                now the supplied primary lockup, light variant for this dark bar.
+
+                The scramble went with it. You cannot scramble artwork character
+                by character because it has no characters, and the effect is not
+                worth reintroducing the prohibition to keep. The hover scale
+                stays.
+
+                Width is the lockup's digital minimum from the token document
+                (--434-min-width-horizontal-digital, 72px) and no smaller. */}
             <Link
               href="/"
-              className="text-white font-menda-black text-base sm:text-lg flex items-center group leading-none shrink-0"
+              className="flex items-center group leading-none shrink-0"
               aria-label="434 Media - Home"
             >
-              <ScrambleText
-                text="434 MEDIA"
-                className="inline-block cursor-pointer transition-transform duration-300 group-hover:scale-105"
-                scrambleOnMount={false}
-                scrambleOnHover={true}
+              <Image
+                src="/brand/434-primary-light.svg"
+                alt="434 MEDIA"
+                width={112}
+                height={24}
+                priority
+                className="h-auto w-[72px] sm:w-[96px] transition-transform duration-300 group-hover:scale-105"
               />
             </Link>
 

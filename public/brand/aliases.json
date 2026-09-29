@@ -1,0 +1,7 @@
+{
+  "$description": "Filenames that resolve to another file. Generated; see 434-context.",
+  "aliases": {
+    "434-wordmark-dark.svg": "434-primary-dark.svg",
+    "434-wordmark-light.svg": "434-primary-light.svg"
+  }
+}
