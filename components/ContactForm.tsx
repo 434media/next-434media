@@ -155,8 +155,8 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center rounded-full bg-neutral-100">
                 <Check className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-neutral-900 tracking-tight leading-tight">Thanks for Connecting!</h3>
-              <p className="mt-1.5 text-sm text-neutral-500 font-normal leading-tight">We&apos;ll be in touch soon.</p>
+              <h3 className="mt-4 t-heading-s font-semibold text-neutral-900 tracking-tight">Thanks for Connecting!</h3>
+              <p className="mt-1.5 t-body-s text-neutral-500">We&apos;ll be in touch soon.</p>
             </div>
           </motion.div>
         ) : (
@@ -173,8 +173,8 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   20px; the display face only carries its personality at page-
                   headline sizes (48px+) and below that just reads as an odd
                   sans. Display type is reserved for page-level headlines. */}
-              <h2 className="font-geist-sans text-xl font-semibold text-neutral-900 tracking-tight leading-none">Get in Touch</h2>
-              <p className="mt-1.5 text-xs text-neutral-400 font-normal leading-tight">Fields marked with * are required</p>
+              <h2 className="font-geist-sans t-heading-s font-semibold text-neutral-900 tracking-tight">Get in Touch</h2>
+              <p className="mt-1.5 t-caption text-neutral-400">Fields marked with * are required</p>
             </div>
             <form className="space-y-3.5" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
               <div className="grid grid-cols-1 gap-x-4 lg:gap-x-5 gap-y-3.5 sm:grid-cols-2">
@@ -198,7 +198,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.firstName && (
-                    <p className="mt-1 text-sm text-red-600" id="firstName-error">
+                    <p className="mt-1 t-body-s text-red-600" id="firstName-error">
                       {fieldErrors.firstName}
                     </p>
                   )}
@@ -222,7 +222,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.lastName && (
-                    <p className="mt-1 text-sm text-red-600" id="lastName-error">
+                    <p className="mt-1 t-body-s text-red-600" id="lastName-error">
                       {fieldErrors.lastName}
                     </p>
                   )}
@@ -247,7 +247,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.company && (
-                    <p className="mt-1 text-sm text-red-600" id="company-error">
+                    <p className="mt-1 t-body-s text-red-600" id="company-error">
                       {fieldErrors.company}
                     </p>
                   )}
@@ -272,7 +272,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     } text-neutral-900 placeholder-neutral-400 text-sm px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.email && (
-                    <p className="mt-1 text-sm text-red-600" id="email-error">
+                    <p className="mt-1 t-body-s text-red-600" id="email-error">
                       {fieldErrors.email}
                     </p>
                   )}
@@ -305,7 +305,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
 
               {error && (
                 <div
-                  className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+                  className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 t-body-s"
                   role="alert"
                 >
                   {error}

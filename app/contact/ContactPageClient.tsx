@@ -156,7 +156,7 @@ export function ContactPageClient() {
                 className="space-y-4 lg:space-y-5"
               >
                 <motion.h1
-                  className="font-ggx88 font-black text-5xl lg:text-6xl xl:text-7xl text-neutral-900 leading-[0.9] tracking-tighter"
+                  className="font-ggx88 font-black t-display-l text-neutral-900 tracking-tighter"
                   transition={{ duration: 0.3 }}
                 >
                   <motion.span
@@ -181,7 +181,7 @@ export function ContactPageClient() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.7 }}
-                  className="font-geist-sans text-base text-neutral-500 leading-relaxed font-normal max-w-md"
+                  className="font-geist-sans t-body text-neutral-500 max-w-md"
                 >
                   From brand campaigns, to event production, we help the world&apos;s most innovative firms find their voice and amplify their impact through bold storytelling and experiences.
                 </motion.p>
