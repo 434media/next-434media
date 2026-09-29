@@ -45,7 +45,7 @@ export default function SDOHStartupBootcamp({ locale, dict }: SDOHStartupBootcam
             <p className="text-[#FF6B35] font-medium text-sm uppercase tracking-wider mb-4">
               {locale === "es" ? "Convirtiendo la Perspicacia en Acción" : "Turning Insight into Action"}
             </p>
-            <h2 className="text-3xl sm:text-4xl type:text-5xl font-bold leading-tight mb-6 text-neutral-900">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight mb-6 text-neutral-900">
               {getStringValue(d.title)}
             </h2>
           </div>

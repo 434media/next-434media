@@ -520,7 +520,7 @@ export function ImpactStatistic({
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
       transition={{ duration: 0.6 }}
     >
-      <div className={`text-2xl sm:text-3xl type:text-4xl font-black ${colors[colorScheme]} whitespace-nowrap`}>
+      <div className={`text-2xl sm:text-3xl md:text-4xl font-black ${colors[colorScheme]} whitespace-nowrap`}>
         {prefix}{displayValue.toLocaleString()}{suffix}
       </div>
       <div className="text-neutral-600 text-xs sm:text-sm mt-2 font-medium leading-tight">

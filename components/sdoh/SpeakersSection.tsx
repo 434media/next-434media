@@ -69,7 +69,7 @@ export function SpeakersSection({ companyLogos }: SpeakersSectionProps) {
                     <span className="inline-block w-1 h-12 bg-[#FF6B35] mr-6" />
                   </div>
                   <div>
-                    <h2 className="text-3xl type:text-4xl lg:text-5xl font-black text-neutral-900 mb-2">
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-neutral-900 mb-2">
                       {dictionary.sdoh?.speakers?.title || "Panel Speakers"}
                     </h2>
                     <p className="text-lg text-neutral-600 font-medium">

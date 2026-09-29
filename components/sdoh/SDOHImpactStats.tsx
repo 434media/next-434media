@@ -218,7 +218,7 @@ export default function SDOHImpactStats({ locale }: SDOHImpactStatsProps) {
             {content.badge}
           </div>
           
-          <h2 className="text-3xl sm:text-4xl type:text-5xl lg:text-6xl font-black text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white mb-4">
             {content.title}
           </h2>
           
