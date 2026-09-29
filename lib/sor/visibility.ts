@@ -47,6 +47,10 @@ const INTERNAL_COLLECTIONS = new Set([
   "qualification_thresholds",
   "partner_services",
   "contractors",
+  // Names systems that are not built yet and says what to do meanwhile. Useful
+  // to a job, and a map of what 434 has not finished to anyone else.
+  "launch_dependencies",
+  "policy_documents",
 ])
 
 export function isReadable(collection: string, scope: Scope): boolean {

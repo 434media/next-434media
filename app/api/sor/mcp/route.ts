@@ -26,6 +26,21 @@
  *
  * The public scope is not a filter applied per tool — every row leaves through
  * `project()` in lib/sor/visibility.ts, so a tool added later cannot forget it.
+ *
+ * Known limitation: `tools/list` returns every tool to every caller. No data
+ * leaks — each internal tool refuses at call time — but the names and
+ * descriptions of internal collections are visible to a public token.
+ *
+ * The SDK supports fixing this: its `McpServerFactory` receives an
+ * `McpRequestContext` carrying `authInfo`, so internal tools could simply not be
+ * registered for a public caller. `mcp-handler` 2.1.1, the version Vercel's
+ * documentation pins, does not pass it through — it calls
+ * `initializeServer(server)` with one argument. Casting to the wider SDK type
+ * compiles and then silently hands every caller `undefined`, which would drop
+ * the internal tools for the internal token too.
+ *
+ * So this waits for a version of the wrapper that forwards the context, or for
+ * dropping the wrapper. Recorded rather than forced.
  */
 import type { AuthInfo } from "@modelcontextprotocol/server"
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
@@ -57,7 +72,19 @@ const handler = createMcpHandler((server) => {
     inputSchema: z.object({}),
   }, async (_args, extra) => {
     if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("get_policy")
-    return json(await listCollection("policy_documents", "internal"))
+    const result = await listCollection("policy_documents", "internal")
+    // An empty policy collection is not "there is no policy" — it is a broken
+    // deployment, and a job that reads the former will draft without any rules
+    // at all. Say so loudly rather than returning an empty list.
+    if (result.data.length === 0) {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          error: "policy_documents is empty. The policy has not been loaded. Do not proceed.",
+        }, null, 2) }],
+        isError: true,
+      }
+    }
+    return json(result)
   })
 
   server.registerTool("list_portfolio_records", {
@@ -119,6 +146,19 @@ const handler = createMcpHandler((server) => {
   }, async ({ layer }, extra) =>
     json(await listCollection("rate_card_lines", scopeOf(extra?.http?.authInfo),
       (r) => layer === undefined || r.layer === layer)))
+
+  server.registerTool("list_launch_dependencies", {
+    description:
+      "Open items whose status changes what a job may do — whether the investor intake form is " +
+      "live (IMP-12), whether a Ntooitive inbox exists (IMP-10), whether an agent may send at all " +
+      "(IMP-27). Each row carries effect_while_open, written to be followed without the register. " +
+      "Read this before acting on any rule that cites an IMP. Internal only.",
+    inputSchema: z.object({ status: z.enum(["open", "closed"]).optional() }),
+  }, async ({ status }, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("list_launch_dependencies")
+    return json(await listCollection("launch_dependencies", "internal",
+      (r) => status === undefined || r.status === status))
+  })
 
   server.registerTool("list_contractors", {
     description: "Contractors. Internal only. Populated when the Contractor Brief job is built.",

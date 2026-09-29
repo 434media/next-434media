@@ -147,7 +147,8 @@ test("publication fails closed when work_page is missing or malformed", () => {
 })
 
 test("public scope cannot read internal collections at all", () => {
-  for (const c of ["icp_cohorts", "qualification_thresholds", "partner_services", "contractors"]) {
+  for (const c of ["icp_cohorts", "qualification_thresholds", "partner_services", "contractors",
+                   "launch_dependencies", "policy_documents"]) {
     assert.equal(isReadable(c, "public"), false, c)
     assert.equal(project(c, { key: "x" }, "public"), null, c)
     assert.equal(isReadable(c, "internal"), true, c)
