@@ -105,7 +105,7 @@ export default function ShopClient() {
               aria-label="Shop TXMX Boxing Collection"
             >
               <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-              <span className="text-2xl type:text-3xl font-ggx88 font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
+              <span className="t-display-s font-ggx88 font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
                 {isLoading ? "LOADING..." : "BUY NOW"}
               </span>
             </button>
@@ -193,7 +193,7 @@ export default function ShopClient() {
               aria-label="Shop TXMX Boxing Collection"
             >
               <div className="absolute inset-0 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
-              <span className="text-xl font-ggx88 font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
+              <span className="t-display-s font-ggx88 font-black tracking-wider relative z-10 group-hover:text-black transition-colors duration-500">
                 {isLoading ? "LOADING..." : "BUY NOW"}
               </span>
             </button>
