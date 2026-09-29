@@ -1,0 +1,160 @@
+/**
+ * System-of-record connector — a read-only MCP server.
+ *
+ * Method: Vercel's documented approach for hosting an MCP server in a Next.js
+ * App Router app — `mcp-handler` v2 with `@modelcontextprotocol/server` v2,
+ * mounted as a route and exported as GET and POST.
+ * https://vercel.com/docs/mcp/deploy-mcp-servers-to-vercel (last updated
+ * 2026-09-18). Clients connect over Streamable HTTP; the framework determines
+ * the route, so no base path is configured here.
+ *
+ * Zod 4 is installed under the alias `zod4` and imported only here. mcp-handler
+ * v2 needs Zod 4, and this repo is on 3.25. The `zod/v4` subpath looks like the
+ * answer and is not: in 3.25.76 its `~standard` carries only validate, vendor
+ * and version, with no `jsonSchema`, which is precisely what the SDK reads to
+ * advertise a tool's argument shape. Checked rather than assumed, after the
+ * types failed to infer.
+ *
+ * An alias keeps the upgrade local. Two other files import zod, and neither has
+ * anything to do with this route; moving the whole repository to Zod 4 is a
+ * change that deserves its own pull request and its own reason.
+ *
+ * Auth is bearer-token rather than OAuth. The doc's OAuth path needs an
+ * authorization server; there is none, and two static tokens in Vercel env
+ * express what is actually being distinguished: 434's own jobs, and everything
+ * outward-facing. `verifyToken` maps a token to a scope and nothing else.
+ *
+ * The public scope is not a filter applied per tool — every row leaves through
+ * `project()` in lib/sor/visibility.ts, so a tool added later cannot forget it.
+ */
+import type { AuthInfo } from "@modelcontextprotocol/server"
+import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { z } from "zod4"
+import { listCollection, getOne, listPartnerServices, type Envelope } from "@/lib/sor/read"
+import { type Scope } from "@/lib/sor/visibility"
+
+export const maxDuration = 60
+
+const scopeOf = (info?: AuthInfo): Scope =>
+  info?.scopes?.includes("sor:internal") ? "internal" : "public"
+
+const json = (value: Envelope<unknown>) => ({
+  content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+})
+
+/** Refusal that names the scope, so a caller learns the boundary rather than guessing. */
+const denied = (tool: string) => ({
+  content: [{
+    type: "text" as const,
+    text: JSON.stringify({ error: `${tool} is internal. This token has the public scope.` }, null, 2),
+  }],
+  isError: true,
+})
+
+const handler = createMcpHandler((server) => {
+  server.registerTool("get_policy", {
+    description: "The current policy document and voice files, with version. Internal only.",
+    inputSchema: z.object({}),
+  }, async (_args, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("get_policy")
+    return json(await listCollection("policy_documents", "internal"))
+  })
+
+  server.registerTool("list_portfolio_records", {
+    description:
+      "Portfolio records. The public scope returns published records with public fields only.",
+    inputSchema: z.object({
+      commercial_model: z.string().optional(),
+      category: z.string().optional(),
+      published: z.boolean().optional(),
+    }),
+  }, async ({ commercial_model, category, published }, extra) =>
+    json(await listCollection("portfolio_records", scopeOf(extra?.http?.authInfo), (r) =>
+      (commercial_model === undefined || r.commercial_model === commercial_model) &&
+      (category === undefined || (Array.isArray(r.production_categories) && r.production_categories.includes(category))) &&
+      (published === undefined || r.published === published))))
+
+  server.registerTool("get_portfolio_record", {
+    description: "One portfolio record by key. Public scope sees public fields only.",
+    inputSchema: z.object({ key: z.string() }),
+  }, async ({ key }, extra) => json(await getOne("portfolio_records", key, scopeOf(extra?.http?.authInfo))))
+
+  server.registerTool("list_icp_cohorts", {
+    description: "ICP buyer cohorts A-E. Internal only. Not the CRM's Digital Canvas cohorts.",
+    inputSchema: z.object({}),
+  }, async (_args, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("list_icp_cohorts")
+    return json(await listCollection("icp_cohorts", "internal"))
+  })
+
+  server.registerTool("get_icp_cohort", {
+    description: "One ICP cohort by key. Internal only.",
+    inputSchema: z.object({ key: z.string() }),
+  }, async ({ key }, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("get_icp_cohort")
+    return json(await getOne("icp_cohorts", key, "internal"))
+  })
+
+  server.registerTool("get_threshold", {
+    description:
+      "Qualification thresholds for a subject. Internal, and never quoted to a prospect.",
+    inputSchema: z.object({ applies_to: z.string() }),
+  }, async ({ applies_to }, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("get_threshold")
+    return json(await listCollection("qualification_thresholds", "internal", (r) => r.applies_to === applies_to))
+  })
+
+  server.registerTool("list_partner_services", {
+    description:
+      "Partner services, each carrying a stale flag when last_reviewed is more than 31 days old (master 2.11). Internal only.",
+    inputSchema: z.object({ tier: z.string().optional() }),
+  }, async ({ tier }, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("list_partner_services")
+    return json(await listPartnerServices("internal", tier))
+  })
+
+  server.registerTool("list_rate_card", {
+    description: "Rate card lines. The public scope returns published anchors only.",
+    inputSchema: z.object({ layer: z.enum(["fixed_minimum", "public_anchor", "internal_cost"]).optional() }),
+  }, async ({ layer }, extra) =>
+    json(await listCollection("rate_card_lines", scopeOf(extra?.http?.authInfo),
+      (r) => layer === undefined || r.layer === layer)))
+
+  server.registerTool("list_contractors", {
+    description: "Contractors. Internal only. Populated when the Contractor Brief job is built.",
+    inputSchema: z.object({}),
+  }, async (_args, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("list_contractors")
+    return json(await listCollection("contractors", "internal"))
+  })
+})
+
+/**
+ * A token is compared with `timingSafeEqual` on equal-length buffers. A plain
+ * `===` on a secret leaks its length and prefix to a patient caller, and there
+ * is no reason to accept that when the fix is three lines.
+ */
+async function verifyToken(_req: Request, bearer?: string): Promise<AuthInfo | undefined> {
+  if (!bearer) return undefined
+  const { timingSafeEqual } = await import("node:crypto")
+  const matches = (expected?: string) => {
+    if (!expected) return false
+    const a = Buffer.from(bearer)
+    const b = Buffer.from(expected)
+    return a.length === b.length && timingSafeEqual(a, b)
+  }
+  if (matches(process.env.SOR_MCP_TOKEN_INTERNAL)) {
+    return { token: bearer, clientId: "sor-internal", scopes: ["sor:internal", "sor:public"] }
+  }
+  if (matches(process.env.SOR_MCP_TOKEN_PUBLIC)) {
+    return { token: bearer, clientId: "sor-public", scopes: ["sor:public"] }
+  }
+  return undefined
+}
+
+const authHandler = withMcpAuth(handler, verifyToken, {
+  required: true,
+  requiredScopes: ["sor:public"],
+})
+
+export { authHandler as GET, authHandler as POST }
