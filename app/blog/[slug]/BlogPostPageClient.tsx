@@ -31,7 +31,7 @@ const LoadingSpinner = () => (
     <div className="relative">
       <div className="w-12 h-12 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin"></div>
       <div className="absolute top-16 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-        <div className="text-gray-900 font-medium text-sm">Loading article...</div>
+        <div className="text-gray-900 font-medium t-body-s">Loading article...</div>
       </div>
     </div>
   </div>
@@ -208,19 +208,19 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-[1.15] mb-6 tracking-tight">
+            <h1 className="t-heading-xl font-extrabold text-gray-900 mb-6 tracking-tight">
               {post.title}
             </h1>
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className="text-lg sm:text-xl text-gray-600 leading-relaxed mb-10 font-normal max-w-2xl">
+              <p className="t-body-l sm:text-xl text-gray-600 mb-10 max-w-2xl">
                 {post.excerpt}
               </p>
             )}
 
             {/* Meta Info with Share Button */}
-            <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 pt-6 border-t border-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-4 t-body-s text-gray-500 pt-6 border-t border-gray-100">
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 <span className="font-semibold text-gray-900">{post.author}</span>
                 <span className="text-gray-300">·</span>
@@ -301,7 +301,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
                 {/* Tags */}
                 {post.tags && post.tags.length > 0 && (
                   <div className="mt-14 pt-10 border-t border-gray-200">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">Tagged</h4>
+                    <h4 className="t-label text-gray-500 mb-4">Tagged</h4>
                     <div className="flex flex-wrap gap-2">
                       {post.tags.map((tag: string, index: number) => (
                         <span
@@ -324,8 +324,8 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
           <section className="py-20 bg-gray-50 border-t border-gray-100">
             <div className="max-w-6xl mx-auto px-6">
               <div className="mb-14">
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 tracking-tight">Related Articles</h2>
-                <p className="text-gray-500 text-base sm:text-lg">Continue exploring our insights</p>
+                <h2 className="t-heading-l font-bold text-gray-900 mb-3 tracking-tight">Related Articles</h2>
+                <p className="text-gray-500 t-body sm:text-lg">Continue exploring our insights</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -342,7 +342,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="t-heading-s font-semibold text-gray-900 flex items-center gap-2">
                   <Share2 className="w-5 h-5" />
                   Share Article
                 </h3>
