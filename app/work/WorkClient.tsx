@@ -297,7 +297,7 @@ function VideoModal({
             }`}
           >
             {/* Eyebrow: now-playing + category */}
-            <div className="flex items-center gap-2 font-geist-mono text-[10px] font-medium uppercase tracking-[0.22em] text-neutral-500">
+            <div className="flex items-center gap-2 font-geist-mono t-label text-neutral-500">
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -317,7 +317,7 @@ function VideoModal({
               {[item.status, item.years].filter(Boolean).map((meta) => (
                 <span
                   key={meta}
-                  className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 font-geist-mono text-[10px] font-medium uppercase tracking-[0.16em] text-neutral-700"
+                  className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 font-geist-mono t-label text-neutral-700"
                 >
                   {meta}
                 </span>
@@ -325,7 +325,7 @@ function VideoModal({
             </div>
 
             {/* Approved public description */}
-            <p className="text-balance font-geist-sans text-sm leading-relaxed text-neutral-600 md:text-[15px]">
+            <p className="text-balance t-body-s text-neutral-600">
               {item.description}
             </p>
 
@@ -333,30 +333,30 @@ function VideoModal({
             <dl className="flex flex-col gap-2 border-t border-neutral-200/80 pt-4">
               {item.client && (
                 <div className="flex flex-col gap-0.5">
-                  <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                  <dt className="font-geist-mono t-label text-neutral-400">
                     Client
                   </dt>
-                  <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.client}</dd>
+                  <dd className="t-caption text-neutral-600">{item.client}</dd>
                 </div>
               )}
               <div className="flex flex-col gap-0.5">
-                <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                <dt className="font-geist-mono t-label text-neutral-400">
                   434 MEDIA role
                 </dt>
-                <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.role}</dd>
+                <dd className="t-caption text-neutral-600">{item.role}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
-                <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                <dt className="font-geist-mono t-label text-neutral-400">
                   Credit
                 </dt>
-                <dd className="font-geist-sans text-xs leading-snug text-neutral-600">{item.founderCredit}</dd>
+                <dd className="t-caption text-neutral-600">{item.founderCredit}</dd>
               </div>
               {item.collaboratorCredit && (
                 <div className="flex flex-col gap-0.5">
-                  <dt className="font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+                  <dt className="font-geist-mono t-label text-neutral-400">
                     Collaborator credit
                   </dt>
-                  <dd className="font-geist-sans text-xs leading-snug text-neutral-600">
+                  <dd className="t-caption text-neutral-600">
                     {item.collaboratorCredit}
                   </dd>
                 </div>
@@ -377,7 +377,7 @@ function VideoModal({
               )}
               <Button onClick={onClose} variant="secondary" size="sm">
                 Close
-                <kbd className="rounded bg-neutral-100 px-1.5 py-px font-geist-mono text-[9px] font-medium tracking-wider text-neutral-500">
+                <kbd className="rounded bg-neutral-100 px-1.5 py-px font-geist-mono t-label text-neutral-500">
                   Esc
                 </kbd>
               </Button>
@@ -497,7 +497,7 @@ function WorkCard({
       {/* Persistent bottom info */}
       <div className="absolute inset-x-0 bottom-0 z-2 p-4">
         <p
-          className={`mb-1.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.18em] transition-colors duration-300 ${
+          className={`mb-1.5 font-geist-mono t-label transition-colors duration-300 ${
             isMediaCard ? "text-white/55 group-hover:text-white/80" : "text-neutral-400 group-hover:text-neutral-600"
           }`}
         >
@@ -513,7 +513,7 @@ function WorkCard({
         </h3>
 
         <p
-          className={`font-geist-sans text-xs leading-snug tracking-tight transition-all duration-500 ${
+          className={`t-caption tracking-tight transition-all duration-500 ${
             isMediaCard ? "text-white/65" : "text-neutral-500"
           } line-clamp-2 max-h-0 overflow-hidden opacity-0 group-hover:mt-1.5 group-hover:max-h-24 group-hover:opacity-100`}
         >
@@ -656,7 +656,7 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-8 flex items-center gap-2 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500"
+              className="mb-8 flex items-center gap-2 font-geist-mono t-label text-neutral-500"
             >
               <span className="grid h-1.5 w-1.5 place-items-center rounded-full bg-neutral-900" />
               Portfolio · 434 MEDIA
@@ -677,7 +677,7 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-8 max-w-2xl text-balance font-geist-sans text-lg leading-relaxed tracking-tight text-neutral-600 md:text-xl"
+              className="mt-8 max-w-2xl text-balance t-body-l text-neutral-600 md:text-xl"
             >
               {BRAND_RECORDS.canonicalDefinition} Everything
               below is organized by commercial model: what we own, the platforms we build for
@@ -718,7 +718,7 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center gap-2 rounded-full bg-white/85 px-3.5 py-1.5 font-geist-mono text-[10px] font-medium uppercase tracking-[0.2em] text-neutral-700 shadow-sm ring-1 ring-neutral-200 backdrop-blur-md"
+                className="flex items-center gap-2 rounded-full bg-white/85 px-3.5 py-1.5 font-geist-mono t-label text-neutral-700 shadow-sm ring-1 ring-neutral-200 backdrop-blur-md"
               >
                 <span className="grid h-1.5 w-1.5 place-items-center rounded-full bg-emerald-500" />
                 {activeMeta.eyebrow}
@@ -754,14 +754,14 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
                   className="mb-10 grid items-end gap-6 md:mb-14 md:grid-cols-12"
                 >
                   <div className="md:col-span-8">
-                    <p className="mb-3 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500">
+                    <p className="mb-3 font-geist-mono t-label text-neutral-500">
                       {group.eyebrow}
                     </p>
-                    <h2 className="font-ggx88 text-3xl font-black leading-[0.95] tracking-[-0.02em] text-neutral-950 md:text-5xl">
+                    <h2 className="font-ggx88 t-display-m font-black tracking-[-0.02em] text-neutral-950">
                       {group.headline}
                     </h2>
                   </div>
-                  <p className="font-geist-sans text-sm leading-relaxed text-neutral-500 md:col-span-4 md:text-base">
+                  <p className="t-body-s text-neutral-500 md:col-span-4">
                     {group.subline}
                   </p>
                 </motion.div>
@@ -812,13 +812,13 @@ export default function WorkClient({ records = WORK_RECORDS }: { records?: reado
               className="grid items-end gap-10 md:grid-cols-12"
             >
               <div className="md:col-span-7">
-                <p className="mb-4 font-geist-mono text-[11px] font-medium uppercase tracking-[0.22em] text-neutral-500">
+                <p className="mb-4 font-geist-mono t-label text-neutral-500">
                   Next step
                 </p>
-                <h2 className="font-ggx88 text-4xl font-black leading-[0.95] tracking-[-0.03em] text-neutral-950 md:text-6xl">
+                <h2 className="font-ggx88 t-display-m font-black tracking-[-0.03em] text-neutral-950">
                   Tell us what you&apos;re producing.
                 </h2>
-                <p className="mt-6 max-w-xl font-geist-sans text-base leading-relaxed text-neutral-600 md:text-lg">
+                <p className="mt-6 max-w-xl t-body text-neutral-600 md:text-lg">
                   We can lead the full production or own a defined part of it within a larger
                   team. Send the objective, the audience, and the target date, and we&apos;ll come
                   back with the structure that fits.
