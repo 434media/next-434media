@@ -58,3 +58,10 @@ jobs:
       # repo is actually exposed to, someone editing a generated file by hand.
       # "Are the types current with the schemas" is checked where the schemas are.
       - run: tsx scripts/sor/verify-types.ts
+
+      # The visual system's source — logo artwork, the spec, the palette with
+      # its provenance — is canonical in the private context repository, so CI
+      # cannot regenerate the tokens to compare. It checks the question it can
+      # answer: was a generated file edited by hand? A brand colour added here
+      # rather than in the handoff is a colour with no provenance.
+      - run: tsx scripts/visual/verify-tokens.ts
