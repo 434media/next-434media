@@ -16,16 +16,46 @@
 import type { WorkRecord } from "../work-records"
 import { isPublished } from "./visibility"
 
-type Row = Record<string, any>
+/**
+ * A portfolio row as Firestore returns it. Only the fields the Work page reads
+ * are named; the rest are carried and ignored. Typed rather than `any` so a
+ * renamed field fails here instead of rendering as undefined on the page —
+ * which is how `work_page.published` slipped through once already.
+ */
+type Row = {
+  key?: unknown
+  title?: unknown
+  commercial_model?: unknown
+  production_categories?: unknown
+  client_or_partner_as_written?: unknown
+  role_434?: unknown
+  founder_credit?: { as_written?: unknown } | null
+  collaborator_credits_as_written?: unknown
+  years_as_written?: unknown
+  operating_status?: unknown
+  public_url?: unknown
+  rights_defaults?: RightsDefaults | null
+  registered_identifier_as_written?: unknown
+  video?: unknown
+  approved_public_description?: unknown
+  work_page?: unknown
+}
+
+type RightsDefaults = {
+  creator?: unknown
+  copyright_notice?: unknown
+  credit_line?: unknown
+  usage_terms?: unknown
+}
 
 /** "Creator X · Copyright notice Y · Credit line Z · Rights usage terms W", or null. */
-function rightsDefaults(rd: Row | null | undefined): string | null {
+function rightsDefaults(rd: RightsDefaults | null | undefined): string | null {
   if (!rd) return null
   const parts = [
-    rd.creator && `Creator ${rd.creator}`,
-    rd.copyright_notice && `Copyright notice ${rd.copyright_notice}`,
-    rd.credit_line && `Credit line ${rd.credit_line}`,
-    rd.usage_terms && `Rights usage terms ${rd.usage_terms}`,
+    rd.creator && `Creator ${String(rd.creator)}`,
+    rd.copyright_notice && `Copyright notice ${String(rd.copyright_notice)}`,
+    rd.credit_line && `Credit line ${String(rd.credit_line)}`,
+    rd.usage_terms && `Rights usage terms ${String(rd.usage_terms)}`,
   ].filter(Boolean)
   return parts.length ? parts.join(" · ") : null
 }
@@ -65,7 +95,9 @@ export function toWorkRecord(row: Row): WorkRecord {
  * left to the database.
  */
 export function toWorkRecords(rows: Row[], order?: readonly string[]): WorkRecord[] {
-  const published = rows.filter(isPublished).map(toWorkRecord)
+  const published = rows
+    .filter((r) => isPublished(r as Record<string, unknown>))
+    .map(toWorkRecord)
   if (!order) return published
   const rank = new Map(order.map((key, i) => [key, i]))
   return published.sort(

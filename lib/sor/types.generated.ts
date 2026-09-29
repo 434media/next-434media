@@ -27,7 +27,10 @@ export interface OutboundCohort {
     amount_minor: number
     currency: string
   } | null
-  signer: "brand" | "founder"
+  /**
+   * Who signs the outbound email. The vocabulary is the approved outbound skill's (assets/draft-set-format.md: 'Signer: 434 | founder'), not the master's — the master describes who speaks, the skill names the field. Recorded as `434` rather than `brand` so the row and the skill read the same.
+   */
+  signer: "434" | "founder"
   source?: string
   updated_at?: string
   updated_by?: string
@@ -56,6 +59,25 @@ export interface Contractor {
 }
 
 /**
+ * An open item from the Implementation Decisions Register whose status changes what an agent may do. The register holds the decision; this holds the state a job branches on.
+ */
+export interface LaunchDependency {
+  key: string
+  subject: string
+  status: "open" | "closed"
+  /**
+   * What a job must do while this is open. Written so it can be followed without reading the register.
+   */
+  effect_while_open: string
+  gating_ref: string
+  register_status_as_written?: string
+  closed_on?: string | null
+  source: string
+  updated_at?: string
+  updated_by?: string
+}
+
+/**
  * Routable partner services (master §2.11).
  */
 export interface PartnerService {
@@ -66,6 +88,22 @@ export interface PartnerService {
   confirmed: boolean
   last_reviewed: string
   source?: string
+  updated_at?: string
+  updated_by?: string
+}
+
+/**
+ * The policy and the voice files, served to jobs through the connector. The master remains the source; these are cut from it or synced from the voice system.
+ */
+export interface PolicyDocument {
+  key: string
+  kind: "policy" | "voice"
+  title: string
+  version: string
+  body: string
+  bytes?: number
+  sha256?: string
+  source: string
   updated_at?: string
   updated_by?: string
 }
@@ -179,9 +217,11 @@ export interface RateCardLine {
 
 /** sha256[:16] of each source schema, for the drift check in the context repository. */
 export const sorSchemaHashes = {
-    "cohort.schema.json": "1c4efc42708514b3",
+    "cohort.schema.json": "14255713087a8896",
     "contractor.schema.json": "0e30b1e384417bfe",
+    "launch_dependency.schema.json": "b60a01e2bf2af341",
     "partner_service.schema.json": "27d5fa1bf7ad7543",
+    "policy_document.schema.json": "4e1d0184b8692961",
     "portfolio_record.schema.json": "65c1a6f335b83027",
     "qualification_threshold.schema.json": "4b346713da931afd",
     "rate_card_line.schema.json": "099711957961ffe2"

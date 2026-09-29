@@ -18,6 +18,7 @@
  *   tsx scripts/sor/load.ts --dry-run
  *   tsx scripts/sor/load.ts --seed <dir> --schemas <dir> [--dry-run]
  */
+import { createHash } from "node:crypto"
 import { readFileSync, readdirSync, existsSync } from "node:fs"
 import { join, resolve, basename } from "node:path"
 import Ajv2020 from "ajv/dist/2020"
@@ -33,6 +34,7 @@ const TABLES = [
   { seed: "qualification_thresholds.json", collection: "qualification_thresholds", schema: "qualification_threshold" },
   { seed: "partner_services.json", collection: "partner_services", schema: "partner_service" },
   { seed: "rate_card.json", collection: "rate_card_lines", schema: "rate_card_line", optional: true },
+  { seed: "launch_dependencies.json", collection: "launch_dependencies", schema: "launch_dependency" },
 ] as const
 
 const DRY = process.argv.includes("--dry-run")
@@ -62,6 +64,42 @@ function enumKey(value: unknown): string {
 
 type Row = Record<string, unknown> & { key: string }
 type Planned = { collection: string; rows: Row[] }
+
+/**
+ * The policy and voice files, read as documents rather than rows.
+ *
+ * They are what `get_policy` serves. A job with a network reads them here; a
+ * job without one reads the copy in its bundle. Both come from the same cut, so
+ * the connector is the live path rather than a second version.
+ *
+ * Firestore's document limit is 1 MiB and the policy is ~69 KB, so a whole
+ * document fits in a field with room to spare.
+ */
+function policyRows(policyPath: string, voiceDir: string, now: string, updatedBy: string): Row[] {
+  const read = (p: string) => readFileSync(p, "utf8")
+  const short = (t: string) => createHash("sha256").update(t).digest("hex").slice(0, 16)
+  const versionOf = (t: string) =>
+    t.match(/\*\*Version (\S+) \u2014/)?.[1] ?? t.match(/^Version:\s*(.+?)\s*$/m)?.[1]?.trim() ?? "unversioned"
+
+  const rows: Row[] = []
+  const policy = read(policyPath)
+  rows.push({
+    key: "policy", kind: "policy", title: "434 MEDIA \u2014 Policy",
+    version: versionOf(policy), body: policy, bytes: Buffer.byteLength(policy),
+    sha256: short(policy), source: "434-context: 00 Governing/434_MEDIA_Policy.md",
+    updated_at: now, updated_by: updatedBy,
+  })
+  for (const f of readdirSync(voiceDir).filter((f) => f.endsWith(".md")).sort()) {
+    const body = read(join(voiceDir, f))
+    rows.push({
+      key: `voice-${basename(f, ".md").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`,
+      kind: "voice", title: basename(f, ".md"), version: versionOf(body), body,
+      bytes: Buffer.byteLength(body), sha256: short(body),
+      source: `434-context: 01 Voice System/${f}`, updated_at: now, updated_by: updatedBy,
+    })
+  }
+  return rows
+}
 
 async function main() {
   const manifest = read(join(SEED, "_manifest.json"))
@@ -108,6 +146,32 @@ async function main() {
       }
     }
     planned.push({ collection: table.collection, rows })
+  }
+
+  // Policy and voice documents, if their sources are reachable.
+  const policyPath = process.argv.includes("--policy")
+    ? resolve(process.argv[process.argv.indexOf("--policy") + 1])
+    : resolve("../434-context/00 Governing/434_MEDIA_Policy.md")
+  const voiceDir = process.argv.includes("--voice")
+    ? resolve(process.argv[process.argv.indexOf("--voice") + 1])
+    : resolve("../434-context/01 Voice System")
+  if (existsSync(policyPath) && existsSync(voiceDir)) {
+    const rows = policyRows(policyPath, voiceDir, now, updatedBy)
+    // Validated like every other collection. These rows are built in code rather
+    // than read from seed, which is exactly why they need the check — nothing
+    // upstream has already refused a malformed one.
+    const validatePolicy = ajv.getSchema("policy_document")
+    if (!validatePolicy) failures.push("policy_document: schema not loaded")
+    else for (const row of rows) {
+      if (!validatePolicy(row)) {
+        for (const e of validatePolicy.errors ?? []) {
+          failures.push(`policy_documents/${row.key}: ${e.instancePath || "/"} ${e.message}`)
+        }
+      }
+    }
+    planned.push({ collection: "policy_documents", rows })
+  } else {
+    failures.push(`policy_documents: ${policyPath} or ${voiceDir} not found; pass --policy and --voice`)
   }
 
   // Enumerations: one collection each, document id from the value.
