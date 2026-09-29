@@ -134,11 +134,31 @@ html, body {
    Typography System — Consistent line-height & font-weight across pages
    ========================================================================== */
 
-/* Headings: tight line-height, heavy weight for brand fonts */
-h1, h2, h3, h4, h5, h6 {
-  line-height: 1.1;
-  font-weight: 700;
-  text-wrap: balance;
+/* Headings: tight line-height, heavy weight for brand fonts.
+
+   In @layer base, and that is the whole fix.
+
+   Unlayered, this rule beat every cascade layer — so it beat the type scale's
+   heading roles, which each specify 600, and it beat a `font-semibold` or
+   `font-bold` utility written beside them. Measured on production: a blog card
+   title carrying `t-heading-s font-semibold` computed 18px / Geist / **700**.
+   The size was right and the weight came from here, with nothing in the markup
+   to suggest it.
+
+   base sits below components and utilities, so a role now wins and an explicit
+   utility wins over the role. An element with neither still gets these
+   defaults, which is what a base rule is for.
+
+   The same defect remains in the four rules below — they are unlayered too, and
+   `p { line-height: 1.6 }` overrides every body role's line height. Left alone
+   here deliberately: that is a separate visible change across every paragraph
+   on the site and wants its own preview. */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.1;
+    font-weight: 700;
+    text-wrap: balance;
+  }
 }
 
 /* Display headings (font-ggx88) — tightest line-height */
