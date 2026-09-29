@@ -51,8 +51,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "^9",
     "eslint-config-next": "15.2.1",
+    "json-schema-to-typescript": "^16.0.0",
     "tailwindcss": "^4",
     "typescript": "^5.9.3"
   },
