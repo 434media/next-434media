@@ -11,24 +11,122 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { project, projectAll, isReadable, isStale, withStaleFlag, STALE_AFTER_DAYS } from "../visibility"
 
+/**
+ * Real rows from the seed, not a hand-written fixture.
+ *
+ * The first version of these tests invented a record shape with a top-level
+ * `published` and a `name` field. Both were wrong — publication is nested at
+ * `work_page.published` and the title field is `title` — and the tests passed
+ * anyway, because the code was written from the same wrong assumption. A test
+ * that shares the code's assumptions cannot find the assumption.
+ */
 const record = {
-  key: "txmx-boxing",
-  name: "TXMX Boxing",
-  commercial_model: "Original IP",
-  approved_public_description: "A boxing property.",
-  published: true,
-  source: "master 2.0.26",
-  internal_context: "never leaves the building",
-  notes: "internal only",
-  updated_by: "migration-2.0.26",
+  "key": "txmx-boxing",
+  "title": "TXMX Boxing",
+  "commercial_model": "Original IP",
+  "parent_key": null,
+  "production_categories": [
+    "Platform",
+    "Content",
+    "Experience"
+  ],
+  "client_or_partner_as_written": null,
+  "role_434": "Owned and produced by 434 MEDIA",
+  "founder_credit": {
+    "roles": [
+      "Creator",
+      "Executive Producer",
+      "Director"
+    ],
+    "as_written": "Marcos Resendez — Creator, Executive Producer & Director"
+  },
+  "collaborator_credits_as_written": null,
+  "years": {
+    "start": 2025,
+    "end": 2025,
+    "ongoing": false
+  },
+  "years_as_written": "2025",
+  "operating_status": "Active",
+  "work_page": {
+    "published": true,
+    "reason": null
+  },
+  "public_url": "https://txmxboxing.com",
+  "approved_public_description": "A fight-culture media property spanning original content, live experiences, talent, partnerships, and commerce across Texas and Mexico.",
+  "internal_context": null,
+  "proof_assets_as_written": "Content library, photography, brand assets, live-event assets, and Rise of a Champion",
+  "video": "TXMX DROP TEASER V2.mp4",
+  "rights_defaults": {
+    "creator": "434 MEDIA",
+    "copyright_notice": "© 2026 434 MEDIA",
+    "credit_line": "434 MEDIA",
+    "usage_terms": "All rights reserved"
+  },
+  "registered_identifier_as_written": null,
+  "restrictions_as_written": null,
+  "source": "master 2.0.26 §4.8"
+}
+
+const unpublished = {
+  "key": "health-cell-state-of-industry",
+  "title": "The Health Cell — State of the Industry",
+  "commercial_model": "Productions for Brands",
+  "parent_key": null,
+  "production_categories": [
+    "Experience",
+    "Content"
+  ],
+  "client_or_partner_as_written": "The Health Cell",
+  "role_434": "Full event production, technical direction, show direction, and post-event content production",
+  "founder_credit": {
+    "roles": [
+      "Executive Producer",
+      "Event Producer",
+      "Show Director",
+      "Stage Director",
+      "Technical Director"
+    ],
+    "as_written": "Marcos Resendez — Executive Producer, Event Producer, Show Director, Stage Director & Technical Director"
+  },
+  "collaborator_credits_as_written": null,
+  "years": null,
+  "years_as_written": null,
+  "operating_status": "Completed",
+  "work_page": {
+    "published": false,
+    "reason": "the record, its credits, and its proof stand; the card is not carried on the Work page."
+  },
+  "public_url": null,
+  "approved_public_description": "434 delivered full event production for The Health Cell’s flagship annual fundraising event after the client established the program. Work included venue and catering management, project management, front-of-house and back-of-house operations, technical direction, show and stage direction, content capture, editing, and two speaker assets created for year-round organizational promotion.",
+  "internal_context": null,
+  "proof_assets_as_written": "Event media, photography, recorded program content, and two completed speaker assets",
+  "video": null,
+  "rights_defaults": null,
+  "registered_identifier_as_written": null,
+  "restrictions_as_written": null,
+  "source": "master 2.0.26 §4.10"
 }
 
 test("public scope keeps the approved description and drops internal context", () => {
   const out = project("portfolio_records", record, "public")
-  assert.equal(out?.approved_public_description, "A boxing property.")
+  assert.equal(out?.approved_public_description, record.approved_public_description)
+  assert.equal(out?.title, record.title)
   assert.equal(out?.internal_context, undefined)
-  assert.equal(out?.notes, undefined)
+  assert.equal(out?.proof_assets_as_written, undefined)
+  assert.equal(out?.restrictions_as_written, undefined)
   assert.equal(out?.updated_by, undefined)
+})
+
+test("every field the Work page renders survives the public projection", () => {
+  // The page maps these out of the row. Stripping one would blank a card field
+  // in production while every test about "internal data" still passed.
+  const out = project("portfolio_records", record, "public")!
+  for (const f of ["title", "commercial_model", "production_categories", "role_434",
+                   "founder_credit", "years_as_written", "operating_status",
+                   "rights_defaults", "approved_public_description", "key"]) {
+    assert.ok(f in out, `public projection dropped ${f}, which the Work page renders`)
+  }
 })
 
 test("internal scope returns the row untouched", () => {
@@ -36,8 +134,16 @@ test("internal scope returns the row untouched", () => {
 })
 
 test("an unpublished record does not exist to a public caller", () => {
-  assert.equal(project("portfolio_records", { ...record, published: false }, "public"), null)
-  assert.notEqual(project("portfolio_records", { ...record, published: false }, "internal"), null)
+  assert.equal(unpublished.work_page.published, false)
+  assert.equal(project("portfolio_records", unpublished, "public"), null)
+  assert.notEqual(project("portfolio_records", unpublished, "internal"), null)
+})
+
+test("publication fails closed when work_page is missing or malformed", () => {
+  for (const wp of [undefined, null, {}, { published: "true" }, { published: 1 }]) {
+    const row = { ...record, work_page: wp }
+    assert.equal(project("portfolio_records", row, "public"), null, JSON.stringify(wp))
+  }
 })
 
 test("public scope cannot read internal collections at all", () => {

@@ -186,13 +186,21 @@ const PRESENTATION: Record<string, Presentation> = {
   },
 }
 
-// Records come from the generated extract; presentation is merged in by title.
-// A record with no presentation entry still renders — as a title card, per the
-// Display and Design Standard 2.2.
-const workItems: WorkItem[] = WORK_RECORDS.map((record) => ({
-  ...record,
-  ...(PRESENTATION[record.title] ?? { id: record.title }),
-}))
+// Presentation is merged into each record by title. A record with no
+// presentation entry still renders — as a title card, per the Display and
+// Design Standard 2.2.
+//
+// Records now arrive as a prop from the server component, which reads them from
+// the `portfolio_records` collection. They used to be imported from the
+// generated extract; that file is still the fallback and still what CI checks,
+// so the default here is not dead code — it is what renders if the server could
+// not reach the record store.
+function buildItems(records: readonly WorkRecord[]): WorkItem[] {
+  return records.map((record) => ({
+    ...record,
+    ...(PRESENTATION[record.title] ?? { id: record.title }),
+  }))
+}
 
 // ─── Video Modal ──────────────────────────────────────────────────────────────
 
@@ -545,7 +553,9 @@ function WorkCard({
 
 // ─── Page Client ──────────────────────────────────────────────────────────────
 
-export default function WorkClient() {
+export default function WorkClient({ records = WORK_RECORDS }: { records?: readonly WorkRecord[] }) {
+  const workItems = useMemo(() => buildItems(records), [records])
+
   const [activeItem, setActiveItem] = useState<WorkItem | null>(null)
   const [activeCategory, setActiveCategory] = useState<Category>(CATEGORIES[0].id)
 

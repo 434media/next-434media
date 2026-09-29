@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import WorkClient from "./WorkClient"
+import { getWorkPageRecords } from "@/lib/sor/work-page-data"
 import { buildServicesItemListLd } from "@/lib/seo/services"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 
@@ -57,7 +58,20 @@ export const metadata: Metadata = {
   },
 }
 
-export default function WorkPage() {
+/**
+ * Records come from the `portfolio_records` collection rather than from the
+ * generated extract, and are revalidated hourly. They change when the master
+ * changes, which is rarely and never urgently, so an hour of staleness costs
+ * nothing and a Firestore read on every request would.
+ *
+ * `getWorkPageRecords` falls back to the generated extract if the store cannot
+ * be reached, so this page cannot be emptied by an infrastructure fault.
+ */
+export const revalidate = 3600
+
+export default async function WorkPage() {
+  const { records } = await getWorkPageRecords()
+
   return (
     <>
       <script
@@ -81,7 +95,7 @@ export default function WorkPage() {
           }),
         }}
       />
-      <WorkClient />
+      <WorkClient records={records} />
     </>
   )
 }
