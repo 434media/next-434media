@@ -156,9 +156,14 @@ function Card({
       ([e]) => e.isIntersecting && setNear(true),
       { rootMargin: "600px" },
     )
+    // Not a threshold on the card's own area. A 4:5 card is taller than a short
+    // viewport, so "35% of the card is visible" can be unreachable on the very
+    // screens where the card fills everything. This asks the opposite question:
+    // does the card overlap the middle 60% of the screen? That holds whatever
+    // the card's height is.
     const run = new IntersectionObserver(
       ([e]) => setVisible(e.isIntersecting),
-      { threshold: 0.35 },
+      { rootMargin: "-20% 0px -20% 0px", threshold: 0 },
     )
     arm.observe(el)
     run.observe(el)
