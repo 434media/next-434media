@@ -33,7 +33,7 @@ export function DeckViewer({ slides, name }: { slides: DeckSlide[]; name: string
 
   if (count === 0) {
     return (
-      <div className="min-h-screen grid place-items-center bg-neutral-950 text-neutral-400 text-sm">
+      <div className="min-h-screen grid place-items-center bg-neutral-950 text-[var(--color-on-dark-text-secondary)] text-sm">
         This deck has no slides.
       </div>
     )
@@ -65,7 +65,7 @@ export function DeckViewer({ slides, name }: { slides: DeckSlide[]; name: string
 
       {/* Controls */}
       <footer className="flex h-16 shrink-0 items-center justify-between border-t border-neutral-900 bg-neutral-950 px-4 md:px-6">
-        <div className="w-28 truncate font-geist-mono text-xs text-neutral-400" title={name}>
+        <div className="w-28 truncate font-geist-mono text-xs text-[var(--color-on-dark-text-secondary)]" title={name}>
           <span className="font-bold text-white tabular-nums">{String(current + 1).padStart(2, "0")}</span>{" "}
           / <span className="tabular-nums">{String(count).padStart(2, "0")}</span>
         </div>
@@ -102,7 +102,7 @@ export function DeckViewer({ slides, name }: { slides: DeckSlide[]; name: string
         </div>
 
         <div className="hidden w-28 flex-col text-right sm:flex">
-          <p className="font-geist-mono text-[10px] uppercase tracking-[0.2em] text-neutral-400">434 Media</p>
+          <p className="font-geist-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-on-dark-text-secondary)]">434 Media</p>
         </div>
       </footer>
     </section>
