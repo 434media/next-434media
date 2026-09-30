@@ -66,9 +66,14 @@ const SECTIONS = [
  * `<picture>` is used here instead of next/image - next/image resizes, it does
  * not art-direct.
  *
- * `video` is the detail-view file, which keeps its audio. The audio-free card
- * previews exist as assets but are deliberately not wired to autoplay: the
- * approved design says no video requests before user activation.
+ * Two video assets per record, and they are not the same file. The CARD plays a
+ * short muted loop - 11 to 14 seconds cut from the strongest part of the film,
+ * 720p, no audio track, under 3 MB - offered as WebM (VP9) first and MP4
+ * second, which is Standard 3.0's two-encoding rule. The DETAIL view plays the
+ * full film with its audio, and that file is requested only when the dialog
+ * opens.
+ *
+ * The card used to play the full film. Thirteen of them came to 210.6 MB.
  */
 const MEDIA = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work"
 
@@ -104,11 +109,17 @@ const stillsFor = (r: WorkRecord) => {
   if (!k || !ASSETS[k]?.still) return null
   return { wide: `/work/stills/${k}-wide.jpg`, compact: `/work/stills/${k}-compact.jpg` }
 }
-const cardVideoFor = (r: WorkRecord) => {
+/**
+ * The card's loop, in both encodings. WebM is listed first because it is the
+ * smaller of the two for every record — measured, not assumed; VP9 was tuned
+ * per record until that was true.
+ */
+const cardLoopFor = (r: WorkRecord) => {
   const k = r.recordKey
   const cap = k ? ASSETS[k]?.cap : undefined
   if (!k || !cap) return null
-  return `${MEDIA}/${k}-card-${cap > 720 ? 720 : cap}p.mp4`
+  const h = cap > 720 ? 720 : cap
+  return { webm: `${MEDIA}/${k}-loop-${h}p.webm`, mp4: `${MEDIA}/${k}-loop-${h}p.mp4` }
 }
 const detailVideoFor = (r: WorkRecord) => {
   const k = r.recordKey
@@ -139,7 +150,7 @@ function Card({
   priority: boolean
 }) {
   const stills = stillsFor(record)
-  const video = cardVideoFor(record)
+  const video = cardLoopFor(record)
   const reduced = usePrefersReducedMotion()
   const ref = useRef<HTMLButtonElement>(null)
   const vidRef = useRef<HTMLVideoElement>(null)
@@ -203,18 +214,20 @@ function Card({
               decoding="async"
             />
           </picture>
-          {showVideo ? (
+          {showVideo && near ? (
             <video
               ref={vidRef}
               className={styles.cardVideo}
               muted
               loop
               playsInline
-              preload="none"
+              preload="auto"
               aria-hidden="true"
               tabIndex={-1}
-              src={near ? video : undefined}
-            />
+            >
+              <source src={video.webm} type="video/webm" />
+              <source src={video.mp4} type="video/mp4" />
+            </video>
           ) : null}
           <span className={styles.cardScrim} aria-hidden="true" />
         </>
