@@ -70,46 +70,64 @@ const SECTIONS = [
  * previews exist as assets but are deliberately not wired to autoplay: the
  * approved design says no video requests before user activation.
  */
-const ASSETS: Record<string, { still?: boolean; video?: string }> = {
+const MEDIA = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work"
+
+/**
+ * Per record: whether it has a still, and the height its video was encoded at.
+ *
+ * The cap is the source's own height, never an upscale. AMPD and OVERDRIVE cap
+ * at 540 and TXMX at 808 because that is what their masters are — see #118.
+ *
+ * Two files come out of each cap. The card plays the audio-free one at 720 or
+ * below; the detail plays the one that kept its audio at full cap.
+ */
+const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
   "alamo-angels": { still: true },
-  "ampd-project": { still: true },
   "milcityusa": { still: true },
-  "mission-road-soar": { still: true },
   "nucleate-global-summit": { still: true },
-  "overdrive": { still: true },
-  "rise-of-a-champion": { still: true },
-  "salute-to-troops": { still: true },
-  "velocitytx-demo-day": { still: true },
-  "vemosvamos": { still: true, video: "vemosvamos-1080p" },
-  "aim-health-summit": { still: true },
-  "que-es-sdoh": { still: true },
-  "techbloc-tech-day": { still: true },
-  "txmx-boxing": { still: true },
-  "univision-70th": { still: true },
+  "ampd-project": { still: true, cap: 540 },
+  "overdrive": { still: true, cap: 540 },
+  "salute-to-troops": { still: true, cap: 720 },
+  "txmx-boxing": { still: true, cap: 808 },
+  "rise-of-a-champion": { still: true, cap: 1080 },
+  "mission-road-soar": { still: true, cap: 1080 },
+  "velocitytx-demo-day": { still: true, cap: 1080 },
+  "aim-health-summit": { still: true, cap: 1080 },
+  "vemosvamos": { still: true, cap: 1080 },
+  "techbloc-tech-day": { still: true, cap: 1080 },
+  "que-es-sdoh": { still: true, cap: 1080 },
+  "univision-70th": { still: true, cap: 1080 },
 }
-
-// Only VemosVamos ships its video here, and only because it is the edit with a
-// specified cut - 46s, picture and audio fading together from 42s, ending on
-// black - so it is the one worth seeing in a preview. At 9.6 MB it is also the
-// only one small enough to belong in a repository.
-//
-// The other eight are encoded and waiting on hosting, not on work: 657 MB in
-// total against a 30 MB repository. They go where the hero video goes, and the
-// `video` key here is filled in per record as each one lands. Until then a
-// record with no entry opens on its still, which is the supported state.
-
 
 const stillsFor = (r: WorkRecord) => {
   const k = r.recordKey
   if (!k || !ASSETS[k]?.still) return null
   return { wide: `/work/stills/${k}-wide.jpg`, compact: `/work/stills/${k}-compact.jpg` }
 }
-const videoFor = (r: WorkRecord) => {
+const cardVideoFor = (r: WorkRecord) => {
   const k = r.recordKey
-  const v = k ? ASSETS[k]?.video : undefined
-  return v ? `/work/video/${v}.mp4` : null
+  const cap = k ? ASSETS[k]?.cap : undefined
+  if (!k || !cap) return null
+  return `${MEDIA}/${k}-card-${cap > 720 ? 720 : cap}p.mp4`
+}
+const detailVideoFor = (r: WorkRecord) => {
+  const k = r.recordKey
+  const cap = k ? ASSETS[k]?.cap : undefined
+  return k && cap ? `${MEDIA}/${k}-${cap}p.mp4` : null
 }
 
+/** True when the visitor has asked for less motion. */
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false)
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const set = () => setReduced(q.matches)
+    set()
+    q.addEventListener("change", set)
+    return () => q.removeEventListener("change", set)
+  }, [])
+  return reduced
+}
 
 function Card({
   record,
@@ -121,8 +139,48 @@ function Card({
   priority: boolean
 }) {
   const stills = stillsFor(record)
+  const video = cardVideoFor(record)
+  const reduced = usePrefersReducedMotion()
+  const ref = useRef<HTMLButtonElement>(null)
+  const vidRef = useRef<HTMLVideoElement>(null)
+  // `near` arms the source; `visible` runs it. Two thresholds, because loading
+  // early and playing early are different things: the file should be on its way
+  // before the card arrives, and playing only once it has.
+  const [near, setNear] = useState(false)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!video || reduced || !ref.current) return
+    const el = ref.current
+    const arm = new IntersectionObserver(
+      ([e]) => e.isIntersecting && setNear(true),
+      { rootMargin: "600px" },
+    )
+    const run = new IntersectionObserver(
+      ([e]) => setVisible(e.isIntersecting),
+      { threshold: 0.35 },
+    )
+    arm.observe(el)
+    run.observe(el)
+    return () => {
+      arm.disconnect()
+      run.disconnect()
+    }
+  }, [video, reduced])
+
+  useEffect(() => {
+    const v = vidRef.current
+    if (!v) return
+    if (visible) void v.play().catch(() => {})
+    else v.pause()
+  }, [visible, near])
+
+  // Reduced motion gets the still and nothing else — no element, no request.
+  const showVideo = video && !reduced
+
   return (
     <button
+      ref={ref}
       type="button"
       className={styles.card}
       onClick={() => onOpen(record)}
@@ -140,6 +198,19 @@ function Card({
               decoding="async"
             />
           </picture>
+          {showVideo ? (
+            <video
+              ref={vidRef}
+              className={styles.cardVideo}
+              muted
+              loop
+              playsInline
+              preload="none"
+              aria-hidden="true"
+              tabIndex={-1}
+              src={near ? video : undefined}
+            />
+          ) : null}
           <span className={styles.cardScrim} aria-hidden="true" />
         </>
       ) : null}
@@ -153,7 +224,24 @@ function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const stills = stillsFor(record)
-  const video = videoFor(record)
+  const video = detailVideoFor(record)
+  const detailVidRef = useRef<HTMLVideoElement>(null)
+
+  // The detail plays with sound. Opening the dialog is a click, so this runs
+  // inside a user gesture and autoplay-with-audio is permitted - but only
+  // "permitted", not guaranteed: a browser or an OS setting can still refuse.
+  // If it does, fall back to muted playback rather than a dead frame, because a
+  // silent video that plays is closer to the intent than a video that does not.
+  useEffect(() => {
+    const v = detailVidRef.current
+    if (!v) return
+    v.muted = false
+    v.play().catch(() => {
+      v.muted = true
+      void v.play().catch(() => {})
+    })
+  }, [])
+
 
   // Escape closes, focus is contained, body scrolling locks, and focus returns
   // to the card that opened this — handled by the caller, which holds the
@@ -224,14 +312,14 @@ function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }
               visitor presses play. */}
           {video ? (
             <video
+              ref={detailVidRef}
               className={styles.dialogHeroImage}
               controls
-              preload="none"
+              preload="auto"
               playsInline
               poster={stills?.wide}
-            >
-              <source src={video} type="video/mp4" />
-            </video>
+              src={video}
+            />
           ) : stills ? (
             <>
               <picture>

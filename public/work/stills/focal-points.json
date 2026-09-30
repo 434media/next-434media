@@ -402,161 +402,169 @@
  "que-es-sdoh": {
   "16:9": {
    "focal": [
-    0.5,
+    0.52,
     0.45
    ],
    "crop": [
-    1080,
-    608,
+    3840,
+    2160,
     0,
-    304
+    0
    ],
    "delivered": [
-    1080,
-    608
+    1920,
+    1080
    ],
-   "bytes": 80915,
+   "bytes": 176746,
    "q": 4,
-   "note": "NATIVE \u2014 78% upscale refused"
+   "note": "",
+   "source": "frame from the record's video"
   },
   "4:5": {
    "focal": [
-    0.5,
+    0.55,
     0.45
    ],
    "crop": [
-    1080,
-    1350,
-    0,
+    1728,
+    2160,
+    1248,
     0
    ],
    "delivered": [
     1200,
     1500
    ],
-   "bytes": 172167,
+   "bytes": 125630,
    "q": 4,
-   "note": ""
+   "note": "",
+   "source": "frame from the record's video"
   }
  },
  "techbloc-tech-day": {
   "16:9": {
    "focal": [
-    0.5,
+    0.42,
     0.45
    ],
    "crop": [
-    1024,
-    576,
+    1920,
+    1080,
     0,
-    403
+    0
    ],
    "delivered": [
-    1024,
-    576
+    1920,
+    1080
    ],
-   "bytes": 96226,
+   "bytes": 83154,
    "q": 4,
-   "note": "NATIVE \u2014 88% upscale refused"
+   "note": "",
+   "source": "frame from the record's video"
   },
   "4:5": {
    "focal": [
-    0.5,
+    0.4,
     0.45
    ],
    "crop": [
-    1024,
-    1280,
-    0,
-    51
+    864,
+    1080,
+    336,
+    0
    ],
    "delivered": [
-    1024,
-    1280
+    864,
+    1080
    ],
-   "bytes": 162518,
+   "bytes": 41668,
    "q": 4,
-   "note": "NATIVE \u2014 17% upscale refused"
+   "note": "NATIVE \u2014 39% upscale refused",
+   "source": "frame from the record's video"
   }
  },
  "txmx-boxing": {
   "16:9": {
    "focal": [
-    0.5,
-    0.42
+    0.42,
+    0.5
    ],
    "crop": [
-    1080,
-    608,
-    0,
-    263
-   ],
-   "delivered": [
-    1080,
-    608
-   ],
-   "bytes": 64536,
-   "q": 4,
-   "note": "NATIVE \u2014 78% upscale refused"
-  },
-  "4:5": {
-   "focal": [
-    0.5,
-    0.42
-   ],
-   "crop": [
-    1080,
-    1350,
-    0,
+    1436,
+    808,
+    88,
     0
    ],
    "delivered": [
-    1200,
-    1500
+    1436,
+    808
    ],
-   "bytes": 137675,
+   "bytes": 73957,
    "q": 4,
-   "note": ""
+   "note": "NATIVE \u2014 34% upscale refused",
+   "source": "frame from the record's video"
+  },
+  "4:5": {
+   "focal": [
+    0.4,
+    0.5
+   ],
+   "crop": [
+    646,
+    808,
+    445,
+    0
+   ],
+   "delivered": [
+    646,
+    808
+   ],
+   "bytes": 37656,
+   "q": 4,
+   "note": "NATIVE \u2014 86% upscale refused",
+   "source": "frame from the record's video"
   }
  },
  "univision-70th": {
   "16:9": {
    "focal": [
-    0.5,
+    0.42,
     0.45
    ],
    "crop": [
-    1080,
-    608,
+    3840,
+    2160,
     0,
-    304
+    0
    ],
    "delivered": [
-    1080,
-    608
+    1920,
+    1080
    ],
-   "bytes": 85951,
+   "bytes": 124897,
    "q": 4,
-   "note": "NATIVE \u2014 78% upscale refused"
+   "note": "",
+   "source": "frame from the record's video"
   },
   "4:5": {
    "focal": [
-    0.5,
+    0.4,
     0.45
    ],
    "crop": [
-    1080,
-    1350,
-    0,
+    1728,
+    2160,
+    672,
     0
    ],
    "delivered": [
     1200,
     1500
    ],
-   "bytes": 179768,
+   "bytes": 100765,
    "q": 4,
-   "note": ""
+   "note": "",
+   "source": "frame from the record's video"
   }
  }
 }
