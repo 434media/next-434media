@@ -1,7 +1,12 @@
 import type { Metadata } from "next"
-// Approved design Revision 12. WorkClient is kept in the tree: this branch is
-// for review, not a replacement decision, and the seven questions in
-// 434-context 08 Work Page/COMPLIANCE.md are unanswered.
+// Approved design Revision 12, and now the only Work page. WorkClient is gone:
+// the redesign is the approved replacement, so keeping a second implementation
+// meant two answers to every question about this page and one of them stale.
+//
+// Its removal also retires a contrast problem that was never going to be fixed
+// in it - its grey-on-light body copy measured 1.96:1 at worst, against AA's
+// 4.5:1 - and the seven questions in 434-context 08 Work Page/COMPLIANCE.md are
+// now questions about this file alone.
 import WorkRedesign from "./redesign/WorkRedesign"
 import { getWorkPageRecords } from "@/lib/sor/work-page-data"
 import { buildServicesItemListLd } from "@/lib/seo/services"
