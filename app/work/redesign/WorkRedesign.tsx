@@ -136,6 +136,33 @@ const detailVideoFor = (r: WorkRecord) => {
   return k && cap ? `${MEDIA}/${k}-${cap}p.mp4` : null
 }
 
+/**
+ * True once the window `load` event has fired, or immediately if it already has.
+ *
+ * Only the tiles already inside the viewport at navigation are affected: a card
+ * that enters view by scrolling does so long after load, so its behaviour is
+ * unchanged. §3.0 says card video "autoplays muted as the card enters view" —
+ * it specifies the trigger and the manner, not immediacy, and a card that is
+ * in view at navigation never has a moment of entering.
+ *
+ * The reason to wait: play() pulls the whole file regardless of `preload`, and
+ * on a throttled connection two in-viewport videos compete with the LCP image
+ * for the same pipe.
+ */
+function useWindowLoaded() {
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    if (document.readyState === "complete") {
+      setLoaded(true)
+      return
+    }
+    const done = () => setLoaded(true)
+    window.addEventListener("load", done, { once: true })
+    return () => window.removeEventListener("load", done)
+  }, [])
+  return loaded
+}
+
 /** True when the visitor has asked for less motion. */
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -165,6 +192,7 @@ function Card({
   const stills = stillsFor(record)
   const video = cardLoopFor(record)
   const reduced = usePrefersReducedMotion()
+  const pageLoaded = useWindowLoaded()
   const ref = useRef<HTMLButtonElement>(null)
   const vidRef = useRef<HTMLVideoElement>(null)
   // `near` arms the source; `visible` runs it. Two thresholds, because loading
@@ -200,9 +228,10 @@ function Card({
   useEffect(() => {
     const v = vidRef.current
     if (!v) return
-    if (visible) void v.play().catch(() => {})
-    else v.pause()
-  }, [visible, near])
+    // Playback waits for window load; pausing never does. Arming is untouched.
+    if (visible && pageLoaded) void v.play().catch(() => {})
+    else if (!visible) v.pause()
+  }, [visible, near, pageLoaded])
 
   // Reduced motion gets the still and nothing else — no element, no request.
   const showVideo = video && !reduced
