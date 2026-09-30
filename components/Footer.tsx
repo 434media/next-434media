@@ -25,6 +25,25 @@ export default function Footer() {
     { label: "Terms", href: "/terms-of-service" },
   ]
 
+  // The footer reveals when it nears the viewport, not when a fraction of it is
+  // inside one.
+  //
+  // It used to ask for `threshold: 0.1` - "is 10% of this element visible" - of
+  // an element that is EMPTY until the answer is yes. An empty footer is zero
+  // pixels tall, so it has no area for a tenth of, and it only gains height by
+  // rendering the content this observer is gating. Content needs to be seen to
+  // render and needs to render to be seeable.
+  //
+  // On most pages that resolved anyway, because the content above is long
+  // enough that a zero-height footer still lands inside the viewport. On the
+  // Work page it did not: at maximum scroll the footer sat 0.21px BELOW the
+  // fold, and a zero-height element contributes no scrollable height to push
+  // itself into view. The page had no footer at all, and nothing reported it.
+  //
+  // `rootMargin` asks a question the element's own size cannot invalidate: is
+  // the bottom of the document within 300px. Same correction as the Work card
+  // videos, same underlying mistake - a threshold expressed as a fraction of
+  // the element is a fraction of the wrong thing.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -35,7 +54,7 @@ export default function Footer() {
           }
         }
       },
-      { threshold: 0.1 },
+      { rootMargin: "300px 0px", threshold: 0 },
     )
 
     const currentFooterRef = footerRef.current
