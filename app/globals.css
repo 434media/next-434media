@@ -40,25 +40,35 @@
 
   /* Chrome roles — the header and footer, which are the site's dark surfaces.
 
-     One role per purpose, each resolving to a palette token. They exist
-     because the chrome was reaching for six steps of the neutral scale to
-     express four intentions, and a grey chosen by number drifts. A grey
-     chosen by purpose does not.
+     One role per purpose, each derived from the palette. The text roles are
+     NEUTRAL TINTS of palette white mixed toward palette black, not palette
+     colours.
 
-     The three text roles are a deliberate ramp on black:
-       primary    #FFFFFF   21:1
-       secondary  #CAD9D6   15:1
-       label      #A2B7B2   10:1
+     They used to be color-01 and color-05, which are palette members and
+     correct by provenance — and visibly green. The palette's mid tones carry a
+     blue-green cast that reads as intent on a light surface and as a colour
+     error on black, where the eye has nothing to reference it against. Footer
+     copy is not tinted; it is text at three weights of the same white.
 
-     The footer previously put its legal row on the 600 and 700 steps, which
-     resolve to #49625E — about 3.2:1 on black, under the 4.5:1 floor. Moving
-     it onto the label role is a visible change and an intended one. */
+     Three tiers, measured on palette black:
+
+       logo            #FFFFFF   21.00:1   the artwork, full white
+       primary text    #DEDEDE   15.61:1   87% white
+       secondary,
+       label, icon     #9E9E9E    7.84:1   62% white
+
+     WCAG AA wants 4.5:1 for normal text and 3:1 for large. Every tier clears
+     both with room. The dimmest is still nearly twice the floor, which is what
+     lets the ramp be this quiet.
+
+     Secondary and label resolve to the same tint deliberately — they are one
+     step in the ramp, kept as two names so they can diverge without a hunt. */
   --color-chrome-bg: var(--434-color-02-black);
-  --color-chrome-text: var(--434-white);
-  --color-chrome-text-secondary: var(--434-color-01);
-  --color-chrome-label: var(--434-color-05);
+  --color-chrome-text: color-mix(in srgb, var(--434-white) 87%, var(--434-color-02-black));
+  --color-chrome-text-secondary: color-mix(in srgb, var(--434-white) 62%, var(--434-color-02-black));
+  --color-chrome-label: color-mix(in srgb, var(--434-white) 62%, var(--434-color-02-black));
   --color-chrome-divider: color-mix(in srgb, var(--434-white) 12%, transparent);
-  --color-chrome-icon: var(--434-color-05);
+  --color-chrome-icon: color-mix(in srgb, var(--434-white) 62%, var(--434-color-02-black));
   
   --font-geist-sans: var(--font-geist-sans, sans-serif);
   --font-geist-mono: var(--font-geist-mono, monospace);
