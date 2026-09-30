@@ -5,21 +5,20 @@ import Link from "next/link"
 import Image from "next/image"
 import { motion } from "motion/react"
 import { usePathname } from "next/navigation"
-import { ArrowUpRight } from "lucide-react"
 import CartModal from "./shopify/cart/modal"
 import { useCart } from "./shopify/cart/cart-context"
 import NavMenu from "./Navmenu"
-import { useMobile } from "../hooks/use-mobile"
 import type { Menu } from "../lib/shopify/types"
 
 type CombinedNavbarProps = {
   menu?: Menu[]
+  /**
+   * Whether the menu offers the Work item. Decided on the server by the root
+   * layout, from the same condition as the `/work` redirect — see
+   * lib/work-page-visibility.ts. A client component cannot read `VERCEL_ENV`.
+   */
+  showWork?: boolean
 }
-
-// Internal links lead — they keep visitors on the application.
-// External destinations follow and are visually marked with ↗.
-// Empty while the Work page is offline; the /work entry returns with it.
-const desktopLinks: { href: string; label: string }[] = []
 
 // Custom hook to check if component has mounted
 function useHasMounted() {
@@ -32,13 +31,11 @@ function useHasMounted() {
   return hasMounted
 }
 
-export function CombinedNavbar(_props: CombinedNavbarProps) {
-  void _props
+export function CombinedNavbar({ showWork = false }: CombinedNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const pathname = usePathname()
   const { cart } = useCart()
-  const isMobile = useMobile()
   const hasMounted = useHasMounted()
 
   // Check if cart has items - only after component has mounted
@@ -121,71 +118,25 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
               />
             </Link>
 
-            {/* Desktop Nav Links + Contact CTA + Cart */}
-            {hasMounted && !isMobile && (
-              <div className="hidden md:flex items-center gap-2">
-                <nav className="flex items-center gap-1">
-                  {desktopLinks.map((link) => {
-                    const isActive = pathname === link.href || pathname?.startsWith(link.href + "/")
-                    const isExternal = link.href.startsWith("http")
-                    return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                        className={`group inline-flex items-center gap-1 font-geist-mono text-[11px] font-medium uppercase tracking-[0.16em] leading-none px-3 py-1.5 rounded-md transition-all duration-200 ${
-                          isActive
-                            ? "text-white bg-white/10"
-                            : "text-white/60 hover:text-white hover:bg-white/5"
-                        }`}
-                      >
-                        {link.label}
-                        {isExternal && (
-                          <ArrowUpRight
-                            className="h-3 w-3 text-white/40 transition-all duration-200 group-hover:text-white/80 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-                            aria-hidden="true"
-                          />
-                        )}
-                      </Link>
-                    )
-                  })}
-                </nav>
-
-                {/* Contact CTA — plain text like the other links; the arrow is
-                    what marks it as the closing prompt. */}
-                <Link
-                  href="/contact"
-                  className={`group ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-geist-mono text-[11px] font-medium uppercase tracking-[0.16em] leading-none transition-all duration-200 ${
-                    pathname === "/contact"
-                      ? "text-white bg-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5"
-                  }`}
-                  aria-label="Start a project with 434 MEDIA"
-                >
-                  Start a project
-                  <ArrowUpRight
-                    className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12"
-                    aria-hidden="true"
-                  />
-                </Link>
-
-                {(isInShop || hasCartItems) && (
-                  <div className="flex items-center ml-1">
-                    <CartModal />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Mobile: hamburger + cart */}
-            <div className="flex items-center gap-2 md:hidden shrink-0">
-              {hasMounted && isMobile && (isInShop || hasCartItems) && (
+            {/* One menu, every width.
+                There is no desktop link row any more. The desktop "Start a
+                project" link is now the menu's second item, which is the point:
+                two places that had to be kept in step became one place. */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* The cart DOES depend on client state - the cart contents are
+                  not known to the server - so it keeps the mount gate. */}
+              {hasMounted && (isInShop || hasCartItems) && (
                 <div className="flex items-center">
                   <CartModal />
                 </div>
               )}
-              {hasMounted && isMobile && (
-                <motion.button
+              {/* Not gated on mount. The button's appearance depends on
+                  nothing the server cannot know, so it is server-rendered and
+                  is in the first paint. It used to wait for `hasMounted`
+                  because `useMobile()` decided which of two navigations to
+                  draw, and the server cannot measure a viewport — that reason
+                  went when the two navigations became one. */}
+              <motion.button
                   onClick={toggleActionMenu}
                   className="relative text-white p-2 rounded-md flex items-center justify-center transition-all duration-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
                   aria-expanded={isActionMenuOpen}
@@ -228,14 +179,18 @@ export function CombinedNavbar(_props: CombinedNavbarProps) {
                     />
                   </motion.div>
                 </motion.button>
-              )}
             </div>
           </div>
         </div>
       </motion.header>
 
       {/* Action Speaks Louder Menu */}
-      <NavMenu isOpen={isActionMenuOpen} onClose={() => setIsActionMenuOpen(false)} id="nav-menu" />
+      <NavMenu
+        isOpen={isActionMenuOpen}
+        onClose={() => setIsActionMenuOpen(false)}
+        id="nav-menu"
+        showWork={showWork}
+      />
     </>
   )
 }
