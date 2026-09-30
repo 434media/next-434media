@@ -82,7 +82,7 @@ const MEDIA = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestora
  * below; the detail plays the one that kept its audio at full cap.
  */
 const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
-  "alamo-angels": { still: true },
+  "alamo-angels": { still: true, cap: 1080 },
   "milcityusa": { still: true },
   "nucleate-global-summit": { still: true },
   "ampd-project": { still: true, cap: 540 },
