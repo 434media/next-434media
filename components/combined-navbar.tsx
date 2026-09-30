@@ -123,13 +123,20 @@ export function CombinedNavbar({ showWork = false }: CombinedNavbarProps) {
                 project" link is now the menu's second item, which is the point:
                 two places that had to be kept in step became one place. */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* The cart DOES depend on client state - the cart contents are
+                  not known to the server - so it keeps the mount gate. */}
               {hasMounted && (isInShop || hasCartItems) && (
                 <div className="flex items-center">
                   <CartModal />
                 </div>
               )}
-              {hasMounted && (
-                <motion.button
+              {/* Not gated on mount. The button's appearance depends on
+                  nothing the server cannot know, so it is server-rendered and
+                  is in the first paint. It used to wait for `hasMounted`
+                  because `useMobile()` decided which of two navigations to
+                  draw, and the server cannot measure a viewport — that reason
+                  went when the two navigations became one. */}
+              <motion.button
                   onClick={toggleActionMenu}
                   className="relative text-white p-2 rounded-md flex items-center justify-center transition-all duration-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
                   aria-expanded={isActionMenuOpen}
@@ -172,7 +179,6 @@ export function CombinedNavbar({ showWork = false }: CombinedNavbarProps) {
                     />
                   </motion.div>
                 </motion.button>
-              )}
             </div>
           </div>
         </div>
