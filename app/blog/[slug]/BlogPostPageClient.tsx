@@ -1,16 +1,27 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { ArrowLeft, Share2, Copy, X, ExternalLink } from "lucide-react"
-import { getBlogPostBySlugAction, getBlogPostsAction } from "@/actions/blog"
+import { getBlogPostsAction } from "@/actions/blog"
 import BlogCard from "@/components/blog/BlogCard"
 import type { BlogPost } from "@/types/blog-types"
 
+/**
+ * The post arrives as a prop, already fetched.
+ *
+ * It used to arrive as a slug, and this component fetched the post again in
+ * the browser. The server had already fetched it for `generateMetadata` and the
+ * Article JSON-LD and then dropped it, so every view read the same document
+ * twice and the article existed only in the second read — which meant a blog
+ * post server-rendered no `<h1>` and no body at all. See #110.
+ *
+ * Related posts stay client-side. They are not the article, and fetching them
+ * on the server would add a query to first byte for a strip nobody reads first.
+ */
 interface BlogPostPageProps {
-  params: { slug: string }
+  post: BlogPost
 }
 
 // Custom SVG Icons based on Simple Icons
@@ -26,59 +37,40 @@ const LinkedInIcon = () => (
   </svg>
 )
 
-const LoadingSpinner = () => (
-  <div className="min-h-screen bg-white flex items-center justify-center">
-    <div className="relative">
-      <div className="w-12 h-12 rounded-full border-2 border-gray-200 border-t-gray-900 animate-spin"></div>
-      <div className="absolute top-16 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-        <div className="text-gray-900 font-medium t-body-s">Loading article...</div>
-      </div>
-    </div>
-  </div>
-)
 
-export default function BlogPostPageClient({ params }: BlogPostPageProps) {
-  const { slug } = params
-
-  const [post, setPost] = useState<BlogPost | null>(null)
+export default function BlogPostPageClient({ post }: BlogPostPageProps) {
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([])
-  const [loading, setLoading] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [readingProgress, setReadingProgress] = useState(0)
 
+  // Related posts only. A failure here costs the strip at the bottom of the
+  // page and nothing else, so it is logged rather than escalated to notFound -
+  // which is what the old combined load did, taking the whole article down with
+  // it when the related query failed.
   useEffect(() => {
-    const loadData = async () => {
+    let cancelled = false
+
+    const loadRelated = async () => {
       try {
-        setLoading(true)
-        const [postResult, relatedResult] = await Promise.all([
-          getBlogPostBySlugAction(slug),
-          getBlogPostsAction({ status: "published" }),
-        ])
-
-        if (!postResult.success || !postResult.post) {
-          notFound()
-        }
-
-        setPost(postResult.post)
-
-        const posts = relatedResult.success && relatedResult.posts ? relatedResult.posts : []
-        const filtered = posts
-          .filter((p) => p.id !== postResult.post!.id && p.category === postResult.post!.category)
-          .slice(0, 3)
-
-        setRelatedPosts(filtered)
+        const result = await getBlogPostsAction({ status: "published" })
+        if (cancelled || !result.success || !result.posts) return
+        setRelatedPosts(
+          result.posts
+            .filter((p) => p.id !== post.id && p.category === post.category)
+            .slice(0, 3),
+        )
       } catch (error) {
-        console.error("Error loading blog post:", error)
-        notFound()
-      } finally {
-        setLoading(false)
+        console.error("Error loading related posts:", error)
       }
     }
 
-    loadData()
-  }, [slug])
+    loadRelated()
+    return () => {
+      cancelled = true
+    }
+  }, [post.id, post.category])
 
   // Reading progress tracker
   useEffect(() => {
@@ -169,14 +161,6 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
     setShowShareModal(false)
   }
 
-  if (loading) {
-    return <LoadingSpinner />
-  }
-
-  if (!post) {
-    notFound()
-  }
-
   return (
     <>
       <div className="fixed top-0 left-0 w-full h-0.5 bg-gray-200 z-40">
@@ -195,7 +179,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors duration-200 mb-10 group"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span className="text-sm font-medium tracking-wide">Back to Blog</span>
+              <span className="t-control tracking-wide">Back to Blog</span>
             </Link>
 
             {/* Category Badge */}
@@ -214,7 +198,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className="t-body-l sm:text-xl text-gray-600 mb-10 max-w-2xl">
+              <p className="t-body-xl text-gray-600 mb-10 max-w-2xl">
                 {post.excerpt}
               </p>
             )}
@@ -236,7 +220,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               </div>
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 t-control"
               >
                 <Share2 className="w-4 h-4" />
                 Share
@@ -306,7 +290,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
                       {post.tags.map((tag: string, index: number) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-3.5 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
+                          className="inline-flex items-center px-3.5 py-1.5 rounded-full t-control bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors cursor-pointer"
                         >
                           {tag}
                         </span>
@@ -325,7 +309,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
             <div className="max-w-6xl mx-auto px-6">
               <div className="mb-14">
                 <h2 className="t-heading-l font-bold text-gray-900 mb-3 tracking-tight">Related Articles</h2>
-                <p className="text-gray-500 t-body sm:text-lg">Continue exploring our insights</p>
+                <p className="text-gray-500 t-body-l">Continue exploring our insights</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -357,7 +341,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
               <div className="space-y-3">
                 <button
                   onClick={() => handleShare("twitter")}
-                  className="w-full flex items-center gap-3 p-3 bg-black hover:bg-gray-800 text-white rounded-lg transition-colors text-sm font-medium"
+                  className="w-full flex items-center gap-3 p-3 bg-black hover:bg-gray-800 text-white rounded-lg transition-colors t-control-emphasis"
                 >
                   <TwitterIcon />
                   Share on X (Twitter)
@@ -365,7 +349,7 @@ export default function BlogPostPageClient({ params }: BlogPostPageProps) {
 
                 <button
                   onClick={() => handleShare("linkedin")}
-                  className="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  className="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors t-control-emphasis"
                 >
                   <LinkedInIcon />
                   Share on LinkedIn

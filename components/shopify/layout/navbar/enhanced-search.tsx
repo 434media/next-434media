@@ -314,7 +314,7 @@ export default function EnhancedSearch() {
                 {query.trim().length >= 2 && (
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-medium text-neutral-300">
+                      <h3 className="t-heading-xs text-neutral-300">
                         {isLoading ? "Searching..." : `Results for "${query}"`}
                       </h3>
                       {searchResults.length > 0 && (
@@ -410,10 +410,10 @@ export default function EnhancedSearch() {
                     {recentSearches.length > 0 && (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-sm font-medium text-neutral-300">Recent Searches</h3>
+                          <h3 className="t-heading-xs text-neutral-300">Recent Searches</h3>
                           <button
                             onClick={clearRecentSearches}
-                            className="text-xs text-neutral-400 hover:text-white transition-colors"
+                            className="t-control text-neutral-400 hover:text-white transition-colors"
                           >
                             Clear
                           </button>
@@ -439,7 +439,7 @@ export default function EnhancedSearch() {
 
                     {/* Trending searches */}
                     <div className="mb-6">
-                      <h3 className="text-sm font-medium text-neutral-300 mb-2">Trending</h3>
+                      <h3 className="t-heading-xs text-neutral-300 mb-2">Trending</h3>
                       <div className="space-y-1">
                         {trendingSearches.map((suggestion, index) => (
                           <motion.button
@@ -460,7 +460,7 @@ export default function EnhancedSearch() {
 
                     {/* Collections */}
                     <div>
-                      <h3 className="text-sm font-medium text-neutral-300 mb-3">Collections</h3>
+                      <h3 className="t-heading-xs text-neutral-300 mb-3">Collections</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {collections.map((collection, index) => (
                           <motion.div

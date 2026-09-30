@@ -166,7 +166,7 @@ export default async function BlogPostPage({ params }: Props) {
           />
         </>
       )}
-      <BlogPostPageClient params={{ slug }} />
+      <BlogPostPageClient post={post} />
     </>
   )
 }

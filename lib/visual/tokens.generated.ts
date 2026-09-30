@@ -4,7 +4,7 @@
 // email clients being the reason this file exists. Outlook renders
 // `var(--434-signal)` as no colour at all.
 //
-// Source: 07 Visual System/source, package 1.1 (2026-09-29).
+// Source: 07 Visual System/source, package 1.2 (2026-09-29).
 
 export const COLOR = {
   /** Light atmospheric field / soft brand surface */
@@ -65,6 +65,10 @@ export const TYPE = {
   "metadata-l": { compactPx: 16, widePx: 16, lineHeight: 1.3, weight: 500, family: ["Geist Mono"] },
   "metadata": { compactPx: 14, widePx: 14, lineHeight: 1.35, weight: 500, family: ["Geist Mono"] },
   "caption": { compactPx: 12, widePx: 12, lineHeight: 1.4, weight: 400, family: ["Geist"] },
+  "body-xl": { compactPx: 20, widePx: 24, lineHeight: 1.5, weight: 400, family: ["Geist"] },
+  "heading-xs": { compactPx: 16, widePx: 16, lineHeight: 1.25, weight: 600, family: ["Geist"] },
+  "control": { compactPx: 16, widePx: 16, lineHeight: 1.25, weight: 400, family: ["Geist"] },
+  "display-s": { compactPx: 24, widePx: 30, lineHeight: 1.1, weight: 400, family: ["GGX88"] },
 } as const
 
 export const LOGO = {
