@@ -29,6 +29,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { ArrowUpRight, X } from "lucide-react"
 import type { WorkRecord } from "@/lib/work-records"
 import { BRAND_RECORDS } from "@/lib/brand-records"
+import { getImageProps } from "next/image"
 import { STILLS_WITH_WEBP } from "@/lib/work-stills-webp"
 import styles from "./work-redesign.module.css"
 
@@ -217,6 +218,32 @@ function Card({
    * video simply has no poster, which is the honest state: better no poster
    * than a second file fetched for one.
    */
+  /**
+   * Sizing comes from next/image's optimizer through `getImageProps`, which is
+   * the documented way to keep art direction inside a <picture> — the component
+   * itself resizes but cannot art-direct, and these two crops carry different
+   * focal points.
+   *
+   * `sizes` is read off the CSS rather than guessed. `.card` is 92% of the rail
+   * at base, 88% from 680px, 84% from 1600px, which is §3.1's rail geometry.
+   * The breakpoint stays 680px, the crops stay the same two files, and the
+   * frame stays reserved by `.card`'s aspect-ratio.
+   */
+  const commonImg = {
+    alt: "",
+    loading: (eager ? "eager" : "lazy") as "eager" | "lazy",
+    fetchPriority: (priority ? "high" : "auto") as "high" | "auto",
+    decoding: "async" as const,
+  }
+  const wideProps = stills
+    ? getImageProps({ ...commonImg, src: stills.wide, width: 1920, height: 1080,
+        sizes: "(min-width: 1600px) 84vw, 88vw" }).props
+    : null
+  const compactProps = stills
+    ? getImageProps({ ...commonImg, src: stills.compact, width: 1200, height: 1500,
+        sizes: "92vw" }).props
+    : null
+
   const imgRef = useRef<HTMLImageElement>(null)
   const [poster, setPoster] = useState<string | undefined>(undefined)
   const readPoster = useCallback(() => {
@@ -237,27 +264,23 @@ function Card({
     >
       {stills ? (
         <>
+          {/* Standard 3.1 Loading. Tiles inside the initial viewport load
+              eagerly; everything else uses native lazy loading, which already
+              starts fetching shortly before the tile scrolls in rather than at
+              the moment it arrives. The frame is reserved in CSS — .card owns
+              the aspect ratio and .cardImage is absolutely positioned inside it
+              — so nothing moves as an image lands. */}
           <picture>
-            {stills.wideWebp ? (
-              <source media="(min-width: 680px)" type="image/webp" srcSet={stills.wideWebp} />
-            ) : null}
-            <source media="(min-width: 680px)" srcSet={stills.wide} />
-            {stills.compactWebp ? <source type="image/webp" srcSet={stills.compactWebp} /> : null}
+            <source
+              media="(min-width: 680px)"
+              srcSet={wideProps!.srcSet}
+              sizes={wideProps!.sizes}
+            />
             <img
+              {...compactProps!}
               ref={imgRef}
               onLoad={readPoster}
-              src={stills.compact}
-              alt=""
               className={styles.cardImage}
-              // Standard 3.1 Loading. Tiles inside the initial viewport load
-              // eagerly; everything else uses native lazy loading, which already
-              // starts fetching shortly before the tile scrolls in rather than at
-              // the moment it arrives. The frame is reserved in CSS - .card owns
-              // the aspect ratio and .cardImage is absolutely positioned inside it
-              // - so nothing moves as an image lands.
-              loading={eager ? "eager" : "lazy"}
-              fetchPriority={priority ? "high" : undefined}
-              decoding="async"
             />
           </picture>
           {showVideo && near ? (
