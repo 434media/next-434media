@@ -206,6 +206,27 @@ function Card({
   // Reduced motion gets the still and nothing else — no element, no request.
   const showVideo = video && !reduced
 
+  /**
+   * The video's poster is the still the browser already chose for this
+   * breakpoint and format — `currentSrc`, not a URL guessed here. The card is a
+   * <picture> with four candidates across two crops and two formats, so the
+   * only way to name the file actually in use is to ask the element.
+   *
+   * It is read on load, and again on mount for the cached case where the image
+   * is already complete and no load event will fire. Until it is known the
+   * video simply has no poster, which is the honest state: better no poster
+   * than a second file fetched for one.
+   */
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [poster, setPoster] = useState<string | undefined>(undefined)
+  const readPoster = useCallback(() => {
+    const src = imgRef.current?.currentSrc
+    if (src) setPoster(src)
+  }, [])
+  useEffect(() => {
+    if (imgRef.current?.complete) readPoster()
+  }, [readPoster])
+
   return (
     <button
       ref={ref}
@@ -223,6 +244,8 @@ function Card({
             <source media="(min-width: 680px)" srcSet={stills.wide} />
             {stills.compactWebp ? <source type="image/webp" srcSet={stills.compactWebp} /> : null}
             <img
+              ref={imgRef}
+              onLoad={readPoster}
               src={stills.compact}
               alt=""
               className={styles.cardImage}
@@ -244,7 +267,12 @@ function Card({
               muted
               loop
               playsInline
-              preload="auto"
+              // Standard 4: "Autoplay without a poster and without
+              // preload='metadata' is not permitted - it pulls the full file on
+              // open." The poster is the still already on screen, so it costs no
+              // extra request.
+              preload="metadata"
+              poster={poster}
               aria-hidden="true"
               tabIndex={-1}
             >
