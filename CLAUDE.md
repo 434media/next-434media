@@ -32,6 +32,21 @@ pull request; a direct commit to `main` needs explicit founder approval (master 
 register IMP-31). Present the diff and wait for a call. One designated writer per task: if another
 agent already holds a task or branch, report the conflict rather than writing alongside it.
 
+**After any merge that touches CSS, verify the served stylesheet.** Fetch the
+deployed HTML, read the stylesheet path out of it — on this project
+`/_next/static/immutable/chunks/*.css`, *not* `/_next/static/css/` — and grep
+that file for the declaration you changed. Or build without the cache:
+`forceNew=1` on the deployments API is the CLI's `--force` and skips the build
+cache. "Touches CSS" includes a component whose Tailwind classes change, since
+the stylesheet is compiled from class usage.
+
+A matching commit SHA on a green deployment is **not** evidence of correct
+output. On 2026-09-29 a build from the right commit served the previous commit's
+CSS: `Restored build cache from previous deployment`, compiled in 5.1s, and
+Turbopack never invalidated `app/globals.css`. Nothing failed, the page
+rendered, and one colour was silently the old one. Promoting or re-aliasing a
+deployment does not fix this — that is a different failure.
+
 **Jurisdiction policy is one constant.** 434 Media does not cold-outreach the
 EU/UK/EEA/Switzerland/Canada (GDPR/CASL). The single source of truth is
 `EXCLUDED_COUNTRIES` in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts).
