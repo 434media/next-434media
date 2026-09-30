@@ -3,7 +3,7 @@
 /**
  * Work page — approved design Revision 12.
  *
- * Source: 434-context `08 Work Page/source/`, manifest verified 40 of 40.
+ * Source: 434-context `90 Assets/08 Work Page/source/`, manifest verified 40 of 40.
  * Checked against visual system v1.2 in that folder's `COMPLIANCE.md`, which
  * also lists seven questions for the design thread. **Those are not resolved
  * here.** Two of them are conflicts with Display and Design Standard v1.6 —
