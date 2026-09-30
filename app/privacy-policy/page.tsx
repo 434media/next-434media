@@ -33,14 +33,14 @@ export default function PrivacyPolicyPage() {
     <>
       <main className="bg-white py-16 sm:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
-          <h1 className="t-heading-xl font-bold text-neutral-900 mb-8">Privacy Policy</h1>
+          <h1 className="t-heading-xl text-neutral-900 mb-8">Privacy Policy</h1>
 
           <div className="prose prose-lg max-w-none">
             <p className="text-neutral-700 mb-6">
               Last Updated: {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">1. Introduction</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">1. Introduction</h2>
             <p className="text-neutral-700 mb-4">
               434 Media (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) respects your privacy and is committed to
               protecting your personal information. This Privacy Policy explains how we collect, use, disclose, and
@@ -51,7 +51,7 @@ export default function PrivacyPolicyPage() {
               that you have read, understood, and agree to be bound by this Privacy Policy.
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">2. Information We Collect</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">2. Information We Collect</h2>
             <p className="text-neutral-700 mb-4">
               We may collect personal information that you voluntarily provide to us when you:
             </p>
@@ -72,7 +72,7 @@ export default function PrivacyPolicyPage() {
               <li>Message content</li>
             </ul>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">3. How We Use Your Information</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">3. How We Use Your Information</h2>
             <p className="text-neutral-700 mb-4">
               We may use the information we collect for various purposes, including to:
             </p>
@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
               <li>Protect against, identify, and prevent fraud and other illegal activity</li>
             </ul>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">4. Cookies and Tracking Technologies</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">4. Cookies and Tracking Technologies</h2>
             <p className="text-neutral-700 mb-4">
               We use cookies and similar tracking technologies to track activity on our website and collect certain
               information. Cookies are files with a small amount of data that may include an anonymous unique
@@ -93,21 +93,21 @@ export default function PrivacyPolicyPage() {
               sent.
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">5. Third-Party Services</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">5. Third-Party Services</h2>
             <p className="text-neutral-700 mb-4">
               We may use third-party services, such as analytics providers and marketing platforms, that collect,
               monitor, and analyze information to help us improve our website and services. These third parties may use
               cookies, web beacons, and other technologies to collect information about your use of our website.
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">6. Data Security</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">6. Data Security</h2>
             <p className="text-neutral-700 mb-4">
               We implement appropriate technical and organizational measures to protect the security of your personal
               information. However, please be aware that no method of transmission over the internet or electronic
               storage is 100% secure, and we cannot guarantee absolute security.
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">7. Your Rights</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">7. Your Rights</h2>
             <p className="text-neutral-700 mb-4">
               Depending on your location, you may have certain rights regarding your personal information, such as:
             </p>
@@ -122,14 +122,14 @@ export default function PrivacyPolicyPage() {
               section below.
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">8. Changes to This Privacy Policy</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">8. Changes to This Privacy Policy</h2>
             <p className="text-neutral-700 mb-4">
               We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new
               Privacy Policy on this page and updating the &quot;Last Updated&quot; date. You are advised to review this
               Privacy Policy periodically for any changes.
             </p>
 
-            <h2 className="t-heading-m font-semibold text-neutral-900 mt-8 mb-4">9. Contact Us</h2>
+            <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">9. Contact Us</h2>
             <p className="text-neutral-700 mb-4">
               If you have any questions about this Privacy Policy, please contact us at:
             </p>

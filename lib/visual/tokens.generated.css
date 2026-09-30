@@ -108,9 +108,9 @@
    the markup. In `components` the role sets the base and any utility on
    the same element still wins, which is the contract the roles are for. */
 @layer components {
-  .t-display-xl { font-size: var(--434-type-display-xl-size); line-height: var(--434-type-display-xl-line); }
-  .t-display-l { font-size: var(--434-type-display-l-size); line-height: var(--434-type-display-l-line); }
-  .t-display-m { font-size: var(--434-type-display-m-size); line-height: var(--434-type-display-m-line); }
+  .t-display-xl { font-size: var(--434-type-display-xl-size); line-height: var(--434-type-display-xl-line); font-weight: 400; }
+  .t-display-l { font-size: var(--434-type-display-l-size); line-height: var(--434-type-display-l-line); font-weight: 400; }
+  .t-display-m { font-size: var(--434-type-display-m-size); line-height: var(--434-type-display-m-line); font-weight: 400; }
   .t-heading-xl { font-size: var(--434-type-heading-xl-size); line-height: var(--434-type-heading-xl-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
   .t-heading-l { font-size: var(--434-type-heading-l-size); line-height: var(--434-type-heading-l-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }
   .t-heading-m { font-size: var(--434-type-heading-m-size); line-height: var(--434-type-heading-m-line); font-family: var(--font-geist-sans), sans-serif; font-weight: 600; }

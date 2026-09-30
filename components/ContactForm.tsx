@@ -155,7 +155,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center rounded-full bg-neutral-100">
                 <Check className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 t-heading-s font-semibold text-neutral-900 tracking-tight">Thanks for Connecting!</h3>
+              <h3 className="mt-4 t-heading-s text-neutral-900 tracking-tight">Thanks for Connecting!</h3>
               <p className="mt-1.5 t-body-s text-neutral-500">We&apos;ll be in touch soon.</p>
             </div>
           </motion.div>
@@ -173,7 +173,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   20px; the display face only carries its personality at page-
                   headline sizes (48px+) and below that just reads as an odd
                   sans. Display type is reserved for page-level headlines. */}
-              <h2 className="font-geist-sans t-heading-s font-semibold text-neutral-900 tracking-tight">Get in Touch</h2>
+              <h2 className="font-geist-sans t-heading-s text-neutral-900 tracking-tight">Get in Touch</h2>
               <p className="mt-1.5 t-caption text-neutral-400">Fields marked with * are required</p>
             </div>
             <form className="space-y-3.5" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
@@ -191,11 +191,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-required="true"
                     aria-invalid={!!fieldErrors.firstName}
                     aria-describedby={fieldErrors.firstName ? "firstName-error" : undefined}
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
-                      fieldErrors.firstName
-                        ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.firstName ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.firstName && (
                     <p className="mt-1 t-body-s text-red-600" id="firstName-error">
@@ -215,11 +211,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-required="true"
                     aria-invalid={!!fieldErrors.lastName}
                     aria-describedby={fieldErrors.lastName ? "lastName-error" : undefined}
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
-                      fieldErrors.lastName
-                        ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.lastName ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.lastName && (
                     <p className="mt-1 t-body-s text-red-600" id="lastName-error">
@@ -240,11 +232,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-invalid={!!fieldErrors.company}
                     aria-describedby={fieldErrors.company ? "company-error" : undefined}
                     placeholder="Enter your company name"
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
-                      fieldErrors.company
-                        ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.company ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.company && (
                     <p className="mt-1 t-body-s text-red-600" id="company-error">
@@ -265,11 +253,7 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                     aria-invalid={!!fieldErrors.email}
                     aria-describedby={fieldErrors.email ? "email-error" : undefined}
                     placeholder="Enter your email"
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
-                      fieldErrors.email
-                        ? "border-red-400 focus:ring-red-500 focus:border-red-500"
-                        : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
-                    } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
+                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.email ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
                   />
                   {fieldErrors.email && (
                     <p className="mt-1 t-body-s text-red-600" id="email-error">
