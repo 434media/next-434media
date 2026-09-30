@@ -21,21 +21,25 @@ interface NavigationItem {
 }
 
 // This IS the navbar on mobile, so it carries the same roster and the same
-// wording as the desktop links + footer.
+// wording as the desktop links.
+//
+// Which means it is currently one item. `desktopLinks` in combined-navbar.tsx
+// emptied when the Work page went offline; this list did not, and kept an
+// Events entry pointing at https://www.devsa.community/events — off-site, to a
+// property, as the only thing a visitor could tap besides Contact. It also
+// rendered through next/link with no target and no rel, so it left the site in
+// the same tab with no noopener.
+//
+// The /work entry returns here when the Work page does, exactly as it returns
+// to desktopLinks. At that point this is Work and Start a project, and nothing
+// else — see next.config.ts for the three conditions on the redirect.
 const navigationItems: NavigationItem[] = [
-  {
-    id: "events",
-    title: "Events",
-    subtitle: "Where Networks Meet Action",
-    href: "https://www.devsa.community/events",
-    delay: 0.15,
-  },
   {
     id: "contact",
     title: "Start a project",
     subtitle: "Take the next step",
     href: "/contact",
-    delay: 0.2,
+    delay: 0.15,
   },
 ]
 
