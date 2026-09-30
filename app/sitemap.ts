@@ -13,6 +13,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1.0,
     },
     {
+      // Launched 2026-09-29. It was absent from here for as long as it
+      // redirected, which was correct then and wrong the moment it went live.
+      url: `${baseUrl}/work`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
       url: `${baseUrl}/contact`,
       lastModified: new Date(),
       changeFrequency: "monthly",

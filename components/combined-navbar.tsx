@@ -12,12 +12,6 @@ import type { Menu } from "../lib/shopify/types"
 
 type CombinedNavbarProps = {
   menu?: Menu[]
-  /**
-   * Whether the menu offers the Work item. Decided on the server by the root
-   * layout, from the same condition as the `/work` redirect — see
-   * lib/work-page-visibility.ts. A client component cannot read `VERCEL_ENV`.
-   */
-  showWork?: boolean
 }
 
 // Custom hook to check if component has mounted
@@ -31,7 +25,8 @@ function useHasMounted() {
   return hasMounted
 }
 
-export function CombinedNavbar({ showWork = false }: CombinedNavbarProps) {
+export function CombinedNavbar(_props: CombinedNavbarProps) {
+  void _props
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const pathname = usePathname()
@@ -185,12 +180,7 @@ export function CombinedNavbar({ showWork = false }: CombinedNavbarProps) {
       </motion.header>
 
       {/* Action Speaks Louder Menu */}
-      <NavMenu
-        isOpen={isActionMenuOpen}
-        onClose={() => setIsActionMenuOpen(false)}
-        id="nav-menu"
-        showWork={showWork}
-      />
+      <NavMenu isOpen={isActionMenuOpen} onClose={() => setIsActionMenuOpen(false)} id="nav-menu" />
     </>
   )
 }

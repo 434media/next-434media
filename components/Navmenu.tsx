@@ -3,19 +3,13 @@
 import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { XIcon } from "lucide-react"
 
 interface NavMenuProps {
   isOpen: boolean
   onClose: () => void
   id?: string
-  /**
-   * Whether to offer the Work item. Decided on the server by the root layout,
-   * from the same condition as the `/work` redirect — see
-   * lib/work-page-visibility.ts. A client component cannot read `VERCEL_ENV`.
-   */
-  showWork?: boolean
 }
 
 interface NavigationItem {
@@ -26,42 +20,31 @@ interface NavigationItem {
   delay: number
 }
 
-// This IS the navigation, at every width. There is no desktop link row any
-// more: one menu, two items, the same on a phone and on a 27-inch display.
+// This IS the navigation, at every width. There is no desktop link row: one
+// menu, two items, the same on a phone and on a 27-inch display.
 //
-// Work is offered only when it resolves. `/work` redirects to `/` in
-// production until the asset pass lands, and a menu item pointing at a redirect
-// is worse than no item — nothing errors, the visitor just arrives at the
-// homepage and assumes they misclicked. The condition is shared with the
-// redirect itself rather than restated; see lib/work-page-visibility.ts.
-function buildNavigationItems(showWork: boolean): NavigationItem[] {
-  const items: NavigationItem[] = []
-
-  if (showWork) {
-    items.push({
-      id: "work",
-      title: "Work",
-      subtitle: "Original IP, platforms, and productions",
-      href: "/work",
-      delay: 0.15,
-    })
-  }
-
-  items.push({
+// Work was conditional until 2026-09-29, offered only where `/work` resolved,
+// because it redirected to the homepage in production and a menu item pointing
+// at a redirect is worse than no item. The founder launched the page, the
+// redirect went, and the condition went with it — the item is simply here now.
+const navigationItems: NavigationItem[] = [
+  {
+    id: "work",
+    title: "Work",
+    subtitle: "Original IP, platforms, and productions",
+    href: "/work",
+    delay: 0.15,
+  },
+  {
     id: "contact",
     title: "Start a project",
     subtitle: "Take the next step",
     href: "/contact",
-    // The first slot's delay, so a one-item menu does not start late.
-    delay: showWork ? 0.2 : 0.15,
-  })
+    delay: 0.2,
+  },
+]
 
-  return items
-}
-
-
-export default function NavMenu({ isOpen, onClose, id = "nav-menu", showWork = false }: NavMenuProps) {
-  const navigationItems = useMemo(() => buildNavigationItems(showWork), [showWork])
+export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const renderNavigationItems = useCallback(() => {
@@ -97,7 +80,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu", showWork = f
         </Link>
       </motion.div>
     ))
-  }, [navigationItems, onClose])
+  }, [onClose])
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
