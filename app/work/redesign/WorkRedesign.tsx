@@ -26,7 +26,6 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
-import Image from "next/image"
 import { ArrowUpRight, X } from "lucide-react"
 import type { WorkRecord } from "@/lib/work-records"
 import { BRAND_RECORDS } from "@/lib/brand-records"
@@ -59,23 +58,54 @@ const SECTIONS = [
 ] as const
 
 /**
- * Reference stills, keyed by record key. A key absent from this map has no
- * still and renders black — which is a supported state, not a defect.
+ * Stills and video, keyed by record key.
+ *
+ * Two crops per still, art-directed rather than resized: 16:9 at and above
+ * 680px, 4:5 below, each with its own focal point. A single image scaled to
+ * both would put the subject in the wrong place at one of them, which is why
+ * `<picture>` is used here instead of next/image - next/image resizes, it does
+ * not art-direct.
+ *
+ * `video` is the detail-view file, which keeps its audio. The audio-free card
+ * previews exist as assets but are deliberately not wired to autoplay: the
+ * approved design says no video requests before user activation.
  */
-const STILLS: Record<string, string> = {
-  "aim-health-summit": "/work/reference/aim-health-summit.jpg",
-  "alamo-angels": "/work/reference/alamo-angels.jpg",
-  "mission-road-soar": "/work/reference/mission-road-soar.jpg",
-  "nucleate-global-summit": "/work/reference/nucleate-global-summit.jpg",
-  "que-es-sdoh": "/work/reference/que-es-sdoh.jpg",
-  "rise-of-a-champion": "/work/reference/rise-of-a-champion.jpg",
-  "techbloc-tech-day": "/work/reference/techbloc-tech-day.jpg",
-  "txmx-boxing": "/work/reference/txmx-boxing.jpg",
-  "univision-70th": "/work/reference/univision-70th.jpg",
-  vemosvamos: "/work/reference/vemosvamos.jpg",
+const ASSETS: Record<string, { still?: boolean; video?: string }> = {
+  "alamo-angels": { still: true },
+  "ampd-project": { still: true },
+  "milcityusa": { still: true },
+  "mission-road-soar": { still: true },
+  "nucleate-global-summit": { still: true },
+  "overdrive": { still: true },
+  "rise-of-a-champion": { still: true },
+  "salute-to-troops": { still: true },
+  "velocitytx-demo-day": { still: true },
+  "vemosvamos": { still: true, video: "vemosvamos-1080p" },
 }
 
-const stillFor = (r: WorkRecord) => (r.recordKey ? STILLS[r.recordKey] : undefined)
+// Only VemosVamos ships its video here, and only because it is the edit with a
+// specified cut - 46s, picture and audio fading together from 42s, ending on
+// black - so it is the one worth seeing in a preview. At 9.6 MB it is also the
+// only one small enough to belong in a repository.
+//
+// The other eight are encoded and waiting on hosting, not on work: 657 MB in
+// total against a 30 MB repository. They go where the hero video goes, and the
+// `video` key here is filled in per record as each one lands. Until then a
+// record with no entry opens on its still, which is the supported state.
+//
+// aim-health-summit has a video and no still, so it has no entry at all yet.
+
+const stillsFor = (r: WorkRecord) => {
+  const k = r.recordKey
+  if (!k || !ASSETS[k]?.still) return null
+  return { wide: `/work/stills/${k}-wide.jpg`, compact: `/work/stills/${k}-compact.jpg` }
+}
+const videoFor = (r: WorkRecord) => {
+  const k = r.recordKey
+  const v = k ? ASSETS[k]?.video : undefined
+  return v ? `/work/video/${v}.mp4` : null
+}
+
 
 function Card({
   record,
@@ -86,7 +116,7 @@ function Card({
   onOpen: (r: WorkRecord) => void
   priority: boolean
 }) {
-  const still = stillFor(record)
+  const stills = stillsFor(record)
   return (
     <button
       type="button"
@@ -94,16 +124,18 @@ function Card({
       onClick={() => onOpen(record)}
       aria-haspopup="dialog"
     >
-      {still ? (
+      {stills ? (
         <>
-          <Image
-            src={still}
-            alt=""
-            fill
-            sizes="(min-width: 1000px) 88vw, 92vw"
-            className={styles.cardImage}
-            priority={priority}
-          />
+          <picture>
+            <source media="(min-width: 680px)" srcSet={stills.wide} />
+            <img
+              src={stills.compact}
+              alt=""
+              className={styles.cardImage}
+              loading={priority ? "eager" : "lazy"}
+              decoding="async"
+            />
+          </picture>
           <span className={styles.cardScrim} aria-hidden="true" />
         </>
       ) : null}
@@ -116,7 +148,8 @@ function Card({
 function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
-  const still = stillFor(record)
+  const stills = stillsFor(record)
+  const video = videoFor(record)
 
   // Escape closes, focus is contained, body scrolling locks, and focus returns
   // to the card that opened this — handled by the caller, which holds the
@@ -178,21 +211,45 @@ function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }
         </button>
 
         <div className={styles.dialogHero}>
-          {still ? (
-            <Image
-              src={still}
-              alt=""
-              fill
-              sizes="(min-width: 1000px) 1100px, 100vw"
+          {/* Media leads, per Display and Design Standard 1.7. Video where the
+              record has one, still otherwise, and a record with neither opens
+              on the title card rather than an empty frame.
+
+              preload="none" and an explicit poster: the design forbids video
+              requests before user activation, so nothing is fetched until the
+              visitor presses play. */}
+          {video ? (
+            <video
               className={styles.dialogHeroImage}
-            />
+              controls
+              preload="none"
+              playsInline
+              poster={stills?.wide}
+            >
+              <source src={video} type="video/mp4" />
+            </video>
+          ) : stills ? (
+            <>
+              <picture>
+                <source media="(min-width: 680px)" srcSet={stills.wide} />
+                <img src={stills.compact} alt="" className={styles.dialogHeroImage} decoding="async" />
+              </picture>
+              <span className={styles.cardScrim} aria-hidden="true" />
+            </>
           ) : null}
-          {still ? <span className={styles.cardScrim} aria-hidden="true" /> : null}
-          <div className={styles.dialogHeroCaption}>
-            <p className="t-label">{record.model}</p>
-            <h2 id={titleId}>{record.title}</h2>
-          </div>
+          {video ? null : (
+            <div className={styles.dialogHeroCaption}>
+              <p className="t-label">{record.model}</p>
+              <h2 id={titleId}>{record.title}</h2>
+            </div>
+          )}
         </div>
+        {video ? (
+          <div className={styles.dialogBody} style={{ paddingBottom: 0 }}>
+            <p className="t-label">{record.model}</p>
+            <h2 id={titleId} className={styles.dialogHeroCaptionTitle}>{record.title}</h2>
+          </div>
+        ) : null}
 
         {/* Attribution beneath the hero. Absent fields are omitted rather than
             rendered empty, and a null client is never read as 434 ownership. */}
