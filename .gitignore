@@ -57,3 +57,6 @@ yarn.lock
 # pre-symlink backups. Never committed — see the context rules in CLAUDE.md.
 docs/context
 docs/context-backup-*/
+
+# Lighthouse CI local output
+.lighthouseci/

@@ -152,10 +152,14 @@ function Card({
   record,
   onOpen,
   priority,
+  eager,
 }: {
   record: WorkRecord
   onOpen: (r: WorkRecord) => void
+  /** The LCP candidate: the first tile of the first rail. Exactly one per page. */
   priority: boolean
+  /** Inside the initial viewport at the Lighthouse mobile and desktop presets. */
+  eager: boolean
 }) {
   const stills = stillsFor(record)
   const video = cardLoopFor(record)
@@ -222,7 +226,14 @@ function Card({
               src={stills.compact}
               alt=""
               className={styles.cardImage}
-              loading={priority ? "eager" : "lazy"}
+              // Standard 3.1 Loading. Tiles inside the initial viewport load
+              // eagerly; everything else uses native lazy loading, which already
+              // starts fetching shortly before the tile scrolls in rather than at
+              // the moment it arrives. The frame is reserved in CSS - .card owns
+              // the aspect ratio and .cardImage is absolutely positioned inside it
+              // - so nothing moves as an image lands.
+              loading={eager ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : undefined}
               decoding="async"
             />
           </picture>
@@ -481,7 +492,13 @@ export default function WorkRedesign({ records }: { records: readonly WorkRecord
                 key={record.recordKey ?? record.title}
                 record={record}
                 onOpen={onOpen}
+                // Measured, not assumed: at Lighthouse's mobile preset (412x823)
+                // and desktop preset (1350x940) the first rail shows tile 0 and
+                // tile 1, the second peeking in by design (3.1, "the next tile
+                // peeking into view"). Both load eagerly; tile 0 is the LCP
+                // candidate and the only one marked high priority.
                 priority={si === 0 && i === 0}
+                eager={si === 0 && i <= 1}
               />
             ))}
           </div>
