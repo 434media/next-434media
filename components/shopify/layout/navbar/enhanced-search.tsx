@@ -249,7 +249,7 @@ export default function EnhancedSearch() {
             }}
             placeholder="Search for products..."
             autoComplete="off"
-            className="w-full rounded-lg border border-neutral-700/50 bg-black/40 backdrop-blur-md px-4 py-3 pr-12 text-white placeholder:text-neutral-400 focus:border-emerald-500/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
+            className="w-full rounded-lg border border-neutral-700/50 bg-black/40 backdrop-blur-md px-4 py-3 pr-12 text-white placeholder:text-[var(--color-on-dark-text-secondary)] focus:border-emerald-500/70 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
             aria-label="Search products"
           />
 
@@ -314,11 +314,11 @@ export default function EnhancedSearch() {
                 {query.trim().length >= 2 && (
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="t-heading-xs text-neutral-300">
+                      <h3 className="t-heading-xs text-[var(--color-on-dark-text)]">
                         {isLoading ? "Searching..." : `Results for "${query}"`}
                       </h3>
                       {searchResults.length > 0 && (
-                        <span className="t-caption text-neutral-400">
+                        <span className="t-caption text-[var(--color-on-dark-text-secondary)]">
                           {searchResults.length} {searchResults.length === 1 ? "result" : "results"}
                         </span>
                       )}
@@ -368,7 +368,7 @@ export default function EnhancedSearch() {
                               <div className="flex-1">
                                 <h4 className="font-medium">{highlightMatch(product.title, query)}</h4>
                                 {product.description && (
-                                  <p className="mt-1 t-body-s text-neutral-400 line-clamp-1">
+                                  <p className="mt-1 t-body-s text-[var(--color-on-dark-text-secondary)] line-clamp-1">
                                     {highlightMatch(product.description, query)}
                                   </p>
                                 )}
@@ -378,7 +378,7 @@ export default function EnhancedSearch() {
                                   </span>
                                   {/* Use vendor or tags instead of collections */}
                                   {getProductMetadata(product) && (
-                                    <span className="t-caption text-neutral-500">{getProductMetadata(product)}</span>
+                                    <span className="t-caption text-[var(--color-on-dark-text-secondary)]">{getProductMetadata(product)}</span>
                                   )}
                                 </div>
                               </div>
@@ -392,10 +392,10 @@ export default function EnhancedSearch() {
                     {!isLoading && query.trim().length >= 2 && searchResults.length === 0 && (
                       <div className="py-8 text-center">
                         <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-neutral-800/50 mb-3">
-                          <SearchIcon className="h-6 w-6 text-neutral-400" aria-hidden="true" />
+                          <SearchIcon className="h-6 w-6 text-[var(--color-on-dark-text-secondary)]" aria-hidden="true" />
                         </div>
                         <h4 className="t-heading-s font-medium text-white">No results found</h4>
-                        <p className="mt-1 t-body-s text-neutral-400">
+                        <p className="mt-1 t-body-s text-[var(--color-on-dark-text-secondary)]">
                           Try different keywords or browse our collections
                         </p>
                       </div>
@@ -410,10 +410,10 @@ export default function EnhancedSearch() {
                     {recentSearches.length > 0 && (
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="t-heading-xs text-neutral-300">Recent Searches</h3>
+                          <h3 className="t-heading-xs text-[var(--color-on-dark-text)]">Recent Searches</h3>
                           <button
                             onClick={clearRecentSearches}
-                            className="t-control text-neutral-400 hover:text-white transition-colors"
+                            className="t-control text-[var(--color-on-dark-text-secondary)] hover:text-white transition-colors"
                           >
                             Clear
                           </button>
@@ -429,7 +429,7 @@ export default function EnhancedSearch() {
                               transition={{ delay: index * 0.05 }}
                               whileHover={{ x: 5 }}
                             >
-                              <Clock className="mr-2 h-4 w-4 text-neutral-400" aria-hidden="true" />
+                              <Clock className="mr-2 h-4 w-4 text-[var(--color-on-dark-text-secondary)]" aria-hidden="true" />
                               <span>{search}</span>
                             </motion.button>
                           ))}
@@ -439,7 +439,7 @@ export default function EnhancedSearch() {
 
                     {/* Trending searches */}
                     <div className="mb-6">
-                      <h3 className="t-heading-xs text-neutral-300 mb-2">Trending</h3>
+                      <h3 className="t-heading-xs text-[var(--color-on-dark-text)] mb-2">Trending</h3>
                       <div className="space-y-1">
                         {trendingSearches.map((suggestion, index) => (
                           <motion.button
@@ -460,7 +460,7 @@ export default function EnhancedSearch() {
 
                     {/* Collections */}
                     <div>
-                      <h3 className="t-heading-xs text-neutral-300 mb-3">Collections</h3>
+                      <h3 className="t-heading-xs text-[var(--color-on-dark-text)] mb-3">Collections</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {collections.map((collection, index) => (
                           <motion.div

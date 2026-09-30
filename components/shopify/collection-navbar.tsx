@@ -119,7 +119,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                 <ShoppingBag className="mr-2 h-5 w-5 text-emerald-400" />
                 Products
                 {activeCollection && activeCollection.handle !== "" && (
-                  <span className="text-neutral-400 hidden sm:inline ml-2">
+                  <span className="text-[var(--color-on-dark-text-secondary)] hidden sm:inline ml-2">
                     in <span className="text-emerald-400">{activeCollection.title}</span>
                   </span>
                 )}
@@ -365,7 +365,7 @@ export function CollectionNavbar({ collections, sortOptions, currentCollection }
                 transition={{ delay: 0.3 }}
                 className="mt-6 pt-4 border-t border-neutral-800"
               >
-                <h3 className="t-heading-xs text-neutral-400 mb-3">Quick Links</h3>
+                <h3 className="t-heading-xs text-[var(--color-on-dark-text-secondary)] mb-3">Quick Links</h3>
                 <div className="flex flex-wrap gap-2">
                   {collections.slice(0, 6).map((collection, index) => (
                     <motion.div

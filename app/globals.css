@@ -37,6 +37,58 @@
      use Tailwind's green (#22C55E, 8 uses today); it is left alone rather than
      forced to red or invented, and it is raised for a founder decision. */
   --color-fn-error: var(--434-signal);
+
+  /* Text on dark surfaces — two tints, shared.
+
+     These began as the footer's text colours and are now the site-wide answer
+     for text on a dark surface, because the footer was not a special case. Any
+     dark surface has the same problem and the palette has the same trap:
+     reaching into the mapped neutral scale for a grey gets a blue-green cast,
+     which reads as intent on a light surface and as a colour error on black.
+
+     Two tiers, not six. A dark surface needs a primary and a dimmer secondary;
+     every additional step is a decision nobody made on purpose.
+
+       primary     #DEDEDE   87% white   15.59:1 on palette black
+       secondary   #9E9E9E   62% white    7.85:1 on palette black
+
+     Both resolve with all three channels equal, so the cast is gone by
+     construction rather than by eye. Do not reach for `text-neutral-*` for
+     text on a dark surface — that is the thing these replace. */
+  --color-on-dark-text: color-mix(in srgb, var(--434-white) 87%, var(--434-color-02-black));
+  --color-on-dark-text-secondary: color-mix(in srgb, var(--434-white) 62%, var(--434-color-02-black));
+
+  /* Chrome roles — the header and footer, which are the site's dark surfaces.
+
+     One role per purpose. The text roles now alias the shared on-dark tints
+     above rather than restating them, so the footer and any other dark surface
+     cannot drift apart. The names stay because the purposes stay.
+
+     They used to be color-01 and color-05, which are palette members and
+     correct by provenance — and visibly green. The palette's mid tones carry a
+     blue-green cast that reads as intent on a light surface and as a colour
+     error on black, where the eye has nothing to reference it against. Footer
+     copy is not tinted; it is text at three weights of the same white.
+
+     Three tiers, measured on palette black:
+
+       logo            #FFFFFF   21.00:1   the artwork, full white
+       primary text    #DEDEDE   15.59:1   87% white
+       secondary,
+       label, icon     #9E9E9E    7.85:1   62% white
+
+     WCAG AA wants 4.5:1 for normal text and 3:1 for large. Every tier clears
+     both with room. The dimmest is still nearly twice the floor, which is what
+     lets the ramp be this quiet.
+
+     Secondary and label resolve to the same tint deliberately — they are one
+     step in the ramp, kept as two names so they can diverge without a hunt. */
+  --color-chrome-bg: var(--434-color-02-black);
+  --color-chrome-text: var(--color-on-dark-text);
+  --color-chrome-text-secondary: var(--color-on-dark-text-secondary);
+  --color-chrome-label: var(--color-on-dark-text-secondary);
+  --color-chrome-divider: color-mix(in srgb, var(--434-white) 12%, transparent);
+  --color-chrome-icon: var(--color-on-dark-text-secondary);
   
   --font-geist-sans: var(--font-geist-sans, sans-serif);
   --font-geist-mono: var(--font-geist-mono, monospace);
