@@ -1,0 +1,400 @@
+/* Work page — approved design Revision 12.
+ *
+ * Every value here comes from the visual system's generated custom properties.
+ * Where the design's ramp crosses two roles rather than stepping one role at
+ * 680px, both endpoints are still role values and the ramp itself is recorded
+ * as question 1 in 434-context `08 Work Page/COMPLIANCE.md`. Nothing is an
+ * invented size.
+ *
+ * Three widths, as the spec names them:
+ *   compact       <= 679px
+ *   intermediate  680 - 999px
+ *   wide          >= 1000px
+ */
+
+:root {
+  /* The public header is fixed, so the page has to clear it or the first
+     thing a visitor reads sits underneath it.
+
+     Measured on the deployed preview rather than derived from the Tailwind
+     classes, because the header's height depends on which of its two mounted
+     states is showing:
+
+       375px wide   64px at rest, 56px scrolled
+       1280px wide  58px at rest, 42px scrolled
+
+     The at-rest height is the one that matters: it is the state at load and
+     the state an anchor jump lands in. This couples the Work page to
+     components/combined-navbar.tsx — if that header's padding changes, this
+     number is wrong and nothing will look broken until someone reads the top
+     of the page. */
+  --work-header-h: 64px;
+}
+
+@media (min-width: 680px) {
+  :root { --work-header-h: 58px; }
+}
+
+.page {
+  background: var(--434-white);
+  color: var(--434-color-02-black);
+  padding-top: var(--work-header-h);
+}
+
+/* An anchor jump scrolls the target to y=0, which is under the fixed header.
+   scroll-margin-top moves the landing point down by the same amount. */
+.section,
+.opening {
+  scroll-margin-top: var(--work-header-h);
+}
+
+/* ── Opening ──────────────────────────────────────────────────────────────
+   Compact: stacked, 16px gap, 28px vertical / 24px horizontal padding. */
+.opening {
+  display: grid;
+  gap: 16px;
+  padding: 28px 24px;
+}
+
+.openingTitle {
+  font-family: var(--font-ggx88), sans-serif;
+  font-weight: 400;
+  font-size: var(--434-type-display-l-size);   /* 44 compact, 72 wide */
+  line-height: 0.92;                            /* the design's, not the role's 0.92 default */
+  margin: 0;
+  text-wrap: balance;
+}
+
+.openingIntro {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 400;
+  font-size: var(--434-type-body-size);         /* 16 compact */
+  line-height: 1.5;
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* ── Service section ───────────────────────────────────────────────────── */
+.section {
+  /* No extra section padding around the service headers: the header carries
+     its own and the rail is flush to the viewport. */
+  padding: 0;
+}
+
+.serviceHeader {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  align-items: center;
+}
+
+.serviceLabel {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  /* 28 compact -> 32 wide is heading-l's own ramp, exactly. */
+  font-size: var(--434-type-heading-l-size);
+  line-height: 1.1;
+  margin: 0;
+  text-align: left;
+  text-wrap: balance;
+}
+
+.serviceDefinition {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 400;
+  font-size: var(--434-type-body-s-size);       /* 14 compact */
+  line-height: 1.5;
+  margin: 0;
+  text-align: left;
+  text-wrap: balance;
+}
+
+/* ── Rail ─────────────────────────────────────────────────────────────────
+   Spans the viewport: no text-container maximum, no horizontal page inset.
+   The next card peeks in. Native horizontal scrolling, thin affordance, and a
+   small allowance below the rail. */
+.rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  padding-bottom: 10px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rail::-webkit-scrollbar { height: 6px; }
+.rail::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--434-color-02-black) 25%, transparent);
+}
+
+.rail:focus-visible {
+  outline: 2px solid var(--434-color-02-black);
+  outline-offset: -2px;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────
+   Square corners. White title over a dark legibility gradient. A record with
+   no still is a solid black card with a white title — never a blank
+   white-to-black gradient standing in for artwork. */
+.card {
+  position: relative;
+  flex: 0 0 92%;
+  aspect-ratio: 4 / 5;
+  scroll-snap-align: start;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  background: var(--434-color-02-black);
+  cursor: pointer;
+  display: block;
+  text-align: left;
+  color: var(--434-white);
+}
+
+.card:focus-visible {
+  outline: 3px solid var(--434-color-02-black);
+  outline-offset: 3px;
+}
+
+.cardImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Only over media. A card with no still is already black; laying a gradient on
+   it would be the blank white-to-black the spec forbids. */
+.cardVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cardScrim {
+  position: absolute;
+  inset: 0;
+  /* Palette black, not a literal. Same three stops on every image card - the
+     gradient is a property of the card system, not of any one picture.
+
+     Measured against all ten stills at both shapes, worst case per card, white
+     title on the composited background: the lowest is 8.85:1 and the highest
+     20.63:1. WCAG AA wants 3:1 for large text, which the card title is at 28
+     and 40px, and 4.5:1 for normal text. Every card clears both, so the
+     gradient is not strengthened - there is nothing failing to fix, and
+     darkening it further would cost the picture for no accessibility gain. */
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--434-color-02-black) 86%, transparent) 0%,
+    color-mix(in srgb, var(--434-color-02-black) 25%, transparent) 45%,
+    transparent 72%
+  );
+}
+
+.cardTitle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  font-size: var(--434-type-heading-l-size);   /* 28 compact */
+  line-height: 1.1;
+  color: var(--434-white);
+  padding: 0 52px 24px 24px;
+}
+
+/* The corner affordance. Present on every card, including black ones. */
+.cardCorner {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+  width: 14px;
+  height: 14px;
+  color: var(--434-white);
+  opacity: 0.85;
+}
+
+/* ── Detail dialog ────────────────────────────────────────────────────────
+   Hero first, attribution beneath — the approved design's order. It differs
+   from Display and Design Standard v1.6 section 2.3, which puts media sixth.
+   Recorded as question 3 in COMPLIANCE.md and not resolved here. */
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(0 0 0 / 0.65);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.dialog {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  background: var(--434-white);
+  color: var(--434-color-02-black);
+  border-radius: 0;
+}
+
+.dialogHero {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  background: var(--434-color-02-black);
+  overflow: hidden;
+}
+
+.dialogHeroImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dialogHeroCaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 24px 24px;
+  color: var(--434-white);
+}
+
+.dialogHeroCaptionTitle {
+  margin: 6px 0 0;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  font-size: var(--434-type-heading-l-size);
+  line-height: 1.1;
+}
+
+.dialogHeroCaption h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  font-size: var(--434-type-heading-l-size);
+  line-height: 1.1;
+}
+
+.dialogBody {
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.dialogRow {
+  display: grid;
+  gap: 4px;
+}
+
+.dialogClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--434-color-02-black);
+  color: var(--434-white);
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.dialogClose:focus-visible {
+  outline: 3px solid var(--434-white);
+  outline-offset: -3px;
+}
+
+/* ── Intermediate: 680 – 999px ────────────────────────────────────────── */
+@media (min-width: 680px) {
+  .opening {
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 40px;
+    align-items: center;
+  }
+
+  /* 16 -> 18 crosses body into body-l. See COMPLIANCE question 1. */
+  .openingIntro {
+    font-size: var(--434-type-body-l-size);
+    line-height: 1.6;
+  }
+
+  .serviceHeader {
+    gap: 12px;
+    padding: 28px 24px;
+  }
+
+  /* 14 -> 16 crosses body-s into body. See COMPLIANCE question 1. */
+  .serviceDefinition {
+    font-size: var(--434-type-body-size);
+  }
+
+  .rail { gap: 12px; }
+
+  .card {
+    flex-basis: 88%;
+    aspect-ratio: 16 / 9;
+  }
+
+  .dialogHero { aspect-ratio: 16 / 9; }
+}
+
+/* ── Wide: >= 1000px ──────────────────────────────────────────────────── */
+@media (min-width: 1000px) {
+  .opening {
+    grid-template-columns: 1.2fr 1fr;
+  }
+
+  .serviceHeader {
+    grid-template-columns: 1.2fr 1fr;
+    gap: 40px;
+    padding: 32px 40px;
+  }
+
+  /* 28 -> 40 crosses heading-l into heading-xl. See COMPLIANCE question 1. */
+  .cardTitle {
+    font-size: var(--434-type-heading-xl-size);
+    line-height: 1.05;
+    padding: 0 88px 36px 40px;
+  }
+
+  .cardCorner { right: 36px; bottom: 36px; }
+
+  .dialogHeroCaption { padding: 0 40px 36px; }
+  .dialogHeroCaptionTitle {
+  margin: 6px 0 0;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
+  font-size: var(--434-type-heading-l-size);
+  line-height: 1.1;
+}
+
+.dialogHeroCaption h2 { font-size: var(--434-type-heading-xl-size); line-height: 1.05; }
+  .dialogBody { padding: 40px; gap: 20px; }
+}
+
+/* ── >= 1600px ────────────────────────────────────────────────────────── */
+@media (min-width: 1600px) {
+  .card { flex-basis: 84%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail { scroll-behavior: auto; }
+}
