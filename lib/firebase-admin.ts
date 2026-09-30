@@ -11,6 +11,22 @@ interface ServiceAccountCredentials {
   private_key: string
 }
 
+/**
+ * Parse the service-account key, accepting both shapes it arrives in.
+ *
+ * Compact single-line JSON, as Vercel stores it, may carry raw newlines inside
+ * `private_key` — illegal in JSON, so those are escaped and it is parsed again.
+ * A pretty-printed file parses as-is and must not be escaped.
+ */
+function parseKey(raw: string): Record<string, string> {
+  try {
+    return JSON.parse(raw) as Record<string, string>
+  } catch {
+    const escaped = raw.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
+    return JSON.parse(escaped) as Record<string, string>
+  }
+}
+
 function getCredentials(): ServiceAccountCredentials {
   // GOOGLE_SERVICE_ACCOUNT_KEY is the single source of truth for the 434 Media
   // service account — Firestore Admin, GA4, and Search Console all use this key.
@@ -21,9 +37,22 @@ function getCredentials(): ServiceAccountCredentials {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY is not set — it is required for Firebase Admin / Firestore.")
   }
   try {
-    // Sanitize control characters (e.g. literal newlines in the private_key field)
-    const sanitized = serviceAccountKey.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")
-    const credentials = JSON.parse(sanitized)
+    // Parse as-is first.
+    //
+    // The sanitize step below escapes every literal newline, which is right for
+    // the single-line JSON Vercel stores — there, a raw newline can only be
+    // inside the private_key string, where it is illegal and needs escaping.
+    //
+    // It is wrong for a pretty-printed key file. There the newlines between
+    // keys are ordinary JSON whitespace, and escaping them turns `{\n  "type"`
+    // into `{\\n  "type"`, which fails at position 1. That is what a service
+    // account file downloaded from Google Cloud looks like, so the loader could
+    // not read one without the caller compacting it first.
+    //
+    // So: try the string as given, and only sanitize if that fails. Valid JSON
+    // in either shape parses on the first attempt; the escape is reserved for
+    // the case it was actually written for.
+    const credentials = parseKey(serviceAccountKey)
     return {
       project_id: credentials.project_id,
       client_email: credentials.client_email,
