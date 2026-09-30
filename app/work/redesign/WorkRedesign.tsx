@@ -81,6 +81,11 @@ const ASSETS: Record<string, { still?: boolean; video?: string }> = {
   "salute-to-troops": { still: true },
   "velocitytx-demo-day": { still: true },
   "vemosvamos": { still: true, video: "vemosvamos-1080p" },
+  "aim-health-summit": { still: true },
+  "que-es-sdoh": { still: true },
+  "techbloc-tech-day": { still: true },
+  "txmx-boxing": { still: true },
+  "univision-70th": { still: true },
 }
 
 // Only VemosVamos ships its video here, and only because it is the edit with a
@@ -92,8 +97,7 @@ const ASSETS: Record<string, { still?: boolean; video?: string }> = {
 // total against a 30 MB repository. They go where the hero video goes, and the
 // `video` key here is filled in per record as each one lands. Until then a
 // record with no entry opens on its still, which is the supported state.
-//
-// aim-health-summit has a video and no still, so it has no entry at all yet.
+
 
 const stillsFor = (r: WorkRecord) => {
   const k = r.recordKey
