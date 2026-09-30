@@ -29,6 +29,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { ArrowUpRight, X } from "lucide-react"
 import type { WorkRecord } from "@/lib/work-records"
 import { BRAND_RECORDS } from "@/lib/brand-records"
+import { STILLS_WITH_WEBP } from "@/lib/work-stills-webp"
 import styles from "./work-redesign.module.css"
 
 /**
@@ -107,7 +108,14 @@ const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
 const stillsFor = (r: WorkRecord) => {
   const k = r.recordKey
   if (!k || !ASSETS[k]?.still) return null
-  return { wide: `/work/stills/${k}-wide.jpg`, compact: `/work/stills/${k}-compact.jpg` }
+  const webp = (crop: "wide" | "compact") =>
+    STILLS_WITH_WEBP.includes(`${k}-${crop}`) ? `/work/stills/${k}-${crop}.webp` : null
+  return {
+    wide: `/work/stills/${k}-wide.jpg`,
+    compact: `/work/stills/${k}-compact.jpg`,
+    wideWebp: webp("wide"),
+    compactWebp: webp("compact"),
+  }
 }
 /**
  * The card's loop, in both encodings. WebM is listed first because it is the
@@ -205,7 +213,11 @@ function Card({
       {stills ? (
         <>
           <picture>
+            {stills.wideWebp ? (
+              <source media="(min-width: 680px)" type="image/webp" srcSet={stills.wideWebp} />
+            ) : null}
             <source media="(min-width: 680px)" srcSet={stills.wide} />
+            {stills.compactWebp ? <source type="image/webp" srcSet={stills.compactWebp} /> : null}
             <img
               src={stills.compact}
               alt=""
@@ -341,7 +353,11 @@ function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }
           ) : stills ? (
             <>
               <picture>
+                {stills.wideWebp ? (
+                  <source media="(min-width: 680px)" type="image/webp" srcSet={stills.wideWebp} />
+                ) : null}
                 <source media="(min-width: 680px)" srcSet={stills.wide} />
+                {stills.compactWebp ? <source type="image/webp" srcSet={stills.compactWebp} /> : null}
                 <img src={stills.compact} alt="" className={styles.dialogHeroImage} decoding="async" />
               </picture>
               <span className={styles.cardScrim} aria-hidden="true" />
