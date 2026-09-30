@@ -3,13 +3,19 @@
 import { motion, AnimatePresence } from "motion/react"
 import Link from "next/link"
 import Image from "next/image"
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { XIcon } from "lucide-react"
 
 interface NavMenuProps {
   isOpen: boolean
   onClose: () => void
   id?: string
+  /**
+   * Whether to offer the Work item. Decided on the server by the root layout,
+   * from the same condition as the `/work` redirect — see
+   * lib/work-page-visibility.ts. A client component cannot read `VERCEL_ENV`.
+   */
+  showWork?: boolean
 }
 
 interface NavigationItem {
@@ -20,30 +26,42 @@ interface NavigationItem {
   delay: number
 }
 
-// This IS the navbar on mobile, so it carries the same roster and the same
-// wording as the desktop links.
+// This IS the navigation, at every width. There is no desktop link row any
+// more: one menu, two items, the same on a phone and on a 27-inch display.
 //
-// Which means it is currently one item. `desktopLinks` in combined-navbar.tsx
-// emptied when the Work page went offline; this list did not, and kept an
-// Events entry pointing at https://www.devsa.community/events — off-site, to a
-// property, as the only thing a visitor could tap besides Contact. It also
-// rendered through next/link with no target and no rel, so it left the site in
-// the same tab with no noopener.
-//
-// The /work entry returns here when the Work page does, exactly as it returns
-// to desktopLinks. At that point this is Work and Start a project, and nothing
-// else — see next.config.ts for the three conditions on the redirect.
-const navigationItems: NavigationItem[] = [
-  {
+// Work is offered only when it resolves. `/work` redirects to `/` in
+// production until the asset pass lands, and a menu item pointing at a redirect
+// is worse than no item — nothing errors, the visitor just arrives at the
+// homepage and assumes they misclicked. The condition is shared with the
+// redirect itself rather than restated; see lib/work-page-visibility.ts.
+function buildNavigationItems(showWork: boolean): NavigationItem[] {
+  const items: NavigationItem[] = []
+
+  if (showWork) {
+    items.push({
+      id: "work",
+      title: "Work",
+      subtitle: "Original IP, platforms, and productions",
+      href: "/work",
+      delay: 0.15,
+    })
+  }
+
+  items.push({
     id: "contact",
     title: "Start a project",
     subtitle: "Take the next step",
     href: "/contact",
-    delay: 0.15,
-  },
-]
+    // The first slot's delay, so a one-item menu does not start late.
+    delay: showWork ? 0.2 : 0.15,
+  })
 
-export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuProps) {
+  return items
+}
+
+
+export default function NavMenu({ isOpen, onClose, id = "nav-menu", showWork = false }: NavMenuProps) {
+  const navigationItems = useMemo(() => buildNavigationItems(showWork), [showWork])
   const menuRef = useRef<HTMLDivElement>(null)
 
   const renderNavigationItems = useCallback(() => {
@@ -79,7 +97,7 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
         </Link>
       </motion.div>
     ))
-  }, [onClose])
+  }, [navigationItems, onClose])
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -175,16 +193,6 @@ export default function NavMenu({ isOpen, onClose, id = "nav-menu" }: NavMenuPro
                   <XIcon className="h-5 w-5" />
                 </motion.button>
               </div>
-
-              {/* Tagline */}
-              <motion.p
-                className="font-geist-sans t-body-l text-white/80 font-medium type:text-xl tracking-tight mb-8"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.15 }}
-              >
-                Explore how we blend creativity with community impact through innovative storytelling and design.
-              </motion.p>
 
               {/* Nav items */}
               <nav className="flex-1">

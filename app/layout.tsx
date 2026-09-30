@@ -17,6 +17,7 @@ import Script from "next/script"
 import { headers } from "next/headers"
 import { MetaPixel } from "@/components/MetaPixel"
 import { EXCLUDED_COUNTRY_CODES } from "@/lib/prospecting/scorer"
+import { workPageRedirectsToHome } from "@/lib/work-page-visibility"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -337,7 +338,10 @@ export default async function RootLayout({
 
         <CartProvider cartPromise={cart}>
           <Suspense>
-            <CombinedNavbar menu={menu} />
+            {/* The menu offers Work only when /work resolves. Same condition as the
+                redirect, from the same function — see lib/work-page-visibility.ts.
+                It is decided here because VERCEL_ENV is server-only. */}
+            <CombinedNavbar menu={menu} showWork={!workPageRedirectsToHome()} />
           </Suspense>
           <main>
             <PageTransition>{children}</PageTransition>

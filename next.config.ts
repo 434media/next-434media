@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withBotId } from 'botid/next/config';
+import { workPageRedirectsToHome } from './lib/work-page-visibility'
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -82,7 +83,7 @@ const nextConfig: NextConfig = {
       // plan. It said "Temporary" with no date and no condition for two weeks,
       // which is how a temporary rule becomes a permanent one nobody can argue
       // with.
-      ...(process.env.VERCEL_ENV === 'production'
+      ...(workPageRedirectsToHome()
         ? [{ source: '/work', destination: '/', permanent: false }]
         : []),
       { source: '/admin/crm', destination: '/admin/opportunities', permanent: false },
