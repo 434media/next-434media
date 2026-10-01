@@ -192,25 +192,51 @@ export default async function RootLayout({
         </Script>
         {/* End Google Tag Manager */}
 
-        {/* Google tag (gtag.js)
-            lazyOnload, not afterInteractive: it loads during browser idle time,
-            after every other resource on the page has been fetched. On the Work
-            page at Lighthouse's mobile preset this script was 195.9 KB and in
-            flight from 593ms to 4,501ms, sharing a 1.6 Mbps link with the LCP
-            image for the whole of that image's load window.
-            Next's own docs file analytics under afterInteractive, so this is a
-            departure: it trades a slightly later first page-view for an LCP the
-            standard can pass. The measurement ID and the events are unchanged.
-            SITE-WIDE — this is the root layout, not the Work page. */}
-        <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="lazyOnload" />
-        <Script id="google-analytics" strategy="lazyOnload">
-          {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-FTWW298D70');
-        `}
-        </Script>
+        {/* Google tag (gtag.js) — fetched after the window load event, by hand.
+
+            Not next/script. `strategy="lazyOnload"` defers EXECUTION but Next
+            still emits <link rel="preload" href="...gtag/js..." as="script">
+            into the HTML, so the 195.9 KB was fetched early regardless and sat
+            in flight 596-4,672 ms, across the whole of the LCP image's load
+            window on a throttled mobile link. Measured, not assumed.
+
+            So the fetch is done manually instead: a plain inline script that
+            appends the tag on `load`. Next does not preload a URL it never
+            sees, which is the entire point.
+
+            The queue is live from parse, deliberately. web.dev: "Analytics
+            scripts are usually loaded early so you don't miss any valuable
+            analytics data... there are patterns to initialize analytics lazily
+            while retaining early page-load data." dataLayer and window.gtag
+            exist immediately, so a call made before load is queued and replays
+            when the tag arrives. Only the bytes wait.
+
+            readyState is checked first because `load` has already fired on a
+            client-side navigation into a fresh mount, and a listener added then
+            would never run.
+
+            SITE-WIDE - this is the root layout, not the Work page. */}
+        <script
+          id="google-analytics"
+          dangerouslySetInnerHTML={{
+            __html: `
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
+            window.gtag('js', new Date());
+            window.gtag('config', 'G-FTWW298D70');
+            (function(){
+              function l(){
+                var s = document.createElement('script');
+                s.async = true;
+                s.src = 'https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70';
+                document.head.appendChild(s);
+              }
+              if (document.readyState === 'complete') { l(); }
+              else { window.addEventListener('load', l); }
+            })();
+          `,
+          }}
+        />
 
         {/* Meta Pixel — gated by route and jurisdiction; see components/MetaPixel.tsx */}
         <MetaPixel pixelId={metaPixelId} />
