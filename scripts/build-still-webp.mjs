@@ -18,7 +18,23 @@ import { join } from "node:path"
 
 const DIR = "public/work/stills"
 const MANIFEST = "lib/work-stills-webp.ts"
-const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg"
+/**
+ * ffmpeg is not on PATH on the build machine; it comes from the Python package
+ * imageio-ffmpeg, which is what 434-context's build_media.py uses and says so in
+ * its own docstring. Bare "ffmpeg" fails ENOENT here, so ask imageio-ffmpeg for
+ * the binary and keep bare "ffmpeg" only as the last resort.
+ */
+function resolveFfmpeg() {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH
+  try {
+    return execFileSync("python3",
+      ["-c", "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())"],
+      { encoding: "utf8" }).trim()
+  } catch {
+    return "ffmpeg"
+  }
+}
+const FFMPEG = resolveFfmpeg()
 const check = process.argv.includes("--check")
 
 const jpgs = readdirSync(DIR).filter((f) => f.endsWith(".jpg")).sort()
