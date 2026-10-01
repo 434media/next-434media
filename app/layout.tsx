@@ -24,16 +24,33 @@ const geistSans = Geist({
   display: "swap",
 })
 
+// Geist Mono and Menda Black are NOT preloaded.
+//
+// Measured on the Work page at both Lighthouse presets: the first screen renders
+// in Geist and GGX88 only, and those are the only two faces the browser reports
+// as loaded. next/font preloads every face by default, so all four were being
+// fetched in the critical window — about 105 KB competing with the LCP image on
+// a throttled link.
+//
+// web.dev's font best practices: preload "comes at the cost of taking away
+// browser resources from the loading of other resources", and preloading should
+// be selective. Both keep display: swap, so when a later screen needs them the
+// text renders immediately in the fallback and swaps.
+//
+// SITE-WIDE — these are declared in the root layout. No typeface, weight or
+// visual changes; only when the file is fetched.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
+  preload: false,
 })
 
 const mendaBlack = localFont({
   src: "../fonts/Menda-Black.otf",
   variable: "--font-menda-black",
   display: "swap",
+  preload: false,
 })
 
 const ggx88Font = localFont({
