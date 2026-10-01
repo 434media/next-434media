@@ -60,10 +60,19 @@ jobs:
       - name: Lighthouse CI (${{ matrix.preset }})
         run: npx --yes @lhci/cli@0.15.1 autorun --config=./lighthouserc.${{ matrix.preset }}.json
 
+      # include-hidden-files is required, not optional. upload-artifact v4:
+      # "By default, hidden files are ignored by this action to avoid
+      # unintentionally uploading sensitive information", where "Hidden files
+      # are defined as any file beginning with `.` or files within folders
+      # beginning with `.`". `.lighthouseci/` is such a folder, so every run so
+      # far uploaded nothing and warned "No files were found with the provided
+      # path" — including the runs that passed. There is nothing sensitive in a
+      # Lighthouse report and this repository is public anyway.
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-${{ matrix.preset }}
           path: .lighthouseci/
+          include-hidden-files: true
           retention-days: 14
