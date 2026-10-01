@@ -38,6 +38,8 @@ const TABLES = [
 ] as const
 
 const DRY = process.argv.includes("--dry-run")
+/** Reads Firestore and writes nothing: reports what a load would add, change or leave alone. */
+const PLAN = process.argv.includes("--plan")
 
 function arg(name: string, fallbacks: string[]): string {
   const i = process.argv.indexOf(`--${name}`)
@@ -203,6 +205,48 @@ async function main() {
 
   if (DRY) {
     console.log(`\nDRY RUN — validated only, nothing written.`)
+    return
+  }
+
+  // --plan reads Firestore and writes nothing. Everything above has already
+  // validated, so a plan that prints is a load that would have succeeded.
+  //
+  // Rows in Firestore that the seed does not have are REPORTED, never removed.
+  // The loader has no delete path and this does not add one: a row the seed has
+  // dropped may be a record the master retired, or may be a seed that is behind,
+  // and only a person can tell those apart.
+  if (PLAN) {
+    const { getDb } = await import("../../lib/firebase-admin")
+    const db = getDb()
+    console.log(`\nPLAN — reading Firestore, writing nothing.`)
+    let add = 0, chg = 0, same = 0, extra = 0
+    for (const p of planned) {
+      const snap = await db.collection(p.collection).get()
+      const live = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]))
+      const seedKeys = new Set(p.rows.map((r) => r.key))
+      const a: string[] = [], c: string[] = [], u: string[] = []
+      for (const row of p.rows) {
+        const cur = live.get(row.key)
+        if (!cur) { a.push(row.key); continue }
+        // updated_at/updated_by are written by the loader, not carried by the
+        // seed, so comparing them would mark every row changed on every run.
+        const strip = (o: Record<string, unknown>) => {
+          const { updated_at, updated_by, ...rest } = o
+          return JSON.stringify(rest, Object.keys(rest).sort())
+        }
+        if (strip(cur) === strip(row as unknown as Record<string, unknown>)) u.push(row.key)
+        else c.push(row.key)
+      }
+      const only = [...live.keys()].filter((k) => !seedKeys.has(k)).sort()
+      add += a.length; chg += c.length; same += u.length; extra += only.length
+      console.log(`\n  ${p.collection}`)
+      console.log(`    add       ${String(a.length).padStart(3)}${a.length ? "  " + a.join(" ") : ""}`)
+      console.log(`    change    ${String(c.length).padStart(3)}${c.length ? "  " + c.join(" ") : ""}`)
+      console.log(`    unchanged ${String(u.length).padStart(3)}`)
+      if (only.length) console.log(`    IN FIRESTORE, NOT IN SEED  ${only.length}  ${only.join(" ")}   (reported, never removed)`)
+    }
+    console.log(`\n  TOTAL  add ${add} · change ${chg} · unchanged ${same} · firestore-only ${extra}`)
+    console.log(`  Nothing was written.`)
     return
   }
 
