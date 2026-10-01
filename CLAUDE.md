@@ -47,6 +47,10 @@ Turbopack never invalidated `app/globals.css`. Nothing failed, the page
 rendered, and one colour was silently the old one. Promoting or re-aliasing a
 deployment does not fix this — that is a different failure.
 
+**One thread directs this agent at a time.** Only one conversation holds the writer role for Claude Code; a second thread issuing work at the same time is the two-writer failure 11.4 forbids, arriving through the front door. If another thread is mid-task, report the conflict rather than writing alongside it.
+
+**Work outside the build sequence waits.** The order of work is the build sequence in `434_Process_Log_and_SOP.md`. A task that is not in it waits until the founder adds it there — not because the idea is wrong, but because an order nobody can see is not an order. Raise it; do not start it.
+
 **Jurisdiction policy is one constant.** 434 Media does not cold-outreach the
 EU/UK/EEA/Switzerland/Canada (GDPR/CASL). The single source of truth is
 `EXCLUDED_COUNTRIES` in [lib/prospecting/scorer.ts](lib/prospecting/scorer.ts).
