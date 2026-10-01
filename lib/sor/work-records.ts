@@ -37,6 +37,7 @@ type Row = {
   rights_defaults?: RightsDefaults | null
   registered_identifier_as_written?: unknown
   video?: unknown
+  display_exception?: unknown
   approved_public_description?: unknown
   work_page?: unknown
 }
@@ -81,6 +82,7 @@ export function toWorkRecord(row: Row): WorkRecord {
     rightsDefaults: rightsDefaults(row.rights_defaults),
     registeredIdentifier: orNull(row.registered_identifier_as_written),
     video: orNull(row.video),
+    displayException: orNull(row.display_exception),
     description: orNull(row.approved_public_description),
   }
 }
