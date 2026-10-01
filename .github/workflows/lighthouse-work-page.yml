@@ -1,15 +1,46 @@
-# Display and Design Standard 3.1, Enforcement: a Lighthouse check runs on every
-# pull request that touches the Work page and fails it where the page misses the
-# Core Web Vitals "good" thresholds.
+# Display and Design Standard 3.1, Enforcement. A Lighthouse check runs on every
+# pull request that touches the Work page. What it actually enforces, as of
+# Standard 1.12, is not one line:
+#
+#   desktop  LCP  error at 2,500 ms   the Core Web Vitals threshold, which
+#                                     desktop meets
+#   mobile   LCP  error at 4,000 ms   a regression ceiling set at the level the
+#                                     page measures today - the worst CI median
+#                                     on branch #129, 3,931 ms, rounded up to
+#                                     the next 250. It may only be lowered,
+#                                     never raised, and only by founder
+#                                     approval. Owner: the founder.
+#   mobile   LCP  warn  at 2,500 ms   the threshold itself, reported on every
+#                                     run so the gap stays visible
+#   both     CLS  error at 0.1        the threshold; both presets meet it
+#   both     TBT  warn  at 200 ms     standing in for INP, which cannot be
+#                                     measured in a lab run because its value
+#                                     depends on which interactions are
+#                                     performed. web.dev calls TBT "a reasonable
+#                                     proxy metric for INP, but it's not a
+#                                     substitute for INP in and of itself". It
+#                                     warns rather than blocks because a shared
+#                                     runner cannot measure a CPU-bound metric
+#                                     reliably - measured here at 10 ms locally
+#                                     against 525.5 ms in CI on one commit - and
+#                                     it blocks again on dedicated hardware.
+#
+# So the check blocks on regression on mobile and on the threshold on desktop,
+# and reports the threshold everywhere. The previous version of this comment
+# said it "fails it where the page misses the Core Web Vitals thresholds", which
+# has not been true of mobile since 1.12 or of TBT since 1.11.
+#
+# Five runs per preset, asserting on the median. The first run on a cold runner
+# is routinely a wild outlier - 10,358 ms mobile and a 2,684 ms desktop LCP have
+# both been observed - so the aggregation is load-bearing, not decoration.
+#
+# Two levels for one audit are expressed through assertMatrix, with two entries
+# both matching ".*". Verified against real reports before use: both fire, and
+# the error still sets exit 1.
 #
 # No secrets. This repository is public and so are its workflow logs, so results
 # are written to the filesystem and uploaded as an artifact rather than sent to a
 # Lighthouse CI server with a token.
-#
-# INP is not asserted: it cannot be measured in a lab run, because its value
-# depends on which interactions are performed. Total Blocking Time stands in for
-# it — web.dev names TBT "a reasonable proxy metric for INP, but it's not a
-# substitute for INP in and of itself".
 name: Lighthouse — Work page
 
 on:

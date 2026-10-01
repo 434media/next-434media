@@ -4,7 +4,7 @@
       "url": [
         "http://localhost:3000/work"
       ],
-      "numberOfRuns": 3,
+      "numberOfRuns": 5,
       "startServerCommand": "pnpm run start",
       "startServerReadyPattern": "Ready in|started server on|Local:",
       "startServerReadyTimeout": 120000,
