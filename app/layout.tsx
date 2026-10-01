@@ -24,16 +24,33 @@ const geistSans = Geist({
   display: "swap",
 })
 
+// Geist Mono and Menda Black are NOT preloaded.
+//
+// Measured on the Work page at both Lighthouse presets: the first screen renders
+// in Geist and GGX88 only, and those are the only two faces the browser reports
+// as loaded. next/font preloads every face by default, so all four were being
+// fetched in the critical window — about 105 KB competing with the LCP image on
+// a throttled link.
+//
+// web.dev's font best practices: preload "comes at the cost of taking away
+// browser resources from the loading of other resources", and preloading should
+// be selective. Both keep display: swap, so when a later screen needs them the
+// text renders immediately in the fallback and swaps.
+//
+// SITE-WIDE — these are declared in the root layout. No typeface, weight or
+// visual changes; only when the file is fetched.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
+  preload: false,
 })
 
 const mendaBlack = localFont({
   src: "../fonts/Menda-Black.otf",
   variable: "--font-menda-black",
   display: "swap",
+  preload: false,
 })
 
 const ggx88Font = localFont({
@@ -175,16 +192,51 @@ export default async function RootLayout({
         </Script>
         {/* End Google Tag Manager */}
 
-        {/* Google tag (gtag.js) */}
-        <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="afterInteractive" />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-FTWW298D70');
-        `}
-        </Script>
+        {/* Google tag (gtag.js) — fetched after the window load event, by hand.
+
+            Not next/script. `strategy="lazyOnload"` defers EXECUTION but Next
+            still emits <link rel="preload" href="...gtag/js..." as="script">
+            into the HTML, so the 195.9 KB was fetched early regardless and sat
+            in flight 596-4,672 ms, across the whole of the LCP image's load
+            window on a throttled mobile link. Measured, not assumed.
+
+            So the fetch is done manually instead: a plain inline script that
+            appends the tag on `load`. Next does not preload a URL it never
+            sees, which is the entire point.
+
+            The queue is live from parse, deliberately. web.dev: "Analytics
+            scripts are usually loaded early so you don't miss any valuable
+            analytics data... there are patterns to initialize analytics lazily
+            while retaining early page-load data." dataLayer and window.gtag
+            exist immediately, so a call made before load is queued and replays
+            when the tag arrives. Only the bytes wait.
+
+            readyState is checked first because `load` has already fired on a
+            client-side navigation into a fresh mount, and a listener added then
+            would never run.
+
+            SITE-WIDE - this is the root layout, not the Work page. */}
+        <script
+          id="google-analytics"
+          dangerouslySetInnerHTML={{
+            __html: `
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
+            window.gtag('js', new Date());
+            window.gtag('config', 'G-FTWW298D70');
+            (function(){
+              function l(){
+                var s = document.createElement('script');
+                s.async = true;
+                s.src = 'https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70';
+                document.head.appendChild(s);
+              }
+              if (document.readyState === 'complete') { l(); }
+              else { window.addEventListener('load', l); }
+            })();
+          `,
+          }}
+        />
 
         {/* Meta Pixel — gated by route and jurisdiction; see components/MetaPixel.tsx */}
         <MetaPixel pixelId={metaPixelId} />

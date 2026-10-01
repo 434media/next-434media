@@ -29,6 +29,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { ArrowUpRight, X } from "lucide-react"
 import type { WorkRecord } from "@/lib/work-records"
 import { BRAND_RECORDS } from "@/lib/brand-records"
+import { getImageProps } from "next/image"
 import { STILLS_WITH_WEBP } from "@/lib/work-stills-webp"
 import styles from "./work-redesign.module.css"
 
@@ -135,6 +136,33 @@ const detailVideoFor = (r: WorkRecord) => {
   return k && cap ? `${MEDIA}/${k}-${cap}p.mp4` : null
 }
 
+/**
+ * True once the window `load` event has fired, or immediately if it already has.
+ *
+ * Only the tiles already inside the viewport at navigation are affected: a card
+ * that enters view by scrolling does so long after load, so its behaviour is
+ * unchanged. §3.0 says card video "autoplays muted as the card enters view" —
+ * it specifies the trigger and the manner, not immediacy, and a card that is
+ * in view at navigation never has a moment of entering.
+ *
+ * The reason to wait: play() pulls the whole file regardless of `preload`, and
+ * on a throttled connection two in-viewport videos compete with the LCP image
+ * for the same pipe.
+ */
+function useWindowLoaded() {
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => {
+    if (document.readyState === "complete") {
+      setLoaded(true)
+      return
+    }
+    const done = () => setLoaded(true)
+    window.addEventListener("load", done, { once: true })
+    return () => window.removeEventListener("load", done)
+  }, [])
+  return loaded
+}
+
 /** True when the visitor has asked for less motion. */
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -152,14 +180,19 @@ function Card({
   record,
   onOpen,
   priority,
+  eager,
 }: {
   record: WorkRecord
   onOpen: (r: WorkRecord) => void
+  /** The LCP candidate: the first tile of the first rail. Exactly one per page. */
   priority: boolean
+  /** Inside the initial viewport at the Lighthouse mobile and desktop presets. */
+  eager: boolean
 }) {
   const stills = stillsFor(record)
   const video = cardLoopFor(record)
   const reduced = usePrefersReducedMotion()
+  const pageLoaded = useWindowLoaded()
   const ref = useRef<HTMLButtonElement>(null)
   const vidRef = useRef<HTMLVideoElement>(null)
   // `near` arms the source; `visible` runs it. Two thresholds, because loading
@@ -195,12 +228,60 @@ function Card({
   useEffect(() => {
     const v = vidRef.current
     if (!v) return
-    if (visible) void v.play().catch(() => {})
-    else v.pause()
-  }, [visible, near])
+    // Playback waits for window load; pausing never does. Arming is untouched.
+    if (visible && pageLoaded) void v.play().catch(() => {})
+    else if (!visible) v.pause()
+  }, [visible, near, pageLoaded])
 
   // Reduced motion gets the still and nothing else — no element, no request.
   const showVideo = video && !reduced
+
+  /**
+   * The video's poster is the still the browser already chose for this
+   * breakpoint and format — `currentSrc`, not a URL guessed here. The card is a
+   * <picture> with four candidates across two crops and two formats, so the
+   * only way to name the file actually in use is to ask the element.
+   *
+   * It is read on load, and again on mount for the cached case where the image
+   * is already complete and no load event will fire. Until it is known the
+   * video simply has no poster, which is the honest state: better no poster
+   * than a second file fetched for one.
+   */
+  /**
+   * Sizing comes from next/image's optimizer through `getImageProps`, which is
+   * the documented way to keep art direction inside a <picture> — the component
+   * itself resizes but cannot art-direct, and these two crops carry different
+   * focal points.
+   *
+   * `sizes` is read off the CSS rather than guessed. `.card` is 92% of the rail
+   * at base, 88% from 680px, 84% from 1600px, which is §3.1's rail geometry.
+   * The breakpoint stays 680px, the crops stay the same two files, and the
+   * frame stays reserved by `.card`'s aspect-ratio.
+   */
+  const commonImg = {
+    alt: "",
+    loading: (eager ? "eager" : "lazy") as "eager" | "lazy",
+    fetchPriority: (priority ? "high" : "auto") as "high" | "auto",
+    decoding: "async" as const,
+  }
+  const wideProps = stills
+    ? getImageProps({ ...commonImg, src: stills.wide, width: 1920, height: 1080,
+        sizes: "(min-width: 1600px) 84vw, 88vw" }).props
+    : null
+  const compactProps = stills
+    ? getImageProps({ ...commonImg, src: stills.compact, width: 1200, height: 1500,
+        sizes: "92vw" }).props
+    : null
+
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [poster, setPoster] = useState<string | undefined>(undefined)
+  const readPoster = useCallback(() => {
+    const src = imgRef.current?.currentSrc
+    if (src) setPoster(src)
+  }, [])
+  useEffect(() => {
+    if (imgRef.current?.complete) readPoster()
+  }, [readPoster])
 
   return (
     <button
@@ -212,18 +293,80 @@ function Card({
     >
       {stills ? (
         <>
+          {/* Preload the LCP crop, so its fetch starts at parse rather than
+              when the parser reaches the <picture>.
+
+              web.dev, Optimize LCP: "your LCP resource should be discoverable
+              from the HTML source", resource load delay should be "<10%" of
+              LCP, and "Any time before LCP where one of these two resources is
+              not loading is an opportunity to improve." Measured here it was
+              585 ms of a 2,164 ms LCP — 27%, against a <10% target — because
+              the <img> sits below three stylesheets and two fonts in the
+              document.
+
+              Two links, not one, and each carries a media condition, because
+              this tile is art-directed: two different crops with different
+              focal points. The conditions are exact complements of the
+              <picture>'s own — `(min-width: 680px)` and `not all and
+              (min-width: 680px)` — so a browser preloads the one crop it will
+              actually use and never the other.
+
+              Next's own `preload` prop cannot do this. Its documentation says
+              not to use it "When you have multiple images that could be
+              considered the Largest Contentful Paint (LCP) element depending on
+              the viewport", nor "When the `loading` property is used", nor
+              "When the `fetchPriority` property is used" — all three are true
+              here. The art-direction section is blunter: "You cannot use
+              `preload` or `loading=\"eager\"` because that would cause both
+              images to load." The prop emits a link with no media condition,
+              which is the thing that would double the download.
+
+              So the links are written out, and `imageSrcSet`/`imageSizes` are
+              taken from the same `getImageProps` call the <picture> renders
+              from rather than restated, which is what makes the preloaded URL
+              and the chosen URL the same URL. React hoists both into <head>.
+
+              Only the priority tile does this. Preloading every tile would
+              contend for the bandwidth this is trying to free. */}
+          {priority ? (
+            <>
+              <link
+                rel="preload"
+                as="image"
+                media="(min-width: 680px)"
+                href={wideProps!.src}
+                imageSrcSet={wideProps!.srcSet}
+                imageSizes={wideProps!.sizes}
+                fetchPriority="high"
+              />
+              <link
+                rel="preload"
+                as="image"
+                media="not all and (min-width: 680px)"
+                href={compactProps!.src}
+                imageSrcSet={compactProps!.srcSet}
+                imageSizes={compactProps!.sizes}
+                fetchPriority="high"
+              />
+            </>
+          ) : null}
+          {/* Standard 3.1 Loading. Tiles inside the initial viewport load
+              eagerly; everything else uses native lazy loading, which already
+              starts fetching shortly before the tile scrolls in rather than at
+              the moment it arrives. The frame is reserved in CSS — .card owns
+              the aspect ratio and .cardImage is absolutely positioned inside it
+              — so nothing moves as an image lands. */}
           <picture>
-            {stills.wideWebp ? (
-              <source media="(min-width: 680px)" type="image/webp" srcSet={stills.wideWebp} />
-            ) : null}
-            <source media="(min-width: 680px)" srcSet={stills.wide} />
-            {stills.compactWebp ? <source type="image/webp" srcSet={stills.compactWebp} /> : null}
+            <source
+              media="(min-width: 680px)"
+              srcSet={wideProps!.srcSet}
+              sizes={wideProps!.sizes}
+            />
             <img
-              src={stills.compact}
-              alt=""
+              {...compactProps!}
+              ref={imgRef}
+              onLoad={readPoster}
               className={styles.cardImage}
-              loading={priority ? "eager" : "lazy"}
-              decoding="async"
             />
           </picture>
           {showVideo && near ? (
@@ -233,7 +376,12 @@ function Card({
               muted
               loop
               playsInline
-              preload="auto"
+              // Standard 4: "Autoplay without a poster and without
+              // preload='metadata' is not permitted - it pulls the full file on
+              // open." The poster is the still already on screen, so it costs no
+              // extra request.
+              preload="metadata"
+              poster={poster}
               aria-hidden="true"
               tabIndex={-1}
             >
@@ -481,7 +629,13 @@ export default function WorkRedesign({ records }: { records: readonly WorkRecord
                 key={record.recordKey ?? record.title}
                 record={record}
                 onOpen={onOpen}
+                // Measured, not assumed: at Lighthouse's mobile preset (412x823)
+                // and desktop preset (1350x940) the first rail shows tile 0 and
+                // tile 1, the second peeking in by design (3.1, "the next tile
+                // peeking into view"). Both load eagerly; tile 0 is the LCP
+                // candidate and the only one marked high priority.
                 priority={si === 0 && i === 0}
+                eager={si === 0 && i <= 1}
               />
             ))}
           </div>

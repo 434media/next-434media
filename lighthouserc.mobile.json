@@ -1,0 +1,30 @@
+{
+  "ci": {
+    "collect": {
+      "url": ["http://localhost:3000/work"],
+      "numberOfRuns": 5,
+      "startServerCommand": "pnpm run start",
+      "startServerReadyPattern": "Ready in|started server on|Local:",
+      "startServerReadyTimeout": 120000
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": ".*",
+          "assertions": {
+            "largest-contentful-paint": ["error", { "maxNumericValue": 4000, "aggregationMethod": "median" }],
+            "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1, "aggregationMethod": "median" }],
+            "total-blocking-time": ["warn", { "maxNumericValue": 200, "aggregationMethod": "median" }]
+          }
+        },
+        {
+          "matchingUrlPattern": ".*",
+          "assertions": {
+            "largest-contentful-paint": ["warn", { "maxNumericValue": 2500, "aggregationMethod": "median" }]
+          }
+        }
+      ]
+    },
+    "upload": { "target": "filesystem", "outputDir": ".lighthouseci/mobile" }
+  }
+}
