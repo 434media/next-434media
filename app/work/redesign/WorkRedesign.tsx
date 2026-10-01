@@ -293,6 +293,63 @@ function Card({
     >
       {stills ? (
         <>
+          {/* Preload the LCP crop, so its fetch starts at parse rather than
+              when the parser reaches the <picture>.
+
+              web.dev, Optimize LCP: "your LCP resource should be discoverable
+              from the HTML source", resource load delay should be "<10%" of
+              LCP, and "Any time before LCP where one of these two resources is
+              not loading is an opportunity to improve." Measured here it was
+              585 ms of a 2,164 ms LCP — 27%, against a <10% target — because
+              the <img> sits below three stylesheets and two fonts in the
+              document.
+
+              Two links, not one, and each carries a media condition, because
+              this tile is art-directed: two different crops with different
+              focal points. The conditions are exact complements of the
+              <picture>'s own — `(min-width: 680px)` and `not all and
+              (min-width: 680px)` — so a browser preloads the one crop it will
+              actually use and never the other.
+
+              Next's own `preload` prop cannot do this. Its documentation says
+              not to use it "When you have multiple images that could be
+              considered the Largest Contentful Paint (LCP) element depending on
+              the viewport", nor "When the `loading` property is used", nor
+              "When the `fetchPriority` property is used" — all three are true
+              here. The art-direction section is blunter: "You cannot use
+              `preload` or `loading=\"eager\"` because that would cause both
+              images to load." The prop emits a link with no media condition,
+              which is the thing that would double the download.
+
+              So the links are written out, and `imageSrcSet`/`imageSizes` are
+              taken from the same `getImageProps` call the <picture> renders
+              from rather than restated, which is what makes the preloaded URL
+              and the chosen URL the same URL. React hoists both into <head>.
+
+              Only the priority tile does this. Preloading every tile would
+              contend for the bandwidth this is trying to free. */}
+          {priority ? (
+            <>
+              <link
+                rel="preload"
+                as="image"
+                media="(min-width: 680px)"
+                href={wideProps!.src}
+                imageSrcSet={wideProps!.srcSet}
+                imageSizes={wideProps!.sizes}
+                fetchPriority="high"
+              />
+              <link
+                rel="preload"
+                as="image"
+                media="not all and (min-width: 680px)"
+                href={compactProps!.src}
+                imageSrcSet={compactProps!.srcSet}
+                imageSizes={compactProps!.sizes}
+                fetchPriority="high"
+              />
+            </>
+          ) : null}
           {/* Standard 3.1 Loading. Tiles inside the initial viewport load
               eagerly; everything else uses native lazy loading, which already
               starts fetching shortly before the tile scrolls in rather than at
