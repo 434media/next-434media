@@ -175,9 +175,18 @@ export default async function RootLayout({
         </Script>
         {/* End Google Tag Manager */}
 
-        {/* Google tag (gtag.js) */}
-        <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="afterInteractive" />
-        <Script id="google-analytics" strategy="afterInteractive">
+        {/* Google tag (gtag.js)
+            lazyOnload, not afterInteractive: it loads during browser idle time,
+            after every other resource on the page has been fetched. On the Work
+            page at Lighthouse's mobile preset this script was 195.9 KB and in
+            flight from 593ms to 4,501ms, sharing a 1.6 Mbps link with the LCP
+            image for the whole of that image's load window.
+            Next's own docs file analytics under afterInteractive, so this is a
+            departure: it trades a slightly later first page-view for an LCP the
+            standard can pass. The measurement ID and the events are unchanged.
+            SITE-WIDE — this is the root layout, not the Work page. */}
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70" strategy="lazyOnload" />
+        <Script id="google-analytics" strategy="lazyOnload">
           {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
