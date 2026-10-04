@@ -127,6 +127,18 @@ alone drops a translation from ~$0.019 to ~$0.0052 on the cached path.
   source, qualification — are not readable from this repository at all, because
   it is public. See [docs/standards/README.md](docs/standards/README.md).
 
+## Environment
+
+This machine is a MacBook Air (Apple Silicon) on macOS 13.4, with bash as the
+shell and the Command Line Tools Python 3.9 as the interpreter. ffmpeg comes
+from the Python package `imageio-ffmpeg` and is reached through
+`imageio_ffmpeg.get_ffmpeg_exe()`; it is never on PATH, and its absence from
+PATH is not evidence that it is missing. Homebrew is not installed and does not
+support this macOS version. Never install, upgrade or remove a package, binary
+or tool without the founder's approval. When a tool appears to be missing, check
+this section first; if the problem persists, stop and report the interpreter,
+the command and the error rather than working around it.
+
 ## Verifying
 
 `npx tsc --noEmit` currently reports pre-existing errors in the Instagram,
