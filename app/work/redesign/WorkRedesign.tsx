@@ -104,6 +104,30 @@ const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
   "techbloc-tech-day": { still: true, cap: 1080 },
   "que-es-sdoh": { still: true, cap: 1080 },
   "univision-70th": { still: true, cap: 1080 },
+
+  // Builders VC, master 2.0.27. Stills only, no `cap`, so no card loop and no
+  // detail video - the same shape as milcityusa and nucleate-global-summit.
+  //
+  // Not an oversight. The loops and detail encodes would publish to the `work/`
+  // prefix this file's MEDIA constant points at, and the media pipeline's
+  // credential refuses to write outside `records/` and `review/`
+  // (build_media.py: "refusing to write outside records/ and review/"). Widening
+  // that guard was out of scope, so the video is held and the stills ship.
+  //
+  // Both crops are real: the 16:9 is the full 1920x1080 frame at no upscale, and
+  // the 4:5 is an 864x1080 window scaled x1.389 under the founder-approved
+  // exception each record carries in its 4.5 Display exception field.
+  "280-earth": { still: true },
+  "amplifier-health": { still: true },
+  "ashbrook-technologies": { still: true },
+  "breaking": { still: true },
+  "checkerspot": { still: true },
+  "gradiant": { still: true },
+  "native-microbials": { still: true },
+  "navier": { still: true },
+  "pathos": { still: true },
+  "pie-vat": { still: true },
+  "ubiqd": { still: true },
 }
 
 const stillsFor = (r: WorkRecord) => {
