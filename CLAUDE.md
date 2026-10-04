@@ -47,6 +47,15 @@ Turbopack never invalidated `app/globals.css`. Nothing failed, the page
 rendered, and one colour was silently the old one. Promoting or re-aliasing a
 deployment does not fix this — that is a different failure.
 
+**The founder works directly here, and merges wait for review.** He no longer
+relays prompts from a claude.ai thread; threads are for context and review.
+**Before any merge to `main` in either repository, and before any change to the
+master, the register, a standard or the build sequence, write a short summary of
+the change and its evidence for the founder to take to a thread, and wait for
+his go-ahead.** The gate is narrow on purpose: it covers merges and the four
+governing artifacts, not ordinary work, reads, branches or drafts. Everything
+reversible proceeds; everything that lands or governs stops for a second reader.
+
 **One thread directs this agent at a time.** Only one conversation holds the writer role for Claude Code; a second thread issuing work at the same time is the two-writer failure 11.4 forbids, arriving through the front door. If another thread is mid-task, report the conflict rather than writing alongside it.
 
 **Work outside the build sequence waits.** The order of work is the build sequence in `434_Process_Log_and_SOP.md`. A task that is not in it waits until the founder adds it there — not because the idea is wrong, but because an order nobody can see is not an order. Raise it; do not start it.
