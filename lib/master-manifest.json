@@ -4,13 +4,13 @@
   "masterSha256": "428c43da782dd430",
   "generated": "2026-10-04",
   "artifacts": {
-    "work-records.ts": "93acba3dcd0d82b7",
+    "work-records.ts": "de7a50c1d8677b1c",
     "brand-records.ts": "c6c4d26df06b07e8",
     "work-sections.ts": "dd14eb464594047f",
     "commercial-models.ts": "5ae251c892c05f8b",
     "work-media.ts": "b35db84a6095af23"
   },
-  "seedSha256": "b93caa9f399fa686",
+  "seedSha256": "4424e77b1d278825",
   "sectionsSeedSha256": "e5e64cc34aa74b69",
   "recordsManifestSha256": "06a1cbba5a5823ba"
 }
