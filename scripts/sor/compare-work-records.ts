@@ -1,10 +1,17 @@
 /**
- * Prove the Work page's data is unchanged by the move to Firestore.
+ * Prove the Work page's committed artifact is current with the seed.
  *
- * Compares `lib/work-records.ts` — the artifact generated from the master, and
- * what the page rendered before — against the same content mapped out of the
- * `portfolio_records` seed. Field by field, in order. Any difference is printed
- * and the script exits non-zero.
+ * The records are canonical in `portfolio_records` seed; `lib/work-records.ts`
+ * is generated from it by emit_work_records.py and is the page's fallback when
+ * Firestore cannot be read. This compares the committed artifact against the
+ * seed mapped through `lib/sor/work-records.ts` — the same mapper the Firestore
+ * path uses — field by field, in order. Any difference is printed and the
+ * script exits non-zero.
+ *
+ * So it catches two things at once: an artifact nobody regenerated after a seed
+ * change, and a mapper that disagrees with the generator about any field. Until
+ * the records moved it compared two independent extractions of the master; that
+ * second source is gone, and this is what the check is for now.
  *
  * This runs against the seed rather than against Firestore so it needs no
  * credentials and can run in CI. The seed is what was loaded, and the loader

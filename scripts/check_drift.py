@@ -53,16 +53,30 @@ MASTER = (
     / "00 Governing"
     / "434_MEDIA_Master_Contextual_Document_v2_0_Locked.md"
 )
+# The records are canonical in the seed, not in the master. brand-records.ts is
+# still master-derived, so the two artifacts now have two different sources and
+# two different staleness questions.
+SEED = (
+    ROOT / "docs" / "context" / "05 System of Record" / "seed" / "portfolio_records.json"
+)
 
 REGENERATE = (
-    'python3 docs/context/"04 Build"/master_extract.py \\\n'
-    "          --emit-web lib/work-records.ts \\\n"
+    'python3 docs/context/"05 System of Record"/scripts/emit_work_records.py \\\n'
+    '          docs/context/"05 System of Record"/seed lib/work-records.ts\n'
+    '        python3 docs/context/"04 Build"/master_extract.py \\\n'
     "          --emit-brand lib/brand-records.ts"
 )
 
 OK = "ok"
 STALE = "stale"
 UNKNOWN = "unknown"
+
+
+def seed_digest() -> Optional[str]:
+    """sha256 prefix of the record seed, or None if unreachable."""
+    if not SEED.exists():
+        return None
+    return hashlib.sha256(SEED.read_bytes()).hexdigest()[:16]
 
 
 def master_digest() -> Optional[str]:
@@ -111,6 +125,7 @@ def main() -> int:
     generated_from = manifest.get("masterVersion")
     generated_hash = manifest.get("masterSha256")
     generated_on = manifest.get("generated")
+    generated_seed = manifest.get("seedSha256")
     recorded = manifest.get("artifacts") or {}
 
     # ── 2. Hand-edit check. Needs no master, so it always runs. ──────────────
@@ -141,7 +156,27 @@ def main() -> int:
         else:
             version_state = OK
 
+    # ── 1b. Seed staleness, for the artifact the seed now owns. ─────────────
+    current_seed = seed_digest()
+    if current_seed is None:
+        seed_state = UNKNOWN
+    elif generated_seed is None:
+        seed_state = UNKNOWN
+    elif current_seed != generated_seed:
+        seed_state = STALE
+    else:
+        seed_state = OK
+
     print(f"artifacts generated from master v{generated_from} on {generated_on}")
+
+    if seed_state is UNKNOWN and current_seed is None:
+        print("seed           not reachable — docs/context is not mounted")
+    elif generated_seed is None:
+        print("seed           manifest predates seedSha256 — cannot verify work-records.ts")
+    elif seed_state == STALE:
+        print(f"seed           MOVED — manifest {generated_seed}, file {current_seed}")
+    else:
+        print(f"seed           {current_seed} — matches")
 
     if version_state is UNKNOWN:
         print("master         not reachable — docs/context is not mounted")
@@ -173,6 +208,12 @@ def main() -> int:
         print(f"FAIL  {', '.join(drifted)} does not match its manifest hash.")
         print("      Generated output. Either it was hand-edited, or a formatter")
         print("      rewrote it. Do not fix it by hand — regenerate:")
+        print(f"        {REGENERATE}")
+        return 1
+
+    if seed_state == STALE:
+        print("FAIL  seed/portfolio_records.json has changed since lib/work-records.ts")
+        print("      was written. The records are canonical in the seed; regenerate:")
         print(f"        {REGENERATE}")
         return 1
 
