@@ -75,12 +75,16 @@ function main(): void {
       fail([`lib/work-media.ts names ${k}, which app/work/redesign/WorkRedesign.tsx does not.`])
     }
   }
-  if (!/const published = RECORD_MEDIA\[k\]\?\.loop\s*\n\s*if \(published\) return published/.test(src) ||
-      !/const published = RECORD_MEDIA\[k\]\?\.tile\s*\n\s*if \(published\) return published/.test(src)) {
-    fail([
-      `${PAGE} no longer prefers the published manifest over the path convention.`,
-      "Both the loop and the tile must read RECORD_MEDIA first and fall back after.",
-    ])
+  for (const group of ["loop", "detail", "tile"]) {
+    const re = new RegExp(
+      `const published = RECORD_MEDIA\\[k\\]\\?\\.${group}\\s*\\n\\s*if \\(published\\) return published`)
+    if (!re.test(src)) {
+      fail([
+        `${PAGE} no longer prefers the published manifest for the ${group}.`,
+        "Each of the loop, the detail video and the tile must read RECORD_MEDIA",
+        "first and fall back to the path convention after.",
+      ])
+    }
   }
 
   // The component must build its sections from that file rather than listing

@@ -163,10 +163,21 @@ const cardLoopFor = (r: WorkRecord) => {
   const h = cap > 720 ? 720 : cap
   return { webm: `${MEDIA}/${k}-loop-${h}p.webm`, mp4: `${MEDIA}/${k}-loop-${h}p.mp4` }
 }
-const detailVideoFor = (r: WorkRecord) => {
+/**
+ * The full film with its audio, requested only when the detail view opens.
+ *
+ * The manifest wins where it names the record, and carries both encodings. The
+ * fifteen fall back to the work/ prefix and the cap convention, where only an
+ * MP4 was ever published — so `webm` is optional and the element simply has one
+ * source for them.
+ */
+const detailVideoFor = (r: WorkRecord): { webm?: string; mp4: string } | null => {
   const k = r.recordKey
-  const cap = k ? ASSETS[k]?.cap : undefined
-  return k && cap ? `${MEDIA}/${k}-${cap}p.mp4` : null
+  if (!k) return null
+  const published = RECORD_MEDIA[k]?.detail
+  if (published) return published
+  const cap = ASSETS[k]?.cap
+  return cap ? { mp4: `${MEDIA}/${k}-${cap}p.mp4` } : null
 }
 
 /**
@@ -529,8 +540,13 @@ function Detail({ record, onClose }: { record: WorkRecord; onClose: () => void }
               preload="auto"
               playsInline
               poster={stills?.wide}
-              src={video}
-            />
+            >
+              {/* WebM first for codec preference: a browser takes the first
+                  source it can decode. The fifteen have no WebM detail encode,
+                  so they render a single MP4 source. */}
+              {video.webm ? <source src={video.webm} type="video/webm" /> : null}
+              <source src={video.mp4} type="video/mp4" />
+            </video>
           ) : stills ? (
             <>
               <picture>
