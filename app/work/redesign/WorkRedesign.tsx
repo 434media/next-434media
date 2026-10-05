@@ -30,7 +30,6 @@ import { ArrowUpRight, X } from "lucide-react"
 import type { WorkRecord } from "@/lib/work-records"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 import { getImageProps } from "next/image"
-import { STILLS_WITH_WEBP } from "@/lib/work-stills-webp"
 import { WORK_SECTIONS } from "@/lib/work-sections"
 import { COMMERCIAL_MODEL_DEFINITIONS } from "@/lib/commercial-models"
 import { RECORD_MEDIA } from "@/lib/work-media"
@@ -71,76 +70,15 @@ const SECTIONS = WORK_SECTIONS.map((s) => ({
  * opens.
  *
  * The card used to play the full film. Thirteen of them came to 210.6 MB.
- */
-const MEDIA = "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/work"
-
-/**
- * Per record: whether it has a still, and the height its video was encoded at.
  *
- * The cap is the source's own height, never an upscale. AMPD and OVERDRIVE cap
- * at 540 and TXMX at 808 because that is what their masters are — see #118.
- *
- * Two files come out of each cap. The card plays the audio-free one at 720 or
- * below; the detail plays the one that kept its audio at full cap.
+ * Every URL comes from lib/work-media.ts, generated from the stamped manifest
+ * published beside the objects at records/<key>/v1/. That is Display and Design
+ * Standard section 5's rule: delivered media is resolved from the manifest, never
+ * by path convention, so a replacement is a v2 with the manifest moving to it and
+ * nothing here to edit. All twenty-six published records are in it since
+ * 2026-10-05; a record it does not name has no media rather than a guessed path.
  */
-const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
-  "alamo-angels": { still: true, cap: 1080 },
-  "milcityusa": { still: true },
-  "nucleate-global-summit": { still: true },
-  "ampd-project": { still: true, cap: 540 },
-  "overdrive": { still: true, cap: 540 },
-  "salute-to-troops": { still: true, cap: 720 },
-  "txmx-boxing": { still: true, cap: 808 },
-  "rise-of-a-champion": { still: true, cap: 1080 },
-  "mission-road-soar": { still: true, cap: 1080 },
-  "velocitytx-demo-day": { still: true, cap: 1080 },
-  "aim-health-summit": { still: true, cap: 1080 },
-  "vemosvamos": { still: true, cap: 1080 },
-  "techbloc-tech-day": { still: true, cap: 1080 },
-  "que-es-sdoh": { still: true, cap: 1080 },
-  "univision-70th": { still: true, cap: 1080 },
-
-  // Builders VC. Their media is not described here: it is published under
-  // records/<key>/v1/ and resolved from the generated manifest in
-  // lib/work-media.ts, which is Display and Design Standard section 5's rule
-  // that the site reads delivered media from the manifest rather than by path
-  // convention. `still: true` is kept because the page still asks this map
-  // whether a record has a still at all.
-  //
-  // Through master 2.0.27 they had stills and nothing else, because a loop
-  // would have had to publish to the work/ prefix and the pipeline credential
-  // refuses to write outside records/ and review/. The fix was not to widen
-  // that guard: it was to stop addressing media by path.
-  "280-earth": { still: true },
-  "amplifier-health": { still: true },
-  "ashbrook-technologies": { still: true },
-  "breaking": { still: true },
-  "checkerspot": { still: true },
-  "gradiant": { still: true },
-  "native-microbials": { still: true },
-  "navier": { still: true },
-  "pathos": { still: true },
-  "pie-vat": { still: true },
-  "ubiqd": { still: true },
-}
-
-const stillsFor = (r: WorkRecord) => {
-  const k = r.recordKey
-  if (!k || !ASSETS[k]?.still) return null
-  // The manifest wins where it names the record. It carries a versioned path
-  // for every crop and both formats, so there is no WebP presence list to keep
-  // and no convention to re-derive.
-  const published = RECORD_MEDIA[k]?.tile
-  if (published) return published
-  const webp = (crop: "wide" | "compact") =>
-    STILLS_WITH_WEBP.includes(`${k}-${crop}`) ? `/work/stills/${k}-${crop}.webp` : null
-  return {
-    wide: `/work/stills/${k}-wide.jpg`,
-    compact: `/work/stills/${k}-compact.jpg`,
-    wideWebp: webp("wide"),
-    compactWebp: webp("compact"),
-  }
-}
+const stillsFor = (r: WorkRecord) => (r.recordKey ? RECORD_MEDIA[r.recordKey]?.tile ?? null : null)
 /**
  * The card's loop, in both encodings.
  *
@@ -150,35 +88,18 @@ const stillsFor = (r: WorkRecord) => {
  * give size as the reason and that was wrong twice over — it is not why the
  * order matters, and it is not true: navier's WebM is the larger of the two.
  *
- * The manifest wins where it names the record. Everything else falls back to
- * the work/ prefix and the cap convention.
+ * Read from the manifest only.
  */
-const cardLoopFor = (r: WorkRecord) => {
-  const k = r.recordKey
-  if (!k) return null
-  const published = RECORD_MEDIA[k]?.loop
-  if (published) return published
-  const cap = ASSETS[k]?.cap
-  if (!cap) return null
-  const h = cap > 720 ? 720 : cap
-  return { webm: `${MEDIA}/${k}-loop-${h}p.webm`, mp4: `${MEDIA}/${k}-loop-${h}p.mp4` }
-}
+const cardLoopFor = (r: WorkRecord) => (r.recordKey ? RECORD_MEDIA[r.recordKey]?.loop ?? null : null)
 /**
  * The full film with its audio, requested only when the detail view opens.
  *
- * The manifest wins where it names the record, and carries both encodings. The
- * fifteen fall back to the work/ prefix and the cap convention, where only an
- * MP4 was ever published — so `webm` is optional and the element simply has one
- * source for them.
+ * Read from the manifest only. The fifteen older records were only ever encoded
+ * as MP4 for the detail view, so `webm` is optional and the element simply has
+ * one source for them.
  */
-const detailVideoFor = (r: WorkRecord): { webm?: string; mp4: string } | null => {
-  const k = r.recordKey
-  if (!k) return null
-  const published = RECORD_MEDIA[k]?.detail
-  if (published) return published
-  const cap = ASSETS[k]?.cap
-  return cap ? { mp4: `${MEDIA}/${k}-${cap}p.mp4` } : null
-}
+const detailVideoFor = (r: WorkRecord): { webm?: string; mp4: string } | null =>
+  r.recordKey ? RECORD_MEDIA[r.recordKey]?.detail ?? null : null
 
 /**
  * True once the window `load` event has fired, or immediately if it already has.

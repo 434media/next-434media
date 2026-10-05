@@ -49,7 +49,7 @@ on:
       - "app/work/**"
       - "public/work/**"
       - "lib/work-records.ts"
-      - "lib/work-stills-webp.ts"
+      - "lib/work-media.ts"
       - "lib/sor/work-page-data.ts"
       - "components/Footer.tsx"
       - "components/combined-navbar.tsx"
