@@ -310,7 +310,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2025 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 471 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 400 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 41.83s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Spun out of X, Alphabet's moonshot factory, it builds modular direct air capture systems that use waste heat to remove carbon dioxide from the atmosphere. Produced for Builders VC's 2025 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -328,7 +328,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2024 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 530 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 700 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 57.93s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Developing an acoustic AI model that detects health conditions from the human voice. Produced for Builders VC's 2024 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -346,7 +346,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2025 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 626 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 708 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 22.06s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Gives farmers, advisors and agents real-time tools to manage crop, livestock and revenue risk. Produced for Builders VC's 2025 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -364,7 +364,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2024 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 530 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 183 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 23.73s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Developing a biological approach to breaking down plastic waste. Produced for Builders VC's 2024 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -382,7 +382,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2025 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 430 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 0 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 22.44s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Uses precision fermentation and microalgae to produce specialty oils, licensing its processes to partners instead of building its own plants. Produced for Builders VC's 2025 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -400,7 +400,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2024 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 471 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 760 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 18.98s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "An MIT spinout building water treatment and recycling systems for industrial users. Produced for Builders VC's 2024 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -418,7 +418,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2024 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 430 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 143 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 67.19s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart. card-loop-duration; 10.85 s against the card's 11–14 s window in Display and Design Standard 3.0. Every interview shot in this film carries a client watermark, and the longest unbroken stretch without one is 10.85 s, so the loop is built at that length rather than run into the next interview shot; founder-approved 2026-10-04.",
     description: "Develops species-specific microbial products for animal health. Produced for Builders VC's 2024 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -436,7 +436,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2024 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 585 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 503 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 51.84s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Builds electric hydrofoil vessels and waterborne transit services for coastal cities. Produced for Builders VC's 2024 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -454,7 +454,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2025 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 626 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 470 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 29.61s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "A clinical-stage oncology company using AI and real-world clinical data to guide drug development and patient selection. Produced for Builders VC's 2025 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -472,7 +472,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2024 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 297 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 793 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 43.33s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Digitizing the VAT refund process for international travelers. Produced for Builders VC's 2024 annual general meeting, with 434 as co-executive producer, producer and editor.",
   },
   {
@@ -490,7 +490,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2025 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
     registeredIdentifier: null,
     video: null,
-    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 722 px.",
+    displayException: "tile-4x5-upscale; factor 1.39× from an 864×1080 crop, the widest 4:5 a 1080-tall source gives; beyond the 15% allowance in Display and Design Standard 3.1; founder-approved 2026-09-30; interim until higher-resolution stills are supplied. The 16:9 tile needs no upscale and is met exactly at 1920×1080. Left edge of the 4:5 window in the 1920×1080 frame: 450 px, chosen against the card's title zone and founder-approved 2026-10-04. Both crops are the first frame of the card loop, at 16.31s, so the still the card shows and the frame the loop opens on are the same picture and cannot drift apart.",
     description: "Manufactures quantum dot materials that improve how greenhouses, solar panels and other systems use light. Produced for Builders VC's 2025 annual general meeting, with 434 as co-executive producer, producer and editor.",
   }
 ]
