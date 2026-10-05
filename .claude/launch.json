@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "434-dev", "runtimeExecutable": "pnpm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+  ]
+}

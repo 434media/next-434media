@@ -33,6 +33,7 @@ import { getImageProps } from "next/image"
 import { STILLS_WITH_WEBP } from "@/lib/work-stills-webp"
 import { WORK_SECTIONS } from "@/lib/work-sections"
 import { COMMERCIAL_MODEL_DEFINITIONS } from "@/lib/commercial-models"
+import { RECORD_MEDIA } from "@/lib/work-media"
 import styles from "./work-redesign.module.css"
 
 /**
@@ -99,18 +100,17 @@ const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
   "que-es-sdoh": { still: true, cap: 1080 },
   "univision-70th": { still: true, cap: 1080 },
 
-  // Builders VC, master 2.0.27. Stills only, no `cap`, so no card loop and no
-  // detail video - the same shape as milcityusa and nucleate-global-summit.
+  // Builders VC. Their media is not described here: it is published under
+  // records/<key>/v1/ and resolved from the generated manifest in
+  // lib/work-media.ts, which is Display and Design Standard section 5's rule
+  // that the site reads delivered media from the manifest rather than by path
+  // convention. `still: true` is kept because the page still asks this map
+  // whether a record has a still at all.
   //
-  // Not an oversight. The loops and detail encodes would publish to the `work/`
-  // prefix this file's MEDIA constant points at, and the media pipeline's
-  // credential refuses to write outside `records/` and `review/`
-  // (build_media.py: "refusing to write outside records/ and review/"). Widening
-  // that guard was out of scope, so the video is held and the stills ship.
-  //
-  // Both crops are real: the 16:9 is the full 1920x1080 frame at no upscale, and
-  // the 4:5 is an 864x1080 window scaled x1.389 under the founder-approved
-  // exception each record carries in its 4.5 Display exception field.
+  // Through master 2.0.27 they had stills and nothing else, because a loop
+  // would have had to publish to the work/ prefix and the pipeline credential
+  // refuses to write outside records/ and review/. The fix was not to widen
+  // that guard: it was to stop addressing media by path.
   "280-earth": { still: true },
   "amplifier-health": { still: true },
   "ashbrook-technologies": { still: true },
@@ -127,6 +127,11 @@ const ASSETS: Record<string, { still?: boolean; cap?: number }> = {
 const stillsFor = (r: WorkRecord) => {
   const k = r.recordKey
   if (!k || !ASSETS[k]?.still) return null
+  // The manifest wins where it names the record. It carries a versioned path
+  // for every crop and both formats, so there is no WebP presence list to keep
+  // and no convention to re-derive.
+  const published = RECORD_MEDIA[k]?.tile
+  if (published) return published
   const webp = (crop: "wide" | "compact") =>
     STILLS_WITH_WEBP.includes(`${k}-${crop}`) ? `/work/stills/${k}-${crop}.webp` : null
   return {
@@ -137,14 +142,24 @@ const stillsFor = (r: WorkRecord) => {
   }
 }
 /**
- * The card's loop, in both encodings. WebM is listed first because it is the
- * smaller of the two for every record — measured, not assumed; VP9 was tuned
- * per record until that was true.
+ * The card's loop, in both encodings.
+ *
+ * WebM is listed first for codec preference, not for size: a browser takes the
+ * first source it can decode, so VP9 first is how a browser that supports it
+ * gets it and one that does not falls through to H.264. This comment used to
+ * give size as the reason and that was wrong twice over — it is not why the
+ * order matters, and it is not true: navier's WebM is the larger of the two.
+ *
+ * The manifest wins where it names the record. Everything else falls back to
+ * the work/ prefix and the cap convention.
  */
 const cardLoopFor = (r: WorkRecord) => {
   const k = r.recordKey
-  const cap = k ? ASSETS[k]?.cap : undefined
-  if (!k || !cap) return null
+  if (!k) return null
+  const published = RECORD_MEDIA[k]?.loop
+  if (published) return published
+  const cap = ASSETS[k]?.cap
+  if (!cap) return null
   const h = cap > 720 ? 720 : cap
   return { webm: `${MEDIA}/${k}-loop-${h}p.webm`, mp4: `${MEDIA}/${k}-loop-${h}p.mp4` }
 }
