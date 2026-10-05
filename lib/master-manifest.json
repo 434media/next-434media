@@ -2,15 +2,15 @@
   "masterVersion": "2.0.30",
   "masterDate": "October 4, 2026",
   "masterSha256": "428c43da782dd430",
-  "generated": "2026-10-04",
+  "generated": "2026-10-05",
   "artifacts": {
     "work-records.ts": "de7a50c1d8677b1c",
     "brand-records.ts": "c6c4d26df06b07e8",
     "work-sections.ts": "dd14eb464594047f",
     "commercial-models.ts": "5ae251c892c05f8b",
-    "work-media.ts": "6819e867ba1fc69a"
+    "work-media.ts": "a3d3adafa3ef3460"
   },
   "seedSha256": "4424e77b1d278825",
   "sectionsSeedSha256": "e5e64cc34aa74b69",
-  "recordsManifestSha256": "d71cac95f12bcc8f"
+  "recordsManifestSha256": "f874c829ec3ee837"
 }

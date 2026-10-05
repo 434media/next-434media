@@ -60,29 +60,44 @@ function main(): void {
     fail([`Could not read models from ${SECTIONS_FILE}.`])
   }
 
-  // Every record the published manifest names must be one the page renders, and
-  // the page must prefer the manifest over the path convention. A manifest entry
-  // for a record the page never shows is media published to nobody; a component
-  // that reads the convention first would serve the old asset from a versioned
-  // bucket and look entirely correct.
+  // Every published record has its media in the manifest, and the manifest
+  // names nothing the page does not publish. Since 2026-10-05 all twenty-six
+  // are at records/<key>/v1/ and the page has no path convention to fall back
+  // to, so a record missing here renders with no still and no video and no
+  // error. A manifest entry for a record the page never shows is media
+  // published to nobody.
   const media = readFileSync("lib/work-media.ts", "utf8")
-  const mediaKeys = [...media.matchAll(/^  "([a-z0-9-]+)": \{$/gm)].map((m) => m[1])
-  if (mediaKeys.length === 0) {
-    fail(["lib/work-media.ts names no records."])
+  const mediaKeys = new Set([...media.matchAll(/^  "([a-z0-9-]+)": \{$/gm)].map((m) => m[1]))
+  const tileKeys = new Set([...media.matchAll(/^  "([a-z0-9-]+)": \{(?:(?!\n  \}).)*?\n      tile: \{/gms)].map((m) => m[1]))
+  const publishedKeys = WORK_RECORDS.map((r) => r.recordKey).filter((k): k is string => Boolean(k))
+  const noMedia = publishedKeys.filter((k) => !tileKeys.has(k))
+  if (noMedia.length > 0 || publishedKeys.length !== WORK_RECORDS.length) {
+    fail([
+      `${noMedia.length} published record(s) have no still in lib/work-media.ts:`,
+      ...noMedia.map((k) => `  ${k}`),
+      ...(publishedKeys.length !== WORK_RECORDS.length ? ["  (and a published record has no record key)"] : []),
+    ])
   }
-  for (const k of mediaKeys) {
-    if (!src.includes(`"${k}"`)) {
-      fail([`lib/work-media.ts names ${k}, which app/work/redesign/WorkRedesign.tsx does not.`])
+  const unpublished = [...mediaKeys].filter((k) => !publishedKeys.includes(k))
+  if (unpublished.length > 0) {
+    fail([`lib/work-media.ts names record(s) the page does not publish: ${unpublished.join(", ")}`])
+  }
+
+  // The page resolves every group from the manifest and from nothing else.
+  // Display and Design Standard section 5: no path convention. A convention
+  // left beside the manifest would serve the old asset from an unversioned path
+  // and look entirely correct.
+  for (const group of ["loop", "detail", "tile"]) {
+    if (!new RegExp(`RECORD_MEDIA\\[r\\.recordKey\\]\\?\\.${group} \\?\\? null`).test(src)) {
+      fail([`${PAGE} no longer resolves the ${group} from RECORD_MEDIA alone.`])
     }
   }
-  for (const group of ["loop", "detail", "tile"]) {
-    const re = new RegExp(
-      `const published = RECORD_MEDIA\\[k\\]\\?\\.${group}\\s*\\n\\s*if \\(published\\) return published`)
-    if (!re.test(src)) {
+  for (const convention of ["firebasestorage.app/work", "/work/stills/", "ASSETS", "STILLS_WITH_WEBP"]) {
+    if (src.includes(convention)) {
       fail([
-        `${PAGE} no longer prefers the published manifest for the ${group}.`,
-        "Each of the loop, the detail video and the tile must read RECORD_MEDIA",
-        "first and fall back to the path convention after.",
+        `${PAGE} still contains ${JSON.stringify(convention)}.`,
+        "Media is resolved from the stamped manifest only; a path convention",
+        "beside it is the thing section 5 removed.",
       ])
     }
   }
