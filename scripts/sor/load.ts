@@ -14,8 +14,21 @@
  * The schemas are canonical in the private context repo and are not in this
  * repository; pass --seed and --schemas, or run from a checkout that has both.
  *
+ * Writes only what changed. Every row is compared with the document already in
+ * Firestore on its content (the load stamps `updated_at` and `updated_by` are
+ * not content), and only added or changed rows are written, so the stamps record
+ * the last change rather than the last load. Every row written is then read
+ * back and compared again; any mismatch exits non-zero. A field Firestore holds
+ * and the seed does not is reported, never removed, the same rule as a whole
+ * document the seed does not have.
+ *
+ * Credentials: GOOGLE_SERVICE_ACCOUNT_KEY where it is set (the founder's machine,
+ * the site), otherwise Application Default Credentials, which is how CI
+ * authenticates through Workload Identity Federation with no stored key.
+ *
  * Usage:
  *   tsx scripts/sor/load.ts --dry-run
+ *   tsx scripts/sor/load.ts --plan [--fail-on-diff]
  *   tsx scripts/sor/load.ts --seed <dir> --schemas <dir> [--dry-run]
  */
 import { createHash } from "node:crypto"
@@ -48,6 +61,8 @@ const TABLES = [
 const DRY = process.argv.includes("--dry-run")
 /** Reads Firestore and writes nothing: reports what a load would add, change or leave alone. */
 const PLAN = process.argv.includes("--plan")
+/** With --plan: exit 1 when Firestore and the seed differ at all, so a scheduled run reports it. */
+const FAIL_ON_DIFF = process.argv.includes("--fail-on-diff")
 
 function arg(name: string, fallbacks: string[]): string {
   const i = process.argv.indexOf(`--${name}`)
@@ -73,6 +88,55 @@ function enumKey(value: unknown): string {
 }
 
 type Row = Record<string, unknown> & { key: string }
+
+/** Written by the loader on every row it writes; not content, so never compared. */
+const STAMPS = new Set(["updated_at", "updated_by"])
+const MISSING = Symbol("missing")
+
+/**
+ * JSON with keys sorted at every depth, so two equal values serialize equally
+ * whatever order Firestore returns their keys in. The previous comparison passed
+ * the top-level keys as a JSON.stringify replacer, which also filters nested
+ * objects by that list: a change inside `work_page` was invisible to it. That
+ * was harmless while every row was written regardless and is not now.
+ */
+function canonical(v: unknown): string {
+  if (v === MISSING) return "<missing>"
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>
+    return `{${Object.keys(o).sort().map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`).join(",")}}`
+  }
+  return JSON.stringify(v === undefined ? null : v)
+}
+
+/** A row's content and the same fields of a document, both canonical. */
+function compare(row: Row, doc: Record<string, unknown> | undefined) {
+  const keys = Object.keys(row).filter((k) => !STAMPS.has(k))
+  const want = canonical(Object.fromEntries(keys.map((k) => [k, row[k]])))
+  if (!doc) return { state: "add" as const, extra: [] as string[] }
+  const got = canonical(Object.fromEntries(keys.map((k) => [k, k in doc ? doc[k] : MISSING])))
+  const extra = Object.keys(doc).filter((k) => !STAMPS.has(k) && !(k in row)).sort()
+  return { state: want === got ? ("same" as const) : ("change" as const), extra }
+}
+
+async function database() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    const { getDb } = await import("../../lib/firebase-admin")
+    return getDb()
+  }
+  // Workload Identity Federation: google-github-actions/auth leaves a short-lived
+  // external-account credential behind GOOGLE_APPLICATION_CREDENTIALS, and
+  // firebase-admin's applicationDefault() reads it through google-auth-library.
+  const admin = (await import("firebase-admin")).default
+  const app = admin.apps[0] ?? admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+    projectId: process.env.GOOGLE_CLOUD_PROJECT ?? "groovy-ego-462522-v2",
+  })
+  const db = app.firestore()
+  try { db.settings({ ignoreUndefinedProperties: true }) } catch { /* already set */ }
+  return db
+}
 type Planned = { collection: string; rows: Row[] }
 
 /**
@@ -216,62 +280,85 @@ async function main() {
     return
   }
 
-  // --plan reads Firestore and writes nothing. Everything above has already
-  // validated, so a plan that prints is a load that would have succeeded.
+  // Both --plan and a load start from the same comparison, so a plan that
+  // prints is exactly the set of writes a load would make.
   //
   // Rows in Firestore that the seed does not have are REPORTED, never removed.
   // The loader has no delete path and this does not add one: a row the seed has
   // dropped may be a record the master retired, or may be a seed that is behind,
-  // and only a person can tell those apart.
-  if (PLAN) {
-    const { getDb } = await import("../../lib/firebase-admin")
-    const db = getDb()
-    console.log(`\nPLAN — reading Firestore, writing nothing.`)
-    let add = 0, chg = 0, same = 0, extra = 0
-    for (const p of planned) {
-      const snap = await db.collection(p.collection).get()
-      const live = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]))
-      const seedKeys = new Set(p.rows.map((r) => r.key))
-      const a: string[] = [], c: string[] = [], u: string[] = []
-      for (const row of p.rows) {
-        const cur = live.get(row.key)
-        if (!cur) { a.push(row.key); continue }
-        // updated_at/updated_by are written by the loader, not carried by the
-        // seed, so comparing them would mark every row changed on every run.
-        const strip = (o: Record<string, unknown>) => {
-          const { updated_at, updated_by, ...rest } = o
-          return JSON.stringify(rest, Object.keys(rest).sort())
-        }
-        if (strip(cur) === strip(row as unknown as Record<string, unknown>)) u.push(row.key)
-        else c.push(row.key)
-      }
-      const only = [...live.keys()].filter((k) => !seedKeys.has(k)).sort()
-      add += a.length; chg += c.length; same += u.length; extra += only.length
-      console.log(`\n  ${p.collection}`)
-      console.log(`    add       ${String(a.length).padStart(3)}${a.length ? "  " + a.join(" ") : ""}`)
-      console.log(`    change    ${String(c.length).padStart(3)}${c.length ? "  " + c.join(" ") : ""}`)
-      console.log(`    unchanged ${String(u.length).padStart(3)}`)
-      if (only.length) console.log(`    IN FIRESTORE, NOT IN SEED  ${only.length}  ${only.join(" ")}   (reported, never removed)`)
+  // and only a person can tell those apart. The same holds for a field.
+  const db = await database()
+  console.log(PLAN ? `\nPLAN — reading Firestore, writing nothing.` : `\nLOAD — writing only rows whose content changed.`)
+  const toWrite: { collection: string; row: Row }[] = []
+  let add = 0, chg = 0, same = 0, extra = 0, extraFields = 0
+  for (const p of planned) {
+    const snap = await db.collection(p.collection).get()
+    const live = new Map(snap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]))
+    const seedKeys = new Set(p.rows.map((r) => r.key))
+    const a: string[] = [], c: string[] = [], f: string[] = []
+    let u = 0
+    for (const row of p.rows) {
+      const r = compare(row, live.get(row.key))
+      if (r.state === "add") a.push(row.key)
+      else if (r.state === "change") c.push(row.key)
+      else u++
+      if (r.state !== "same") toWrite.push({ collection: p.collection, row })
+      for (const k of r.extra) f.push(`${row.key}.${k}`)
     }
-    console.log(`\n  TOTAL  add ${add} · change ${chg} · unchanged ${same} · firestore-only ${extra}`)
+    const only = [...live.keys()].filter((k) => !seedKeys.has(k)).sort()
+    add += a.length; chg += c.length; same += u; extra += only.length; extraFields += f.length
+    if (!a.length && !c.length && !only.length && !f.length) continue
+    console.log(`\n  ${p.collection}`)
+    console.log(`    add       ${String(a.length).padStart(3)}${a.length ? "  " + a.join(" ") : ""}`)
+    console.log(`    change    ${String(c.length).padStart(3)}${c.length ? "  " + c.join(" ") : ""}`)
+    console.log(`    unchanged ${String(u).padStart(3)}`)
+    if (only.length) console.log(`    IN FIRESTORE, NOT IN SEED  ${only.length}  ${only.join(" ")}   (reported, never removed)`)
+    if (f.length) console.log(`    FIELDS IN FIRESTORE, NOT IN SEED  ${f.length}  ${f.join(" ")}   (reported, never removed)`)
+  }
+  console.log(`\n  TOTAL  add ${add} · change ${chg} · unchanged ${same} · firestore-only ${extra} · firestore-only fields ${extraFields}`)
+
+  if (PLAN) {
     console.log(`  Nothing was written.`)
+    if (FAIL_ON_DIFF && (add || chg || extra || extraFields)) {
+      console.error(`\nDIFFERENCE — Firestore and the seed disagree. A load would write ${add + chg} row(s).`)
+      process.exit(1)
+    }
     return
   }
 
-  const { getDb } = await import("../../lib/firebase-admin")
-  const db = getDb()
-  for (const p of planned) {
-    // 500 is Firestore's documented per-batch write limit.
-    for (let i = 0; i < p.rows.length; i += 400) {
-      const batch = db.batch()
-      for (const row of p.rows.slice(i, i + 400)) {
-        batch.set(db.collection(p.collection).doc(row.key), row, { merge: true })
-      }
-      await batch.commit()
-    }
-    console.log(`  wrote ${p.collection}: ${p.rows.length}`)
+  if (toWrite.length === 0) {
+    console.log(`\nNothing to write: Firestore already matches the seed.`)
+    return
   }
-  console.log(`\nLoaded ${total} rows.`)
+  // 500 is Firestore's documented per-batch write limit.
+  for (let i = 0; i < toWrite.length; i += 400) {
+    const batch = db.batch()
+    for (const { collection, row } of toWrite.slice(i, i + 400)) {
+      batch.set(db.collection(collection).doc(row.key), row, { merge: true })
+    }
+    await batch.commit()
+  }
+  console.log(`\nWrote ${toWrite.length} row(s).`)
+
+  // Read every written row back and compare it again. A commit that returned is
+  // not proof of what Firestore now holds.
+  const mismatches: string[] = []
+  for (let i = 0; i < toWrite.length; i += 100) {
+    const chunk = toWrite.slice(i, i + 100)
+    const docs = await db.getAll(...chunk.map(({ collection, row }) => db.collection(collection).doc(row.key)))
+    docs.forEach((d, j) => {
+      const { collection, row } = chunk[j]
+      if (!d.exists || compare(row, d.data() as Record<string, unknown>).state !== "same") {
+        mismatches.push(`${collection}/${row.key}`)
+      }
+    })
+  }
+  if (mismatches.length) {
+    console.error(`\nREAD-BACK MISMATCH — ${mismatches.length} row(s) do not match what was written:`)
+    for (const m of mismatches) console.error(`  ${m}`)
+    process.exit(1)
+  }
+  console.log(`Read back ${toWrite.length} row(s): all match.`)
 }
 
 main().catch((e) => {
