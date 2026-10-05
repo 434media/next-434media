@@ -31,33 +31,27 @@ import type { WorkRecord } from "@/lib/work-records"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 import { getImageProps } from "next/image"
 import { STILLS_WITH_WEBP } from "@/lib/work-stills-webp"
+import { WORK_SECTIONS } from "@/lib/work-sections"
+import { COMMERCIAL_MODEL_DEFINITIONS } from "@/lib/commercial-models"
 import styles from "./work-redesign.module.css"
 
 /**
- * The three commercial models, in the order the design fixes, with the
- * definitions verbatim from master Section 4.3.
+ * The three commercial models, assembled rather than written here.
  *
- * The page previously carried longer sublines that embellished these. The
- * approved reference uses the master's own wording and so does this.
+ * The order comes from the record seed (lib/work-sections.ts) and each
+ * definition from master 4.3 (lib/commercial-models.ts), both generated. This
+ * component used to carry its own copy of all three definitions, verbatim from
+ * the master, which is a governing string living in a component where nothing
+ * could tell you it had drifted.
+ *
+ * The label is a formatting of position and model, so it is derived and not
+ * stored anywhere.
  */
-const SECTIONS = [
-  {
-    model: "Original IP",
-    label: "01 / Original IP",
-    definition: "Media properties and original productions owned by 434 MEDIA.",
-  },
-  {
-    model: "Platforms for Brands",
-    label: "02 / Platforms for Brands",
-    definition:
-      "Integrated, multi-part programs or properties developed or produced for a client.",
-  },
-  {
-    model: "Productions for Brands",
-    label: "03 / Productions for Brands",
-    definition: "Defined content or live-experience engagements produced for a client.",
-  },
-] as const
+const SECTIONS = WORK_SECTIONS.map((s) => ({
+  model: s.model,
+  label: `${String(s.position).padStart(2, "0")} / ${s.model}`,
+  definition: COMMERCIAL_MODEL_DEFINITIONS[s.model] ?? "",
+}))
 
 /**
  * Stills and video, keyed by record key.

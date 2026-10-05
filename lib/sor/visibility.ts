@@ -50,6 +50,9 @@ const INTERNAL_COLLECTIONS = new Set([
   // Names systems that are not built yet and says what to do meanwhile. Useful
   // to a job, and a map of what 434 has not finished to anyone else.
   "launch_dependencies",
+  // Master 4.11: this history must never imply artist management,
+  // marketing representation, or exclusivity. Internal only.
+  "talent_relationships",
   "policy_documents",
 ])
 
