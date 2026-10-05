@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
 // Written by 434media/434-context: 04 Build/master_extract.py from the canonical master.
-// Master version 2.0.29 (October 4, 2026). Regenerate after any section 4.3 change.
+// Master version 2.0.30 (October 4, 2026). Regenerate after any section 4.3 change.
 //
 // Each definition is the first paragraph under its 4.3 heading, verbatim.
 // The Work page renders them and must not restate or embellish them. The
