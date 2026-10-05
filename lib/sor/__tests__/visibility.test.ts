@@ -156,20 +156,31 @@ test("public scope cannot read internal collections at all", () => {
   }
 })
 
+/**
+ * Fixtures are synthetic on purpose. This repository is public, and these three
+ * lines carried a real gate, a real internal cost and a real cost basis, copied
+ * from the rate card — published to anyone, in a file that exists to prove those
+ * very figures never reach a public caller.
+ *
+ * The amounts below are deliberately unreal. What the test asserts is the layer
+ * rule and the field stripping, neither of which depends on the number being
+ * true. A fixture never carries a figure from the seed; the context repository
+ * has a pre-merge check that fails when one does.
+ */
 test("rate card: public scope returns anchors only", () => {
   const lines = [
-    { key: "productions-anchor", layer: "public_anchor", amount: { amount_minor: 2500000, currency: "USD" } },
-    { key: "platforms-minimum", layer: "fixed_minimum", amount: { amount_minor: 10000000, currency: "USD" } },
-    { key: "editing", layer: "internal_cost", amount: { amount_minor: 12500, currency: "USD" }, cost_basis: "$65 (derived)" },
+    { key: "anchor-example", layer: "public_anchor", amount: { amount_minor: 111100, currency: "USD" } },
+    { key: "minimum-example", layer: "fixed_minimum", amount: { amount_minor: 222200, currency: "USD" } },
+    { key: "cost-example", layer: "internal_cost", amount: { amount_minor: 333300, currency: "USD" }, cost_basis: "$44 (synthetic)" },
   ]
   const pub = projectAll("rate_card_lines", lines, "public")
   assert.equal(pub.length, 1)
-  assert.equal(pub[0].key, "productions-anchor")
+  assert.equal(pub[0].key, "anchor-example")
   assert.equal(projectAll("rate_card_lines", lines, "internal").length, 3)
 })
 
 test("an internal cost line never leaks its cost basis", () => {
-  const line = { key: "editing", layer: "internal_cost", cost_basis: "$65 (derived)" }
+  const line = { key: "cost-example", layer: "internal_cost", cost_basis: "$44 (synthetic)" }
   assert.equal(project("rate_card_lines", line, "public"), null)
   // and even if the layer were mislabelled, the field itself is stripped
   assert.equal(project("rate_card_lines", { ...line, layer: "public_anchor" }, "public")?.cost_basis, undefined)
