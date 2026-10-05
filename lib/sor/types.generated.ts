@@ -18,6 +18,20 @@ export interface OutboundCohort {
   proof: {
     portfolio_record: string | null
     as_written: string
+    /**
+     * Where this proof comes from when it is not one named record. A cohort may cite a class of proof — a collection, or a query across one — and before this that was a string the extractor tried to guess a record key from, failing silently when it could not. `restriction` names a master rule that governs anything written from the rows it returns.
+     */
+    selector?: null | {
+      collection: "portfolio_records" | "talent_relationships"
+      where?: {
+        [k: string]: string
+      }
+      restriction?: string | null
+    }
+    /**
+     * True where the proof is deliberately not a record and never will be — founder biography, for instance. Stated rather than inferred: this used to be a string match on the word 'founder' in the extractor, which excused the one case that was right and would have excused the next one that was not.
+     */
+    non_record?: boolean
   }[]
   narrative?: string | null
   first_pitch: string
@@ -34,6 +48,19 @@ export interface OutboundCohort {
   source?: string
   updated_at?: string
   updated_by?: string
+}
+
+/**
+ * A constraint on outbound for one cohort: a first-pitch constraint, an operating rule, a hard escalation, a founder review. These were generated and validated for weeks and loaded by nothing, so the systems doing outbound could not see them.
+ */
+export interface CohortRule {
+  key: string
+  cohort: "A" | "B" | "C" | "D" | "E"
+  kind: string
+  text: string
+  source: string
+  updated_at?: string | null
+  updated_by?: string | null
 }
 
 /**
@@ -246,7 +273,8 @@ export interface WorkPageSection {
 
 /** sha256[:16] of each source schema, for the drift check in the context repository. */
 export const sorSchemaHashes = {
-    "cohort.schema.json": "14255713087a8896",
+    "cohort.schema.json": "3c8be15db7b4fe80",
+    "cohort_rule.schema.json": "6dba9c5ea2c43de8",
     "contractor.schema.json": "0e30b1e384417bfe",
     "launch_dependency.schema.json": "b60a01e2bf2af341",
     "partner_service.schema.json": "27d5fa1bf7ad7543",
