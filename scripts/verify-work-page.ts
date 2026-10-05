@@ -60,6 +60,29 @@ function main(): void {
     fail([`Could not read models from ${SECTIONS_FILE}.`])
   }
 
+  // Every record the published manifest names must be one the page renders, and
+  // the page must prefer the manifest over the path convention. A manifest entry
+  // for a record the page never shows is media published to nobody; a component
+  // that reads the convention first would serve the old asset from a versioned
+  // bucket and look entirely correct.
+  const media = readFileSync("lib/work-media.ts", "utf8")
+  const mediaKeys = [...media.matchAll(/^  "([a-z0-9-]+)": \{$/gm)].map((m) => m[1])
+  if (mediaKeys.length === 0) {
+    fail(["lib/work-media.ts names no records."])
+  }
+  for (const k of mediaKeys) {
+    if (!src.includes(`"${k}"`)) {
+      fail([`lib/work-media.ts names ${k}, which app/work/redesign/WorkRedesign.tsx does not.`])
+    }
+  }
+  if (!/const published = RECORD_MEDIA\[k\]\?\.loop\s*\n\s*if \(published\) return published/.test(src) ||
+      !/const published = RECORD_MEDIA\[k\]\?\.tile\s*\n\s*if \(published\) return published/.test(src)) {
+    fail([
+      `${PAGE} no longer prefers the published manifest over the path convention.`,
+      "Both the loop and the tile must read RECORD_MEDIA first and fall back after.",
+    ])
+  }
+
   // The component must build its sections from that file rather than listing
   // them again. A second copy is how the page and the seed drift apart.
   if (!/const SECTIONS = WORK_SECTIONS\.map\(/.test(src)) {

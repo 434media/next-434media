@@ -47,6 +47,7 @@ ARTIFACTS = {
     "brand-records.ts": ROOT / "lib" / "brand-records.ts",
     "work-sections.ts": ROOT / "lib" / "work-sections.ts",
     "commercial-models.ts": ROOT / "lib" / "commercial-models.ts",
+    "work-media.ts": ROOT / "lib" / "work-media.ts",
 }
 MASTER = (
     ROOT
@@ -64,6 +65,9 @@ SEED = (
 SECTIONS_SEED = (
     ROOT / "docs" / "context" / "05 System of Record" / "seed" / "work_page_sections.json"
 )
+# The media map's source is the manifest published beside the objects, not a
+# seed and not the master — a third kind of source, so a third hash.
+RECORDS_MANIFEST = ROOT / "docs" / "context" / "04 Build" / "records-media-manifest.json"
 
 REGENERATE = (
     'python3 docs/context/"05 System of Record"/scripts/emit_work_records.py \\\n'
@@ -71,7 +75,9 @@ REGENERATE = (
     '        python3 docs/context/"05 System of Record"/scripts/emit_work_sections.py \\\n'
     '          docs/context/"05 System of Record"/seed lib/work-sections.ts\n'
     '        python3 docs/context/"04 Build"/master_extract.py \\\n'
-    "          --emit-brand lib/brand-records.ts --emit-models lib/commercial-models.ts"
+    "          --emit-brand lib/brand-records.ts --emit-models lib/commercial-models.ts\n"
+    '        python3 docs/context/"04 Build"/emit_work_media.py \\\n'
+    '          docs/context/"04 Build"/records-media-manifest.json lib/work-media.ts'
 )
 
 OK = "ok"
@@ -138,6 +144,7 @@ def main() -> int:
     generated_on = manifest.get("generated")
     generated_seed = manifest.get("seedSha256")
     generated_sections = manifest.get("sectionsSeedSha256")
+    generated_media = manifest.get("recordsManifestSha256")
     recorded = manifest.get("artifacts") or {}
 
     # ── 2. Hand-edit check. Needs no master, so it always runs. ──────────────
@@ -169,6 +176,9 @@ def main() -> int:
             version_state = OK
 
     # ── 1b. Seed staleness, for the artifact the seed now owns. ─────────────
+    current_media = digest_of(RECORDS_MANIFEST)
+    media_stale = (current_media is not None and generated_media is not None
+                   and current_media != generated_media)
     current_sections = digest_of(SECTIONS_SEED)
     sections_stale = (current_sections is not None and generated_sections is not None
                       and current_sections != generated_sections)
@@ -192,6 +202,10 @@ def main() -> int:
         print(f"seed           MOVED — manifest {generated_seed}, file {current_seed}")
     else:
         print(f"seed           {current_seed} — matches")
+    if media_stale:
+        print(f"records man.   MOVED — manifest {generated_media}, file {current_media}")
+    elif current_media is not None and generated_media is not None:
+        print(f"records man.   {current_media} — matches")
     if sections_stale:
         print(f"sections seed  MOVED — manifest {generated_sections}, file {current_sections}")
     elif current_sections is not None and generated_sections is not None:
@@ -227,6 +241,12 @@ def main() -> int:
         print(f"FAIL  {', '.join(drifted)} does not match its manifest hash.")
         print("      Generated output. Either it was hand-edited, or a formatter")
         print("      rewrote it. Do not fix it by hand — regenerate:")
+        print(f"        {REGENERATE}")
+        return 1
+
+    if media_stale:
+        print("FAIL  04 Build/records-media-manifest.json has changed since")
+        print("      lib/work-media.ts was written. Regenerate:")
         print(f"        {REGENERATE}")
         return 1
 
