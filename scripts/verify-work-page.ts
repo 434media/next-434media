@@ -36,6 +36,11 @@ import { readFileSync } from "node:fs"
 import { WORK_RECORDS } from "../lib/work-records"
 
 const PAGE = "app/work/redesign/WorkRedesign.tsx"
+// The order the page groups by is generated from the record seed, so read the
+// models from there rather than from a literal in the component. The component
+// used to carry its own copy; it now derives SECTIONS from this file, and the
+// check below holds it to that.
+const SECTIONS_FILE = "lib/work-sections.ts"
 const SERVER = "app/work/page.tsx"
 const DATA = "lib/sor/work-page-data.ts"
 
@@ -47,16 +52,22 @@ function fail(lines: string[]): never {
 function main(): void {
   const src = readFileSync(PAGE, "utf8")
 
-  // The section models the page groups by, read from SECTIONS.
-  const marker = "const SECTIONS = ["
-  const metaStart = src.indexOf(marker)
-  if (metaStart === -1) {
-    fail([`Could not find SECTIONS in ${PAGE}.`])
-  }
-  const meta = src.slice(metaStart, src.indexOf("] as const", metaStart))
-  const sections = [...meta.matchAll(/model: "([^"]+)"/g)].map((m) => m[1])
+  // The section models the page groups by, read from the generated order.
+  const sections = [
+    ...readFileSync(SECTIONS_FILE, "utf8").matchAll(/model: "([^"]+)"/g),
+  ].map((m) => m[1])
   if (sections.length === 0) {
-    fail([`Could not read SECTIONS models from ${PAGE}.`])
+    fail([`Could not read models from ${SECTIONS_FILE}.`])
+  }
+
+  // The component must build its sections from that file rather than listing
+  // them again. A second copy is how the page and the seed drift apart.
+  if (!/const SECTIONS = WORK_SECTIONS\.map\(/.test(src)) {
+    fail([
+      `${PAGE} no longer derives SECTIONS from ${SECTIONS_FILE}.`,
+      "The order is canonical in the record seed. A literal here is a second",
+      "copy of it, and nothing would tell you the two had diverged.",
+    ])
   }
 
   // The page must group by mapping SECTIONS and selecting each section's

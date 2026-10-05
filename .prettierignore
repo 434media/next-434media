@@ -4,4 +4,6 @@
 # drift check in scripts/check_drift.py. Regenerate rather than reformat.
 lib/work-records.ts
 lib/brand-records.ts
+lib/work-sections.ts
+lib/commercial-models.ts
 lib/master-manifest.json

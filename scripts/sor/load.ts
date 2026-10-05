@@ -35,6 +35,11 @@ const TABLES = [
   { seed: "partner_services.json", collection: "partner_services", schema: "partner_service" },
   { seed: "rate_card.json", collection: "rate_card_lines", schema: "rate_card_line", optional: true },
   { seed: "launch_dependencies.json", collection: "launch_dependencies", schema: "launch_dependency" },
+  // Internal by policy, not by accident: master 4.11 forbids using a talent
+  // history to imply management or representation, and a public read is the
+  // shortest route to exactly that. See INTERNAL_COLLECTIONS in lib/sor/visibility.ts.
+  { seed: "talent_relationships.json", collection: "talent_relationships", schema: "talent_relationship" },
+  { seed: "work_page_sections.json", collection: "work_page_sections", schema: "work_page_section" },
 ] as const
 
 const DRY = process.argv.includes("--dry-run")

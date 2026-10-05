@@ -219,6 +219,31 @@ export interface RateCardLine {
   updated_by?: string
 }
 
+/**
+ * A recurring talent collaborator and the engagements they appeared in. Master 4.11 holds the rules: talent is credited within the production, a recurring relationship is not a standalone portfolio title, and this history must never be used to imply artist management, marketing representation, or exclusivity. That last rule is why these rows are internal.
+ */
+export interface TalentRelationship {
+  key: string
+  name: string
+  relationship_type: string
+  relevant_engagements_as_written: string
+  source: string
+  updated_at?: string | null
+  updated_by?: string | null
+}
+
+/**
+ * The order the Work page presents the three commercial models in. Model and position only: the label is a formatting of the two, and the definition stays canonical in master 4.3 and is generated into the website from there, so it is not duplicated here.
+ */
+export interface WorkPageSection {
+  key: string
+  model: string
+  position: number
+  source: string
+  updated_at?: string | null
+  updated_by?: string | null
+}
+
 /** sha256[:16] of each source schema, for the drift check in the context repository. */
 export const sorSchemaHashes = {
     "cohort.schema.json": "14255713087a8896",
@@ -228,5 +253,7 @@ export const sorSchemaHashes = {
     "policy_document.schema.json": "4e1d0184b8692961",
     "portfolio_record.schema.json": "299576a4a45c00dc",
     "qualification_threshold.schema.json": "4b346713da931afd",
-    "rate_card_line.schema.json": "099711957961ffe2"
+    "rate_card_line.schema.json": "099711957961ffe2",
+    "talent_relationship.schema.json": "f0414d7b7a227ea1",
+    "work_page_section.schema.json": "af3bd0fab24e4fe8"
   } as const

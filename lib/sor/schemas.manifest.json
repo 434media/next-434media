@@ -8,7 +8,9 @@
     "policy_document.schema.json": "4e1d0184b8692961",
     "portfolio_record.schema.json": "299576a4a45c00dc",
     "qualification_threshold.schema.json": "4b346713da931afd",
-    "rate_card_line.schema.json": "099711957961ffe2"
+    "rate_card_line.schema.json": "099711957961ffe2",
+    "talent_relationship.schema.json": "f0414d7b7a227ea1",
+    "work_page_section.schema.json": "af3bd0fab24e4fe8"
   },
-  "typesBody": "681621f9a14b24b6"
+  "typesBody": "dd5a4d1a6e14ac5c"
 }

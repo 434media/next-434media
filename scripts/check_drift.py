@@ -45,6 +45,8 @@ MANIFEST = ROOT / "lib" / "master-manifest.json"
 ARTIFACTS = {
     "work-records.ts": ROOT / "lib" / "work-records.ts",
     "brand-records.ts": ROOT / "lib" / "brand-records.ts",
+    "work-sections.ts": ROOT / "lib" / "work-sections.ts",
+    "commercial-models.ts": ROOT / "lib" / "commercial-models.ts",
 }
 MASTER = (
     ROOT
@@ -59,12 +61,17 @@ MASTER = (
 SEED = (
     ROOT / "docs" / "context" / "05 System of Record" / "seed" / "portfolio_records.json"
 )
+SECTIONS_SEED = (
+    ROOT / "docs" / "context" / "05 System of Record" / "seed" / "work_page_sections.json"
+)
 
 REGENERATE = (
     'python3 docs/context/"05 System of Record"/scripts/emit_work_records.py \\\n'
     '          docs/context/"05 System of Record"/seed lib/work-records.ts\n'
+    '        python3 docs/context/"05 System of Record"/scripts/emit_work_sections.py \\\n'
+    '          docs/context/"05 System of Record"/seed lib/work-sections.ts\n'
     '        python3 docs/context/"04 Build"/master_extract.py \\\n'
-    "          --emit-brand lib/brand-records.ts"
+    "          --emit-brand lib/brand-records.ts --emit-models lib/commercial-models.ts"
 )
 
 OK = "ok"
@@ -72,11 +79,15 @@ STALE = "stale"
 UNKNOWN = "unknown"
 
 
-def seed_digest() -> Optional[str]:
-    """sha256 prefix of the record seed, or None if unreachable."""
-    if not SEED.exists():
+def digest_of(path: Path) -> Optional[str]:
+    """sha256 prefix of a seed file, or None if unreachable."""
+    if not path.exists():
         return None
-    return hashlib.sha256(SEED.read_bytes()).hexdigest()[:16]
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
+def seed_digest() -> Optional[str]:
+    return digest_of(SEED)
 
 
 def master_digest() -> Optional[str]:
@@ -126,6 +137,7 @@ def main() -> int:
     generated_hash = manifest.get("masterSha256")
     generated_on = manifest.get("generated")
     generated_seed = manifest.get("seedSha256")
+    generated_sections = manifest.get("sectionsSeedSha256")
     recorded = manifest.get("artifacts") or {}
 
     # ── 2. Hand-edit check. Needs no master, so it always runs. ──────────────
@@ -157,6 +169,9 @@ def main() -> int:
             version_state = OK
 
     # ── 1b. Seed staleness, for the artifact the seed now owns. ─────────────
+    current_sections = digest_of(SECTIONS_SEED)
+    sections_stale = (current_sections is not None and generated_sections is not None
+                      and current_sections != generated_sections)
     current_seed = seed_digest()
     if current_seed is None:
         seed_state = UNKNOWN
@@ -177,6 +192,10 @@ def main() -> int:
         print(f"seed           MOVED — manifest {generated_seed}, file {current_seed}")
     else:
         print(f"seed           {current_seed} — matches")
+    if sections_stale:
+        print(f"sections seed  MOVED — manifest {generated_sections}, file {current_sections}")
+    elif current_sections is not None and generated_sections is not None:
+        print(f"sections seed  {current_sections} — matches")
 
     if version_state is UNKNOWN:
         print("master         not reachable — docs/context is not mounted")
@@ -208,6 +227,12 @@ def main() -> int:
         print(f"FAIL  {', '.join(drifted)} does not match its manifest hash.")
         print("      Generated output. Either it was hand-edited, or a formatter")
         print("      rewrote it. Do not fix it by hand — regenerate:")
+        print(f"        {REGENERATE}")
+        return 1
+
+    if sections_stale:
+        print("FAIL  seed/work_page_sections.json has changed since lib/work-sections.ts")
+        print("      was written. The page order is canonical in the seed; regenerate:")
         print(f"        {REGENERATE}")
         return 1
 
