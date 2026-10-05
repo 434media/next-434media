@@ -4,7 +4,8 @@
   "masterSha256": "f126d9a3b5522e4b",
   "generated": "2026-10-04",
   "artifacts": {
-    "work-records.ts": "4a681b31eae97b4f",
+    "work-records.ts": "93acba3dcd0d82b7",
     "brand-records.ts": "ace1901efa08a1ae"
-  }
+  },
+  "seedSha256": "73393bdf1baf6294"
 }

@@ -149,6 +149,10 @@ export interface PortfolioRecord {
   internal_context?: string | null
   proof_assets_as_written?: string | null
   video?: string | null
+  /**
+   * A departure from the Display and Design Standard approved for this record, with its factor, the rule departed from, who approved it and when, and the condition that ends it. lib/sor/work-records.ts reads it.
+   */
+  display_exception?: string | null
   rights_defaults?: null | {
     creator: string
     copyright_notice: string
@@ -222,7 +226,7 @@ export const sorSchemaHashes = {
     "launch_dependency.schema.json": "b60a01e2bf2af341",
     "partner_service.schema.json": "27d5fa1bf7ad7543",
     "policy_document.schema.json": "4e1d0184b8692961",
-    "portfolio_record.schema.json": "65c1a6f335b83027",
+    "portfolio_record.schema.json": "299576a4a45c00dc",
     "qualification_threshold.schema.json": "4b346713da931afd",
     "rate_card_line.schema.json": "099711957961ffe2"
   } as const

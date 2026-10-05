@@ -1,6 +1,7 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
-// Written by 434media/434-context: 04 Build/master_extract.py from the canonical master.
-// Master version 2.0.28 (October 4, 2026). Regenerate after any section 4 change.
+// Written by 434media/434-context: 05 System of Record/scripts/emit_work_records.py
+// from seed/portfolio_records.json, which is canonical for these records.
+// The master holds the record standard and points here; it no longer holds the records.
 // Internal context, proof assets and restrictions are deliberately
 // excluded - they are not for public display.
 
@@ -33,7 +34,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     founderCredit: "Marcos Resendez — Creator, Executive Producer & Creative Director",
     collaboratorCredit: null,
     years: "2022–present",
-    status: "Active owned property",
+    status: "Active",
     publicUrl: null,
     recordKey: "salute-to-troops",
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
@@ -177,7 +178,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     founderCredit: "Marcos Resendez — Creator, Executive Producer, Conference Producer & Project Lead",
     collaboratorCredit: null,
     years: "2023–2026",
-    status: "Completed and handed off",
+    status: "Completed",
     publicUrl: "https://www.brdgsatx.com/",
     recordKey: "aim-health-summit",
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
@@ -267,7 +268,7 @@ export const WORK_RECORDS: WorkRecord[] = [
     founderCredit: "Marcos Resendez — Co-Producer & Technical Director",
     collaboratorCredit: null,
     years: "2026",
-    status: "Event-production scope completed",
+    status: "Completed",
     publicUrl: null,
     recordKey: "nucleate-global-summit",
     rightsDefaults: "Creator 434 MEDIA · Copyright notice © 2026 434 MEDIA · Credit line 434 MEDIA · Rights usage terms All rights reserved",
