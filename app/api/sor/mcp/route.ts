@@ -122,6 +122,18 @@ const handler = createMcpHandler((server) => {
     return json(await getOne("icp_cohorts", key, "internal"))
   })
 
+  server.registerTool("list_cohort_rules", {
+    description:
+      "Outbound constraints for a cohort: first-pitch constraints, operating rules, hard " +
+      "escalations, founder reviews. Internal only. Read these before writing outbound for a " +
+      "cohort — a hard escalation is a stop, not a style note.",
+    inputSchema: z.object({ cohort: z.enum(["A", "B", "C", "D", "E"]).optional() }),
+  }, async ({ cohort }, extra) => {
+    if (scopeOf(extra?.http?.authInfo) !== "internal") return denied("list_cohort_rules")
+    return json(await listCollection("cohort_rules", "internal",
+      (r) => !cohort || r.cohort === cohort))
+  })
+
   server.registerTool("get_threshold", {
     description:
       "Qualification thresholds for a subject. Internal, and never quoted to a prospect.",

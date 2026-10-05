@@ -44,6 +44,7 @@ export function isPublished(row: Record<string, unknown>): boolean {
 /** Collections a `public` caller may not read at all. */
 const INTERNAL_COLLECTIONS = new Set([
   "icp_cohorts",
+  "cohort_rules",
   "qualification_thresholds",
   "partner_services",
   "contractors",

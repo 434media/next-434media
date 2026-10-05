@@ -40,6 +40,9 @@ const TABLES = [
   // shortest route to exactly that. See INTERNAL_COLLECTIONS in lib/sor/visibility.ts.
   { seed: "talent_relationships.json", collection: "talent_relationships", schema: "talent_relationship" },
   { seed: "work_page_sections.json", collection: "work_page_sections", schema: "work_page_section" },
+  // Generated and validated for weeks and loaded by nothing, so the systems
+  // doing outbound could not see a hard escalation or a founder review.
+  { seed: "cohort_rules.json", collection: "cohort_rules", schema: "cohort_rule" },
 ] as const
 
 const DRY = process.argv.includes("--dry-run")
