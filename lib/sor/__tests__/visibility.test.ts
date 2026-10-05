@@ -214,6 +214,17 @@ test("withStaleFlag marks each row without mutating it", () => {
   assert.equal("stale" in rows[0], false)
 })
 
+test("core 2.11 rows never read as stale; snapshot and never-route rows do", () => {
+  const rows = [
+    { key: "c", tier: "core_2_11", last_reviewed: "2026-01-01" },
+    { key: "s", tier: "snapshot", last_reviewed: "2026-01-01" },
+    { key: "n", tier: "never_route", last_reviewed: "2026-01-01" },
+    { key: "c2", tier: "core_2_11", last_reviewed: undefined },
+  ]
+  const out = withStaleFlag(rows, new Date("2026-10-04T00:00:00Z"))
+  assert.deepEqual(out.map((r) => r.stale), [false, true, true, false])
+})
+
 test("staleness does not depend on the time of day the question is asked", () => {
   // The defect this pins: last_reviewed is a date, not a timestamp. Comparing it
   // as an instant made a review flip to stale partway through the 32nd day

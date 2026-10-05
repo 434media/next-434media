@@ -141,8 +141,13 @@ export function isStale(lastReviewed: string | null | undefined, now: Date = new
   return daysBetween(reviewed, now) > STALE_AFTER_DAYS
 }
 
-export function withStaleFlag<T extends { last_reviewed?: string | null }>(
+/**
+ * Core 2.11 rows never read as stale (founder decision, 2026-10-05): they route
+ * regardless of the snapshot, so a stale flag on them would tell a caller to
+ * withhold exactly the functions the master says always route.
+ */
+export function withStaleFlag<T extends { last_reviewed?: string | null; tier?: string | null }>(
   rows: T[], now: Date = new Date()
 ): (T & { stale: boolean })[] {
-  return rows.map((r) => ({ ...r, stale: isStale(r.last_reviewed, now) }))
+  return rows.map((r) => ({ ...r, stale: r.tier === "core_2_11" ? false : isStale(r.last_reviewed, now) }))
 }
