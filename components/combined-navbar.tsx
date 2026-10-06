@@ -8,11 +8,6 @@ import { usePathname } from "next/navigation"
 import CartModal from "./shopify/cart/modal"
 import { useCart } from "./shopify/cart/cart-context"
 import NavMenu from "./Navmenu"
-import type { Menu } from "../lib/shopify/types"
-
-type CombinedNavbarProps = {
-  menu?: Menu[]
-}
 
 // Custom hook to check if component has mounted
 function useHasMounted() {
@@ -25,8 +20,7 @@ function useHasMounted() {
   return hasMounted
 }
 
-export function CombinedNavbar(_props: CombinedNavbarProps) {
-  void _props
+export function CombinedNavbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const pathname = usePathname()
