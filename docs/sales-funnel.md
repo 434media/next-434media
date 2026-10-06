@@ -207,6 +207,9 @@ integration — no manual `vercel --prod`.
 
 **QA period toggles to revert when testing ends:** ~~remove `intern` from
 `SEND_CAPABLE_ROLES` ([`lib/auth.ts`](../lib/auth.ts))~~ (done — reverted at
-cohort offboarding), drop `SEQUENCE_STEP_GAP_MINUTES`, and restore the
-`vercel.json` outreach cron from the every-minute test schedule back to the
-weekday schedule.
+cohort offboarding), ~~restore the `vercel.json` outreach cron from the
+every-minute test schedule back to the weekday schedule~~ (done 2026-10-06, 2b
+fix 2: weekdays at 15:00 UTC), and ~~drop `SEQUENCE_STEP_GAP_MINUTES`~~ (done
+2026-10-06, deleted by the founder in the Vercel dashboard; it existed in
+Production only). Sequence testing adds it to Preview when it starts, and
+triggers the route by hand in a preview deployment.
