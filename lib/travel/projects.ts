@@ -19,7 +19,6 @@ export const TRAVEL_PROJECTS = {
           { code: "LAX", city: "Home", dates: "Oct 1–4", home: true },
           { code: "PHL", city: "Philadelphia", dates: "Oct 5–6" },
           { code: "SFO", city: "San Francisco", dates: "Oct 6–8" },
-          { code: "TBD", city: "Return", dates: "Oct 9–10" },
         ],
       },
     },

@@ -337,7 +337,7 @@ export default function TravelItinerary({
             <span>{shortDate(project.startDate)} – {shortDate(project.endDate)}</span>
             <span>{project.year}</span>
           </p>
-          <div className={styles.routeLine}>{traveler.routeStops.slice(0, -1).map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
+          <div className={styles.routeLine}>{traveler.routeStops.map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
           <h1>Your route, at a glance. Every time shows the clock at its airport.</h1>
         </section>
 
