@@ -337,7 +337,7 @@ export default function TravelItinerary({
             <span>{shortDate(project.startDate)} – {shortDate(project.endDate)}</span>
             <span>{project.year}</span>
           </p>
-          <div className={styles.routeLine}>{traveler.routeStops.slice(0, -1).map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
+          <div className={styles.routeLine}>{traveler.routeStops.map((stop, index) => <span key={`${stop.code}-${index}`}>{index > 0 && <b>→</b>}{stop.code}</span>)}</div>
           <h1>Your route, at a glance. Every time shows the clock at its airport.</h1>
         </section>
 
@@ -360,7 +360,7 @@ export default function TravelItinerary({
           </> : <><div className={styles.nextTime}>Pending</div><div className={styles.nextTitle}>Final outbound routing</div></>}
         </section>
 
-        <aside className={styles.alert}><span className={styles.label}>Open item</span><div><strong>Return from SFO is not booked.</strong><span>ATOMS and the final outbound plan remain open for October 9–10.</span></div></aside>
+        <aside className={styles.alert}><span className={styles.label}>Open item</span><div><strong>ATOMS filming is not yet scheduled.</strong></div></aside>
 
         <section className={styles.routeSection}>
           <div className={styles.sectionHead}><h2 className={styles.label}>Trip route</h2><p className={styles.label}>Swipe to scan</p></div>
