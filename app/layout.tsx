@@ -7,14 +7,13 @@ import { CombinedNavbar } from "@/components/combined-navbar"
 import { BRAND } from "@/lib/seo/brand"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 import Footer from "@/components/Footer"
-import { Analytics } from "@vercel/analytics/next"
 import { getCart } from "@/lib/shopify"
 import { CartProvider } from "@/components/shopify/cart/cart-context"
 import { PageTransition } from "@/components/shopify/page-transition"
 import { Suspense } from "react"
-import Script from "next/script"
 import { headers } from "next/headers"
 import { MetaPixel } from "@/components/MetaPixel"
+import { PublicHeadTrackers, PublicBodyTrackers } from "@/components/PublicTrackers"
 import { EXCLUDED_COUNTRY_CODES } from "@/lib/prospecting/scorer"
 
 const geistSans = Geist({
@@ -178,103 +177,11 @@ export default async function RootLayout({
   <link rel="alternate" hrefLang="es" href={`${siteUrl}/es`} />
   <link rel="alternate" hrefLang="x-default" href={`${siteUrl}/`} />
 
-        {/* Google Tag Manager */}
-        <Script id="google-tag-manager" strategy="afterInteractive">
-          {`
-            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-            })(window,document,'script','dataLayer','GTM-569XSBBR');
-          `}
-        </Script>
-        {/* End Google Tag Manager */}
-
-        {/* Google tag (gtag.js) — fetched after the window load event, by hand.
-
-            Not next/script. `strategy="lazyOnload"` defers EXECUTION but Next
-            still emits <link rel="preload" href="...gtag/js..." as="script">
-            into the HTML, so the 195.9 KB was fetched early regardless and sat
-            in flight 596-4,672 ms, across the whole of the LCP image's load
-            window on a throttled mobile link. Measured, not assumed.
-
-            So the fetch is done manually instead: a plain inline script that
-            appends the tag on `load`. Next does not preload a URL it never
-            sees, which is the entire point.
-
-            The queue is live from parse, deliberately. web.dev: "Analytics
-            scripts are usually loaded early so you don't miss any valuable
-            analytics data... there are patterns to initialize analytics lazily
-            while retaining early page-load data." dataLayer and window.gtag
-            exist immediately, so a call made before load is queued and replays
-            when the tag arrives. Only the bytes wait.
-
-            readyState is checked first because `load` has already fired on a
-            client-side navigation into a fresh mount, and a listener added then
-            would never run.
-
-            SITE-WIDE - this is the root layout, not the Work page. */}
-        <script
-          id="google-analytics"
-          dangerouslySetInnerHTML={{
-            __html: `
-            window.dataLayer = window.dataLayer || [];
-            window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
-            window.gtag('js', new Date());
-            window.gtag('config', 'G-FTWW298D70');
-            (function(){
-              function l(){
-                var s = document.createElement('script');
-                s.async = true;
-                s.src = 'https://www.googletagmanager.com/gtag/js?id=G-FTWW298D70';
-                document.head.appendChild(s);
-              }
-              if (document.readyState === 'complete') { l(); }
-              else { window.addEventListener('load', l); }
-            })();
-          `,
-          }}
-        />
+        {/* GTM, GA4 and LinkedIn: public routes only — see components/PublicTrackers.tsx */}
+        <PublicHeadTrackers />
 
         {/* Meta Pixel — gated by route and jurisdiction; see components/MetaPixel.tsx */}
         <MetaPixel pixelId={metaPixelId} />
-
-        {/* LinkedIn Pixel */}
-        <Script id="linkedin-pixel-init" strategy="afterInteractive">
-          {`
-            _linkedin_partner_id = "7445314";
-            window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-            window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-          `}
-        </Script>
-        <Script id="linkedin-pixel" strategy="afterInteractive">
-          {`
-            (function(l) {
-              if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
-              window.lintrk.q=[]}
-              var s = document.getElementsByTagName("script")[0];
-              var b = document.createElement("script");
-              b.type = "text/javascript";b.async = true;
-              b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-              s.parentNode.insertBefore(b, s);
-            })(window.lintrk);
-          `}
-        </Script>
-        <noscript>
-          <img
-            height="1"
-            width="1"
-            style={{ display: "none" }}
-            alt=""
-            src="https://px.ads.linkedin.com/collect/?pid=7445314&fmt=gif"
-          />
-        </noscript>
-        {/* Simpli.fi Retargeting Script */}
-        <Script
-          src="https://tag.simpli.fi/sifitag/5ea76a26-ff7f-46cf-b7d3-47031c857acb"
-          strategy="afterInteractive"
-          async
-        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${mendaBlack.variable} ${ggx88Font.variable} antialiased min-h-screen flex flex-col`}
@@ -374,16 +281,8 @@ export default async function RootLayout({
             })
           }}
         />
-        {/* Google Tag Manager (noscript) */}
-        <noscript>
-          <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-569XSBBR"
-            height="0"
-            width="0"
-            style={{ display: "none", visibility: "hidden" }}
-          />
-        </noscript>
-        {/* End Google Tag Manager (noscript) */}
+        {/* GTM (noscript): public routes only */}
+        <PublicBodyTrackers />
 
         <CartProvider cartPromise={cart}>
           <Suspense>
@@ -392,7 +291,6 @@ export default async function RootLayout({
           <main>
             <PageTransition>{children}</PageTransition>
           </main>
-          <Analytics />
           <Footer />
         </CartProvider>
       </body>

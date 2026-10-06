@@ -144,7 +144,6 @@ next-434media/
 │   ├── ai-gateway-*.ts           # Model registry + text generation
 │   ├── google-analytics.ts       # GA4 data fetching
 │   ├── mailchimp-*.ts            # Mailchimp config + analytics + tags
-│   ├── meta-conversions-api.ts   # Meta server-side tracking
 │   ├── prospecting/              # Apollo + ICP scoring + NL translator
 │   └── seo/                      # Structured data (services, FAQ, brand)
 ├── types/                        # Shared TypeScript types

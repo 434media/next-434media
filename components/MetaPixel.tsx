@@ -2,16 +2,16 @@
 
 import { usePathname } from "next/navigation"
 import Script from "next/script"
+import { isTrackedPath } from "@/lib/tracking-scope"
 
 /**
  * Meta Pixel, gated.
  *
  * This used to be an inline <script> in the root layout with the pixel ID
  * hardcoded, which meant three things:
- *   1. The ID was duplicated — the literal here and `META_PIXEL_ID` in
- *      lib/meta-server-tracking.ts (the Conversions API). Rotating the pixel
- *      changed one and silently left the other pointing at the old one. The ID
- *      is now passed in from the server layout, read from the same env var.
+ *   1. The ID was duplicated — the literal here and `META_PIXEL_ID` in the
+ *      Conversions API module (removed in 2b fix 6, never called). The ID is
+ *      passed in from the server layout, read from the env var.
  *   2. It fired on every route, `/admin` included, so the team's own CRM
  *      sessions were tracked into the same pixel as customer traffic.
  *   3. It fired for every visitor pre-consent, including EU/UK/EEA/Swiss and
@@ -24,14 +24,12 @@ import Script from "next/script"
  * a pixel mounted that was allowed on the entry route.
  */
 
-/** Surfaces that are never tracked — internal tooling and the full-screen deck. */
-const UNTRACKED_PREFIXES = ["/admin", "/squads"]
-
 export function MetaPixel({ pixelId }: { pixelId: string }) {
   const pathname = usePathname()
 
   if (!pixelId) return null
-  if (UNTRACKED_PREFIXES.some((p) => pathname?.startsWith(p))) return null
+  // /admin, /travel and /squads: see UNTRACKED_PREFIXES in lib/tracking-scope.ts.
+  if (!isTrackedPath(pathname)) return null
 
   return (
     <>
