@@ -1,42 +1,48 @@
 import type { Metadata } from "next"
 import { ContactPageClient } from "./ContactPageClient"
+import { BRAND } from "@/lib/seo/brand"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 
+// Master 9.5 (Start a production), 9.7 (metadata) and 1.1 (the definition,
+// read from the generated extract rather than restated).
+const description = `${BRAND.description} Tell us what you want to produce.`
+const socialTitle = `Start a production | ${BRAND.name}`
+
 export const metadata: Metadata = {
-  title: "Contact Us",
-  description:
-    "Take the next step with 434 MEDIA. We partner with venture capital firms, accelerators, startups, and industry leaders to create bold, strategic content that delivers results.",
+  title: "Start a production",
+  description,
   keywords: [
     "contact 434 MEDIA",
-    "San Antonio marketing agency",
-    "video production contact",
-    "brand storytelling services",
-    "ROI-driven media strategy",
-    "event production quote",
+    "start a production",
+    "production studio",
+    "production company",
+    "original IP",
+    "brand studio",
+    "live-event production",
+    "documentary production",
+    "San Antonio production studio",
   ],
   alternates: {
     canonical: "/contact",
   },
   openGraph: {
-    title: "Contact 434 MEDIA | Get Started Today",
-    description:
-      "Ready to create bold, strategic content that delivers results? Contact 434 MEDIA for ROI-driven media strategies, brand storytelling, and video production services.",
+    title: socialTitle,
+    description,
     url: `${siteUrl}/contact`,
     images: [
       {
         url: `${siteUrl}/opengraph-image`,
         width: 1200,
         height: 630,
-        alt: "Contact 434 MEDIA — Get Started Today",
+        alt: `Start a production with ${BRAND.name}`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Contact 434 MEDIA | Get Started Today",
-    description:
-      "Ready to create bold, strategic content that delivers results? Contact 434 MEDIA for ROI-driven media strategies, brand storytelling, and video production services.",
+    title: socialTitle,
+    description,
     images: [`${siteUrl}/twitter-image`],
     creator: "@434media",
     site: "@434media",

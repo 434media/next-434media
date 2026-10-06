@@ -3,6 +3,7 @@
 import { motion } from "motion/react"
 import { useEffect, useState, useRef, useCallback } from "react"
 import { ContactForm } from "@/components/ContactForm"
+import { BRAND_RECORDS } from "@/lib/brand-records"
 
 // Single-purpose contact page. Conversion is the only job.
 
@@ -92,34 +93,26 @@ export function ContactPageClient() {
               >
                 <motion.h1
                   className="font-ggx88 t-display-l text-neutral-900"
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 0.3 }}
                 >
-                  <motion.span
-                    className="block"
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8, delay: 0.3 }}
-                  >
-                    Bold Stories.
-                  </motion.span>
-                  <motion.span
-                    className="block"
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8, delay: 0.5 }}
-                  >
-                    Proven Impact.
-                  </motion.span>
+                  Start a production.
                 </motion.h1>
 
-                <motion.p
+                <motion.div
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.7 }}
-                  className="font-geist-sans t-body text-neutral-500 max-w-md"
+                  className="space-y-3 max-w-md"
                 >
-                  From brand campaigns, to event production, we help the world&apos;s most innovative firms find their voice and amplify their impact through bold storytelling and experiences.
-                </motion.p>
+                  {/* Master 1.1, verbatim. Never reword, shorten or split it. */}
+                  <p className="font-geist-sans t-body text-neutral-900">{BRAND_RECORDS.canonicalDefinition}</p>
+                  <p className="font-geist-sans t-body text-neutral-500">
+                    Tell us what you want to produce, when you need it, and the budget behind it. We review every
+                    request before confirming the right next step.
+                  </p>
+                </motion.div>
               </motion.div>
             </motion.div>
 

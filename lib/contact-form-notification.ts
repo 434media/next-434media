@@ -17,6 +17,12 @@ export interface ContactFormNotification {
   email: string
   phone?: string
   message?: string
+  role?: string
+  organizationType?: string
+  requestType?: string
+  timeline?: string
+  budgetRange?: string
+  referralSource?: string
   source: string
   created_at: string
 }
@@ -60,11 +66,19 @@ export async function notifyNewContactForm(sub: ContactFormNotification): Promis
     const inboxUrl = `${appBaseUrl()}/admin/inbox?search=${encodeURIComponent(sub.email)}`
     const subject = `New inbox message — ${fullName}${sub.company ? `, ${sub.company}` : ""}`
 
+    // Intake fields (master 9.5) appear only when set; older submissions lack them.
+    const row = (k: string, v?: string): Array<[string, string]> => (v ? [[k, v]] : [])
     const rows: Array<[string, string]> = [
       ["Name", fullName],
+      ...row("Role", sub.role),
       ["Company", sub.company || "—"],
+      ...row("Organization type", sub.organizationType),
       ["Email", sub.email],
       ["Phone", sub.phone || "—"],
+      ...row("Request", sub.requestType),
+      ...row("Timeline", sub.timeline),
+      ...row("Budget range", sub.budgetRange),
+      ...row("Heard about 434", sub.referralSource),
       ["Source", sub.source],
       ["Received", submittedAt],
     ]
