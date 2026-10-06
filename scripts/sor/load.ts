@@ -56,6 +56,10 @@ const TABLES = [
   // Generated and validated for weeks and loaded by nothing, so the systems
   // doing outbound could not see a hard escalation or a founder review.
   { seed: "cohort_rules.json", collection: "cohort_rules", schema: "cohort_rule" },
+  // Internal by policy: people 434 contracts, with contact details. See INTERNAL_COLLECTIONS in lib/sor/visibility.ts.
+  { seed: "contractors.json", collection: "contractors", schema: "contractor" },
+  // Internal by policy: agreed prices that depart from list. See INTERNAL_COLLECTIONS in lib/sor/visibility.ts.
+  { seed: "pricing_exceptions.json", collection: "pricing_exceptions", schema: "pricing_exception" },
 ] as const
 
 const DRY = process.argv.includes("--dry-run")
