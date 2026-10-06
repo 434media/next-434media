@@ -185,8 +185,9 @@ export function HeroSection() {
         </div>
 
         {/* Poster image, under the video for the life of the page. The video
-            fades in over it rather than the poster being removed, so the
-            largest paint stays in the DOM and is reported as the LCP element. */}
+            fades in over it rather than the poster being removed. Chrome does
+            not count a full-viewport image as an LCP candidate, so / reports
+            no LCP by design; the Display Standard's ceiling governs /work. */}
         <div className="absolute inset-0">
           <Image
             src={posterUrl}
