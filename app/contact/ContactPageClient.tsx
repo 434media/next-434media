@@ -3,73 +3,8 @@
 import { motion } from "motion/react"
 import { useEffect, useState, useRef, useCallback } from "react"
 import { ContactForm } from "@/components/ContactForm"
-import { Eyebrow } from "@/components/ui/Eyebrow"
 
 // Single-purpose contact page. Conversion is the only job.
-const trustedByLogos = [
-  {
-    name: "Builders VC",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/builders-dark.svg",
-    height: "h-8 md:h-9",
-  },
-  {
-    name: "Alamo Angels",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/angels.png",
-    height: "h-6 md:h-7",
-  },
-  {
-    name: "Digital Canvas",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/digital-canvas-ymas.svg",
-    invert: true,
-    height: "h-6 md:h-7",
-  },
-  {
-    name: "Univision",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/univision-logo.svg",
-    height: "h-7 md:h-9",
-  },
-  {
-    name: "TXMX Boxing",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg",
-    invert: true,
-    height: "h-6 md:h-8",
-  },
-  {
-    name: "VelocityTX",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Sponsor%20Logos/VelocityTX%20Logo%20MAIN%20RGB%20(1).png",
-    height: "h-6 md:h-9",
-  },
-  {
-    name: "SDOH",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg",
-    height: "h-7 md:h-9",
-  },
-  {
-    name: "The Health Cell",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/healthcell.png",
-    height: "h-7 md:h-8",
-  },
-  {
-    name: "Mission Road Ministries",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/missionroad.svg",
-    height: "h-6 md:h-9",
-  },
-  {
-    name: "Methodist Healthcare Ministries",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/mhm.png",
-    height: "h-9 md:h-10",
-  },
-  {
-    name: "Tech Bloc",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TB%20Full%20Logo.png",
-    height: "h-9 md:h-12",
-  },
-  {
-    name: "Learn2AI",
-    logo: "https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/Learn2ai.svg",
-    height: "h-6 md:h-7",
-  },
-]
 
 export function ContactPageClient() {
   const [mounted, setMounted] = useState(false)
@@ -185,68 +120,6 @@ export function ContactPageClient() {
                 >
                   From brand campaigns, to event production, we help the world&apos;s most innovative firms find their voice and amplify their impact through bold storytelling and experiences.
                 </motion.p>
-              </motion.div>
-
-              {/* Trust Indicator - Logo Carousel (mobile) / Grid (desktop) */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 1.5 }}
-                className="pt-4 border-t border-neutral-100"
-              >
-                <Eyebrow className="mb-3.5">
-                  Producing with <span className="text-neutral-900">enterprise &amp; civic brands</span>
-                </Eyebrow>
-
-                {/* Mobile: scrolling marquee */}
-                <div className="relative overflow-hidden lg:hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-linear-to-r from-white to-transparent z-10 pointer-events-none" />
-                  <div className="absolute right-0 top-0 bottom-0 w-12 bg-linear-to-l from-white to-transparent z-10 pointer-events-none" />
-                  
-                  <motion.div
-                    className="flex items-center gap-8"
-                    animate={{
-                      x: [0, -1200],
-                    }}
-                    transition={{
-                      x: {
-                        repeat: Infinity,
-                        repeatType: "loop",
-                        duration: 25,
-                        ease: "linear",
-                      },
-                    }}
-                  >
-                    {[...trustedByLogos, ...trustedByLogos].map((company, index) => (
-                      <div
-                        key={`${company.name}-${index}`}
-                        className="shrink-0 h-6 flex items-center justify-center"
-                      >
-                        <img
-                          src={company.logo}
-                          alt={`${company.name} logo`}
-                          className={`${company.height} w-auto object-contain opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-300${company.invert ? ' invert' : ''}`}
-                        />
-                      </div>
-                    ))}
-                  </motion.div>
-                </div>
-
-                {/* Desktop: logo grid */}
-                <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-px bg-neutral-100 border border-neutral-100 rounded-lg overflow-hidden">
-                  {trustedByLogos.map((company) => (
-                    <div
-                      key={company.name}
-                      className="bg-white flex items-center justify-center p-5 xl:p-6 group"
-                    >
-                      <img
-                        src={company.logo}
-                        alt={`${company.name} logo`}
-                        className={`${company.height} w-auto object-contain opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-300${company.invert ? ' invert' : ''}`}
-                      />
-                    </div>
-                  ))}
-                </div>
               </motion.div>
             </motion.div>
 

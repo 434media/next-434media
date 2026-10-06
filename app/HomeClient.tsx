@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { HeroSection } from "@/components/HeroSection"
-import TrustedBy from "@/components/TrustedBy"
 import NewsletterPopup from "@/components/NewsletterPopup"
 
 export default function HomeClient() {

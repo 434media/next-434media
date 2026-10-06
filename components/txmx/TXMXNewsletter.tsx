@@ -138,10 +138,10 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       {/* TXMX Logo - Using text fallback if SVG doesn't load */}
                       <div className="relative">
                         <Image
-                          src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/TXMXBack.svg"
+                          src="/marks/txmx/txmx-mark-somos-boxeo-v2.webp"
                           alt="TXMX Boxing Logo"
                           width={160}
-                          height={80}
+                          height={127}
                           className="filter brightness-0 invert"
                           priority
                           onError={(e) => {

@@ -114,10 +114,10 @@ export default function SDOHImpactMessage({ locale, dict }: SDOHImpactMessagePro
             <div className="relative order-2 md:order-1">
               <div className="relative w-full max-w-md mx-auto">
                 <Image
-                  src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg"
+                  src="/marks/que/que-mark-v2.webp"
                   alt="SDOH Logo"
-                  width={400}
-                  height={400}
+                  width={448}
+                  height={444}
                   className="w-full h-auto"
                 />
                 {/* Corner accents */}

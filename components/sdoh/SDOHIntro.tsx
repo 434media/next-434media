@@ -66,10 +66,10 @@ export function SDOHIntro({ locale, dict }: SDOHIntroProps) {
               >
                 <div className="relative w-[100px] sm:w-[120px]">
                   <Image
-                    src="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/que.svg"
+                    src="/marks/que/que-mark-v2.webp"
                     alt={dict?.sdoh?.title || "¿Qué es SDOH?"}
                     width={120}
-                    height={120}
+                    height={119}
                     className="w-full h-auto"
                     priority
                   />
