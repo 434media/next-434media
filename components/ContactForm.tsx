@@ -6,21 +6,43 @@ import { motion, AnimatePresence } from "motion/react"
 import { Check, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import { Eyebrow } from "@/components/ui/Eyebrow"
+import { BUDGET_RANGES, ORGANIZATION_TYPES, REQUEST_OPTIONS } from "@/lib/start-a-production"
 
 interface ContactFormProps {
   className?: string
   isVisible?: boolean
 }
 
-// This interface is used for the form data structure
-interface FormValues {
-  firstName: string
-  lastName: string
-  company: string
-  email: string
-  phoneNumber: string
-  message: string
+// The "Start a production" intake (master 9.5). Every field 9.5 lists is
+// required; phone is the one optional contact detail.
+const REQUIRED: Array<[name: string, message: string]> = [
+  ["firstName", "First name is required"],
+  ["lastName", "Last name is required"],
+  ["role", "Role is required"],
+  ["company", "Organization is required"],
+  ["organizationType", "Choose an organization type"],
+  ["email", "Email is required"],
+  ["requestType", "Choose a request"],
+  ["message", "Tell us what you want to produce or accomplish"],
+  ["timeline", "Timeline is required"],
+  ["budgetRange", "Choose a budget range"],
+  ["referralSource", "Tell us how you heard about 434"],
+]
+
+type ControlProps = {
+  name: string
+  id: string
+  "aria-invalid": boolean
+  "aria-describedby"?: string
+  className: string
 }
+
+const fieldClass = (hasError: boolean) =>
+  `mt-1.5 block w-full rounded-lg bg-neutral-50 border ${
+    hasError
+      ? "border-red-400 focus:ring-red-500 focus:border-red-500"
+      : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900"
+  } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`
 
 export function ContactForm({ className = "", isVisible = true }: ContactFormProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -60,35 +82,17 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     setError(null)
     setFieldErrors({})
 
-    // Get form data
     const formData = new FormData(e.target as HTMLFormElement)
-    const formValues: FormValues = {
-      firstName: formData.get("firstName") as string,
-      lastName: formData.get("lastName") as string,
-      company: formData.get("company") as string,
-      email: formData.get("email") as string,
-      phoneNumber: (formData.get("phoneNumber") as string) || "",
-      message: (formData.get("message") as string) || "",
+    const values: Record<string, string> = {}
+    for (const name of [...REQUIRED.map(([n]) => n), "phoneNumber"]) {
+      values[name] = ((formData.get(name) as string) || "").trim()
     }
 
-    // Validate form data
     const errors: Record<string, string> = {}
-
-    if (!formValues.firstName.trim()) {
-      errors.firstName = "First name is required"
+    for (const [name, message] of REQUIRED) {
+      if (!values[name]) errors[name] = message
     }
-
-    if (!formValues.lastName.trim()) {
-      errors.lastName = "Last name is required"
-    }
-
-    if (!formValues.company.trim()) {
-      errors.company = "Company is required"
-    }
-
-    if (!formValues.email.trim()) {
-      errors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) {
+    if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
       errors.email = "Please enter a valid email address"
     }
 
@@ -100,15 +104,12 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     }
 
     try {
-      // Log the request for debugging
-      console.log("Submitting form with data:", formValues)
-
       const response = await fetch("/api/contact-form", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formValues),
+        body: JSON.stringify(values),
       })
 
       const responseData = await response.json()
@@ -128,12 +129,55 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
     } catch (error) {
       console.error("Error submitting form:", error)
       setError(
-        `${error instanceof Error ? error.message : "An error occurred while submitting the contact form"}. Please try again.`,
+        `${error instanceof Error ? error.message : "An error occurred while submitting the form"}. Please try again.`,
       )
     } finally {
       setIsLoading(false)
     }
   }
+
+  // Label, control and error message for one field. `span` widens it to both
+  // columns on the two-column layout.
+  const field = (
+    name: string,
+    label: string,
+    control: (props: ControlProps) => React.ReactNode,
+    { required = true, span = true }: { required?: boolean; span?: boolean } = {},
+  ) => (
+    <div className={span ? "sm:col-span-2" : undefined}>
+      <Eyebrow as="label" htmlFor={name} className="block">
+        {label} {required && <span aria-hidden="true">*</span>}
+      </Eyebrow>
+      {control({
+        name,
+        id: name,
+        "aria-invalid": !!fieldErrors[name],
+        "aria-describedby": fieldErrors[name] ? `${name}-error` : undefined,
+        className: fieldClass(!!fieldErrors[name]),
+      })}
+      {fieldErrors[name] && (
+        <p className="mt-1 t-body-s text-red-600" id={`${name}-error`}>
+          {fieldErrors[name]}
+        </p>
+      )}
+    </div>
+  )
+
+  const select = (options: readonly string[]) =>
+    function SelectControl(props: ControlProps) {
+      return (
+        <select {...props} required aria-required="true" defaultValue="">
+          <option value="" disabled>
+            Select one
+          </option>
+          {options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      )
+    }
 
   return (
     <div
@@ -155,8 +199,10 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
               <div className="mx-auto h-12 w-12 text-neutral-900 flex items-center justify-center rounded-full bg-neutral-100">
                 <Check className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 t-heading-s text-neutral-900 tracking-tight">Thanks for Connecting!</h3>
-              <p className="mt-1.5 t-body-s text-neutral-500">We&apos;ll be in touch soon.</p>
+              <h3 className="mt-4 t-heading-s text-neutral-900 tracking-tight">Thank you. We have your request.</h3>
+              <p className="mt-1.5 t-body-s text-neutral-500">
+                We review every request before confirming the right next step.
+              </p>
             </div>
           </motion.div>
         ) : (
@@ -173,118 +219,23 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   20px; the display face only carries its personality at page-
                   headline sizes (48px+) and below that just reads as an odd
                   sans. Display type is reserved for page-level headlines. */}
-              <h2 className="font-geist-sans t-heading-s text-neutral-900 tracking-tight">Get in Touch</h2>
+              <h2 className="font-geist-sans t-heading-s text-neutral-900 tracking-tight">Production details</h2>
               <p className="mt-1.5 t-caption text-neutral-400">Fields marked with * are required</p>
             </div>
             <form className="space-y-3.5" onSubmit={handleSubmit} ref={formRef} id="contact-form" noValidate>
               <div className="grid grid-cols-1 gap-x-4 lg:gap-x-5 gap-y-3.5 sm:grid-cols-2">
-                <div>
-                  <Eyebrow as="label" htmlFor="firstName" className="block">
-                    First Name <span aria-hidden="true">*</span>
-                  </Eyebrow>
-                  <input
-                    type="text"
-                    name="firstName"
-                    id="firstName"
-                    ref={firstNameRef}
-                    required
-                    aria-required="true"
-                    aria-invalid={!!fieldErrors.firstName}
-                    aria-describedby={fieldErrors.firstName ? "firstName-error" : undefined}
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.firstName ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
-                  />
-                  {fieldErrors.firstName && (
-                    <p className="mt-1 t-body-s text-red-600" id="firstName-error">
-                      {fieldErrors.firstName}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Eyebrow as="label" htmlFor="lastName" className="block">
-                    Last Name <span aria-hidden="true">*</span>
-                  </Eyebrow>
-                  <input
-                    type="text"
-                    name="lastName"
-                    id="lastName"
-                    required
-                    aria-required="true"
-                    aria-invalid={!!fieldErrors.lastName}
-                    aria-describedby={fieldErrors.lastName ? "lastName-error" : undefined}
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.lastName ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
-                  />
-                  {fieldErrors.lastName && (
-                    <p className="mt-1 t-body-s text-red-600" id="lastName-error">
-                      {fieldErrors.lastName}
-                    </p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <Eyebrow as="label" htmlFor="company" className="block">
-                    Company <span aria-hidden="true">*</span>
-                  </Eyebrow>
-                  <input
-                    type="text"
-                    name="company"
-                    id="company"
-                    required
-                    aria-required="true"
-                    aria-invalid={!!fieldErrors.company}
-                    aria-describedby={fieldErrors.company ? "company-error" : undefined}
-                    placeholder="Enter your company name"
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.company ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
-                  />
-                  {fieldErrors.company && (
-                    <p className="mt-1 t-body-s text-red-600" id="company-error">
-                      {fieldErrors.company}
-                    </p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <Eyebrow as="label" htmlFor="email" className="block">
-                    Work Email <span aria-hidden="true">*</span>
-                  </Eyebrow>
-                  <input
-                    type="email"
-                    name="email"
-                    id="email"
-                    required
-                    aria-required="true"
-                    aria-invalid={!!fieldErrors.email}
-                    aria-describedby={fieldErrors.email ? "email-error" : undefined}
-                    placeholder="Enter your email"
-                    className={`mt-1.5 block w-full rounded-lg bg-neutral-50 border ${ fieldErrors.email ? "border-red-400 focus:ring-red-500 focus:border-red-500" : "border-neutral-200 focus:ring-neutral-900 focus:border-neutral-900" } text-neutral-900 placeholder-neutral-400 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors`}
-                  />
-                  {fieldErrors.email && (
-                    <p className="mt-1 t-body-s text-red-600" id="email-error">
-                      {fieldErrors.email}
-                    </p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <Eyebrow as="label" htmlFor="phoneNumber" className="block">
-                    Phone Number
-                  </Eyebrow>
-                  <input
-                    type="tel"
-                    name="phoneNumber"
-                    id="phoneNumber"
-                    placeholder="(123) 456-7890"
-                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <Eyebrow as="label" htmlFor="message" className="block">
-                    Message
-                  </Eyebrow>
-                  <textarea
-                    name="message"
-                    id="message"
-                    rows={2}
-                    placeholder="How can we help you?"
-                    className="mt-1.5 block w-full rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder-neutral-400 focus:ring-neutral-900 focus:border-neutral-900 t-control px-3 py-2 lg:px-3.5 lg:py-2.5 transition-colors"
-                  ></textarea>
-                </div>
+                {field("firstName", "First name", (p) => <input type="text" ref={firstNameRef} required aria-required="true" {...p} />, { span: false })}
+                {field("lastName", "Last name", (p) => <input type="text" required aria-required="true" {...p} />, { span: false })}
+                {field("role", "Role", (p) => <input type="text" required aria-required="true" placeholder="Your title or role" {...p} />, { span: false })}
+                {field("company", "Organization", (p) => <input type="text" required aria-required="true" placeholder="Organization name" {...p} />, { span: false })}
+                {field("organizationType", "Organization type", select(ORGANIZATION_TYPES))}
+                {field("email", "Work email", (p) => <input type="email" required aria-required="true" placeholder="name@organization.com" {...p} />, { span: false })}
+                {field("phoneNumber", "Phone", (p) => <input type="tel" placeholder="(123) 456-7890" {...p} />, { required: false, span: false })}
+                {field("requestType", "Request", select(REQUEST_OPTIONS))}
+                {field("message", "What do you want to produce or accomplish?", (p) => <textarea rows={3} required aria-required="true" {...p} />)}
+                {field("timeline", "Timeline", (p) => <input type="text" required aria-required="true" placeholder="Target date or window" {...p} />, { span: false })}
+                {field("budgetRange", "Budget range", select(BUDGET_RANGES), { span: false })}
+                {field("referralSource", "How did you hear about 434?", (p) => <input type="text" required aria-required="true" {...p} />)}
               </div>
 
               {error && (
@@ -301,10 +252,10 @@ export function ContactForm({ className = "", isVisible = true }: ContactFormPro
                   {isLoading ? (
                     <>
                       <Loader2 className="animate-spin h-4 w-4" aria-hidden="true" />
-                      Submitting…
+                      Sending…
                     </>
                   ) : (
-                    "Submit"
+                    "Start a production"
                   )}
                 </Button>
               </div>

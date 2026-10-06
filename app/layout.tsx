@@ -73,14 +73,9 @@ export const metadata: Metadata = {
     BRAND.name,
     "brand campaigns",
     "event production",
-    "creative media agency",
     "brand storytelling",
     "video production",
-    "web development",
-    "programmatic advertising",
-    "OTT and CTV",
     "San Antonio",
-    "South Texas",
     "Texas",
   ],
   authors: [{ name: BRAND.name }],
@@ -256,21 +251,12 @@ export default async function RootLayout({
               },
               areaServed: [
                 { '@type': 'City', name: 'San Antonio' },
-                { '@type': 'State', name: 'Texas' },
-                { '@type': 'Place', name: 'South Texas' }
+                { '@type': 'State', name: 'Texas' }
               ],
               knowsAbout: [
-                'Creative media',
                 'Brand storytelling',
                 'Video production',
-                'Web development',
-                'Programmatic advertising',
-                'OTT and CTV advertising',
-                'Event production',
-                'Multichannel marketing',
-                'Smart marketing',
-                'Media strategy',
-                'Digital marketing'
+                'Event production'
               ],
               sameAs: [
                 'https://www.facebook.com/434media',

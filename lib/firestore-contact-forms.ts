@@ -9,6 +9,14 @@ export interface ContactFormSubmission {
   email: string
   phone?: string
   message?: string
+  // "Start a production" intake fields (master 9.5). Absent on submissions
+  // made before the intake, and on every named-database source.
+  role?: string
+  organizationType?: string
+  requestType?: string
+  timeline?: string
+  budgetRange?: string
+  referralSource?: string
   source: string // "434Media" | "AIM" | "VemosVamos" | "DigitalCanvas" | "SATechDay"
   created_at: string
   _dbSource?: string // Track which database this came from
@@ -277,7 +285,10 @@ export async function getContactFormCountsBySource(): Promise<Record<string, num
  * Convert contact form submissions to CSV format
  */
 export function contactFormsToCSV(submissions: ContactFormSubmission[]): string {
-  const headers = ["First Name", "Last Name", "Company", "Email", "Phone", "Message", "Source", "Date"]
+  const headers = [
+    "First Name", "Last Name", "Company", "Email", "Phone", "Message", "Source", "Date",
+    "Role", "Organization Type", "Request", "Timeline", "Budget Range", "Heard About 434",
+  ]
   const rows = submissions.map((s) => [
     s.firstName,
     s.lastName,
@@ -287,6 +298,12 @@ export function contactFormsToCSV(submissions: ContactFormSubmission[]): string 
     s.message || "",
     s.source,
     s.created_at ? new Date(s.created_at).toLocaleDateString() : "",
+    s.role || "",
+    s.organizationType || "",
+    s.requestType || "",
+    s.timeline || "",
+    s.budgetRange || "",
+    s.referralSource || "",
   ])
 
   const csvContent = [
@@ -369,6 +386,12 @@ export async function getContactFormById(
     email: data.email || "",
     phone: data.phone || data.phoneNumber || "",
     message: data.message || "",
+    role: data.role || undefined,
+    organizationType: data.organizationType || undefined,
+    requestType: data.requestType || undefined,
+    timeline: data.timeline || undefined,
+    budgetRange: data.budgetRange || undefined,
+    referralSource: data.referralSource || undefined,
     source: data.source || "",
     created_at: data.created_at || "",
     promotedLeadId: data.promotedLeadId || undefined,

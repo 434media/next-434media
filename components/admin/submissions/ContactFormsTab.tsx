@@ -18,6 +18,7 @@ import {
   Clock,
   Reply,
   User,
+  Wallet,
 } from "lucide-react"
 import {
   Eye as EyeIcon,
@@ -55,6 +56,13 @@ interface ContactFormSubmission {
   email: string
   phone?: string
   message?: string
+  // "Start a production" intake fields (master 9.5); absent on older submissions.
+  role?: string
+  organizationType?: string
+  requestType?: string
+  timeline?: string
+  budgetRange?: string
+  referralSource?: string
   source: string
   created_at: string
   // Set when this submission has been promoted into the leads pipeline.
@@ -1025,6 +1033,28 @@ export function ContactFormsTab({
                   <DetailRow icon={Building2} label="Company">
                     {selectedSubmission.company || "—"}
                   </DetailRow>
+                  {selectedSubmission.requestType && (
+                    <>
+                      <DetailRow icon={User} label="Role">
+                        {selectedSubmission.role || "—"}
+                      </DetailRow>
+                      <DetailRow icon={Building2} label="Org type">
+                        {selectedSubmission.organizationType || "—"}
+                      </DetailRow>
+                      <DetailRow icon={MessageSquare} label="Request">
+                        {selectedSubmission.requestType}
+                      </DetailRow>
+                      <DetailRow icon={Clock} label="Timeline">
+                        {selectedSubmission.timeline || "—"}
+                      </DetailRow>
+                      <DetailRow icon={Wallet} label="Budget">
+                        {selectedSubmission.budgetRange || "—"}
+                      </DetailRow>
+                      <DetailRow icon={Globe} label="Heard via">
+                        {selectedSubmission.referralSource || "—"}
+                      </DetailRow>
+                    </>
+                  )}
                   <DetailRow icon={Globe} label="Source">
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium bg-neutral-100 text-neutral-700">
                       {selectedSubmission.source}
