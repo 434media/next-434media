@@ -138,10 +138,10 @@ export default function TXMXNewsletter({ showModal, onClose }: TXMXNewsletterPro
                       {/* TXMX Logo - Using text fallback if SVG doesn't load */}
                       <div className="relative">
                         <Image
-                          src="/marks/txmx/txmx-mark-v2.webp"
+                          src="/marks/txmx/txmx-mark-somos-boxeo-v2.webp"
                           alt="TXMX Boxing Logo"
                           width={160}
-                          height={112}
+                          height={127}
                           className="filter brightness-0 invert"
                           priority
                           onError={(e) => {

@@ -161,10 +161,10 @@ export default async function CategoryPage({
           <div className="container mx-auto px-4">
             <div className="flex justify-center">
               <Image
-                src="/marks/txmx/txmx-mark-v2.webp"
+                src="/marks/txmx/txmx-mark-somos-boxeo-v2.webp"
                 alt="TXMX Boxing - Premium Boxing Merchandise"
                 width={600}
-                height={419}
+                height={476}
                 className="w-96 sm:w-125 md:w-150 h-auto"
                 priority={false}
                 sizes="(max-width: 640px) 384px, (max-width: 768px) 500px, 600px"

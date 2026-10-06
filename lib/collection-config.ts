@@ -47,9 +47,9 @@ const collectionConfigs: Record<string, Partial<CollectionConfig>> = {
     buttonStyle: "custom",
     customButtonClasses:
       "bg-black/40 backdrop-blur-sm text-white border border-white/30 hover:bg-white/10 hover:border-white/50 transition-all duration-300 text-lg font-bold px-8 py-4",
-    logoSrc: "/marks/txmx/txmx-mark-v2.webp", // Path to the TXMX logo
+    logoSrc: "/marks/txmx/txmx-mark-somos-boxeo-v2.webp", // Path to the TXMX logo
     logoWidth: 800, // Significantly increased logo size
-    logoHeight: 559, // Significantly increased logo size
+    logoHeight: 634, // Significantly increased logo size
     scrollToProducts: true, // Enable scroll to products
     hideDownArrow: true, // Hide the down arrow as requested
     hideText: true, // Explicitly hide the text

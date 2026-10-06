@@ -34,7 +34,7 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
               loop
               muted
               playsInline
-              poster="/sdoh/sdoh-poster-v2.webp"
+              poster="/sdoh/sdoh-poster-v2.jpg"
               className="w-full h-full object-cover"
               preload="metadata"
             >

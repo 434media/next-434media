@@ -218,10 +218,10 @@ export default function ShopClient() {
                 <div className="relative">
                   <h1 id="shop-heading" className="sr-only">TXMX Boxing — Premium Boxing Merchandise</h1>
                   <Image
-                    src="/marks/txmx/txmx-mark-v2.webp"
+                    src="/marks/txmx/txmx-mark-somos-boxeo-v2.webp"
                     alt="TXMX Boxing - Premium Boxing Merchandise"
                     width={400}
-                    height={279}
+                    height={317}
                     className="w-72 sm:w-80 md:w-96 h-auto"
                     priority
                     sizes="(max-width: 640px) 288px, (max-width: 768px) 320px, 384px"
