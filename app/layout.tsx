@@ -8,7 +8,6 @@ import { BRAND } from "@/lib/seo/brand"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 import Footer from "@/components/Footer"
 import { Analytics } from "@vercel/analytics/next"
-import { Toaster } from "sonner"
 import { getCart } from "@/lib/shopify"
 import { CartProvider } from "@/components/shopify/cart/cart-context"
 import { PageTransition } from "@/components/shopify/page-transition"
@@ -392,7 +391,6 @@ export default async function RootLayout({
           </Suspense>
           <main>
             <PageTransition>{children}</PageTransition>
-            <Toaster closeButton />
           </main>
           <Analytics />
           <Footer />
