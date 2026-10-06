@@ -435,6 +435,10 @@ Scheduled jobs (`app/api/cron/*`) are driven by the `crons` array in
 3. Create API routes as needed under `app/api/`
 4. Add admin UI if required
 
+### Firestore security rules
+
+`firestore/*.rules` and `firebase.json` are the record of the rules released on all five Firestore databases (every one denies all client reads and writes; data access is server-side through the Admin SDK). The Firebase console is still the deploy path; these files are the record, and 434-context's nightly `Firestore rules` workflow fails if the released rules drift from them.
+
 ### Working with i18n
 
 1. Add translations to `dictionaries/en.json` and `dictionaries/es.json`

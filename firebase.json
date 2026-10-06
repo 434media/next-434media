@@ -1,0 +1,9 @@
+{
+  "firestore": [
+    { "database": "(default)", "rules": "firestore/default.rules" },
+    { "database": "techday", "rules": "firestore/techday.rules" },
+    { "database": "aimsatx", "rules": "firestore/aimsatx.rules" },
+    { "database": "digitalcanvas", "rules": "firestore/digitalcanvas.rules" },
+    { "database": "vemosvamos", "rules": "firestore/vemosvamos.rules" }
+  ]
+}
