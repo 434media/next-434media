@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence, useScroll, useTransform } from "motion/react"
+import { motion, useScroll, useTransform } from "motion/react"
 import Image from "next/image"
 import { useMobile } from "../hooks/use-mobile"
 import { BRAND_RECORDS } from "@/lib/brand-records"
@@ -56,11 +56,19 @@ export function HeroSection() {
    * the file finishes arriving:
    *
    *   1080p  4.49 MB   desktop and tablet
-   *    720p  2.36 MB   phones, via useMobile
+   *    720p  2.36 MB   phones
    *
    * The originals are untouched on Cloud Storage. Nothing here deletes them.
+   *
+   * The encode is chosen in the HTML, by <source media>, before the first
+   * request. It used to come from useMobile, which is false during server
+   * render and only turns true after hydration, so a phone started fetching
+   * the 1080p file and then fetched the 720p one as well (2b audit §4).
+   * 720p is listed first so a browser that ignores `media` on a video
+   * <source> plays the smaller file; MDN's compatibility data (8.1.4) records
+   * Firefox 53-119 as honouring `media` only inside <picture>.
    */
-  const videoUrl = isMobile ? "/hero/hero-720p.mp4" : "/hero/hero-1080p.mp4"
+  const MOBILE_QUERY = "(max-width: 768px)" // useMobile's breakpoint
   const posterUrl = "/hero/hero-poster.webp"
 
   // Intersection Observer to play/pause video based on visibility
@@ -176,27 +184,20 @@ export function HeroSection() {
           <p>{BRAND_RECORDS.shortDescriptor}</p>
         </div>
 
-        {/* Poster Image (shown until video loads or as fallback) */}
-        <AnimatePresence>
-          {(!isVideoLoaded || error) && (
-            <motion.div
-              className="absolute inset-0"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Image
-                src={posterUrl}
-                alt={BRAND_RECORDS.shortDescriptor}
-                fill
-                priority
-                sizes="100vw"
-                className="object-cover"
-                style={{ objectPosition: "center" }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Poster image, under the video for the life of the page. The video
+            fades in over it rather than the poster being removed, so the
+            largest paint stays in the DOM and is reported as the LCP element. */}
+        <div className="absolute inset-0">
+          <Image
+            src={posterUrl}
+            alt={BRAND_RECORDS.shortDescriptor}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+            style={{ objectPosition: "center" }}
+          />
+        </div>
 
         {/* Video Background - Full opacity for better showcase */}
         <video
@@ -214,7 +215,8 @@ export function HeroSection() {
             isVideoLoaded && !error ? "opacity-100" : "opacity-0"
           }`}
         >
-          <source src={videoUrl} type="video/mp4" />
+          <source src="/hero/hero-720p.mp4" type="video/mp4" media={MOBILE_QUERY} />
+          <source src="/hero/hero-1080p.mp4" type="video/mp4" />
           <p>Your browser does not support HTML5 video.</p>
         </video>
 
