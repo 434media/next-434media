@@ -20,7 +20,7 @@ const LLMS_TXT = `# 434 MEDIA
 - [Blog](https://www.434media.com/blog)
 - [Events](https://www.434media.com/events): Upcoming and recent community and industry events.
 - [Shop](https://www.434media.com/shop): TXMX Boxing premium apparel rooted in Texas-Mexico boxing culture.
-- [Contact](https://www.434media.com/contact): Start a project conversation.
+- [Contact](https://www.434media.com/contact): Start a production.
 
 ## Sub-brands and initiatives
 

@@ -37,7 +37,7 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: "contact",
-    title: "Start a project",
+    title: "Start a production",
     subtitle: "Take the next step",
     href: "/contact",
     delay: 0.2,
