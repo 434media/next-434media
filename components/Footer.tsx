@@ -17,7 +17,7 @@ export default function Footer() {
 
   // "Build with us" — close the loop on this page.
   const buildLinks = [
-    { label: "Start a project", href: "/contact", emphasis: true },
+    { label: "Start a production", href: "/contact", emphasis: true },
   ]
 
   const legalLinks = [
