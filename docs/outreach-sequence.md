@@ -59,7 +59,9 @@ A sequence ends (status → stopped/completed) when:
 
 ## The cron — `/api/cron/outreach-sequence`
 
-Runs on business days. For each lead with `outreach_sequence.status === "active"` and `next_send_at ≤ today`:
+Runs once each weekday at 15:00 UTC — `0 15 * * 1-5` in [`vercel.json`](../vercel.json), which is 10:00 Central during daylight time and 09:00 Central after the November change. Vercel crons run in UTC only, so the one-hour seasonal shift is accepted. The every-minute schedule used during QA does not return: sequence testing (`SEQUENCE_STEP_GAP_MINUTES`) happens in a preview deployment, by triggering the route by hand.
+
+For each lead with `outreach_sequence.status === "active"` and `next_send_at ≤ today`:
 1. Re-check stop conditions (status, consent). If tripped → stop, skip.
 2. Send `steps[next_step-1]` via the shared send path (consent gate + Resend).
 3. Stamp `sent_at` + `resend_email_id`; advance `next_step`; set `next_send_at` (+4 or +5 biz days) or mark `completed`.
