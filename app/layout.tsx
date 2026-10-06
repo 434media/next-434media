@@ -9,7 +9,7 @@ import { BRAND_RECORDS } from "@/lib/brand-records"
 import Footer from "@/components/Footer"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
-import { getCart, getMenu } from "@/lib/shopify"
+import { getCart } from "@/lib/shopify"
 import { CartProvider } from "@/components/shopify/cart/cart-context"
 import { PageTransition } from "@/components/shopify/page-transition"
 import { Suspense } from "react"
@@ -157,7 +157,6 @@ export default async function RootLayout({
 }>) {
   // Don't await the fetch, pass the Promise to the context provider
   const cart = getCart()
-  const menu = await getMenu("next-js-frontend-header-menu")
 
   // Meta Pixel jurisdiction gate. The pixel sets cookies before any consent is
   // given, so it does not run for visitors in the GDPR/CASL jurisdictions 434
@@ -389,7 +388,7 @@ export default async function RootLayout({
 
         <CartProvider cartPromise={cart}>
           <Suspense>
-<CombinedNavbar menu={menu} />
+<CombinedNavbar />
           </Suspense>
           <main>
             <PageTransition>{children}</PageTransition>
