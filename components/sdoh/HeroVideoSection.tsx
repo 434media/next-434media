@@ -34,7 +34,7 @@ export function HeroVideoSection({ prefersReducedMotion = false }: HeroVideoSect
               loop
               muted
               playsInline
-              poster="https://storage.googleapis.com/groovy-ego-462522-v2.firebasestorage.app/sdoh-poster.png"
+              poster="/sdoh/sdoh-poster-v2.webp"
               className="w-full h-full object-cover"
               preload="metadata"
             >
