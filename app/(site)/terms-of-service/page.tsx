@@ -37,7 +37,12 @@ export default function TermsOfServicePage() {
 
           <div className="prose prose-lg max-w-none">
             <p className="text-neutral-700 mb-6">
-              Last Updated: {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              {/* The date of the last change to this page's text: commit 4734dd9
+                  (2025-03-21), which created it. Later commits changed only
+                  markup, styling and metadata. Update it when the text changes;
+                  the section below says this date marks when changes were made,
+                  so it must never be the load or build date. */}
+              Last Updated: March 21, 2025
             </p>
 
             <h2 className="t-heading-m text-neutral-900 mt-8 mb-4">1. Agreement to Terms</h2>
