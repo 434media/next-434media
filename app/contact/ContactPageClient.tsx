@@ -100,19 +100,15 @@ export function ContactPageClient() {
                   Start a production.
                 </motion.h1>
 
-                <motion.div
+                {/* Master 1.1, verbatim. Never reword, shorten or split it. */}
+                <motion.p
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.7 }}
-                  className="space-y-3 max-w-md"
+                  className="font-geist-sans t-body text-neutral-900 max-w-md"
                 >
-                  {/* Master 1.1, verbatim. Never reword, shorten or split it. */}
-                  <p className="font-geist-sans t-body text-neutral-900">{BRAND_RECORDS.canonicalDefinition}</p>
-                  <p className="font-geist-sans t-body text-neutral-500">
-                    Tell us what you want to produce, when you need it, and the budget behind it. We review every
-                    request before confirming the right next step.
-                  </p>
-                </motion.div>
+                  {BRAND_RECORDS.canonicalDefinition}
+                </motion.p>
               </motion.div>
             </motion.div>
 
@@ -120,7 +116,6 @@ export function ContactPageClient() {
               initial={{ opacity: 0, y: 60, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 1, delay: 0.5 }}
-              className="mt-6 lg:mt-0"
             >
               <div className="relative">
                 <ContactForm
