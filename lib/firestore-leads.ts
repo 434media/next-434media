@@ -11,6 +11,7 @@ import {
   type LeadCreateInput,
   type LeadStatus,
   type LeadUpdateInput,
+  type OutreachSequence,
 } from "../types/crm-types"
 import crypto from "crypto"
 
@@ -228,6 +229,44 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     /* swallowed — analytics must not break creation */
   })
   return created
+}
+
+/**
+ * Leads with an active outreach sequence, for the outreach cron (2b fix 11).
+ * An equality filter on one field uses Firestore's automatic single-field
+ * index, so no composite index is needed; the cron filters `next_send_at` in
+ * memory. `read` is the number of documents the query returned.
+ */
+export async function getActiveSequenceLeads(): Promise<{ leads: Lead[]; read: number }> {
+  const db = getDb()
+  const snap = await db.collection(COLLECTION).where("outreach_sequence.status", "==", "active").get()
+  return { leads: snap.docs.map((d) => normalize(d.id, d.data())), read: snap.size }
+}
+
+/**
+ * Read-modify-write of one lead's outreach_sequence inside a Firestore
+ * transaction — the store behind lib/outreach-claim.ts. `fn` may run more than
+ * once if the document changes underneath it, so it must not have side effects.
+ */
+export async function updateLeadSequenceTx<T>(
+  id: string,
+  fn: (seq: OutreachSequence | undefined) => { next?: OutreachSequence; extra?: Record<string, unknown>; result: T },
+): Promise<T> {
+  const db = getDb()
+  const ref = db.collection(COLLECTION).doc(id)
+  const result = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    if (!snap.exists) throw new Error(`Lead ${id} not found`)
+    const raw = snap.data()?.outreach_sequence
+    const seq = raw && typeof raw === "object" ? (raw as OutreachSequence) : undefined
+    const out = fn(seq)
+    if (out.next) {
+      tx.update(ref, { ...(out.extra ?? {}), outreach_sequence: out.next, updated_at: new Date().toISOString() })
+    }
+    return out.result
+  })
+  invalidate()
+  return result
 }
 
 export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Lead> {

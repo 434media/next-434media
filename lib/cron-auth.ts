@@ -1,7 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { Timestamp } from "firebase-admin/firestore"
 import { getDb } from "./firebase-admin"
 
 export const CRON_RUNS_COLLECTION = "cron_runs"
+
+/** Run records expire 90 days after they start, through a Firestore TTL policy
+ *  on `expireAt` (founder decision, 2026-10-07; 2b fix 11). */
+export const CRON_RUN_RETENTION_DAYS = 90
+
+export function cronRunExpireAt(startedAt: Date): Timestamp {
+  return Timestamp.fromMillis(startedAt.getTime() + CRON_RUN_RETENTION_DAYS * 24 * 60 * 60 * 1000)
+}
 
 export interface CronRunRecord {
   job: string
@@ -11,6 +20,7 @@ export interface CronRunRecord {
   status: "success" | "error" | "partial"
   message?: string
   detail?: Record<string, unknown>
+  expireAt?: Timestamp
 }
 
 export function authorizeCronRequest(request: NextRequest): NextResponse | null {
@@ -22,14 +32,10 @@ export function authorizeCronRequest(request: NextRequest): NextResponse | null 
     )
   }
 
+  // Bearer only. The `?secret=` form put the secret in URLs and request logs;
+  // a manual run sends the same header Vercel Cron does (2b fix 11).
   const header = request.headers.get("authorization") || ""
-  const isVercelCron = header === `Bearer ${expected}`
-
-  const url = new URL(request.url)
-  const querySecret = url.searchParams.get("secret")
-  const isManualRun = querySecret === expected
-
-  if (!isVercelCron && !isManualRun) {
+  if (header !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -39,7 +45,7 @@ export function authorizeCronRequest(request: NextRequest): NextResponse | null 
 export async function recordCronRun(record: CronRunRecord): Promise<void> {
   try {
     const db = getDb()
-    await db.collection(CRON_RUNS_COLLECTION).add(record)
+    await db.collection(CRON_RUNS_COLLECTION).add({ ...record, expireAt: cronRunExpireAt(new Date(record.startedAt)) })
   } catch (error) {
     console.error(`[cron:${record.job}] Failed to write run record:`, error)
   }
@@ -48,7 +54,14 @@ export async function recordCronRun(record: CronRunRecord): Promise<void> {
 export async function runCronJob<T>(
   job: string,
   request: NextRequest,
-  handler: () => Promise<{ message: string; detail?: Record<string, unknown>; data?: T }>,
+  // `status` lets a job report a partial or failed run it did not throw for;
+  // anything but "success" returns HTTP 500, so Vercel marks the run failed.
+  handler: () => Promise<{
+    message: string
+    detail?: Record<string, unknown>
+    data?: T
+    status?: "success" | "partial" | "error"
+  }>,
 ): Promise<NextResponse> {
   const unauthorized = authorizeCronRequest(request)
   if (unauthorized) return unauthorized
@@ -61,25 +74,34 @@ export async function runCronJob<T>(
     const finishedAt = new Date()
     const durationMs = finishedAt.getTime() - startedAt.getTime()
 
+    const status = result.status ?? "success"
     await recordCronRun({
       job,
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString(),
       durationMs,
-      status: "success",
+      status,
       message: result.message,
       detail: result.detail,
     })
 
-    console.log(`[cron:${job}] success in ${durationMs}ms — ${result.message}`)
-    return NextResponse.json({
-      ok: true,
-      job,
-      durationMs,
-      message: result.message,
-      detail: result.detail,
-      data: result.data,
-    })
+    if (status === "success") {
+      console.log(`[cron:${job}] success in ${durationMs}ms — ${result.message}`)
+    } else {
+      console.error(`[cron:${job}] ${status} in ${durationMs}ms — ${result.message}`)
+    }
+    return NextResponse.json(
+      {
+        ok: status === "success",
+        job,
+        status,
+        durationMs,
+        message: result.message,
+        detail: result.detail,
+        data: result.data,
+      },
+      { status: status === "success" ? 200 : 500 },
+    )
   } catch (error) {
     const finishedAt = new Date()
     const durationMs = finishedAt.getTime() - startedAt.getTime()

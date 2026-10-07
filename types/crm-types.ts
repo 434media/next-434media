@@ -940,6 +940,11 @@ export interface OutreachSequence {
   enrolled_at: string
   enrolled_by: string
   stopped_reason?: OutreachSequenceStopReason
+  /** Held while a step is being sent; see lib/outreach-claim.ts. */
+  claim?: { step: number; claimed_at: string; run_id: string } | null
+  /** Set when a run found a claim that never settled: the step may have been
+   *  sent, so the sequence was paused rather than retried. */
+  needs_review?: { step: number; claimed_at: string; flagged_at: string } | null
 }
 
 export interface Lead extends BaseRecord {
