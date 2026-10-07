@@ -71,3 +71,7 @@ jobs:
       # uses Next's own matcher, so this step needs the installed dependencies.
       - run: pnpm install --frozen-lockfile
       - run: node --test lib/__tests__/proxy-matcher.test.mjs
+
+      # The outreach sequence sends each step at most once, however runs overlap
+      # (2b fix 11). In-memory store with Firestore-style transaction retries.
+      - run: tsx --test lib/__tests__/outreach-claim.test.ts

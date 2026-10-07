@@ -13,7 +13,8 @@ export const maxDuration = 120
 // members never have their status changed (no resurrection of opt-outs) — only
 // brand-new emails get `subscribed`, and tags refresh harmlessly.
 //
-// Preview without writing: hit this route with `?secret=<CRON_SECRET>&dryRun=1`.
+// Preview without writing: GET this route with `?dryRun=1` and the header
+// `Authorization: Bearer <CRON_SECRET>` (the `?secret=` form was removed in 2b fix 11).
 export async function GET(request: NextRequest) {
   return runCronJob("mailchimp-push", request, async () => {
     const dryRun = request.nextUrl.searchParams.get("dryRun") === "1"

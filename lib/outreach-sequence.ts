@@ -1,7 +1,10 @@
+import crypto from "crypto"
 import { getResend, OUTREACH_FROM, assertVerifiedSender } from "@/lib/resend"
 import { isSuppressed } from "@/lib/firestore-suppression"
 import { getMailchimpMemberProfile } from "@/lib/mailchimp-analytics"
-import { updateLead, appendLeadActivity, recordResendEmailId } from "@/lib/firestore-leads"
+import { updateLead, appendLeadActivity, recordResendEmailId, updateLeadSequenceTx } from "@/lib/firestore-leads"
+import { sendStepOnce, type StepClaim } from "@/lib/outreach-claim"
+import { stepGapMinutes } from "@/lib/outreach-step-gap"
 import type { Lead, OutreachSequence, OutreachSequenceStopReason } from "@/types/crm-types"
 
 /**
@@ -18,8 +21,9 @@ export const STEP_GAP_BIZ_DAYS: Record<1 | 2, number> = { 1: 4, 2: 5 }
 // QA test mode: when SEQUENCE_STEP_GAP_MINUTES is set (e.g. "2"), steps are
 // spaced that many MINUTES apart (stored as a full timestamp) instead of the
 // business-day cadence — so an auditor can watch all three emails arrive and
-// test replying mid-campaign. Unset it to restore the normal 0/+4/+5 cadence.
-const TEST_GAP_MINUTES = Number(process.env.SEQUENCE_STEP_GAP_MINUTES) || 0
+// test replying mid-campaign. Ignored in production whatever its value
+// (lib/outreach-step-gap.ts, 2b fix 11).
+const TEST_GAP_MINUTES = stepGapMinutes(process.env)
 
 export function addBusinessDays(from: Date, days: number): Date {
   const d = new Date(from)
@@ -98,10 +102,14 @@ async function consentStop(email: string): Promise<OutreachSequenceStopReason | 
 }
 
 export interface SequenceStepResult {
-  action: "sent" | "completed" | "stopped" | "skipped"
+  /** "stale": a previous run's claim never settled; the sequence was paused. */
+  action: "sent" | "completed" | "stopped" | "skipped" | "stale"
   step?: number
   reason?: OutreachSequenceStopReason
+  /** Why a step was skipped, e.g. another run holds the claim. */
+  skipReason?: string
   emailId?: string
+  staleClaim?: StepClaim
 }
 
 async function stopSequence(
@@ -109,9 +117,14 @@ async function stopSequence(
   seq: OutreachSequence,
   reason: OutreachSequenceStopReason,
 ): Promise<SequenceStepResult> {
-  await updateLead(lead.id, {
-    outreach_sequence: { ...seq, status: "stopped", stopped_reason: reason, next_step: null, next_send_at: undefined },
-  })
+  // In a transaction, and only while no run is sending a step, so a stop can
+  // never erase a claim another run is about to settle.
+  const stopped = await updateLeadSequenceTx(lead.id, (cur) =>
+    cur && cur.status === "active" && !cur.claim
+      ? { next: { ...cur, status: "stopped", stopped_reason: reason, next_step: null, next_send_at: undefined }, result: true }
+      : { result: false },
+  )
+  if (!stopped) return { action: "skipped", step: seq.next_step ?? undefined, skipReason: "stop_raced" }
   await appendLeadActivity(lead.id, {
     type: "note",
     actor: "system",
@@ -138,44 +151,65 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
   const step = seq.steps.find((s) => s.n === seq.next_step)
   if (!step || !lead.email) return { action: "skipped" }
 
-  // Send via Resend — reply-to is the enrolling rep (Phase 1; replies land
-  // in their inbox, and they mark the lead engaged to stop the sequence).
+  // Send via Resend, at most once per step (lib/outreach-claim.ts): claim the
+  // step in a transaction, send with an idempotency key, then advance and
+  // release the claim in a second transaction (2b fix 11).
   const from = process.env.LEAD_OUTREACH_FROM || OUTREACH_FROM
   assertVerifiedSender(from)
-  const { data, error } = await getResend().emails.send({
-    from,
-    to: lead.email,
-    replyTo: sequenceReplyTo(lead.id, seq.enrolled_by),
-    subject: step.subject,
-    text: step.body,
-  })
-  if (error || !data?.id) {
-    throw new Error(error?.message ?? "Resend returned no email id")
-  }
-  const emailId = data.id
-
-  // Advance: stamp this step, schedule the next (or complete).
-  const now = new Date()
-  const steps = seq.steps.map((s) =>
-    s.n === step.n ? { ...s, sent_at: now.toISOString(), resend_email_id: emailId } : s,
-  )
-  const current = seq.next_step
+  const current = step.n
   const nextStep = current < 3 ? ((current + 1) as 2 | 3) : null
+  let next: OutreachSequence | undefined
 
-  const next: OutreachSequence = nextStep
-    ? {
-        ...seq,
-        steps,
-        next_step: nextStep,
-        next_send_at: nextSendAt(now, current as 1 | 2),
-      }
-    : { ...seq, steps, status: "completed", next_step: null, next_send_at: undefined, stopped_reason: "completed" }
+  const outcome = await sendStepOnce<OutreachSequence>({
+    leadId: lead.id,
+    step: current,
+    runId: crypto.randomUUID(),
+    now: () => new Date(),
+    store: { update: updateLeadSequenceTx },
+    sender: {
+      async send(idempotencyKey) {
+        const { data, error } = await getResend().emails.send(
+          {
+            from,
+            to: lead.email,
+            replyTo: sequenceReplyTo(lead.id, seq.enrolled_by),
+            subject: step.subject,
+            text: step.body,
+          },
+          { idempotencyKey },
+        )
+        if (error || !data?.id) throw new Error(error?.message ?? "Resend returned no email id")
+        return { id: data.id }
+      },
+    },
+    // Stamp this step, schedule the next (or complete).
+    advance(cur, emailId, at) {
+      const steps = cur.steps.map((s) =>
+        s.n === current ? { ...s, sent_at: at.toISOString(), resend_email_id: emailId } : s,
+      )
+      next = nextStep
+        ? { ...cur, steps, next_step: nextStep, next_send_at: nextSendAt(at, current as 1 | 2) }
+        : { ...cur, steps, status: "completed", next_step: null, next_send_at: undefined, stopped_reason: "completed" }
+      return { next }
+    },
+  })
+
+  if (outcome.action === "skipped") return { action: "skipped", step: current, skipReason: outcome.reason }
+  if (outcome.action === "stale") {
+    await appendLeadActivity(lead.id, {
+      type: "note",
+      actor: "system",
+      detail: `Outreach sequence paused for review: step ${current} was claimed at ${outcome.claim.claimed_at} and never confirmed, so it may already have been sent. Check the Resend log before resuming.`,
+    }).catch(() => {})
+    return { action: "stale", step: current, staleClaim: outcome.claim }
+  }
+  const emailId = outcome.emailId
+  const now = new Date()
 
   await updateLead(lead.id, {
     status: "contacted",
     last_contacted_at: now.toISOString(),
     resend_email_id: emailId,
-    outreach_sequence: next,
   })
   // Preserve this step's id in the send history so its opens/clicks still match
   // after the next step overwrites resend_email_id.
@@ -183,7 +217,7 @@ export async function runSequenceStep(lead: Lead): Promise<SequenceStepResult> {
   await appendLeadActivity(lead.id, {
     type: "outreach_sent",
     actor: seq.enrolled_by,
-    detail: `Sequence email ${step.n}/3 sent: “${step.subject}”${nextStep ? ` · next ${next.next_send_at}` : " · sequence complete"}`,
+    detail: `Sequence email ${step.n}/3 sent: “${step.subject}”${nextStep ? ` · next ${next?.next_send_at}` : " · sequence complete"}`,
   }).catch(() => {})
 
   return { action: nextStep ? "sent" : "completed", step: step.n, emailId }

@@ -59,13 +59,18 @@ A sequence ends (status → stopped/completed) when:
 
 ## The cron — `/api/cron/outreach-sequence`
 
-Runs once each weekday at 15:00 UTC — `0 15 * * 1-5` in [`vercel.json`](../vercel.json), which is 10:00 Central during daylight time and 09:00 Central after the November change. Vercel crons run in UTC only, so the one-hour seasonal shift is accepted. The every-minute schedule used during QA does not return: sequence testing (`SEQUENCE_STEP_GAP_MINUTES`) happens in a preview deployment, by triggering the route by hand.
+Runs once each weekday at 15:00 UTC — `0 15 * * 1-5` in [`vercel.json`](../vercel.json), which is 10:00 Central during daylight time and 09:00 Central after the November change. Vercel crons run in UTC only, so the one-hour seasonal shift is accepted. The every-minute schedule used during QA does not return: sequence testing (`SEQUENCE_STEP_GAP_MINUTES`) happens in a preview deployment, by triggering the route by hand with `Authorization: Bearer <CRON_SECRET>`. `SEQUENCE_STEP_GAP_MINUTES` is ignored in production whatever its value ([`lib/outreach-step-gap.ts`](../lib/outreach-step-gap.ts)).
 
-For each lead with `outreach_sequence.status === "active"` and `next_send_at ≤ today`:
+It queries only leads with `outreach_sequence.status == "active"`, and for each with `next_send_at ≤ now`:
 1. Re-check stop conditions (status, consent). If tripped → stop, skip.
-2. Send `steps[next_step-1]` via the shared send path (consent gate + Resend).
-3. Stamp `sent_at` + `resend_email_id`; advance `next_step`; set `next_send_at` (+4 or +5 biz days) or mark `completed`.
-4. Log a `outreach_sent` activity event.
+2. **Claim** the step in a Firestore transaction ([`lib/outreach-claim.ts`](../lib/outreach-claim.ts)). Another run holding the claim → skip.
+3. Send `steps[next_step-1]` via Resend with an idempotency key per lead, enrolment and step.
+4. In a second transaction, stamp `sent_at` + `resend_email_id`, advance `next_step`, set `next_send_at` (+4 or +5 biz days) or mark `completed`, and release the claim. A Resend error releases the claim instead, and the next run retries with the same key.
+5. Log a `outreach_sent` activity event.
+
+A step is sent at most once. A claim older than 10 minutes that never settled means a run died between sending and saving; that sequence is **paused** with `needs_review` set and the alert names the lead — check the Resend log before resuming it.
+
+Each run records `success`, `partial` (something failed or was stale) or `error` (every due send failed) in `cron_runs` with lead IDs only, returns HTTP 500 for anything but success, and emails a partial, error or stale run to `CRON_ALERT_RECIPIENT` (default marcos@434media.com). `cron_runs` records carry `expireAt` (start + 90 days) for a Firestore TTL policy.
 
 ## Phasing
 
