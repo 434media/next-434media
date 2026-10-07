@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server"
 import { runCronJob } from "@/lib/cron-auth"
-import { getActiveSequenceLeads } from "@/lib/firestore-leads"
+import { getActiveSequenceLeads, getLeadById } from "@/lib/firestore-leads"
 import { runSequenceStep } from "@/lib/outreach-sequence"
 import { getResend, DEFAULT_FROM, assertVerifiedSender } from "@/lib/resend"
 
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
     const completed: string[] = []
     const stopped: string[] = []
     const claimedElsewhere: string[] = []
+    const skipped: { lead: string; reason: string }[] = []
     const stale: { lead: string; step?: number; claimed_at?: string }[] = []
     const failed: { lead: string; error: string }[] = []
     for (const lead of due) {
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest) {
         else if (r.action === "stopped") stopped.push(lead.id)
         else if (r.action === "stale") stale.push({ lead: lead.id, step: r.step, claimed_at: r.staleClaim?.claimed_at })
         else if (r.action === "skipped" && r.skipReason === "claimed") claimedElsewhere.push(lead.id)
+        else if (r.action === "skipped") skipped.push({ lead: lead.id, reason: r.skipReason ?? "unknown" })
       } catch (err) {
         const error = scrubEmails(err instanceof Error ? err.message : String(err))
         failed.push({ lead: lead.id, error })
@@ -61,6 +63,25 @@ export async function GET(req: NextRequest) {
           ? "error"
           : "partial"
 
+    // Read back every lead this run touched, so the record shows the state it
+    // left behind: step sent times, next step, status, and whether a claim is
+    // still held (it should not be). IDs and timestamps only.
+    const touched = [...new Set([...sent, ...completed, ...stopped, ...claimedElsewhere, ...stale.map((s) => s.lead), ...failed.map((f) => f.lead), ...skipped.map((s) => s.lead)])]
+    const after = await Promise.all(
+      touched.map(async (id) => {
+        const seq = (await getLeadById(id).catch(() => null))?.outreach_sequence
+        return {
+          lead: id,
+          status: seq?.status ?? null,
+          next_step: seq?.next_step ?? null,
+          next_send_at: seq?.next_send_at ?? null,
+          claim_held: !!seq?.claim,
+          needs_review: seq?.needs_review ?? null,
+          sent_at: Object.fromEntries((seq?.steps ?? []).map((s) => [`step${s.n}`, s.sent_at ?? null])),
+        }
+      }),
+    )
+
     const message = `Outreach sequence: ${delivered} sent · ${completed.length} completed · ${stopped.length} stopped · ${failed.length} failed · ${stale.length} stale · ${claimedElsewhere.length} claimed elsewhere (${due.length} due, ${read} read)`
     const detail: Record<string, unknown> = {
       read,
@@ -71,6 +92,8 @@ export async function GET(req: NextRequest) {
       failed,
       stale,
       claimedElsewhere,
+      skipped,
+      after,
     }
 
     if (status !== "success") {
