@@ -1,30 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { HeroSection } from "@/components/HeroSection"
-import NewsletterPopup from "@/components/NewsletterPopup"
 
+// NewsletterPopup was imported here, with a timer that set state, but never
+// rendered. Both are gone so the popup's motion code cannot reach the homepage
+// (2b fix 10); the component itself is untouched and unused.
 export default function HomeClient() {
-  const [showNewsletter, setShowNewsletter] = useState(false)
-
-  // Show newsletter popup after 5 seconds on first visit
-  useEffect(() => {
-    const hasSeenNewsletter = localStorage.getItem("434-newsletter-seen")
-
-    if (!hasSeenNewsletter) {
-      const timer = setTimeout(() => {
-        setShowNewsletter(true)
-      }, 3000)
-
-      return () => clearTimeout(timer)
-    }
-  }, [])
-
-  const handleCloseNewsletter = () => {
-    setShowNewsletter(false)
-    localStorage.setItem("434-newsletter-seen", "true")
-  }
-
   return (
     <>
       <HeroSection />

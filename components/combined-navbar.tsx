@@ -3,7 +3,6 @@
 import { useState, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { motion } from "motion/react"
 import { usePathname } from "next/navigation"
 import NavMenu from "./Navmenu"
 
@@ -51,15 +50,12 @@ export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
 
   return (
     <>
-      <motion.header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
+      <header
+        className={`m-header-in fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md ${
           isScrolled
             ? "bg-[color-mix(in_srgb,var(--color-chrome-bg)_95%,transparent)] shadow-lg py-2"
             : "bg-[color-mix(in_srgb,var(--color-chrome-bg)_85%,transparent)] py-3 md:py-4"
         }`}
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
@@ -104,53 +100,30 @@ export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
                   because `useMobile()` decided which of two navigations to
                   draw, and the server cannot measure a viewport — that reason
                   went when the two navigations became one. */}
-              <motion.button
+              {/* Motion lives in globals.css (2b fix 10): .m-menu-button and
+                  .m-burger-line reproduce the entrance, hover, tap and the
+                  lines-to-cross the motion library drew. */}
+              <button
                   onClick={toggleActionMenu}
-                  className="relative text-white p-2 rounded-md flex items-center justify-center transition-all duration-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  className="m-menu-button relative text-white p-2 rounded-md flex items-center justify-center hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
                   aria-expanded={isActionMenuOpen}
                   aria-haspopup="true"
                   aria-controls="nav-menu"
                   aria-label="Open navigation menu"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2, duration: 0.3 }}
                 >
-                  <motion.div
+                  <div
                     className="relative w-6 h-6 flex flex-col justify-center items-center"
-                    animate={isActionMenuOpen ? "open" : "closed"}
+                    data-open={isActionMenuOpen ? "true" : "false"}
                   >
-                    <motion.span
-                      className="absolute w-5 h-0.5 bg-white rounded-full"
-                      variants={{
-                        closed: { rotate: 0, y: -4 },
-                        open: { rotate: 45, y: 0 },
-                      }}
-                      transition={{ duration: 0.3 }}
-                    />
-                    <motion.span
-                      className="absolute w-5 h-0.5 bg-white rounded-full"
-                      variants={{
-                        closed: { opacity: 1 },
-                        open: { opacity: 0 },
-                      }}
-                      transition={{ duration: 0.3 }}
-                    />
-                    <motion.span
-                      className="absolute w-5 h-0.5 bg-white rounded-full"
-                      variants={{
-                        closed: { rotate: 0, y: 4 },
-                        open: { rotate: -45, y: 0 },
-                      }}
-                      transition={{ duration: 0.3 }}
-                    />
-                  </motion.div>
-                </motion.button>
+                    <span className="m-burger-line absolute w-5 h-0.5 bg-white rounded-full" />
+                    <span className="m-burger-line absolute w-5 h-0.5 bg-white rounded-full" />
+                    <span className="m-burger-line absolute w-5 h-0.5 bg-white rounded-full" />
+                  </div>
+                </button>
             </div>
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Action Speaks Louder Menu */}
       <NavMenu isOpen={isActionMenuOpen} onClose={() => setIsActionMenuOpen(false)} id="nav-menu" />

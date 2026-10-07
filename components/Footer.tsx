@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { motion, AnimatePresence } from "motion/react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -85,12 +84,11 @@ export default function Footer() {
       aria-labelledby="footer-heading"
     >
       <div className="max-w-7xl mx-auto px-6 lg:px-8 relative">
-        <AnimatePresence>
-          {isVisible && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6 }}
+        {/* Fades in once, when it nears the viewport (.m-footer-in,
+            globals.css). It never leaves, so there was no exit to keep. */}
+        {isVisible && (
+            <div
+              className="m-footer-in"
             >
               {/* Main footer grid — Brand / Build / Newsletter */}
               <div className="py-12 md:py-16 border-b border-[var(--color-chrome-divider)]">
@@ -206,9 +204,8 @@ export default function Footer() {
                   </a>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
       </div>
     </footer>
   )
