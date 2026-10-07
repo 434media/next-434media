@@ -47,6 +47,24 @@ Turbopack never invalidated `app/globals.css`. Nothing failed, the page
 rendered, and one colour was silently the old one. Promoting or re-aliasing a
 deployment does not fix this — that is a different failure.
 
+**Every build starts without the build cache.** `VERCEL_FORCE_NO_BUILD_CACHE=1`
+is set on the Vercel project for Preview and Production (founder decision,
+2026-10-07). It lives in Vercel's project settings, not in git, so nothing in
+this tree shows it — check it there. The founder set it by hand in the dashboard,
+because the Vercel connector cannot write (or list) project environment
+variables. It skips restoring the cache; a fresh cache
+is still uploaded and simply never read. Documented under "Managing Build cache"
+in Vercel's [Troubleshoot a build](https://vercel.com/docs/deployments/troubleshoot-a-build).
+Why: the 2026-09-29 failure above, and on 2026-10-07 it could not be reproduced
+off Vercel — the same commit pair rebuilt locally from a restored cache came out
+correct — so the mechanism is not established, and skipping the cache is the
+only remedy that has actually fixed it. It costs about 40 s a build (roughly 80 s
+instead of 40 s). Do **not** substitute `turbopackFileSystemCacheForBuild` in
+`next.config.ts`; that bets on a mechanism nobody has shown. Revisit only if
+Vercel or Next.js documents a fix for restored-cache staleness and a test build
+on a CSS-only change, with the cache restored, serves the new CSS. The
+served-stylesheet check above stays until the founder retires it.
+
 **The founder works directly here, and merges wait for review.** He no longer
 relays prompts from a claude.ai thread; threads are for context and review.
 **Before any merge to `main` in either repository, and before any change to the
