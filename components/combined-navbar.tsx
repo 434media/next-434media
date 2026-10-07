@@ -1,38 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "motion/react"
 import { usePathname } from "next/navigation"
-import CartModal from "./shopify/cart/modal"
-import { useCart } from "./shopify/cart/cart-context"
 import NavMenu from "./Navmenu"
 
-// Custom hook to check if component has mounted
-function useHasMounted() {
-  const [hasMounted, setHasMounted] = useState(false)
-
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
-
-  return hasMounted
-}
-
-export function CombinedNavbar() {
+/**
+ * `cart` is filled only by the (shop) layout, with <NavCart />. Elsewhere it is
+ * empty, so the cart code and its provider never reach the rest of the site
+ * (2b fix 9). The icon used to show site-wide whenever the cart had items; that
+ * was given up by founder decision on 2026-10-07.
+ */
+export function CombinedNavbar({ cart }: { cart?: ReactNode }) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false)
   const pathname = usePathname()
-  const { cart } = useCart()
-  const hasMounted = useHasMounted()
 
-  // Check if cart has items - only after component has mounted
-  const hasCartItems = hasMounted && typeof cart?.totalQuantity === "number" && cart.totalQuantity > 0
-
-  // Check if we're in the shop section
-  const isInShop = pathname?.startsWith("/shop") || pathname?.startsWith("/product") || pathname?.startsWith("/search")
-  
   // Handle scroll events with throttling for performance
   useEffect(() => {
     let ticking = false
@@ -112,13 +97,7 @@ export function CombinedNavbar() {
                 project" link is now the menu's second item, which is the point:
                 two places that had to be kept in step became one place. */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* The cart DOES depend on client state - the cart contents are
-                  not known to the server - so it keeps the mount gate. */}
-              {hasMounted && (isInShop || hasCartItems) && (
-                <div className="flex items-center">
-                  <CartModal />
-                </div>
-              )}
+              {cart && <div className="flex items-center">{cart}</div>}
               {/* Not gated on mount. The button's appearance depends on
                   nothing the server cannot know, so it is server-rendered and
                   is in the first paint. It used to wait for `hasMounted`

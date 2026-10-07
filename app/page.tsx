@@ -4,6 +4,7 @@ import { buildServicesItemListLd } from "@/lib/seo/services"
 import { buildFaqPageLd } from "@/lib/seo/faq"
 import { BRAND } from "@/lib/seo/brand"
 import { BRAND_RECORDS } from "@/lib/brand-records"
+import { PublicShell } from "@/components/PublicShell"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
 // Master 9.7's primary title. Open Graph and Twitter keep the short descriptor.
@@ -47,9 +48,13 @@ export const metadata: Metadata = {
   },
 }
 
+// The homepage stays at the app root rather than in app/(site): its title is
+// absolute only at the root (the "%s | 434 MEDIA" template applies below it),
+// and app/opengraph-image.tsx and twitter-image.tsx wire themselves into the
+// root segment. So it wraps itself in the public shell (2b fix 9).
 export default function HomePage() {
   return (
-    <>
+    <PublicShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -63,6 +68,6 @@ export default function HomePage() {
         }}
       />
       <HomeClient />
-    </>
+    </PublicShell>
   )
 }

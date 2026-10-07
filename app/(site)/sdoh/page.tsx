@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { i18n, type Locale } from "../../i18n-config"
+import { i18n, type Locale } from "../../../i18n-config"
 import { cookies, headers } from "next/headers"
 
 // Detect the user's preferred language

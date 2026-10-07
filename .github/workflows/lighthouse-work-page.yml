@@ -46,7 +46,9 @@ name: Lighthouse — Work page
 on:
   pull_request:
     paths:
-      - "app/work/**"
+      - "app/(site)/work/**"
+      - "app/(site)/layout.tsx"
+      - "components/PublicShell.tsx"
       - "public/work/**"
       - "lib/work-records.ts"
       - "lib/work-media.ts"

@@ -65,3 +65,9 @@ jobs:
       # answer: was a generated file edited by hand? A brand colour added here
       # rather than in the handoff is a colour with no provenance.
       - run: tsx scripts/visual/verify-tokens.ts
+
+      # proxy.ts sets the Meta Pixel cookie, so it must run on every public page
+      # and skip assets, API routes and the app-root files (2b fix 9). The test
+      # uses Next's own matcher, so this step needs the installed dependencies.
+      - run: pnpm install --frozen-lockfile
+      - run: node --test lib/__tests__/proxy-matcher.test.mjs

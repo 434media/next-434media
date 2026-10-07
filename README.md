@@ -119,11 +119,13 @@ next-434media/
 │   ├── [lang]/sdoh/              # i18n SDOH brand pages (en/es)
 │   ├── admin/                    # Protected admin dashboard (see below)
 │   ├── api/                      # Route handlers (REST + webhooks + cron)
-│   ├── blog/                     # Public blog (listing + [slug])
-│   ├── contact/  work/  shop/    # Public marketing routes
-│   ├── search/  product/  sdoh/  # Storefront + brand routes
-│   ├── layout.tsx                # Root layout
-│   ├── page.tsx + HomeClient.tsx # Homepage (server page → client component)
+│   ├── (site)/                   # Public pages: chrome + trackers, no cart (route group, not in the URL)
+│   │   └── blog/  contact/  work/  [lang]/sdoh/  …
+│   ├── (shop)/                   # Store: shop/  product/  search/ — public shell + cart
+│   ├── layout.tsx                # Root layout: document, fonts, metadata — no chrome, no trackers
+│   ├── page.tsx + HomeClient.tsx # Homepage, wrapped in the public shell itself (server page → client component)
+│   ├── deck/                     # Shared decks — public shell via deck/layout.tsx
+│   ├── not-found.tsx             # 404 inside the public shell
 │   ├── globals.css               # Global styles (Tailwind v4)
 │   ├── robots.ts  sitemap.ts     # SEO generators
 │   └── opengraph-image.tsx       # Social-card image generation (+ twitter-image)
@@ -201,7 +203,7 @@ Firestore-based blog with markdown support:
 | `lib/firestore-blog.ts` | Blog CRUD operations |
 | `actions/blog.ts` | Public read server actions (`getBlogPostsAction`, `getBlogPostBySlugAction`) |
 | `app/admin/blog/` | Blog post editor (create/update/delete via `app/api/blog`) |
-| `app/blog/[slug]/` | Public blog post pages |
+| `app/(site)/blog/[slug]/` | Public blog post pages |
 | `components/blog/` | Blog UI components |
 
 ### Sales Pipeline (Audiences → Inbox → Leads → CRM)
@@ -424,7 +426,7 @@ Scheduled jobs (`app/api/cron/*`) are driven by the `crons` array in
 1. Create a folder in `app/admin/your-page/`
 2. Add `page.tsx` (automatically protected by the admin layout)
 3. For interactivity, split into a server `page.tsx` + a `"use client"`
-   companion component (e.g. `YourPageClient.tsx`) — see `app/work/` for the pattern
+   companion component (e.g. `YourPageClient.tsx`) — see `app/(site)/work/` for the pattern
 4. Reuse existing component patterns from other admin pages
 
 ### Adding a New Firestore Collection

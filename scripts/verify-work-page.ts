@@ -35,13 +35,13 @@ import { readFileSync } from "node:fs"
 
 import { WORK_RECORDS } from "../lib/work-records"
 
-const PAGE = "app/work/redesign/WorkRedesign.tsx"
+const PAGE = "app/(site)/work/redesign/WorkRedesign.tsx"
 // The order the page groups by is generated from the record seed, so read the
 // models from there rather than from a literal in the component. The component
 // used to carry its own copy; it now derives SECTIONS from this file, and the
 // check below holds it to that.
 const SECTIONS_FILE = "lib/work-sections.ts"
-const SERVER = "app/work/page.tsx"
+const SERVER = "app/(site)/work/page.tsx"
 const DATA = "lib/sor/work-page-data.ts"
 
 function fail(lines: string[]): never {
