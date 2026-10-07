@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       }),
     )
 
-    const message = `Outreach sequence: ${delivered} sent · ${completed.length} completed · ${stopped.length} stopped · ${failed.length} failed · ${stale.length} stale · ${claimedElsewhere.length} claimed elsewhere (${due.length} due, ${read} read)`
+    const message = `Outreach sequence: ${delivered} sent (${completed.length} finishing a sequence) · ${stopped.length} stopped · ${failed.length} failed · ${stale.length} stale · ${claimedElsewhere.length} claimed elsewhere (${due.length} due, ${read} read)`
     const detail: Record<string, unknown> = {
       read,
       due: due.length,
