@@ -6,7 +6,9 @@ import { BRAND } from "@/lib/seo/brand"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.434media.com"
-const homeTitle = `${BRAND.name} — ${BRAND_RECORDS.shortDescriptor}`
+// Master 9.7's primary title. Open Graph and Twitter keep the short descriptor.
+const homeTitle = `${BRAND.name} — Production Studio`
+const shareTitle = `${BRAND.name} — ${BRAND_RECORDS.shortDescriptor}`
 
 export const metadata: Metadata = {
   title: homeTitle,
@@ -27,7 +29,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: homeTitle,
+    title: shareTitle,
     description: BRAND.description,
     url: `${siteUrl}/`,
     siteName: BRAND.name,
@@ -37,7 +39,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: homeTitle,
+    title: shareTitle,
     description: BRAND.description,
     creator: "@434media",
     site: "@434media",

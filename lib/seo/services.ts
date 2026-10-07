@@ -1,7 +1,15 @@
 /**
  * Canonical list of 434 MEDIA services for schema.org/Service JSON-LD.
  * Used on the homepage and /work to expose service offerings to AI search and traditional SEO.
+ *
+ * Each entry is a master 2.4–2.7 scope, in master wording. The platform
+ * definition is read from the generated 4.3 extract; the others quote the
+ * master section named beside them, verbatim. Nothing here may claim media
+ * buying, distribution or ad services (1.8, 2.11; 9.7 puts those concepts on
+ * the Distribution page), and digital infrastructure appears only as 2.7
+ * frames it, never as standalone web development.
  */
+import { COMMERCIAL_MODEL_DEFINITIONS } from "@/lib/commercial-models"
 
 export interface ServiceEntity {
   name: string
@@ -13,52 +21,31 @@ export interface ServiceEntity {
 
 export const SERVICES: ServiceEntity[] = [
   {
-    name: "Brand Storytelling",
-    serviceType: "Brand Storytelling",
+    name: "Content",
+    serviceType: "Content production",
+    // 2.4, first paragraph, verbatim.
     description:
-      "Narrative-first brand strategy and storytelling that turns enterprise positioning into audience-moving content for VCs, accelerators, and category-defining startups.",
+      "434 produces individual and episodic media, including films, short films, commercials, brand films, documentaries, interviews, podcasts, branded series, broadcasts, event coverage, social content, and other short- or long-form units.",
   },
   {
-    name: "Video Production",
-    serviceType: "Video Production",
+    name: "Experiences",
+    serviceType: "Experience production",
+    // 2.5, first paragraph, verbatim.
     description:
-      "Full-service video production — from concept and scripting to multi-camera shoots, post-production, and distribution-ready cuts for events, brand films, and ad campaigns.",
+      "434 produces live and recorded experiences, including events, conferences, performances, panels, broadcasts, activations, and sponsor-led programs.",
   },
   {
-    name: "Web Development",
-    serviceType: "Web Development",
-    description:
-      "Modern, performant marketing sites and web platforms built on Next.js with measurable conversion goals, analytics instrumentation, and accessibility built in.",
+    name: "Platforms for Brands",
+    serviceType: "Platform production",
+    // 1.7 / 4.3, from the generated extract (2.6's own list names distribution).
+    description: COMMERCIAL_MODEL_DEFINITIONS["Platforms for Brands"],
   },
   {
-    name: "Event Production",
-    serviceType: "Event Production",
+    name: "Digital infrastructure",
+    serviceType: "Digital infrastructure",
+    // 2.7, first sentence, verbatim.
     description:
-      "Programming, run-of-show, on-site capture, and post-event amplification for summits, accelerator demo days, and industry conferences across South Texas.",
-  },
-  {
-    name: "Programmatic & OTT/CTV Advertising",
-    serviceType: "Programmatic Advertising",
-    description:
-      "Audience-targeted programmatic, OTT, and connected-TV media buying with creative production and performance reporting tied to enterprise KPIs.",
-  },
-  {
-    name: "Multichannel Marketing Strategy",
-    serviceType: "Marketing Strategy",
-    description:
-      "Integrated multichannel campaigns spanning paid media, social, email, and content — sequenced to brand, demand, and pipeline objectives.",
-  },
-  {
-    name: "Content Strategy & Production",
-    serviceType: "Content Marketing",
-    description:
-      "Editorial planning, on-brand content production, and distribution playbooks for B2B brands building durable audience and category authority.",
-  },
-  {
-    name: "Social Media Management",
-    serviceType: "Social Media Marketing",
-    description:
-      "Channel-native strategy, content production, and community engagement across Instagram, LinkedIn, X, and emerging platforms.",
+      "Digital infrastructure qualifies as 434 work when it is purpose-built for, or functions as an integrated part of, a production, experience, platform, campaign, or approved program.",
   },
 ]
 
@@ -76,7 +63,6 @@ export function buildServiceLd(service: ServiceEntity, siteUrl: string) {
     areaServed: [
       { "@type": "City", name: "San Antonio" },
       { "@type": "State", name: "Texas" },
-      { "@type": "Place", name: "South Texas" },
     ],
     ...(service.url ? { url: service.url } : {}),
   }
