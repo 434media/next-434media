@@ -11,7 +11,7 @@
  *
  * The generated file is deliberately NOT deleted. It remains the artifact the
  * drift check hashes and the CI page check reads, and it is the fallback when
- * Firestore is unreachable — see app/work/page.tsx.
+ * Firestore is unreachable — see app/(site)/work/page.tsx.
  */
 import type { WorkRecord } from "../work-records"
 import { isPublished } from "./visibility"

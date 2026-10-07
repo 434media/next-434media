@@ -10,3 +10,10 @@ export function isTrackedPath(pathname: string | null): boolean {
   if (!pathname) return true
   return !UNTRACKED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
 }
+
+/**
+ * Set by proxy.ts for visitors allowed to receive the Meta Pixel; read by
+ * components/MetaPixel.tsx. The decision itself is lib/meta-pixel-gate.ts,
+ * which is server-only because it reads the exclusion list.
+ */
+export const META_PIXEL_COOKIE = "434_px"

@@ -3,6 +3,11 @@ import { notFound } from "next/navigation"
 import { getBlogPostBySlugFromFirestore } from "@/lib/firestore-blog"
 import BlogPostPageClient from "./BlogPostPageClient"
 
+// Posts are read from Firestore on every request, so a published or edited post
+// appears immediately. The root layout used to force that for every page; it no
+// longer does (2b fix 9), so the blog states it.
+export const dynamic = "force-dynamic"
+
 type Props = {
   params: Promise<{ slug: string }>
 }

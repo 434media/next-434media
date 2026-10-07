@@ -13,11 +13,9 @@ import { isTrackedPath } from "@/lib/tracking-scope"
  * Pixel was already gated this way; all four now share one list,
  * UNTRACKED_PREFIXES in lib/tracking-scope.ts.
  *
- * Gated on the client because the root layout cannot see the path. usePathname
- * is known during server rendering, so an untracked page's HTML carries none of
- * these tags. A script already running stays loaded after a client-side
- * navigation from a public page into an untracked one; the layout split
- * (2b fix 9) is what ends that, by giving those routes a layout without them.
+ * Rendered only by the public layouts (components/PublicShell.tsx), so the
+ * untracked routes never mount it (2b fix 9). The pathname check stays as a
+ * backstop.
  *
  * Simpli.fi and Vercel Analytics were removed rather than moved.
  */

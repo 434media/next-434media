@@ -2,6 +2,11 @@ import type { Metadata } from "next"
 import { getBlogPostsFromFirestore } from "@/lib/firestore-blog"
 import BlogClientPage from "./BlogClientPage"
 
+// Posts are read from Firestore on every request, so a published or edited post
+// appears immediately. The root layout used to force that for every page; it no
+// longer does (2b fix 9), so the blog states it.
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   // "%s | 434 MEDIA" comes from the title template in app/layout.tsx. The
   // previous absolute title also carried "Creative Media & Smart Marketing",
