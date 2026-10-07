@@ -1,57 +1,59 @@
 /**
  * Canonical FAQ used for schema.org/FAQPage on the homepage.
  *
- * Questions are written to mirror the conversational, intent-driven queries
- * generative engines surface ("Best digital marketing agency in San Antonio?",
- * "Who does OTT advertising in Texas?"). Answers are answer-first and concise —
- * the form AI engines prefer to cite verbatim.
+ * Every answer is master wording. The Section 1.1 definition and the 4.3
+ * commercial-model definitions are read from the generated extracts; the
+ * other answers quote the master section named beside them, verbatim. Do not
+ * add a question the master does not supply the substance for, and do not
+ * add distribution, media-buying, OTT or CTV entries here: master 9.7 puts
+ * those on the Distribution page, and 2.11 says 434 does not perform them.
  */
+import { BRAND_RECORDS } from "@/lib/brand-records"
+import { COMMERCIAL_MODEL_DEFINITIONS } from "@/lib/commercial-models"
 
 export interface FaqEntry {
   question: string
   answer: string
 }
 
+const commercialModels = Object.entries(COMMERCIAL_MODEL_DEFINITIONS)
+  .map(([model, definition]) => `${model}: ${definition}`)
+  .join(" ")
+
 export const FAQS: FaqEntry[] = [
   {
     question: "What does 434 MEDIA do?",
-    answer:
-      "434 MEDIA is a creative media and smart marketing agency based in San Antonio, TX. We deliver ROI-driven brand strategy, video production, web development, programmatic and OTT/CTV advertising, multichannel campaigns, and event production for enterprises across South Texas.",
+    // 1.1, then 1.2 verbatim.
+    answer: `${BRAND_RECORDS.canonicalDefinition} 434 MEDIA develops and owns original media properties while producing individual content, live experiences, and multi-part platforms for brands. Productions may also include purpose-built digital infrastructure and distribution through specialized partners.`,
+  },
+  {
+    question: "What does 434 MEDIA produce?",
+    // 1.7 lead-in; 4.3 definitions from the generated extract.
+    answer: `434 operates through three commercial models: ${commercialModels}`,
   },
   {
     question: "Where is 434 MEDIA located?",
+    // Address as in the root layout's structured data (8.2 allows location
+    // there); the second sentence is 8.2's approved website line.
     answer:
-      "434 MEDIA is headquartered at 816 Camaron St., Suite 1.11, San Antonio, TX 78212. We work with enterprise clients throughout San Antonio, South Texas, and across the United States.",
+      "434 MEDIA is located at 816 Camaron St., Suite 1.11, San Antonio, TX 78212. 434 produces on location, wherever the story is.",
   },
   {
     question: "What types of clients does 434 MEDIA work with?",
+    // 1.1's "for brands", and 1.5 verbatim.
     answer:
-      "We partner with venture capital firms, accelerators, startups, healthcare and life-science organizations, civic and nonprofit institutions, and enterprise brands that need integrated brand storytelling and performance media.",
+      "434 MEDIA produces for brands. “Brands” includes qualified businesses, nonprofits, institutions, government entities, agencies, and other organizations.",
   },
   {
-    question: "Does 434 MEDIA offer OTT, CTV, and programmatic advertising?",
+    question: "Does 434 MEDIA produce video?",
+    // 1.3's approved response to "So you produce video?", verbatim.
     answer:
-      "Yes. We plan and execute audience-targeted programmatic, OTT, and connected-TV campaigns end-to-end — including creative production, media buying, and performance reporting tied to enterprise KPIs.",
-  },
-  {
-    question: "Does 434 MEDIA do video production?",
-    answer:
-      "Yes. Video production is a core service. We handle concept and scripting, multi-camera shoots, post-production, and distribution-ready cuts for brand films, ad campaigns, event coverage, and recurring content programs.",
-  },
-  {
-    question: "Can 434 MEDIA build my website?",
-    answer:
-      "Yes. We design and build modern marketing sites and web platforms on Next.js with conversion goals, analytics instrumentation, and accessibility built in from day one.",
-  },
-  {
-    question: "What makes 434 MEDIA different from other San Antonio marketing agencies?",
-    answer:
-      "We combine in-house production capability — video, web, design, and event execution — with measurable, ROI-driven media strategy. Clients get one partner for narrative, creative, and performance instead of stitching together specialists.",
+      "Yes. Video is one of our production formats. We also produce live experiences and multi-part platforms, and we develop original media properties of our own.",
   },
   {
     question: "How do I contact 434 MEDIA?",
-    answer:
-      "Email build@434media.com or visit https://www.434media.com/contact to start a project conversation. We respond to qualified inquiries within one business day.",
+    // 9.1 primary CTA and 9.5 intake.
+    answer: "Start a production at https://www.434media.com/contact.",
   },
 ]
 
