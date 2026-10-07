@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useState, useRef } from "react"
-import { motion, AnimatePresence } from "motion/react"
 
 export function Newsletter() {
   const [email, setEmail] = useState("")
@@ -73,16 +72,15 @@ export function Newsletter() {
 
   return (
     <div className="w-full max-w-md">
-      <AnimatePresence mode="wait">
-        {!isSuccess ? (
-          <motion.form
+      {/* Entrances in CSS (.m-form-in, .m-success-in; globals.css). The exits
+          motion played between the two — form up and out, thank-you shrinking
+          away — are dropped: each now swaps in directly (2b fix 10). */}
+      {!isSuccess ? (
+          <form
             ref={formRef}
             key="subscribe-form"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
             onSubmit={handleSubmit}
-            className="newsletter-form"
+            className="m-form-in newsletter-form"
             aria-label="Newsletter subscription form"
           >
             <div className="relative flex items-center">
@@ -109,12 +107,10 @@ export function Newsletter() {
                 className="absolute right-1.5 bg-white text-neutral-950 w-9 h-9 rounded-md flex items-center justify-center hover:bg-neutral-200 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-900 focus:ring-white"
                 aria-label="Subscribe to newsletter"
               >
-                <motion.div
-                  animate={isSubmitting ? { rotate: 360 } : { rotate: 0 }}
-                  transition={isSubmitting ? { duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" } : {}}
-                >
+                {/* Spins 360° a second, linearly, while submitting. */}
+                <div className={isSubmitting ? "m-spin" : undefined}>
                   {isSubmitting ? <LoadingIcon className="h-4 w-4" /> : <ArrowIcon className="h-4 w-4" />}
-                </motion.div>
+                </div>
               </button>
             </div>
 
@@ -123,21 +119,17 @@ export function Newsletter() {
                 {error}
               </div>
             )}
-          </motion.form>
+          </form>
         ) : (
-          <motion.div
+          <div
             key="success-message"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-neutral-900 border border-white/10 px-4 py-3 rounded-lg text-white text-sm text-center font-geist-sans"
+            className="m-success-in bg-neutral-900 border border-white/10 px-4 py-3 rounded-lg text-white text-sm text-center font-geist-sans"
             role="status"
             aria-live="polite"
           >
             Thanks for subscribing! We&apos;ll be in touch soon.
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   )
 }

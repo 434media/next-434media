@@ -1,40 +1,44 @@
 "use client"
 
 import { useRef, useState, useEffect, useCallback } from "react"
-import { motion, useScroll, useTransform } from "motion/react"
 import Image from "next/image"
 import { useMobile } from "../hooks/use-mobile"
 import { BRAND_RECORDS } from "@/lib/brand-records"
 
+// The cue fades in to 0.6 after 2s and bobs 8px every 1.5s (.m-scroll-cue-in,
+// .m-bob; globals.css). Scrolling fades it out over the first 10px, as
+// motion's useTransform(scrollY, [0, 10], [0.6, 0]) did: the outer element
+// carries the scroll factor, the inner one the entrance (2b fix 10).
 function ScrollIndicator() {
-  const { scrollY } = useScroll()
-  const opacity = useTransform(scrollY, [0, 10], [0.6, 0])
+  const [scrollFactor, setScrollFactor] = useState(1)
+
+  useEffect(() => {
+    const onScroll = () => setScrollFactor(Math.max(0, 1 - window.scrollY / 10))
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
 
   return (
-    <motion.div
+    <div
       className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
-      style={{ opacity }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 0.6 }}
-      transition={{ delay: 2, duration: 1 }}
+      style={{ opacity: scrollFactor }}
       aria-hidden="true"
     >
-      <motion.div
-        animate={{ y: [0, 8, 0] }}
-        transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5, ease: "easeInOut" }}
-        className="text-white/60"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M5 9L12 16L19 9"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </motion.div>
-    </motion.div>
+      <div className="m-scroll-cue-in">
+        <div className="m-bob text-white/60">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M5 9L12 16L19 9"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
   )
 }
 
