@@ -11,18 +11,17 @@ const homeTitle = `${BRAND.name} — ${BRAND_RECORDS.shortDescriptor}`
 export const metadata: Metadata = {
   title: homeTitle,
   description: BRAND.description,
+  // Master 9.7's production-search concepts, verbatim and in its order.
   keywords: [
-    BRAND.name,
-    "brand campaigns",
-    "event production",
-    "creative media agency",
-    "brand storytelling",
-    "video production",
-    "web development",
-    "programmatic advertising",
-    "OTT and CTV",
-    "San Antonio marketing agency",
-    "South Texas",
+    "production studio",
+    "production company",
+    "original IP",
+    "brand studio",
+    "live-event production",
+    "documentary production",
+    "executive producer",
+    "Salute to Troops",
+    "TXMX Boxing",
   ],
   alternates: {
     canonical: "/",
