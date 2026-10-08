@@ -13,7 +13,7 @@ export const config = {
   // the OG and Twitter images, the icons) and any path ending in a file
   // extension. Every public page has to match, or it would never receive the
   // Meta Pixel cookie and the pixel would silently never load there —
-  // lib/__tests__/proxy-matcher.test.ts asserts both directions.
+  // lib/__tests__/proxy-matcher.test.mjs asserts both directions.
   matcher: [
     "/((?!_next/static|_next/image|api/|favicon\\.ico|robots\\.txt|sitemap\\.xml|llms\\.txt|(?:.*/)?opengraph-image|(?:.*/)?twitter-image|apple-icon|apple-touch-icon|.*\\.[A-Za-z0-9]+$).*)",
   ],

@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/feed-publish",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cron-runs-ttl-backfill",
+      "schedule": "15 2 8 10 *"
     }
   ]
 }
