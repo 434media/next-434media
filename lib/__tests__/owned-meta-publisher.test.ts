@@ -279,20 +279,20 @@ test("final provider guard runs after bytes check and immediately before POST; f
   }
 })
 test("production recovery route rejects other publishers and super-admins before storage or Meta access",async()=>{
-  const req=(await import("node:module")).createRequire(__filename)
-  const env=process.env,auth=req("../auth") as typeof import("../auth"),db=req("../firestore-crm") as typeof import("../firestore-crm")
-  const original={getSession:auth.getSession,isAuthorizedAdmin:auth.isAuthorizedAdmin,canSend:auth.canSend,isCrmSuperAdmin:auth.isCrmSuperAdmin,ownedMetaRuntimeEnabled:db.ownedMetaRuntimeEnabled,ownedMetaStore:db.ownedMetaStore}
+  const {readFileSync}=await import("node:fs"),{createRequire}=await import("node:module"),{runInNewContext}=await import("node:vm")
+  const req=createRequire(process.cwd()+"/package.json"),ts=req("typescript")
   let reads=0,email="publisher@example.test"
-  Object.assign(auth,{getSession:async()=>({email,role:"crm_super_admin"}),isAuthorizedAdmin:()=>true,canSend:()=>true,isCrmSuperAdmin:async()=>true})
-  Object.assign(db,{ownedMetaRuntimeEnabled:async()=>true,ownedMetaStore:()=>{reads++;throw Error("must not access store")}})
-  process.env={...env,VERCEL_ENV:"production"}
-  try {
-    const route=await import("../../app/api/admin/crm/content-posts/[id]/owned-meta/route")
-    for(email of ["publisher@example.test","jesse@434media.com","promoted@example.test"]) {
-      const response=await route.POST(new Request("http://localhost/offline",{method:"POST",body:JSON.stringify({action:"recover-facebook",...recoveryInput})}) as never,{params:Promise.resolve({id:"offline"})})
-      assert.equal(response.status,403);assert.equal(reads,0)
-    }
-  } finally {process.env=env;Object.assign(auth,original);db.ownedMetaRuntimeEnabled=original.ownedMetaRuntimeEnabled;db.ownedMetaStore=original.ownedMetaStore}
+  const auth={getSession:async()=>({email,role:"crm_super_admin"}),isAuthorizedAdmin:()=>true,canSend:()=>true,isCrmSuperAdmin:async()=>true}
+  const db={ownedMetaRuntimeEnabled:async()=>true,ownedMetaStore:()=>{reads++;throw Error("must not access store")}}
+  const source=readFileSync("app/api/admin/crm/content-posts/[id]/owned-meta/route.ts","utf8")
+  const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText
+  const exports:{POST?:(request:Request,ctx:{params:Promise<{id:string}>})=>Promise<Response>}={}
+  const localReq=createRequire(__filename)
+  runInNewContext(code,{exports,process:{env:{VERCEL_ENV:"production"}},require:(name:string)=>name==="@/lib/auth"?auth:name==="@/lib/firestore-crm"?db:name.startsWith("@/lib/")?localReq("../"+name.slice(6)):req(name)})
+  for(email of ["publisher@example.test","jesse@434media.com","promoted@example.test"]) {
+    const response=await exports.POST!(new Request("http://localhost/offline",{method:"POST",body:JSON.stringify({action:"recover-facebook",...recoveryInput})}),{params:Promise.resolve({id:"offline"})})
+    assert.equal(response.status,403);assert.equal(reads,0)
+  }
 })
 test("exact manual settlement of late original ID permits Instagram continuation without another Facebook post",async()=>{
   const r=uncertainFacebook();beginFacebookRecovery(r,recoveryInput,"retry","2026-10-09T01:00:00Z")
