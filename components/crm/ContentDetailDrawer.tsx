@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type { MetaConnectionReport } from "@/lib/owned-meta-connection"
+
+import { useState, useEffect, useRef } from "react"
 import { 
   X, 
   Loader2, 
@@ -1176,6 +1178,8 @@ export function ContentDetailDrawer({
 
 /** Existing review drawer extension. No new dashboard or unattended worker. */
 function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: () => void }) {
+  const [diagnostics,setDiagnostics]=useState<MetaConnectionReport|null>(null)
+  const connectionRequest=useRef<AbortController|null>(null)
   const [enabled,setEnabled]=useState(false)
   const [batch,setBatch]=useState<MetaBatch|null>(null)
   const [brand,setBrand]=useState<MetaBrand>("milcity")
@@ -1199,14 +1203,27 @@ function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: ()
   const endpoint=`/api/admin/crm/content-posts/${post.id}/owned-meta`
   useEffect(()=>{
     const controller=new AbortController()
+    setDiagnostics(null)
     fetch(endpoint,{credentials:"include",signal:controller.signal}).then(r=>r.json()).then(data=>{setEnabled(data.enabled===true);setBatch(data.batch||null)}).catch(e=>{if(e.name!=="AbortError")setError("Publisher status unavailable")})
-    return()=>controller.abort()
+    return()=>{controller.abort();connectionRequest.current?.abort()}
   },[endpoint])
+  async function checkConnection() {
+    if(connectionRequest.current)return
+    const controller=new AbortController();connectionRequest.current=controller
+    setBusy(true);setError("");setDiagnostics(null)
+    try {
+      const r=await fetch(`${endpoint}?checkConnection=1`,{credentials:"include",cache:"no-store",signal:controller.signal})
+      const data=await r.json();if(controller.signal.aborted)return
+      if(data.batch)setBatch(data.batch)
+      if(!r.ok)throw new Error(data.error||"Connection check unavailable")
+      setDiagnostics(data.diagnostics);setBatch(data.batch);setEnabled(data.diagnostics.runtime.globalEnabled)
+    } catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:"Connection check unavailable")} finally {if(connectionRequest.current===controller)connectionRequest.current=null;if(!controller.signal.aborted)setBusy(false)}
+  }
   async function action(body:Record<string,unknown>) {
     setBusy(true);setError("")
     try {
       const r=await fetch(endpoint,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify({batchId:batch?.id,hash:batch?.hash,...body})})
-      const data=await r.json();if(!r.ok)throw new Error(data.error||"Publisher action failed")
+      const data=await r.json();if(data.batch)setBatch(data.batch);if(!r.ok)throw new Error(data.error||"Publisher action failed")
       setBatch(data.batch);setReviewed(false);setPreviews({})
     } catch(e){setError(e instanceof Error?e.message:"Publisher action failed")} finally {setBusy(false)}
   }
@@ -1222,6 +1239,14 @@ function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: ()
   if(!enabled&&!batch)return null
   return <section className="pt-4 border-t border-gray-200 space-y-3" aria-label="Owned Meta publishing">
     <h3 className="font-medium text-gray-800">Instagram and Facebook publication</h3>
+    {batch&&<button type="button" disabled={busy} onClick={checkConnection} className="border rounded px-2 py-1">Check connection (read only)</button>}
+    {diagnostics&&<div className="text-xs space-y-1" role="status">
+      <p>Checked {diagnostics.checkedAt}. Global switch: {diagnostics.runtime.globalEnabled?"on":"off"}; brand: {diagnostics.runtime.brandEnabled?"on":"off"}; permission block: {diagnostics.runtime.permissionBlocked?"active":"inactive"}.</p>
+      <p>Configured app {diagnostics.configured.appId}, Page {diagnostics.configured.pageId}, Instagram {diagnostics.configured.instagramId}. Batch configuration {diagnostics.configurationMatchesBatch?"matches":"differs"}. Credential app and publishing permissions remain unverified.</p>
+      {(["identity","relationship","facebook","instagram","container"] as const).map(key=><p key={key}>{key}: {diagnostics[key].outcome}{diagnostics[key].observedPageId&&` (Page ${diagnostics[key].observedPageId}${diagnostics[key].observedInstagramId?`, Instagram ${diagnostics[key].observedInstagramId}`:""}; configuration ${diagnostics[key].matchesConfigured?"matches":"differs"})`}{diagnostics[key].containerStatus&&` (${diagnostics[key].containerStatus})`}{diagnostics[key].error&&` — HTTP ${diagnostics[key].error!.httpStatus}, code ${diagnostics[key].error!.code??"unknown"}, subcode ${diagnostics[key].error!.subcode??"unknown"}`}{diagnostics[key].candidateIds&&` · exact-caption candidate IDs: ${diagnostics[key].candidateIds!.join(", ")||"none in this window"}`}</p>)}
+      <p>Only the first 25 posts per destination are checked. Caption matches do not prove the approved asset was published. No match does not prove absence. Read access does not prove publishing permission. This check never publishes, reconciles or clears the safety block.</p>
+    </div>}
+    {batch&&(["instagram","facebook"] as const).map(d=>batch.jobs[d].lastError&&<p key={`error-${d}`} className="text-xs text-red-700">Last {d} {batch.jobs[d].lastError!.operation} failure: HTTP {batch.jobs[d].lastError!.httpStatus}, code {batch.jobs[d].lastError!.code??"unknown"}, subcode {batch.jobs[d].lastError!.subcode??"unknown"} at {batch.jobs[d].lastError!.at}</p>)}
     <p className="text-xs text-gray-600">Uses the saved export references on this post. Save edits first. Each export must be on an approved source origin and at most 64 MiB. No private Drive access is assumed.</p>
     {enabled&&(!batch?.approval || Object.values(batch.jobs).every(j=>j.status==="verified"||j.status==="operator_confirmed")) && <div className="space-y-2">
       <label className="block text-sm">Brand <select value={brand} onChange={e=>setBrand(e.target.value as MetaBrand)} disabled={busy} className="border rounded p-1"><option value="txmx">TXMX Boxing</option><option value="vemos">VemosVamos</option><option value="milcity">MilCityUSA</option><option value="ampd">AMPD Project</option></select></label>

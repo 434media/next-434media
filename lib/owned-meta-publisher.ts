@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import type { SafeMetaError } from "./owned-meta-errors"
 
 export const META_BRANDS = ["txmx", "vemos", "milcity", "ampd"] as const
 export type MetaBrand = typeof META_BRANDS[number]
@@ -36,6 +37,7 @@ export interface MetaJob {
   permalink?: string
   verifiedAt?: string
   blocker?: string
+  lastError?: SafeMetaError
   manualEvidence?: { by: string; at: string; approvedHash: string; confirmation: string }
 }
 export interface MetaBatch {
@@ -61,8 +63,8 @@ export interface MetaProvider {
   publish(manifest: MetaManifest, destination: MetaDestination, urls: string[], preparation: Record<string, string>): Promise<string>
   verify(manifest: MetaManifest, destination: MetaDestination, remoteId: string): Promise<{ verified: boolean; permalink?: string; blocker?: string }>
 }
-export class MetaBlocked extends Error { constructor(message: string) { super(message); this.name = "MetaBlocked" } }
-export class MetaPermissionError extends Error { constructor() { super("Publishing permission failed; this brand needs a new permission check"); this.name = "MetaPermissionError" } }
+export class MetaBlocked extends Error { constructor(message: string, public readonly detail?: SafeMetaError) { super(message); this.name = "MetaBlocked" } }
+export class MetaPermissionError extends Error { constructor(public readonly detail?: SafeMetaError) { super("Publishing permission failed; this brand needs a new permission check"); this.name = "MetaPermissionError" } }
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`
   if (value && typeof value === "object") return `{${Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`
@@ -152,8 +154,13 @@ export async function runOwnedMeta(args: {
       }
       if (job.finalIntent) {
         if (job.remoteId) {
-          const v = await provider.verify(r.batch.manifest, destination, job.remoteId)
-          await mutate(current => { const j = current.batch.jobs[destination]; if (v.verified && v.permalink) { j.status = "verified"; j.permalink = v.permalink; j.verifiedAt = now(); delete j.blocker } else { j.status = "needs_reconciliation"; j.blocker = v.blocker || "Remote outcome unverified" } }, true)
+          try {
+            const v = await provider.verify(r.batch.manifest, destination, job.remoteId)
+            await mutate(current => { const j = current.batch.jobs[destination]; if (v.verified && v.permalink) { j.status = "verified"; j.permalink = v.permalink; j.verifiedAt = now(); delete j.blocker } else { j.status = "needs_reconciliation"; j.blocker = v.blocker || "Remote outcome unverified" } }, true)
+          } catch (error) {
+            if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) await mutate(current => { current.batch.jobs[destination].lastError = error.detail }, true).catch(() => {})
+            throw error
+          }
         }
         continue // NEVER issue a second final publication.
       }
@@ -165,6 +172,7 @@ export async function runOwnedMeta(args: {
       })
       await mutate(current => { current.batch.jobs[destination].preparation = prepared.preparation; current.batch.jobs[destination].status = "processing" })
       } catch (error) {
+        if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) await mutate(current => { current.batch.jobs[destination].lastError = error.detail }, true).catch(() => {})
         if (error instanceof MetaPermissionError) throw error
         await mutate(current => { current.batch.jobs[destination].status = "manual_required"; current.batch.jobs[destination].blocker = "Preparation failed; operator may reset unpublished preparation and retry" })
         continue
@@ -207,7 +215,7 @@ export async function runOwnedMeta(args: {
           else { job.status = "needs_reconciliation"; job.blocker = result.blocker || "Published result needs review" }
         }, true)
       } catch (error) {
-        await mutate(current => { const j = current.batch.jobs[destination]; j.status = "needs_reconciliation"; j.blocker = "Final publication may have happened; do not repeat" }, true)
+        await mutate(current => { const j = current.batch.jobs[destination]; j.status = "needs_reconciliation"; j.blocker = "Final publication may have happened; do not repeat"; if ((error instanceof MetaPermissionError || error instanceof MetaBlocked) && error.detail) j.lastError = error.detail }, true)
         if (error instanceof MetaPermissionError) throw error
       }
     }

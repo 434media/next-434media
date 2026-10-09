@@ -82,3 +82,115 @@ test("cached asset URLs are still revalidated on manual resume",async()=>{const 
 
 
 test("archive or stopped claim during byte verification prevents dispatch",async()=>{for(const change of [(r:MetaRecord)=>{r.archived=true},(r:MetaRecord)=>{r.batch.claim=null}]){const r=record();r.batch.claim="r";let dispatched=false;await assert.rejects(async()=>{await validateMetaMutationBoundary({enabled:async()=>true,read:async()=>structuredClone(r),batchId:r.batch.id,runId:"r",verify:async()=>change(r)});dispatched=true});assert.equal(dispatched,false)}})
+
+// Connection diagnostics share the production credential boundary, but no write capability.
+test("connection check is GET-only, bounded, and leaves uncertain publication untouched",async()=>{
+  const {checkOwnedMetaConnection}=await import("../owned-meta-connection")
+  const r=record();r.batch.jobs.instagram.preparation.container="11";r.batch.jobs.instagram.status="processing"
+  r.batch.jobs.facebook.status="needs_reconciliation";r.batch.jobs.facebook.finalIntent={id:"prior:facebook",at:"2026-10-09T17:11:03Z"}
+  const before=JSON.stringify(r),calls:string[]=[]
+  const result=await checkOwnedMetaConnection({batch:r.batch,config:{...r.batch.manifest.destinations,accessToken:"fake-private-token"},runtime:{globalEnabled:false,brandEnabled:false,permissionBlocked:true},fetcher:(async(url,init)=>{
+    const u=new URL(String(url));calls.push(u.pathname);assert.equal(init?.method,"GET");assert.equal(init?.body,undefined);assert.equal(init?.redirect,"error");assert.equal(init?.cache,"no-store");assert.equal(u.searchParams.has("access_token"),false)
+    if(u.pathname.endsWith("/me"))return Response.json({id:"2",access_token:"fake-private-token"})
+    if(u.pathname.endsWith("/2"))return Response.json({id:"2",instagram_business_account:{id:"3"},access_token:"fake-private-token"})
+    if(u.pathname.endsWith("/11"))return Response.json({status_code:"FINISHED",secret:"fake-private-token"})
+    assert.equal(u.searchParams.get("limit"),"25")
+    return Response.json({data:[{id:"2_99",message:"FB exact",caption:"IG exact",access_token:"fake-private-token"}],paging:{next:"https://untrusted.test/token"}})
+  }) as typeof fetch})
+  assert.equal(calls.length,5);assert.equal(JSON.stringify(r),before);assert.deepEqual(result.facebook.candidateIds,["2_99"])
+  assert.equal(result.container.containerStatus,"FINISHED");assert.equal(result.permissions,"unverified");assert.equal(result.relationship.matchesConfigured,true);assert.equal(result.identity.matchesConfigured,true)
+  assert.equal(result.runtime.permissionBlocked,true);assert.ok(!JSON.stringify(result).includes("fake-private-token"));assert.ok(!JSON.stringify(result).includes("FB exact"))
+})
+test("connection provider errors discard raw bodies, credential echoes and invalid trace IDs",async()=>{
+  const {checkOwnedMetaConnection}=await import("../owned-meta-connection")
+  const r=record(),secret="PRIVATE_TOKEN_12345678"
+  const result=await checkOwnedMetaConnection({batch:r.batch,config:{...r.batch.manifest.destinations,accessToken:secret},runtime:{globalEnabled:true,brandEnabled:true,permissionBlocked:true},fetcher:(async()=>Response.json({error:{code:200,error_subcode:999,fbtrace_id:secret,message:secret,url:`https://x.test/${secret}`},access_token:secret},{status:403})) as typeof fetch})
+  assert.equal(result.facebook.error?.httpStatus,403);assert.equal(result.facebook.error?.code,200);assert.equal(result.facebook.error?.subcode,999)
+  assert.equal(result.facebook.error?.traceId,undefined);assert.ok(!JSON.stringify(result).includes(secret));assert.equal(result.container.outcome,"unavailable")
+})
+test("connection does not follow pagination, accept invalid saved paths, or claim missing post absence",async()=>{
+  const {checkOwnedMetaConnection}=await import("../owned-meta-connection")
+  const r=record();r.batch.jobs.instagram.preparation.container="https://untrusted.test/path"
+  let calls=0
+  const result=await checkOwnedMetaConnection({batch:r.batch,config:{...r.batch.manifest.destinations,accessToken:"fake"},runtime:{globalEnabled:false,brandEnabled:false,permissionBlocked:true},fetcher:(async()=>{calls++;return Response.json({data:Array.from({length:26},(_,i)=>({id:String(i+1),message:i===25?"FB exact":"other"})),paging:{next:"https://untrusted.test/"}})}) as typeof fetch})
+  assert.equal(calls,4);assert.deepEqual(result.facebook.candidateIds,[]);assert.equal(result.container.outcome,"unavailable")
+})
+test("connection transport and malformed payload errors never echo secrets",async()=>{
+  const {checkOwnedMetaConnection}=await import("../owned-meta-connection")
+  const r=record(),secret="secret-response-body"
+  for(const fetcher of [(async()=>{throw Error(secret)}) as typeof fetch,(async()=>new Response(secret)) as typeof fetch]) {
+    const result=await checkOwnedMetaConnection({batch:r.batch,config:{...r.batch.manifest.destinations,accessToken:secret},runtime:{globalEnabled:false,brandEnabled:false,permissionBlocked:true},fetcher})
+    assert.equal(result.facebook.outcome,"unavailable");assert.ok(!JSON.stringify(result).includes(secret))
+  }
+})
+test("failed final Facebook publication retains safe detail and final intent alongside processing Instagram",async()=>{
+  const s=new Store(),m=s.value.batch.manifest,secret="PRIVATE_TOKEN_12345678",requests:string[]=[]
+  const p=createMetaProvider({accessToken:secret,evidence:evidence(m),beforeMutation:async()=>{},fetcher:(async(url,init)=>{
+    const u=new URL(String(url));requests.push(`${init?.method}:${u.pathname}`)
+    if(u.pathname.endsWith("/photos"))return Response.json({error:{code:200,error_subcode:123,fbtrace_id:"SafeTrace_1234",message:secret}},{status:403})
+    if(init?.method==="POST")return Response.json({id:"11"})
+    return Response.json({status_code:"IN_PROGRESS"})
+  }) as typeof fetch})
+  await assert.rejects(run(s,p),/permission/)
+  assert.equal(s.value.batch.jobs.instagram.status,"processing");assert.equal(s.value.batch.jobs.instagram.preparation.container,"11")
+  assert.equal(s.value.batch.jobs.facebook.status,"needs_reconciliation");assert.ok(s.value.batch.jobs.facebook.finalIntent)
+  assert.equal(s.value.batch.jobs.facebook.remoteId,undefined);assert.equal(s.value.batch.claim,null)
+  assert.equal(s.value.batch.jobs.facebook.lastError?.code,200);assert.equal(s.value.batch.jobs.facebook.lastError?.operation,"publish")
+  assert.ok(!JSON.stringify(s.value).includes(secret));assert.equal(requests.filter(x=>x.endsWith("/photos")).length,1)
+})
+test("diagnostics route is owner-gated before reads and never reaches POST mutation handlers",async()=>{
+  const {readFileSync}=await import("node:fs")
+  const source=readFileSync("app/api/admin/crm/content-posts/[id]/owned-meta/route.ts","utf8")
+  const get=source.slice(source.indexOf("export async function GET"),source.indexOf("export async function POST"))
+  assert.ok(get.indexOf('process.env.VERCEL_ENV !== "production"')<get.indexOf("authorize()"))
+  assert.ok(get.indexOf("connection && !await isCrmSuperAdmin")<get.indexOf("ownedMetaStore().read"))
+  assert.ok(!/blockOwnedMetaPermission\(|recordCronRun\(|\.update\(|\.event\(|\.set\(|createOwnedMetaDraft\(/.test(get))
+  assert.match(get,/cache-control.*private, no-store/)
+})
+test("safe error fields reject vendor text, numeric strings and URL traces",async()=>{
+  const {safeMetaError}=await import("../owned-meta-errors")
+  for(const trace of ["https://vendor.test/private", "secret token", "x".repeat(65)]) {
+    const detail=safeMetaError(403,{error:{code:"200",error_subcode:"123",fbtrace_id:trace,message:"never expose"}},"facebook","publish","secret")
+    assert.equal(detail.code,undefined);assert.equal(detail.subcode,undefined);assert.equal(detail.traceId,undefined);assert.ok(!JSON.stringify(detail).includes("never expose"))
+  }
+})
+test("observed account mismatch is reported without treating read access as publishing permission",async()=>{
+  const {checkOwnedMetaConnection}=await import("../owned-meta-connection")
+  const r=record()
+  const result=await checkOwnedMetaConnection({batch:r.batch,config:{...r.batch.manifest.destinations,accessToken:"fake"},runtime:{globalEnabled:true,brandEnabled:true,permissionBlocked:true},fetcher:(async url=>{
+    const path=new URL(String(url)).pathname
+    return Response.json(path.endsWith("/me")?{id:"999"}:path.endsWith("/2")?{id:"2",instagram_business_account:{id:"888"}}:{data:[]})
+  }) as typeof fetch})
+  assert.equal(result.identity.matchesConfigured,false);assert.equal(result.relationship.matchesConfigured,false);assert.equal(result.permissions,"unverified");assert.equal(result.runtime.permissionBlocked,true)
+})
+test("connection UI aborts on dismissal, prevents concurrent checks and reads current batch after probes",async()=>{
+  const {readFileSync}=await import("node:fs")
+  const ui=readFileSync("components/crm/ContentDetailDrawer.tsx","utf8")
+  assert.match(ui,/key=\{post.id\}/);assert.match(ui,/connectionRequest.current\?\.abort\(\)/)
+  assert.match(ui,/if\(connectionRequest.current\)return/);assert.match(ui,/if\(controller.signal.aborted\)return/)
+  const route=readFileSync("app/api/admin/crm/content-posts/[id]/owned-meta/route.ts","utf8")
+  const get=route.slice(route.indexOf("export async function GET"),route.indexOf("export async function POST"))
+  assert.ok(get.indexOf("const current=await ownedMetaStore().read(id)")>get.indexOf("await checkOwnedMetaConnection"))
+  assert.match(get,/diagnostics,batch:current.batch/)
+})
+test("diagnostic persistence cannot replace a permission failure after archive or claim change",async()=>{
+  const {MetaPermissionError}=await import("../owned-meta-publisher")
+  for(const change of [(r:MetaRecord)=>{r.archived=true},(r:MetaRecord)=>{r.batch.claim="other-run"}]) {
+    const s=new Store(),p=fakeProvider(),failure=new MetaPermissionError({destination:"instagram",operation:"prepare",httpStatus:403,code:200,at:"2026-10-09T18:00:00Z"})
+    p.prepare=async()=>{change(s.value);throw failure}
+    await assert.rejects(run(s,p),e=>e===failure)
+    assert.equal(s.value.batch.jobs.instagram.finalIntent,undefined)
+    assert.ok(!p.calls.some(c=>c.startsWith("publish:")))
+    if(s.value.archived)assert.equal(s.value.batch.jobs.instagram.lastError?.code,200)
+    else assert.equal(s.value.batch.claim,"other-run")
+  }
+})
+test("saved final ID readback failure retains safe detail without another final publication",async()=>{
+  const {MetaPermissionError}=await import("../owned-meta-publisher")
+  const r=record();r.batch.jobs.instagram.finalIntent={id:"original:instagram",at:"earlier"};r.batch.jobs.instagram.remoteId="123";r.batch.jobs.instagram.status="needs_reconciliation"
+  const s=new Store(r),p=fakeProvider(),failure=new MetaPermissionError({destination:"instagram",operation:"verify",httpStatus:403,code:200,at:"2026-10-09T18:00:00Z"})
+  p.verify=async()=>{throw failure}
+  await assert.rejects(run(s,p),e=>e===failure)
+  assert.equal(s.value.batch.jobs.instagram.lastError?.operation,"verify");assert.equal(s.value.batch.jobs.instagram.remoteId,"123")
+  assert.equal(s.value.batch.jobs.instagram.finalIntent?.id,"original:instagram");assert.equal(s.value.batch.claim,null);assert.deepEqual(p.calls,[])
+})

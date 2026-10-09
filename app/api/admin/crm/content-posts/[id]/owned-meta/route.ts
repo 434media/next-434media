@@ -5,6 +5,7 @@ import { createOwnedMetaDraft, getContentPostById, ownedMetaStore, blockOwnedMet
 import { runOwnedMeta, validateMetaMutationBoundary, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, MetaPermissionError, META_BRANDS, type MetaBrand, type MetaManifest, type MetaAsset } from "@/lib/owned-meta-publisher"
 import { readTrustedAsset, assertApprovedBlobUrl, assetDigest, verifyAssetBytes, measureExport } from "@/lib/owned-meta-assets"
 import { createMetaProvider } from "@/lib/instagram-publishing"
+import { checkOwnedMetaConnection } from "@/lib/owned-meta-connection"
 import { recordCronRun } from "@/lib/cron-auth"
 
 const actionBody = z.object({
@@ -33,8 +34,18 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   if (process.env.VERCEL_ENV !== "production") return NextResponse.json({enabled:false})
   const auth=await authorize(); if ("error" in auth) return NextResponse.json({error:auth.error},{status:auth.status})
   const {id}=await ctx.params
+  const connection=req.nextUrl.searchParams.get("checkConnection") === "1"
+  if (connection && !await isCrmSuperAdmin(auth.session.email)) return NextResponse.json({error:"Super-admin connection check required"},{status:403})
   try {
     const r=await ownedMetaStore().read(id)
+    if (connection) {
+      const {getOwnedMetaPublishingConfig}=await import("@/lib/instagram-config")
+      const config=getOwnedMetaPublishingConfig(r.batch.manifest.brand)
+      const diagnostics=await checkOwnedMetaConnection({batch:r.batch,config,runtime:{globalEnabled:await deploymentEnabled(),brandEnabled:await brandEnabled(r.batch.manifest.brand),permissionBlocked:await ownedMetaPermissionBlocked(r.batch.manifest.brand,config.evidence.verifiedAt)}})
+      const current=await ownedMetaStore().read(id)
+      if(current.batch.id!==r.batch.id || current.batch.hash!==r.batch.hash) return NextResponse.json({error:"Batch changed during connection check; reload",batch:current.batch},{status:409,headers:{"cache-control":"private, no-store"}})
+      return NextResponse.json({diagnostics,batch:current.batch},{headers:{"cache-control":"private, no-store"}})
+    }
     const index=req.nextUrl.searchParams.get("asset")
     if(index!==null){
       const i=Number(index),a=r.batch.manifest.assets[i]
@@ -46,7 +57,10 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     }
     return NextResponse.json({enabled:await deploymentEnabled(),batch:r.batch,archived:r.archived})
   }
-  catch { return NextResponse.json({enabled:await deploymentEnabled(),batch:null,error:"Review unavailable"},{status:404}) }
+  catch {
+    if(connection) return NextResponse.json({error:"Connection check unavailable; configuration or saved state could not be read"},{status:503,headers:{"cache-control":"private, no-store"}})
+    return NextResponse.json({enabled:await deploymentEnabled(),batch:null,error:"Review unavailable"},{status:404})
+  }
 }
 export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   if (process.env.VERCEL_ENV !== "production") return NextResponse.json({error:"Previews cannot write publisher data"},{status:423})
@@ -57,6 +71,7 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   if (!await deploymentEnabled() && !["reconcile","manual-confirm","confirm-stopped-run"].includes(body.action)) return NextResponse.json({error:"Publisher disabled"},{status:423})
   const startedAt=new Date().toISOString(),runId=crypto.randomUUID()
   let brand:MetaBrand|undefined
+  let batchId:string|undefined
   try {
     if (body.action === "prepare") {
       brand=body.brand
@@ -78,6 +93,7 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     }
     const store=ownedMetaStore(),record=await store.read(id)
     brand=record.batch.manifest.brand
+    batchId=record.batch.id
     if (body.batchId!==record.batch.id || body.hash!==record.batch.hash) throw new MetaBlocked("Displayed batch changed; reload before acting")
     if(body.action === "confirm-stopped-run") {
       if(!await isCrmSuperAdmin(auth.session.email) || body.confirmTerminated!==true || typeof body.evidence!=="string")throw new MetaBlocked("Super-admin must confirm observed run termination, not elapsed time")
@@ -148,8 +164,24 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     await recordCronRun({job:"owned-meta-publish",startedAt,finishedAt,durationMs:Date.parse(finishedAt)-Date.parse(startedAt),status:complete?"success":"partial",message:complete?"Both destinations complete; inspect per-job evidence type":"Operator continuation required",detail:{postId:id,batchId:batch.id,runId,evidence:{instagram:batch.jobs.instagram.status,facebook:batch.jobs.facebook.status}}})
     return NextResponse.json({batch})
   } catch(error) {
+    const detail=error instanceof MetaBlocked || error instanceof MetaPermissionError ? error.detail : undefined
+    if (detail && batchId) {
+      // Evidence only: never take another run's claim or overwrite newer failure evidence.
+      await ownedMetaStore().update(id,r=>{
+        if(r.batch.id!==batchId || r.batch.claim && r.batch.claim!==runId) return {result:null}
+        const job=r.batch.jobs[detail.destination]
+        if(job.lastError && Date.parse(job.lastError.at)>Date.parse(detail.at)) return {result:null}
+        job.lastError=detail
+        return {next:r,result:null}
+      }).catch(()=>{})
+    }
+    if (body.action === "execute") {
+      const finishedAt=new Date().toISOString()
+      await recordCronRun({job:"owned-meta-publish",startedAt,finishedAt,durationMs:Date.parse(finishedAt)-Date.parse(startedAt),status:"error",message:"Publisher stopped; inspect saved state before retrying",detail:{postId:id,runId,...(batchId?{batchId}:{}),...(detail?{providerError:detail}:{})}})
+    }
     if(error instanceof MetaPermissionError && brand) await blockOwnedMetaPermission(brand)
     const message=error instanceof MetaBlocked || error instanceof MetaPermissionError ? error.message : "Publisher failed; inspect saved state before retrying"
-    return NextResponse.json({error:message},{status:error instanceof MetaPermissionError?403:error instanceof MetaBlocked?409:500})
+    const saved=batchId ? await ownedMetaStore().read(id).catch(()=>null) : null
+    return NextResponse.json({error:message,...(saved?.batch.id===batchId?{batch:saved?.batch}:{}),...(detail?{providerError:detail}:{})},{status:error instanceof MetaPermissionError?403:error instanceof MetaBlocked?409:500})
   }
 }
