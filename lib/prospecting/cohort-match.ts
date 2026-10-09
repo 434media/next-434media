@@ -113,6 +113,6 @@ export function matchCohort(
     }
   })
   if (!best) return null
-  const { weight: _weight, ...match } = best as CohortMatch & { weight: number }
-  return match
+  const { key, letter, name, terms } = best as CohortMatch
+  return { key, letter, name, terms }
 }
