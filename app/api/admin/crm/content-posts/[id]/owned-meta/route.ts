@@ -2,21 +2,22 @@ import { z } from "zod"
 import { NextResponse, type NextRequest } from "next/server"
 import { getSession, isAuthorizedAdmin, canSend, isCrmSuperAdmin } from "@/lib/auth"
 import { createOwnedMetaDraft, getContentPostById, ownedMetaStore, blockOwnedMetaPermission, ownedMetaPermissionBlocked, ownedMetaRuntimeEnabled } from "@/lib/firestore-crm"
-import { runOwnedMeta, validateMetaMutationBoundary, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, MetaPermissionError, META_BRANDS, type MetaBrand, type MetaManifest, type MetaAsset } from "@/lib/owned-meta-publisher"
+import { runOwnedMeta, guardFacebookRetryDispatch, validateMetaMutationBoundary, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, MetaBlocked, MetaPermissionError, META_BRANDS, type MetaBrand, type MetaManifest, type MetaAsset } from "@/lib/owned-meta-publisher"
 import { readTrustedAsset, assertApprovedBlobUrl, assetDigest, verifyAssetBytes, measureExport } from "@/lib/owned-meta-assets"
 import { createMetaProvider } from "@/lib/instagram-publishing"
 import { checkOwnedMetaConnection } from "@/lib/owned-meta-connection"
 import { recordCronRun } from "@/lib/cron-auth"
 
 const actionBody = z.object({
-  action: z.enum(["prepare", "execute", "reconcile", "manual-confirm", "confirm-stopped-run", "reset-preparation", "release-preparation"]),
+  action: z.enum(["prepare", "execute", "reconcile", "manual-confirm", "confirm-stopped-run", "reset-preparation", "release-preparation", "recover-facebook"]),
   brand: z.enum(META_BRANDS).optional(), format: z.enum(["still", "carousel", "video"]).optional(),
   captions: z.object({ instagram: z.string(), facebook: z.string() }).optional(),
   placements: z.object({ instagram: z.enum(["feed", "reels"]), facebook: z.enum(["feed", "video", "reels"]) }).optional(),
   instagramShareToFeed: z.boolean().optional(), aiGenerated: z.boolean().optional(), publicHostingApproved: z.boolean().optional(),
   templateRevision: z.string().default("unknown"), batchId: z.string().default(""), hash: z.string().default(""),
   destination: z.enum(["instagram", "facebook"]).optional(), remoteId: z.string().default(""), permalink: z.string().default(""),
-  expectedClaim: z.string().default(""), evidence: z.string().default(""), confirmExact: z.boolean().default(false), confirmTerminated: z.boolean().default(false),
+  expectedAttemptId: z.string().default(""), acceptDuplicateRisk: z.boolean().default(false),
+  expectedClaim: z.string().default(""), evidence: z.string().max(2000).default(""), confirmExact: z.boolean().default(false), confirmTerminated: z.boolean().default(false),
 })
 
 export const runtime = "nodejs"
@@ -55,7 +56,7 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       const stream=new ReadableStream<Uint8Array>({pull(controller){if(offset>=bytes.length){controller.close();return}controller.enqueue(bytes.subarray(offset,offset+64*1024));offset+=64*1024}})
       return new Response(stream,{headers:{"content-type":a.mime,"cache-control":"private, no-store","x-content-type-options":"nosniff"}})
     }
-    return NextResponse.json({enabled:await deploymentEnabled(),batch:r.batch,archived:r.archived})
+    return NextResponse.json({enabled:await deploymentEnabled(),batch:r.batch,archived:r.archived,canRecover:auth.session.email.toLowerCase()==="marcos@434media.com"})
   }
   catch {
     if(connection) return NextResponse.json({error:"Connection check unavailable; configuration or saved state could not be read"},{status:503,headers:{"cache-control":"private, no-store"}})
@@ -69,6 +70,7 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   let body:z.infer<typeof actionBody>
   try { body=actionBody.parse(await req.json()) } catch { return NextResponse.json({error:"Invalid JSON"},{status:400}) }
   if (!await deploymentEnabled() && !["reconcile","manual-confirm","confirm-stopped-run"].includes(body.action)) return NextResponse.json({error:"Publisher disabled"},{status:423})
+  if(body.action==="recover-facebook" && auth.session.email.toLowerCase()!=="marcos@434media.com") return NextResponse.json({error:"Founder recovery required"},{status:403})
   const startedAt=new Date().toISOString(),runId=crypto.randomUUID()
   let brand:MetaBrand|undefined
   let batchId:string|undefined
@@ -131,9 +133,14 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     const verifyUrls=async (urls: string[]) => {
       for(const url of urls){const asset=record.batch.manifest.assets.find(a=>a.url===url);if(!asset)throw new MetaBlocked("URL is not bound to this approval");verifyAssetBytes(asset,await readTrustedAsset(url,sourceOrigins()))}
     }
-    const provider=createMetaProvider({accessToken:config.accessToken,evidence:config.evidence,beforeMutation:async(urls=[])=>{
+    const provider:ReturnType<typeof createMetaProvider>=createMetaProvider({accessToken:config.accessToken,evidence:config.evidence,beforeMutation:async(urls=[])=>{
       await validateMetaMutationBoundary({enabled:localEnabled,read:()=>store.read(id),batchId:record.batch.id,runId,
         verify:()=>verifyUrls(urls.length?urls:record.batch.manifest.assets.map(a=>a.url))})
+    },beforeFinalDispatch:async(_m,d)=>{
+      const current=await store.read(id),job=current.batch.jobs[d]
+      if(!job.retry)return
+      if(body.action!=="recover-facebook" || d!=="facebook")throw new MetaBlocked("Owner recovery action required")
+      await guardFacebookRetryDispatch({id,batchId:record.batch.id,runId,store,enabled:localEnabled,check:(manifest,earliest)=>provider.checkFacebookRetry(manifest,earliest)})
     }})
     if (body.action==="reconcile") {
       const d=body.destination
@@ -152,8 +159,9 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       await store.update(id,r=>{if(r.batch.id!==body.batchId || r.batch.claim!==body.expectedClaim || Object.values(r.batch.jobs).some(j=>j.finalIntent))throw new MetaBlocked("Cannot release a final-publication claim");r.batch.claim=null;return{next:r,result:null}})
       return NextResponse.json({batch:(await store.read(id)).batch})
     }
-    if (body.action!=="execute") throw new MetaBlocked("Unknown action")
-    const batch=await runOwnedMeta({id,runId,store,provider,enabled:localEnabled,resolveAssets:async b=>{
+    if (body.action!=="execute" && body.action!=="recover-facebook") throw new MetaBlocked("Unknown action")
+    const batch=await runOwnedMeta({id,runId,store,provider,enabled:localEnabled,
+      ...(body.action==="recover-facebook"?{facebookRecovery:{expectedAttemptId:body.expectedAttemptId,actor:auth.session.email,evidence:body.evidence,acceptDuplicateRisk:body.acceptDuplicateRisk}}:{}),resolveAssets:async b=>{
       if (!await localEnabled()) throw new MetaBlocked("Brand disabled")
       const urls=b.manifest.assets.map(a=>a.url)
       await verifyUrls(urls)
@@ -175,7 +183,7 @@ export async function POST(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         return {next:r,result:null}
       }).catch(()=>{})
     }
-    if (body.action === "execute") {
+    if (body.action === "execute" || body.action === "recover-facebook") {
       const finishedAt=new Date().toISOString()
       await recordCronRun({job:"owned-meta-publish",startedAt,finishedAt,durationMs:Date.parse(finishedAt)-Date.parse(startedAt),status:"error",message:"Publisher stopped; inspect saved state before retrying",detail:{postId:id,runId,...(batchId?{batchId}:{}),...(detail?{providerError:detail}:{})}})
     }

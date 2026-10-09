@@ -160,3 +160,70 @@ Read contracts: Meta's [Graph overview (`me`)](https://developers.facebook.com/d
 [PagePost fields](https://developers.facebook.com/docs/graph-api/reference/page-post/),
 and [official Page-token IG-container example](https://www.postman.com/meta/instagram/request/munmruq/get-ig-container-status).
 Verified against official sources on 2026-10-09. Existing graph version remains unchanged.
+
+## Founder-only uncertain-final recovery (draft; offline verified only)
+
+`recover-facebook` is restricted to the authenticated `marcos@434media.com`
+session, in addition to the existing admin/publishing gates. The broader CRM
+super-admin role is not recovery authority. This first recovery surface supports
+Facebook still/feed only. Instagram uncertainty, video/Reels and carousels remain
+on their existing reconciliation/manual paths; none is claimed live-verified.
+
+The founder must inspect the exact Page/post, confirm the prior run stopped, give
+20–2,000 characters of observed evidence and explicitly accept duplicate risk.
+An active claim must first be settled using observed termination evidence.
+The transaction checks the displayed attempt, unchanged approval/revision and
+absence of known remote IDs. It retains the entire old job (including final
+intent, preparation and error) under `facebookAttempts`, records the operator's
+“reconciled, not found” observation and links one successor. That statement is
+bounded operator evidence, never a definitive finding that publication did not
+happen. The manifest/hash/approval are unchanged. At most ten recovery attempts
+are allowed; history is not pruned. Unrelated Instagram state is not advanced.
+
+Immediately before the successor's final transport request, after slow asset-byte
+verification, the provider reads the Page's `published_posts` collection with
+`id,message,created_time`. The window begins five minutes before the earliest
+original intent and ends at the fresh read's start (rounded outward to seconds).
+Intents older than seven days cannot use this surface. The scan follows returned
+`after` cursors, rebuilding the same trusted endpoint/window, never following or
+saving a token-bearing pagination URL. It stops closed on errors, malformed IDs,
+timestamps or cursors, repeated cursors, more than ten pages (100 posts each), a
+full page without continuation evidence, or a read exceeding 30 seconds. Each
+request also has a 15-second transport timeout.
+
+A whitespace-normalized exact-caption match, missing caption, or empty approved
+caption blocks publication conservatively. No candidate observed means only that
+this API collection/window returned no candidate. Permission filtering, eventual
+consistency, modified captions and visibility restrictions mean a duplicate is
+still possible; the manual Page inspection and explicit risk acceptance are
+mandatory. Existing diagnostic first-25 results are never consumed as a gate.
+All claim, revision, approval, runtime enablement and saved permission-block gates
+are rechecked after the scan. No safety block is cleared. The scan's window,
+counts and timestamp are retained; raw response bodies/cursors/tokens are not.
+
+The ordinary execute action never prepares or publishes a recovery job. Repeated
+recovery clicks race on the existing transactional claim/expected attempt. A
+renewed unknown final result again needs a fresh explicit recovery action; there
+is no automatic retry. A delayed original response is retained on its historical
+attempt and blocks further recovery. An exact-post manual confirmation bound to
+that single late remote ID allows unfinished Instagram work to continue while
+Facebook remains complete. Multiple known historical outcomes stay blocked.
+
+The UI resets acceptance/evidence on Cancel and submission, locks synchronous
+repeat clicks and discards late UI updates after dismissal. Closing the drawer
+once submitted does not cancel a server-side publish; reload its saved state
+before taking further action. History distinguishes operator observation from
+API verification.
+
+Design references: Meta's Page `published_posts` reference and Graph API
+pagination/results documentation. A fresh documentation fetch on 2026-10-09
+returned HTTP 429; the implementation extends the existing adapter endpoint and
+cursor convention and fails closed on unsupported response shapes. No new live
+API contract or permission coverage is claimed. Recheck the references and
+perform a separately authorized live test before activation:
+- https://developers.facebook.com/docs/graph-api/reference/page/published_posts/
+- https://developers.facebook.com/docs/graph-api/results/
+
+Canon reviewed read-only through the GitHub connector under founder approval:
+434-context commit `068cd39f1fb41ed6290ba432a13af68ec799383d`, master 2.0.30.
+No governing artifacts were changed. Base: next-434media `b47a20e` (PR #176).
