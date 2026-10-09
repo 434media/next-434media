@@ -21,7 +21,10 @@
  *   - a location outside the United States (cold outbound is US-only,
  *     master 5.3);
  *   - for a prompt marked `expect.no_keyword_with_tags`, a niche q_keywords
- *     term on top of industry tags (translator rule 11).
+ *     term on top of industry tags (translator rule 11);
+ *   - for a prompt marked `expect.industries_within_cohort: "<letter>"`, an ICP
+ *     industry outside that cohort's match.industries: a query naming one
+ *     cohort searches only that cohort's industries.
  *
  * A prompt marked `expected_failure: "<issue>"` is a known failure tracked by
  * that issue: its failures are reported but do not fail the run, and if it
@@ -32,6 +35,7 @@ import { join } from "node:path"
 import { execSync } from "node:child_process"
 import { revenueFigureStated, translatePromptToFilters } from "../../../lib/prospecting/translator"
 import { isOutsideUnitedStates } from "../../../lib/prospecting/scorer"
+import { listIcpCohorts } from "../../../lib/firestore-icp-cohorts"
 import type { OutboundCohort } from "../../../lib/sor/types.generated"
 
 function arg(name: string): string | undefined {
@@ -63,14 +67,19 @@ async function main() {
   const prompts = JSON.parse(readFileSync(join(__dirname, "e1-prompts.json"), "utf-8")) as {
     id: string
     prompt: string
-    expect?: { no_keyword_with_tags?: boolean }
+    expect?: { no_keyword_with_tags?: boolean; industries_within_cohort?: string }
     expected_failure?: string
   }[]
+
+  // The cohort rows the industry check compares against: the fixture if one was
+  // given, else the same production read the translator makes.
+  const cohortRows = prompts.some((p) => p.expect?.industries_within_cohort) ? (cohorts ?? (await listIcpCohorts())) : []
 
   const results = []
   const unrequestedRevenue: string[] = []
   const outsideUs: string[] = []
   const keywordOverTags: string[] = []
+  const outsideCohort: string[] = []
   const expectedFailures: string[] = []
   for (const p of prompts) {
     const runsOut = []
@@ -94,6 +103,13 @@ async function main() {
         if (p.expect?.no_keyword_with_tags && r.filters.industry_tag_ids?.length && r.nicheKeyword) {
           fail(keywordOverTags, `${tag} ("${r.nicheKeyword}")`)
         }
+        const letter = p.expect?.industries_within_cohort
+        if (letter) {
+          const own = new Set<string>(cohortRows.find((c) => c.letter === letter)?.match?.industries ?? [])
+          const extra = (r.icpIndustries ?? []).filter((i) => !own.has(i))
+          if (!own.size) fail(outsideCohort, `${tag} (cohort ${letter} not found)`)
+          else if (extra.length) fail(outsideCohort, `${tag} (${extra.join(", ")})`)
+        }
       } catch (err) {
         runsOut.push({ error: err instanceof Error ? err.message : String(err) })
       }
@@ -115,6 +131,7 @@ async function main() {
         unrequested_revenue_filters: unrequestedRevenue,
         locations_outside_us: outsideUs,
         keyword_over_tags: keywordOverTags,
+        industries_outside_named_cohort: outsideCohort,
         expected_failures: expectedFailures,
         results,
       },
@@ -127,13 +144,14 @@ async function main() {
   console.log(`unrequested revenue filters: ${list(unrequestedRevenue)}`)
   console.log(`locations outside the US: ${list(outsideUs)}`)
   console.log(`niche keyword on top of industry tags (rule 11): ${list(keywordOverTags)}`)
+  console.log(`industries outside the named cohort: ${list(outsideCohort)}`)
   console.log(`expected failures (tracked, not failing the run): ${list(expectedFailures)}`)
   for (const p of prompts.filter((x) => x.expected_failure)) {
     if (!expectedFailures.some((f) => f.startsWith(`${p.id} `))) {
       console.log(`${p.id} passed: remove its expected_failure marker (${p.expected_failure})`)
     }
   }
-  if (unrequestedRevenue.length || outsideUs.length || keywordOverTags.length) process.exit(1)
+  if (unrequestedRevenue.length || outsideUs.length || keywordOverTags.length || outsideCohort.length) process.exit(1)
 }
 
 main().catch((err) => {

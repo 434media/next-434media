@@ -40,6 +40,13 @@ known failure tracked by that issue. Its failures are reported but do not fail
 the run, and the run says when it starts passing. `c-keyword-over-tags` is one,
 tracked by next-434media#179.
 
+**Cohort named, no other cohort's industries.** For a prompt marked
+`"expect": { "industries_within_cohort": "<letter>" }`, every ICP industry the
+translator picks must be in that cohort's `match.industries`, read from the
+fixture or through the production reader. `cohort-a-only` is the case: in the
+first production check (2026-10-09), "Cohort A prospects in Texas" added
+healthcare's three tags to cohort A's eight.
+
 **What a run does.** Each prompt in `e1-prompts.json` is translated `--runs`
 times.
 
