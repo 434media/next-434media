@@ -42,6 +42,10 @@ export const ICP_INDUSTRIES = [
   // both together.
   "defense_aerospace",
   "marketing_agency",
+  // Added the same day for cohort A's prose: advanced manufacturers, and
+  // military-health and veteran-employment / defense-workforce organizations.
+  "advanced_manufacturing",
+  "military_veteran",
 ] as const
 
 export type IcpIndustry = (typeof ICP_INDUSTRIES)[number]
@@ -142,6 +146,19 @@ export const INDUSTRY_MAP: Record<IcpIndustry, IndustryMapping> = {
     tagIds: [],
     keyword: "advertising agency",
   },
+  // machinery · industrial automation · electrical/electronic manufacturing ·
+  // semiconductors · mechanical or industrial engineering (tag IDs not yet captured)
+  advanced_manufacturing: {
+    label: "Advanced manufacturing",
+    tagIds: [],
+    keyword: "manufacturing",
+  },
+  // military · veterans' health and services · defense workforce (tag IDs not yet captured)
+  military_veteran: {
+    label: "Military health & veteran services",
+    tagIds: [],
+    keyword: "veteran",
+  },
 }
 
 /**
@@ -180,6 +197,14 @@ export const INDUSTRY_TERMS: Record<IcpIndustry, string[]> = {
   marketing_agency: [
     "marketing & advertising", "advertising", "public relations", "marketing agency",
     "creative agency", "pr firm", "agency",
+  ],
+  advanced_manufacturing: [
+    "manufactur", "machinery", "industrial automation", "semiconductor", "electronic manufacturing",
+    "mechanical or industrial engineering", "industrial engineering",
+  ],
+  military_veteran: [
+    "military health", "military medic", "defense health", "veterans affairs", "veteran", "army",
+    "navy", "air force", "marine corps", "military",
   ],
 }
 

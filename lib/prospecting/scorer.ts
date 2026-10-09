@@ -1,7 +1,7 @@
 import type { ApolloPerson, ApolloSearchFilters } from "./apollo"
 import type { IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
 import { scoreIcpFit } from "@/lib/icp/rubric"
-import type { CohortLike } from "./cohort-match"
+import type { CohortHit, CohortLike } from "./cohort-match"
 
 /**
  * Stage 3 — ICP scorer (prospecting path).
@@ -231,6 +231,8 @@ export interface ScoredPerson {
    * review instead of scored as no-fit. Holds why.
    */
   needsReview?: string
+  /** Every outbound cohort the candidate matches — the pitch is picked from these at approval. */
+  cohorts: CohortHit[]
   /** Set when score is -1 — explains why the candidate was excluded. */
   excluded?: string
   /** Per-dimension explanations, for the review tray. */
@@ -248,6 +250,7 @@ function excludedResult(person: ApolloPerson, message: string, reason: string): 
     contactQualifier: 0,
     excluded: message,
     reasons: [reason],
+    cohorts: [],
   }
 }
 
@@ -303,6 +306,7 @@ export function scoreCandidate(
     breakdown: fit.breakdown,
     contactQualifier: title.score,
     reasons,
+    cohorts: fit.cohorts,
     ...(fit.needsReview ? { needsReview: fit.needsReview } : {}),
   }
 }

@@ -15,15 +15,15 @@
  *                      by size (cohort D). Revenue decides the band when it is
  *                      known; otherwise employee count.
  *
- * Results:
- *   match  — an industry the cohort lists, or a size inside one of its bands.
- *            An industry match is preferred to a size match, and among either
- *            the earlier cohort letter wins.
- *   review — nothing matched on industry and the company's size is unknown
- *            (no revenue, no employee count), so a size-defined cohort can
- *            neither match nor be ruled out. Marked for review rather than
- *            scored as no-fit.
- *   null   — no cohort: no listed industry, and a known size outside every band.
+ * A company carries EVERY cohort it matches (matchCohorts), not just one: a
+ * cohort matches when it lists one of the company's industries, or when the
+ * company's size is inside one of its bands. The founder picks the pitch at
+ * lead approval from that list.
+ *
+ * Review: when no cohort matches and the company's size is unknown (no
+ * revenue, no employee count), a size-defined cohort can neither match nor be
+ * ruled out, so the company is marked for review rather than scored as no-fit.
+ * No match and a known size outside every band is simply no cohort.
  *
  * The ICP rubric scores its Industry dimension from this (lib/icp/rubric.ts).
  */
@@ -63,26 +63,27 @@ export interface CompanyFacts {
   annualRevenue?: number | null
 }
 
-export type CohortMatch =
-  | {
-      status: "match"
-      key: string
-      letter?: string
-      name: string
-      /** "industry": a listed industry; "size": inside a size band. */
-      via: "industry" | "size"
-      /** The company's industries the cohort lists (via "industry"). */
-      industries?: IcpIndustry[]
-      /** The band the company sits in (via "size"). */
-      band?: string
-      /** What decided the band: revenue when known, else employees. */
-      sizeBasis?: "revenue" | "employees"
-    }
-  | {
-      status: "review"
-      /** Why the company could not be placed. */
-      reason: string
-    }
+/** One cohort a company matches, and how. */
+export interface CohortHit {
+  key: string
+  letter?: string
+  name: string
+  /** "industry": a listed industry; "size": inside a size band. */
+  via: "industry" | "size"
+  /** The company's industries the cohort lists (via "industry"). */
+  industries?: IcpIndustry[]
+  /** The band the company sits in (via "size"). */
+  band?: string
+  /** What decided the band: revenue when known, else employees. */
+  sizeBasis?: "revenue" | "employees"
+}
+
+export interface CohortMatches {
+  /** Every cohort the company matches, in cohort-letter order. */
+  matches: CohortHit[]
+  /** Set when nothing matched and size is unknown: why it needs review. */
+  review?: string
+}
 
 export function inRange(value: number, r: Range): boolean {
   if (r.gt !== undefined && !(value > r.gt)) return false
@@ -116,43 +117,36 @@ export function bandFor(
   return "unknown"
 }
 
-export function matchCohort(company: CompanyFacts, cohorts: CohortLike[]): CohortMatch | null {
+/** Every cohort a company matches, or why it needs review. */
+export function matchCohorts(company: CompanyFacts, cohorts: CohortLike[]): CohortMatches {
   const ordered = [...cohorts]
     .filter((c): c is CohortLike & { match: CohortMatchFields } => !!c.match)
     .sort((a, b) => (a.letter ?? a.key).localeCompare(b.letter ?? b.key))
   const have = classifyIndustries(company.industry, company.company)
+  const matches: CohortHit[] = []
+  let unknownSize = false
 
-  // 1. Industry: the earliest cohort that lists one of the company's industries.
   for (const c of ordered) {
+    const base = { key: c.key, letter: c.letter, name: c.name }
     const hit = have.filter((i) => c.match.industries.includes(i))
     if (hit.length) {
-      return { status: "match", key: c.key, letter: c.letter, name: c.name, via: "industry", industries: hit }
+      matches.push({ ...base, via: "industry", industries: hit })
+      continue
     }
-  }
-
-  // 2. Size: the earliest size-defined cohort whose band the company sits in.
-  let unknownSize = false
-  for (const c of ordered) {
     const bands = c.match.size?.bands
     if (!bands?.length) continue
     const b = bandFor(company, bands)
-    if (b === "unknown") {
-      unknownSize = true
-      continue
-    }
-    if (b) {
-      return { status: "match", key: c.key, letter: c.letter, name: c.name, via: "size", band: b.band, sizeBasis: b.basis }
-    }
+    if (b === "unknown") unknownSize = true
+    else if (b) matches.push({ ...base, via: "size", band: b.band, sizeBasis: b.basis })
   }
 
-  // 3. Unknown size where a size-defined cohort could have matched: review.
-  if (unknownSize) {
+  if (!matches.length && unknownSize) {
     return {
-      status: "review",
-      reason: have.length
+      matches,
+      review: have.length
         ? `industry (${have.join(", ")}) is in no cohort, and size is unknown (no revenue or employee count)`
         : "industry not recognized, and size is unknown (no revenue or employee count)",
     }
   }
-  return null
+  return { matches }
 }

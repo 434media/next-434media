@@ -36,6 +36,11 @@ function cohortWhy(r: Row): string {
   const d = r.cohort_detail
   if (!d) return "no match"
   if (d.status === "review") return `review: ${d.reason}`
+  if (Array.isArray(d.matches)) {
+    return (d.matches as { key: string; via: string; industries?: string[]; band?: string; sizeBasis?: string }[])
+      .map((m) => (m.via === "industry" ? `${m.key}: industry ${(m.industries ?? []).join(", ")}` : `${m.key}: size band ${m.band} (by ${m.sizeBasis})`))
+      .join("; ")
+  }
   if (d.via === "industry") return `industry ${(d.industries as string[]).join(", ")}`
   if (d.via === "size") return `size band ${d.band} (by ${d.sizeBasis})`
   const parts = []

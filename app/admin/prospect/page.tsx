@@ -1086,6 +1086,30 @@ function CandidateRow({
               </span>
             )}
           </div>
+          {/* Every cohort the candidate matches — the pitch is picked from
+              these at approval. "Review" when no cohort matched and the
+              company's size is unknown. */}
+          {((candidate.cohorts ?? []).length > 0 || candidate.needsReview) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              {(candidate.cohorts ?? []).map((c) => (
+                <span
+                  key={c.key}
+                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-700"
+                  title={c.via === "size" ? `${c.name} — by size (${c.band})` : `${c.name} — by industry`}
+                >
+                  {c.letter ?? c.key} · {c.name}
+                </span>
+              ))}
+              {candidate.needsReview && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                  title={candidate.needsReview}
+                >
+                  Review: size unknown
+                </span>
+              )}
+            </div>
+          )}
           {/* Render for any non-excluded candidate so the Reveal button shows
               even when Apollo's masked search returns no email/linkedin/status. */}
           {(!isExcluded || person.email || person.linkedin_url) && (

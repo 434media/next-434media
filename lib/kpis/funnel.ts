@@ -1,4 +1,4 @@
-import { matchCohort, type CohortLike } from "../prospecting/cohort-match"
+import { matchCohorts, type CohortLike } from "../prospecting/cohort-match"
 import type {
   Lead,
   LeadStatus,
@@ -110,7 +110,12 @@ export interface FunnelKpis {
   generatedAt: string
   total: number
   threshold: number
+  /** ICP match over DECIDED leads only: leads held for review are left out. */
   icpMatchRate: number
+  /** Leads the rate is computed over (all leads minus those held for review). */
+  icpDecided: number
+  /** Leads held for review (`icp_review`): size unknown, no cohort by industry. */
+  icpReviewCount: number
   /**
    * % of leads whose industry and company name point to an outbound cohort
    * (icp_cohorts; lib/prospecting/cohort-match.ts). Informational — no
@@ -326,11 +331,16 @@ export function computeFunnelKpis(
   })
 
   const total = leads.length
-  const matched = leads.filter((l) => icpFitOf(l) >= ICP_MATCH_THRESHOLD)
-  const icpMatchRate = total > 0 ? round(matched.length / total, 3) : 0
+  // ICP match counts DECIDED leads only. A lead held for review (no cohort by
+  // industry and size unknown) has no fit decision yet, so it is left out of
+  // the denominator and reported beside the rate instead (next-434media#63).
+  const decided = leads.filter((l) => !l.icp_review)
+  const icpReviewCount = total - decided.length
+  const matched = decided.filter((l) => icpFitOf(l) >= ICP_MATCH_THRESHOLD)
+  const icpMatchRate = decided.length > 0 ? round(matched.length / decided.length, 3) : 0
 
   const icpMatchBySource: IcpMatchSourceStat[] = ALL_SOURCES.map((source) => {
-    const rows = leads.filter((l) => l.source === source)
+    const rows = decided.filter((l) => l.source === source)
     const m = rows.filter((l) => icpFitOf(l) >= ICP_MATCH_THRESHOLD).length
     return {
       source,
@@ -347,15 +357,19 @@ export function computeFunnelKpis(
     const byKey = new Map<string, CohortMatchStat>()
     let cohortMatched = 0
     for (const l of leads) {
-      const m = matchCohort(
+      // A lead can match several cohorts; it counts once in the rate and once
+      // under each cohort it matches.
+      const { matches } = matchCohorts(
         { industry: l.industry, company: l.company, employeeCount: l.employee_count, annualRevenue: l.annual_revenue },
         cohorts,
       )
-      if (!m || m.status !== "match") continue
+      if (!matches.length) continue
       cohortMatched++
-      const stat = byKey.get(m.key) ?? { key: m.key, letter: m.letter, name: m.name, count: 0 }
-      stat.count++
-      byKey.set(m.key, stat)
+      for (const m of matches) {
+        const stat = byKey.get(m.key) ?? { key: m.key, letter: m.letter, name: m.name, count: 0 }
+        stat.count++
+        byKey.set(m.key, stat)
+      }
     }
     cohortMatchRate = total > 0 ? round(cohortMatched / total, 3) : 0
     cohortMatches.push(...[...byKey.values()].sort((a, b) => b.count - a.count))
@@ -392,6 +406,8 @@ export function computeFunnelKpis(
     total,
     threshold: ICP_MATCH_THRESHOLD,
     icpMatchRate,
+    icpDecided: decided.length,
+    icpReviewCount,
     cohortMatchRate,
     cohortMatches,
     stages,

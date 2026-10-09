@@ -1,4 +1,4 @@
-import type { Lead, LeadPriority, LeadScoreBreakdown, IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
+import type { Lead, LeadPriority, LeadScoreBreakdown, IcpGrade, IcpFitBreakdown, LeadCohortMatch } from "@/types/crm-types"
 import { isSponsorTagged } from "./tag-taxonomy"
 import { scoreIcpFit } from "./icp/rubric"
 import type { CohortLike } from "./prospecting/cohort-match"
@@ -29,6 +29,8 @@ export interface ScoreResult {
   icp_breakdown: IcpFitBreakdown
   /** Why the lead needs review (size unknown, no cohort by industry), or null. */
   icp_review: string | null
+  /** Every outbound cohort the lead matches. */
+  icp_cohorts: LeadCohortMatch[]
   // Relocated intent signals (engagement / sponsor / event-source)
   intent_score: number
   intent_breakdown: { engagement?: number; sponsor?: number; event?: number }
@@ -99,6 +101,13 @@ export function scoreLead(input: ScoreInput, cohorts: CohortLike[]): ScoreResult
     icp_grade: fit.grade,
     icp_breakdown: fit.breakdown,
     icp_review: fit.needsReview ?? null,
+    icp_cohorts: fit.cohorts.map((c) => ({
+      key: c.key,
+      ...(c.letter ? { letter: c.letter } : {}),
+      name: c.name,
+      via: c.via,
+      ...(c.band ? { band: c.band } : {}),
+    })),
     intent_score: intent,
     intent_breakdown,
   }

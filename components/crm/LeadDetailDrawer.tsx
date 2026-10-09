@@ -648,6 +648,25 @@ export function LeadDetailDrawer({
                   {grade}
                 </span>
               )}
+              {/* Every outbound cohort the lead matches — the pitch is picked
+                  from these. "Review" when size is unknown and no cohort matched. */}
+              {(lead.icp_cohorts ?? []).map((c) => (
+                <span
+                  key={c.key}
+                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-700"
+                  title={c.via === "size" ? `${c.name} — by size (${c.band})` : `${c.name} — by industry`}
+                >
+                  {c.letter ?? c.key} · {c.name}
+                </span>
+              ))}
+              {lead.icp_review && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                  title={lead.icp_review}
+                >
+                  Review: size unknown
+                </span>
+              )}
               {statusMeta && (
                 <div className="relative">
                   <button

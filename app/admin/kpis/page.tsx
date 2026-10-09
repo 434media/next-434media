@@ -226,7 +226,7 @@ function FunnelKpisInner() {
               <HeroMetric
                 label="ICP match rate"
                 value={pct(funnel.icpMatchRate)}
-                sub={`score ≥ ${funnel.threshold}`}
+                sub={`score ≥ ${funnel.threshold} · of ${funnel.icpDecided ?? funnel.total} decided · ${funnel.icpReviewCount ?? 0} held for review`}
               />
               <HeroMetric
                 label="Cohort match"

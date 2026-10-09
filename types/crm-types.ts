@@ -901,6 +901,17 @@ export type IcpGrade = "A+" | "A" | "B" | "C" | "D"
 // Per-dimension raw points behind the ICP fit score. Core dims (industry,
 // location, companySize) always present; extended dims (funding/growth/event)
 // present only when their data is. See lib/icp/rubric.ts.
+/** One outbound cohort a lead matches (see lib/prospecting/cohort-match.ts). */
+export interface LeadCohortMatch {
+  key: string
+  letter?: string
+  name: string
+  /** "industry": a listed industry; "size": inside a size band. */
+  via: "industry" | "size"
+  /** The band, when matched by size. */
+  band?: string
+}
+
 export interface IcpFitBreakdown {
   industry?: number
   location?: number
@@ -983,6 +994,10 @@ export interface Lead extends BaseRecord {
   // and the lead is marked for review instead of scored as no-fit. Holds why.
   // Computed on every write (next-434media#63).
   icp_review?: string | null
+  // Every outbound cohort (icp_cohorts) the lead matches, and how: the founder
+  // picks the pitch at lead approval from this list. Computed on every write
+  // (next-434media#63).
+  icp_cohorts?: LeadCohortMatch[]
   intent_score?: number
   intent_breakdown?: { engagement?: number; sponsor?: number; event?: number }
 
@@ -1081,6 +1096,7 @@ export type LeadCreateInput = Omit<
   | "icp_grade"
   | "icp_breakdown"
   | "icp_review"
+  | "icp_cohorts"
   | "intent_score"
   | "intent_breakdown"
   | "email_opens"
@@ -1112,6 +1128,7 @@ export type LeadUpdateInput = Partial<
     | "icp_grade"
     | "icp_breakdown"
     | "icp_review"
+    | "icp_cohorts"
     | "intent_score"
     | "intent_breakdown"
     | "enriched_at"

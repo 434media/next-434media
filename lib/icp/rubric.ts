@@ -4,7 +4,7 @@ import {
   TEXAS_CITIES,
   HISPANIC_TARGETED_METROS,
 } from "@/lib/icp/taxonomy"
-import { matchCohort, type CohortLike } from "@/lib/prospecting/cohort-match"
+import { matchCohorts, type CohortHit, type CohortLike } from "@/lib/prospecting/cohort-match"
 
 /**
  * Canonical ICP FIT score — the single source of truth (Step 2).
@@ -97,6 +97,8 @@ export interface IcpFitResult {
    * matched nor zeroed) and the company is marked for review.
    */
   needsReview?: string
+  /** Every outbound cohort the company matches (empty when none or review). */
+  cohorts: CohortHit[]
   grade: IcpGrade
   /** Raw points per scored dimension. */
   breakdown: IcpFitBreakdown
@@ -119,11 +121,11 @@ export function icpGrade(fit: number): IcpGrade {
 // ─── Dimension scorers (company-level) ──────────────────────────────────
 
 // Industry (max 25) — from the outbound cohorts' structured match fields
-// (icp_cohorts `match`) through the cohort matcher: a cohort match by industry
-// or by size band earns 25; no cohort earns 0; "review" (no industry match and
+// (icp_cohorts `match`) through the cohort matcher: matching any cohort, by
+// industry or by size band, earns 25; no cohort earns 0; "review" (no match and
 // size unknown) is not scored at all — see scoreIcpFit.
-function scoreIndustry(input: IcpCompanyInput): number | { review: string } {
-  const match = matchCohort(
+function scoreIndustry(input: IcpCompanyInput): { points: number | null; cohorts: CohortHit[]; review?: string } {
+  const { matches, review } = matchCohorts(
     {
       industry: input.industry,
       company: input.orgName,
@@ -132,9 +134,8 @@ function scoreIndustry(input: IcpCompanyInput): number | { review: string } {
     },
     input.cohorts,
   )
-  if (!match) return 0
-  if (match.status === "review") return { review: match.reason }
-  return 25
+  if (review) return { points: null, cohorts: [], review }
+  return { points: matches.length ? 25 : 0, cohorts: matches }
 }
 
 // Location (max 20) — 434's geography priority, rescaled heavier than Canva's
@@ -212,9 +213,9 @@ export function scoreIcpFit(input: IcpCompanyInput): IcpFitResult {
   // except an Industry that needs review: it is left out of both, so the
   // company is neither matched nor zeroed on it.
   const industry = scoreIndustry(input)
-  const needsReview = typeof industry === "object" ? industry.review : undefined
+  const needsReview = industry.review
   const breakdown: IcpFitBreakdown = {
-    ...(typeof industry === "number" ? { industry } : {}),
+    ...(industry.points !== null ? { industry: industry.points } : {}),
     location: scoreLocation(input),
     companySize: scoreCompanySize(input),
   }
@@ -240,5 +241,13 @@ export function scoreIcpFit(input: IcpCompanyInput): IcpFitResult {
   }
 
   const fit = denom > 0 ? Math.round((raw / denom) * 100) : 0
-  return { fit, grade: icpGrade(fit), breakdown, raw, activeMax: denom, ...(needsReview ? { needsReview } : {}) }
+  return {
+    fit,
+    grade: icpGrade(fit),
+    breakdown,
+    raw,
+    activeMax: denom,
+    cohorts: industry.cohorts,
+    ...(needsReview ? { needsReview } : {}),
+  }
 }

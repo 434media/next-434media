@@ -124,7 +124,24 @@ async function loadMatcher(): Promise<CohortMatcher | null> {
   try {
     // A variable path keeps the baseline compiling before the module exists.
     const modulePath: string = "../../../lib/prospecting/cohort-match"
-    const mod = (await import(modulePath)) as { matchCohort?: CohortMatcher }
+    const mod = (await import(modulePath)) as {
+      matchCohort?: CohortMatcher
+      matchCohorts?: (company: Parameters<CohortMatcher>[0], cohorts: unknown[]) => {
+        matches: { key: string }[]
+        review?: string
+      }
+    }
+    // Since every match is carried (matchCohorts), a company's cohorts are a
+    // list; it is folded into the older single-match shape for the report.
+    if (mod.matchCohorts) {
+      const many = mod.matchCohorts
+      return (company, cohorts) => {
+        const r = many(company, cohorts)
+        if (r.review) return { status: "review", reason: r.review }
+        if (!r.matches.length) return null
+        return { status: "match", key: r.matches.map((m) => m.key).join(","), matches: r.matches }
+      }
+    }
     return mod.matchCohort ?? null
   } catch {
     return null

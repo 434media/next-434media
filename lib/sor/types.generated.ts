@@ -70,7 +70,7 @@ export interface OutboundCohort {
    */
   match: {
     /**
-     * Industry categories, in the controlled vocabulary of next-434media lib/prospecting/industry-tags.ts (ICP_INDUSTRIES). defense_aerospace and marketing_agency were added to that vocabulary on 2026-10-09 for cohorts A and E. The two lists are copies: change both together. An empty list means the cohort matches on size only.
+     * Industry categories, in the controlled vocabulary of next-434media lib/prospecting/industry-tags.ts (ICP_INDUSTRIES). defense_aerospace and marketing_agency were added to that vocabulary on 2026-10-09 for cohorts A and E; advanced_manufacturing and military_veteran (military health, and veteran-employment and defense-workforce organizations) were added the same day for cohort A. The two lists are copies: change both together. An empty list means the cohort matches on size only. A company can match several cohorts; every match is carried. LIMIT: some prose items cannot be told apart by industry alone and have no category here. Cohort A's dual-use technology companies look like any software or hardware company by industry, so software is deliberately not in cohort A; they are found by research or by the rep, not by this field.
      */
     industries: (
       | "healthcare_life_sciences"
@@ -84,6 +84,8 @@ export interface OutboundCohort {
       | "civic_econ_dev"
       | "defense_aerospace"
       | "marketing_agency"
+      | "advanced_manufacturing"
+      | "military_veteran"
     )[]
     /**
      * Size bands, where the cohort is defined by size; null where it is not. Sources for cohort D's bands (founder decision 2026-10-08): REVENUE — National Center for the Middle Market (Ohio State), 'NCMM InfoSheet', https://www.middlemarketcenter.org/Media/Documents/NCMM%20InfoSheet.pdf: the U.S. middle market is annual revenue of $10 million to $1 billion (read through a web search result on 2026-10-08; the direct URL returned 404 on 2026-10-09). EMPLOYEES — Gartner Glossary, 'Midsize Enterprise (MSE)', https://www.gartner.com/en/information-technology/glossary/midsize-enterprise-mse: '$50 million and $1 billion in annual revenues and/or 100 to 2500 employees' (read through a web search result on 2026-10-08; the page redirected to Gartner's IT landing page on 2026-10-09); 100–2,500 approved by the founder 2026-10-08. OTHER BANDS RECORDED: Capterra's glossary, 'Midsize Enterprise (MSE)', https://www.capterra.ca/glossary/900/midsize-enterprise-mse, gives 100–1,000 employees; an earlier Gartner passage gives 100–999 employees with revenue over $50 million and under $1 billion; the Federal Reserve uses $10–$250 million revenue (as reported by Grata, https://grata.com/resources/what-is-the-middle-market).
@@ -373,7 +375,7 @@ export interface WorkPageSection {
 
 /** sha256[:16] of each source schema, for the drift check in the context repository. */
 export const sorSchemaHashes = {
-    "cohort.schema.json": "60ad6886aa1f571c",
+    "cohort.schema.json": "e88419f1a6a6b0ba",
     "cohort_rule.schema.json": "6dba9c5ea2c43de8",
     "contractor.schema.json": "0e30b1e384417bfe",
     "launch_dependency.schema.json": "b60a01e2bf2af341",
