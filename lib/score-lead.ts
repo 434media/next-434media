@@ -1,6 +1,7 @@
-import type { Lead, LeadPriority, LeadScoreBreakdown, IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
+import type { Lead, LeadPriority, LeadScoreBreakdown, IcpGrade, IcpFitBreakdown, LeadCohortMatch } from "@/types/crm-types"
 import { isSponsorTagged } from "./tag-taxonomy"
 import { scoreIcpFit } from "./icp/rubric"
+import type { CohortLike } from "./prospecting/cohort-match"
 
 /**
  * Inline lead scoring. Runs on every write; no Cloud Function needed.
@@ -26,6 +27,10 @@ export interface ScoreResult {
   icp_fit_score: number
   icp_grade: IcpGrade
   icp_breakdown: IcpFitBreakdown
+  /** Why the lead needs review (size unknown, no cohort by industry), or null. */
+  icp_review: string | null
+  /** Every outbound cohort the lead matches. */
+  icp_cohorts: LeadCohortMatch[]
   // Relocated intent signals (engagement / sponsor / event-source)
   intent_score: number
   intent_breakdown: { engagement?: number; sponsor?: number; event?: number }
@@ -36,7 +41,11 @@ type ScoreInput = Pick<
   "location" | "industry" | "title" | "company" | "employee_count" | "annual_revenue" | "source" | "email_opens" | "email_clicks" | "tags"
 >
 
-export function scoreLead(input: ScoreInput): ScoreResult {
+/**
+ * `cohorts` are the outbound cohorts (icp_cohorts); the rubric scores Industry
+ * from them. Callers read them with listIcpCohorts().
+ */
+export function scoreLead(input: ScoreInput, cohorts: CohortLike[]): ScoreResult {
   // ── ICP FIT (company-level, canonical rubric) — the source of truth ──
   const fit = scoreIcpFit({
     industry: input.industry,
@@ -44,6 +53,7 @@ export function scoreLead(input: ScoreInput): ScoreResult {
     location: input.location,
     employeeCount: input.employee_count,
     annualRevenue: input.annual_revenue,
+    cohorts,
   })
 
   // ── INTENT (relocated out of fit) — likelihood to engage right now ──
@@ -90,6 +100,14 @@ export function scoreLead(input: ScoreInput): ScoreResult {
     icp_fit_score: fit.fit,
     icp_grade: fit.grade,
     icp_breakdown: fit.breakdown,
+    icp_review: fit.needsReview ?? null,
+    icp_cohorts: fit.cohorts.map((c) => ({
+      key: c.key,
+      ...(c.letter ? { letter: c.letter } : {}),
+      name: c.name,
+      via: c.via,
+      ...(c.band ? { band: c.band } : {}),
+    })),
     intent_score: intent,
     intent_breakdown,
   }

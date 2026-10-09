@@ -1,34 +1,58 @@
 /**
  * Cohort match — which outbound cohort (icp_cohorts, master §5.6–5.10) a
- * company's industry and name point to. next-434media#63.
+ * company belongs to, read from each cohort row's structured `match` fields.
+ * next-434media#63.
  *
- * Informational, not a score: it sits next to ICP match and changes no
- * threshold, approval or exclusion. The terms come from each cohort row's own
- * `target_profile` wording, so a cohort edit in the system of record changes
- * the match with no code change. The cohort list is never restated here.
+ * The rows carry the definition; nothing about any cohort is restated here.
+ * The prose target profile stays in the row for people and agents. Matching
+ * reads only:
  *
- * Deliberately simple: a word overlap between the company's industry and name
- * and the cohort's target-profile words, after dropping words that carry no
- * targeting meaning. Each matched word counts by how specific it is to the
- * cohort (how often the cohort uses it, divided by how many cohorts use it), so
- * "health" in Bio & Health outweighs the same word in a defense phrase. A
- * company word also matches a cohort word it starts with ("healthcare" →
- * "health"). Geography is not matched (every cohort is Texas-relevant, and
- * location is the ICP rubric's job).
+ *   match.industries — categories in the ICP_INDUSTRIES vocabulary
+ *                      (lib/prospecting/industry-tags.ts). A company's own
+ *                      industry text and name are classified into that
+ *                      vocabulary by classifyIndustries().
+ *   match.size       — revenue and employee bands, where the cohort is defined
+ *                      by size (cohort D). Revenue decides the band when it is
+ *                      known; otherwise employee count.
  *
- * Company size. A cohort whose target profile is defined by scale ("Fortune
- * 500 companies", "Large privately held companies", "Major regional
- * enterprises") matches a large company even with no industry word in common.
- * Scale is read from the row's own wording (SCALE_WORDS), and "large" is the
- * LARGE_* constants below. A size match counts for less than one specific
- * industry word, so a large hospital system still goes to the health cohort.
+ * A company carries EVERY cohort it matches (matchCohorts), not just one: a
+ * cohort matches when it lists one of the company's industries, or when the
+ * company's size is inside one of its bands. The founder picks the pitch at
+ * lead approval from that list.
+ *
+ * Review: when no cohort matches and the company's size is unknown (no
+ * revenue, no employee count), a size-defined cohort can neither match nor be
+ * ruled out, so the company is marked for review rather than scored as no-fit.
+ * No match and a known size outside every band is simply no cohort.
+ *
+ * The ICP rubric scores its Industry dimension from this (lib/icp/rubric.ts).
  */
+import { classifyIndustries, type IcpIndustry } from "./industry-tags"
+
+/** A numeric range: gte/lte inclusive, gt/lt exclusive. */
+export interface Range {
+  gt?: number
+  gte?: number
+  lt?: number
+  lte?: number
+}
+
+export interface SizeBand {
+  name: string
+  revenue_usd?: Range
+  employees?: Range
+}
+
+export interface CohortMatchFields {
+  industries: string[]
+  size: { bands: SizeBand[] } | null
+}
 
 export interface CohortLike {
   key: string
   letter?: string
   name: string
-  target_profile: string[]
+  match?: CohortMatchFields
 }
 
 /** What the matcher reads about a company. */
@@ -39,118 +63,90 @@ export interface CompanyFacts {
   annualRevenue?: number | null
 }
 
-export interface CohortMatch {
+/** One cohort a company matches, and how. */
+export interface CohortHit {
   key: string
   letter?: string
   name: string
-  /** The cohort words the company matched, for the review surface. */
-  terms: string[]
-  /** True when the company's size, not only its words, put it in the cohort. */
-  bySize?: boolean
+  /** "industry": a listed industry; "size": inside a size band. */
+  via: "industry" | "size"
+  /** The company's industries the cohort lists (via "industry"). */
+  industries?: IcpIndustry[]
+  /** The band the company sits in (via "size"). */
+  band?: string
+  /** What decided the band: revenue when known, else employees. */
+  sizeBasis?: "revenue" | "employees"
 }
 
-// Words that mark a target-profile phrase as defined by company scale.
-const SCALE_WORDS = ["fortune", "large", "major", "enterprise"]
-
-// "Large" for a size-defined cohort: either measure is enough. Proposed
-// values (next-434media#63), not taken from the master — the founder sets them.
-export const LARGE_EMPLOYEES = 1000
-export const LARGE_REVENUE_USD = 100_000_000
-
-// A size match weighs less than one industry word a single cohort owns (1.0).
-const SIZE_WEIGHT = 0.5
-
-// Words in target-profile phrases that say nothing about who the target is:
-// structure words, size and ownership words, and geography.
-const STOP = new Set([
-  "and", "the", "with", "their", "other", "for", "into", "that", "which",
-  "companies", "company", "organizations", "organization", "institutions", "institution",
-  "brands", "brand", "businesses", "business", "firms", "firm", "groups", "group",
-  "large", "major", "established", "significant", "independent", "specialist",
-  "privately", "held", "regional", "enterprises", "enterprise", "operators", "operator",
-  "multi", "location", "fortune", "networks", "network", "holding",
-  "ecosystems", "ecosystem", "stakeholders", "investing", "operating", "named",
-  "budgets", "seeking", "alignment", "related", "supplier", "suppliers",
-  "texas", "mexico", "mexican", "american", "americans", "audiences", "audience",
-  "live", "original", "content", "experiences", "storytelling", "communication",
-  "communications", "programs", "program", "public", "initiatives", "funding",
-  "sponsor", "sponsors", "led", "personalities", "events", "event", "culture",
-  // Too generic to point at one cohort on their own.
-  "technology", "system", "media", "marketing", "relation",
-])
-
-/** Lowercase words of 3+ letters, singularized ("agencies" → "agency"). */
-export function words(text: string): string[] {
-  return (text.toLowerCase().match(/[a-z]+/g) ?? [])
-    .filter((w) => w.length >= 3)
-    .map((w) => {
-      if (w.length > 4 && w.endsWith("ies")) return `${w.slice(0, -3)}y`
-      if (w.length > 4 && w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1)
-      return w
-    })
+export interface CohortMatches {
+  /** Every cohort the company matches, in cohort-letter order. */
+  matches: CohortHit[]
+  /** Set when nothing matched and size is unknown: why it needs review. */
+  review?: string
 }
 
-// The stop list, singularized the same way as the words it is checked against.
-const STOP_WORDS = new Set([...STOP].flatMap((w) => words(w)))
-
-/** The targeting words of one cohort with how often its phrases use each. */
-export function cohortTermCounts(cohort: CohortLike): Map<string, number> {
-  const counts = new Map<string, number>()
-  for (const phrase of cohort.target_profile) {
-    for (const w of words(phrase)) if (!STOP_WORDS.has(w)) counts.set(w, (counts.get(w) ?? 0) + 1)
-  }
-  return counts
+export function inRange(value: number, r: Range): boolean {
+  if (r.gt !== undefined && !(value > r.gt)) return false
+  if (r.gte !== undefined && !(value >= r.gte)) return false
+  if (r.lt !== undefined && !(value < r.lt)) return false
+  if (r.lte !== undefined && !(value <= r.lte)) return false
+  return true
 }
 
-/** Whether a cohort's target profile defines it by company scale. */
-export function isSizeDefined(cohort: CohortLike): boolean {
-  return cohort.target_profile.some((phrase) => words(phrase).some((w) => SCALE_WORDS.includes(w)))
-}
-
-/** Whether a company is large by either measure. Unknown size is not large. */
-export function isLarge(company: CompanyFacts): boolean {
-  return (company.employeeCount ?? 0) >= LARGE_EMPLOYEES || (company.annualRevenue ?? 0) >= LARGE_REVENUE_USD
-}
-
-/** The targeting words of one cohort, from its target-profile phrases. */
-export function cohortTerms(cohort: CohortLike): string[] {
-  return [...cohortTermCounts(cohort).keys()]
-}
-
-// A company word matches a cohort word that equals it or, for words of five
-// letters or more, that it starts with ("healthcare" → "health").
-function hits(have: Set<string>, term: string): boolean {
-  if (have.has(term)) return true
-  if (term.length < 5) return false
-  for (const w of have) if (w.startsWith(term)) return true
-  return false
-}
+const known = (n: number | null | undefined): n is number => typeof n === "number" && Number.isFinite(n)
 
 /**
- * The cohort whose target-profile words best overlap the company's industry
- * and name — or, for a size-defined cohort, whose scale the company meets —
- * or null when none does. Ties go to the earlier cohort letter.
+ * The band a company sits in. Revenue decides when known (a band with no
+ * revenue range cannot be decided by revenue); otherwise employee count.
+ * Returns "unknown" when neither is known.
  */
-export function matchCohort(company: CompanyFacts, cohorts: CohortLike[]): CohortMatch | null {
-  const have = new Set(words(`${company.industry ?? ""} ${company.company ?? ""}`))
-  const large = isLarge(company)
-  if (!have.size && !large) return null
-  const ordered = [...cohorts].sort((a, b) => (a.letter ?? a.key).localeCompare(b.letter ?? b.key))
-  const counts = ordered.map((c) => cohortTermCounts(c))
-  // How many cohorts use each word — a word every cohort shares says little.
-  const spread = new Map<string, number>()
-  for (const m of counts) for (const t of m.keys()) spread.set(t, (spread.get(t) ?? 0) + 1)
+export function bandFor(
+  company: CompanyFacts,
+  bands: SizeBand[],
+): { band: string; basis: "revenue" | "employees" } | null | "unknown" {
+  if (known(company.annualRevenue)) {
+    const revenue = company.annualRevenue
+    const b = bands.find((x) => x.revenue_usd && inRange(revenue, x.revenue_usd))
+    return b ? { band: b.name, basis: "revenue" } : null
+  }
+  if (known(company.employeeCount)) {
+    const employees = company.employeeCount
+    const b = bands.find((x) => x.employees && inRange(employees, x.employees))
+    return b ? { band: b.name, basis: "employees" } : null
+  }
+  return "unknown"
+}
 
-  let best: (CohortMatch & { weight: number }) | null = null
-  ordered.forEach((c, i) => {
-    const matched = [...counts[i].entries()].filter(([t]) => hits(have, t))
-    const bySize = large && isSizeDefined(c)
-    const weight = matched.reduce((sum, [t, n]) => sum + n / (spread.get(t) ?? 1), 0) + (bySize ? SIZE_WEIGHT : 0)
-    if ((matched.length || bySize) && (!best || weight > best.weight)) {
-      best = { key: c.key, letter: c.letter, name: c.name, terms: matched.map(([t]) => t), bySize, weight }
+/** Every cohort a company matches, or why it needs review. */
+export function matchCohorts(company: CompanyFacts, cohorts: CohortLike[]): CohortMatches {
+  const ordered = [...cohorts]
+    .filter((c): c is CohortLike & { match: CohortMatchFields } => !!c.match)
+    .sort((a, b) => (a.letter ?? a.key).localeCompare(b.letter ?? b.key))
+  const have = classifyIndustries(company.industry, company.company)
+  const matches: CohortHit[] = []
+  let unknownSize = false
+
+  for (const c of ordered) {
+    const base = { key: c.key, letter: c.letter, name: c.name }
+    const hit = have.filter((i) => c.match.industries.includes(i))
+    if (hit.length) {
+      matches.push({ ...base, via: "industry", industries: hit })
+      continue
     }
-  })
-  if (!best) return null
-  const { key, letter, name, terms, bySize } = best as CohortMatch
-  return bySize ? { key, letter, name, terms, bySize } : { key, letter, name, terms }
+    const bands = c.match.size?.bands
+    if (!bands?.length) continue
+    const b = bandFor(company, bands)
+    if (b === "unknown") unknownSize = true
+    else if (b) matches.push({ ...base, via: "size", band: b.band, sizeBasis: b.basis })
+  }
+
+  if (!matches.length && unknownSize) {
+    return {
+      matches,
+      review: have.length
+        ? `industry (${have.join(", ")}) is in no cohort, and size is unknown (no revenue or employee count)`
+        : "industry not recognized, and size is unknown (no revenue or employee count)",
+    }
+  }
+  return { matches }
 }

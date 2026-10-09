@@ -3,6 +3,23 @@
 // Source: 434-context "05 System of Record/schemas" — canonical, and not in this
 // repository. Regenerate with: tsx scripts/sor/generate-types.ts
 
+export type Band = Band1 & {
+  name: string
+  revenue_usd?: Range
+  employees?: Range
+} & Band1 & {
+    name: string
+    revenue_usd?: Range
+    employees?: Range
+  }
+export type Band1 =
+  | {
+      [k: string]: unknown
+    }
+  | {
+      [k: string]: unknown
+    }
+
 /**
  * Master §5.6–5.10. Cohort rules live in the policy document, not here.
  */
@@ -48,6 +65,47 @@ export interface OutboundCohort {
   source?: string
   updated_at?: string
   updated_by?: string
+  /**
+   * Structured match fields read by the prospecting matcher and the ICP rubric (next-434media lib/prospecting/cohort-match.ts) in place of the prose target profile, which stays for people and agents. A company matches the cohort when one of its industries is listed, or when its size falls in one of the cohort's bands. Revenue decides the band when known; otherwise employee count. When both are unknown the company is neither matched nor ruled out by size: it is marked for review.
+   */
+  match: {
+    /**
+     * Industry categories, in the controlled vocabulary of next-434media lib/prospecting/industry-tags.ts (ICP_INDUSTRIES). defense_aerospace and marketing_agency were added to that vocabulary on 2026-10-09 for cohorts A and E; advanced_manufacturing and military_veteran (military health, and veteran-employment and defense-workforce organizations) were added the same day for cohort A. The two lists are copies: change both together. An empty list means the cohort matches on size only. A company can match several cohorts; every match is carried. LIMIT: some prose items cannot be told apart by industry alone and have no category here. Cohort A's dual-use technology companies look like any software or hardware company by industry, so software is deliberately not in cohort A; they are found by research or by the rep, not by this field.
+     */
+    industries: (
+      | "healthcare_life_sciences"
+      | "sports_fitness_lifestyle"
+      | "tech_saas"
+      | "capital_vc"
+      | "media_broadcast"
+      | "education_workforce"
+      | "nonprofit_mission"
+      | "cpg_consumer"
+      | "civic_econ_dev"
+      | "defense_aerospace"
+      | "marketing_agency"
+      | "advanced_manufacturing"
+      | "military_veteran"
+    )[]
+    /**
+     * Size bands, where the cohort is defined by size; null where it is not. Sources for cohort D's bands (founder decision 2026-10-08): REVENUE — National Center for the Middle Market (Ohio State), 'NCMM InfoSheet', https://www.middlemarketcenter.org/Media/Documents/NCMM%20InfoSheet.pdf: the U.S. middle market is annual revenue of $10 million to $1 billion (read through a web search result on 2026-10-08; the direct URL returned 404 on 2026-10-09). EMPLOYEES — Gartner Glossary, 'Midsize Enterprise (MSE)', https://www.gartner.com/en/information-technology/glossary/midsize-enterprise-mse: '$50 million and $1 billion in annual revenues and/or 100 to 2500 employees' (read through a web search result on 2026-10-08; the page redirected to Gartner's IT landing page on 2026-10-09); 100–2,500 approved by the founder 2026-10-08. OTHER BANDS RECORDED: Capterra's glossary, 'Midsize Enterprise (MSE)', https://www.capterra.ca/glossary/900/midsize-enterprise-mse, gives 100–1,000 employees; an earlier Gartner passage gives 100–999 employees with revenue over $50 million and under $1 billion; the Federal Reserve uses $10–$250 million revenue (as reported by Grata, https://grata.com/resources/what-is-the-middle-market).
+     */
+    size: null | {
+      /**
+       * @minItems 1
+       */
+      bands: [Band, ...Band[]]
+    }
+  }
+}
+/**
+ * A numeric range. gte/lte are inclusive bounds, gt/lt exclusive.
+ */
+export interface Range {
+  gt?: number
+  gte?: number
+  lt?: number
+  lte?: number
 }
 
 /**
@@ -194,6 +252,50 @@ export interface PortfolioRecord {
 }
 
 /**
+ * A price the founder set below cost-sheet rates or below a minimum. Pricing Architecture §5.3: approved by the act of setting it; its rationale is recorded, not reviewed; logged here and never in governing documents, so exceptions can be counted and reported on. Money follows contractor.standard_rates: integer minor units with an ISO 4217 code. agreed_price is a list because a quote can offer options; once a row is agreed, delivered or paid it holds exactly one, which validate.py checks. Internal, never quotable.
+ */
+export interface PricingException {
+  key: string
+  date: string
+  client: string
+  project: string
+  scope?: string | null
+  /**
+   * The cost-sheet line or minimum the price falls below, with its amount.
+   */
+  list_basis: string
+  /**
+   * @minItems 1
+   */
+  agreed_price: [
+    {
+      label?: string | null
+      amount_minor: number
+    },
+    ...{
+      label?: string | null
+      amount_minor: number
+    }[]
+  ]
+  currency: string
+  reason_category: "icp_visibility" | "relationship" | "strategic_ip" | "other"
+  /**
+   * One sentence.
+   */
+  reason: string
+  series: boolean
+  status: "quoted" | "agreed" | "delivered" | "paid" | "lost"
+  approved_by: "founder"
+  /**
+   * Reserved for the CRM link.
+   */
+  deal_ref?: string | null
+  source: string
+  updated_at?: string | null
+  updated_by?: string | null
+}
+
+/**
  * Master §6.1–6.2 numbers. Never quoted to a prospect.
  */
 export interface QualificationThreshold {
@@ -273,13 +375,14 @@ export interface WorkPageSection {
 
 /** sha256[:16] of each source schema, for the drift check in the context repository. */
 export const sorSchemaHashes = {
-    "cohort.schema.json": "3c8be15db7b4fe80",
+    "cohort.schema.json": "e88419f1a6a6b0ba",
     "cohort_rule.schema.json": "6dba9c5ea2c43de8",
     "contractor.schema.json": "0e30b1e384417bfe",
     "launch_dependency.schema.json": "b60a01e2bf2af341",
     "partner_service.schema.json": "27d5fa1bf7ad7543",
     "policy_document.schema.json": "4e1d0184b8692961",
     "portfolio_record.schema.json": "299576a4a45c00dc",
+    "pricing_exception.schema.json": "30bd46b76e2e2ded",
     "qualification_threshold.schema.json": "4b346713da931afd",
     "rate_card_line.schema.json": "099711957961ffe2",
     "talent_relationship.schema.json": "f0414d7b7a227ea1",

@@ -1,6 +1,7 @@
 import { Timestamp, FieldValue } from "firebase-admin/firestore"
 import { getDb } from "./firebase-admin"
 import { scoreLead } from "./score-lead"
+import { listIcpCohorts } from "./firestore-icp-cohorts"
 import { trackLeadCapture, trackLeadQualified } from "./ga4-events"
 import { makeTag, normalizeLegacyTags } from "./tag-taxonomy"
 import {
@@ -58,6 +59,8 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): Lead {
     score_breakdown: (raw.score_breakdown || {}) as Lead["score_breakdown"],
     icp_fit_score: typeof raw.icp_fit_score === "number" ? raw.icp_fit_score : undefined,
     icp_grade: (raw.icp_grade || undefined) as Lead["icp_grade"],
+    icp_review: typeof raw.icp_review === "string" ? raw.icp_review : null,
+    icp_cohorts: Array.isArray(raw.icp_cohorts) ? (raw.icp_cohorts as Lead["icp_cohorts"]) : [],
     icp_breakdown:
       raw.icp_breakdown && typeof raw.icp_breakdown === "object"
         ? (raw.icp_breakdown as Lead["icp_breakdown"])
@@ -155,7 +158,7 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     email_opens: 0,
     email_clicks: 0,
     tags: input.tags,
-  })
+  }, await listIcpCohorts())
 
   const doc = {
     name: input.name,
@@ -174,6 +177,8 @@ export async function createLead(input: LeadCreateInput): Promise<Lead> {
     icp_fit_score: scored.icp_fit_score,
     icp_grade: scored.icp_grade,
     icp_breakdown: scored.icp_breakdown,
+    icp_review: scored.icp_review,
+    icp_cohorts: scored.icp_cohorts,
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     employee_count: input.employee_count ?? null,
@@ -291,7 +296,7 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
     email_opens: merged.email_opens,
     email_clicks: merged.email_clicks,
     tags: merged.tags,
-  })
+  }, await listIcpCohorts())
 
   const update: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
     ...patch,
@@ -301,6 +306,8 @@ export async function updateLead(id: string, patch: LeadUpdateInput): Promise<Le
     icp_fit_score: scored.icp_fit_score,
     icp_grade: scored.icp_grade,
     icp_breakdown: scored.icp_breakdown,
+    icp_review: scored.icp_review,
+    icp_cohorts: scored.icp_cohorts,
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     enriched_at: new Date().toISOString(),
@@ -856,7 +863,7 @@ export async function incrementEngagement(
     email_opens: updated.email_opens,
     email_clicks: updated.email_clicks,
     tags: updated.tags,
-  })
+  }, await listIcpCohorts())
   await ref.update({
     score: scored.score,
     priority: scored.priority,
@@ -864,6 +871,8 @@ export async function incrementEngagement(
     icp_fit_score: scored.icp_fit_score,
     icp_grade: scored.icp_grade,
     icp_breakdown: scored.icp_breakdown,
+    icp_review: scored.icp_review,
+    icp_cohorts: scored.icp_cohorts,
     intent_score: scored.intent_score,
     intent_breakdown: scored.intent_breakdown,
     enriched_at: new Date().toISOString(),

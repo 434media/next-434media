@@ -1,6 +1,7 @@
 import type { ApolloPerson, ApolloSearchFilters } from "./apollo"
 import type { IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
 import { scoreIcpFit } from "@/lib/icp/rubric"
+import type { CohortHit, CohortLike } from "./cohort-match"
 
 /**
  * Stage 3 — ICP scorer (prospecting path).
@@ -16,8 +17,10 @@ import { scoreIcpFit } from "@/lib/icp/rubric"
  *     so it's surfaced separately rather than folded into the fit score
  *   - the approve-into-queue threshold
  *
- * Free-plan obfuscation is handled by passing the search filters as fallback
- * hints to the rubric (filter keywords → industry, filter locations → location).
+ * Free-plan obfuscation is handled by passing the search's locations to the
+ * rubric as a location fallback. The search keyword is not passed: it describes
+ * the search, not the candidate, so it never counts as the candidate's industry.
+ * Industry is scored from the outbound cohorts (icp_cohorts).
  */
 
 // ─── Configuration ──────────────────────────────────────────────────────
@@ -222,6 +225,14 @@ export interface ScoredPerson {
   breakdown: IcpFitBreakdown
   /** Title fit (0–20) — a contact qualifier, NOT part of the company fit score. */
   contactQualifier: number
+  /**
+   * Set when the company could not be placed in a cohort because its size is
+   * unknown: Industry is left out of the score and the candidate is marked for
+   * review instead of scored as no-fit. Holds why.
+   */
+  needsReview?: string
+  /** Every outbound cohort the candidate matches — the pitch is picked from these at approval. */
+  cohorts: CohortHit[]
   /** Set when score is -1 — explains why the candidate was excluded. */
   excluded?: string
   /** Per-dimension explanations, for the review tray. */
@@ -239,6 +250,7 @@ function excludedResult(person: ApolloPerson, message: string, reason: string): 
     contactQualifier: 0,
     excluded: message,
     reasons: [reason],
+    cohorts: [],
   }
 }
 
@@ -250,6 +262,7 @@ function excludedResult(person: ApolloPerson, message: string, reason: string): 
 export function scoreCandidate(
   person: ApolloPerson,
   filters: ApolloSearchFilters,
+  cohorts: CohortLike[],
 ): ScoredPerson {
   const orgName = person.organization?.name ?? ""
 
@@ -272,14 +285,14 @@ export function scoreCandidate(
     state: person.state || person.organization?.state,
     employeeCount: person.organization?.estimated_num_employees,
     annualRevenue: person.organization?.annual_revenue,
-    keywordHint: filters.q_keywords,
     locationHint: (filters.organization_locations || []).join(" "),
+    cohorts,
   })
 
   const title = scoreTitle(person)
 
   const reasons = [
-    `Industry +${fit.breakdown.industry}`,
+    fit.needsReview ? `Industry: review — ${fit.needsReview}` : `Industry +${fit.breakdown.industry}`,
     `Location +${fit.breakdown.location}`,
     `Company size +${fit.breakdown.companySize}`,
   ]
@@ -293,6 +306,8 @@ export function scoreCandidate(
     breakdown: fit.breakdown,
     contactQualifier: title.score,
     reasons,
+    cohorts: fit.cohorts,
+    ...(fit.needsReview ? { needsReview: fit.needsReview } : {}),
   }
 }
 
@@ -303,8 +318,9 @@ export function scoreCandidate(
 export function scoreCandidates(
   people: ApolloPerson[],
   filters: ApolloSearchFilters,
+  cohorts: CohortLike[],
 ): ScoredPerson[] {
-  const scored = people.map((p) => scoreCandidate(p, filters))
+  const scored = people.map((p) => scoreCandidate(p, filters, cohorts))
   return scored.sort((a, b) => {
     if (a.score === -1 && b.score !== -1) return 1
     if (b.score === -1 && a.score !== -1) return -1

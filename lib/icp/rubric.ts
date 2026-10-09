@@ -1,10 +1,10 @@
 import type { IcpGrade, IcpFitBreakdown } from "@/types/crm-types"
 import {
-  INDUSTRY_SIGNALS,
   SOUTH_TEXAS_CITIES,
   TEXAS_CITIES,
   HISPANIC_TARGETED_METROS,
 } from "@/lib/icp/taxonomy"
+import { matchCohorts, type CohortHit, type CohortLike } from "@/lib/prospecting/cohort-match"
 
 /**
  * Canonical ICP FIT score — the single source of truth (Step 2).
@@ -75,16 +75,30 @@ export interface IcpCompanyInput {
   growthStage?: GrowthStage
   /** Event-activity signals — research-sourced; scored only when provided. */
   eventActivity?: EventActivitySignal
-  // Fallback hints for the prospecting path when real fields are obfuscated
-  // (Apollo Free plan): filter keywords inform industry, filter locations
-  // inform location. Ignored when real data is present.
-  keywordHint?: string
+  // Fallback hint for the prospecting path when real fields are obfuscated
+  // (Apollo Free plan): filter locations inform location. Ignored when real
+  // data is present. The search keyword is NOT a hint for industry: the
+  // keyword describes the search, not the candidate (next-434media#63).
   locationHint?: string
+  /**
+   * The outbound cohorts (icp_cohorts). Industry is scored from them through
+   * the cohort matcher; there is no hand-written industry list.
+   */
+  cohorts: CohortLike[]
 }
 
 export interface IcpFitResult {
   /** 0–100, normalized over the scored dimensions (core + present extended). */
   fit: number
+  /**
+   * Set when Industry could not be scored: the company matched no cohort by
+   * industry and its size is unknown, so a size-defined cohort could neither
+   * match nor be ruled out. Industry is then left out of the score (neither
+   * matched nor zeroed) and the company is marked for review.
+   */
+  needsReview?: string
+  /** Every outbound cohort the company matches (empty when none or review). */
+  cohorts: CohortHit[]
   grade: IcpGrade
   /** Raw points per scored dimension. */
   breakdown: IcpFitBreakdown
@@ -106,19 +120,22 @@ export function icpGrade(fit: number): IcpGrade {
 
 // ─── Dimension scorers (company-level) ──────────────────────────────────
 
-// Industry (max 25) — reuses the prospecting INDUSTRY_SIGNALS taxonomy
-// (434's real verticals). Scores are already 22–25; cap at the dimension max.
-function scoreIndustry(input: IcpCompanyInput): number {
-  const haystack = [input.industry, input.orgName, input.keywordHint]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-  if (!haystack.trim()) return 0
-  let best = 0
-  for (const sig of INDUSTRY_SIGNALS) {
-    if (sig.patterns.some((p) => p.test(haystack)) && sig.score > best) best = sig.score
-  }
-  return Math.min(best, 25)
+// Industry (max 25) — from the outbound cohorts' structured match fields
+// (icp_cohorts `match`) through the cohort matcher: matching any cohort, by
+// industry or by size band, earns 25; no cohort earns 0; "review" (no match and
+// size unknown) is not scored at all — see scoreIcpFit.
+function scoreIndustry(input: IcpCompanyInput): { points: number | null; cohorts: CohortHit[]; review?: string } {
+  const { matches, review } = matchCohorts(
+    {
+      industry: input.industry,
+      company: input.orgName,
+      employeeCount: input.employeeCount,
+      annualRevenue: input.annualRevenue,
+    },
+    input.cohorts,
+  )
+  if (review) return { points: null, cohorts: [], review }
+  return { points: matches.length ? 25 : 0, cohorts: matches }
 }
 
 // Location (max 20) — 434's geography priority, rescaled heavier than Canva's
@@ -192,14 +209,18 @@ function scoreEvent(signal: EventActivitySignal): number {
 }
 
 export function scoreIcpFit(input: IcpCompanyInput): IcpFitResult {
-  // Core dimensions — always scored, always in the denominator (unknown = 0).
+  // Core dimensions — always scored, always in the denominator (unknown = 0),
+  // except an Industry that needs review: it is left out of both, so the
+  // company is neither matched nor zeroed on it.
+  const industry = scoreIndustry(input)
+  const needsReview = industry.review
   const breakdown: IcpFitBreakdown = {
-    industry: scoreIndustry(input),
+    ...(industry.points !== null ? { industry: industry.points } : {}),
     location: scoreLocation(input),
     companySize: scoreCompanySize(input),
   }
   let raw = (breakdown.industry ?? 0) + (breakdown.location ?? 0) + (breakdown.companySize ?? 0)
-  let denom = ICP_CORE_MAX
+  let denom = ICP_CORE_MAX - (needsReview ? 25 : 0)
 
   // Extended dimensions — join raw AND denominator only when data is present,
   // so they sharpen rich-data leads without cratering sparse ones.
@@ -220,5 +241,13 @@ export function scoreIcpFit(input: IcpCompanyInput): IcpFitResult {
   }
 
   const fit = denom > 0 ? Math.round((raw / denom) * 100) : 0
-  return { fit, grade: icpGrade(fit), breakdown, raw, activeMax: denom }
+  return {
+    fit,
+    grade: icpGrade(fit),
+    breakdown,
+    raw,
+    activeMax: denom,
+    cohorts: industry.cohorts,
+    ...(needsReview ? { needsReview } : {}),
+  }
 }
