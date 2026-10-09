@@ -3,6 +3,7 @@ import { getSession, isAuthorizedAdmin } from "@/lib/auth"
 import { getLeads } from "@/lib/firestore-leads"
 import { getClients } from "@/lib/firestore-crm"
 import { computeFunnelKpis } from "@/lib/kpis/funnel"
+import { listIcpCohorts } from "@/lib/firestore-icp-cohorts"
 
 export const runtime = "nodejs"
 
@@ -25,8 +26,16 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
   try {
-    const [leads, clients] = await Promise.all([getLeads(), getClients()])
-    const kpis = computeFunnelKpis(leads, clients, new Date().toISOString())
+    const [leads, clients, cohorts] = await Promise.all([
+      getLeads(),
+      getClients(),
+      // Cohort match is informational: a failed read shows "—", not an error.
+      listIcpCohorts().catch((err) => {
+        console.warn("[GET /api/admin/kpis/funnel] icp_cohorts unreadable:", err)
+        return null
+      }),
+    ])
+    const kpis = computeFunnelKpis(leads, clients, new Date().toISOString(), cohorts)
     return NextResponse.json({ success: true, kpis })
   } catch (err) {
     console.error("[GET /api/admin/kpis/funnel]", err)

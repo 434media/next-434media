@@ -1,3 +1,4 @@
+import { matchCohort, type CohortLike } from "../prospecting/cohort-match"
 import type {
   Lead,
   LeadStatus,
@@ -98,11 +99,25 @@ export interface VelocityStat {
   sampleSize: number
 }
 
+export interface CohortMatchStat {
+  key: string
+  letter?: string
+  name: string
+  count: number
+}
+
 export interface FunnelKpis {
   generatedAt: string
   total: number
   threshold: number
   icpMatchRate: number
+  /**
+   * % of leads whose industry and company name point to an outbound cohort
+   * (icp_cohorts; lib/prospecting/cohort-match.ts). Informational — no
+   * threshold rides on it. Null when the cohort rows could not be read.
+   */
+  cohortMatchRate: number | null
+  cohortMatches: CohortMatchStat[]
   stages: FunnelStageStat[]
   conversions: FunnelConversionStat[]
   icpMatchBySource: IcpMatchSourceStat[]
@@ -259,6 +274,7 @@ export function computeFunnelKpis(
   leads: Lead[],
   clients: ClientRecord[],
   generatedAt: string,
+  cohorts: CohortLike[] | null = null,
 ): FunnelKpis {
   const clientById = new Map(clients.map((c) => [c.id, c]))
 
@@ -324,6 +340,24 @@ export function computeFunnelKpis(
     }
   }).filter((s) => s.total > 0)
 
+  // Cohort match — beside ICP match, not a gate. Null when cohorts are unread.
+  let cohortMatchRate: number | null = null
+  const cohortMatches: CohortMatchStat[] = []
+  if (cohorts) {
+    const byKey = new Map<string, CohortMatchStat>()
+    let cohortMatched = 0
+    for (const l of leads) {
+      const m = matchCohort({ industry: l.industry, company: l.company }, cohorts)
+      if (!m) continue
+      cohortMatched++
+      const stat = byKey.get(m.key) ?? { key: m.key, letter: m.letter, name: m.name, count: 0 }
+      stat.count++
+      byKey.set(m.key, stat)
+    }
+    cohortMatchRate = total > 0 ? round(cohortMatched / total, 3) : 0
+    cohortMatches.push(...[...byKey.values()].sort((a, b) => b.count - a.count))
+  }
+
   // Velocity — median + p90 days between stage entries. Median over mean so a
   // single slow deal doesn't skew the read; p90 surfaces the long tail.
   const deltas: Record<string, number[]> = {
@@ -355,6 +389,8 @@ export function computeFunnelKpis(
     total,
     threshold: ICP_MATCH_THRESHOLD,
     icpMatchRate,
+    cohortMatchRate,
+    cohortMatches,
     stages,
     conversions,
     icpMatchBySource,

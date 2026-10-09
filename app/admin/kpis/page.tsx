@@ -27,6 +27,13 @@ function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`
 }
 
+// "B 13 · C 1" — leads per outbound cohort, beside the cohort-match rate.
+function cohortSub(funnel: FunnelKpis): string {
+  if (funnel.cohortMatchRate === null) return "cohorts unavailable"
+  if (!funnel.cohortMatches.length) return "no lead matches a cohort"
+  return funnel.cohortMatches.map((c) => `${c.letter ?? c.key} ${c.count}`).join(" · ")
+}
+
 function HeroMetric({
   label,
   value,
@@ -215,11 +222,16 @@ function FunnelKpisInner() {
         {/* ===== Funnel conversion & velocity ===== */}
         {funnel && (
           <Section title="Funnel conversion & velocity" icon={Filter}>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
               <HeroMetric
                 label="ICP match rate"
                 value={pct(funnel.icpMatchRate)}
                 sub={`score ≥ ${funnel.threshold}`}
+              />
+              <HeroMetric
+                label="Cohort match"
+                value={funnel.cohortMatchRate === null ? "—" : pct(funnel.cohortMatchRate)}
+                sub={cohortSub(funnel)}
               />
               <HeroMetric label="Total leads" value={String(funnel.total)} />
               <HeroMetric label="Reach opportunity" value={pct(oppRate)} sub="lead → discovery" />

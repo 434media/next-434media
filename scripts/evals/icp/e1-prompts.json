@@ -1,0 +1,18 @@
+[
+  { "id": "health-sa", "prompt": "Hospital systems and health nonprofits in San Antonio, decision-makers" },
+  { "id": "biotech-tx", "prompt": "Biotech and life-science companies in Texas raising Series A or later" },
+  { "id": "defense-tech", "prompt": "Defense technology and dual-use manufacturers expanding in Texas" },
+  { "id": "veteran-workforce", "prompt": "Organizations focused on veteran employment and military workforce in Texas" },
+  { "id": "boxing-sponsors", "prompt": "Brands that sponsor boxing or combat sports and target Mexican American fans" },
+  { "id": "beverage-hispanic", "prompt": "Beverage and consumer brands marketing to US Hispanic audiences" },
+  { "id": "regional-enterprise", "prompt": "Large regional enterprises and dealer groups headquartered in South Texas, marketing leaders" },
+  { "id": "fortune-500-tx", "prompt": "Fortune 500 companies with Texas headquarters, heads of brand or communications" },
+  { "id": "vc-portfolio", "prompt": "Venture capital firms and accelerators in Austin with portfolio marketing leads" },
+  { "id": "edtech", "prompt": "Edtech and workforce training companies in Texas, 50 to 500 employees" },
+  { "id": "saas-hiring", "prompt": "SaaS companies in Texas actively hiring a Head of Partnerships" },
+  { "id": "agencies", "prompt": "Creative and experiential agencies in Texas that hire production partners" },
+  { "id": "eu-trap", "prompt": "Media companies in Germany and the UK" },
+  { "id": "canada-trap", "prompt": "Health systems in Toronto and Vancouver" },
+  { "id": "decision-makers-generic", "prompt": "Decision-makers at mid-size companies" },
+  { "id": "niche", "prompt": "Fight gear and boxing equipment makers" }
+]
