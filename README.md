@@ -297,9 +297,7 @@ ADMIN_PASSWORD=your-admin-password          # legacy guard on a few analytics/IG
 # and Search Console; the project ID is read from it (no separate FIREBASE_PROJECT_ID
 # or GCP_PROJECT_ID). See the GOOGLE ANALYTICS block below for the key itself.
 # Firebase web SDK (client) — NEXT_PUBLIC_FIREBASE_* keys for auth.
-# Exception: Gmail notifications use a separate delegation-enabled service account:
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com  # notifications.ts Gmail only
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"  # notifications.ts Gmail only
+# @mention notification emails go through Resend (RESEND_API_KEY), not Gmail.
 
 # MAILCHIMP
 MAILCHIMP_API_KEY=xxxxxxxxxx-us1

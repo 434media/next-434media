@@ -1,4 +1,4 @@
-import { google } from 'googleapis'
+import { getResend, DEFAULT_FROM } from './resend'
 import type { TaskComment } from '../types/crm-types'
 
 interface NotificationData {
@@ -17,31 +17,6 @@ interface AssignmentNotificationData {
   assignedBy: string
   notificationType: 'assignment' | 'tagged'
   taskUrl?: string
-}
-
-interface ServiceAccountCredentials {
-  client_email: string
-  private_key: string
-}
-
-function getCredentials(): ServiceAccountCredentials | null {
-  // Gmail send uses a SEPARATE service account (firebase-adminsdk@) that has
-  // domain-wide delegation authorized in Google Workspace for gmail.send. This
-  // is the one Google credential NOT folded into GOOGLE_SERVICE_ACCOUNT_KEY:
-  // the digitalcanvas@ SA in that key isn't authorized for Gmail delegation.
-  // To consolidate, authorize that SA's client_id in Workspace, then switch here.
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-
-  if (clientEmail && privateKey) {
-    return {
-      client_email: clientEmail,
-      private_key: privateKey,
-    }
-  }
-
-  console.error('[Notifications] Firebase credentials not found. Set FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.')
-  return null
 }
 
 /**
@@ -76,25 +51,18 @@ function sanitizeUrl(url: string): string {
 }
 
 /**
- * Send email notification to mentioned users via Gmail API
- * Uses domain-wide delegation to send emails as the notification sender
+ * Send email notification to mentioned users through Resend, from the same
+ * verified sender as the site's other CRM mail (DEFAULT_FROM). Any recipient
+ * whose send fails is logged as an error and gets the Firestore in-app
+ * notification instead.
  */
 export async function sendCommentNotification(data: NotificationData): Promise<{ success: boolean; error?: string }> {
-  const { taskId, taskTitle, comment, mentionedEmails, taskUrl, isContentPost } = data
+  const { taskId, taskTitle, comment, mentionedEmails, taskUrl } = data
 
   if (!mentionedEmails.length) {
     return { success: true } // No one to notify
   }
 
-  const credentials = getCredentials()
-  if (!credentials) {
-    console.error('[Notifications] No valid credentials found')
-    return { success: false, error: 'No valid credentials found' }
-  }
-
-  // Get the sender email from environment variable (should be a 434media.com admin)
-  const senderEmail = process.env.NOTIFICATION_SENDER_EMAIL || 'notifications@434media.com'
-  
   // Filter to only 434media.com emails
   const validRecipients = mentionedEmails.filter(email => 
     email.endsWith('@434media.com')
@@ -106,17 +74,7 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
   }
 
   try {
-    // Create a JWT client with domain-wide delegation
-    const jwtClient = new google.auth.JWT({
-      email: credentials.client_email,
-      key: credentials.private_key,
-      scopes: ['https://www.googleapis.com/auth/gmail.send'],
-      subject: senderEmail, // The user to impersonate (requires domain-wide delegation)
-    })
-
-    await jwtClient.authorize()
-
-    const gmail = google.gmail({ version: 'v1', auth: jwtClient })
+    const resend = getResend()
 
     // Create the email content
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://434media.com'
@@ -170,45 +128,43 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
 </html>
 `
 
-    // Send email to each recipient
+    // Send one email per recipient so addresses aren't shared between them.
+    // Resend reports most failures in `error` rather than throwing, so both
+    // shapes count as a failure.
     const results = await Promise.allSettled(
       validRecipients.map(async (recipient) => {
-        const rawEmail = createRawEmail({
-          from: `434 Media CRM <${senderEmail}>`,
+        const { error } = await resend.emails.send({
+          from: DEFAULT_FROM,
           to: recipient,
           subject: emailSubject,
           html: emailBody,
         })
-
-        return gmail.users.messages.send({
-          userId: 'me',
-          requestBody: {
-            raw: rawEmail,
-          },
-        })
+        if (error) throw new Error(`${error.name}: ${error.message}`)
       })
     )
 
-    // Log results
-    const successful = results.filter(r => r.status === 'fulfilled').length
-    const failed = results.filter(r => r.status === 'rejected')
-    
-    if (failed.length > 0) {
-      console.error('[Notifications] Some emails failed to send:', 
-        failed.map(f => (f as PromiseRejectedResult).reason)
+    const failedRecipients = validRecipients.filter((_, i) => results[i].status === 'rejected')
+    const successful = validRecipients.length - failedRecipients.length
+
+    if (failedRecipients.length > 0) {
+      console.error('[Notifications] Resend failed to send mention emails:',
+        results.flatMap((r, i) => r.status === 'rejected'
+          ? [{ recipient: validRecipients[i], reason: r.reason instanceof Error ? r.reason.message : String(r.reason) }]
+          : [])
       )
+      await storeNotificationInFirestore({ ...data, mentionedEmails: failedRecipients })
     }
 
     console.log(`[Notifications] Sent ${successful}/${validRecipients.length} notification emails`)
     
     return { 
       success: successful > 0,
-      error: failed.length > 0 ? `${failed.length} emails failed to send` : undefined
+      error: failedRecipients.length > 0 ? `${failedRecipients.length} emails failed to send` : undefined
     }
   } catch (error) {
     console.error('[Notifications] Failed to send notification:', error)
     
-    // If Gmail API fails, fall back to storing notification in Firestore
+    // If Resend is unavailable, fall back to storing notification in Firestore
     // This allows the admin panel to show a notification badge
     await storeNotificationInFirestore(data)
     
@@ -217,33 +173,6 @@ export async function sendCommentNotification(data: NotificationData): Promise<{
       error: error instanceof Error ? error.message : 'Unknown error' 
     }
   }
-}
-
-/**
- * Create a raw email string for Gmail API
- */
-function createRawEmail(params: {
-  from: string
-  to: string
-  subject: string
-  html: string
-}): string {
-  const { from, to, subject, html } = params
-  
-  const email = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=utf-8',
-    '',
-    html,
-  ].join('\r\n')
-
-  // Base64 URL encode the email
-  // Using native base64url encoding which handles +→- , /→_ , and padding removal
-  // without regex (avoids ReDoS risk from polynomial /=+$/ pattern)
-  return Buffer.from(email).toString('base64url')
 }
 
 /**
