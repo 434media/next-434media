@@ -1,3 +1,4 @@
+import { runtimePublishingEnabled, guardedContentUpdate, draftBatch, manifestHash, MetaBlocked, type MetaManifest, type MetaBatch, type MetaStore, type MetaRecord, type MetaBrand } from "./owned-meta-publisher"
 import { getDb, admin } from "./firebase-admin"
 import { normalizeAssigneeName } from "../components/crm/types"
 import type {
@@ -1294,7 +1295,7 @@ export async function getContentPosts(): Promise<ContentPost[]> {
   try {
     const db = getDb()
     const snapshot = await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).orderBy("date_to_post", "desc").get()
-    const results = snapshot.docs.map((doc) => {
+    const results = snapshot.docs.filter(doc => doc.data().archived !== true).map((doc) => {
       const data = doc.data()
       return {
         ...data,
@@ -1334,6 +1335,7 @@ export async function getContentPostById(id: string): Promise<ContentPost | null
 }
 
 export async function createContentPost(postData: Omit<ContentPost, "id" | "created_at" | "updated_at">): Promise<ContentPost> {
+  guardedContentUpdate({}, postData as unknown as Record<string, unknown>)
   try {
     const db = getDb()
     const FieldValue = admin.firestore.FieldValue
@@ -1369,9 +1371,21 @@ export async function updateContentPost(id: string, updates: Partial<ContentPost
     // Remove id from updates
     const { id: _, created_at: __, ...updateData } = updates
     
-    await docRef.update({
-      ...updateData,
-      updated_at: FieldValue.serverTimestamp(),
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(docRef)
+      if (!snap.exists) throw new MetaBlocked("Content post not found")
+      const existing = snap.data()!
+      if (existing.owned_meta_history && process.env.VERCEL_ENV !== "production") throw new MetaBlocked("Preview cannot change publisher records")
+      if (existing.archived) throw new MetaBlocked("Archived content cannot be edited")
+      if (existing.owned_meta && ("approvals" in updateData || "published_url" in updateData || "posted_at" in updateData || (updateData.status !== existing.status && ["approved", "scheduled", "posted"].includes(String(updateData.status))))) throw new MetaBlocked("Use version-bound publisher approval and results")
+      let guardView = existing
+      if (existing.owned_meta?.started) {
+        const batch = (await tx.get(docRef.collection("owned_meta_batches").doc(existing.owned_meta.batchId))).data() as MetaBatch | undefined
+        // A new revision can supersede settled or unpublished work, never an active/unknown final call.
+        if (batch && !batch.claim && Object.values(batch.jobs).every(j => !j.finalIntent || j.status === "verified" || j.status === "operator_confirmed")) guardView = { ...existing, owned_meta: { ...existing.owned_meta, started: false } }
+      }
+      const protectedUpdates = guardedContentUpdate(guardView, updateData as Record<string, unknown>)
+      tx.update(docRef, { ...protectedUpdates, updated_at: FieldValue.serverTimestamp() })
     })
     
     invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
@@ -1394,7 +1408,14 @@ export async function updateContentPost(id: string, updates: Partial<ContentPost
 export async function deleteContentPost(id: string): Promise<void> {
   try {
     const db = getDb()
-    await db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id).delete()
+    const ref = db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(ref)
+      if (!snap.exists) return
+      if (snap.data()!.owned_meta_history && process.env.VERCEL_ENV !== "production") throw new MetaBlocked("Preview cannot archive publisher records")
+      if (snap.data()!.owned_meta_history) tx.update(ref, { archived: true, updated_at: admin.firestore.FieldValue.serverTimestamp() })
+      else tx.delete(ref)
+    })
     invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
     console.log("[Firestore] Deleted content post:", id)
   } catch (error) {
@@ -1638,4 +1659,96 @@ function legacyOwnerFromAssignee(name: string | undefined): string {
     "Nichole Snow": "teams",
   }
   return map[name] ?? "teams"
+}
+
+// Owned Meta history lives under the existing content record. No automatic TTL.
+const META_BATCHES = "owned_meta_batches"
+export async function createOwnedMetaDraft(id: string, input: Omit<MetaManifest, "revision">): Promise<MetaBatch> {
+  const db = getDb(), ref = db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+  const batchId = crypto.randomUUID()
+  const batch = await db.runTransaction(async tx => {
+    const snap = await tx.get(ref)
+    if (!snap.exists || snap.data()!.archived) throw new MetaBlocked("Content unavailable")
+    const data = snap.data()!
+    if (data.owned_meta?.batchId) {
+      const previous = await tx.get(ref.collection(META_BATCHES).doc(data.owned_meta.batchId))
+      const old = previous.data() as MetaBatch | undefined
+      if (old?.claim || old && Object.values(old.jobs).some(j => j.finalIntent && j.status !== "verified" && j.status !== "operator_confirmed")) throw new MetaBlocked("Resolve the current publishing attempt before making a new revision")
+    }
+    const next = draftBatch(batchId, { ...input, revision: Number(data.owned_meta_revision || 0) + 1 })
+    tx.create(ref.collection(META_BATCHES).doc(batchId), next)
+    tx.update(ref, { owned_meta: { batchId, hash: next.hash, started: false }, owned_meta_revision: next.manifest.revision, owned_meta_history: true, status: "needs_approval", updated_at: admin.firestore.FieldValue.serverTimestamp() })
+    return next
+  })
+  invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+  return batch
+}
+export async function decideOwnedMeta(id: string, expectedRevision: number, expectedHash: string, decision: "approved" | "rejected", reviewer: { email: string; name: string }, note: string): Promise<MetaBatch> {
+  const db = getDb(), ref = db.collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+  const batch = await db.runTransaction(async tx => {
+    const post = await tx.get(ref), data = post.data()
+    if (!data?.owned_meta || data.archived) throw new MetaBlocked("Publisher draft unavailable")
+    const bRef = ref.collection(META_BATCHES).doc(data.owned_meta.batchId), b = (await tx.get(bRef)).data() as MetaBatch
+    if (!b || b.claim || Object.values(b.jobs).some(j => j.finalIntent) || b.manifest.revision !== expectedRevision || data.owned_meta_revision !== expectedRevision || b.hash !== expectedHash || manifestHash(b.manifest) !== expectedHash) throw new MetaBlocked("Review changed or publication started; reload the exact manifest")
+    const at = new Date().toISOString()
+    // Approval fields are written once. A rejected/changed approval needs a new batch.
+    if (b.approval || b.revoked) throw new MetaBlocked("This immutable revision already has a decision; create a new draft")
+    if (decision === "approved") { if (!b.manifest.publicHostingApproved) throw new MetaBlocked("Public hosting must be approved"); b.approval = { by: reviewer.email, at, hash: expectedHash } }
+    else b.revoked = true
+    tx.set(bRef,b)
+    tx.update(ref, { status:decision, approvals:[...(data.approvals || []), { decision,by_name:reviewer.name,by_email:reviewer.email,at,note,manifest_hash:expectedHash,manifest_revision:expectedRevision }],updated_at:admin.firestore.FieldValue.serverTimestamp() })
+    return b
+  })
+  invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+  return batch
+}
+export function ownedMetaStore(): MetaStore {
+  const refFor = (id: string) => getDb().collection(CRM_COLLECTIONS.CONTENT_POSTS).doc(id)
+  return {
+    async read(id) {
+      const ref=refFor(id), post=await ref.get(), data=post.data()
+      if (!data?.owned_meta) throw new MetaBlocked("No active publisher batch")
+      const batch=(await ref.collection(META_BATCHES).doc(data.owned_meta.batchId).get()).data() as MetaBatch
+      if (!batch) throw new MetaBlocked("Batch history missing")
+      return { archived:data.archived === true,revision:data.owned_meta_revision,batch }
+    },
+    async update(id,fn) {
+      const db=getDb(),ref=refFor(id)
+      const result=await db.runTransaction(async tx => {
+        const data=(await tx.get(ref)).data()
+        if (!data?.owned_meta) throw new MetaBlocked("No active publisher batch")
+        const bRef=ref.collection(META_BATCHES).doc(data.owned_meta.batchId),batch=(await tx.get(bRef)).data() as MetaBatch
+        if (!batch) throw new MetaBlocked("Batch history missing")
+        const oldHash=batch.hash,oldManifest=manifestHash(batch.manifest),oldApproval=JSON.stringify(batch.approval)
+        const current:MetaRecord={archived:data.archived===true,revision:data.owned_meta_revision,batch:structuredClone(batch)}
+        const {next,result}=fn(current)
+        if (next) {
+          if (next.batch.hash!==oldHash || manifestHash(next.batch.manifest)!==oldManifest || JSON.stringify(next.batch.approval)!==oldApproval) throw new MetaBlocked("Immutable batch changed")
+          tx.set(bRef,next.batch)
+          const complete=Object.values(next.batch.jobs).every(j=>j.status==="verified"||j.status==="operator_confirmed")
+          tx.update(ref,{ "owned_meta.started":data.owned_meta.started || !!next.batch.claim, ...(complete?{status:"posted",posted_at:data.posted_at || new Date().toISOString()}:{}),updated_at:admin.firestore.FieldValue.serverTimestamp() })
+        }
+        return result
+      })
+      invalidateCache(CRM_COLLECTIONS.CONTENT_POSTS)
+      return result
+    },
+    async event(id,batchId,detail) { await refFor(id).collection(META_BATCHES).doc(batchId).collection("attempts").add(detail) },
+  }
+}
+export async function ownedMetaPermissionBlocked(brand: MetaBrand, verifiedAt: string): Promise<boolean> {
+  const doc=await getDb().collection("crm_meta").doc(`owned_meta_permission_${brand}`).get()
+  const failedAt=doc.data()?.failed_at
+  return !!failedAt && (!Number.isFinite(Date.parse(verifiedAt)) || Date.parse(verifiedAt)<=Date.parse(failedAt))
+}
+export async function blockOwnedMetaPermission(brand: MetaBrand): Promise<void> {
+  await getDb().collection("crm_meta").doc(`owned_meta_permission_${brand}`).set({failed_at:new Date().toISOString()})
+}
+
+/** Runtime kill switch: deliberately bypasses every application list/config cache. */
+export async function ownedMetaRuntimeEnabled(brand?: MetaBrand, readSwitch: () => Promise<unknown> = async () => (await getDb().collection("crm_meta").doc("owned_meta_enabled").get()).data()): Promise<boolean> {
+  if(process.env.VERCEL_ENV!=="production")return false
+  try {
+    return runtimePublishingEnabled(await readSwitch(),brand)
+  } catch { return false }
 }

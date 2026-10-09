@@ -362,6 +362,11 @@ export const CONTENT_POST_STATUS_OPTIONS: { value: ContentPostStatus; label: str
 
 // Content Post interface (for Social Calendar - independent from Tasks)
 export interface ContentPost {
+  owned_meta?: { batchId: string; hash: string; started: boolean } | null
+  owned_meta_revision?: number
+  owned_meta_history?: boolean
+  archived?: boolean
+
   id: string
   user: string  // Assigned user (dropdown)
   date_created: string  // Hard-coded creation date
@@ -399,6 +404,9 @@ export interface ContentPost {
 // One reviewer decision on a content post. The latest entry reflects the
 // current approve/reject state; the array preserves the full history.
 export interface ContentApproval {
+  manifest_hash?: string
+  manifest_revision?: number
+
   decision: "approved" | "rejected"
   by_name: string
   by_email: string

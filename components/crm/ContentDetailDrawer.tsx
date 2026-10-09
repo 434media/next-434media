@@ -30,6 +30,7 @@ import { useTeamMembers } from "@/hooks/useTeamMembers"
 import { DetailDrawer } from "@/components/admin/DetailDrawer"
 import { GeneratePanel } from "./GeneratePanel"
 import { AssetLibraryPicker } from "./AssetLibraryPicker"
+import type { MetaBatch, MetaBrand, MetaFormat, MetaDestination } from "@/lib/owned-meta-publisher"
 
 interface ContentDetailDrawerProps {
   open: boolean
@@ -839,7 +840,7 @@ export function ContentDetailDrawer({
                   )}
 
                   {/* Reviewer action bar — only super-admins, only when awaiting approval */}
-                  {canReview && post.status === "needs_approval" && (
+                  {canReview && !post.owned_meta && post.status === "needs_approval" && (
                     <div className="space-y-2">
                       {showRejectNote && (
                         <textarea
@@ -908,7 +909,7 @@ export function ContentDetailDrawer({
                   )}
 
                   {/* Mark-as-posted action — any admin, once approved/scheduled */}
-                  {(post.status === "approved" || post.status === "scheduled") && (
+                  {!post.owned_meta && (post.status === "approved" || post.status === "scheduled") && (
                     <div className="space-y-2">
                       {showPublishForm && (
                         <input
@@ -939,6 +940,8 @@ export function ContentDetailDrawer({
                   )}
                 </div>
               )}
+
+              {post && canReview && <OwnedMetaPanel key={post.id} post={post} onChanged={onDecided} />}
 
               {/* Comments Section */}
               <div className="pt-4 border-t border-gray-200">
@@ -1169,4 +1172,93 @@ export function ContentDetailDrawer({
       </div>
     </DetailDrawer>
   )
+}
+
+/** Existing review drawer extension. No new dashboard or unattended worker. */
+function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: () => void }) {
+  const [enabled,setEnabled]=useState(false)
+  const [batch,setBatch]=useState<MetaBatch|null>(null)
+  const [brand,setBrand]=useState<MetaBrand>("milcity")
+  const [format,setFormat]=useState<MetaFormat>(post.assets.length>1?"carousel":post.assets[0]?.kind==="video"?"video":"still")
+  const [facebookPlacement,setFacebookPlacement]=useState<"video"|"reels">("reels")
+  const [instagramCaption,setInstagramCaption]=useState(post.social_copy||"")
+  const [facebookCaption,setFacebookCaption]=useState(post.social_copy||"")
+  const [ai,setAi]=useState(false)
+  const [shareToFeed,setShareToFeed]=useState(false)
+  const [previews,setPreviews]=useState<Record<number,boolean>>({})
+  const [manualLinks,setManualLinks]=useState<Record<MetaDestination,string>>({instagram:"",facebook:""})
+  const [manualChecks,setManualChecks]=useState<Record<MetaDestination,boolean>>({instagram:false,facebook:false})
+  const [hosting,setHosting]=useState(false)
+  const [reviewed,setReviewed]=useState(false)
+  const [template,setTemplate]=useState("")
+  const [stopEvidence,setStopEvidence]=useState("")
+  const [stopConfirmed,setStopConfirmed]=useState(false)
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState("")
+  const [remoteIds,setRemoteIds]=useState<Record<MetaDestination,string>>({instagram:"",facebook:""})
+  const endpoint=`/api/admin/crm/content-posts/${post.id}/owned-meta`
+  useEffect(()=>{
+    const controller=new AbortController()
+    fetch(endpoint,{credentials:"include",signal:controller.signal}).then(r=>r.json()).then(data=>{setEnabled(data.enabled===true);setBatch(data.batch||null)}).catch(e=>{if(e.name!=="AbortError")setError("Publisher status unavailable")})
+    return()=>controller.abort()
+  },[endpoint])
+  async function action(body:Record<string,unknown>) {
+    setBusy(true);setError("")
+    try {
+      const r=await fetch(endpoint,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify({batchId:batch?.id,hash:batch?.hash,...body})})
+      const data=await r.json();if(!r.ok)throw new Error(data.error||"Publisher action failed")
+      setBatch(data.batch);setReviewed(false);setPreviews({})
+    } catch(e){setError(e instanceof Error?e.message:"Publisher action failed")} finally {setBusy(false)}
+  }
+  async function approve() {
+    if(!batch||!reviewed)return
+    setBusy(true);setError("")
+    try {
+      const r=await fetch(`/api/admin/crm/content-posts/${post.id}/decision`,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify({decision:"approved",expectedRevision:batch.manifest.revision,expectedManifestHash:batch.hash})})
+      const data=await r.json();if(!r.ok)throw new Error(data.error||"Approval failed")
+      setBatch(data.batch)
+    } catch(e){setError(e instanceof Error?e.message:"Approval failed")} finally {setBusy(false)}
+  }
+  if(!enabled&&!batch)return null
+  return <section className="pt-4 border-t border-gray-200 space-y-3" aria-label="Owned Meta publishing">
+    <h3 className="font-medium text-gray-800">Instagram and Facebook publication</h3>
+    <p className="text-xs text-gray-600">Uses the saved export references on this post. Save edits first. Each export must be on an approved source origin and at most 64 MiB. No private Drive access is assumed.</p>
+    {enabled&&(!batch?.approval || Object.values(batch.jobs).every(j=>j.status==="verified"||j.status==="operator_confirmed")) && <div className="space-y-2">
+      <label className="block text-sm">Brand <select value={brand} onChange={e=>setBrand(e.target.value as MetaBrand)} disabled={busy} className="border rounded p-1"><option value="txmx">TXMX Boxing</option><option value="vemos">VemosVamos</option><option value="milcity">MilCityUSA</option><option value="ampd">AMPD Project</option></select></label>
+      <label className="block text-sm">Format <select value={format} onChange={e=>setFormat(e.target.value as MetaFormat)} disabled={busy} className="border rounded p-1"><option value="still">Still</option><option value="carousel">Carousel / Facebook multi-photo</option><option value="video">Video</option></select></label>
+      {format==="video"&&<label className="block text-sm">Facebook placement <select value={facebookPlacement} onChange={e=>setFacebookPlacement(e.target.value as "video"|"reels")}><option value="reels">Reel</option><option value="video">Video</option></select></label>}
+      {format==="video"&&<label className="flex gap-2 text-sm"><input type="checkbox" checked={shareToFeed} onChange={e=>setShareToFeed(e.target.checked)}/>Also share the Instagram Reel to feed</label>}
+      <label className="block text-sm">Instagram caption<textarea className="block w-full border rounded p-2" value={instagramCaption} onChange={e=>setInstagramCaption(e.target.value)}/></label>
+      <label className="block text-sm">Facebook caption<textarea className="block w-full border rounded p-2" value={facebookCaption} onChange={e=>setFacebookCaption(e.target.value)}/></label>
+      <label className="block text-sm">Canva design/template revision<input className="block w-full border rounded p-2" placeholder="Exact revision or unknown" value={template} onChange={e=>setTemplate(e.target.value)}/></label>
+
+      <label className="flex gap-2 text-sm"><input type="checkbox" checked={ai} onChange={e=>setAi(e.target.checked)}/>This post contains AI-generated content</label>
+      <label className="flex gap-2 text-sm"><input type="checkbox" checked={hosting} onChange={e=>setHosting(e.target.checked)}/>I approve using these existing public exports for this post</label>
+      <button type="button" disabled={busy||!hosting} className="border rounded px-3 py-2 disabled:opacity-50" onClick={()=>action({action:"prepare",brand,format,captions:{instagram:instagramCaption,facebook:facebookCaption},placements:{instagram:format==="video"?"reels":"feed",facebook:format==="video"?facebookPlacement:"feed"},instagramShareToFeed:shareToFeed,aiGenerated:ai,publicHostingApproved:hosting,templateRevision:template})}>Prepare exact review manifest</button>
+    </div>}
+    {batch&&<div className="space-y-2 text-sm">
+      <p>Revision {batch.manifest.revision} · {batch.manifest.brand} · {batch.manifest.format} · Feed share: {batch.manifest.instagramShareToFeed?"yes":"no"} · AI generated: {batch.manifest.aiGenerated?"yes":"no"}</p>
+      <p className="break-all text-xs">App {batch.manifest.destinations.appId} · Page {batch.manifest.destinations.pageId} · Instagram {batch.manifest.destinations.instagramId}</p>
+      <p>Instagram placement: {batch.manifest.placements.instagram}; Facebook placement: {batch.manifest.placements.facebook}; public export use: {batch.manifest.publicHostingApproved?"approved":"not approved"}</p>
+      <p className="break-all text-xs">Approval fingerprint: {batch.hash}</p>
+      {batch.manifest.assets.map((a,i)=><div key={a.sha256+String(i)} className="border rounded p-2">
+        <p>{i+1}. {a.mime} · {a.width} × {a.height} · {a.size} bytes</p>
+        {a.mime==="video/mp4"?<video controls className="max-h-48" src={`${endpoint}?asset=${i}&hash=${batch.hash}`} onLoadedData={()=>setPreviews(v=>({...v,[i]:true}))} onError={()=>setPreviews(v=>({...v,[i]:false}))}/>:<img className="max-h-48" alt={`Reviewed export ${i+1}`} src={`${endpoint}?asset=${i}&hash=${batch.hash}`} onLoad={()=>setPreviews(v=>({...v,[i]:true}))} onError={()=>setPreviews(v=>({...v,[i]:false}))}/>}
+        <p className="break-all text-xs">SHA-256 {a.sha256}</p><p className="text-xs">Metadata provenance: {a.provenance.metadata}; bytes are preserved unchanged.</p>
+      </div>)}
+      <p className="whitespace-pre-wrap">Instagram: {batch.manifest.captions.instagram}</p><p className="whitespace-pre-wrap">Facebook: {batch.manifest.captions.facebook}</p>
+      {enabled&&!batch.approval&&!batch.revoked&&<><label className="flex gap-2"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/>I reviewed these exact exports, order, captions, accounts and disclosure</label><button type="button" className="border rounded px-3 py-2 disabled:opacity-50" disabled={busy||!reviewed||batch.manifest.assets.some((_,i)=>!previews[i])} onClick={approve}>Approve this revision</button></>}
+      {batch.approval&&<><p>Approved by {batch.approval.by} at {batch.approval.at}</p><button type="button" className="border rounded px-3 py-2 disabled:opacity-50" disabled={busy||!!batch.claim||!enabled} onClick={()=>action({action:"execute"})}>Publish / resume approved post</button></>}
+      {(["instagram","facebook"] as const).map(d=><div key={d} className="border rounded p-2"><p>{d}: {batch.jobs[d].status}</p>{batch.jobs[d].blocker&&<p role="status">{batch.jobs[d].blocker}</p>}{batch.jobs[d].permalink&&<a className="underline" href={sanitizeUrl(batch.jobs[d].permalink)} target="_blank" rel="noreferrer">{batch.jobs[d].status==="operator_confirmed"?"Operator-confirmed post":"API-verified published post"}</a>}{!["verified","operator_confirmed"].includes(batch.jobs[d].status)&&<><label className="block text-xs">Actual remote post/media ID for exact-post manual evidence<input className="block border rounded p-1 w-full" value={remoteIds[d]} onChange={e=>setRemoteIds(v=>({...v,[d]:e.target.value}))}/></label><button type="button" className="border rounded px-2 py-1" disabled={busy} onClick={()=>action({action:"reconcile",destination:d,remoteId:remoteIds[d]})}>Verify persisted post / AI label</button>
+        <label className="block text-xs mt-2">Published permalink for manual evidence<input className="block border rounded p-1 w-full" value={manualLinks[d]} onChange={e=>setManualLinks(v=>({...v,[d]:e.target.value}))}/></label>
+        <label className="flex gap-2 text-xs"><input type="checkbox" checked={manualChecks[d]} onChange={e=>setManualChecks(v=>({...v,[d]:e.target.checked}))}/>I inspected this exact published account, approved exports/order/captions and required AI label. This is my confirmation, not API verification.</label>
+        <button type="button" className="border rounded px-2 py-1" disabled={busy||!manualChecks[d]||!remoteIds[d]||!manualLinks[d]} onClick={()=>action({action:"manual-confirm",destination:d,remoteId:remoteIds[d],permalink:manualLinks[d],confirmExact:manualChecks[d]})}>Record exact-post manual confirmation</button>
+        {!batch.jobs[d].finalIntent&&<button type="button" className="border rounded px-2 py-1" disabled={busy||!enabled} onClick={()=>action({action:"reset-preparation",destination:d})}>Reset unpublished preparation</button>}
+      </>}</div>)}
+      {batch.claim&&<div className="space-y-2"><p className="text-xs">If the run really terminated, record observed termination/cancellation evidence. A long wait is not evidence.</p><textarea className="border rounded w-full p-2" value={stopEvidence} onChange={e=>setStopEvidence(e.target.value)} placeholder="Observed runtime termination/cancellation evidence"/><label className="flex gap-2 text-xs"><input type="checkbox" checked={stopConfirmed} onChange={e=>setStopConfirmed(e.target.checked)}/>I confirmed this exact run has stopped</label><button type="button" disabled={busy||!stopConfirmed||stopEvidence.trim().length<20} className="border rounded px-2 py-1" onClick={()=>action({action:"confirm-stopped-run",expectedClaim:batch.claim,confirmTerminated:stopConfirmed,evidence:stopEvidence})}>Record stopped run for read-only recovery</button></div>}
+      {batch.claim&&<button type="button" className="border rounded px-2 py-1" disabled={busy||Object.values(batch.jobs).some(j=>j.finalIntent)} onClick={()=>action({action:"release-preparation",expectedClaim:batch.claim})}>Release interrupted preparation for manual resume</button>}
+      <button type="button" className="text-xs underline" onClick={onChanged}>Refresh saved content</button>
+    </div>}
+    {busy&&<p role="status">Working on this post…</p>}{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
+  </section>
 }
