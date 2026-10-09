@@ -134,29 +134,40 @@ export const INDUSTRY_MAP: Record<IcpIndustry, IndustryMapping> = {
     tagIds: ["5567cd527369643981050000", "5567e28a7369642ae2500000", "5567e1de7369642069ea0100"],
     keyword: "economic development",
   },
-  // defense & space · aviation & aerospace · military (tag IDs not yet captured)
+  // defense & space · aviation & aerospace · military
+  // (captured from Apollo People Search, 2026-10-09)
   defense_aerospace: {
     label: "Defense & aerospace",
-    tagIds: [],
+    tagIds: ["5567e1097369641b5f810500", "5567e0dd73696416d3c20100", "5567e2c572616932bb3b0000"],
     keyword: "defense",
   },
-  // marketing & advertising · public relations & communications (tag IDs not yet captured)
+  // marketing & advertising · public relations & communications
+  // (captured from Apollo People Search, 2026-10-09)
   marketing_agency: {
     label: "Marketing, advertising & PR agencies",
-    tagIds: [],
+    tagIds: ["5567cd467369644d39040000", "5567ce5973696453d9780000"],
     keyword: "advertising agency",
   },
   // machinery · industrial automation · electrical/electronic manufacturing ·
-  // semiconductors · mechanical or industrial engineering (tag IDs not yet captured)
+  // semiconductors · mechanical or industrial engineering
+  // (captured from Apollo People Search, 2026-10-09)
   advanced_manufacturing: {
     label: "Advanced manufacturing",
-    tagIds: [],
+    tagIds: [
+      "5567cd4973696439d53c0000",
+      "5567e1337369641ad2970000",
+      "5567cd4c73696439c9030000",
+      "5567e0d87369640e5aa30c00",
+      "5567ce2673696453d95c0000",
+    ],
     keyword: "manufacturing",
   },
-  // military · veterans' health and services · defense workforce (tag IDs not yet captured)
+  // military (captured from Apollo People Search, 2026-10-09). Apollo has no
+  // veterans' services or defense-workforce industry, so the military tag
+  // stands for all three.
   military_veteran: {
     label: "Military health & veteran services",
-    tagIds: [],
+    tagIds: ["5567e2c572616932bb3b0000"],
     keyword: "veteran",
   },
 }
