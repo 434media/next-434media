@@ -38,8 +38,12 @@ export interface MetaJob {
   verifiedAt?: string
   blocker?: string
   lastError?: SafeMetaError
+  retry?: { id: string; priorIntentId: string; by: string; at: string; evidence: string; approvedHash: string; duplicateRiskAccepted: true }
+  retryRead?: FacebookRetryRead
   manualEvidence?: { by: string; at: string; approvedHash: string; confirmation: string }
 }
+export interface FacebookRetryRead { checkedAt: string; since: string; until: string; pages: number; items: number; outcome: "no_candidate_observed" }
+export interface FacebookRecovery { expectedAttemptId: string; actor: string; evidence: string; acceptDuplicateRisk: boolean }
 export interface MetaBatch {
   id: string
   manifest: MetaManifest
@@ -49,6 +53,7 @@ export interface MetaBatch {
   claim?: string | null
   jobs: Record<MetaDestination, MetaJob>
   stoppedRuns?: { id: string; by: string; at: string; evidence: string }[]
+  facebookAttempts?: { job: MetaJob; successorId: string; resolution: { outcome: "reconciled_not_found"; by: string; at: string; evidence: string; limitation: "Operator observation, not proof of absence" } }[]
   publicAssets: string[]
 }
 export interface MetaRecord { archived: boolean; revision: number; batch: MetaBatch }
@@ -116,6 +121,7 @@ export async function runOwnedMeta(args: {
   enabled: (brand: MetaBrand) => Promise<boolean>
   resolveAssets: (batch: MetaBatch) => Promise<string[]>
   now?: () => string
+  facebookRecovery?: FacebookRecovery
 }): Promise<MetaBatch> {
   const { id, runId, store, provider } = args
   const now = args.now ?? (() => new Date().toISOString())
@@ -127,12 +133,14 @@ export async function runOwnedMeta(args: {
   await store.update(id, r => {
     assertApproved(r)
     if (r.batch.id !== initial.batch.id || r.batch.claim) throw new MetaBlocked("Post already claimed or revision changed; use reconcile")
+    if (args.facebookRecovery) beginFacebookRecovery(r, args.facebookRecovery, runId, now())
     r.batch.claim = runId
     return { next: r, result: null }
   })
   const mutate = async (fn: (r: MetaRecord) => void, allowArchived = false) => store.update(id, r => {
     if (r.batch.id !== initial.batch.id || r.batch.claim !== runId) throw new MetaBlocked("Claim changed; no further dispatch allowed")
     if (!allowArchived) assertApproved(r)
+    if (!allowArchived) assertNoRecoveredRemote(r)
     fn(r)
     return { next: r, result: null }
   })
@@ -143,10 +151,11 @@ export async function runOwnedMeta(args: {
       const urls = await args.resolveAssets(r.batch)
       await mutate(current => { current.batch.publicAssets = urls })
     }
-    for (const destination of ["instagram", "facebook"] as const) {
+    for (const destination of (args.facebookRecovery ? ["facebook"] : ["instagram", "facebook"]) as MetaDestination[]) {
       r = await store.read(id)
       if (r.batch.claim !== runId || r.batch.id !== initial.batch.id) throw new MetaBlocked("Stopped run cannot dispatch another destination")
       let job = r.batch.jobs[destination]
+      if (job.retry && !args.facebookRecovery) continue
       if (job.status === "verified" || job.status === "operator_confirmed") continue
       if (blockers[destination]) {
         await mutate(current => { current.batch.jobs[destination].status = "manual_required"; current.batch.jobs[destination].blocker = blockers[destination]! })
@@ -194,7 +203,15 @@ export async function runOwnedMeta(args: {
         const remoteId = await provider.publish(r.batch.manifest, destination, r.batch.publicAssets, prepared.preparation)
         try {
         await store.update(id,current=>{
-          if(current.batch.id!==initial.batch.id || current.batch.jobs[destination].finalIntent?.id!==`${runId}:${destination}`) return {result:null}
+          if(current.batch.id!==initial.batch.id) return {result:null}
+          if(current.batch.jobs[destination].finalIntent?.id!==`${runId}:${destination}`) {
+            const old = destination === "facebook" && current.batch.facebookAttempts?.find(a=>a.job.finalIntent?.id===`${runId}:${destination}`)
+            if (!old) return {result:null}
+            old.job.remoteId=remoteId
+            old.job.status="needs_reconciliation"
+            current.batch.jobs.facebook.blocker="A prior attempt returned a remote ID; inspect it before any further action"
+            return {next:current,result:null}
+          }
           const j=current.batch.jobs[destination]
           if(j.remoteId && j.remoteId!==remoteId){j.status="needs_reconciliation";j.blocker="Conflicting remote IDs; review retained attempt evidence"}
           else if(!j.manualEvidence)j.remoteId=remoteId
@@ -229,11 +246,58 @@ export async function runOwnedMeta(args: {
 /** Operator reset can abandon unused containers only, never a recorded public outcome. */
 export function resetUnpublishedPreparation(record: MetaRecord, destination: MetaDestination): void {
   const j=record.batch.jobs[destination]
-  if(record.batch.claim || j.finalIntent || j.remoteId || j.manualEvidence || ["verified","operator_confirmed"].includes(j.status)) throw new MetaBlocked("Cannot reset active, uncertain or completed publication")
+  if(record.batch.claim || j.retry || j.finalIntent || j.remoteId || j.manualEvidence || ["verified","operator_confirmed"].includes(j.status)) throw new MetaBlocked("Cannot reset active, uncertain or completed publication")
   record.batch.jobs[destination]={status:"ready",preparation:{}}
 }
 export function assertOperatorSettlement(record: MetaRecord, expectedBatchId: string): void {
   if(record.batch.id!==expectedBatchId || record.batch.claim) throw new MetaBlocked("Wait for the active run to stop before operator reconciliation")
+}
+
+/** Every original intent stays in history. A new attempt is never a preparation reset. */
+export function beginFacebookRecovery(record: MetaRecord, input: FacebookRecovery, successorId: string, at: string): void {
+  assertApproved(record)
+  assertOperatorSettlement(record, record.batch.id)
+  assertNoRecoveredRemote(record)
+  const j=record.batch.jobs.facebook
+  if (record.batch.manifest.format!=="still" || record.batch.manifest.placements.facebook!=="feed") throw new MetaBlocked("Uncertain-final recovery supports Facebook still/feed only")
+  if (!input.actor || input.acceptDuplicateRisk!==true || input.evidence.trim().length<20 || input.evidence.length>2000 || !Number.isFinite(Date.parse(at))) throw new MetaBlocked("Owner observation evidence and explicit duplicate-risk acceptance required")
+  if (j.remoteId || j.manualEvidence || ["verified","operator_confirmed"].includes(j.status)) throw new MetaBlocked("An observed or completed publication cannot be retried")
+  if (input.expectedAttemptId !== (j.finalIntent?.id || j.retry?.id)) throw new MetaBlocked("Displayed attempt changed; reload before recovery")
+  if (!j.finalIntent) {
+    if (!j.retry) throw new MetaBlocked("No uncertain final attempt to reconcile")
+    return // explicitly resume an owner-authorized attempt that never reached final intent
+  }
+  if (j.status!=="needs_reconciliation" || !Number.isFinite(Date.parse(j.finalIntent.at))) throw new MetaBlocked("Only a stopped uncertain final attempt can be reconciled")
+  if((record.batch.facebookAttempts?.length || 0)>=10) throw new MetaBlocked("Recovery attempt limit reached; operator settlement required")
+  record.batch.facebookAttempts=[...(record.batch.facebookAttempts || []),{job:structuredClone(j),successorId,resolution:{outcome:"reconciled_not_found",by:input.actor,at,evidence:input.evidence.trim(),limitation:"Operator observation, not proof of absence"}}]
+  record.batch.jobs.facebook={status:"ready",preparation:{},retry:{id:successorId,priorIntentId:j.finalIntent.id,by:input.actor,at,evidence:input.evidence.trim(),approvedHash:record.batch.hash,duplicateRiskAccepted:true}}
+}
+export function assertNoRecoveredRemote(record: MetaRecord): void {
+  const known=record.batch.facebookAttempts?.filter(a=>a.job.remoteId) || []
+  const current=record.batch.jobs.facebook
+  const settled=known.length===1 && current.status==="operator_confirmed" && current.manualEvidence && current.remoteId===known[0].job.remoteId
+  if(known.length && !settled) throw new MetaBlocked("A prior attempt has an observed remote ID; recovery is blocked")
+}
+
+/** Runs after byte validation and immediately before the retry transport dispatch. */
+export async function guardFacebookRetryDispatch(args: {
+  id: string; batchId: string; runId: string; store: MetaStore; enabled: () => Promise<boolean>
+  check: (manifest: MetaManifest, earliestIntentAt: string) => Promise<FacebookRetryRead>
+}): Promise<void> {
+  const assertCurrent=(r:MetaRecord)=>{
+    assertApproved(r);assertNoRecoveredRemote(r)
+    const j=r.batch.jobs.facebook
+    if(r.batch.id!==args.batchId || r.batch.claim!==args.runId || !j.retry || j.finalIntent?.id!==`${args.runId}:facebook`) throw new MetaBlocked("Recovery attempt changed")
+  }
+  const current=await args.store.read(args.id);assertCurrent(current)
+  if(!await args.enabled())throw new MetaBlocked("Publishing disabled")
+  const intents=current.batch.facebookAttempts?.map(a=>a.job.finalIntent?.at).filter((v):v is string=>!!v) || []
+  if(!intents.length || intents.some(v=>!Number.isFinite(Date.parse(v))))throw new MetaBlocked("Original final intent evidence missing")
+  const earliest=intents.reduce((a,b)=>Date.parse(a)<Date.parse(b)?a:b)
+  const read=await args.check(current.batch.manifest,earliest)
+  await args.store.update(args.id,r=>{assertCurrent(r);r.batch.jobs.facebook.retryRead=read;return{next:r,result:null}})
+  assertCurrent(await args.store.read(args.id))
+  if(!await args.enabled())throw new MetaBlocked("Publishing stopped before retry dispatch")
 }
 
 /** Human-observed termination, never elapsed-time inference. Final intents survive. */
@@ -259,7 +323,7 @@ export async function validateMetaMutationBoundary(args: {
   runId: string
 }): Promise<void> {
   const current = async () => {
-    const r=await args.read();assertApproved(r)
+    const r=await args.read();assertApproved(r);assertNoRecoveredRemote(r)
     if(r.batch.id!==args.batchId || r.batch.claim!==args.runId)throw new MetaBlocked("Current publishing claim required")
   }
   if(!await args.enabled())throw new MetaBlocked("Publishing is disabled")

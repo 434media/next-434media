@@ -1,7 +1,7 @@
 /** Offline only. Run with tsx --test; all transport/persistence is injected. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { draftBatch, manifestHash, dryRun, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, runtimePublishingEnabled, validateMetaMutationBoundary, runOwnedMeta, guardedContentUpdate, type MetaManifest, type MetaRecord, type MetaStore, type MetaProvider, type MetaDestination } from "../owned-meta-publisher"
+import { beginFacebookRecovery, guardFacebookRetryDispatch, draftBatch, manifestHash, dryRun, resetUnpublishedPreparation, assertOperatorSettlement, confirmStoppedRun, runtimePublishingEnabled, validateMetaMutationBoundary, runOwnedMeta, guardedContentUpdate, type MetaManifest, type MetaRecord, type MetaStore, type MetaProvider, type MetaDestination } from "../owned-meta-publisher"
 import { createMetaProvider, checkMetaCapability, type MetaPublishingEvidence } from "../instagram-publishing"
 import { assetDigest, assertApprovedBlobUrl, verifyAssetBytes, readTrustedAsset, measureExport } from "../owned-meta-assets"
 
@@ -167,7 +167,7 @@ test("connection UI aborts on dismissal, prevents concurrent checks and reads cu
   const {readFileSync}=await import("node:fs")
   const ui=readFileSync("components/crm/ContentDetailDrawer.tsx","utf8")
   assert.match(ui,/key=\{post.id\}/);assert.match(ui,/connectionRequest.current\?\.abort\(\)/)
-  assert.match(ui,/if\(connectionRequest.current\)return/);assert.match(ui,/if\(controller.signal.aborted\)return/)
+  assert.match(ui,/if\(connectionRequest.current \|\| mutationBusy.current\)return/);assert.match(ui,/if\(controller.signal.aborted\)return/)
   const route=readFileSync("app/api/admin/crm/content-posts/[id]/owned-meta/route.ts","utf8")
   const get=route.slice(route.indexOf("export async function GET"),route.indexOf("export async function POST"))
   assert.ok(get.indexOf("const current=await ownedMetaStore().read(id)")>get.indexOf("await checkOwnedMetaConnection"))
@@ -193,4 +193,159 @@ test("saved final ID readback failure retains safe detail without another final 
   await assert.rejects(run(s,p),e=>e===failure)
   assert.equal(s.value.batch.jobs.instagram.lastError?.operation,"verify");assert.equal(s.value.batch.jobs.instagram.remoteId,"123")
   assert.equal(s.value.batch.jobs.instagram.finalIntent?.id,"original:instagram");assert.equal(s.value.batch.claim,null);assert.deepEqual(p.calls,[])
+})
+
+
+const recoveryInput={expectedAttemptId:"original:facebook",actor:"owner@example.test",evidence:"Inspected Page and exact caption; runtime confirmed stopped, no matching post observed",acceptDuplicateRisk:true}
+function uncertainFacebook() {const r=record();r.batch.jobs.facebook={status:"needs_reconciliation",preparation:{photo:"old"},finalIntent:{id:"original:facebook",at:"2026-10-09T00:00:00Z"},blocker:"Original uncertainty"};return r}
+const retryRead={checkedAt:"2026-10-09T01:00:00Z",since:"2026-10-08T23:55:00Z",until:"2026-10-09T01:00:00Z",pages:1,items:0,outcome:"no_candidate_observed" as const}
+const recover=(store:Store,provider:MetaProvider,runId="recovery")=>runOwnedMeta({id:"p",runId,store,provider,enabled:async()=>true,resolveAssets:async b=>b.manifest.assets.map(a=>a.url),now:()=>"2026-10-09T01:00:00Z",facebookRecovery:recoveryInput})
+test("Facebook recovery preserves original intent, immutable approval and untouched Instagram",async()=>{
+  for(const status of ["processing","verified"] as const) {
+    const r=uncertainFacebook();r.batch.jobs.instagram.status=status
+    const before=structuredClone(r),s=new Store(r),p=fakeProvider()
+    await recover(s,p)
+    assert.deepEqual(s.value.batch.jobs.instagram,before.batch.jobs.instagram)
+    assert.deepEqual(s.value.batch.facebookAttempts?.[0].job,before.batch.jobs.facebook)
+    assert.equal(s.value.batch.jobs.facebook.retry?.priorIntentId,"original:facebook")
+    assert.deepEqual(s.value.batch.manifest,before.batch.manifest);assert.deepEqual(s.value.batch.approval,before.batch.approval)
+    assert.deepEqual(p.calls,["prepare:facebook","publish:facebook"])
+  }
+})
+test("ordinary execute cannot consume a pending recovery; reset cannot erase it",async()=>{
+  const r=uncertainFacebook();beginFacebookRecovery(r,recoveryInput,"next","2026-10-09T01:00:00Z")
+  assert.throws(()=>resetUnpublishedPreparation(r,"facebook"),/Cannot reset/)
+  const s=new Store(r),p=fakeProvider();await run(s,p);assert.ok(!p.calls.some(c=>c.endsWith(":facebook")))
+})
+test("recovery validates evidence, expected attempt, active claims, approval and known outcomes",()=>{
+  for(const change of [(r:MetaRecord)=>{r.batch.claim="active"},(r:MetaRecord)=>{r.revision++},(r:MetaRecord)=>{r.archived=true},(r:MetaRecord)=>{r.batch.revoked=true},(r:MetaRecord)=>{r.batch.jobs.facebook.remoteId="2_10"},(r:MetaRecord)=>{r.batch.jobs.facebook.status="verified"},(r:MetaRecord)=>{r.batch.manifest.captions.facebook="changed"}]) {
+    const r=uncertainFacebook();change(r);assert.throws(()=>beginFacebookRecovery(r,recoveryInput,"next","2026-10-09T01:00:00Z"))
+  }
+  for(const input of [{...recoveryInput,evidence:"waited"},{...recoveryInput,acceptDuplicateRisk:false},{...recoveryInput,expectedAttemptId:"stale"},{...recoveryInput,actor:""}]) assert.throws(()=>beginFacebookRecovery(uncertainFacebook(),input,"next","2026-10-09T01:00:00Z"))
+})
+test("simultaneous recovery clicks produce one successor and one Facebook publication",async()=>{
+  const s=new Store(uncertainFacebook()),p=fakeProvider();const results=await Promise.allSettled([recover(s,p,"a"),recover(s,p,"b")])
+  assert.equal(results.filter(r=>r.status==="rejected").length,1);assert.equal(s.value.batch.facebookAttempts?.length,1);assert.equal(p.calls.filter(c=>c==="publish:facebook").length,1)
+})
+test("renewed uncertainty requires another explicit linked owner recovery",async()=>{
+  const s=new Store(uncertainFacebook()),p=fakeProvider({failFinal:"facebook"});await recover(s,p)
+  await run(s,p,"ordinary");assert.equal(p.calls.filter(c=>c==="publish:facebook").length,1)
+  const j=s.value.batch.jobs.facebook;assert.equal(j.status,"needs_reconciliation");assert.equal(j.finalIntent?.id,"recovery:facebook")
+  await assert.rejects(recover(s,p,"stale"),/attempt changed/)
+  await runOwnedMeta({id:"p",runId:"second",store:s,provider:p,enabled:async()=>true,resolveAssets:async b=>b.manifest.assets.map(a=>a.url),now:()=>"2026-10-09T02:00:00Z",facebookRecovery:{...recoveryInput,expectedAttemptId:j.finalIntent!.id}})
+  assert.equal(s.value.batch.facebookAttempts?.length,2);assert.equal(s.value.batch.facebookAttempts?.[1].job.finalIntent?.id,"recovery:facebook")
+})
+test("fresh retry guard fails closed on query errors and changes during the read",async()=>{
+  for(const change of [(r:MetaRecord)=>{r.archived=true},(r:MetaRecord)=>{r.batch.claim=null},(r:MetaRecord)=>{r.batch.facebookAttempts![0].job.remoteId="2_123"},(r:MetaRecord)=>{r.revision++}]) {
+    const r=uncertainFacebook();beginFacebookRecovery(r,recoveryInput,"retry","2026-10-09T01:00:00Z");r.batch.claim="retry";r.batch.jobs.facebook.finalIntent={id:"retry:facebook",at:"2026-10-09T01:00:00Z"}
+    const s=new Store(r)
+    await assert.rejects(guardFacebookRetryDispatch({id:"p",batchId:r.batch.id,runId:"retry",store:s,enabled:async()=>true,check:async()=>{change(s.value);return retryRead}}))
+    assert.equal(s.value.batch.jobs.facebook.retryRead,undefined)
+  }
+})
+test("fresh retry guard checks original window, records bounded evidence and rereads kill switch",async()=>{
+  const r=uncertainFacebook();beginFacebookRecovery(r,recoveryInput,"retry","2026-10-09T01:00:00Z");r.batch.claim="retry";r.batch.jobs.facebook.finalIntent={id:"retry:facebook",at:"2026-10-09T01:00:00Z"}
+  const s=new Store(r);let reads=0
+  await assert.rejects(guardFacebookRetryDispatch({id:"p",batchId:r.batch.id,runId:"retry",store:s,enabled:async()=>++reads===1,check:async(_m,since)=>{assert.equal(since,"2026-10-09T00:00:00Z");return retryRead}}),/stopped/)
+  assert.deepEqual(s.value.batch.jobs.facebook.retryRead,retryRead)
+  await assert.rejects(guardFacebookRetryDispatch({id:"p",batchId:r.batch.id,runId:"retry",store:s,enabled:async()=>true,check:async()=>{throw Error("read error")}}),/read error/)
+})
+test("late original response is retained in history and blocks retry dispatch",async()=>{
+  const r=record();r.batch.jobs.instagram.status="verified";const s=new Store(r),p=fakeProvider()
+  p.publish=async()=>{await s.update("p",r=>{confirmStoppedRun(r,"old","owner","Observed runtime terminated; request no longer running","2026-10-09T01:00:00Z");r.batch.jobs.facebook.status="needs_reconciliation";beginFacebookRecovery(r,{...recoveryInput,expectedAttemptId:"old:facebook"},"new","2026-10-09T01:00:00Z");return{next:r,result:null}});return "2_123"}
+  await run(s,p,"old")
+  assert.equal(s.value.batch.facebookAttempts?.[0].job.remoteId,"2_123")
+  await assert.rejects(recover(s,fakeProvider()),/observed remote/)
+})
+test("Facebook collection check paginates before ruling out candidates; no provider URL is followed",async()=>{
+  const m=manifest();let requests=0
+  const p=createMetaProvider({accessToken:"fake",evidence:evidence(m),beforeMutation:async()=>{},fetcher:(async(url)=>{requests++;const u=new URL(String(url));assert.equal(u.hostname,"graph.facebook.com");assert.equal(u.searchParams.has("access_token"),false);assert.ok(u.searchParams.has("since"));assert.ok(u.searchParams.has("until"));if(requests===1)return Response.json({data:[],paging:{next:"https://untrusted.test/secret",cursors:{after:"cursor"}}});assert.equal(u.searchParams.get("after"),"cursor");return Response.json({data:[{id:"2_123",message:" FB  exact ",created_time:new Date().toISOString()}]})}) as typeof fetch})
+  await assert.rejects(p.checkFacebookRetry(m,new Date(Date.now()-60000).toISOString()),/matching Facebook/);assert.equal(requests,2)
+})
+test("Facebook collection check rejects malformed, unbounded, failed or ambiguous reads",async()=>{
+  const m=manifest(),at=new Date(Date.now()-60000).toISOString()
+  for(const body of [{},{data:[],paging:"bad"},{data:[],paging:{next:"next"}},{data:[{id:"2_1",message:"different"}]},{data:[{id:"99_1",message:"different",created_time:new Date().toISOString()}]},{data:[{id:"2_1",created_time:new Date().toISOString()}]}]) {
+    const p=createMetaProvider({accessToken:"fake",evidence:evidence(m),beforeMutation:async()=>{},fetcher:(async()=>Response.json(body)) as typeof fetch});await assert.rejects(p.checkFacebookRetry(m,at))
+  }
+  let calls=0;const p=createMetaProvider({accessToken:"fake",evidence:evidence(m),beforeMutation:async()=>{},fetcher:(async()=>Response.json({data:[],paging:{next:"next",cursors:{after:String(++calls)}}})) as typeof fetch})
+  await assert.rejects(p.checkFacebookRetry(m,at),/page bound/);assert.equal(calls,10)
+})
+test("final provider guard runs after bytes check and immediately before POST; failures never POST",async()=>{
+  for(const fail of [false,true]) {
+    const order:string[]=[],m=manifest()
+    const p=createMetaProvider({accessToken:"fake",evidence:evidence(m),beforeMutation:async()=>{order.push("bytes")},beforeFinalDispatch:async()=>{order.push("fresh-read");if(fail)throw Error("candidate")},fetcher:(async()=>{order.push("POST");return Response.json({post_id:"2_1"})}) as typeof fetch})
+    if(fail)await assert.rejects(p.publish(m,"facebook",["https://example.test/image"],{}),/candidate/);else await p.publish(m,"facebook",["https://example.test/image"],{})
+    assert.deepEqual(order,fail?["bytes","fresh-read"]:["bytes","fresh-read","POST"])
+  }
+})
+test("production recovery route rejects other publishers and super-admins before storage or Meta access",async()=>{
+  const req=(await import("node:module")).createRequire(__filename)
+  const env=process.env,auth=req("../auth") as typeof import("../auth"),db=req("../firestore-crm") as typeof import("../firestore-crm")
+  const original={getSession:auth.getSession,isAuthorizedAdmin:auth.isAuthorizedAdmin,canSend:auth.canSend,isCrmSuperAdmin:auth.isCrmSuperAdmin,ownedMetaRuntimeEnabled:db.ownedMetaRuntimeEnabled,ownedMetaStore:db.ownedMetaStore}
+  let reads=0,email="publisher@example.test"
+  Object.assign(auth,{getSession:async()=>({email,role:"crm_super_admin"}),isAuthorizedAdmin:()=>true,canSend:()=>true,isCrmSuperAdmin:async()=>true})
+  Object.assign(db,{ownedMetaRuntimeEnabled:async()=>true,ownedMetaStore:()=>{reads++;throw Error("must not access store")}})
+  process.env={...env,VERCEL_ENV:"production"}
+  try {
+    const route=await import("../../app/api/admin/crm/content-posts/[id]/owned-meta/route")
+    for(email of ["publisher@example.test","jesse@434media.com","promoted@example.test"]) {
+      const response=await route.POST(new Request("http://localhost/offline",{method:"POST",body:JSON.stringify({action:"recover-facebook",...recoveryInput})}) as never,{params:Promise.resolve({id:"offline"})})
+      assert.equal(response.status,403);assert.equal(reads,0)
+    }
+  } finally {process.env=env;Object.assign(auth,original);db.ownedMetaRuntimeEnabled=original.ownedMetaRuntimeEnabled;db.ownedMetaStore=original.ownedMetaStore}
+})
+test("exact manual settlement of late original ID permits Instagram continuation without another Facebook post",async()=>{
+  const r=uncertainFacebook();beginFacebookRecovery(r,recoveryInput,"retry","2026-10-09T01:00:00Z")
+  r.batch.facebookAttempts![0].job.remoteId="2_123"
+  r.batch.jobs.facebook={...r.batch.jobs.facebook,status:"operator_confirmed",remoteId:"2_123",manualEvidence:{by:"owner",at:"now",approvedHash:r.batch.hash,confirmation:"Exact original inspected"}}
+  const s=new Store(r),p=fakeProvider();await run(s,p)
+  assert.equal(s.value.batch.jobs.instagram.status,"verified");assert.ok(!p.calls.includes("publish:facebook"))
+})
+test("successful paginated no-candidate read returns only bounded audit evidence",async()=>{
+  const m=manifest();let calls=0
+  const p=createMetaProvider({accessToken:"fake",evidence:evidence(m),beforeMutation:async()=>{},fetcher:(async()=>++calls===1?Response.json({data:[{id:"2_1",message:"different",created_time:new Date().toISOString()}],paging:{next:"next",cursors:{after:"a"}}}):Response.json({data:[]})) as typeof fetch})
+  const result=await p.checkFacebookRetry(m,new Date(Date.now()-60000).toISOString())
+  assert.equal(result.pages,2);assert.equal(result.items,1);assert.equal(result.outcome,"no_candidate_observed");assert.ok(!JSON.stringify(result).includes("different"))
+})
+test("failed recovery audit persistence prevents final provider POST",async()=>{
+  const r=uncertainFacebook();beginFacebookRecovery(r,recoveryInput,"retry","2026-10-09T01:00:00Z");r.batch.claim="retry";r.batch.jobs.facebook.finalIntent={id:"retry:facebook",at:"2026-10-09T01:00:00Z"}
+  const s=new Store(r);s.update=async()=>{throw Error("audit unavailable")};let posts=0
+  const p=createMetaProvider({accessToken:"fake",evidence:evidence(r.batch.manifest),beforeMutation:async()=>{},beforeFinalDispatch:()=>guardFacebookRetryDispatch({id:"p",batchId:r.batch.id,runId:"retry",store:s,enabled:async()=>true,check:async()=>retryRead}),fetcher:(async()=>{posts++;return Response.json({post_id:"2_1"})}) as typeof fetch})
+  await assert.rejects(p.publish(r.batch.manifest,"facebook",["https://example.test/image"],{}),/audit unavailable/);assert.equal(posts,0)
+})
+test("recovery UI clears Cancel and locks repeated submissions through dismissal",async()=>{
+  const {readFileSync}=await import("node:fs"),{createRequire}=await import("node:module"),{runInNewContext}=await import("node:vm")
+  const req=createRequire(process.cwd()+"/package.json")
+  const {JSDOM}=createRequire(req.resolve("isomorphic-dompurify"))("jsdom")
+  const dom=new JSDOM("<!doctype html><div id='root'></div>",{url:"http://localhost"})
+  const keys=["window","document","navigator","IS_REACT_ACT_ENVIRONMENT","fetch"] as const
+  const saved=Object.fromEntries(keys.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+  Object.defineProperties(globalThis,{window:{value:dom.window,configurable:true},document:{value:dom.window.document,configurable:true},navigator:{value:dom.window.navigator,configurable:true},IS_REACT_ACT_ENVIRONMENT:{value:true,configurable:true}})
+  const React=req("react"),{act}=React,{createRoot}=req("react-dom/client"),ts=req("typescript")
+  const source=readFileSync("components/crm/ContentDetailDrawer.tsx","utf8").split("function OwnedMetaPanel(")[1]
+  const code=ts.transpileModule('const {useState,useEffect,useRef}=require("react"); function OwnedMetaPanel('+source+';exports.Panel=OwnedMetaPanel',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText
+  const exports:{Panel?:unknown}={};let posts=0,resolvePost:((r:Response)=>void)|undefined
+  const fakeFetch=async(_url:unknown,init?:RequestInit)=>{if(init?.method==="POST"){posts++;return new Promise<Response>(resolve=>{resolvePost=resolve})}return Response.json({enabled:true,canRecover:true,batch:uncertainFacebook().batch})}
+  Object.defineProperty(globalThis,"fetch",{value:fakeFetch,configurable:true})
+  runInNewContext(code,{exports,require:req,fetch:fakeFetch,AbortController,sanitizeUrl:(v:string)=>v})
+  const host=dom.window.document.getElementById("root"),root=createRoot(host)
+  const button=(text:string)=>Array.from(host.querySelectorAll("button")).find((b:unknown)=>(b as HTMLButtonElement).textContent===text) as HTMLButtonElement
+  const click=async(el:HTMLElement)=>act(async()=>{el.dispatchEvent(new dom.window.MouseEvent("click",{bubbles:true}))})
+  try {
+    await act(async()=>{root.render(React.createElement(exports.Panel,{post:{id:"test",assets:[]}}))})
+    await click(button("Review Facebook-only retry"));await click(button("Cancel"));assert.equal(host.textContent.includes("Observed reconciliation evidence"),false);assert.equal(posts,0)
+    await click(button("Review Facebook-only retry"))
+    const textarea=Array.from(host.querySelectorAll("textarea")).find((e:unknown)=>(e as HTMLTextAreaElement).maxLength===2000) as HTMLTextAreaElement
+    assert.equal(textarea.value,"")
+    const box=Array.from(host.querySelectorAll('input[type="checkbox"]')).find((e:unknown)=>(e as HTMLInputElement).parentElement!.textContent!.includes("accept the risk")) as HTMLInputElement
+    assert.equal(box.checked,false)
+    await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,"value")!.set!.call(textarea,recoveryInput.evidence);textarea.dispatchEvent(new dom.window.Event("input",{bubbles:true}));textarea.dispatchEvent(new dom.window.Event("change",{bubbles:true}))})
+    await click(box)
+    const submit=button("Accept duplicate risk and retry Facebook");assert.equal(submit.disabled,false)
+    await act(async()=>{submit.dispatchEvent(new dom.window.MouseEvent("click",{bubbles:true}));submit.dispatchEvent(new dom.window.MouseEvent("click",{bubbles:true}))})
+    assert.equal(posts,1)
+    await act(async()=>root.unmount())
+    await act(async()=>{resolvePost!(Response.json({batch:uncertainFacebook().batch}));await Promise.resolve()})
+    assert.equal(host.textContent,"");assert.equal(posts,1)
+  } finally {await act(async()=>root.unmount());dom.window.close();for(const k of keys){if(saved[k])Object.defineProperty(globalThis,k,saved[k]!);else Reflect.deleteProperty(globalThis,k)}}
 })

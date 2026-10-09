@@ -1,6 +1,6 @@
 import { safeMetaError, type MetaOperation } from "./owned-meta-errors"
 import { checkReviewedFormat, OWNED_META_GRAPH_VERSION } from "./owned-meta-formats"
-import { MetaBlocked, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider } from "./owned-meta-publisher"
+import { MetaBlocked, MetaPermissionError, type MetaDestination, type MetaManifest, type MetaProvider, type FacebookRetryRead } from "./owned-meta-publisher"
 
 export interface MetaPublishingEvidence {
   verifiedAt: string
@@ -13,22 +13,24 @@ export function checkMetaCapability(m: MetaManifest, d: MetaDestination, e: Meta
   if (!e || e.credentialKind!=="system_user_page" || !Number.isFinite(Date.parse(e.verifiedAt)) || ["appId","pageId","instagramId"].some(k=>e[k as "appId"|"pageId"|"instagramId"]!==m.destinations[k as "appId"|"pageId"|"instagramId"]))return "First-live permission/account verification required"
   return checkReviewedFormat(m,d)
 }
-interface PublishedItem { id: string; permalink?: string; permalink_url?: string; attachments?: { data?: { target?: { id?: string } }[] } }
+interface PublishedItem { id: string; message?: string; created_time?: string; permalink?: string; permalink_url?: string; attachments?: { data?: { target?: { id?: string } }[] } }
 interface GraphResponse {
   id?: string; post_id?: string; video_id?: string; upload_url?: string; success?: boolean
   error?: { code?: number }; status_code?: string; status?: { processing_phase?: { status?: string } }
   data?: PublishedItem[]; is_ai_generated?: boolean
+  paging?: { next?: string; cursors?: { after?: string } }
 }
-export function createMetaProvider(args: { accessToken: string; evidence: MetaPublishingEvidence; fetcher?: typeof fetch; beforeMutation: (urls?: string[]) => Promise<void> }): MetaProvider {
+export function createMetaProvider(args: { accessToken: string; evidence: MetaPublishingEvidence; fetcher?: typeof fetch; beforeMutation: (urls?: string[]) => Promise<void>; beforeFinalDispatch?: (manifest: MetaManifest, destination: MetaDestination) => Promise<void> }): MetaProvider & { checkFacebookRetry: (m: MetaManifest, intentAt: string) => Promise<FacebookRetryRead> } {
   const fetcher = args.fetcher ?? fetch
-  const graphFor = (destination: MetaDestination, operation: MetaOperation) => async (path: string, values: Record<string, unknown> = {}, method: "GET" | "POST" = "GET") => {
+  const graphFor = (destination: MetaDestination, operation: MetaOperation, finalGuard?: () => Promise<void>) => async (path: string, values: Record<string, unknown> = {}, method: "GET" | "POST" = "GET") => {
     if (!/^\d+(?:_\d+)?(\/(media|media_publish|photos|feed|videos|video_reels|published_posts))?$/.test(path)) throw new MetaBlocked("Unrecognized Meta endpoint")
     if (method === "POST") await args.beforeMutation([values.url,values.image_url,values.video_url,values.file_url].filter((v):v is string=>typeof v==="string"))
     const url = new URL(`https://graph.facebook.com/${OWNED_META_GRAPH_VERSION}/${path}`)
     const params = new URLSearchParams()
     for (const [k,v] of Object.entries(values)) if (v !== undefined) params.set(k, typeof v === "object" ? JSON.stringify(v) : String(v))
     if (method === "GET") url.search = params.toString()
-    const response = await fetcher(url, { method, headers: { authorization: `Bearer ${args.accessToken}` }, ...(method === "POST" ? { body: params } : {}), redirect: "error", cache: "no-store" })
+    if (method === "POST") await finalGuard?.()
+    const response = await fetcher(url, { method, headers: { authorization: `Bearer ${args.accessToken}` }, ...(method === "POST" ? { body: params } : {}), redirect: "error", cache: "no-store", signal: AbortSignal.timeout(15_000) })
     const data = await response.json().catch(() => ({})) as GraphResponse
     if (!response.ok) {
       const detail = safeMetaError(response.status, data, destination, operation, args.accessToken)
@@ -87,7 +89,7 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       return { ready:true, preparation:p }
     },
     async publish(m,d,urls,p) {
-      const graph = graphFor(d,"publish")
+      const graph = graphFor(d,"publish",()=>args.beforeFinalDispatch?.(m,d) ?? Promise.resolve())
       const ai = m.aiGenerated ? { is_ai_generated: true } : {}
       if (d === "instagram") return id((await graph(`${m.destinations.instagramId}/media_publish`,{ creation_id:p.container },"POST")).id)
       if (m.format === "still") { const r = await graph(`${m.destinations.pageId}/photos`,{ url:urls[0], caption:m.captions.facebook,published:true },"POST"); return id(r.post_id || r.id) }
@@ -96,6 +98,40 @@ export function createMetaProvider(args: { accessToken: string; evidence: MetaPu
       const r = await graph(`${m.destinations.pageId}/video_reels`,{ upload_phase:"finish",video_id:p.video,video_state:"PUBLISHED",description:m.captions.facebook,...ai },"POST")
       if (r.success !== true) throw new MetaBlocked("Facebook final result unconfirmed")
       return id(p.video)
+    },
+    async checkFacebookRetry(m,intentAt) {
+      if(m.format!=="still" || m.placements.facebook!=="feed") throw new MetaBlocked("Recovery collection coverage supports Facebook still/feed only")
+      const started=Date.now(), intent=Date.parse(intentAt)
+      if(!Number.isFinite(intent) || intent>started || started-intent>7*24*60*60*1000) throw new MetaBlocked("Recovery needs a valid final intent within the last seven days")
+      const since=Math.floor(intent/1000)-300, until=Math.floor(started/1000)+1
+      const graph=graphFor("facebook","verify"), seen=new Set<string>()
+      const normalize=(s:string)=>s.normalize("NFKC").replace(/\s+/g," ").trim()
+      const caption=normalize(m.captions.facebook)
+      let after:string|undefined, items=0
+      for(let pages=1;pages<=10;pages++) {
+        if(Date.now()-started>30_000) throw new MetaBlocked("Recovery read took too long; no final publication dispatched")
+        const listing=await graph(`${m.destinations.pageId}/published_posts`,{fields:"id,message,created_time",limit:100,since,until,...(after?{after}:{})})
+        if(!Array.isArray(listing.data) || listing.error) throw new MetaBlocked("Recovery read is incomplete; no final publication dispatched")
+        for(const item of listing.data) {
+          if(!item || typeof item.id!=="string" || !new RegExp(`^${m.destinations.pageId}_\\d+$`).test(item.id) || !Number.isFinite(Date.parse(item.created_time || ""))) throw new MetaBlocked("Recovery read contains unusable ownership/time evidence")
+          items++
+          const time=Date.parse(item.created_time!)
+          if(time<since*1000 || time>until*1000) throw new MetaBlocked("Recovery collection did not honor the requested time window")
+          // Missing captions cannot rule a candidate out. Matching is deliberately conservative.
+          if(typeof item.message!=="string" || !caption || normalize(item.message)===caption) throw new MetaBlocked("Possible matching Facebook post found; inspect the Page and reconcile instead of retrying")
+        }
+        if(listing.paging!==undefined && (!listing.paging || typeof listing.paging!=="object" || Array.isArray(listing.paging))) throw new MetaBlocked("Malformed recovery pagination")
+        if(!listing.paging?.next) {
+          if(listing.data.length>=100) throw new MetaBlocked("Full recovery page lacks continuation evidence")
+          if(listing.paging && listing.paging.next!==undefined) throw new MetaBlocked("Malformed recovery pagination")
+          if(Date.now()-started>30_000) throw new MetaBlocked("Recovery read took too long")
+          return {checkedAt:new Date().toISOString(),since:new Date(since*1000).toISOString(),until:new Date(until*1000).toISOString(),pages,items,outcome:"no_candidate_observed"}
+        }
+        const cursor=listing.paging.cursors?.after
+        if(typeof listing.paging.next!=="string" || typeof cursor!=="string" || !cursor || cursor.length>4096 || seen.has(cursor)) throw new MetaBlocked("Recovery pagination is incomplete or repeated")
+        seen.add(cursor);after=cursor // Never follow a provider URL or persist its token-bearing query.
+      }
+      throw new MetaBlocked("Recovery read reached its page bound; absence is unproven")
     },
     async verify(m,d,remoteId) {
       const graph = graphFor(d,"verify")

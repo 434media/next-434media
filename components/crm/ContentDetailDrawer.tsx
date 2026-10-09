@@ -1178,6 +1178,12 @@ export function ContentDetailDrawer({
 
 /** Existing review drawer extension. No new dashboard or unattended worker. */
 function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: () => void }) {
+  const [canRecover,setCanRecover]=useState(false)
+  const [recoveryOpen,setRecoveryOpen]=useState(false)
+  const [recoveryEvidence,setRecoveryEvidence]=useState("")
+  const [duplicateRisk,setDuplicateRisk]=useState(false)
+  const mutationBusy=useRef(false)
+  const mounted=useRef(true)
   const [diagnostics,setDiagnostics]=useState<MetaConnectionReport|null>(null)
   const connectionRequest=useRef<AbortController|null>(null)
   const [enabled,setEnabled]=useState(false)
@@ -1203,12 +1209,13 @@ function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: ()
   const endpoint=`/api/admin/crm/content-posts/${post.id}/owned-meta`
   useEffect(()=>{
     const controller=new AbortController()
+    mounted.current=true
     setDiagnostics(null)
-    fetch(endpoint,{credentials:"include",signal:controller.signal}).then(r=>r.json()).then(data=>{setEnabled(data.enabled===true);setBatch(data.batch||null)}).catch(e=>{if(e.name!=="AbortError")setError("Publisher status unavailable")})
-    return()=>{controller.abort();connectionRequest.current?.abort()}
+    fetch(endpoint,{credentials:"include",signal:controller.signal}).then(r=>r.json()).then(data=>{if(controller.signal.aborted)return;setEnabled(data.enabled===true);setCanRecover(data.canRecover===true);setBatch(data.batch||null)}).catch(e=>{if(e.name!=="AbortError")setError("Publisher status unavailable")})
+    return()=>{mounted.current=false;controller.abort();connectionRequest.current?.abort()}
   },[endpoint])
   async function checkConnection() {
-    if(connectionRequest.current)return
+    if(connectionRequest.current || mutationBusy.current)return
     const controller=new AbortController();connectionRequest.current=controller
     setBusy(true);setError("");setDiagnostics(null)
     try {
@@ -1220,12 +1227,15 @@ function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: ()
     } catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:"Connection check unavailable")} finally {if(connectionRequest.current===controller)connectionRequest.current=null;if(!controller.signal.aborted)setBusy(false)}
   }
   async function action(body:Record<string,unknown>) {
+    if(mutationBusy.current || connectionRequest.current)return
+    mutationBusy.current=true
+    setRecoveryOpen(false);setRecoveryEvidence("");setDuplicateRisk(false)
     setBusy(true);setError("")
     try {
       const r=await fetch(endpoint,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify({batchId:batch?.id,hash:batch?.hash,...body})})
-      const data=await r.json();if(data.batch)setBatch(data.batch);if(!r.ok)throw new Error(data.error||"Publisher action failed")
+      const data=await r.json();if(!mounted.current)return;if(data.batch)setBatch(data.batch);if(!r.ok)throw new Error(data.error||"Publisher action failed")
       setBatch(data.batch);setReviewed(false);setPreviews({})
-    } catch(e){setError(e instanceof Error?e.message:"Publisher action failed")} finally {setBusy(false)}
+    } catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Publisher action failed")} finally {mutationBusy.current=false;if(mounted.current)setBusy(false)}
   }
   async function approve() {
     if(!batch||!reviewed)return
@@ -1278,8 +1288,21 @@ function OwnedMetaPanel({ post, onChanged }: { post: ContentPost; onChanged?: ()
         <label className="block text-xs mt-2">Published permalink for manual evidence<input className="block border rounded p-1 w-full" value={manualLinks[d]} onChange={e=>setManualLinks(v=>({...v,[d]:e.target.value}))}/></label>
         <label className="flex gap-2 text-xs"><input type="checkbox" checked={manualChecks[d]} onChange={e=>setManualChecks(v=>({...v,[d]:e.target.checked}))}/>I inspected this exact published account, approved exports/order/captions and required AI label. This is my confirmation, not API verification.</label>
         <button type="button" className="border rounded px-2 py-1" disabled={busy||!manualChecks[d]||!remoteIds[d]||!manualLinks[d]} onClick={()=>action({action:"manual-confirm",destination:d,remoteId:remoteIds[d],permalink:manualLinks[d],confirmExact:manualChecks[d]})}>Record exact-post manual confirmation</button>
-        {!batch.jobs[d].finalIntent&&<button type="button" className="border rounded px-2 py-1" disabled={busy||!enabled} onClick={()=>action({action:"reset-preparation",destination:d})}>Reset unpublished preparation</button>}
+        {!batch.jobs[d].finalIntent&&!batch.jobs[d].retry&&<button type="button" className="border rounded px-2 py-1" disabled={busy||!enabled} onClick={()=>action({action:"reset-preparation",destination:d})}>Reset unpublished preparation</button>}
       </>}</div>)}
+      {batch.facebookAttempts?.map((attempt,i)=><p key={attempt.successorId} className="text-xs">Facebook attempt {i+1}: {attempt.job.finalIntent?.id}; reconciled, not found by {attempt.resolution.by} at {attempt.resolution.at}. Bounded operator observation, not proof of absence.{attempt.job.remoteId&&` Late remote ID: ${attempt.job.remoteId}; recovery blocked.`}</p>)}
+      {batch.jobs.facebook.retryRead&&<p className="text-xs">Last recovery read: {batch.jobs.facebook.retryRead.pages} pages, {batch.jobs.facebook.retryRead.items} posts, {batch.jobs.facebook.retryRead.since} to {batch.jobs.facebook.retryRead.until}. No candidate observed; this does not prove absence.</p>}
+      {canRecover&&batch.approval&&batch.manifest.format==="still"&&batch.manifest.placements.facebook==="feed"&&!batch.jobs.facebook.remoteId&&!batch.jobs.facebook.manualEvidence&&(batch.jobs.facebook.status==="needs_reconciliation"||!!batch.jobs.facebook.retry&&!batch.jobs.facebook.finalIntent)&&<div className="space-y-2">
+        <button type="button" className="border rounded px-2 py-1" disabled={busy||!enabled||!!batch.claim} onClick={()=>{setRecoveryOpen(true);setRecoveryEvidence("");setDuplicateRisk(false)}}>Review Facebook-only retry</button>
+        {recoveryOpen&&<div className="border rounded p-2 space-y-2">
+          <p>Owner recovery of attempt {batch.jobs.facebook.finalIntent?.id||batch.jobs.facebook.retry?.id}. Inspect the Page for the exact approved post and confirm the old run stopped. Record what you checked and when. A missing result cannot prove the post was never published.</p>
+          <label className="block">Observed reconciliation evidence<textarea className="border rounded w-full p-2" maxLength={2000} disabled={busy} value={recoveryEvidence} onChange={e=>setRecoveryEvidence(e.target.value)}/></label>
+          <label className="flex gap-2"><input type="checkbox" disabled={busy} checked={duplicateRisk} onChange={e=>setDuplicateRisk(e.target.checked)}/>I found no matching post in my checks, confirmed the old run stopped, and accept the risk of a duplicate. Retry only Facebook with this exact approved manifest.</label>
+          <p className="text-xs">This saves the original attempt and creates a linked retry. A fresh paginated Page check runs immediately before publication; a possible match, incomplete read or safety block stops it. Instagram is unchanged.</p>
+          <button type="button" disabled={busy||!enabled||!!batch.claim||!duplicateRisk||recoveryEvidence.trim().length<20} className="border rounded px-2 py-1" onClick={()=>action({action:"recover-facebook",expectedAttemptId:batch.jobs.facebook.finalIntent?.id||batch.jobs.facebook.retry?.id,evidence:recoveryEvidence,acceptDuplicateRisk:duplicateRisk})}>Accept duplicate risk and retry Facebook</button>
+          <button type="button" disabled={busy} className="text-xs underline" onClick={()=>{setRecoveryOpen(false);setRecoveryEvidence("");setDuplicateRisk(false)}}>Cancel</button>
+        </div>}
+      </div>}
       {batch.claim&&<div className="space-y-2"><p className="text-xs">If the run really terminated, record observed termination/cancellation evidence. A long wait is not evidence.</p><textarea className="border rounded w-full p-2" value={stopEvidence} onChange={e=>setStopEvidence(e.target.value)} placeholder="Observed runtime termination/cancellation evidence"/><label className="flex gap-2 text-xs"><input type="checkbox" checked={stopConfirmed} onChange={e=>setStopConfirmed(e.target.checked)}/>I confirmed this exact run has stopped</label><button type="button" disabled={busy||!stopConfirmed||stopEvidence.trim().length<20} className="border rounded px-2 py-1" onClick={()=>action({action:"confirm-stopped-run",expectedClaim:batch.claim,confirmTerminated:stopConfirmed,evidence:stopEvidence})}>Record stopped run for read-only recovery</button></div>}
       {batch.claim&&<button type="button" className="border rounded px-2 py-1" disabled={busy||Object.values(batch.jobs).some(j=>j.finalIntent)} onClick={()=>action({action:"release-preparation",expectedClaim:batch.claim})}>Release interrupted preparation for manual resume</button>}
       <button type="button" className="text-xs underline" onClick={onChanged}>Refresh saved content</button>
