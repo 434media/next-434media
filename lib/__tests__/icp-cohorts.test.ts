@@ -183,3 +183,33 @@ test("rendered cohorts carry targeting fields, not pitch or proof", () => {
   assert.ok(text.includes("USD 10,000,000"))
   assert.ok(!text.includes("pitch text"))
 })
+
+// ── The Firestore reader keeps the match fields (2026-10-09 incident) ──────
+// The tests above pass cohort rows straight in; production reads them through
+// lib/firestore-icp-cohorts.ts. That reader rebuilt each row field by field and
+// dropped `match`, so every company scored as no-cohort. This test runs a row
+// through the reader and then the matcher.
+test("the Firestore reader keeps match, and the matcher sees it", async () => {
+  const { normalize } = await import("../firestore-icp-cohorts")
+  const row = normalize("cohort-b", {
+    key: "cohort-b",
+    letter: "B",
+    name: "Health",
+    objective: "o",
+    target_profile: ["Health systems"],
+    qualification_signals: [],
+    proof: [],
+    first_pitch: "p",
+    signer: "434",
+    match: { industries: ["healthcare_life_sciences"], size: null },
+  })
+  assert.deepEqual(row.match, { industries: ["healthcare_life_sciences"], size: null })
+  const sized = normalize("cohort-d", {
+    letter: "D",
+    name: "Scale",
+    match: { industries: [], size: { bands: [{ name: "enterprise", employees: { gt: 2500 } }] } },
+  })
+  assert.equal(sized.match.size?.bands[0].name, "enterprise")
+  assert.deepEqual(matchCohorts({ industry: "Medical Care" }, [row]).matches.map((m) => m.key), ["cohort-b"])
+  assert.deepEqual(normalize("x", {}).match, { industries: [], size: null })
+})

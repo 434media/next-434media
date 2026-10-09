@@ -19,7 +19,19 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []
 }
 
-function normalize(id: string, raw: FirebaseFirestore.DocumentData): OutboundCohort {
+/** The structured match fields; an absent or malformed block matches nothing. */
+function normalizeMatch(raw: unknown): OutboundCohort["match"] {
+  const m = (raw && typeof raw === "object" ? raw : {}) as { industries?: unknown; size?: unknown }
+  const size = m.size as { bands?: unknown } | null | undefined
+  const bands = size && typeof size === "object" && Array.isArray(size.bands) ? size.bands : null
+  return {
+    industries: strings(m.industries) as OutboundCohort["match"]["industries"],
+    size: bands && bands.length ? ({ bands } as OutboundCohort["match"]["size"]) : null,
+  }
+}
+
+// Exported for the test that keeps every schema field flowing through the reader.
+export function normalize(id: string, raw: FirebaseFirestore.DocumentData): OutboundCohort {
   const letter = LETTERS.includes(raw.letter) ? (raw.letter as OutboundCohort["letter"]) : "A"
   const floor = raw.revenue_floor
   return {
@@ -42,6 +54,9 @@ function normalize(id: string, raw: FirebaseFirestore.DocumentData): OutboundCoh
         ? { amount_minor: floor.amount_minor, currency: floor.currency }
         : null,
     signer: raw.signer === "founder" ? "founder" : "434",
+    // Read by the cohort matcher and the ICP rubric. Dropping it here silently
+    // scored every company as no-cohort in production (2026-10-09).
+    match: normalizeMatch(raw.match),
     source: raw.source || undefined,
     updated_at: typeof raw.updated_at === "string" ? raw.updated_at : undefined,
   }
